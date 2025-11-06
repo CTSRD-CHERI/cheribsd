@@ -664,12 +664,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 
 	*preferred_rbase = reservation - start;
 
-#ifdef __CHERI_PURE_CAPABILITY__
 	reservation_cap = (void *)reservation;
-#else
-	reservation_cap = cheri_setbounds(
-	    cheri_setaddress(userspace_root_cap, reservation), end - start);
-#endif
 	*imgact_cap = cheri_andperm(reservation_cap, perm);
 
 	return (0);
