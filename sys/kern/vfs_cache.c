@@ -3940,7 +3940,7 @@ vn_path_to_global_path(struct thread *td, struct vnode *vp, char *path,
 	 * If vnode was renamed, return ENOENT.
 	 */
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1, UIO_SYSSPACE,
-	    PTR2CAP(path));
+	    path);
 	error = namei(&nd);
 	if (error != 0) {
 		vrele(vp);
@@ -4007,7 +4007,7 @@ vn_path_to_global_path_hardlink(struct thread *td, struct vnode *vp,
 	 * If vnode was renamed, return ENOENT.
 	 */
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1, UIO_SYSSPACE,
-	    PTR2CAP(path));
+	    path);
 	error = namei(&nd);
 	if (error != 0) {
 		vrele(vp);

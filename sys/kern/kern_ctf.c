@@ -100,7 +100,7 @@ link_elf_ctf_get(linker_file_t lf, linker_ctf_t *lc)
 	 */
 	ef->ctfcnt = -1;
 
-	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(lf->pathname));
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, lf->pathname);
 	flags = FREAD;
 	error = vn_open(&nd, &flags, 0, NULL);
 	if (error)
@@ -111,7 +111,7 @@ link_elf_ctf_get(linker_file_t lf, linker_ctf_t *lc)
 	hdr = malloc(sizeof(*hdr), M_LINKER, M_WAITOK);
 
 	/* Read the ELF header. */
-	if ((error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(hdr), sizeof(*hdr),
+	if ((error = vn_rdwr(UIO_READ, nd.ni_vp, hdr, sizeof(*hdr),
 	    0, UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED, NULL,
 	    td)) != 0)
 		goto out;
@@ -133,7 +133,7 @@ link_elf_ctf_get(linker_file_t lf, linker_ctf_t *lc)
 	shdr = malloc(nbytes, M_LINKER, M_WAITOK);
 
 	/* Read all the section headers */
-	if ((error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(shdr), nbytes,
+	if ((error = vn_rdwr(UIO_READ, nd.ni_vp, shdr, nbytes,
 	    hdr->e_shoff, UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 	    NULL, td)) != 0)
 		goto out;
@@ -158,7 +158,7 @@ link_elf_ctf_get(linker_file_t lf, linker_ctf_t *lc)
 	shstrtab = malloc(shdr[hdr->e_shstrndx].sh_size, M_LINKER, M_WAITOK);
 
 	/* Read the section header strings. */
-	if ((error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(shstrtab),
+	if ((error = vn_rdwr(UIO_READ, nd.ni_vp, shstrtab,
 	    shdr[hdr->e_shstrndx].sh_size, shdr[hdr->e_shstrndx].sh_offset,
 	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED, NULL, td)) != 0)
 		goto out;
@@ -179,7 +179,7 @@ link_elf_ctf_get(linker_file_t lf, linker_ctf_t *lc)
 	}
 
 	/* Read the CTF header. */
-	if ((error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(&cth), sizeof(cth),
+	if ((error = vn_rdwr(UIO_READ, nd.ni_vp, &cth, sizeof(cth),
 	    shdr[i].sh_offset, UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred,
 	    NOCRED, NULL, td)) != 0)
 		goto out;
@@ -240,7 +240,7 @@ link_elf_ctf_get(linker_file_t lf, linker_ctf_t *lc)
 	 * directly into the CTF buffer otherwise.
 	 */
 	if ((error = vn_rdwr(UIO_READ, nd.ni_vp,
-	    PTR2CAP(raw == NULL ? ctftab : raw),
+	    raw == NULL ? ctftab : raw,
 	    shdr[i].sh_size, shdr[i].sh_offset, UIO_SYSSPACE, IO_NODELOCKED,
 	    td->td_ucred, NOCRED, NULL, td)) != 0)
 		goto out;

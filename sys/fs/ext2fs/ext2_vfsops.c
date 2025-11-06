@@ -237,7 +237,7 @@ ext2_mount(struct mount *mp)
 	 */
 	if (fspec == NULL)
 		return (EINVAL);
-	NDINIT(ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, PTR2CAP(fspec));
+	NDINIT(ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, fspec);
 	if ((error = namei(ndp)) != 0)
 		return (error);
 	NDFREE_PNBUF(ndp);

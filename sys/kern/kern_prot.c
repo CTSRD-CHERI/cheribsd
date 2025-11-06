@@ -580,7 +580,7 @@ kern_setcred_copyin_supp_groups(struct setcred *const wcred,
 		    wcred->sc_supp_groups_nb * sizeof(*groups));
 		if (error != 0)
 			return (error);
-		wcred->sc_supp_groups = PTR2CAP(*groups);
+		wcred->sc_supp_groups = *groups;
 	} else {
 		wcred->sc_supp_groups_nb = 0;
 		wcred->sc_supp_groups = NULL;
@@ -709,8 +709,7 @@ kern_setcred(struct thread *const td, const u_int flags,
 			return (EINVAL);
 		if (preallocated_groups != NULL) {
 			groups = preallocated_groups;
-			MPASS(PTR2CAP(preallocated_groups) ==
-			    wcred->sc_supp_groups);
+			MPASS(preallocated_groups == wcred->sc_supp_groups);
 		} else {
 			if (wcred->sc_supp_groups_nb <= CRED_SMALLGROUPS_NB)
 				groups = smallgroups;
