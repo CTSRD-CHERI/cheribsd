@@ -383,9 +383,9 @@ ktls_copyin_tls_enable(struct sockopt *sopt, struct tls_enable *tls)
 			    auth_key, tls->auth_key_len);
 		}
 	}
-	tls->cipher_key = PTR2CAP(cipher_key);
-	tls->iv = PTR2CAP(iv);
-	tls->auth_key = PTR2CAP(auth_key);
+	tls->cipher_key = cipher_key;
+	tls->iv = iv;
+	tls->auth_key = auth_key;
 
 done:
 	if (error != 0) {

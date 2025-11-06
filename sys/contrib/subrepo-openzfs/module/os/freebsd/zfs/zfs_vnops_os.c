@@ -532,7 +532,7 @@ zfs_write_simple(znode_t *zp, const void *data, size_t len,
 	int error = 0;
 	ssize_t resid;
 
-	error = vn_rdwr(UIO_WRITE, ZTOV(zp), PTR2CAP(__DECONST(void *, data)),
+	error = vn_rdwr(UIO_WRITE, ZTOV(zp), __DECONST(void *, data),
 	    len, pos, UIO_SYSSPACE, IO_SYNC, kcred, NOCRED, &resid, curthread);
 
 	if (error) {
@@ -5294,7 +5294,7 @@ zfs_getextattr_dir(struct vop_getextattr_args *ap, const char *attrname)
 	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, attrname,
 	    xvp, td);
 #else
-	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, PTR2CAP(attrname),
+	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, attrname,
 	    xvp);
 #endif
 	error = vn_open_cred(&nd, &flags, 0, VN_OPEN_INVFS, ap->a_cred, NULL);
@@ -5440,7 +5440,7 @@ zfs_deleteextattr_dir(struct vop_deleteextattr_args *ap, const char *attrname)
 	    UIO_SYSSPACE, attrname, xvp, ap->a_td);
 #else
 	NDINIT_ATVP(&nd, DELETE, NOFOLLOW | LOCKPARENT | LOCKLEAF,
-	    UIO_SYSSPACE, PTR2CAP(attrname), xvp);
+	    UIO_SYSSPACE, attrname, xvp);
 #endif
 	error = namei(&nd);
 	if (error != 0)
@@ -5582,7 +5582,7 @@ zfs_setextattr_dir(struct vop_setextattr_args *ap, const char *attrname)
 #if __FreeBSD_version < 1400043
 	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, attrname, xvp, td);
 #else
-	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, PTR2CAP(attrname), xvp);
+	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, attrname, xvp);
 #endif
 	error = vn_open_cred(&nd, &flags, 0600, VN_OPEN_INVFS, ap->a_cred,
 	    NULL);

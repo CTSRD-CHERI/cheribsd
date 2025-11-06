@@ -503,7 +503,7 @@ interpret:
 		 */
 		NDINIT(&nd, LOOKUP, ISOPEN | LOCKLEAF | LOCKSHARED | FOLLOW |
 		    AUDITVNODE1 | WANTPARENT, UIO_SYSSPACE,
-		    PTR2CAP(args->fname));
+		    args->fname);
 
 		error = namei(&nd);
 		if (error)
@@ -2368,7 +2368,7 @@ core_output_memtag_cheri(char *base, size_t mem_len,
 				    CORE_BUF_SIZE);
 			else {
 				if (hastags)
-					error = core_write(cp, PTR2CAP(tagbuf),
+					error = core_write(cp, tagbuf,
 					    CORE_BUF_SIZE, offset,
 					    UIO_SYSSPACE, NULL);
 				else
@@ -2388,7 +2388,7 @@ core_output_memtag_cheri(char *base, size_t mem_len,
 			error = compressor_write(cp->comp, tagbuf, tagbuflen);
 		else {
 			if (hastags)
-				error = core_write(cp, PTR2CAP(tagbuf),
+				error = core_write(cp, tagbuf,
 				    tagbuflen, offset, UIO_SYSSPACE, NULL);
 			else
 				error = core_extend_file(cp, offset +
@@ -2428,8 +2428,8 @@ sbuf_drain_core_output(void *arg, const char *data, int len)
 		error = compressor_write(cp->comp, __DECONST(char *, data),
 		    len);
 	else
-		error = core_write(cp, PTR2CAP(__DECONST(void *, data)), len, cp->offset,
-		    UIO_SYSSPACE, NULL);
+		error = core_write(cp, __DECONST(void *, data), len,
+		    cp->offset, UIO_SYSSPACE, NULL);
 	if (locked)
 		PROC_LOCK(p);
 	if (error != 0)

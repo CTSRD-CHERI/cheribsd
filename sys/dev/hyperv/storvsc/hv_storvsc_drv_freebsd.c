@@ -1121,7 +1121,7 @@ storvsc_attach(device_t dev)
 				    M_DEVBUF, M_WAITOK|M_ZERO);
 
 				sgl_node->sgl_data->sg_iov[j].iov_base =
-				    PTR2CAP(tmp_buff);
+				    tmp_buff;
 			}
 
 			LIST_INSERT_HEAD(&g_hv_sgl_page_pool.free_sgl_list,

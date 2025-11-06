@@ -1163,7 +1163,7 @@ ext2_dirempty(struct inode *ip, ino_t parentino, struct ucred *cred)
 #define	MINDIRSIZ (sizeof(struct dirtemplate) / 2)
 
 	for (off = 0; off < ip->i_size; off += le16toh(dp->e2d_reclen)) {
-		error = vn_rdwr(UIO_READ, ITOV(ip), PTR2CAP(dp), MINDIRSIZ,
+		error = vn_rdwr(UIO_READ, ITOV(ip), dp, MINDIRSIZ,
 		    off, UIO_SYSSPACE, IO_NODELOCKED | IO_NOMACCHECK, cred,
 		    NOCRED, &count, (struct thread *)0);
 		/*
@@ -1225,7 +1225,7 @@ ext2_checkpath(struct inode *source, struct inode *target, struct ucred *cred)
 			error = ENOTDIR;
 			break;
 		}
-		error = vn_rdwr(UIO_READ, vp, PTR2CAP(&dirbuf),
+		error = vn_rdwr(UIO_READ, vp, &dirbuf,
 		    sizeof(struct dirtemplate), (off_t)0, UIO_SYSSPACE,
 		    IO_NODELOCKED | IO_NOMACCHECK, cred, NOCRED, NULL,
 		    NULL);

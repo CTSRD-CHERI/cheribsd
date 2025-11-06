@@ -449,7 +449,7 @@ sysctl_try_reclaim_vnode(SYSCTL_HANDLER_ARGS)
 	buf[req->newlen] = '\0';
 
 	ndflags = LOCKLEAF | NOFOLLOW | AUDITVNODE1;
-	NDINIT(&nd, LOOKUP, ndflags, UIO_SYSSPACE, PTR2CAP(buf));
+	NDINIT(&nd, LOOKUP, ndflags, UIO_SYSSPACE, buf);
 	if ((error = namei(&nd)) != 0)
 		goto out;
 	vp = nd.ni_vp;

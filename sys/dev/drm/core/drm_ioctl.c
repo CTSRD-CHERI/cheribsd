@@ -949,7 +949,7 @@ long drm_ioctl(struct file *filp,
 		goto err_i1;
 	}
 #else
-	memcpy_c(PTR2CAP(kdata), (void *)arg, in_size);
+	memcpy_c(kdata, (void *)arg, in_size);
 #endif
 
 	if (ksize > in_size)
@@ -961,7 +961,7 @@ long drm_ioctl(struct file *filp,
 	if (copy_to_user((void __user *)arg, kdata, out_size) != 0)
 		retcode = -EFAULT;
 #else
-	memcpy_c((void *)arg, PTR2CAP(kdata), out_size);
+	memcpy_c((void *)arg, kdata, out_size);
 #endif
 
       err_i1:

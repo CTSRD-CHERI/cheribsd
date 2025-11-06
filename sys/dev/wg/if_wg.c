@@ -717,7 +717,7 @@ static int wg_socket_set_sockopt(struct socket *so4, struct socket *so6, int nam
 		.sopt_dir = SOPT_SET,
 		.sopt_level = SOL_SOCKET,
 		.sopt_name = name,
-		.sopt_val = PTR2CAP(val),
+		.sopt_val = val,
 		.sopt_valsize = len
 	};
 

@@ -4095,7 +4095,7 @@ freebsd11_kern_getdirentries(struct thread *td, int fd,
 
 	dirbuf = malloc(count, M_TEMP, M_WAITOK);
 
-	error = kern_getdirentries(td, fd, PTR2CAP(dirbuf), count, &base, &resid,
+	error = kern_getdirentries(td, fd, dirbuf, count, &base, &resid,
 	    UIO_SYSSPACE);
 	if (error != 0)
 		goto done;

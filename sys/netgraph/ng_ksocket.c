@@ -828,7 +828,7 @@ ng_ksocket_rcvmsg(node_p node, item_p item, hook_p lasthook)
 			sopt.sopt_td = NULL;
 			sopt.sopt_valsize = NG_KSOCKET_MAX_OPTLEN;
 			ksopt = (struct ng_ksocket_sockopt *)resp->data;
-			sopt.sopt_val = PTR2CAP(&ksopt->value[0]);
+			sopt.sopt_val = &ksopt->value[0];
 			if ((error = sogetopt(so, &sopt)) != 0) {
 				NG_FREE_MSG(resp);
 				break;
@@ -857,7 +857,7 @@ ng_ksocket_rcvmsg(node_p node, item_p item, hook_p lasthook)
 			sopt.sopt_dir = SOPT_SET;
 			sopt.sopt_level = ksopt->level;
 			sopt.sopt_name = ksopt->name;
-			sopt.sopt_val = PTR2CAP(&ksopt->value[0]);
+			sopt.sopt_val = &ksopt->value[0];
 			sopt.sopt_valsize = valsize;
 			sopt.sopt_td = NULL;
 			error = sosetopt(so, &sopt);

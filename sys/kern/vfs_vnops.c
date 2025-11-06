@@ -3337,7 +3337,7 @@ vn_write_outvp(struct vnode *outvp, char *dat, off_t outoff, off_t xfer,
 		} else {
 			error = vn_lock(outvp, vn_lktype_write(mp, outvp));
 			if (error == 0) {
-				error = vn_rdwr(UIO_WRITE, outvp, PTR2CAP(dat), xfer2,
+				error = vn_rdwr(UIO_WRITE, outvp, dat, xfer2,
 				    outoff, UIO_SYSSPACE, IO_NODELOCKED,
 				    curthread->td_ucred, cred, NULL, curthread);
 				outoff += xfer2;
@@ -3624,7 +3624,7 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 			error = vn_lock(invp, LK_SHARED);
 			if (error != 0)
 				goto out;
-			error = vn_rdwr(UIO_READ, invp, PTR2CAP(dat), xfer,
+			error = vn_rdwr(UIO_READ, invp, dat, xfer,
 			    startoff, UIO_SYSSPACE, IO_NODELOCKED,
 			    curthread->td_ucred, incred, &aresid,
 			    curthread);

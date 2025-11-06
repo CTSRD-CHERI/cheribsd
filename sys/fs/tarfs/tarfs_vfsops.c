@@ -983,7 +983,7 @@ tarfs_mount(struct mount *mp)
 	    flags |= O_VERIFY;
 	}
 	NDINIT(&nd, LOOKUP, ISOPEN | FOLLOW | LOCKLEAF, UIO_SYSSPACE,
-	    PTR2CAP(from));
+	    from);
 	error = namei(&nd);
 	if (error != 0)
 		return (error);

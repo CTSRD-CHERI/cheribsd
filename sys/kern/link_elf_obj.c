@@ -769,7 +769,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 	hdr = NULL;
 
 	nd = malloc(sizeof(struct nameidata), M_TEMP, M_WAITOK);
-	NDINIT(nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(filename));
+	NDINIT(nd, LOOKUP, FOLLOW, UIO_SYSSPACE, filename);
 	flags = FREAD;
 	error = vn_open(nd, &flags, 0, NULL);
 	if (error) {
@@ -790,7 +790,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 
 	/* Read the elf header from the file. */
 	hdr = malloc(sizeof(*hdr), M_LINKER, M_WAITOK);
-	error = vn_rdwr(UIO_READ, nd->ni_vp, PTR2CAP(hdr), sizeof(*hdr), 0,
+	error = vn_rdwr(UIO_READ, nd->ni_vp, hdr, sizeof(*hdr), 0,
 	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 	    &resid, td);
 	if (error)
@@ -862,7 +862,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 	}
 	shdr = malloc(nbytes, M_LINKER, M_WAITOK);
 	ef->e_shdr = shdr;
-	error = vn_rdwr(UIO_READ, nd->ni_vp, PTR2CAP(shdr), nbytes,
+	error = vn_rdwr(UIO_READ, nd->ni_vp, shdr, nbytes,
 	    hdr->e_shoff, UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred,
 	    NOCRED, &resid, td);
 	if (error)
@@ -952,7 +952,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 	/* Allocate space for and load the symbol table */
 	ef->ddbsymcnt = shdr[symtabindex].sh_size / sizeof(Elf_Sym);
 	ef->ddbsymtab = malloc(shdr[symtabindex].sh_size, M_LINKER, M_WAITOK);
-	error = vn_rdwr(UIO_READ, nd->ni_vp, PTR2CAP(ef->ddbsymtab),
+	error = vn_rdwr(UIO_READ, nd->ni_vp, ef->ddbsymtab,
 	    shdr[symtabindex].sh_size, shdr[symtabindex].sh_offset,
 	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 	    &resid, td);
@@ -966,7 +966,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 	/* Allocate space for and load the symbol strings */
 	ef->ddbstrcnt = shdr[symstrindex].sh_size;
 	ef->ddbstrtab = malloc(shdr[symstrindex].sh_size, M_LINKER, M_WAITOK);
-	error = vn_rdwr(UIO_READ, nd->ni_vp, PTR2CAP(ef->ddbstrtab),
+	error = vn_rdwr(UIO_READ, nd->ni_vp, ef->ddbstrtab,
 	    shdr[symstrindex].sh_size, shdr[symstrindex].sh_offset,
 	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 	    &resid, td);
@@ -985,7 +985,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 		ef->shstrcnt = shdr[shstrindex].sh_size;
 		ef->shstrtab = malloc(shdr[shstrindex].sh_size, M_LINKER,
 		    M_WAITOK);
-		error = vn_rdwr(UIO_READ, nd->ni_vp, PTR2CAP(ef->shstrtab),
+		error = vn_rdwr(UIO_READ, nd->ni_vp, ef->shstrtab,
 		    shdr[shstrindex].sh_size, shdr[shstrindex].sh_offset,
 		    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 		    &resid, td);
@@ -1174,7 +1174,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 #endif
 			    ) {
 				error = vn_rdwr(UIO_READ, nd->ni_vp,
-				    PTR2CAP(ef->progtab[pb].addr),
+				    ef->progtab[pb].addr,
 				    shdr[i].sh_size, shdr[i].sh_offset,
 				    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred,
 				    NOCRED, &resid, td);
@@ -1216,7 +1216,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 			ef->reltab[rl].nrel = shdr[i].sh_size / sizeof(Elf_Rel);
 			ef->reltab[rl].sec = shdr[i].sh_info;
 			error = vn_rdwr(UIO_READ, nd->ni_vp,
-			    PTR2CAP((void *)ef->reltab[rl].rel),
+			    (void *)ef->reltab[rl].rel,
 			    shdr[i].sh_size, shdr[i].sh_offset,
 			    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 			    &resid, td);
@@ -1237,7 +1237,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 			    shdr[i].sh_size / sizeof(Elf_Rela);
 			ef->relatab[ra].sec = shdr[i].sh_info;
 			error = vn_rdwr(UIO_READ, nd->ni_vp,
-			    PTR2CAP((void *)ef->relatab[ra].rela),
+			    (void *)ef->relatab[ra].rela,
 			    shdr[i].sh_size, shdr[i].sh_offset,
 			    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 			    &resid, td);
