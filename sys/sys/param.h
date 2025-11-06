@@ -412,21 +412,6 @@ __END_DECLS
     (((__typeof__(*(array)) *)__builtin_no_change_bounds(array))[offset])
 
 #ifdef _KERNEL
-#if __has_feature(capabilities)
-/*
- * Convenience wrapper to convert an in-kernel pointer to a DDC-derived
- * capability.  NB: For purecap kernels this is a no-op.
- */
-#define	PTR2CAP(p)	({					\
-	KASSERT((ptraddr_t)((p)) == 0 ||			\
-	    (ptraddr_t)((p)) >= VM_MAXUSER_ADDRESS,		\
-	    ("PTR2CAP on user address: %p", (p)));		\
-	(__typeof__((*(p))) *)(p);	\
-	})
-#else
-#define	PTR2CAP(p)	(p)
-#endif
-
 #define	TAG_BYTES_PER_PAGE	(PAGE_SIZE / (sizeof(__uintptr_t) * NBBY))
 #endif
 

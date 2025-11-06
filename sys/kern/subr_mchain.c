@@ -137,8 +137,7 @@ mb_put_padbyte(struct mbchain *mbp)
 
 	/* Only add padding if address is odd */
 	if ((unsigned long)dst & 1)
-		return (mb_put_mem(mbp, PTR2CAP((char *)&x), sizeof(x),
-		    MB_MSYSTEM));
+		return (mb_put_mem(mbp, (char *)&x, sizeof(x), MB_MSYSTEM));
 	else
 		return (0);
 }
@@ -146,49 +145,49 @@ mb_put_padbyte(struct mbchain *mbp)
 int
 mb_put_uint8(struct mbchain *mbp, uint8_t x)
 {
-	return (mb_put_mem(mbp, PTR2CAP((char *)&x), sizeof(x), MB_MSYSTEM));
+	return (mb_put_mem(mbp, (char *)&x, sizeof(x), MB_MSYSTEM));
 }
 
 int
 mb_put_uint16be(struct mbchain *mbp, uint16_t x)
 {
 	x = htobe16(x);
-	return (mb_put_mem(mbp, PTR2CAP((char *)&x), sizeof(x), MB_MSYSTEM));
+	return (mb_put_mem(mbp, (char *)&x, sizeof(x), MB_MSYSTEM));
 }
 
 int
 mb_put_uint16le(struct mbchain *mbp, uint16_t x)
 {
 	x = htole16(x);
-	return (mb_put_mem(mbp, PTR2CAP((char *)&x), sizeof(x), MB_MSYSTEM));
+	return (mb_put_mem(mbp, (char *)&x, sizeof(x), MB_MSYSTEM));
 }
 
 int
 mb_put_uint32be(struct mbchain *mbp, uint32_t x)
 {
 	x = htobe32(x);
-	return (mb_put_mem(mbp, PTR2CAP((char *)&x), sizeof(x), MB_MSYSTEM));
+	return (mb_put_mem(mbp, (char *)&x, sizeof(x), MB_MSYSTEM));
 }
 
 int
 mb_put_uint32le(struct mbchain *mbp, uint32_t x)
 {
 	x = htole32(x);
-	return (mb_put_mem(mbp, PTR2CAP((char *)&x), sizeof(x), MB_MSYSTEM));
+	return (mb_put_mem(mbp, (char *)&x, sizeof(x), MB_MSYSTEM));
 }
 
 int
 mb_put_int64be(struct mbchain *mbp, int64_t x)
 {
 	x = htobe64(x);
-	return (mb_put_mem(mbp, PTR2CAP((char *)&x), sizeof(x), MB_MSYSTEM));
+	return (mb_put_mem(mbp, (char *)&x, sizeof(x), MB_MSYSTEM));
 }
 
 int
 mb_put_int64le(struct mbchain *mbp, int64_t x)
 {
 	x = htole64(x);
-	return (mb_put_mem(mbp, PTR2CAP((char *)&x), sizeof(x), MB_MSYSTEM));
+	return (mb_put_mem(mbp, (char *)&x, sizeof(x), MB_MSYSTEM));
 }
 
 int
@@ -374,13 +373,13 @@ md_next_record(struct mdchain *mdp)
 int
 md_get_uint8(struct mdchain *mdp, uint8_t *x)
 {
-	return (md_get_mem(mdp, PTR2CAP((char *)x), 1, MB_MINLINE));
+	return (md_get_mem(mdp, (char *)x, 1, MB_MINLINE));
 }
 
 int
 md_get_uint16(struct mdchain *mdp, uint16_t *x)
 {
-	return (md_get_mem(mdp, PTR2CAP((char *)x), 2, MB_MINLINE));
+	return (md_get_mem(mdp, (char *)x, 2, MB_MINLINE));
 }
 
 int
@@ -408,7 +407,7 @@ md_get_uint16be(struct mdchain *mdp, uint16_t *x)
 int
 md_get_uint32(struct mdchain *mdp, uint32_t *x)
 {
-	return (md_get_mem(mdp, PTR2CAP((char *)x), 4, MB_MINLINE));
+	return (md_get_mem(mdp, (char *)x, 4, MB_MINLINE));
 }
 
 int
@@ -438,7 +437,7 @@ md_get_uint32le(struct mdchain *mdp, uint32_t *x)
 int
 md_get_int64(struct mdchain *mdp, int64_t *x)
 {
-	return (md_get_mem(mdp, PTR2CAP((char *)x), 8, MB_MINLINE));
+	return (md_get_mem(mdp, (char *)x, 8, MB_MINLINE));
 }
 
 int

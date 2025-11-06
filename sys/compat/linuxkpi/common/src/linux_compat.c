@@ -807,7 +807,7 @@ linux_remap_address(void **uaddr, size_t len)
 		}
 
 		/* re-add kernel buffer address */
-		*uaddr = PTR2CAP((char *)pts->bsd_ioctl_data) + uaddr_val;
+		*uaddr = (char *)pts->bsd_ioctl_data + uaddr_val;
 		return (1);
 	}
 	return (0);

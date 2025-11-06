@@ -214,7 +214,7 @@ udf_mount(struct mount *mp)
 	/* Check that the mount device exists */
 	if (fspec == NULL)
 		return (EINVAL);
-	NDINIT(ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, PTR2CAP(fspec));
+	NDINIT(ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, fspec);
 	if ((error = namei(ndp)))
 		return (error);
 	NDFREE_PNBUF(ndp);

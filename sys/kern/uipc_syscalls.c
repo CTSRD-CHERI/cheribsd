@@ -679,7 +679,7 @@ user_sendit(struct thread *td, int s, struct msghdr *mp, int flags)
 			to = NULL;
 			goto bad;
 		}
-		mp->msg_name = PTR2CAP(to);
+		mp->msg_name = to;
 #ifdef CAPABILITY_MODE
 		if (CAP_TRACING(td))
 			ktrcapfail(CAPFAIL_SOCKADDR, to);
@@ -901,7 +901,7 @@ sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 	error = copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		return (error);
-	msg.msg_iov = PTR2CAP(iov);
+	msg.msg_iov = iov;
 #ifdef COMPAT_OLDSOCK
 	if (SV_PROC_FLAG(td->td_proc, SV_AOUT))
 		msg.msg_flags = 0;
@@ -1204,7 +1204,7 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 		msg.msg_flags &= ~MSG_COMPAT;
 #endif
 	uiov = msg.msg_iov;
-	msg.msg_iov = PTR2CAP(iov);
+	msg.msg_iov = iov;
 	error = recvit(td, uap->s, &msg, NULL);
 	if (error == 0) {
 		msg.msg_iov = uiov;

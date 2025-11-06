@@ -543,7 +543,7 @@ __elfN(map_phdr)(struct image_params *imgp, const Elf_Ehdr *hdr, bool complain)
 	}
 
 	td = curthread;
-	error = vn_rdwr(UIO_READ, imgp->vp, PTR2CAP(buf), len, hdr->e_phoff,
+	error = vn_rdwr(UIO_READ, imgp->vp, buf, len, hdr->e_phoff,
 	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED, NULL, td);
 	if (error != 0) {
 		free(buf, M_TEMP);
@@ -1003,7 +1003,7 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	imgp->attr = attr;
 
 	NDINIT(nd, LOOKUP, ISOPEN | FOLLOW | LOCKSHARED | LOCKLEAF,
-	    UIO_SYSSPACE, PTR2CAP(file));
+	    UIO_SYSSPACE, file);
 	if ((error = namei(nd)) != 0) {
 		nd->ni_vp = NULL;
 		goto fail;
@@ -1252,7 +1252,7 @@ __elfN(get_interp)(struct image_params *imgp, const Elf_Phdr *phdr,
 			vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 		}
 
-		error = vn_rdwr(UIO_READ, imgp->vp, PTR2CAP(interp),
+		error = vn_rdwr(UIO_READ, imgp->vp, interp,
 		    interp_name_len, phdr->p_offset,
 		    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred,
 		    NOCRED, NULL, td);
@@ -2056,7 +2056,7 @@ static int
 core_compressed_write(void *base, size_t len, off_t offset, void *arg)
 {
 
-	return (core_write((struct coredump_params *)arg, PTR2CAP(base), len, offset,
+	return (core_write((struct coredump_params *)arg, base, len, offset,
 	    UIO_SYSSPACE, NULL));
 }
 
@@ -3329,7 +3329,7 @@ __elfN(parse_notes)(const struct image_params *imgp, const Elf_Note *checknote,
 			buf = malloc(pnote->p_filesz, M_TEMP, M_WAITOK);
 			vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 		}
-		error = vn_rdwr(UIO_READ, imgp->vp, PTR2CAP(buf), pnote->p_filesz,
+		error = vn_rdwr(UIO_READ, imgp->vp, buf, pnote->p_filesz,
 		    pnote->p_offset, UIO_SYSSPACE, IO_NODELOCKED,
 		    curthread->td_ucred, NOCRED, NULL, curthread);
 		if (error != 0) {

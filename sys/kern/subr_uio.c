@@ -298,17 +298,17 @@ uiomove_flags(void *cp, int n, struct uio *uio, bool nofault)
 			switch (uio->uio_rw) {
 #if __has_feature(capabilities)
 			case UIO_READ_CAP:
-				bcopy_c(PTR2CAP(cp), iov->iov_base, cnt);
+				bcopy_c(cp, iov->iov_base, cnt);
 				break;
 			case UIO_WRITE_CAP:
-				bcopy_c(iov->iov_base, PTR2CAP(cp), cnt);
+				bcopy_c(iov->iov_base, cp, cnt);
 				break;
 #endif
 			case UIO_READ:
-				bcopynocap_c(PTR2CAP(cp), iov->iov_base, cnt);
+				bcopynocap_c(cp, iov->iov_base, cnt);
 				break;
 			case UIO_WRITE:
-				bcopynocap_c(iov->iov_base, PTR2CAP(cp), cnt);
+				bcopynocap_c(iov->iov_base, cp, cnt);
 				break;
 			}
 			break;

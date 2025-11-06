@@ -2045,7 +2045,7 @@ linker_hints_lookup(const char *path, int pathlen, const char *modname,
 	snprintf(pathbuf, reclen, "%.*s%s%s", pathlen, path, sep,
 	    linker_hintfile);
 
-	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, PTR2CAP(pathbuf));
+	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, pathbuf);
 	flags = FREAD;
 	error = vn_open(&nd, &flags, 0, NULL);
 	if (error)
@@ -2069,7 +2069,7 @@ linker_hints_lookup(const char *path, int pathlen, const char *modname,
 		goto bad;
 	}
 	hints = malloc(vattr.va_size, M_TEMP, M_WAITOK);
-	error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(hints), vattr.va_size, 0,
+	error = vn_rdwr(UIO_READ, nd.ni_vp, hints, vattr.va_size, 0,
 	    UIO_SYSSPACE, IO_NODELOCKED, cred, NOCRED, &reclen, td);
 	if (error)
 		goto bad;

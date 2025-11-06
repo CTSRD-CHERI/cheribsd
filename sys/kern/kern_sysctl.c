@@ -345,7 +345,7 @@ sysctl_load_tunable_by_oid_locked(struct sysctl_oid *oidp)
 		if (penv == NULL)
 			return;
 		req.newlen = strlen(penv);
-		req.newptr = PTR2CAP(penv);
+		req.newptr = penv;
 		break;
 	default:
 		return;
@@ -2118,11 +2118,11 @@ sysctl_old_kernel(struct sysctl_req *req, const void *p, size_t l)
 #if __has_feature(capabilities)
 			if (req->flags & SCTL_PTROUT)
 				memcpy_c((char *)req->oldptr +
-				    req->oldidx, PTR2CAP(p), i);
+				    req->oldidx, p, i);
 			else
 #endif
 				memcpynocap_c((char *)req->oldptr +
-				    req->oldidx, PTR2CAP(p), i);
+				    req->oldidx, p, i);
 		}
 	}
 	req->oldidx += l;
@@ -2140,12 +2140,10 @@ sysctl_new_kernel(struct sysctl_req *req, void *p, size_t l)
 		return (EINVAL);
 #if __has_feature(capabilities)
 	if (req->flags & SCTL_PTRIN)
-		memcpy_c(PTR2CAP(p),
-		    (const char *)req->newptr + req->newidx, l);
+		memcpy_c(p, (const char *)req->newptr + req->newidx, l);
 	else
 #endif
-		memcpynocap_c(PTR2CAP(p),
-		    (const char *)req->newptr + req->newidx, l);
+		memcpynocap_c(p, (const char *)req->newptr + req->newidx, l);
 	req->newidx += l;
 	return (0);
 }
@@ -2168,12 +2166,12 @@ kernel_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 	req.validlen = req.oldlen;
 
 	if (old) {
-		req.oldptr= PTR2CAP(old);
+		req.oldptr= old;
 	}
 
 	if (new != NULL) {
 		req.newlen = newlen;
-		req.newptr = PTR2CAP(new);
+		req.newptr = new;
 	}
 
 	req.oldfunc = sysctl_old_kernel;

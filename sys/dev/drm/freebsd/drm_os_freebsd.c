@@ -267,7 +267,7 @@ drm_fstub_ioctl(struct file *file, u_long cmd, void *data, struct ucred *cred,
 		goto out_release;
 	}
 
-	rv = -fops->unlocked_ioctl(file, cmd, (uintptr_t)PTR2CAP(data));
+	rv = -fops->unlocked_ioctl(file, cmd, (uintptr_t)data);
 	if (rv == ERESTARTSYS)
 		rv = ERESTART;
 

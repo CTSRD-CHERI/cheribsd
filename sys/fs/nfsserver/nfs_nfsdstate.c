@@ -4874,7 +4874,7 @@ nfsrv_setupstable(NFSPROC_T *p)
 	if (sf->nsf_fp == NULL)
 		return;
 	error = NFSD_RDWR(UIO_READ, NFSFPVNODE(sf->nsf_fp),
-	    PTR2CAP(&sf->nsf_rec), sizeof (struct nfsf_rec), off, UIO_SYSSPACE,
+	    &sf->nsf_rec, sizeof (struct nfsf_rec), off, UIO_SYSSPACE,
 	    0, NFSFPCRED(sf->nsf_fp), &aresid, p);
 	if (error || aresid || sf->nsf_numboots == 0 ||
 		sf->nsf_numboots > NFSNSF_MAXNUMBOOTS)
@@ -4887,7 +4887,7 @@ nfsrv_setupstable(NFSPROC_T *p)
 		sizeof(time_t), M_TEMP, M_WAITOK);
 	off = sizeof (struct nfsf_rec);
 	error = NFSD_RDWR(UIO_READ, NFSFPVNODE(sf->nsf_fp),
-	    PTR2CAP(sf->nsf_bootvals), sf->nsf_numboots * sizeof (time_t), off,
+	    sf->nsf_bootvals, sf->nsf_numboots * sizeof (time_t), off,
 	    UIO_SYSSPACE, 0, NFSFPCRED(sf->nsf_fp), &aresid, p);
 	if (error || aresid) {
 		free(sf->nsf_bootvals, M_TEMP);
@@ -4924,7 +4924,7 @@ nfsrv_setupstable(NFSPROC_T *p)
 		NFSV4_OPAQUELIMIT - 1, M_TEMP, M_WAITOK);
 	do {
 	    error = NFSD_RDWR(UIO_READ, NFSFPVNODE(sf->nsf_fp),
-	        PTR2CAP(tsp), sizeof (struct nfst_rec) + NFSV4_OPAQUELIMIT - 1,
+	        tsp, sizeof (struct nfst_rec) + NFSV4_OPAQUELIMIT - 1,
 	        off, UIO_SYSSPACE, 0, NFSFPCRED(sf->nsf_fp), &aresid, p);
 	    len = (sizeof (struct nfst_rec) + NFSV4_OPAQUELIMIT - 1) - aresid;
 	    if (error || (len > 0 && (len < sizeof (struct nfst_rec) ||
@@ -5030,11 +5030,11 @@ nfsrv_updatestable(NFSPROC_T *p)
 	vn_finished_write(mp);
 	if (!error)
 	    error = NFSD_RDWR(UIO_WRITE, vp,
-		PTR2CAP(&sf->nsf_rec), sizeof (struct nfsf_rec), (off_t)0,
+		&sf->nsf_rec, sizeof (struct nfsf_rec), (off_t)0,
 		UIO_SYSSPACE, IO_SYNC, NFSFPCRED(sf->nsf_fp), NULL, p);
 	if (!error)
 	    error = NFSD_RDWR(UIO_WRITE, vp,
-		PTR2CAP(sf->nsf_bootvals),
+		sf->nsf_bootvals,
 		sf->nsf_numboots * sizeof (time_t),
 		(off_t)(sizeof (struct nfsf_rec)),
 		UIO_SYSSPACE, IO_SYNC, NFSFPCRED(sf->nsf_fp), NULL, p);
@@ -5081,7 +5081,7 @@ nfsrv_writestable(u_char *client, int len, int flag, NFSPROC_T *p)
 	NFSBCOPY(client, sp->client, len);
 	sp->flag = flag;
 	error = NFSD_RDWR(UIO_WRITE, NFSFPVNODE(sf->nsf_fp),
-	    PTR2CAP(sp), sizeof (struct nfst_rec) + len - 1, (off_t)0,
+	    sp, sizeof (struct nfst_rec) + len - 1, (off_t)0,
 	    UIO_SYSSPACE, (IO_SYNC | IO_APPEND), NFSFPCRED(sf->nsf_fp), NULL, p);
 	free(sp, M_TEMP);
 	if (error) {
@@ -7719,7 +7719,7 @@ nfsrv_setdsserver(char *dspathp, char *mdspathp, NFSPROC_T *p,
 		return (EPERM);
 	}
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF, UIO_SYSSPACE,
-	    PTR2CAP(dspathp));
+	    dspathp);
 	error = namei(&nd);
 	NFSD_DEBUG(4, "lookup=%d\n", error);
 	if (error != 0)
@@ -7755,7 +7755,7 @@ nfsrv_setdsserver(char *dspathp, char *mdspathp, NFSPROC_T *p,
 	for (i = 0; i < nfsrv_dsdirsize; i++) {
 		snprintf(dsdirpath, dsdirsize, "%s/ds%d", dspathp, i);
 		NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF,
-		    UIO_SYSSPACE, PTR2CAP(dsdirpath));
+		    UIO_SYSSPACE, dsdirpath);
 		error = namei(&nd);
 		NFSD_DEBUG(4, "dsdirpath=%s lookup=%d\n", dsdirpath, error);
 		if (error != 0)
@@ -7783,7 +7783,7 @@ nfsrv_setdsserver(char *dspathp, char *mdspathp, NFSPROC_T *p,
 		 * system.
 		 */
 		NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF,
-		    UIO_SYSSPACE, PTR2CAP(mdspathp));
+		    UIO_SYSSPACE, mdspathp);
 		error = namei(&nd);
 		NFSD_DEBUG(4, "mds lookup=%d\n", error);
 		if (error != 0)
@@ -8505,7 +8505,7 @@ tryagain2:
 		ret = VOP_GETATTR(fvp, &va, cred);
 		aresid = 0;
 		while (ret == 0 && aresid == 0) {
-			ret = vn_rdwr(UIO_READ, fvp, PTR2CAP(dat), PNFSDS_COPYSIZ,
+			ret = vn_rdwr(UIO_READ, fvp, dat, PNFSDS_COPYSIZ,
 			    rdpos, UIO_SYSSPACE, IO_NODELOCKED, cred, NULL,
 			    &aresid, p);
 			xfer = PNFSDS_COPYSIZ - aresid;
@@ -8518,7 +8518,7 @@ tryagain2:
 				if (xfer < PNFSDS_COPYSIZ || rdpos ==
 				    va.va_size || NFSBCMP(dat,
 				    nfsrv_zeropnfsdat, PNFSDS_COPYSIZ) != 0)
-					ret = vn_rdwr(UIO_WRITE, tvp, PTR2CAP(dat), xfer,
+					ret = vn_rdwr(UIO_WRITE, tvp, dat, xfer,
 					    wrpos, UIO_SYSSPACE, IO_NODELOCKED,
 					    cred, NULL, NULL, p);
 				if (ret == 0)
@@ -8642,7 +8642,7 @@ nfsrv_mdscopymr(char *mdspathp, char *dspathp, char *curdspathp, char *buf,
 	 */
 	NFSD_DEBUG(4, "mdsopen path=%s\n", mdspathp);
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF, UIO_SYSSPACE,
-	    PTR2CAP(mdspathp));
+	    mdspathp);
 	error = namei(&nd);
 	NFSD_DEBUG(4, "lookup=%d\n", error);
 	if (error != 0)
@@ -8661,7 +8661,7 @@ nfsrv_mdscopymr(char *mdspathp, char *dspathp, char *curdspathp, char *buf,
 		 */
 		NFSD_DEBUG(4, "curmdsdev path=%s\n", curdspathp);
 		NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF,
-		    UIO_SYSSPACE, PTR2CAP(curdspathp));
+		    UIO_SYSSPACE, curdspathp);
 		error = namei(&nd);
 		NFSD_DEBUG(4, "ds lookup=%d\n", error);
 		if (error != 0) {
@@ -8701,7 +8701,7 @@ nfsrv_mdscopymr(char *mdspathp, char *dspathp, char *curdspathp, char *buf,
 		/* Look up the nfsdev path and find the nfsdev structure. */
 		NFSD_DEBUG(4, "mdsdev path=%s\n", dspathp);
 		NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF,
-		    UIO_SYSSPACE, PTR2CAP(dspathp));
+		    UIO_SYSSPACE, dspathp);
 		error = namei(&nd);
 		NFSD_DEBUG(4, "ds lookup=%d\n", error);
 		if (error != 0) {

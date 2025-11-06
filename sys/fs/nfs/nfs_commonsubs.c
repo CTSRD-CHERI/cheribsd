@@ -3170,7 +3170,7 @@ nfsv4_filesavail(struct statfs *fs, struct mount *mp)
 	savuid = p->p_cred->p_ruid;
 	p->p_cred->p_ruid = cred->cr_uid;
 	if (!VFS_QUOTACTL(mp, QCMD(Q_GETQUOTA,USRQUOTA),
-	    cred->cr_uid, PTR2CAP(&dqb)))
+	    cred->cr_uid, &dqb))
 	    freenum = min(dqb.dqb_isoftlimit-dqb.dqb_curinodes,
 		freenum);
 	p->p_cred->p_ruid = savuid;

@@ -414,7 +414,7 @@ linux_getdents(struct thread *td, struct linux_getdents_args *args)
 	buflen = min(args->count, MAXBSIZE);
 	buf = malloc(buflen, M_LINUX, M_WAITOK);
 
-	error = kern_getdirentries(td, args->fd, PTR2CAP(buf), buflen,
+	error = kern_getdirentries(td, args->fd, buf, buflen,
 	    &base, NULL, UIO_SYSSPACE);
 	if (error != 0) {
 		error = linux_getdents_error(td, args->fd, error);
@@ -490,7 +490,7 @@ linux_getdents64(struct thread *td, struct linux_getdents64_args *args)
 	buflen = min(args->count, MAXBSIZE);
 	buf = malloc(buflen, M_LINUX, M_WAITOK);
 
-	error = kern_getdirentries(td, args->fd, PTR2CAP(buf), buflen,
+	error = kern_getdirentries(td, args->fd, buf, buflen,
 	    &base, NULL, UIO_SYSSPACE);
 	if (error != 0) {
 		error = linux_getdents_error(td, args->fd, error);
@@ -560,7 +560,7 @@ linux_readdir(struct thread *td, struct linux_readdir_args *args)
 	buflen = sizeof(*bdp);
 	buf = malloc(buflen, M_LINUX, M_WAITOK);
 
-	error = kern_getdirentries(td, args->fd, PTR2CAP(buf), buflen,
+	error = kern_getdirentries(td, args->fd, buf, buflen,
 	    &base, NULL, UIO_SYSSPACE);
 	if (error != 0) {
 		error = linux_getdents_error(td, args->fd, error);

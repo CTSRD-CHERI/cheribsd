@@ -252,7 +252,7 @@ ffs_snapshot(struct mount *mp, char *snapfile)
 	 */
 restart:
 	NDINIT(&nd, CREATE, LOCKPARENT | LOCKLEAF | NOCACHE, UIO_SYSSPACE,
-	    PTR2CAP(snapfile));
+	    snapfile);
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	if (nd.ni_vp != NULL) {
@@ -888,7 +888,7 @@ out:
 		/* Remove snapshot as its creation has failed. */
 		vput(vp);
 		NDINIT(&nd, DELETE, LOCKPARENT | LOCKLEAF, UIO_SYSSPACE,
-		    PTR2CAP(snapfile));
+		    snapfile);
 		if ((rmerr = namei(&nd)) != 0 ||
 		    (rmerr = VOP_REMOVE(nd.ni_dvp, nd.ni_vp, &nd.ni_cnd)) != 0)
 			printf("Delete of %s failed with error %d\n",

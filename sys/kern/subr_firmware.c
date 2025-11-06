@@ -294,7 +294,7 @@ try_binary_file(const char *imagename, uint32_t flags)
 	if (bootverbose)
 		printf("Trying to load binary firmware from %s\n", fn);
 
-	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(fn));
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, fn);
 	oflags = FREAD;
 	error = vn_open(&nd, &oflags, 0, NULL);
 	if (error)
@@ -315,7 +315,7 @@ try_binary_file(const char *imagename, uint32_t flags)
 		goto err2;
 	}
 	data = malloc(vattr.va_size, M_FIRMWARE, M_WAITOK);
-	error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(data), vattr.va_size, 0,
+	error = vn_rdwr(UIO_READ, nd.ni_vp, data, vattr.va_size, 0,
 	    UIO_SYSSPACE, IO_NODELOCKED, cred, NOCRED, &resid, td);
 	/* XXX make data read only? */
 	VOP_UNLOCK(nd.ni_vp);
