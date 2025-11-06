@@ -108,7 +108,7 @@ mac_label_copyin(const struct mac *const __capability u_mac,
 	MPASS(error == 0);
 	if (u_string != NULL)
 		*u_string = mac->m_string;
-	mac->m_string = PTR2CAP(buffer);
+	mac->m_string = buffer;
 	return (0);
 }
 

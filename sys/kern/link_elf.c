@@ -1318,7 +1318,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	lf = NULL;
 	shstrs = NULL;
 
-	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(filename));
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, filename);
 	flags = FREAD;
 	error = vn_open(&nd, &flags, 0, NULL);
 	if (error != 0)
@@ -1342,7 +1342,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	 */
 	firstpage = malloc(PAGE_SIZE, M_LINKER, M_WAITOK);
 	hdr = (Elf_Ehdr *)firstpage;
-	error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(firstpage), PAGE_SIZE, 0,
+	error = vn_rdwr(UIO_READ, nd.ni_vp, firstpage, PAGE_SIZE, 0,
 	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 	    &resid, td);
 	nbytes = PAGE_SIZE - resid;
@@ -1530,7 +1530,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 #endif
 
 		error = vn_rdwr(UIO_READ, nd.ni_vp,
-		    PTR2CAP(segbase), segs[i]->p_filesz, segs[i]->p_offset,
+		    segbase, segs[i]->p_filesz, segs[i]->p_offset,
 		    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 		    &resid, td);
 		if (error != 0)
@@ -1606,7 +1606,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		goto nosyms;
 	shdr = malloc(nbytes, M_LINKER, M_WAITOK | M_ZERO);
 	error = vn_rdwr(UIO_READ, nd.ni_vp,
-	    PTR2CAP(shdr), nbytes, hdr->e_shoff,
+	    shdr, nbytes, hdr->e_shoff,
 	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 	    &resid, td);
 	if (error != 0)
@@ -1618,7 +1618,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	    shdr[shstrindex].sh_size != 0) {
 		nbytes = shdr[shstrindex].sh_size;
 		shstrs = malloc(nbytes, M_LINKER, M_WAITOK | M_ZERO);
-		error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(shstrs), nbytes,
+		error = vn_rdwr(UIO_READ, nd.ni_vp, shstrs, nbytes,
 		    shdr[shstrindex].sh_offset, UIO_SYSSPACE, IO_NODELOCKED,
 		    td->td_ucred, NOCRED, &resid, td);
 		if (error)
@@ -1649,13 +1649,13 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	ef->strbase = malloc(strcnt, M_LINKER, M_WAITOK);
 
 	error = vn_rdwr(UIO_READ, nd.ni_vp,
-	    PTR2CAP(ef->symbase), symcnt, shdr[symtabindex].sh_offset,
+	    ef->symbase, symcnt, shdr[symtabindex].sh_offset,
 	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 	    &resid, td);
 	if (error != 0)
 		goto out;
 	error = vn_rdwr(UIO_READ, nd.ni_vp,
-	    PTR2CAP(ef->strbase), strcnt, shdr[symstrindex].sh_offset,
+	    ef->strbase, strcnt, shdr[symstrindex].sh_offset,
 	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 	    &resid, td);
 	if (error != 0)

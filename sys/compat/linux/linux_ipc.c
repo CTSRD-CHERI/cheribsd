@@ -656,7 +656,7 @@ linux_msgsnd(struct thread *td, struct linux_msgsnd_args *args)
 		return (error);
 	mtype = (long)lmtype;
 	return (kern_msgsnd(td, args->msqid,
-	    PTR2CAP((const char *)msgp) + sizeof(lmtype),
+	    (const char *)msgp + sizeof(lmtype),
 	    args->msgsz, args->msgflg, mtype));
 }
 
@@ -672,7 +672,7 @@ linux_msgrcv(struct thread *td, struct linux_msgrcv_args *args)
 		return (EINVAL);
 	msgp = PTRIN(args->msgp);
 	if ((error = kern_msgrcv(td, args->msqid,
-	    PTR2CAP((char *)msgp) + sizeof(lmtype), args->msgsz,
+	    (char *)msgp + sizeof(lmtype), args->msgsz,
 	    args->msgtyp, args->msgflg, &mtype)) != 0)
 		return (error);
 	lmtype = (l_long)mtype;

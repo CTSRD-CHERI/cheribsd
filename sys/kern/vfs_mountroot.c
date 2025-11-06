@@ -357,12 +357,12 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 		/* Remount old root under /.mount or /mnt */
 		fspath = "/.mount";
 		NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE,
-		    PTR2CAP(fspath));
+		    fspath);
 		error = namei(&nd);
 		if (error) {
 			fspath = "/mnt";
 			NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE,
-			    PTR2CAP(fspath));
+			    fspath);
 			error = namei(&nd);
 		}
 		if (!error) {
@@ -597,7 +597,7 @@ parse_dir_md(char **conf)
 		return (error);
 
 	/* Get file status. */
-	error = kern_statat(td, 0, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE, &sb);
+	error = kern_statat(td, 0, AT_FDCWD, path, UIO_SYSSPACE, &sb);
 	if (error)
 		goto out;
 
@@ -610,7 +610,7 @@ parse_dir_md(char **conf)
 		root_mount_mddev = -1;
 	}
 
-	mdr.md_file = PTR2CAP(path);
+	mdr.md_file = path;
 	mdr.md_file_seg = UIO_SYSSPACE;
 	mdr.md_options = MD_AUTOUNIT | MD_READONLY;
 	mdr.md_mediasize = sb.st_size;
@@ -718,7 +718,7 @@ parse_mount_dev_present(const char *dev)
 	struct nameidata nd;
 	int error;
 
-	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(dev));
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, dev);
 	error = namei(&nd);
 	if (error != 0)
 		return (false);
@@ -952,9 +952,9 @@ vfs_mountroot_readconf(struct thread *td, struct sbuf *sb)
 	ofs = 0;
 	len = sizeof(buf) - 1;
 	while (1) {
-		error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(buf), len, ofs,
-		    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred,
-		    NOCRED, &resid, td);
+		error = vn_rdwr(UIO_READ, nd.ni_vp, buf, len, ofs,
+				UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred,
+				NOCRED, &resid, td);
 		if (error)
 			break;
 		if (resid == len)

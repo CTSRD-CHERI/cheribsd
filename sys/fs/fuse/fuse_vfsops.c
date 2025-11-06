@@ -146,7 +146,7 @@ fuse_getdevice(const char *fspec, struct thread *td, struct cdev **fdevp)
 	 * and verify that it refers to a sensible disk device.
 	 */
 
-	NDINIT(ndp, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(fspec));
+	NDINIT(ndp, LOOKUP, FOLLOW, UIO_SYSSPACE, fspec);
 	if ((err = namei(ndp)) != 0)
 		return err;
 	NDFREE_PNBUF(ndp);

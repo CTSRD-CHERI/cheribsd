@@ -1662,7 +1662,7 @@ vfs_domount(
 	 * Get vnode to be covered or mount point's vnode in case of MNT_UPDATE.
 	 */
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1 | WANTPARENT,
-	    UIO_SYSSPACE, PTR2CAP(fspath));
+	    UIO_SYSSPACE, fspath);
 	error = namei(&nd);
 	if (error != 0)
 		return (error);
@@ -1778,7 +1778,7 @@ kern_unmount(struct thread *td, const char *path, int flags)
 		 * Try to find global path for path argument.
 		 */
 		NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1,
-		    UIO_SYSSPACE, PTR2CAP(pathbuf));
+		    UIO_SYSSPACE, pathbuf);
 		if (namei(&nd) == 0) {
 			NDFREE_PNBUF(&nd);
 			error = vn_path_to_global_path(td, nd.ni_vp, pathbuf,
