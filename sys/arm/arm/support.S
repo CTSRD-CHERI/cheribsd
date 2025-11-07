@@ -1055,7 +1055,7 @@ ENTRY(memcpy)
 	b	.Lmemcpy_bytewise	/* 0x09 */
 	b	.Lmemcpy_bytewise	/* 0x0a */
 	b	.Lmemcpy_bytewise	/* 0x0b */
-	b	.Lmemcpy_c		/* 0x0c */
+	b	.Lmemcpy		/* 0x0c */
 .Lmemcpy_bytewise:
 	mov	r3, r0			/* We must not clobber r0 */
 	ldrb	ip, [r1], #0x01
@@ -1751,7 +1751,7 @@ ENTRY(memcpy)
 #define	LMEMCPY_C_LOG2	7	/* 128 bytes */
 #define	LMEMCPY_C_PAD	.align LMEMCPY_C_LOG2
 	LMEMCPY_C_PAD
-.Lmemcpy_c:
+.Lmemcpy:
 	and	r2, r1, #0x03
 	orr	r2, r2, r0, lsl #2
 	ands	r2, r2, #0x0f

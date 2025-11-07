@@ -275,24 +275,6 @@ void	*memmove_data(void * _Nonnull dest, const void * _Nonnull src,
 #define	memcpy_data	memcpy
 #define	memmove_data	memmove
 #endif
-#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-void	*memset_c(void * _Nonnullbuf, int c,
-	    size_t len);
-void	*memcpy_c(void * _Nonnullto,
-	    const void * _Nonnullfrom, size_t len);
-void	*memcpy_data_c(void * _Nonnullto,
-	    const void * _Nonnullfrom, size_t len);
-void	*memmove_c(void * _Nonnulldest,
-	    const void * _Nonnullsrc, size_t n);
-void	*memmove_data_c(void * _Nonnulldest,
-	    const void * _Nonnullsrc, size_t n);
-#else
-#define	memset_c	memset
-#define	memcpy_c	memcpy
-#define	memcpy_data_c	memcpy_data
-#define	memmove_c	memmove
-#define	memmove_data_c	memmove_data
-#endif
 
 #ifdef SAN_NEEDS_INTERCEPTORS
 #define	SAN_INTERCEPTOR(func)	\
@@ -320,9 +302,7 @@ int	SAN_INTERCEPTOR(memcmp)(const void *, const void *, size_t);
 #define memcmp(b1, b2, len)	__builtin_memcmp((b1), (b2), (len))
 #endif /* SAN_NEEDS_INTERCEPTORS */
 
-#define bcopy_c(from, to, len)		memmove_c((to), (from), (len))
 #define bcopy_data(from, to, len)	memmove_data((to), (from), (len))
-#define bcopy_data_c(from, to, len)	memmove_data_c((to), (from), (len))
 
 void	*memset_early(void * _Nonnull buf, int c, size_t len);
 #define bzero_early(buf, len) memset_early((buf), 0, (len))
