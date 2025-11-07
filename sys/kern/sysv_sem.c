@@ -757,7 +757,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 		if (error != 0)
 			goto done2;
 #endif
-		bcopy_c(&semakptr->u, arg->buf, sizeof(struct semid_ds));
+		bcopy(&semakptr->u, arg->buf, sizeof(struct semid_ds));
 		if (cred->cr_prison != semakptr->cred->cr_prison)
 			arg->buf->sem_perm.key = IPC_PRIVATE;
 		*rval = IXSEQ_TO_IPCID(semid, semakptr->u.sem_perm);
@@ -813,7 +813,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 			goto done2;
 		if ((error = ipcperm(td, &semakptr->u.sem_perm, IPC_R)))
 			goto done2;
-		bcopy_c(&semakptr->u, arg->buf, sizeof(struct semid_ds));
+		bcopy(&semakptr->u, arg->buf, sizeof(struct semid_ds));
 		if (cred->cr_prison != semakptr->cred->cr_prison)
 			arg->buf->sem_perm.key = IPC_PRIVATE;
 
