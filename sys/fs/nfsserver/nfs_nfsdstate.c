@@ -4874,7 +4874,7 @@ nfsrv_setupstable(NFSPROC_T *p)
 	if (sf->nsf_fp == NULL)
 		return;
 	error = NFSD_RDWR(UIO_READ, NFSFPVNODE(sf->nsf_fp),
-	    &sf->nsf_rec, sizeof (struct nfsf_rec), off, UIO_SYSSPACE,
+	    (caddr_t)&sf->nsf_rec, sizeof (struct nfsf_rec), off, UIO_SYSSPACE,
 	    0, NFSFPCRED(sf->nsf_fp), &aresid, p);
 	if (error || aresid || sf->nsf_numboots == 0 ||
 		sf->nsf_numboots > NFSNSF_MAXNUMBOOTS)
@@ -4887,7 +4887,7 @@ nfsrv_setupstable(NFSPROC_T *p)
 		sizeof(time_t), M_TEMP, M_WAITOK);
 	off = sizeof (struct nfsf_rec);
 	error = NFSD_RDWR(UIO_READ, NFSFPVNODE(sf->nsf_fp),
-	    sf->nsf_bootvals, sf->nsf_numboots * sizeof (time_t), off,
+	    (caddr_t)sf->nsf_bootvals, sf->nsf_numboots * sizeof (time_t), off,
 	    UIO_SYSSPACE, 0, NFSFPCRED(sf->nsf_fp), &aresid, p);
 	if (error || aresid) {
 		free(sf->nsf_bootvals, M_TEMP);
@@ -4924,7 +4924,7 @@ nfsrv_setupstable(NFSPROC_T *p)
 		NFSV4_OPAQUELIMIT - 1, M_TEMP, M_WAITOK);
 	do {
 	    error = NFSD_RDWR(UIO_READ, NFSFPVNODE(sf->nsf_fp),
-	        tsp, sizeof (struct nfst_rec) + NFSV4_OPAQUELIMIT - 1,
+	        (caddr_t)tsp, sizeof (struct nfst_rec) + NFSV4_OPAQUELIMIT - 1,
 	        off, UIO_SYSSPACE, 0, NFSFPCRED(sf->nsf_fp), &aresid, p);
 	    len = (sizeof (struct nfst_rec) + NFSV4_OPAQUELIMIT - 1) - aresid;
 	    if (error || (len > 0 && (len < sizeof (struct nfst_rec) ||
@@ -5030,11 +5030,11 @@ nfsrv_updatestable(NFSPROC_T *p)
 	vn_finished_write(mp);
 	if (!error)
 	    error = NFSD_RDWR(UIO_WRITE, vp,
-		&sf->nsf_rec, sizeof (struct nfsf_rec), (off_t)0,
+		(caddr_t)&sf->nsf_rec, sizeof (struct nfsf_rec), (off_t)0,
 		UIO_SYSSPACE, IO_SYNC, NFSFPCRED(sf->nsf_fp), NULL, p);
 	if (!error)
 	    error = NFSD_RDWR(UIO_WRITE, vp,
-		sf->nsf_bootvals,
+		(caddr_t)sf->nsf_bootvals,
 		sf->nsf_numboots * sizeof (time_t),
 		(off_t)(sizeof (struct nfsf_rec)),
 		UIO_SYSSPACE, IO_SYNC, NFSFPCRED(sf->nsf_fp), NULL, p);
@@ -5081,7 +5081,7 @@ nfsrv_writestable(u_char *client, int len, int flag, NFSPROC_T *p)
 	NFSBCOPY(client, sp->client, len);
 	sp->flag = flag;
 	error = NFSD_RDWR(UIO_WRITE, NFSFPVNODE(sf->nsf_fp),
-	    sp, sizeof (struct nfst_rec) + len - 1, (off_t)0,
+	    (caddr_t)sp, sizeof (struct nfst_rec) + len - 1, (off_t)0,
 	    UIO_SYSSPACE, (IO_SYNC | IO_APPEND), NFSFPCRED(sf->nsf_fp), NULL, p);
 	free(sp, M_TEMP);
 	if (error) {
@@ -8081,10 +8081,10 @@ nfsrv_createdevids(struct nfsd_nfsd_args *args, NFSPROC_T *p)
 	char *addrp, *dnshostp, *dspathp, *mdspathp;
 	int error, i;
 
-	addrp = (char *)args->addr;
-	dnshostp = (char *)args->dnshost;
-	dspathp = (char *)args->dspath;
-	mdspathp = (char *)args->mdspath;
+	addrp = args->addr;
+	dnshostp = args->dnshost;
+	dspathp = args->dspath;
+	mdspathp = args->mdspath;
 	nfsrv_maxpnfsmirror = args->mirrorcnt;
 	if (addrp == NULL || dnshostp == NULL || dspathp == NULL ||
 	    mdspathp == NULL)
@@ -8094,10 +8094,10 @@ nfsrv_createdevids(struct nfsd_nfsd_args *args, NFSPROC_T *p)
 	 * Loop around for each nul-terminated string in args->addr,
 	 * args->dnshost, args->dnspath and args->mdspath.
 	 */
-	while (addrp < ((char *)args->addr + args->addrlen) &&
-	    dnshostp < ((char *)args->dnshost + args->dnshostlen) &&
-	    dspathp < ((char *)args->dspath + args->dspathlen) &&
-	    mdspathp < ((char *)args->mdspath + args->mdspathlen)) {
+	while (addrp < (args->addr + args->addrlen) &&
+	    dnshostp < (args->dnshost + args->dnshostlen) &&
+	    dspathp < (args->dspath + args->dspathlen) &&
+	    mdspathp < (args->mdspath + args->mdspathlen)) {
 		error = nfsrv_setdsserver(dspathp, mdspathp, p, &ds);
 		if (error != 0) {
 			/* Free all DS servers. */

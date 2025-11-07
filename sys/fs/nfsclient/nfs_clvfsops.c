@@ -1312,17 +1312,17 @@ nfs_mount(struct mount *mp)
 			error = EINVAL;
 			goto out;
 		}
-		error = copyin(args.user_fh, nfh, args.fhsize);
+		error = copyin((caddr_t)args.fh, (caddr_t)nfh,
+		    args.fhsize);
 		if (error != 0)
 			goto out;
-		error = copyinstr(args.user_hostname, hst, MNAMELEN - 1,
-		    &hstlen);
+		error = copyinstr(args.hostname, hst, MNAMELEN - 1, &hstlen);
 		if (error != 0)
 			goto out;
 		bzero(&hst[hstlen], MNAMELEN - hstlen);
 		args.hostname = hst;
 		/* getsockaddr() call must be after above copyin() calls */
-		error = getsockaddr(&nam, args.user_addr, args.addrlen);
+		error = getsockaddr(&nam, args.addr, args.addrlen);
 		if (error != 0)
 			goto out;
 	} else if (nfs_mount_parse_from(mp->mnt_optnew,

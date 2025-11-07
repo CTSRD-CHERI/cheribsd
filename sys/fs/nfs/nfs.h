@@ -216,7 +216,7 @@ struct nfsd_pnfsd_args {
 
 /* Old version. */
 struct nfsd_nfsd_oargs {
-	const char *principal; /* GSS-API service principal name */
+	const char *principal;	/* GSS-API service principal name */
 	int	minthreads;	/* minimum service thread count */
 	int	maxthreads;	/* maximum service thread count */
 };
@@ -230,7 +230,7 @@ struct nfsd_nfscbd_args {
 
 struct nfscbd_args {
 	int	sock;		/* Socket to serve */
-	char	*name;		/* Client addr for connection based sockets */
+	caddr_t	name;		/* Client addr for connection based sockets */
 	int	namelen;	/* Length of name */
 	u_short	port;		/* Port# for callbacks */
 };
@@ -241,9 +241,9 @@ struct nfsd_idargs {
 	gid_t		nid_gid;
 	int		nid_usermax;	/* Upper bound on user name cache */
 	int		nid_usertimeout;/* User name timeout (minutes) */
-	u_char 		*nid_name;	/* Name */
+	u_char		*nid_name;	/* Name */
 	int		nid_namelen;	/* and its length */
-	gid_t 		*nid_grps;	/* and the list */
+	gid_t		*nid_grps;	/* and the list */
 	int		nid_ngroup;	/* Size of groups list */
 };
 

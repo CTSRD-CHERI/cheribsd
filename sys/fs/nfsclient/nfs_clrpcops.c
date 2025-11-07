@@ -3648,8 +3648,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				tlen += 8;  /* To ensure null termination. */
 			left = DIRBLKSIZ - blksiz;
 			if (_GENERIC_DIRLEN(len) + NFSX_HYPER > left) {
-				NFSBZERO((void *)
-				    uiop->uio_iov->iov_base, left);
+				NFSBZERO(uiop->uio_iov->iov_base, left);
 				dp->d_reclen += left;
 				IOVEC_ADVANCE(uiop->uio_iov, left);
 				uiop->uio_resid -= left;
@@ -3701,8 +3700,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 					uiop->uio_resid = savresid;
 					blksiz = savblksiz;
 				} else {
-					cp = (char *)
-					    uiop->uio_iov->iov_base;
+					cp = uiop->uio_iov->iov_base;
 					tlen -= len;
 					NFSBZERO(cp, tlen);
 					cp += tlen; /* points to cookie store */
@@ -4093,7 +4091,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				tlen += 8;  /* To ensure null termination. */
 			left = DIRBLKSIZ - blksiz;
 			if (_GENERIC_DIRLEN(len) + NFSX_HYPER > left) {
-				NFSBZERO((void *)uiop->uio_iov->iov_base, left);
+				NFSBZERO(uiop->uio_iov->iov_base, left);
 				dp->d_reclen += left;
 				IOVEC_ADVANCE(uiop->uio_iov, left);
 				uiop->uio_resid -= left;
@@ -4131,8 +4129,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				cnp->cn_nameptr = (void *)uiop->uio_iov->iov_base;
 				cnp->cn_namelen = len;
 				NFSCNHASHZERO(cnp);
-				cp = (char *)
-				    uiop->uio_iov->iov_base;
+				cp = uiop->uio_iov->iov_base;
 				error = nfsm_mbufuio(nd, uiop, len);
 				if (error)
 					goto nfsmout;
@@ -4148,8 +4145,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 					uiop->uio_resid = savresid;
 					blksiz = savblksiz;
 				} else {
-					cp = (void *)
-					    uiop->uio_iov->iov_base;
+					cp = uiop->uio_iov->iov_base;
 					tlen -= len;
 					NFSBZERO(cp, tlen);
 					cp += tlen; /* points to cookie store */
@@ -4344,7 +4340,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	 */
 	if (blksiz > 0) {
 		left = DIRBLKSIZ - blksiz;
-		NFSBZERO((void *)uiop->uio_iov->iov_base, left);
+		NFSBZERO(uiop->uio_iov->iov_base, left);
 		dp->d_reclen += left;
 		IOVEC_ADVANCE(uiop->uio_iov, left);
 		uiop->uio_resid -= left;

@@ -317,8 +317,7 @@ nullfs_root(struct mount *mp, int flags, struct vnode **vpp)
 }
 
 static int
-nullfs_quotactl(struct mount *mp, int cmd, uid_t uid, void *arg,
-    bool *mp_busy)
+nullfs_quotactl(struct mount *mp, int cmd, uid_t uid, void *arg, bool *mp_busy)
 {
 	struct mount *lowermp;
 	struct null_mount *mntdata;
@@ -493,12 +492,3 @@ static struct vfsops null_vfsops = {
 };
 
 VFS_SET(null_vfsops, nullfs, VFCF_LOOPBACK | VFCF_JAIL | VFCF_FILEMOUNT);
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END
