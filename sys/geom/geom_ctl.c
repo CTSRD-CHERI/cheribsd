@@ -197,7 +197,7 @@ gctl_copyin(struct gctl_req *req)
 		return;
 	}
 
-	ap = geom_alloc_copyin(req, req->user_arg, req->narg * sizeof(*ap),
+	ap = geom_alloc_copyin(req, req->arg, req->narg * sizeof(*ap),
 	    true);
 	if (ap == NULL) {
 		gctl_error(req, "bad control request");
@@ -218,7 +218,7 @@ gctl_copyin(struct gctl_req *req)
 			    "wrong param name length %d: %d", i, ap[i].nlen);
 			break;
 		}
-		p = geom_alloc_copyin(req, ap[i].user_name, ap[i].nlen, false);
+		p = geom_alloc_copyin(req, ap[i].name, ap[i].nlen, false);
 		if (p == NULL)
 			break;
 		if (p[ap[i].nlen - 1] != '\0') {
@@ -311,8 +311,7 @@ gctl_dump(struct gctl_req *req, const char *what)
 	for (i = 0; i < req->narg; i++) {
 		ap = &req->arg[i];
 		if (!(ap->flag & GCTL_PARAM_NAMEKERNEL))
-			printf("  param:\t%d@%p", ap->nlen,
-			    (void *)(uintptr_t)(uintptr_t)ap->user_name);
+			printf("  param:\t%d@%p", ap->nlen, ap->name);
 		else
 			printf("  param:\t\"%s\"", ap->name);
 		printf(" [%s%s%d] = ",
@@ -320,7 +319,7 @@ gctl_dump(struct gctl_req *req, const char *what)
 		    ap->flag & GCTL_PARAM_WR ? "W" : "",
 		    ap->len);
 		if (!(ap->flag & GCTL_PARAM_VALUEKERNEL)) {
-			printf(" =@ %p", (void *)(uintptr_t)(uintptr_t)ap->value);
+			printf(" =@ %p", ap->value);
 		} else if (ap->flag & GCTL_PARAM_ASCII) {
 			printf("\"%s\"", (char *)ap->kvalue);
 		} else if (ap->len > 0) {

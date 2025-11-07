@@ -204,12 +204,3 @@ G_LABEL_INIT(ufsid, g_label_ufs_id, "Create device nodes for UFS file system IDs
 G_LABEL_INIT(ufs, g_label_ufs_volume, "Create device nodes for UFS volume names");
 
 MODULE_DEPEND(g_label, ufs, 1, 1, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "pointer_shape"
-//   ]
-// }
-// CHERI CHANGES END
