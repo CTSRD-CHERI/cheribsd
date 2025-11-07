@@ -1294,7 +1294,7 @@ nfssvc_nfscl(struct thread *td, struct nfssvc_args *uap)
 
 	NFSD_CURVNET_SET(NFSD_TD_TO_VNET(td));
 	if (uap->flag & NFSSVC_CBADDSOCK) {
-		error = copyinptr(uap->argp, &nfscbdarg, sizeof(nfscbdarg));
+		error = copyinptr(uap->argp, (caddr_t)&nfscbdarg, sizeof(nfscbdarg));
 		if (error)
 			goto out;
 		/*
@@ -1322,7 +1322,8 @@ nfssvc_nfscl(struct thread *td, struct nfssvc_args *uap)
 			error = EINVAL;
 			goto out;
 		}
-		error = copyinptr(uap->argp, &nfscbdarg2, sizeof(nfscbdarg2));
+		error = copyinptr(uap->argp, (caddr_t)&nfscbdarg2,
+		    sizeof(nfscbdarg2));
 		if (error)
 			goto out;
 		error = nfscbd_nfsd(td, &nfscbdarg2);
