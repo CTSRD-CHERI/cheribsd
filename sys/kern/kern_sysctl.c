@@ -2115,11 +2115,11 @@ sysctl_old_kernel(struct sysctl_req *req, const void *p, size_t l)
 		if (i > 0) {
 #if __has_feature(capabilities)
 			if (req->flags & SCTL_PTROUT)
-				memcpy_c((char *)req->oldptr +
+				memcpy((char *)req->oldptr +
 				    req->oldidx, p, i);
 			else
 #endif
-				memcpy_data_c((char *)req->oldptr +
+				memcpy_data((char *)req->oldptr +
 				    req->oldidx, p, i);
 		}
 	}
@@ -2138,10 +2138,10 @@ sysctl_new_kernel(struct sysctl_req *req, void *p, size_t l)
 		return (EINVAL);
 #if __has_feature(capabilities)
 	if (req->flags & SCTL_PTRIN)
-		memcpy_c(p, (const char *)req->newptr + req->newidx, l);
+		memcpy(p, (const char *)req->newptr + req->newidx, l);
 	else
 #endif
-		memcpy_data_c(p, (const char *)req->newptr + req->newidx, l);
+		memcpy_data(p, (const char *)req->newptr + req->newidx, l);
 	req->newidx += l;
 	return (0);
 }
