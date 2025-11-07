@@ -30,20 +30,12 @@
 #include <sys/types.h>
 #include <sys/libkern.h>
 
-#ifdef CAPABILITY_VERSION
-#define	__CAPSUFFIX(func)	(func ## _c)
-#define	__CAP		
-#else
-#define	__CAPSUFFIX(func)	(func)
-#define	__CAP
-#endif
-
-void * __CAP
-__CAPSUFFIX(memset)(void * __CAP b, int c, size_t len)
+void *
+(memset)(void *b, int c, size_t len)
 {
-	char * __CAP bb;
+	char *bb;
 
-	for (bb = (char * __CAP)b; len--; )
+	for (bb = (char *)b; len--; )
 		*bb++ = c;
 	return (b);
 }

@@ -89,7 +89,7 @@ cuio_copydata(struct uio* uio, int off, int len, caddr_t cp)
 	while (len > 0) {
 		KASSERT(iol >= 0, ("%s: empty", __func__));
 		count = min(iov->iov_len - off, len);
-		bcopy_c(((char *)iov->iov_base) + off, cp, count);
+		bcopy(((char *)iov->iov_base) + off, cp, count);
 		len -= count;
 		cp += count;
 		off = 0;
@@ -109,7 +109,7 @@ cuio_copyback(struct uio* uio, int off, int len, c_caddr_t cp)
 	while (len > 0) {
 		KASSERT(iol >= 0, ("%s: empty", __func__));
 		count = min(iov->iov_len - off, len);
-		bcopy_c(cp, ((char *)iov->iov_base) + off, count);
+		bcopy(cp, ((char *)iov->iov_base) + off, count);
 		len -= count;
 		cp += count;
 		off = 0;
