@@ -364,7 +364,7 @@ ctl_ioctl_do_datamove(struct ctl_scsiio *ctsio)
 		ext_sglist = (struct ctl_sg_entry *)malloc(ext_sglen, M_CTL,
 							   M_WAITOK);
 		ext_sglist_malloced = 1;
-		if (copyin(ctsio->ext_data_uptr, ext_sglist, ext_sglen) != 0) {
+		if (copyin(ctsio->ext_data_ptr, ext_sglist, ext_sglen) != 0) {
 			ctsio->io_hdr.port_status = 31343;
 			goto bailout;
 		}
@@ -384,7 +384,7 @@ ctl_ioctl_do_datamove(struct ctl_scsiio *ctsio)
 	} else {
 		ext_sglist = &ext_entry;
 		ext_sglist_malloced = 0;
-		ext_sglist->uaddr = ctsio->ext_data_uptr;
+		ext_sglist->addr = ctsio->ext_data_ptr;
 		ext_sglist->len = ctsio->ext_data_len;
 		ext_sg_entries = 1;
 		ext_sg_start = 0;
@@ -410,7 +410,7 @@ ctl_ioctl_do_datamove(struct ctl_scsiio *ctsio)
 		len_to_copy = MIN(ext_sglist[i].len - ext_watermark,
 				  kern_sglist[j].len - kern_watermark);
 
-		ext_ptr = (uint8_t *)ext_sglist[i].uaddr;
+		ext_ptr = (uint8_t *)ext_sglist[i].addr;
 		ext_ptr = ext_ptr + ext_watermark;
 		if (ctsio->io_hdr.flags & CTL_FLAG_BUS_ADDR) {
 			/*

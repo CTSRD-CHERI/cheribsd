@@ -320,15 +320,9 @@ typedef union {
 	SLIST_ENTRY(ccb_hdr) sle;
 	TAILQ_ENTRY(ccb_hdr) tqe;
 	STAILQ_ENTRY(ccb_hdr) stqe;
-#ifdef _KERNEL
-	void *_dummy[2];
-#endif
 } camq_entry;
 
 typedef union {
-#ifdef _KERNEL
-	void *user_ptr;
-#endif
 	void		*ptr;
 	u_long		field;
 	uint8_t	bytes[sizeof(uintptr_t)];
@@ -367,12 +361,7 @@ struct ccb_hdr {
 					/* Callback on completion function */
 	xpt_opcode	func_code;	/* XPT function code */
 	uint32_t	status;		/* Status returned by CAM subsystem */
-	union {
-#ifdef _KERNEL
-		struct cam_path *user_path;
-#endif
-		struct cam_path *path;	/* Compiled path for this ccb */
-	};
+	struct		cam_path *path;	/* Compiled path for this ccb */
 	path_id_t	path_id;	/* Path ID for the request */
 	target_id_t	target_id;	/* Target device ID */
 	lun_id_t	target_lun;	/* Target LUN number */
@@ -592,20 +581,10 @@ struct ccb_dev_match {
 	ccb_dev_match_status		status;
 	uint32_t			num_patterns;
 	uint32_t			pattern_buf_len;
-	union {
-#ifdef _KERNEL
-		struct dev_match_pattern *user_patterns;
-#endif
-		struct dev_match_pattern *patterns;
-	};
+	struct dev_match_pattern	*patterns;
 	uint32_t			num_matches;
 	uint32_t			match_buf_len;
-	union {
-#ifdef _KERNEL
-		struct dev_match_result	*user_matches;
-#endif
-		struct dev_match_result	*matches;
-	};
+	struct dev_match_result		*matches;
 	struct ccb_dev_position		pos;
 };
 
@@ -746,27 +725,17 @@ typedef enum {
  */
 struct ccb_smpio {
 	struct ccb_hdr		ccb_h;
-	union {
-#ifdef _KERNEL
-		uint8_t	*smp_user_request;
-#endif
-		uint8_t		*smp_request;
-	};
+	uint8_t			*smp_request;
 	int			smp_request_len;
 	uint16_t		smp_request_sglist_cnt;
-	union {
-#ifdef _KERNEL
-		uint8_t *smp_user_response;
-#endif
-		uint8_t		*smp_response;
-	};
+	uint8_t			*smp_response;
 	int			smp_response_len;
 	uint16_t		smp_response_sglist_cnt;
 	ccb_smp_pass_flags	flags;
 };
 
 typedef union {
-	uint8_t *sense_ptr;	/*
+	uint8_t *sense_ptr;		/*
 					 * Pointer to storage
 					 * for sense information
 					 */
@@ -775,12 +744,7 @@ typedef union {
 } sense_t;
 
 typedef union {
-	union {
-#ifdef _KERNEL
-		uint8_t  *cdb_user_ptr;
-#endif
-		uint8_t  *cdb_ptr;	/* Pointer to the CDB bytes to send */
-	};
+	uint8_t  *cdb_ptr;		/* Pointer to the CDB bytes to send */
 					/* Area for the CDB send */
 	uint8_t  cdb_bytes[IOCDBLEN];
 } cdb_t;
@@ -792,18 +756,8 @@ typedef union {
 struct ccb_scsiio {
 	struct	   ccb_hdr ccb_h;
 	union	   ccb *next_ccb;	/* Ptr for next CCB for action */
-	union {
-#ifdef _KERNEL
-		uint8_t *user_req_map;
-#endif
-		uint8_t   *req_map;	/* Ptr to mapping info */
-	};
-	union {
-#ifdef _KERNEL
-		uint8_t *user_data_ptr;
-#endif
-		uint8_t   *data_ptr;	/* Ptr to the data buf/SG list */
-	};
+	uint8_t   *req_map;		/* Ptr to mapping info */
+	uint8_t   *data_ptr;		/* Ptr to the data buf/SG list */
 	uint32_t  dxfer_len;		/* Data transfer length */
 					/* Autosense storage */
 	struct     scsi_sense_data sense_data;
@@ -846,12 +800,7 @@ struct ccb_ataio {
 	union	   ccb *next_ccb;	/* Ptr for next CCB for action */
 	struct ata_cmd	cmd;		/* ATA command register set */
 	struct ata_res	res;		/* ATA result register set */
-	union {
-#ifdef _KERNEL
-		uint8_t *user_data_ptr;
-#endif
-		uint8_t   *data_ptr;	/* Ptr to the data buf/SG list */
-	};
+	uint8_t   *data_ptr;		/* Ptr to the data buf/SG list */
 	uint32_t  dxfer_len;		/* Data transfer length */
 	uint32_t  resid;		/* Transfer residual length: 2's comp */
 	uint8_t   ata_flags;		/* Flags for the rest of the buffer */
@@ -912,12 +861,7 @@ struct ccb_nvmeio {
 	union	   ccb *next_ccb;	/* Ptr for next CCB for action */
 	struct nvme_command cmd;	/* NVME command, per NVME standard */
 	struct nvme_completion cpl;	/* NVME completion, per NVME standard */
-	union {
-#ifdef _KERNEL
-		uint8_t *user_data_ptr;
-#endif
-		uint8_t   *data_ptr;	/* Ptr to the data buf/SG list */
-	};
+	uint8_t   *data_ptr;		/* Ptr to the data buf/SG list */
 	uint32_t  dxfer_len;		/* Data transfer length */
 	uint16_t  sglist_cnt;		/* Number of SG list entries */
 	uint16_t  unused;		/* padding for removed uint32_t */
@@ -970,7 +914,6 @@ struct ac_device_changed {
 struct ccb_setasync {
 	struct ccb_hdr	 ccb_h;
 	uint32_t	 event_enable;	/* Async Event enables */
-	/* XXXCHERI: Assume this is kernel-only. */
 	ac_callback_t	*callback;
 	void		*callback_arg;
 };
@@ -986,12 +929,7 @@ struct ccb_setdev {
 /* Abort XPT request CCB */
 struct ccb_abort {
 	struct 	ccb_hdr ccb_h;
-	union {
-#ifdef _KERNEL
-		union	ccb *abort_user_ccb;
-#endif
-		union	ccb *abort_ccb;	/* Pointer to CCB to abort */
-	};
+	union	ccb *abort_ccb;	/* Pointer to CCB to abort */
 };
 
 /* Reset SCSI Bus CCB */
@@ -1400,12 +1338,7 @@ struct ccb_dev_advinfo {
 	off_t bufsiz;			/* IN: Size of external buffer */
 #define	CAM_SCSI_DEVID_MAXLEN	65536	/* length in buffer is an uint16_t */
 	off_t provsiz;			/* OUT: Size required/used */
-	union {
-#ifdef _KERNEL
-		uint8_t *user_buf;
-#endif
-		uint8_t *buf;		/* IN/OUT: Buffer for requested data */
-	};
+	uint8_t *buf;			/* IN/OUT: Buffer for requested data */
 };
 
 /*
@@ -1415,7 +1348,6 @@ struct ccb_async {
 	struct ccb_hdr ccb_h;
 	uint32_t async_code;
 	off_t async_arg_size;
-	/* XXXCHERI: Assume this is kernel-only. */
 	void *async_arg_ptr;
 };
 
@@ -1426,8 +1358,7 @@ struct ccb_async {
  * and the argument to xpt_ccb_free.
  */
 union ccb {
-	/* For convenience */
-	struct	ccb_hdr			ccb_h;
+	struct	ccb_hdr			ccb_h;	/* For convenience */
 	struct	ccb_scsiio		csio;
 	struct	ccb_getdev		cgd;
 	struct	ccb_getdevlist		cgdl;
@@ -1493,32 +1424,6 @@ cam_fill_csio(struct ccb_scsiio *csio, uint32_t retries,
 	csio->bio = NULL;
 #endif
 }
-
-#ifdef _KERNEL
-static __inline void
-cam_fill_csio_user(struct ccb_scsiio *csio, u_int32_t retries,
-	      void (*cbfcnp)(struct cam_periph *, union ccb *),
-	      u_int32_t flags, u_int8_t tag_action,
-	      u_int8_t *data_ptr, u_int32_t dxfer_len,
-	      u_int8_t sense_len, u_int8_t cdb_len,
-	      u_int32_t timeout)
-{
-	csio->ccb_h.func_code = XPT_SCSI_IO;
-	csio->ccb_h.flags = flags;
-	csio->ccb_h.xflags = 0;
-	csio->ccb_h.retry_count = retries;
-	csio->ccb_h.cbfcnp = cbfcnp;
-	csio->ccb_h.timeout = timeout;
-	csio->user_data_ptr = data_ptr;
-	csio->dxfer_len = dxfer_len;
-	csio->sense_len = sense_len;
-	csio->cdb_len = cdb_len;
-	csio->tag_action = tag_action;
-#if defined(BUF_TRACKING) || defined(FULL_BUF_TRACKING)
-	csio->bio = NULL;
-#endif
-}
-#endif
 
 static __inline void
 cam_fill_ctio(struct ccb_scsiio *csio, uint32_t retries,
@@ -1648,23 +1553,6 @@ cam_fill_nvmeio(struct ccb_nvmeio *nvmeio, uint32_t retries,
 	nvmeio->data_ptr = data_ptr;
 	nvmeio->dxfer_len = dxfer_len;
 }
-
-#ifdef _KERNEL
-static __inline void
-cam_fill_nvmeio_user(struct ccb_nvmeio *nvmeio, u_int32_t retries,
-	      void (*cbfcnp)(struct cam_periph *, union ccb *),
-	      u_int32_t flags, u_int8_t *data_ptr,
-	      u_int32_t dxfer_len, u_int32_t timeout)
-{
-	nvmeio->ccb_h.func_code = XPT_NVME_IO;
-	nvmeio->ccb_h.flags = flags;
-	nvmeio->ccb_h.retry_count = retries;
-	nvmeio->ccb_h.cbfcnp = cbfcnp;
-	nvmeio->ccb_h.timeout = timeout;
-	nvmeio->user_data_ptr = data_ptr;
-	nvmeio->dxfer_len = dxfer_len;
-}
-#endif
 
 static __inline void
 cam_fill_nvmeadmin(struct ccb_nvmeio *nvmeio, uint32_t retries,

@@ -1927,8 +1927,7 @@ cfiscsi_ioctl_listen(struct ctl_iscsi *ci)
 		return;
 	}
 
-	error = getsockaddr(&sa, __USER_CAP(cilp->addr, cilp->addrlen),
-	    cilp->addrlen);
+	error = getsockaddr(&sa, cilp->addr, cilp->addrlen);
 	if (error != 0) {
 		CFISCSI_DEBUG("getsockaddr, error %d", error);
 		snprintf(ci->error_str, sizeof(ci->error_str), "getsockaddr failed");
@@ -3084,12 +3083,3 @@ cfiscsi_done(union ctl_io *io)
 
 	refcount_release(&cs->cs_outstanding_ctl_pdus);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

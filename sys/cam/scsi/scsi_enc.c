@@ -366,7 +366,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 #endif
 
 	if (arg_addr)
-		addr = *((void **) arg_addr);
+		addr = *((caddr_t *) arg_addr);
 	else
 		addr = NULL;
 
