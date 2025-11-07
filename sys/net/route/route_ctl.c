@@ -1579,12 +1579,3 @@ rib_print_family(int family)
 	return ("unknown");
 }
 
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "subobject_bounds"
-//   ]
-// }
-// CHERI CHANGES END

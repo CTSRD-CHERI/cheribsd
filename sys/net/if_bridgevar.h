@@ -170,7 +170,7 @@ struct ifbreq {
 struct ifbifconf {
 	uint32_t	ifbic_len;	/* buffer size */
 	union {
-		char *ifbicu_buf;
+		caddr_t	ifbicu_buf;
 		struct ifbreq *ifbicu_req;
 	} ifbic_ifbicu;
 #define	ifbic_buf	ifbic_ifbicu.ifbicu_buf
@@ -201,7 +201,7 @@ struct ifbareq {
 struct ifbaconf {
 	uint32_t	ifbac_len;	/* buffer size */
 	union {
-		char *ifbacu_buf;
+		caddr_t ifbacu_buf;
 		struct ifbareq *ifbacu_req;
 	} ifbac_ifbacu;
 #define	ifbac_buf	ifbac_ifbacu.ifbacu_buf
@@ -264,7 +264,7 @@ struct ifbpstpreq {
 struct ifbpstpconf {
 	uint32_t	ifbpstp_len;	/* buffer size */
 	union {
-		char *ifbpstpu_buf;
+		caddr_t	ifbpstpu_buf;
 		struct ifbpstpreq *ifbpstpu_req;
 	} ifbpstp_ifbpstpu;
 #define	ifbpstp_buf	ifbpstp_ifbpstpu.ifbpstpu_buf

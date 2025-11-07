@@ -447,12 +447,3 @@ static moduledata_t enc_mod = {
 
 DECLARE_MODULE(if_enc, enc_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 MODULE_VERSION(if_enc, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

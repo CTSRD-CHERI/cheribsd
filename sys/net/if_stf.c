@@ -1024,7 +1024,9 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 		ifr = (struct ifreq *)data;
-		if (ifr == NULL || ifr->ifr_addr.sa_family != AF_INET6)
+		if (ifr && ifr->ifr_addr.sa_family == AF_INET6)
+			;
+		else
 			error = EAFNOSUPPORT;
 		break;
 
@@ -1047,12 +1049,3 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	return (error);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

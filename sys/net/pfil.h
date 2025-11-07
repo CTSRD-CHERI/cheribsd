@@ -61,8 +61,8 @@ struct pfilioc_hook {
 struct pfilioc_list {
 	u_int			 pio_nheads;
 	u_int			 pio_nhooks;
-	struct pfilioc_head *pio_heads;
-	struct pfilioc_hook *pio_hooks;
+	struct pfilioc_head	*pio_heads;
+	struct pfilioc_hook	*pio_hooks;
 };
 
 struct pfilioc_link {
@@ -194,15 +194,3 @@ struct _pfil_head {
 
 #endif /* _KERNEL */
 #endif /* _NET_PFIL_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "header",
-//   "changes": [
-//     "user_capabilities"
-//   ],
-//   "changes_purecap": [
-//     "pointer_alignment"
-//   ]
-// }
-// CHERI CHANGES END
