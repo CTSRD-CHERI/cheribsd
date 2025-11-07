@@ -181,8 +181,7 @@ struct rtentry {
 	int		rte_flags;	/* up/down?, host/net */
 	u_long		rt_weight;	/* absolute weight */ 
 	struct rtentry	*rt_chain;	/* pointer to next rtentry to delete */
-	/* net epoch tracker */
-	struct epoch_context	rt_epoch_ctx;
+	struct epoch_context	rt_epoch_ctx;	/* net epoch tracker */
 };
 
 /*
