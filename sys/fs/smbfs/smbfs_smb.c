@@ -103,7 +103,7 @@ smbfs_smb_lockandx(struct smbnode *np, int op, u_int32_t pid, off_t start, off_t
 	mb_put_uint8(mbp, 0xff);	/* secondary command */
 	mb_put_uint8(mbp, 0);		/* MBZ */
 	mb_put_uint16le(mbp, 0);
-	mb_put_mem(mbp, (char *)&np->n_fid, 2, MB_MSYSTEM);
+	mb_put_mem(mbp, (caddr_t)&np->n_fid, 2, MB_MSYSTEM);
 	mb_put_uint8(mbp, ltype);	/* locktype */
 	mb_put_uint8(mbp, 0);		/* oplocklevel - 0 seems is NO_OPLOCK */
 	mb_put_uint32le(mbp, 0);	/* timeout - break immediately */
@@ -281,7 +281,7 @@ smbfs_smb_seteof(struct smbnode *np, int64_t newsize, struct smb_cred *scred)
 		return error;
 	mbp = &t2p->t2_tparam;
 	mb_init(mbp);
-	mb_put_mem(mbp, (char *)&np->n_fid, 2, MB_MSYSTEM);
+	mb_put_mem(mbp, (caddr_t)&np->n_fid, 2, MB_MSYSTEM);
 	mb_put_uint16le(mbp, SMB_SET_FILE_END_OF_FILE_INFO);
 	mb_put_uint32le(mbp, 0);
 	mbp = &t2p->t2_tdata;
@@ -312,7 +312,7 @@ smb_smb_flush(struct smbnode *np, struct smb_cred *scred)
 		return (error);
 	smb_rq_getrequest(rqp, &mbp);
 	smb_rq_wstart(rqp);
-	mb_put_mem(mbp, (char *)&np->n_fid, 2, MB_MSYSTEM);
+	mb_put_mem(mbp, (caddr_t)&np->n_fid, 2, MB_MSYSTEM);
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
 	smb_rq_bend(rqp);
@@ -349,7 +349,7 @@ smbfs_smb_setfsize(struct smbnode *np, int64_t newsize, struct smb_cred *scred)
 		return (error);
 	smb_rq_getrequest(rqp, &mbp);
 	smb_rq_wstart(rqp);
-	mb_put_mem(mbp, (char *)&np->n_fid, 2, MB_MSYSTEM);
+	mb_put_mem(mbp, (caddr_t)&np->n_fid, 2, MB_MSYSTEM);
 	mb_put_uint16le(mbp, 0);
 	mb_put_uint32le(mbp, (uint32_t)newsize);
 	mb_put_uint16le(mbp, 0);
@@ -594,7 +594,7 @@ smbfs_smb_setftime(struct smbnode *np, struct timespec *mtime,
 	tzoff = SSTOVC(ssp)->vc_sopt.sv_tz;
 	smb_rq_getrequest(rqp, &mbp);
 	smb_rq_wstart(rqp);
-	mb_put_mem(mbp, (char *)&np->n_fid, 2, MB_MSYSTEM);
+	mb_put_mem(mbp, (caddr_t)&np->n_fid, 2, MB_MSYSTEM);
 	mb_put_uint32le(mbp, 0);		/* creation time */
 
 	if (atime)
@@ -639,7 +639,7 @@ smbfs_smb_setfattrNT(struct smbnode *np, u_int16_t attr, struct timespec *mtime,
 	svtz = SSTOVC(ssp)->vc_sopt.sv_tz;
 	mbp = &t2p->t2_tparam;
 	mb_init(mbp);
-	mb_put_mem(mbp, (char *)&np->n_fid, 2, MB_MSYSTEM);
+	mb_put_mem(mbp, (caddr_t)&np->n_fid, 2, MB_MSYSTEM);
 	mb_put_uint16le(mbp, SMB_SET_FILE_BASIC_INFO);
 	mb_put_uint32le(mbp, 0);
 	mbp = &t2p->t2_tdata;
@@ -731,7 +731,7 @@ smbfs_smb_close(struct smb_share *ssp, u_int16_t fid, struct timespec *mtime,
 		return (error);
 	smb_rq_getrequest(rqp, &mbp);
 	smb_rq_wstart(rqp);
-	mb_put_mem(mbp, (char *)&fid, sizeof(fid), MB_MSYSTEM);
+	mb_put_mem(mbp, (caddr_t)&fid, sizeof(fid), MB_MSYSTEM);
 	if (mtime) {
 		smb_time_local2server(mtime, SSTOVC(ssp)->vc_sopt.sv_tz, &time);
 	} else
@@ -1131,7 +1131,7 @@ smbfs_smb_trans2find2(struct smbfs_fctx *ctx)
 		ctx->f_t2 = t2p;
 		mbp = &t2p->t2_tparam;
 		mb_init(mbp);
-		mb_put_mem(mbp, (char *)&ctx->f_Sid, 2, MB_MSYSTEM);
+		mb_put_mem(mbp, (caddr_t)&ctx->f_Sid, 2, MB_MSYSTEM);
 		mb_put_uint16le(mbp, ctx->f_limit);
 		mb_put_uint16le(mbp, ctx->f_infolevel);
 		mb_put_uint32le(mbp, 0);		/* resume key */
@@ -1208,7 +1208,7 @@ smbfs_smb_findclose2(struct smbfs_fctx *ctx)
 		return (error);
 	smb_rq_getrequest(rqp, &mbp);
 	smb_rq_wstart(rqp);
-	mb_put_mem(mbp, (char *)&ctx->f_Sid, 2, MB_MSYSTEM);
+	mb_put_mem(mbp, (caddr_t)&ctx->f_Sid, 2, MB_MSYSTEM);
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
 	smb_rq_bend(rqp);

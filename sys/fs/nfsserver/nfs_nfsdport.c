@@ -3864,8 +3864,7 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 			cp = malloc(nfsdarg.dnshostlen + 1, M_TEMP, M_WAITOK);
 			error = copyin(nfsdarg.dnshost, cp, nfsdarg.dnshostlen);
 			if (error != 0) {
-				free((char *)nfsdarg.addr,
-				    M_TEMP);
+				free(nfsdarg.addr, M_TEMP);
 				free(cp, M_TEMP);
 				goto out;
 			}
@@ -3874,10 +3873,8 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 			cp = malloc(nfsdarg.dspathlen + 1, M_TEMP, M_WAITOK);
 			error = copyin(nfsdarg.dspath, cp, nfsdarg.dspathlen);
 			if (error != 0) {
-				free((char *)nfsdarg.addr,
-				    M_TEMP);
-				free((char *)nfsdarg.dnshost,
-				    M_TEMP);
+				free(nfsdarg.addr, M_TEMP);
+				free(nfsdarg.dnshost, M_TEMP);
 				free(cp, M_TEMP);
 				goto out;
 			}
@@ -3886,12 +3883,9 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 			cp = malloc(nfsdarg.mdspathlen + 1, M_TEMP, M_WAITOK);
 			error = copyin(nfsdarg.mdspath, cp, nfsdarg.mdspathlen);
 			if (error != 0) {
-				free((char *)nfsdarg.addr,
-				    M_TEMP);
-				free((char *)nfsdarg.dnshost,
-				    M_TEMP);
-				free((char *)nfsdarg.dspath,
-				    M_TEMP);
+				free(nfsdarg.addr, M_TEMP);
+				free(nfsdarg.dnshost, M_TEMP);
+				free(nfsdarg.dspath, M_TEMP);
 				free(cp, M_TEMP);
 				goto out;
 			}
@@ -3911,10 +3905,10 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 		nfsd_timer(NFSD_TD_TO_VNET(td));
 		error = nfsrvd_nfsd(td, &nfsdarg);
 		callout_drain(&NFSD_VNET(nfsd_callout));
-		free((char *)nfsdarg.addr, M_TEMP);
-		free((char *)nfsdarg.dnshost, M_TEMP);
-		free((char *)nfsdarg.dspath, M_TEMP);
-		free((char *)nfsdarg.mdspath, M_TEMP);
+		free(nfsdarg.addr, M_TEMP);
+		free(nfsdarg.dnshost, M_TEMP);
+		free(nfsdarg.dspath, M_TEMP);
+		free(nfsdarg.mdspath, M_TEMP);
 	} else if (uap->flag & NFSSVC_PNFSDS) {
 		error = copyincap(uap->argp, &pnfsdarg, sizeof(pnfsdarg));
 		if (error == 0 && (pnfsdarg.op == PNFSDOP_DELDSSERVER ||
@@ -4020,7 +4014,7 @@ nfssvc_srvcall(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 			nfs_pubfhset = 1;
 	} else if ((uap->flag & (NFSSVC_V4ROOTEXPORT | NFSSVC_NEWSTRUCT)) ==
 	    (NFSSVC_V4ROOTEXPORT | NFSSVC_NEWSTRUCT)) {
-		error = copyincap(uap->argp,(caddr_t)&export,
+		error = copyincap(uap->argp, &export,
 		    sizeof (struct nfsex_args));
 		if (!error) {
 			grps = NULL;
@@ -4030,8 +4024,7 @@ nfssvc_srvcall(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 			else if (export.export.ex_ngroups > 0) {
 				grps = malloc(export.export.ex_ngroups *
 				    sizeof(gid_t), M_TEMP, M_WAITOK);
-				error = copyin(export.export.ex_groups_user,
-				    grps,
+				error = copyin(export.export.ex_groups, grps,
 				    export.export.ex_ngroups * sizeof(gid_t));
 				export.export.ex_groups = grps;
 			} else
