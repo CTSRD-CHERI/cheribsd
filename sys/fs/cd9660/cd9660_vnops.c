@@ -665,7 +665,7 @@ cd9660_readlink(struct vop_readlink_args *ap)
 	 * Abuse a namei buffer for now.
 	 */
 	if (uio->uio_segflg == UIO_SYSSPACE)
-		symname = (void *)uio->uio_iov->iov_base;
+		symname = uio->uio_iov->iov_base;
 	else
 		symname = uma_zalloc(namei_zone, M_WAITOK);
 

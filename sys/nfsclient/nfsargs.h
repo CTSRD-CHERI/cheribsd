@@ -41,21 +41,11 @@
 #define NFS_ARGSVERSION	3		/* change when nfs_args changes */
 struct nfs_args {
 	int		version;	/* args structure version number */
-	union {
-#ifdef _KERNEL
-		struct sockaddr *user_addr;
-#endif
-		struct sockaddr	*addr; /* file server address */
-	};
+	struct sockaddr	*addr;		/* file server address */
 	int		addrlen;	/* length of address */
 	int		sotype;		/* Socket type */
 	int		proto;		/* and Protocol */
-	union {
-#ifdef _KERNEL
-		u_char *user_fh;
-#endif
-		u_char *fh;		/* File handle to be mounted */
-	};
+	u_char		*fh;		/* File handle to be mounted */
 	int		fhsize;		/* Size, in bytes, of fh */
 	int		flags;		/* flags */
 	int		wsize;		/* write size in bytes */
@@ -67,12 +57,7 @@ struct nfs_args {
 	int		readahead;	/* # of blocks to readahead */
 	int		wcommitsize;	/* Max. write commit size in bytes */
 	int		deadthresh;	/* Retrans threshold */
-	union {
-#ifdef _KERNEL
-		char *user_hostname;
-#endif
-		char *hostname;		/* server's name */
-	};
+	char		*hostname;	/* server's name */
 	int		acregmin;	/* cache attrs for reg files min time */
 	int		acregmax;	/* cache attrs for reg files max time */
 	int		acdirmin;	/* cache attrs for dirs min time */

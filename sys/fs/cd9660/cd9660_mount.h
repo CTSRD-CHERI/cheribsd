@@ -38,7 +38,7 @@
  * Arguments to mount ISO 9660 filesystems.
  */
 struct iso_args {
-	char	*fspec;		/* block special device to mount */
+	char	*fspec;			/* block special device to mount */
 	struct	oexport_args export;	/* network export info */
 	uid_t   uid;		    	/* uid that owns ISO-9660 files */
 	gid_t   gid;		    	/* gid that owns ISO-9660 files */
