@@ -3476,7 +3476,7 @@ mesh_ioctl_get80211(struct ieee80211vap *vap, struct ieee80211req *ireq)
 				off += sizeof(*imr);
 			}
 			MESH_RT_UNLOCK(ms);
-			error = copyout(p, ireq->i_data,
+			error = copyout(p, (uint8_t *)ireq->i_data,
 			    ireq->i_len);
 			IEEE80211_FREE(p, M_TEMP);
 			break;
@@ -3494,7 +3494,7 @@ mesh_ioctl_get80211(struct ieee80211vap *vap, struct ieee80211req *ireq)
 			return EINVAL;
 		ireq->i_len = len;
 		error = copyout(ms->ms_pmetric->mpm_descr,
-		    ireq->i_data, len);
+		    (uint8_t *)ireq->i_data, len);
 		break;
 	case IEEE80211_IOC_MESH_PR_PATH:
 		len = strlen(ms->ms_ppath->mpp_descr);
@@ -3502,7 +3502,7 @@ mesh_ioctl_get80211(struct ieee80211vap *vap, struct ieee80211req *ireq)
 			return EINVAL;
 		ireq->i_len = len;
 		error = copyout(ms->ms_ppath->mpp_descr,
-		    ireq->i_data, len);
+		    (uint8_t *)ireq->i_data, len);
 		break;
 	default:
 		return ENOSYS;

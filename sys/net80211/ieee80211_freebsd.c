@@ -1191,12 +1191,3 @@ MODULE_DEPEND(wlan, ether, 1, 1, 1);
 #ifdef	IEEE80211_ALQ
 MODULE_DEPEND(wlan, alq, 1, 1, 1);
 #endif	/* IEEE80211_ALQ */
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END
