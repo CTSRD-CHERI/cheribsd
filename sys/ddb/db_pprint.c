@@ -285,7 +285,6 @@ again:
 		break;
 	}
 
-	/* XXX: Only works on little-endian CHERI. */
 	ptrcnt = min(ptrcnt, strlen(asteriskstr));
 	val = (addr != 0) ? db_get_value(addr, sizeof(db_addr_t), false) : 0;
 	if (depth < max_depth && (val != 0)) {
