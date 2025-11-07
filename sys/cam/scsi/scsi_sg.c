@@ -569,7 +569,7 @@ sgioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
 			break;
 		}
 
-		cam_fill_csio_user(csio,
+		cam_fill_csio(csio,
 			      /*retries*/1,
 			      /*cbfcnp*/NULL,
 			      dir|CAM_DEV_QFRZDIS,

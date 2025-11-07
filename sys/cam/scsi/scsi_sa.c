@@ -1430,7 +1430,7 @@ saparamsetlist(struct cam_periph *periph, struct mtsetlist *list,
 		 */
 		cam_periph_unlock(periph);
 		params = malloc(list->param_len, M_SCSISA, M_WAITOK | M_ZERO);
-		error = copyin(list->user_params, params, list->param_len);
+		error = copyin(list->params, params, list->param_len);
 		cam_periph_lock(periph);
 
 		if (error != 0)
@@ -1497,8 +1497,7 @@ bailout:
 			int error1;
 
 			cam_periph_unlock(periph);
-			error1 = copyout(params, list->user_params,
-			    list->param_len);
+			error1 = copyout(params, list->params, list->param_len);
 			if (error == 0)
 				error = error1;
 			cam_periph_lock(periph);

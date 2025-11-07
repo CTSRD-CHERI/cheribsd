@@ -186,12 +186,7 @@ union ctl_priv {
 #define CTL_UNMAPPED_IID     0xFF
 
 struct ctl_sg_entry {
-	union {
-#ifdef _KERNEL
-		void *uaddr;
-#endif
-		void	*addr;
-	};
+	void	*addr;
 	size_t	len;
 };
 
@@ -292,12 +287,7 @@ struct ctl_scsiio {
 	 * doesn't modify or use them.
 	 */
 	uint32_t   ext_sg_entries;	/* 0 = no S/G list, > 0 = num entries */
-	union {
-#ifdef _KERNEL
-		uint8_t *ext_data_uptr;
-#endif
-		uint8_t    *ext_data_ptr;	/* data buffer or S/G list */
-	};
+	uint8_t    *ext_data_ptr;	/* data buffer or S/G list */
 	uint32_t   ext_data_len;	/* Data transfer length */
 	uint32_t   ext_data_filled;	/* Amount of data filled so far */
 
@@ -312,12 +302,7 @@ struct ctl_scsiio {
 	/*
 	 * The data pointer or a pointer to the scatter/gather list.
 	 */
-	union {
-#ifdef _KERNEL
-		uint8_t *kern_data_uptr;
-#endif
-		uint8_t *kern_data_ptr;
-	};
+	uint8_t *kern_data_ptr;
 
 	/*
 	 * Length of the data buffer or scatter/gather list.  It's also
@@ -355,30 +340,10 @@ struct ctl_scsiio {
 	ctl_tag_type tag_type;		/* simple, ordered, head of queue,etc.*/
 	uint8_t    cdb_len;		/* CDB length */
 	uint8_t	   cdb[CTL_MAX_CDBLEN];	/* CDB */
-	union {
-#ifdef _KERNEL
-		void *_dummy0;
-#endif
-		ctl_be_move_done_t be_move_done;	/* called by fe */
-	};
-	union {
-#ifdef _KERNEL
-		void *_dummy1;
-#endif
-		ctl_io_cont io_cont;		/* to continue processing */
-	};
-	union {
-#ifdef _KERNEL
-		void *_dummy2;
-#endif
-		ctl_ref	    kern_data_ref; /* Method to reference/release data */
-	};
-	union {
-#ifdef _KERNEL
-		void *_dummy3;
-#endif
-		void	   *kern_data_arg; /* Opaque argument for kern_data_ref() */
-	};
+	ctl_be_move_done_t be_move_done;	/* called by fe */
+	ctl_io_cont io_cont;		/* to continue processing */
+	ctl_ref	    kern_data_ref;	/* Method to reference/release data */
+	void	   *kern_data_arg;	/* Opaque argument for kern_data_ref() */
 };
 
 typedef enum {
@@ -481,30 +446,10 @@ struct ctl_nvmeio {
 	struct nvme_command cmd;	/* SQE */
 	struct nvme_completion cpl;	/* CQE */
 	bool       success_sent;	/* datamove already sent CQE */
-	union {
-#ifdef _KERNEL
-		void *_dummy0;
-#endif
-		ctl_be_move_done_t be_move_done;	/* called by fe */
-	};
-	union {
-#ifdef _KERNEL
-		void *_dummy1;
-#endif
-		ctl_io_cont io_cont;		/* to continue processing */
-	};
-	union {
-#ifdef _KERNEL
-		void *_dummy2;
-#endif
-		ctl_ref	    kern_data_ref; /* Method to reference/release data */
-	};
-	union {
-#ifdef _KERNEL
-		void *_dummy3;
-#endif
-		void	   *kern_data_arg; /* Opaque argument for kern_data_ref() */
-	};
+	ctl_be_move_done_t be_move_done;	/* called by fe */
+	ctl_io_cont io_cont;		/* to continue processing */
+	ctl_ref	    kern_data_ref;	/* Method to reference/release data */
+	void	   *kern_data_arg;	/* Opaque argument for kern_data_ref() */
 };
 
 /*
