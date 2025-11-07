@@ -112,9 +112,9 @@ struct bpf_version {
  * buffer as used by BPF.
  */
 struct bpf_zbuf {
-	void *bz_bufa;	/* Location of 'a' zero-copy buffer. */
-	void *bz_bufb;	/* Location of 'b' zero-copy buffer. */
-	size_t	 bz_buflen;		/* Size of zero-copy buffers. */
+	void	*bz_bufa;	/* Location of 'a' zero-copy buffer. */
+	void	*bz_bufb;	/* Location of 'b' zero-copy buffer. */
+	size_t	 bz_buflen;	/* Size of zero-copy buffers. */
 };
 
 #define	BIOCGBLEN	_IOR('B', 102, u_int)
@@ -375,7 +375,7 @@ struct bpf_insn {
  */
 struct bpf_dltlist {
 	u_int	bfl_len;	/* number of bfd_list array */
-	u_int *bfl_list;	/* array of DLTs */
+	u_int	*bfl_list;	/* array of DLTs */
 };
 
 #ifdef _KERNEL

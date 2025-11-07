@@ -91,7 +91,7 @@
  * knows that the space is not available.
  */
 struct zbuf {
-	void *zb_uaddr;	/* User address at time of setup. */
+	void		*zb_uaddr;	/* User address at time of setup. */
 	size_t		 zb_size;	/* Size of buffer, incl. header. */
 	u_int		 zb_numpages;	/* Number of pages. */
 	int		 zb_flags;	/* Flags on zbuf. */
@@ -512,7 +512,7 @@ bpf_zerocopy_ioctl_rotzbuf(struct thread *td, struct bpf_d *d,
 	if (d->bd_hbuf == NULL && d->bd_slen != 0) {
 		ROTATE_BUFFERS(d);
 		bzh = (struct zbuf *)d->bd_hbuf;
-		bz->bz_bufa = bzh->zb_uaddr;
+		bz->bz_bufa = (void *)bzh->zb_uaddr;
 		bz->bz_buflen = d->bd_hlen;
 	}
 	BPFD_UNLOCK(d);

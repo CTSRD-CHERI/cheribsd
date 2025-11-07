@@ -1984,7 +1984,7 @@ struct pfioc_trans {
 
 struct pfioc_table {
 	struct pfr_table	 pfrio_table;
-	void *	 pfrio_buffer;
+	void			 * pfrio_buffer;
 	int			 pfrio_esize;
 	int			 pfrio_size;
 	int			 pfrio_size2;
