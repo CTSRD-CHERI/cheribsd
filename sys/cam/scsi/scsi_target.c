@@ -556,7 +556,7 @@ targwrite(struct cdev *dev, struct uio *uio, int ioflag)
 			descr->user_ccb = user_ccb;
 			descr->func_code = func_code;
 			CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
-			    ("Sent ATIO/INOT (%p)\n", (void *)user_ccb));
+				  ("Sent ATIO/INOT (%p)\n", user_ccb));
 			xpt_action(ccb);
 			TAILQ_INSERT_TAIL(&softc->pending_ccb_queue,
 					  &ccb->ccb_h,
@@ -568,7 +568,7 @@ targwrite(struct cdev *dev, struct uio *uio, int ioflag)
 			if ((func_code & XPT_FC_QUEUED) != 0) {
 				CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
 					  ("Sending queued ccb %#x (%p)\n",
-					  func_code, (void *)user_ccb));
+					  func_code, user_ccb));
 				descr = targgetdescr(softc);
 				descr->user_ccb = user_ccb;
 				descr->priority = priority;
@@ -579,7 +579,7 @@ targwrite(struct cdev *dev, struct uio *uio, int ioflag)
 			} else {
 				CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
 					  ("Sending inline ccb %#x (%p)\n",
-					  func_code, (void *)user_ccb));
+					  func_code, user_ccb));
 				ccb = targgetccb(softc, func_code, priority);
 				descr = (struct targ_cmd_descr *)
 					 ccb->ccb_h.targ_descr;
@@ -685,8 +685,7 @@ targusermerge(struct targ_softc *softc, struct targ_cmd_descr *descr,
 			struct targ_cmd_descr *ab_descr;
 
 			ab_descr = (struct targ_cmd_descr *)ccb_h->targ_descr;
-			if ((union ccb *)ab_descr->user_ccb ==
-			    cab->abort_ccb) {
+			if (ab_descr->user_ccb == cab->abort_ccb) {
 				CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
 					  ("Changing abort for %p to %p\n",
 					  cab->abort_ccb, ccb_h));
@@ -847,7 +846,7 @@ targread(struct cdev *dev, struct uio *uio, int ioflag)
 		descr = (struct targ_cmd_descr *)ccb_h->targ_descr;
 		user_ccb = descr->user_ccb;
 		CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
-			  ("targread ccb %p (%p)\n", ccb_h, (void *)user_ccb));
+			  ("targread ccb %p (%p)\n", ccb_h, user_ccb));
 		error = targreturnccb(softc, (union ccb *)ccb_h);
 		if (error != 0)
 			goto read_fail;
@@ -869,7 +868,7 @@ targread(struct cdev *dev, struct uio *uio, int ioflag)
 		user_ccb = user_descr->user_ccb;
 		CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
 			  ("targread aborted descr %p (%p)\n",
-			  user_descr, (void *)user_ccb));
+			  user_descr, user_ccb));
 		if (suword(&user_ccb->ccb_h.status, CAM_REQ_ABORTED) != 0) {
 			error = EFAULT;
 			goto read_fail;

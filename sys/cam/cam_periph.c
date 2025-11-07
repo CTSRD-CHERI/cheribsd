@@ -823,15 +823,15 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 			return(EINVAL);
 		}
 		if (ccb->cdm.pattern_buf_len > 0) {
-			data_ptrs[0] = (uint8_t **)&ccb->cdm.user_patterns;
+			data_ptrs[0] = (uint8_t **)&ccb->cdm.patterns;
 			lengths[0] = ccb->cdm.pattern_buf_len;
 			dirs[0] = CAM_DIR_OUT;
-			data_ptrs[1] = (uint8_t **)&ccb->cdm.user_matches;
+			data_ptrs[1] = (uint8_t **)&ccb->cdm.matches;
 			lengths[1] = ccb->cdm.match_buf_len;
 			dirs[1] = CAM_DIR_IN;
 			numbufs = 2;
 		} else {
-			data_ptrs[0] = (uint8_t **)&ccb->cdm.user_matches;
+			data_ptrs[0] = (uint8_t **)&ccb->cdm.matches;
 			lengths[0] = ccb->cdm.match_buf_len;
 			dirs[0] = CAM_DIR_IN;
 			numbufs = 1;
@@ -848,7 +848,7 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 			return(0);
 		if ((ccb->ccb_h.flags & CAM_DATA_MASK) != CAM_DATA_VADDR)
 			return (EINVAL);
-		data_ptrs[0] = &ccb->csio.user_data_ptr;
+		data_ptrs[0] = &ccb->csio.data_ptr;
 		lengths[0] = ccb->csio.dxfer_len;
 		dirs[0] = ccb->ccb_h.flags & CAM_DIR_MASK;
 		numbufs = 1;
@@ -858,7 +858,7 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 			return(0);
 		if ((ccb->ccb_h.flags & CAM_DATA_MASK) != CAM_DATA_VADDR)
 			return (EINVAL);
-		data_ptrs[0] = &ccb->ataio.user_data_ptr;
+		data_ptrs[0] = &ccb->ataio.data_ptr;
 		lengths[0] = ccb->ataio.dxfer_len;
 		dirs[0] = ccb->ccb_h.flags & CAM_DIR_MASK;
 		numbufs = 1;
@@ -873,21 +873,21 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 		 * pointer and then tries to modify the copy of the
 		 * pointer in userspace.
 		 */
-		data_ptrs[0] = (u_int8_t **)&ccb->mmcio.cmd.data;
+		data_ptrs[0] = (unsigned char **)&ccb->mmcio.cmd.data;
 		lengths[0] = sizeof(struct mmc_data *);
 		dirs[0] = ccb->ccb_h.flags & CAM_DIR_MASK;
 #if 0
-		data_ptrs[1] = &ccb->mmcio.cmd.data->data;
+		data_ptrs[1] = (unsigned char **)&ccb->mmcio.cmd.data->data;
 		lengths[1] = ccb->mmcio.cmd.data->len;
 		dirs[1] = ccb->ccb_h.flags & CAM_DIR_MASK;
 #endif
 		numbufs = 1;
 		break;
 	case XPT_SMP_IO:
-		data_ptrs[0] = &ccb->smpio.smp_user_request;
+		data_ptrs[0] = &ccb->smpio.smp_request;
 		lengths[0] = ccb->smpio.smp_request_len;
 		dirs[0] = CAM_DIR_OUT;
-		data_ptrs[1] = &ccb->smpio.smp_user_response;
+		data_ptrs[1] = &ccb->smpio.smp_response;
 		lengths[1] = ccb->smpio.smp_response_len;
 		dirs[1] = CAM_DIR_IN;
 		numbufs = 2;
@@ -898,7 +898,7 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 			return (0);
 		if ((ccb->ccb_h.flags & CAM_DATA_MASK) != CAM_DATA_VADDR)
 			return (EINVAL);
-		data_ptrs[0] = &ccb->nvmeio.user_data_ptr;
+		data_ptrs[0] = &ccb->nvmeio.data_ptr;
 		lengths[0] = ccb->nvmeio.dxfer_len;
 		dirs[0] = ccb->ccb_h.flags & CAM_DIR_MASK;
 		numbufs = 1;
@@ -907,7 +907,7 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 		if (ccb->cdai.bufsiz == 0)
 			return (0);
 
-		data_ptrs[0] = &ccb->cdai.user_buf;
+		data_ptrs[0] = (uint8_t **)&ccb->cdai.buf;
 		lengths[0] = ccb->cdai.bufsiz;
 		dirs[0] = CAM_DIR_IN;
 		numbufs = 1;
@@ -948,18 +948,18 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 		 */
 		if (lengths[i] <= periph_mapmem_thresh &&
 		    ccb->ccb_h.func_code != XPT_MMC_IO) {
-			void *buf;
+			*data_ptrs[i] = malloc(lengths[i], M_CAMPERIPH,
+			    M_WAITOK);
 
-			buf = malloc(lengths[i], M_CAMPERIPH, M_WAITOK);
 			if (dirs[i] != CAM_DIR_IN) {
-				if (copyin(mapinfo->orig[i], buf, 
+				if (copyin(mapinfo->orig[i], *data_ptrs[i],
 				    lengths[i]) != 0) {
-					free(buf, M_CAMPERIPH);
+					free(*data_ptrs[i], M_CAMPERIPH);
+					*data_ptrs[i] = mapinfo->orig[i];
 					goto fail;
 				}
 			} else
-				bzero(buf, lengths[i]);
-			*(void **)data_ptrs[i] = buf;
+				bzero(*data_ptrs[i], lengths[i]);
 			continue;
 		}
 
@@ -979,7 +979,7 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 		}
 
 		/* set our pointer to the new mapped area */
-		*(void **)data_ptrs[i] = mapinfo->bp[i]->b_data;
+		*data_ptrs[i] = mapinfo->bp[i]->b_data;
 	}
 
 	/*
@@ -1001,7 +1001,7 @@ fail:
 			vunmapbuf(mapinfo->bp[i]);
 			uma_zfree(pbuf_zone, mapinfo->bp[i]);
 		} else
-			free(*(void **)data_ptrs[i], M_CAMPERIPH);
+			free(*data_ptrs[i], M_CAMPERIPH);
 		*data_ptrs[i] = mapinfo->orig[i];
 	}
 	return(EACCES);
@@ -1027,15 +1027,15 @@ cam_periph_unmapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 	switch (ccb->ccb_h.func_code) {
 	case XPT_DEV_MATCH:
 		if (ccb->cdm.pattern_buf_len > 0) {
-			data_ptrs[0] = (uint8_t **)&ccb->cdm.user_patterns;
+			data_ptrs[0] = (uint8_t **)&ccb->cdm.patterns;
 			lengths[0] = ccb->cdm.pattern_buf_len;
 			dirs[0] = CAM_DIR_OUT;
-			data_ptrs[1] = (uint8_t **)&ccb->cdm.user_matches;
+			data_ptrs[1] = (uint8_t **)&ccb->cdm.matches;
 			lengths[1] = ccb->cdm.match_buf_len;
 			dirs[1] = CAM_DIR_IN;
 			numbufs = 2;
 		} else {
-			data_ptrs[0] = (uint8_t **)&ccb->cdm.user_matches;
+			data_ptrs[0] = (uint8_t **)&ccb->cdm.matches;
 			lengths[0] = ccb->cdm.match_buf_len;
 			dirs[0] = CAM_DIR_IN;
 			numbufs = 1;
@@ -1043,13 +1043,13 @@ cam_periph_unmapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 		break;
 	case XPT_SCSI_IO:
 	case XPT_CONT_TARGET_IO:
-		data_ptrs[0] = &ccb->csio.user_data_ptr;
+		data_ptrs[0] = &ccb->csio.data_ptr;
 		lengths[0] = ccb->csio.dxfer_len;
 		dirs[0] = ccb->ccb_h.flags & CAM_DIR_MASK;
 		numbufs = 1;
 		break;
 	case XPT_ATA_IO:
-		data_ptrs[0] = &ccb->ataio.user_data_ptr;
+		data_ptrs[0] = &ccb->ataio.data_ptr;
 		lengths[0] = ccb->ataio.dxfer_len;
 		dirs[0] = ccb->ccb_h.flags & CAM_DIR_MASK;
 		numbufs = 1;
@@ -1059,30 +1059,30 @@ cam_periph_unmapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 		lengths[0] = sizeof(struct mmc_data *);
 		dirs[0] = ccb->ccb_h.flags & CAM_DIR_MASK;
 #if 0
-		data_ptrs[1] = &ccb->mmcio.cmd.data->data;
+		data_ptrs[1] = (uint8_t **)&ccb->mmcio.cmd.data->data;
 		lengths[1] = ccb->mmcio.cmd.data->len;
 		dirs[1] = ccb->ccb_h.flags & CAM_DIR_MASK;
 #endif
 		numbufs = 1;
 		break;
 	case XPT_SMP_IO:
-		data_ptrs[0] = &ccb->smpio.smp_user_request;
+		data_ptrs[0] = &ccb->smpio.smp_request;
 		lengths[0] = ccb->smpio.smp_request_len;
 		dirs[0] = CAM_DIR_OUT;
-		data_ptrs[1] = &ccb->smpio.smp_user_response;
+		data_ptrs[1] = &ccb->smpio.smp_response;
 		lengths[1] = ccb->smpio.smp_response_len;
 		dirs[1] = CAM_DIR_IN;
 		numbufs = 2;
 		break;
 	case XPT_NVME_IO:
 	case XPT_NVME_ADMIN:
-		data_ptrs[0] = &ccb->nvmeio.user_data_ptr;
+		data_ptrs[0] = &ccb->nvmeio.data_ptr;
 		lengths[0] = ccb->nvmeio.dxfer_len;
 		dirs[0] = ccb->ccb_h.flags & CAM_DIR_MASK;
 		numbufs = 1;
 		break;
 	case XPT_DEV_ADVINFO:
-		data_ptrs[0] = &ccb->cdai.user_buf;
+		data_ptrs[0] = &ccb->cdai.buf;
 		lengths[0] = ccb->cdai.bufsiz;
 		dirs[0] = CAM_DIR_IN;
 		numbufs = 1;
@@ -1101,18 +1101,15 @@ cam_periph_unmapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 			/* release the buffer */
 			uma_zfree(pbuf_zone, mapinfo->bp[i]);
 		} else {
-			void *buf;
-
-			buf = *(void **)data_ptrs[i];
 			if (dirs[i] != CAM_DIR_OUT) {
 				int error1;
 
-				error1 = copyout(buf, mapinfo->orig[i],
+				error1 = copyout(*data_ptrs[i], mapinfo->orig[i],
 				    lengths[i]);
 				if (error == 0)
 					error = error1;
 			}
-			free(buf, M_CAMPERIPH);
+			free(*data_ptrs[i], M_CAMPERIPH);
 		}
 
 		/* Set the user's pointer back to the original value */

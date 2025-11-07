@@ -133,9 +133,6 @@ struct uio;
  */
 typedef struct bus_dma_segment {
 	union {
-#ifdef _KERNEL
-		void *ds_user_vaddr;
-#endif
 		void	 *ds_vaddr;	/* Virtual address. */
 		bus_addr_t ds_addr;	/* DMA address */
 	};
