@@ -443,7 +443,7 @@ freebsd64_copyinuio(const struct iovec *cb_arg, u_int iovcnt,
 			freeuio(uio);
 			return (error);
 		}
-		IOVEC_INIT_C(&iov[i], USER_PTR(iov64.iov_base, iov64.iov_len),
+		IOVEC_INIT(&iov[i], USER_PTR(iov64.iov_base, iov64.iov_len),
 		    iov64.iov_len);
 	}
 	uio->uio_iovcnt = iovcnt;
@@ -487,7 +487,7 @@ freebsd64_copyiniov(const struct iovec *cb_arg, u_int iovcnt,
 			free(iovs, M_IOV);
 			return (error);
 		}
-		IOVEC_INIT_C(iovs + i,
+		IOVEC_INIT(iovs + i,
 		    USER_PTR(useriov.iov_base, useriov.iov_len),
 		    useriov.iov_len);
 	}

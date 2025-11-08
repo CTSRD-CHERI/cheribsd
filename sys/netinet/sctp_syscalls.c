@@ -312,7 +312,7 @@ kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
 		ktrsockaddr(to);
 #endif
 
-	IOVEC_INIT_C(&iov[0], msg, mlen);
+	IOVEC_INIT(&iov[0], msg, mlen);
 
 	so = (struct socket *)fp->f_data;
 	if (so->so_proto->pr_protocol != IPPROTO_SCTP) {

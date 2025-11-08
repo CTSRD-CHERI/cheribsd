@@ -188,7 +188,7 @@ extattr_set_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 		return (error);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 
-	IOVEC_INIT_C(&aiov, data, nbytes);
+	IOVEC_INIT(&aiov, data, nbytes);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_offset = 0;
@@ -381,7 +381,7 @@ extattr_get_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 	sizep = NULL;
 	cnt = 0;
 	if (data != NULL) {
-		IOVEC_INIT_C(&aiov, data, nbytes);
+		IOVEC_INIT(&aiov, data, nbytes);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = 0;
@@ -774,7 +774,7 @@ user_extattr_list_fd(struct thread *td, int fd, int attrnamespace,
 	struct iovec aiov;
 
 	if (data != NULL) {
-		IOVEC_INIT_C(&aiov, data, nbytes);
+		IOVEC_INIT(&aiov, data, nbytes);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = 0;
@@ -850,7 +850,7 @@ user_extattr_list_path(struct thread *td, const char *path,
 	struct iovec aiov;
 
 	if (data != NULL) {
-		IOVEC_INIT_C(&aiov, data, nbytes);
+		IOVEC_INIT(&aiov, data, nbytes);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = 0;
