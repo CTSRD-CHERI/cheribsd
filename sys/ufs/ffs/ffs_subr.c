@@ -207,7 +207,7 @@ ffs_sbget(void *devfd, struct fs **fsp, off_t sblock, int flags,
 		UFS_FREE(fs, filltype);
 		return (ENOMEM);
 	}
-	fs_csp = (struct csum *)space;
+	fs->fs_csp = (struct csum *)space;
 	for (i = 0; i < blks; i += fs->fs_frag) {
 		size = fs->fs_bsize;
 		if (i + fs->fs_frag > blks)
@@ -228,7 +228,7 @@ ffs_sbget(void *devfd, struct fs **fsp, off_t sblock, int flags,
 		space += size;
 	}
 	if (fs->fs_contigsumsize > 0) {
-		fs_maxcluster = lp = (int32_t *)space;
+		fs->fs_maxcluster = lp = (int32_t *)space;
 		for (i = 0; i < fs->fs_ncg; i++)
 			*lp++ = fs->fs_contigsumsize;
 		space = (uint8_t *)lp;
@@ -1100,13 +1100,3 @@ ffs_clusteracct(struct fs *fs, struct cg *cgp, ufs1_daddr_t blkno, int cnt)
 			break;
 	fs->fs_maxcluster[cgp->cg_cgx] = i;
 }
-
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "pointer_shape"
-//   ]
-// }
-// CHERI CHANGES END
