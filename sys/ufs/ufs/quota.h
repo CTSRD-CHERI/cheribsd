@@ -229,22 +229,14 @@ int	getinoquota(struct inode *);
 int	qsync(struct mount *);
 int	qsyncvp(struct vnode *);
 int	quotaoff(struct thread *, struct mount *, int);
-int	quotaon(struct thread *, struct mount *, int, void *,
-	    bool *);
-int	getquota32(struct thread *, struct mount *, uint64_t, int,
-	    void *);
-int	setquota32(struct thread *, struct mount *, uint64_t, int,
-	    void *);
-int	setuse32(struct thread *, struct mount *, uint64_t, int,
-	    void *);
-int	getquota(struct thread *, struct mount *, uint64_t, int,
-	    void *);
-int	setquota(struct thread *, struct mount *, uint64_t, int,
-	    void *);
-int	setuse(struct thread *, struct mount *, uint64_t, int,
-	    void *);
-int	getquotasize(struct thread *, struct mount *, uint64_t, int,
-	    void *);
+int	quotaon(struct thread *, struct mount *, int, void *, bool *);
+int	getquota32(struct thread *, struct mount *, uint64_t, int, void *);
+int	setquota32(struct thread *, struct mount *, uint64_t, int, void *);
+int	setuse32(struct thread *, struct mount *, uint64_t, int, void *);
+int	getquota(struct thread *, struct mount *, uint64_t, int, void *);
+int	setquota(struct thread *, struct mount *, uint64_t, int, void *);
+int	setuse(struct thread *, struct mount *, uint64_t, int, void *);
+int	getquotasize(struct thread *, struct mount *, uint64_t, int, void *);
 vfs_quotactl_t ufs_quotactl;
 
 #ifdef SOFTUPDATES
@@ -264,12 +256,3 @@ __END_DECLS
 #endif /* _KERNEL */
 
 #endif /* !_UFS_UFS_QUOTA_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "header",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

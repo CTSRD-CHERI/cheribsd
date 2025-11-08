@@ -974,8 +974,7 @@ setquota32(struct thread *td, struct mount *mp, uint64_t id, int type,
 }
 
 int
-setuse32(struct thread *td, struct mount *mp, uint64_t id, int type,
-    void *addr)
+setuse32(struct thread *td, struct mount *mp, uint64_t id, int type, void *addr)
 {
 	struct dqblk32 dqb32;
 	struct dqblk64 dqb64;
@@ -990,8 +989,7 @@ setuse32(struct thread *td, struct mount *mp, uint64_t id, int type,
 }
 
 int
-getquota(struct thread *td, struct mount *mp, uint64_t id, int type,
-    void *addr)
+getquota(struct thread *td, struct mount *mp, uint64_t id, int type, void *addr)
 {
 	struct dqblk64 dqb64;
 	int error;
@@ -1004,8 +1002,7 @@ getquota(struct thread *td, struct mount *mp, uint64_t id, int type,
 }
 
 int
-setquota(struct thread *td, struct mount *mp, uint64_t id, int type,
-    void *addr)
+setquota(struct thread *td, struct mount *mp, uint64_t id, int type, void *addr)
 {
 	struct dqblk64 dqb64;
 	int error;
@@ -1018,8 +1015,7 @@ setquota(struct thread *td, struct mount *mp, uint64_t id, int type,
 }
 
 int
-setuse(struct thread *td, struct mount *mp, uint64_t id, int type,
-    void *addr)
+setuse(struct thread *td, struct mount *mp, uint64_t id, int type, void *addr)
 {
 	struct dqblk64 dqb64;
 	int error;
@@ -1419,8 +1415,7 @@ hfound:		DQI_LOCK(dq);
 	}
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	/* XXXBD: CTSRD-CHERI/clang#179 */
-	IOVEC_INIT(&aiov, &buf[0], recsize);
+	IOVEC_INIT(&aiov, buf, recsize);
 	auio.uio_resid = recsize;
 	auio.uio_offset = base + id * recsize;
 	auio.uio_segflg = UIO_SYSSPACE;

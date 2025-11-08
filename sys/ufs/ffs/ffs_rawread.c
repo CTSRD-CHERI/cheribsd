@@ -450,13 +450,3 @@ ffs_rawread(struct vnode *vp,
 	*workdone = 0;
 	return 0;
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "user_capabilities",
-//     "ctoptr"
-//   ]
-// }
-// CHERI CHANGES END
