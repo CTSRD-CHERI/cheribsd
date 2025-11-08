@@ -84,12 +84,7 @@ typedef	struct	ap_control {
 	 */
 	u_long	apc_cmd;
 	u_long	apc_arg;
-	union {
-#ifdef _KERNEL
-		void *apc_udata;
-#endif
-		void	*apc_data;
-	};
+	void	*apc_data;
 	size_t	apc_dsize;
 } ap_ctl_t;
 

@@ -330,8 +330,7 @@ SYSCTL_ULONG(_net_pfsync, OID_AUTO, pfsync_buckets, CTLFLAG_RDTUN,
 SYSCTL_UINT(_net_pfsync, OID_AUTO, defer_delay, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(pfsync_defer_timeout), 0, "Deferred packet timeout (in ms)");
 
-static int	pfsync_clone_create(struct if_clone *, int,
-		    void *);
+static int	pfsync_clone_create(struct if_clone *, int, void *);
 static void	pfsync_clone_destroy(struct ifnet *);
 static int	pfsync_alloc_scrub_memory(struct pfsync_state_peer *,
 		    struct pf_state_peer *);
