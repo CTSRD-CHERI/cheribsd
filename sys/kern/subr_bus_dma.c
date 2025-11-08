@@ -307,7 +307,7 @@ _bus_dmamap_load_uio(bus_dma_tag_t dmat, bus_dmamap_t map, struct uio *uio,
 		 */
 
 		minlen = resid < iov[i].iov_len ? resid : iov[i].iov_len;
-		addr = __DECAP_CHECK(iov[i].iov_base, minlen);
+		addr = iov[i].iov_base;
 		if (minlen > 0) {
 			error = _bus_dmamap_load_buffer(dmat, map, addr,
 			    minlen, pmap, flags, NULL, nsegs);

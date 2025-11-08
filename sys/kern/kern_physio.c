@@ -179,8 +179,7 @@ physio(struct cdev *dev, struct uio *uio, int ioflag)
 					bp->bio_flags |= BIO_UNMAPPED;
 				}
 			} else
-				bp->bio_data = __DECAP_CHECK(base,
-				    bp->bio_length);
+				bp->bio_data = base;
 
 			csw->d_strategy(bp);
 			if (uio->uio_rw == UIO_READ)
