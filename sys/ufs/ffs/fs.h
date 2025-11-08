@@ -451,10 +451,8 @@ struct fs {
 };
 
 /* Sanity checking. */
-//#ifdef __CHERI_PURE_CAPABILITY__
 _Static_assert(!(sizeof(struct fs) < 1376), "struct fs is too small");
 _Static_assert(!(sizeof(struct fs) > 1376), "struct fs is too large");
-//#endif
 #ifdef CTASSERT
 CTASSERT(sizeof(struct fs) == 1376);
 #endif

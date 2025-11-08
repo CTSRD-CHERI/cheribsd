@@ -867,9 +867,9 @@ out:
 		PROC_UNLOCK(td->td_proc);
 	}
 	UFS_LOCK(ump);
-	if (fs->fs_active != NULL) {
+	if (fs->fs_active != 0) {
 		free(fs->fs_active, M_DEVBUF);
-		fs->fs_active = NULL;
+		fs->fs_active = 0;
 	}
 	UFS_UNLOCK(ump);
 	MNT_ILOCK(mp);
@@ -892,7 +892,7 @@ out:
 		if ((rmerr = namei(&nd)) != 0 ||
 		    (rmerr = VOP_REMOVE(nd.ni_dvp, nd.ni_vp, &nd.ni_cnd)) != 0)
 			printf("Delete of %s failed with error %d\n",
-			    (const char *)nd.ni_dirp, rmerr);
+			    nd.ni_dirp, rmerr);
 		NDFREE_PNBUF(&nd);
 		if (nd.ni_dvp != NULL)
 			vput(nd.ni_dvp);
@@ -2758,9 +2758,6 @@ ffs_snapdata_acquire(struct vnode *devvp)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros"
-//   ],
-//   "changes_purecap": [
-//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

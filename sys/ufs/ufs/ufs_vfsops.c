@@ -80,8 +80,7 @@ ufs_root(struct mount *mp, int flags, struct vnode **vpp)
  * Do operations associated with quotas
  */
 int
-ufs_quotactl(struct mount *mp, int cmds, uid_t id, void *arg,
-    bool *mp_busy)
+ufs_quotactl(struct mount *mp, int cmds, uid_t id, void *arg, bool *mp_busy)
 {
 #ifndef QUOTA
 	return (EOPNOTSUPP);
@@ -197,12 +196,3 @@ ufs_uninit(struct vfsconf *vfsp)
 #endif
 	return (0);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END
