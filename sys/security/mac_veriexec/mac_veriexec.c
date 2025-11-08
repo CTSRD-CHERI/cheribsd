@@ -1183,12 +1183,3 @@ mac_veriexec_proc_is_trusted(struct ucred *cred, struct proc *p)
 	/* Check that the trusted flag is set */
 	return ((flags & VERIEXEC_TRUSTED) == VERIEXEC_TRUSTED);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

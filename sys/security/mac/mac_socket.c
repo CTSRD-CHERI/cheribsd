@@ -638,12 +638,3 @@ mac_getsockopt_peerlabel(struct ucred *cred, struct socket *so,
 
 	return (error);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END
