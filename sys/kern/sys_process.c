@@ -1810,7 +1810,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 			error = EINVAL;
 			goto out;
 		}
-		IOVEC_INIT_C(&iov, piod->piod_addr, piod->piod_len);
+		IOVEC_INIT(&iov, piod->piod_addr, piod->piod_len);
 		uio.uio_offset = (off_t)piod->piod_offs;
 		uio.uio_resid = piod->piod_len;
 		uio.uio_iov = &iov;

@@ -775,7 +775,7 @@ nfs_directio_write(struct vnode *vp, struct uio *uiop, struct ucred *cred,
 	while (uiop->uio_resid > 0) {
 		size = MIN(uiop->uio_resid, wsize);
 		size = MIN(uiop->uio_iov->iov_len, size);
-		IOVEC_INIT_C(&iov, uiop->uio_iov->iov_base, size);
+		IOVEC_INIT(&iov, uiop->uio_iov->iov_base, size);
 		uio.uio_iov = &iov;
 		uio.uio_iovcnt = 1;
 		uio.uio_offset = uiop->uio_offset;

@@ -900,7 +900,7 @@ cuse_proc2proc_copy(struct proc *proc_s, uintptr_t data_s,
 
 	if (proc_cur == proc_d) {
 		struct iovec iov;
-		IOVEC_INIT_C(&iov, (void *)data_d, len);
+		IOVEC_INIT(&iov, (void *)data_d, len);
 		struct uio uio = {
 			.uio_iov = &iov,
 			.uio_iovcnt = 1,
@@ -917,7 +917,7 @@ cuse_proc2proc_copy(struct proc *proc_s, uintptr_t data_s,
 
 	} else if (proc_cur == proc_s) {
 		struct iovec iov;
-		IOVEC_INIT_C(&iov, (void *)data_s, len);
+		IOVEC_INIT(&iov, (void *)data_s, len);
 		struct uio uio = {
 			.uio_iov = &iov,
 			.uio_iovcnt = 1,

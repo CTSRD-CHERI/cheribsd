@@ -40,39 +40,19 @@ typedef	__size_t	size_t;
 #endif
 
 struct iovec {
-	void *	iov_base;	/* Base address. */
-	size_t			iov_len;	/* Length. */
+	void	*iov_base;	/* Base address. */
+	size_t	 iov_len;	/* Length. */
 };
 
 #ifdef _KERNEL
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	IOVEC_INIT IOVEC_INIT_C
-#else /* ! __CHERI_PURE_CAPABILITY__ */
-#define	IOVEC_INIT(iovp, base, len)	do {				\
-	(iovp)->iov_base = (base);				\
-	(iovp)->iov_len = (len);					\
-} while(0)
-#endif /* ! __CHERI_PURE_CAPABILITY__ */
-#define IOVEC_INIT_C(iovp, base, len)	do {				\
-	(iovp)->iov_base = (base);					\
-	(iovp)->iov_len = (len);					\
-} while(0)
-#else
-#define IOVEC_INIT(iovp, base, len)	do {				\
-	(iovp)->iov_base = (base);					\
-	(iovp)->iov_len = (len);					\
-} while(0)
-#define	IOVEC_INIT_C IOVEC_INIT
-#endif /* _KERNEL */
+#define	IOVEC_INIT(iovp, base, len) 					\
+	*(iovp) = (struct iovec){ .iov_base = (base), .iov_len = (len) }
 
 /* String with length including NUL terminator */
 #define	IOVEC_INIT_CSTR(iovp, str)	do {				\
 	void *__str = (str);						\
 	IOVEC_INIT(iovp, __str, strlen(__str) + 1);			\
 } while(0)
-
-/* XXX: CheriBSD compat */
-#define	IOVEC_INIT_STR		IOVEC_INIT_CSTR
 
 /* Object with size from sizeof() */
 #define	IOVEC_INIT_OBJ(iovp, obj)					\
@@ -84,18 +64,16 @@ struct iovec {
 	KASSERT(__amt <= __iovp->iov_len, ("%s: amount %zu > iov_len	\
 	    %zu", __func__, __amt, __iovp->iov_len));			\
 	__iovp->iov_len -= __amt;					\
-	__iovp->iov_base = (char *)__iovp->iov_base + __amt; \
+	__iovp->iov_base = (char *)__iovp->iov_base + __amt;		\
 } while(0)
 
-#ifdef _KERNEL
 struct uio;
 
 typedef int(copyiniov_t)(const struct iovec *iovp, unsigned int iovcnt,
     struct iovec **iov, int error);
 typedef int(copyinuio_t)(const struct iovec *iovp, unsigned int iovcnt,
     struct uio **iov);
-typedef int(updateiov_t)(const struct uio *uiop,
-    struct iovec *iovp);
+typedef int(updateiov_t)(const struct uio *uiop, struct iovec *iovp);
 #endif
 
 #endif /* !_SYS__IOVEC_H_ */
