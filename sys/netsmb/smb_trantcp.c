@@ -265,7 +265,7 @@ nbssn_rq_request(struct nbpcb *nbp, struct thread *td)
 			error = ECONNABORTED;
 			break;
 		}
-		md_get_mem(mdp, (char *)&sin.sin_addr, 4, MB_MSYSTEM);
+		md_get_mem(mdp, (caddr_t)&sin.sin_addr, 4, MB_MSYSTEM);
 		md_get_uint16(mdp, &port);
 		sin.sin_port = port;
 		nbp->nbp_state = NBST_RETARGET;
