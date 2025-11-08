@@ -96,11 +96,11 @@ static void ipf_frag_free(ipf_frag_softc_t *, ipfr_t *);
 static frentry_t ipfr_block;
 
 static ipftuneable_t ipf_frag_tuneables[] = {
-	{ { .ipftp_offset = offsetof(ipf_frag_softc_t, ipfr_size) },
+	{ { (void *)offsetof(ipf_frag_softc_t, ipfr_size) },
 		"frag_size",		1,	0x7fffffff,
 		stsizeof(ipf_frag_softc_t, ipfr_size),
 		IPFT_WRDISABLED,	NULL,	NULL },
-	{ { .ipftp_offset = offsetof(ipf_frag_softc_t, ipfr_ttl) },
+	{ { (void *)offsetof(ipf_frag_softc_t, ipfr_ttl) },
 		"frag_ttl",		1,	0x7fffffff,
 		stsizeof(ipf_frag_softc_t, ipfr_ttl),
 		0,			NULL,	NULL },
