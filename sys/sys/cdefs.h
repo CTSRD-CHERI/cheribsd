@@ -581,13 +581,6 @@
 #endif
 #endif
 
-/*
- * XXXAR: For CHERI hybrid mode I removed the cast to the qualified type
- * because we don't know whether the input type is a capability or a pointer
- * and casting to the wrong one causes compiler warnings.
- * The real solution would be an equivalent of const_cast<> for C
- */
-
 #ifndef	__DECONST
 #define	__DECONST(type, var)	((type)(__uintptr_t)(const void *)(var))
 #endif
