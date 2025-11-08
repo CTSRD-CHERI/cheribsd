@@ -734,15 +734,3 @@ void	in_pcboutput_eagain(struct inpcb *);
 #endif /* _KERNEL */
 
 #endif /* !_NETINET_IN_PCB_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "header",
-//   "changes": [
-//     "integer_provenance"
-//   ],
-//   "changes_purecap": [
-//     "pointer_shape"
-//   ]
-// }
-// CHERI CHANGES END

@@ -2044,8 +2044,7 @@ tcp_log_drain(struct tcpcb *tp)
 }
 
 static inline int
-tcp_log_copyout(struct sockopt *sopt, void *src, void *dst,
-    size_t len)
+tcp_log_copyout(struct sockopt *sopt, void *src, void *dst, size_t len)
 {
 
 	if (sopt->sopt_td != NULL)
@@ -2056,7 +2055,7 @@ tcp_log_copyout(struct sockopt *sopt, void *src, void *dst,
 
 static int
 tcp_log_logs_to_buf(struct sockopt *sopt, struct tcp_log_stailq *log_tailqp,
-    struct tcp_log_buffer ** end, int count)
+    struct tcp_log_buffer **end, int count)
 {
 	struct tcp_log_buffer *out_entry;
 	struct tcp_log_mem *log_entry;
@@ -2256,12 +2255,10 @@ tcp_log_getlogbuf(struct sockopt *sopt, struct tcpcb *tp)
 		INP_WUNLOCK(inp);
 	} else {
 		/* Sanity check entries */
-		KASSERT(((char *)out_entry -
-		    (char *)sopt->sopt_val) ==
+		KASSERT(((char *)out_entry - (char *)sopt->sopt_val) ==
 		    outsize, ("%s: Actual output size (%zu) != "
 			"calculated output size (%zu)", __func__,
-			(size_t)((char *)out_entry -
-			    (char *)sopt->sopt_val),
+			(size_t)((char *)out_entry - (char *)sopt->sopt_val),
 		    outsize));
 
 		/* Free the entries we just copied out. */
@@ -2338,7 +2335,7 @@ tcp_log_expandlogbuf(struct tcp_log_dev_queue *param)
 	memset(hdr, 0, sizeof(struct tcp_log_header));
 	hdr->tlh_version = TCP_LOG_BUF_VER;
 	hdr->tlh_type = TCP_LOG_DEV_TYPE_BBR;
-	hdr->tlh_length = end - (uint8_t *)(uint8_t *)hdr;
+	hdr->tlh_length = end - (uint8_t *)hdr;
 	hdr->tlh_ie = entry->tldl_ie;
 	hdr->tlh_af = entry->tldl_af;
 	getboottime(&hdr->tlh_offset);

@@ -4776,12 +4776,3 @@ tcp_account_for_send(struct tcpcb *tp, uint32_t len, uint8_t is_rxt,
 	}
 #endif
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "subobject_bounds"
-//   ]
-// }
-// CHERI CHANGES END

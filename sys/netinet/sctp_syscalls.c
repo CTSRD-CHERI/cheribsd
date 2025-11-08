@@ -182,12 +182,6 @@ sctp_syscalls_uninit(void)
 /*
  * SCTP syscalls.
  */
-#ifndef _SYS_SYSPROTO_H_
-struct sctp_peeloff_args {
-int	sd;
-	caddr_t	name;
-};
-#endif
 int
 sys_sctp_peeloff(struct thread *td, struct sctp_peeloff_args *uap)
 {
@@ -256,21 +250,9 @@ done2:
 	return (error);
 }
 
-#ifndef _SYS_SYSPROTO_H_
-struct sctp_generic_sendmsg_args {
-	int sd;
-	caddr_t msg;
-	int mlen;
-	const struct sockaddr *to;
-	__socklen_t tolen;
-	struct sctp_sndrcvinfo *sinfo;
-	int flags;
-};
-#endif
 int
 sys_sctp_generic_sendmsg(struct thread *td, struct sctp_generic_sendmsg_args *uap)
 {
-
 	return (kern_sys_sctp_generic_sendmsg(td, uap->sd, uap->msg, uap->mlen,
 	    uap->to, uap->tolen, uap->sinfo, uap->flags));
 }
@@ -280,7 +262,6 @@ int
 freebsd64_sctp_generic_sendmsg(struct thread *td,
     struct freebsd64_sctp_generic_sendmsg_args *uap)
 {
-
 	return (kern_sys_sctp_generic_sendmsg(td, uap->sd,
 	    __USER_CAP(uap->msg, uap->mlen), uap->mlen,
 	    __USER_CAP(uap->to, uap->tolen), uap->tolen,
@@ -389,21 +370,9 @@ sctp_bad2:
 	return (error);
 }
 
-#ifndef _SYS_SYSPROTO_H_
-struct sctp_generic_sendmsg_iov_args {
-	int sd;
-	struct iovec *iov;
-	int iovlen;
-	struct sockaddr *to;
-	__socklen_t tolen;
-	struct sctp_sndrcvinfo *sinfo;
-	int flags;
-};
-#endif
 int
 sys_sctp_generic_sendmsg_iov(struct thread *td, struct sctp_generic_sendmsg_iov_args *uap)
 {
-
 	return (kern_sctp_generic_sendmsg_iov(td, uap->sd, uap->iov,
 	    uap->iovlen, uap->to, uap->tolen, uap->sinfo, uap->flags,
 	    copyiniov));
@@ -414,7 +383,6 @@ int
 freebsd32_sctp_generic_sendmsg_iov(struct thread *td,
     struct freebsd32_sctp_generic_sendmsg_iov_args *uap)
 {
-
 	return (kern_sctp_generic_sendmsg_iov(td, uap->sd,
 	    (struct iovec *)__USER_CAP_ARRAY(uap->iov, uap->iovlen),
 	    uap->iovlen, __USER_CAP(uap->to, uap->tolen), uap->tolen,
@@ -427,7 +395,6 @@ int
 freebsd64_sctp_generic_sendmsg_iov(struct thread *td,
     struct freebsd64_sctp_generic_sendmsg_iov_args *uap)
 {
-
 	return (kern_sctp_generic_sendmsg_iov(td, uap->sd,
 	    (struct iovec *)__USER_CAP_ARRAY(uap->iov, uap->iovlen),
 	    uap->iovlen, __USER_CAP(uap->to, uap->tolen), uap->tolen,
