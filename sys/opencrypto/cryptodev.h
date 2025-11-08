@@ -65,7 +65,6 @@
 #define _CRYPTO_CRYPTO_H_
 
 #include <sys/ioccom.h>
-#include <sys/_iovec.h>
 
 #ifdef _KERNEL
 #include <opencrypto/_cryptodev.h>
@@ -227,9 +226,9 @@ struct session_op {
 	uint32_t	mac;		/* ie. CRYPTO_SHA2_256_HMAC */
 
 	uint32_t	keylen;		/* cipher key */
-	const void *key;
+	const void	*key;
 	int		mackeylen;	/* mac key */
-	const void *mackey;
+	const void	*mackey;
 
   	uint32_t	ses;		/* returns: session # */ 
 };
@@ -244,9 +243,9 @@ struct session2_op {
 	uint32_t	mac;		/* ie. CRYPTO_SHA2_256_HMAC */
 
 	uint32_t	keylen;		/* cipher key */
-	const void *key;
+	const void	*key;
 	int		mackeylen;	/* mac key */
-	const void *mackey;
+	const void	*mackey;
 
   	uint32_t	ses;		/* returns: session # */ 
 	int		crid;		/* driver id + flags (rw) */
@@ -264,10 +263,10 @@ struct crypt_op {
 #define	COP_F_CIPHER_FIRST	0x0001	/* Cipher before MAC. */
 #define	COP_F_BATCH		0x0008	/* Batch op if possible */
 	u_int		len;
-	const void *src;	/* become iov[] inside kernel */
-	char *dst;
-	char *mac;		/* must be big enough for chosen MAC */
-	const void *iv;
+	const void	*src;	/* become iov[] inside kernel */
+	char		*dst;
+	char		*mac;	/* must be big enough for chosen MAC */
+	const void	*iv;
 };
 
 /* op and flags the same as crypt_op */
@@ -278,10 +277,10 @@ struct crypt_aead {
 	u_int		len;
 	u_int		aadlen;
 	u_int		ivlen;
-	const void *src;	/* become iov[] inside kernel */
-	char *dst;
-	const void *aad;	/* additional authenticated data */
-	char *tag;		/* must fit for chosen TAG length */
+	const void	*src;	/* become iov[] inside kernel */
+	char		*dst;
+	const void	*aad;	/* additional authenticated data */
+	char		*tag;	/* must fit for chosen TAG length */
 	const void *iv;
 };
 

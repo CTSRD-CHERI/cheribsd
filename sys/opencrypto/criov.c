@@ -89,7 +89,7 @@ cuio_copydata(struct uio* uio, int off, int len, caddr_t cp)
 	while (len > 0) {
 		KASSERT(iol >= 0, ("%s: empty", __func__));
 		count = min(iov->iov_len - off, len);
-		bcopy(((char *)iov->iov_base) + off, cp, count);
+		bcopy(((caddr_t)iov->iov_base) + off, cp, count);
 		len -= count;
 		cp += count;
 		off = 0;
@@ -109,7 +109,7 @@ cuio_copyback(struct uio* uio, int off, int len, c_caddr_t cp)
 	while (len > 0) {
 		KASSERT(iol >= 0, ("%s: empty", __func__));
 		count = min(iov->iov_len - off, len);
-		bcopy(cp, ((char *)iov->iov_base) + off, count);
+		bcopy(cp, ((caddr_t)iov->iov_base) + off, count);
 		len -= count;
 		cp += count;
 		off = 0;
@@ -660,9 +660,7 @@ cuio_apply(struct uio *uio, int off, int len,
 	while (len > 0) {
 		KASSERT(iol >= 0, ("%s: empty", __func__));
 		count = min(iov->iov_len - off, len);
-		rval = (*f)(arg,
-		    __DECAP_CHECK(((char *)iov->iov_base) + off,
-		    count), count);
+		rval = (*f)(arg, ((caddr_t)iov->iov_base) + off, count);
 		if (rval)
 			return (rval);
 		len -= count;
@@ -857,14 +855,3 @@ crypto_contiguous_subsegment(struct cryptop *crp, size_t skip, size_t len)
 {
 	return (crypto_buffer_contiguous_subsegment(&crp->crp_buf, skip, len));
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "iovec-macros",
-//     "user_capabilities",
-//     "ctoptr"
-//   ]
-// }
-// CHERI CHANGES END
