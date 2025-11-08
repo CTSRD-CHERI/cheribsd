@@ -97,7 +97,7 @@ kern_getrandom(struct thread *td, void *user_buf, size_t buflen,
 		return (0);
 	}
 
-	IOVEC_INIT_C(&aiov, user_buf, buflen);
+	IOVEC_INIT(&aiov, user_buf, buflen);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_offset = 0;

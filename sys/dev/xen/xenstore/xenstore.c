@@ -887,7 +887,7 @@ xs_single(struct xs_transaction t, enum xsd_sockmsg_type request_type,
 {
 	struct iovec iovec;
 
-	IOVEC_INIT_STR(&iovec, __DECONST(void *, body));
+	IOVEC_INIT_CSTR(&iovec, __DECONST(void *, body));
 
 	return (xs_talkv(t, request_type, &iovec, 1, len, result));
 }
@@ -907,8 +907,8 @@ xs_watch(const char *path, const char *token)
 {
 	struct iovec iov[2];
 
-	IOVEC_INIT_STR(&iov[0], __DECONST(void *, path));
-	IOVEC_INIT_STR(&iov[1], __DECONST(void *, token));
+	IOVEC_INIT_CSTR(&iov[0], __DECONST(void *, path));
+	IOVEC_INIT_CSTR(&iov[1], __DECONST(void *, token));
 
 	return (xs_talkv(XST_NIL, XS_WATCH, iov, 2, NULL, NULL));
 }
@@ -927,8 +927,8 @@ xs_unwatch(const char *path, const char *token)
 {
 	struct iovec iov[2];
 
-	IOVEC_INIT_STR(&iov[0], __DECONST(void *, path));
-	IOVEC_INIT_STR(&iov[1], __DECONST(void *, token));
+	IOVEC_INIT_CSTR(&iov[0], __DECONST(void *, path));
+	IOVEC_INIT_CSTR(&iov[1], __DECONST(void *, token));
 
 	return (xs_talkv(XST_NIL, XS_UNWATCH, iov, 2, NULL, NULL));
 }

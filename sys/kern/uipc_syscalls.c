@@ -839,7 +839,7 @@ user_sendto(struct thread *td, int s, const char *buf,
 	if (SV_PROC_FLAG(td->td_proc, SV_AOUT))
 		msg.msg_flags = 0;
 #endif
-	IOVEC_INIT_C(&aiov, __DECONST(void *, buf), len);
+	IOVEC_INIT(&aiov, __DECONST(void *, buf), len);
 	return (user_sendit(td, s, &msg, flags));
 }
 
@@ -854,7 +854,7 @@ osend(struct thread *td, struct osend_args *uap)
 	msg.msg_namelen = 0;
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	IOVEC_INIT_C(&aiov, __DECONST(void *, uap->buf),
+	IOVEC_INIT(&aiov, __DECONST(void *, uap->buf),
 	    uap->len);
 	msg.msg_control = 0;
 	msg.msg_flags = 0;
@@ -1109,7 +1109,7 @@ kern_recvfrom(struct thread *td, int s, void *buf, size_t len,
 	msg.msg_name = from;
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	IOVEC_INIT_C(&aiov, buf, len);
+	IOVEC_INIT(&aiov, buf, len);
 	msg.msg_control = 0;
 	msg.msg_flags = flags;
 	error = recvit(td, s, &msg, fromlenaddr);
@@ -1144,7 +1144,7 @@ orecv(struct thread *td, struct orecv_args *uap)
 	msg.msg_namelen = 0;
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	IOVEC_INIT_C(&aiov, uap->buf, uap->len);
+	IOVEC_INIT(&aiov, uap->buf, uap->len);
 	msg.msg_control = 0;
 	msg.msg_flags = uap->flags;
 	return (recvit(td, uap->s, &msg, NULL));

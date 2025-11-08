@@ -1695,7 +1695,7 @@ no_kqueue:
 		MPASS(job->uiop != &job->uio && job->uiop != NULL);
 	} else {
 		/* Setup the inline uio */
-		IOVEC_INIT_C(&job->iov[0], __DEVOLATILE(
+		IOVEC_INIT(&job->iov[0], __DEVOLATILE(
 		    struct iovec *, job->uaiocb.aio_buf),
 		    job->uaiocb.aio_nbytes);
 		job->uio.uio_iov = job->iov;

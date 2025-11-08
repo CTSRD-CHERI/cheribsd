@@ -413,11 +413,11 @@ kern_jail(struct thread *td, const char *path,
 			optstr = __DECONST(char *,
 			    (jail_default_allow & bf->flag)
 			    ? bf->name : bf->noname);
-			IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
+			IOVEC_INIT_CSTR(&optiov[opt.uio_iovcnt], optstr);
 			opt.uio_iovcnt += 2;
 		}
 		optstr = "enforce_statfs";
-		IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
+		IOVEC_INIT_CSTR(&optiov[opt.uio_iovcnt], optstr);
 		opt.uio_iovcnt++;
 		enforce_statfs = jail_default_enforce_statfs;
 		IOVEC_INIT_OBJ(&optiov[opt.uio_iovcnt], enforce_statfs);
@@ -456,7 +456,7 @@ kern_jail(struct thread *td, const char *path,
 #endif
 
 	optstr = "path";
-	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
+	IOVEC_INIT_CSTR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
 	error = copyinstr(path, u_path, MAXPATHLEN, &tmplen);
 	if (error)
@@ -465,7 +465,7 @@ kern_jail(struct thread *td, const char *path,
 	opt.uio_iovcnt++;
 
 	optstr = "host.hostname";
-	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
+	IOVEC_INIT_CSTR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
 	error = copyinstr(hostname, u_hostname, MAXHOSTNAMELEN, &tmplen);
 	if (error)
@@ -475,7 +475,7 @@ kern_jail(struct thread *td, const char *path,
 
 	if (jailname != NULL) {
 		optstr = "name";
-		IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
+		IOVEC_INIT_CSTR(&optiov[opt.uio_iovcnt], optstr);
 		opt.uio_iovcnt++;
 		error = copyinstr(jailname, u_name, MAXHOSTNAMELEN, &tmplen);
 		if (error)
@@ -486,7 +486,7 @@ kern_jail(struct thread *td, const char *path,
 
 #ifdef INET
 	optstr = "ip4.addr";
-	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
+	IOVEC_INIT_CSTR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
 	if (ipseg == UIO_USERSPACE) {
 		error = copyin(ip4, u_ip4, ip4s * sizeof(struct in_addr));
@@ -501,7 +501,7 @@ kern_jail(struct thread *td, const char *path,
 
 #ifdef INET6
 	optstr = "ip6.addr";
-	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
+	IOVEC_INIT_CSTR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
 	if (ipseg == UIO_USERSPACE) {
 		error = copyin(ip6, u_ip6, ip6s * sizeof(struct in6_addr));

@@ -246,7 +246,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		    sizeof(r64.vec));
 		if (error != 0)
 			break;
-		IOVEC_INIT_C(&r.vec, __USER_CAP(r64.vec.iov_base,
+		IOVEC_INIT(&r.vec, __USER_CAP(r64.vec.iov_base,
 		    r64.vec.iov_len), r64.vec.iov_len);
 		break;
 	case PT_SET_EVENT_MASK:
