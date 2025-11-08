@@ -615,20 +615,6 @@
 #endif
 #endif
 
-#ifndef __DECAP_CHECK
-#if __has_feature(capabilities)
-#define __DECAP_CHECK(cap, len)						\
-({									\
-	void *tmpcap = (cap);				\
-	if (!__CAP_CHECK((cap), (len)))					\
-		tmpcap = NULL;						\
-	(void *)(tmpcap);				\
-})
-#else
-#define __DECAP_CHECK(cap, len) (cap)
-#endif
-#endif
-
 #if !defined(_STANDALONE) && !defined(_KERNEL)
 #define	__RENAME(x)	__asm(__STRING(x))
 #else /* _STANDALONE || _KERNEL */
