@@ -173,8 +173,7 @@ sys_auditon(struct thread *td, struct auditon_args *uap)
 }
 
 int
-kern_auditon(struct thread *td, int cmd, void *data,
-    u_int length)
+kern_auditon(struct thread *td, int cmd, void *data, u_int length)
 {
 	struct ucred *cred, *newcred, *oldcred;
 	int error;
