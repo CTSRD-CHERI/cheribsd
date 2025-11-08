@@ -2848,7 +2848,7 @@ mount_argf(struct mntarg *ma, const char *name, const char *fmt, ...)
 
 	ma->v = realloc(ma->v, sizeof *ma->v * (ma->len + 2),
 	    M_MOUNT, M_WAITOK);
-	IOVEC_INIT_STR(&ma->v[ma->len], __DECONST(void *, name));
+	IOVEC_INIT_CSTR(&ma->v[ma->len], __DECONST(void *, name));
 	ma->len++;
 
 	sb = sbuf_new_auto();
@@ -2911,11 +2911,11 @@ mount_arg(struct mntarg *ma, const char *name, const void *val, int len)
 
 	ma->v = realloc(ma->v, sizeof *ma->v * (ma->len + 2),
 	    M_MOUNT, M_WAITOK);
-	IOVEC_INIT_STR(&ma->v[ma->len], __DECONST(void *, name));
+	IOVEC_INIT_CSTR(&ma->v[ma->len], __DECONST(void *, name));
 	ma->len++;
 
 	if (len < 0)
-		IOVEC_INIT_STR(&ma->v[ma->len], __DECONST(char *, val));
+		IOVEC_INIT_CSTR(&ma->v[ma->len], __DECONST(char *, val));
 	else
 		IOVEC_INIT(&ma->v[ma->len], __DECONST(char *, val), len);
 	ma->len++;

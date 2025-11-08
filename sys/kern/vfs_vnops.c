@@ -626,7 +626,7 @@ vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base,
 		return (EINVAL);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	IOVEC_INIT_C(&aiov, base, len);
+	IOVEC_INIT(&aiov, base, len);
 	auio.uio_resid = len;
 	auio.uio_offset = offset;
 	auio.uio_segflg = segflg;
@@ -1424,7 +1424,7 @@ vn_io_fault1(struct vnode *vp, struct uio *uio, struct vn_io_fault_args *args,
 			break;
 		}
 		short_uio.uio_iov = &short_iovec[0];
-		IOVEC_INIT_C(&short_iovec[0], uio_clone->uio_iov->iov_base,
+		IOVEC_INIT(&short_iovec[0], uio_clone->uio_iov->iov_base,
 		    len);
 		short_uio.uio_iovcnt = 1;
 		short_uio.uio_resid = len;

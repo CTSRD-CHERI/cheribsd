@@ -2806,7 +2806,7 @@ kern_readlink_vp(struct vnode *vp, char *buf,
 	if (vp->v_type != VLNK && (vp->v_vflag & VV_READLINK) == 0)
 		return (EINVAL);
 
-	IOVEC_INIT_C(&aiov, buf, count);
+	IOVEC_INIT(&aiov, buf, count);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_offset = 0;
@@ -4314,7 +4314,7 @@ unionread:
 		error = ENOENT;
 		goto fail;
 	}
-	IOVEC_INIT_C(&aiov, buf, count);
+	IOVEC_INIT(&aiov, buf, count);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_rw = UIO_READ;
