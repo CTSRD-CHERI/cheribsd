@@ -4063,7 +4063,7 @@ ipf_sync(ipf_main_softc_t *softc, void *ifp)
 int
 copyinptr(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
 {
-	char *ca;
+	caddr_t ca;
 	int error;
 
 #if SOLARIS
@@ -4096,7 +4096,7 @@ copyinptr(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
 int
 copyoutptr(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
 {
-	char *ca;
+	caddr_t ca;
 	int error;
 
 	bcopy(dst, (caddr_t)&ca, sizeof(ca));
@@ -4663,16 +4663,7 @@ frrequest(ipf_main_softc_t *softc, int unit, ioctlcmd_t req, caddr_t data,
 				bcopy(uptr, ptr, fp->fr_dsize);
 				error = 0;
 			} else {
-				/*
-				 * XXXCHERI: This is a band-aid to
-				 * make hybrid compile with minimal
-				 * changes.
-				 */
-#ifndef __CHERI_PURE_CAPABILITY__
-				error = COPYIN(__USER_CAP(uptr, fp->fr_dsize), ptr, fp->fr_dsize);
-#else
 				error = COPYIN(uptr, ptr, fp->fr_dsize);
-#endif
 				if (error != 0) {
 					IPFERROR(17);
 					error = EFAULT;
@@ -4912,13 +4903,8 @@ frrequest(ipf_main_softc_t *softc, int unit, ioctlcmd_t req, caddr_t data,
 
 			if (error == 0) {
 				if ((f->fr_dsize != 0) && (uptr != NULL)) {
-#ifndef __CHERI_PURE_CAPABILITY__
-					error = COPYOUT(f->fr_data, __USER_CAP(uptr, f->fr_dsize),
-							f->fr_dsize);
-#else
 					error = COPYOUT(f->fr_data, uptr,
 							f->fr_dsize);
-#endif
 					if (error == 0) {
 						f->fr_hits = 0;
 						f->fr_bytes = 0;
