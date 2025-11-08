@@ -57,7 +57,6 @@
 #include <sys/fcntl.h>
 #include <sys/bus.h>
 #include <sys/sdt.h>
-#include <sys/proc.h>
 #include <sys/syscallsubr.h>
 
 #include <opencrypto/cryptodev.h>
@@ -1302,13 +1301,3 @@ MODULE_VERSION(cryptodev, 1);
 DECLARE_MODULE(cryptodev, cryptodev_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 MODULE_DEPEND(cryptodev, crypto, 1, 1, 1);
 MODULE_DEPEND(cryptodev, zlib, 1, 1, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "iovec-macros",
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END
