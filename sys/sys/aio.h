@@ -106,13 +106,13 @@ struct __aiocb_private {
 typedef struct aiocb {
 	int	aio_fildes;		/* File descriptor */
 	off_t	aio_offset;		/* File offset for I/O */
-	volatile void *aio_buf; /* I/O buffer in process space */
+	volatile void *aio_buf;		/* I/O buffer in process space */
 	size_t	aio_nbytes;		/* Number of bytes for I/O */
 	int	__spare__[2];
 	void	*__spare2__;
 	int	aio_lio_opcode;		/* LIO opcode */
 	int	aio_reqprio;		/* Request priority -- ignored */
-	struct __aiocb_private _aiocb_private;
+	struct	__aiocb_private _aiocb_private;
 	struct	sigevent aio_sigevent;	/* Signal to deliver */
 } aiocb_t;
 
