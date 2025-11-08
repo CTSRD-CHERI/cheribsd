@@ -114,7 +114,7 @@ typedef struct ipf_proxy_softc_s {
 } ipf_proxy_softc_t;
 
 static ipftuneable_t ipf_proxy_tuneables[] = {
-	{ { .ipftp_offset = offsetof(ipf_proxy_softc_t, ips_proxy_debug) },
+	{ { (void *)offsetof(ipf_proxy_softc_t, ips_proxy_debug) },
 		"proxy_debug",	0,	0x1f,
 		stsizeof(ipf_proxy_softc_t, ips_proxy_debug),
 		0,	NULL,	NULL },
@@ -702,7 +702,7 @@ ipf_proxy_ioctl(ipf_main_softc_t *softc, caddr_t data, ioctlcmd_t cmd,
 				IPFERROR(80003);
 				error = ENOMEM;
 			} else {
-				error = copyinptr(softc, &ctl.apc_udata, ptr,
+				error = copyinptr(softc, ctl.apc_data, ptr,
 						  ctl.apc_dsize);
 				if (error == 0)
 					ctl.apc_data = ptr;

@@ -135,15 +135,15 @@ static int magic[IPL_LOGSIZE] = { IPL_MAGIC, IPL_MAGIC_NAT, IPL_MAGIC_STATE,
 
 static ipftuneable_t ipf_log_tuneables[] = {
 	/* log */
-	{ { .ipftp_offset = offsetof(ipf_log_softc_t, ipl_suppress) },
+	{ { (void *)offsetof(ipf_log_softc_t, ipl_suppress) },
 		"log_suppress",		0,	1,
 		stsizeof(ipf_log_softc_t, ipl_suppress),
 		0,			NULL,	NULL },
-	{ { .ipftp_offset = offsetof(ipf_log_softc_t, ipl_logall) },
+	{ { (void *)offsetof(ipf_log_softc_t, ipl_logall) },
 		"log_all",		0,	1,
 		stsizeof(ipf_log_softc_t, ipl_logall),
 		0,			NULL,	NULL },
-	{ { .ipftp_offset = offsetof(ipf_log_softc_t, ipl_logsize) },
+	{ { (void *)offsetof(ipf_log_softc_t, ipl_logsize) },
 		"log_size",		0,	0x80000,
 		stsizeof(ipf_log_softc_t, ipl_logsize),
 		0,			NULL,	NULL },

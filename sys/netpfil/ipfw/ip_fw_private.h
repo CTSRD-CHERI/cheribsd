@@ -364,7 +364,7 @@ struct sockopt_data {
 	size_t		kavail;		/* number of bytes available */
 	size_t		ktotal;		/* total bytes pushed */
 	struct sockopt	*sopt;		/* socket data */
-	char *sopt_val;	/* sopt user buffer */
+	caddr_t		sopt_val;	/* sopt user buffer */
 	size_t		valsize;	/* original data size */
 };
 
@@ -826,12 +826,3 @@ cksum_adjust(uint16_t oldsum, uint16_t old, uint16_t new)
 
 #endif /* _KERNEL */
 #endif /* _IPFW2_PRIVATE_H */
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "header",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END
