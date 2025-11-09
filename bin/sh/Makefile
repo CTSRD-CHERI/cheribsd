@@ -1,6 +1,6 @@
 .include <src.opts.mk>
 
-CONFGROUPS=	ETC ROOT
+CONFGROUPS?=	ETC ROOT
 ETC=	profile
 ROOT=	dot.shrc dot.profile
 ROOTDIR=	/root
