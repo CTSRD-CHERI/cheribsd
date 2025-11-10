@@ -47,7 +47,7 @@ struct semid_ds_old {
 
 struct semid_ds {
 	struct ipc_perm	sem_perm;	/* operation permission struct */
-	struct sem *__sem_base; /* first semaphore in set */
+	struct sem	*__sem_base;	/* first semaphore in set */
 	unsigned short	sem_nsems;	/* number of sems in set */
 	time_t		sem_otime;	/* last operation time */
 	time_t		sem_ctime;	/* last change time */
@@ -70,18 +70,19 @@ struct sembuf {
     defined(_WANT_SEMUN_OLD)
 union semun_old {
 	int		val;		/* value for SETVAL */
-	struct semid_ds_old *buf; /* buffer for IPC_STAT & IPC_SET */
-	unsigned short *array; /* array for GETALL & SETALL */
+	struct		semid_ds_old *buf; /* buffer for IPC_STAT & IPC_SET */
+	unsigned short	*array; /* array for GETALL & SETALL */
 };
 #endif
-#if defined(_WANT_SEMUN) || defined(_KERNEL)
+
+#if defined(_KERNEL) || defined(_WANT_SEMUN)
 /*
  * semctl's arg parameter structure
  */
 union semun {
 	int		val;		/* value for SETVAL */
-	struct semid_ds *buf; /* buffer for IPC_STAT & IPC_SET */
-	unsigned short *array; /* array for GETALL & SETALL */
+	struct		semid_ds *buf;	/* buffer for IPC_STAT & IPC_SET */
+	unsigned short	*array;		/* array for GETALL & SETALL */
 };
 #endif
 

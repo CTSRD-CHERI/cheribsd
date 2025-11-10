@@ -220,7 +220,7 @@ typedef	struct __siginfo {
 	__pid_t	si_pid;			/* sending process */
 	__uid_t	si_uid;			/* sender's ruid */
 	int	si_status;		/* exit value */
-	void	*si_addr;   	/* faulting instruction */
+	void	*si_addr; 	  	/* faulting instruction */
 	union sigval si_value;		/* signal value */
 	union	{
 		struct {

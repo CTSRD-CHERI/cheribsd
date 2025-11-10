@@ -43,10 +43,7 @@ struct socket;
  * Argument structure for sosetopt et seq.  This is in the KERNEL
  * section because it will never be visible to user code.
  */
-enum sopt_dir {
-	SOPT_GET,
-	SOPT_SET,
-};
+enum sopt_dir { SOPT_GET, SOPT_SET, };
 
 struct	sockopt {
 	enum	sopt_dir sopt_dir; /* is this a get or a set? */

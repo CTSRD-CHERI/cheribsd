@@ -262,7 +262,7 @@ struct tg_reg {
 
 struct tg_mem {
 	u_int32_t	tgAddr;
-	char		*userAddr;
+	caddr_t		userAddr;
 	int		len;
 }; 
 

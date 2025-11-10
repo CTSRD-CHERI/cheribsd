@@ -161,12 +161,7 @@ struct disk_zone_report {
 	uint32_t			entries_allocated; /* Passed In */
 	uint32_t			entries_filled;    /* Passed Out */
 	uint32_t			entries_available; /* Passed Out */
-	union {
-#ifdef _KERNEL
-		struct disk_zone_rep_entry *user_entries;
-#endif
-		struct disk_zone_rep_entry *entries;
-	};
+	struct disk_zone_rep_entry	*entries;
 };
 
 union disk_zone_params {

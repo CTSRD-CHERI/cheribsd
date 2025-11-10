@@ -40,8 +40,8 @@
 /*
  * Console ioctl commands.  Some commands are named as KDXXXX, GIO_XXX, and
  * PIO_XXX, rather than CONS_XXX, for historical and compatibility reasons.
- * Some other CONS_XXX commands are works as wrapper around frame buffer
- * ioctl commands FBIO_XXX.  Do not try to change all these commands,
+ * Some other CONS_XXX commands are works as wrapper around frame buffer 
+ * ioctl commands FBIO_XXX.  Do not try to change all these commands, 
  * otherwise we shall have compatibility problems.
  */
 
@@ -218,8 +218,8 @@ struct fnt16 {
 typedef struct fnt16	fnt16_t;
 
 struct vfnt {
-	vfnt_map_t *map[VFNT_MAPS];
-	uint8_t *glyphs;
+	vfnt_map_t	*map[VFNT_MAPS];
+	uint8_t		*glyphs;
 	unsigned int	map_count[VFNT_MAPS];
 	unsigned int	glyph_count;
 	unsigned int	width;
