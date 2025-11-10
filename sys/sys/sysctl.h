@@ -172,7 +172,7 @@ struct sysctl_req {
 	size_t		 oldlen;
 	size_t		 oldidx;
 	int		(*oldfunc)(struct sysctl_req *, const void *, size_t);
-	const void	*newptr;
+	const void		*newptr;
 	size_t		 newlen;
 	size_t		 newidx;
 	int		(*newfunc)(struct sysctl_req *, void *, size_t);
@@ -1213,9 +1213,8 @@ int	kernel_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 int	kernel_sysctlbyname(struct thread *td, char *name, void *old,
 	    size_t *oldlenp, void *new, size_t newlen, size_t *retval,
 	    int flags);
-int	userland_sysctl(struct thread *td, int *name, u_int namelen,
-	    void *old, size_t *oldlenp,
-	    int inkernel, const void *new, size_t newlen,
+int	userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
+	    size_t *oldlenp, int inkernel, const void *new, size_t newlen,
 	    size_t *retval, int flags);
 int	sysctl_find_oid(int *name, u_int namelen, struct sysctl_oid **noid,
 	    int *nindx, struct sysctl_req *req);
@@ -1223,8 +1222,7 @@ void	sysctl_wlock(void);
 void	sysctl_wunlock(void);
 int	sysctl_wire_old_buffer(struct sysctl_req *req, size_t len);
 int	kern___sysctlbyname(struct thread *td, const char *name,
-	    size_t namelen, void *old,
-	    size_t *oldlenp, void *new,
+	    size_t namelen, void *old, size_t *oldlenp, void *new,
 	    size_t newlen, size_t *retval, int flags, bool inkernel);
 
 struct sbuf;

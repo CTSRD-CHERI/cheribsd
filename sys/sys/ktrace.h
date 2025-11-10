@@ -324,8 +324,6 @@ struct ktr_struct_array {
 
 #ifdef	_KERNEL
 struct ktr_io_params;
-struct uio;
-struct vnode;
 
 #ifdef	KTRACE
 struct vnode *ktr_get_tracevp(struct proc *, bool);
@@ -354,8 +352,7 @@ void	ktrprocfork(struct proc *, struct proc *);
 void	ktruserret(struct thread *);
 void	ktrstruct(const char *, const void *, size_t);
 void	ktrstruct_error(const char *, const void *, size_t, int);
-void	ktrstructarray(const char *, enum uio_seg, const void *,
-	    int, size_t);
+void	ktrstructarray(const char *, enum uio_seg, const void *, int, size_t);
 void	ktrcapfail(enum ktr_cap_violation, const void *);
 void	ktrdata(int, const void *, size_t);
 #define ktrcaprights(s) \

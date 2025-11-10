@@ -105,8 +105,8 @@
 
 struct ptrace_io_desc {
 	int	piod_op;	/* I/O operation */
-	void *piod_offs;	/* child offset */
-	void *piod_addr;	/* parent offset */
+	void	*piod_offs;	/* child offset */
+	void	*piod_addr;	/* parent offset */
 	size_t	piod_len;	/* request length */
 };
 
@@ -196,7 +196,7 @@ struct ptrace_vm_entry {
 	u_int		pve_pathlen;	/* Size of path. */
 	long		pve_fileid;	/* File ID. */
 	uint32_t	pve_fsid;	/* File system ID. */
-	char *pve_path;	/* Path name of object. */
+	char		*pve_path;	/* Path name of object. */
 };
 
 /* Argument structure for PT_COREDUMP */
@@ -215,7 +215,7 @@ struct ptrace_sc_remote {
 	struct ptrace_sc_ret pscr_ret;
 	u_int	pscr_syscall;
 	u_int	pscr_nargs;
-	syscallarg_t *pscr_args;
+	syscallarg_t	*pscr_args;
 };
 
 #ifdef _KERNEL

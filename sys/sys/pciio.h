@@ -92,10 +92,10 @@ struct pci_match_conf {
 struct pci_conf_io {
 	u_int32_t		pat_buf_len;	/* pattern buffer length */
 	u_int32_t		num_patterns;	/* number of patterns */
-	struct pci_match_conf *patterns;	/* pattern buffer */
+	struct pci_match_conf	*patterns;	/* pattern buffer */
 	u_int32_t		match_buf_len;	/* match buffer length */
 	u_int32_t		num_matches;	/* number of matches returned */
-	struct pci_conf *matches;	/* match buffer */
+	struct pci_conf		*matches;	/* match buffer */
 	u_int32_t		offset;		/* offset into device list */
 	u_int32_t		generation;	/* device list generation */
 	pci_getconf_status	status;		/* request status */
@@ -137,7 +137,7 @@ struct pci_list_vpd_io {
 };
 
 struct pci_bar_mmap {
-	void *pbm_map_base;	/* (sometimes IN)/OUT mmaped base */
+	void		*pbm_map_base;	/* (sometimes IN)/OUT mmaped base */
 	size_t		pbm_map_length;	/* mapped length of the BAR, multiple
 					   of pages */
 	uint64_t	pbm_bar_length;	/* actual length of the BAR */

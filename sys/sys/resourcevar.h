@@ -39,13 +39,6 @@
 #include <sys/_mutex.h>
 #endif
 
-struct uprof {
-	char *			pr_base;	/* Buffer base. */
-	u_long			pr_size;	/* Buffer size. */
-	u_long			pr_off;		/* PC offset. */
-	u_long			pr_scale;	/* PC scaling. */
-};
-
 /*
  * Kernel per-process accounting / statistics
  * (not necessarily resident except when running).
@@ -64,7 +57,12 @@ struct pstats {
 #define	pstat_endzero	pstat_startcopy
 
 #define	pstat_startcopy	p_prof
-	struct	uprof p_prof;		/* (c + w2) Profile arguments. */
+	struct uprof {			/* Profile arguments. */
+		caddr_t	pr_base;	/* (c + w2) Buffer base. */
+		u_long	pr_size;	/* (c + w2) Buffer size. */
+		u_long	pr_off;		/* (c + w2) PC offset. */
+		u_long	pr_scale;	/* (c + w2) PC scaling. */
+	} p_prof;
 #define	pstat_endcopy	p_start
 	struct	timeval p_start;	/* (b) Starting time. */
 };
@@ -199,12 +197,3 @@ void	 ui_racct_foreach(void (*callback)(struct racct *racct,
 
 #endif /* _KERNEL */
 #endif /* !_SYS_RESOURCEVAR_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "header",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

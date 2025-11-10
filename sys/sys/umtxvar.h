@@ -264,12 +264,3 @@ umtxq_unlock(struct umtx_key *key)
 
 #endif /* _KERNEL */
 #endif /* !_SYS_UMTXVAR_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "header",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

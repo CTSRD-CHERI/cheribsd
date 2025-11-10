@@ -1511,7 +1511,7 @@ vfs_domount_update(
 					grps = malloc(export.ex_ngroups *
 					    sizeof(gid_t), M_TEMP, M_WAITOK);
 					export_error = copyin(
-					    export.ex_groups_user,
+					    export.ex_groups,
 					    grps, export.ex_ngroups *
 					    sizeof(gid_t));
 					if (export_error == 0)

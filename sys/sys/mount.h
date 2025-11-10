@@ -581,7 +581,7 @@ struct oexport_args {
 	u_char	ex_addrlen;		/* and the net address length */
 	struct	sockaddr *ex_mask;	/* mask of valid bits in saddr */
 	u_char	ex_masklen;		/* and the smask length */
-	char	*ex_indexfile;	/* index file for WebNFS URLs */
+	char	*ex_indexfile;		/* index file for WebNFS URLs */
 };
 
 /*
@@ -596,7 +596,7 @@ struct o2export_args {
 	u_char	ex_addrlen;		/* and the net address length */
 	struct	sockaddr *ex_mask;	/* mask of valid bits in saddr */
 	u_char	ex_masklen;		/* and the smask length */
-	char	*ex_indexfile;	/* index file for WebNFS URLs */
+	char	*ex_indexfile;		/* index file for WebNFS URLs */
 	int	ex_numsecflavors;	/* security flavor count */
 	int	ex_secflavors[MAXSECFLAVORS]; /* list of security flavors */
 };
@@ -609,17 +609,12 @@ struct export_args {
 	uid_t	ex_root;		/* mapping for root uid */
 	uid_t	ex_uid;			/* mapping for anonymous user */
 	int	ex_ngroups;
-	union {
-#ifdef _KERNEL
-		gid_t *ex_groups_user;
-#endif
-		gid_t	*ex_groups;
-	};
+	gid_t	*ex_groups;
 	struct	sockaddr *ex_addr;	/* net address to which exported */
 	u_char	ex_addrlen;		/* and the net address length */
 	struct	sockaddr *ex_mask;	/* mask of valid bits in saddr */
 	u_char	ex_masklen;		/* and the smask length */
-	char	*ex_indexfile;	/* index file for WebNFS URLs */
+	char	*ex_indexfile;		/* index file for WebNFS URLs */
 	int	ex_numsecflavors;	/* security flavor count */
 	int	ex_secflavors[MAXSECFLAVORS]; /* list of security flavors */
 };
@@ -657,12 +652,12 @@ struct vfsconf {
 
 /* Userland version of the struct vfsconf. */
 struct xvfsconf {
-	struct vfsops *vfc_vfsops;	/* filesystem operations vector */
+	struct	vfsops *vfc_vfsops;	/* filesystem operations vector */
 	char	vfc_name[MFSNAMELEN];	/* filesystem type name */
 	int	vfc_typenum;		/* historic filesystem type number */
 	int	vfc_refcount;		/* number mounted of this type */
 	int	vfc_flags;		/* permanent flags */
-	struct vfsconf *vfc_next;	/* next in list */
+	struct	vfsconf *vfc_next;	/* next in list */
 };
 
 #ifndef BURN_BRIDGES
@@ -746,12 +741,13 @@ struct vfsquery {
 /* Point a sysctl request at a vfsidctl's data. */
 #define VCTLTOREQ(vc, req)						\
 	do {								\
-		(req)->newptr = __USER_CAP((vc)->vc_ptr, (vc)->vc_len);	\
+		(req)->newptr = (vc)->vc_ptr;				\
 		(req)->newlen = (vc)->vc_len;				\
 		(req)->newidx = 0;					\
 	} while (0)
 #endif
 
+struct iovec;
 struct uio;
 
 #ifdef _KERNEL
@@ -792,12 +788,11 @@ struct mntarg;
  * implement vfs_cmount.  Hopefully a future cleanup can remove vfs_cmount and
  * mount(2) entirely.
  */
-typedef int vfs_cmount_t(struct mntarg *ma, void *data,
-		    uint64_t flags);
+typedef int vfs_cmount_t(struct mntarg *ma, void *data, uint64_t flags);
 typedef int vfs_unmount_t(struct mount *mp, int mntflags);
 typedef int vfs_root_t(struct mount *mp, int flags, struct vnode **vpp);
-typedef	int vfs_quotactl_t(struct mount *mp, int cmds, uid_t uid,
-		    void *arg, bool *mp_busy);
+typedef	int vfs_quotactl_t(struct mount *mp, int cmds, uid_t uid, void *arg,
+		    bool *mp_busy);
 typedef	int vfs_statfs_t(struct mount *mp, struct statfs *sbp);
 typedef	int vfs_sync_t(struct mount *mp, int waitfor);
 typedef	int vfs_vget_t(struct mount *mp, ino_t ino, int flags,
@@ -1189,7 +1184,6 @@ void resume_all_fs(void);
 
 #include <sys/cdefs.h>
 
-struct iovec;
 struct stat;
 
 __BEGIN_DECLS
@@ -1217,12 +1211,3 @@ __END_DECLS
 #endif /* _KERNEL */
 
 #endif /* !_SYS_MOUNT_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "header",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

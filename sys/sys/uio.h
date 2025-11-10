@@ -67,7 +67,7 @@ typedef	__off_t	off_t;
 #define	UIO_EXT_IOVEC	1
 
 struct uio {
-	struct iovec	*uio_iov;	/* scatter/gather list */
+	struct	iovec *uio_iov;		/* scatter/gather list */
 	int	uio_flags;		/* uio iovec buffer flags */
 #define	uio_startcopy uio_iovcnt
 	int	uio_iovcnt;		/* length of scatter/gather list */
@@ -82,7 +82,7 @@ struct uio {
 								   array */
 		struct iovec	*uio_ext_iov;	/* external iovec array */
 	};
-} __aligned(sizeof(void *));
+};
 
 #if __has_feature(capabilities)
 static __inline void
@@ -123,10 +123,9 @@ struct bus_dma_segment;
 struct uio *allocuio(u_int iovcnt);
 void	freeuio(struct uio *uio);
 struct uio *cloneuio(struct uio *uiop);
-int	copyiniov(const struct iovec *iovp, u_int iovcnt,
-	    struct iovec **iov, int error);
-int	copyinuio(const struct iovec *iovp, u_int iovcnt,
-	    struct uio **uiop);
+int	copyiniov(const struct iovec *iovp, u_int iovcnt, struct iovec **iov,
+	    int error);
+int	copyinuio(const struct iovec *iovp, u_int iovcnt, struct uio **uiop);
 int	copyout_map(struct thread *td, vm_pointer_t *addr, size_t sz);
 int	copyout_unmap(struct thread *td, vm_pointer_t addr, size_t sz);
 int	physcopyin(void *src, vm_paddr_t dst, size_t len);

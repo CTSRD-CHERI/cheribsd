@@ -61,7 +61,6 @@ struct componentname {
 struct nameicap_tracker;
 TAILQ_HEAD(nameicap_tracker_head, nameicap_tracker);
 
-#ifdef _KERNEL
 /*
  * Encapsulation of namei parameters.
  */
@@ -69,7 +68,7 @@ struct nameidata {
 	/*
 	 * Arguments to namei/lookup.
 	 */
-	const char *	ni_dirp;	/* pathname pointer */
+	const	char *ni_dirp;		/* pathname pointer */
 	enum	uio_seg ni_segflg;	/* location of pathname */
 	cap_rights_t *ni_rightsneeded;	/* rights required to look up vnode */
 	/*
@@ -117,6 +116,8 @@ struct nameidata {
 	seqc_t	ni_dvp_seqc;
 	seqc_t	ni_vp_seqc;
 };
+
+#ifdef _KERNEL
 
 enum cache_fpl_status { CACHE_FPL_STATUS_DESTROYED, CACHE_FPL_STATUS_ABORTED,
     CACHE_FPL_STATUS_PARTIAL, CACHE_FPL_STATUS_HANDLED, CACHE_FPL_STATUS_UNSET };
@@ -316,9 +317,6 @@ extern struct nchstats nchstats;
 // {
 //   "updated": 20230509,
 //   "target_type": "header",
-//   "changes": [
-//     "user_capabilities"
-//   ],
 //   "changes_purecap": [
 //     "subobject_bounds"
 //   ]

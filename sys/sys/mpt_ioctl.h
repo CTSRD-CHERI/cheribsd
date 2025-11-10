@@ -134,7 +134,7 @@ struct mpt_cfg_page_req64 {
 	CONFIG_PAGE_HEADER header;
 	uint32_t page_address;
 	uint64_t buf;
-	int	len;	
+	int	len;
 	uint16_t ioc_status;
 };
 
