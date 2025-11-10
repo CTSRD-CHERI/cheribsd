@@ -279,12 +279,7 @@ struct mtparamset {
 struct mtsetlist {
 	int num_params;
 	int param_len;
-	union {
-#ifdef _KERNEL
-		struct mtparamset *user_params;
-#endif
-		struct mtparamset *params;
-	};
+	struct mtparamset *params;
 };
 
 /*

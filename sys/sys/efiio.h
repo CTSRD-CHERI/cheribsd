@@ -55,12 +55,12 @@ struct efi_get_table_ioctl
 
 struct efi_var_ioctl
 {
-	efi_char *name;	/* User pointer to name, in wide chars */
-	size_t namesize;		/* Number of wide characters in name */
-	efi_guid_t vendor;		/* Vendor's GUID for variable */
-	uint32_t attrib;		/* Attributes */
+	efi_char *name;		/* User pointer to name, in wide chars */
+	size_t namesize;	/* Number of wide characters in name */
+	efi_guid_t vendor;	/* Vendor's GUID for variable */
+	uint32_t attrib;	/* Attributes */
 	void *data;		/* User pointer to the data */
-	size_t datasize;		/* Number of *bytes* in the data */
+	size_t datasize;	/* Number of *bytes* in the data */
 };
 
 struct efi_waketime_ioctl

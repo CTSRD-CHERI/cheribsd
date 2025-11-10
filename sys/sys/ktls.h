@@ -30,7 +30,6 @@
 #ifdef _KERNEL
 #include <sys/_null.h>
 #include <sys/refcount.h>
-#include <sys/_iovec.h>
 #include <sys/_task.h>
 
 #include <machine/param.h>
