@@ -379,13 +379,10 @@ struct uma_slab {
 	uint16_t	us_freecount;		/* How many are free? */
 	uint8_t		us_flags;		/* Page flags see uma.h */
 	uint8_t		us_domain;		/* Backing NUMA domain. */
-	struct noslabbits us_free;		/* Free bitmask, flexible. */
+	struct noslabbits us_free __aligned(sizeof(void *)); /* Free bitmask, flexible. */
 };
-#ifndef __CHERI_PURE_CAPABILITY__
-/* XXX-CHERI: this seems to fail in CheriABI userspace. */
 _Static_assert(sizeof(struct uma_slab) == __offsetof(struct uma_slab, us_free),
     "us_free field must be last");
-#endif
 _Static_assert(MAXMEMDOM < 255,
     "us_domain field is not wide enough");
 
