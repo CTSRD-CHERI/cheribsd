@@ -434,11 +434,11 @@ struct sockproto {
  * Used value-result for recvmsg, value only for sendmsg.
  */
 struct msghdr {
-	void *msg_name;		/* optional address */
+	void		*msg_name;		/* optional address */
 	socklen_t	 msg_namelen;		/* size of address */
-	struct iovec *msg_iov;	/* scatter/gather array */
+	struct iovec	*msg_iov;		/* scatter/gather array */
 	int		 msg_iovlen;		/* # elements in msg_iov */
-	void *msg_control;		/* ancillary data, see below */
+	void		*msg_control;		/* ancillary data, see below */
 	socklen_t	 msg_controllen;	/* ancillary data buffer len */
 	int		 msg_flags;		/* flags on received message */
 };
@@ -647,11 +647,11 @@ struct osockaddr {
  * 4.3-compat message header (move to compat file later).
  */
 struct omsghdr {
-	char *msg_name;	/* optional address */
+	char	*msg_name;		/* optional address */
 	int	msg_namelen;		/* size of address */
-	struct iovec *msg_iov; /* scatter/gather array */
+	struct	iovec *msg_iov;		/* scatter/gather array */
 	int	msg_iovlen;		/* # elements in msg_iov */
-	char *msg_accrights;	/* access rights sent/received */
+	char	*msg_accrights;		/* access rights sent/received */
 	int	msg_accrightslen;
 };
 #endif
@@ -673,9 +673,9 @@ enum shutdown_how {
  * sendfile(2) header/trailer struct
  */
 struct sf_hdtr {
-	struct iovec *headers;	/* header struct iovec's */
+	struct iovec *headers;	/* pointer to an array of header struct iovec's */
 	int hdr_cnt;		/* number of header iovec's */
-	struct iovec *trailers;	/* trailer struct iovec's */
+	struct iovec *trailers;	/* pointer to an array of trailer struct iovec's */
 	int trl_cnt;		/* number of trailer iovec's */
 };
 #ifdef _KERNEL
@@ -699,7 +699,6 @@ typedef	int copyin_hdtr_t(const void *hdtrp, struct sf_hdtr *hdtr);
 /*
  * Sendmmsg/recvmmsg specific structure(s)
  */
-
 struct mmsghdr {
 	struct msghdr	msg_hdr;		/* message header */
 	ssize_t		msg_len;		/* message length */

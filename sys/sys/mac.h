@@ -70,10 +70,9 @@ typedef	__size_t	size_t;
  * struct mac is the data structure used to carry MAC labels in system calls
  * and ioctls between userspace and the kernel.
  */
-
 struct mac {
-	size_t			m_buflen;
-	char *	m_string;
+	size_t		m_buflen;
+	char		*m_string;
 };
 
 typedef struct mac	*mac_t;

@@ -234,8 +234,7 @@ void	*malloc(size_t size, struct malloc_type *type, int flags) __malloc_like
  */
 #define	malloc(size, type, flags) ({					\
 	void *_malloc_item;						\
-	/* XXX-CHERI: work around CTSRD-CHERI/llvm-project#647 */	\
-	size_t _size = CHERI_REPRESENTABLE_LENGTH(size);		\
+	size_t _size = (size);						\
 	if (__builtin_constant_p(size) && __builtin_constant_p(flags) &&\
 	    ((flags) & M_ZERO) != 0) {					\
 		_malloc_item = malloc(_size, type, (flags) &~ M_ZERO);	\

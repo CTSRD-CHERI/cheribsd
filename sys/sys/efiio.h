@@ -32,7 +32,7 @@
 
 struct efi_get_table_ioc
 {
-	void *buf;	/* Pointer to userspace buffer */
+	void *buf;		/* Pointer to userspace buffer */
 	struct uuid uuid;	/* UUID to look up */
 	size_t table_len;	/* Table size */
 	size_t buf_len;		/* Size of the buffer */
@@ -40,12 +40,12 @@ struct efi_get_table_ioc
 
 struct efi_var_ioc
 {
-	efi_char *name;	/* User pointer to name, in wide chars */
-	size_t namesize;		/* Number of wide characters in name */
-	struct uuid vendor;		/* Vendor's UUID for variable */
-	uint32_t attrib;		/* Attributes */
+	efi_char *name;		/* User pointer to name, in wide chars */
+	size_t namesize;	/* Number of wide characters in name */
+	struct uuid vendor;	/* Vendor's UUID for variable */
+	uint32_t attrib;	/* Attributes */
 	void *data;		/* User pointer to the data */
-	size_t datasize;		/* Number of *bytes* in the data */
+	size_t datasize;	/* Number of *bytes* in the data */
 };
 
 struct efi_waketime_ioc

@@ -51,9 +51,9 @@
  * the pointers.
  */
 struct ps_strings {
-	char **ps_argvstr; /* first of 0 or more argument strings */
+	char	**ps_argvstr; /* first of 0 or more argument strings */
 	unsigned int ps_nargvstr; /* the number of argument strings */
-	char **ps_envstr;	/* first of 0 or more environment strings */
+	char	**ps_envstr;	/* first of 0 or more environment strings */
 	unsigned int ps_nenvstr; /* the number of environment strings */
 };
 
@@ -108,8 +108,7 @@ enum uio_seg;
 
 int core_write(struct coredump_params *, const void *, size_t, off_t,
     enum uio_seg, size_t *);
-int core_output(char *, size_t, off_t, struct coredump_params *,
-    void *);
+int core_output(char *, size_t, off_t, struct coredump_params *, void *);
 #if __has_feature(capabilities)
 int core_output_memtag_cheri(char *, size_t, size_t, off_t,
     struct coredump_params *, void *, void *);

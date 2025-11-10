@@ -33,20 +33,20 @@
 #ifdef _KERNEL
 struct jail_v0 {
 	u_int32_t	version;
-	char *path;
-	char *hostname;
+	char		*path;
+	char		*hostname;
 	u_int32_t	ip_number;
 };
 #endif
 
 struct jail {
 	uint32_t	version;
-	char *path;
-	char *hostname;
-	char *jailname;
+	char		*path;
+	char		*hostname;
+	char		*jailname;
 	uint32_t	ip4s;
 	uint32_t	ip6s;
-	struct in_addr *ip4;
+	struct in_addr	*ip4;
 	struct in6_addr	*ip6;
 };
 #define	JAIL_API_VERSION	2

@@ -118,12 +118,3 @@ int		 sbuf_copyin(struct sbuf *, const void *, size_t);
 __END_DECLS
 
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "header",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

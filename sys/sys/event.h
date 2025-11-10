@@ -85,7 +85,7 @@ struct kevent {
 	unsigned short	flags;		/* action flags for kqueue */
 	unsigned int	fflags;		/* filter flag value */
 	__int64_t	data;		/* filter data value */
-	void *udata;		/* opaque user data identifier */
+	void		*udata;		/* opaque user data identifier */
 	__uint64_t	ext[4];		/* extensions */
 };
 
@@ -103,12 +103,12 @@ struct g_kevent_args {
 #if defined(_WANT_FREEBSD11_KEVENT)
 /* Older structure used in FreeBSD 11.x and older. */
 struct freebsd11_kevent {
-	__intptr_t	ident;		/* identifier for this event */
+	__uintptr_t	ident;		/* identifier for this event */
 	short		filter;		/* filter for event */
 	unsigned short	flags;
 	unsigned int	fflags;
 	__intptr_t	data;
-	void *udata;		/* opaque user data identifier */
+	void		*udata;		/* opaque user data identifier */
 };
 #endif
 
@@ -308,7 +308,7 @@ struct knote {
 	struct			knlist *kn_knlist;	/* f_attach populated */
 	TAILQ_ENTRY(knote)	kn_tqe;
 	struct			kqueue *kn_kq;	/* which queue we are on */
-	struct kevent		kn_kevent;
+	struct			kevent kn_kevent;
 	void			*kn_hook;
 	int			kn_hookid;
 	int			kn_status;	/* protected by kq lock */
