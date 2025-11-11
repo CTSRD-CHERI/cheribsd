@@ -296,7 +296,7 @@ uma_zone_t uma_zcache_create(const char *name, int size, uma_ctor ctor,
      UMA_ZONE_FIRSTTOUCH | UMA_ZONE_ROUNDROBIN | UMA_ZONE_NOKASAN)
 
 /* Definitions for align */
-#define UMA_ALIGN_PTR	(sizeof(void *) - 1) /* Align for ptr */
+#define UMA_ALIGN_PTR	(sizeof(void *) - 1)	/* Align for ptr */
 #define UMA_ALIGN_LONG	(sizeof(long) - 1)	/* "" long */
 #define UMA_ALIGN_INT	(sizeof(int) - 1)	/* "" int */
 #define UMA_ALIGN_SHORT	(sizeof(short) - 1)	/* "" short */
@@ -748,13 +748,3 @@ unsigned long uma_size(void);
 long uma_avail(void);
 
 #endif	/* _VM_UMA_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "header",
-//   "changes": [
-//     "integer_provenance",
-//     "pointer_shape"
-//   ]
-// }
-// CHERI CHANGES END
