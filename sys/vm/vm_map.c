@@ -222,12 +222,6 @@ quarantine_cmp(struct vm_map_entry *e1, struct vm_map_entry *e2)
 RB_GENERATE_STATIC(vm_map_quarantine, vm_map_entry, quarantine, quarantine_cmp)
 #endif /* CHERI_CAPREVOKE */
 
-/*
- * XXX: MIPS implementation removed.  vm_map_log() should be implemented
- * or removed entirely.
- */
-#define	vm_map_log(prefix, entry)
-
 #ifndef UMA_USE_DMAP
 
 /*
@@ -2051,7 +2045,6 @@ charged:
 				vm_map_entry_delete(map, new_entry);
 			vm_map_entry_resize(map, prev_entry,
 			    end - prev_entry->end);
-			vm_map_log("resize", prev_entry);
 			*res = vm_map_try_merge_entries(map, prev_entry,
 			    next_entry);
 			return (KERN_SUCCESS);
@@ -2112,8 +2105,6 @@ charged:
 	    ("vm_map_insert: new entry %p is unmapped", new_entry));
 	if ((new_entry->eflags & (MAP_ENTRY_GUARD | MAP_ENTRY_SHADOW)) == 0)
 		map->size += new_entry->end - new_entry->start;
-
-	vm_map_log("insert", new_entry);
 
 	/*
 	 * XXX-AM: this is probably useless with reservations
@@ -3498,7 +3489,6 @@ restart_checks:
 		}
 		if ((flags & VM_MAP_PROTECT_SET_PROT) != 0)
 			entry->protection = new_prot;
-		vm_map_log("protect", entry);
 
 		/*
 		 * For user wired map entries, the normal lazy evaluation of
@@ -4730,7 +4720,6 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 		 * count may need to be deferred to
 		 * vm_map_process_deferred().
 		 */
-		vm_map_log("remove", entry);
 		cloned_entry = NULL;
 		if ((map->flags & MAP_RESERVATIONS) != 0 && keep_reservation) {
 			if ((entry->eflags & MAP_ENTRY_UNMAPPED) != 0) {
@@ -4762,7 +4751,6 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 
 		/* Insert the cloned entry if it exists. */
 		if (cloned_entry != NULL) {
-			vm_map_log("insert unmapped", cloned_entry);
 			vm_map_entry_link(map, cloned_entry);
 			vm_map_try_merge_entries(map, prev_entry,
 			    cloned_entry);
@@ -6264,7 +6252,6 @@ vm_map_reservation_insert(vm_map_t map, vm_offset_t addr, vm_size_t length,
 	new_entry->next_read = addr;
 	new_entry->max_protection = max | VM_PROT_NO_IMPLY_CAP;
 	vm_map_entry_link(map, new_entry);
-	vm_map_log("reserve", new_entry);
 
 	return (new_entry);
 }
