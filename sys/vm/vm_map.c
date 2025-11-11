@@ -2401,8 +2401,6 @@ SYSCTL_LONG(_vm, OID_AUTO, aslr_restarts, CTLFLAG_RD,
     "Number of aslr failures");
 
 /*
- * [Internal use only]
- *
  * Searches for the specified amount of free space in the given map with the
  * specified alignment.  Performs an address-ordered, first-fit search from
  * the given address "*addr", with an optional upper bound "max_addr".  If the
@@ -2414,7 +2412,7 @@ SYSCTL_LONG(_vm, OID_AUTO, aslr_restarts, CTLFLAG_RD,
  * The map must be locked.  Initially, there must be at least "length" bytes
  * of free space at the given address.
  */
-int
+static int
 vm_map_alignspace(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
     vm_offset_t *addr, vm_size_t length, vm_offset_t max_addr,
     vm_offset_t alignment)
@@ -2425,7 +2423,7 @@ vm_map_alignspace(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	free_addr = *addr;
 	KASSERT(free_addr == vm_map_findspace(map, free_addr, length),
 	    ("caller failed to provide space %#jx at address %p",
-	    (uintmax_t)length, (void *)(uintptr_t)free_addr));
+	     (uintmax_t)length, (void *)(uintptr_t)free_addr));
 	for (;;) {
 		/*
 		 * At the start of every iteration, the free space at address
@@ -4401,8 +4399,13 @@ retry:
  * Returns an error if any part of the specified range is not mapped.
  */
 int
-vm_map_sync(vm_map_t map, vm_offset_t start, vm_offset_t end,
-    boolean_t syncio, boolean_t invalidate, boolean_t pageout)
+vm_map_sync(
+	vm_map_t map,
+	vm_offset_t start,
+	vm_offset_t end,
+	boolean_t syncio,
+	boolean_t invalidate,
+	boolean_t pageout)
 {
 	vm_map_entry_t entry, first_entry, next_entry;
 	vm_size_t size;
