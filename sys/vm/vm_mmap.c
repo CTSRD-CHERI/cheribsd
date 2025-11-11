@@ -878,7 +878,7 @@ sys_msync(struct thread *td, struct msync_args *uap)
 		return (EINVAL);
 #endif
 
-	return (kern_msync(td, (uintptr_t)(uintptr_t)uap->addr, uap->len,
+	return (kern_msync(td, (uintptr_t)uap->addr, uap->len,
 	    uap->flags));
 }
 
@@ -943,7 +943,7 @@ sys_munmap(struct thread *td, struct munmap_args *uap)
 		return (EPROT);
 #endif
 
-	return (kern_munmap(td, (uintptr_t)(uintptr_t)uap->addr, uap->len));
+	return (kern_munmap(td, (uintptr_t)uap->addr, uap->len));
 }
 
 int
@@ -951,13 +951,13 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 {
 #ifdef HWPMC_HOOKS
 	struct pmckern_map_out pkm;
-	bool pmc_handled;
 	vm_map_entry_t entry;
+	bool pmc_handled;
 #endif
 	vm_offset_t addr, end;
 	vm_size_t pageoff;
 	vm_map_t map;
-	int rv = KERN_SUCCESS;
+	int rv;
 
 	if (size == 0)
 		return (EINVAL);
@@ -1029,7 +1029,7 @@ sys_mprotect(struct thread *td, struct mprotect_args *uap)
 		return (EPROT);
 #endif
 
-	return (kern_mprotect(td, (uintptr_t)(uintptr_t)uap->addr, uap->len,
+	return (kern_mprotect(td, (uintptr_t)uap->addr, uap->len,
 	    uap->prot, 0));
 }
 
@@ -1118,7 +1118,7 @@ sys_minherit(struct thread *td, struct minherit_args *uap)
 	if ((cheri_perms_get(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
 		return (EPROT);
 #endif
-	return (kern_minherit(td, (uintptr_t)(uintptr_t)uap->addr, uap->len,
+	return (kern_minherit(td, (uintptr_t)uap->addr, uap->len,
 	    uap->inherit));
 }
 
@@ -1141,7 +1141,7 @@ kern_minherit(struct thread *td, uintptr_t addr0, size_t len, int inherit0)
 		return (EINVAL);
 
 	switch (vm_map_inherit(&td->td_proc->p_vmspace->vm_map, addr,
-	    addr + size, (vm_inherit_t)inherit)) {
+	    addr + size, inherit)) {
 	case KERN_SUCCESS:
 		return (0);
 	case KERN_PROTECTION_FAILURE:
@@ -1175,7 +1175,7 @@ sys_madvise(struct thread *td, struct madvise_args *uap)
 		return (EPROT);
 #endif
 
-	return (kern_madvise(td, (uintptr_t)(uintptr_t)uap->addr, uap->len,
+	return (kern_madvise(td, (uintptr_t)uap->addr, uap->len,
 	    uap->behav));
 }
 
@@ -1269,8 +1269,7 @@ sys_mincore(struct thread *td, struct mincore_args *uap)
 }
 
 int
-kern_mincore(struct thread *td, uintptr_t addr0, size_t len,
-    char *vec)
+kern_mincore(struct thread *td, uintptr_t addr0, size_t len, char *vec)
 {
 	pmap_t pmap;
 	vm_map_t map;
@@ -1596,7 +1595,7 @@ sys_mlock(struct thread *td, struct mlock_args *uap)
 #endif
 
 	return (kern_mlock(td->td_proc, td->td_ucred,
-	    (uintptr_t)__DECONST(uintptr_t, uap->addr), uap->len));
+	    __DECONST(uintptr_t, uap->addr), uap->len));
 }
 
 int
@@ -1782,7 +1781,7 @@ sys_munlock(struct thread *td, struct munlock_args *uap)
 		return (EPROT);
 #endif
 
-	return (kern_munlock(td, (uintptr_t)(uintptr_t)uap->addr, uap->len));
+	return (kern_munlock(td, (uintptr_t)uap->addr, uap->len));
 }
 
 int

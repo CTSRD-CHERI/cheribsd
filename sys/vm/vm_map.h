@@ -586,8 +586,6 @@ int vm_map_fixed(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t,
 int vm_map_fixed_name(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t,
     vm_pointer_t *, vm_size_t, vm_prot_t, vm_prot_t, int, const char *);
 vm_offset_t vm_map_findspace(vm_map_t, vm_offset_t, vm_size_t);
-int vm_map_alignspace(vm_map_t, vm_object_t, vm_ooffset_t,
-    vm_offset_t *, vm_size_t, vm_offset_t, vm_offset_t);
 int vm_map_inherit (vm_map_t, vm_offset_t, vm_offset_t, vm_inherit_t);
 void vm_map_init(vm_map_t, pmap_t, uintptr_t, uintptr_t);
 void vm_map_init_system(vm_map_t, pmap_t, uintptr_t, uintptr_t);
