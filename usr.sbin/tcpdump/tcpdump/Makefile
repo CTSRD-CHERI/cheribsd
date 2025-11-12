@@ -1,6 +1,6 @@
 .include <src.opts.mk>
 
-PROG=	tcpdump
+PROG?=	tcpdump
 
 SRCS=	\
 	addrtoname.c \
