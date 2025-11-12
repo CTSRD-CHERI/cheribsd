@@ -330,8 +330,7 @@ int
 freebsd4_freebsd32_getfsstat(struct thread *td,
     struct freebsd4_freebsd32_getfsstat_args *uap)
 {
-	struct statfs *buf;
-	struct statfs *sp;
+	struct statfs *buf, *sp;
 	struct ostatfs32 stat32;
 	size_t count, size, copycount;
 	int error;
@@ -340,7 +339,7 @@ freebsd4_freebsd32_getfsstat(struct thread *td,
 	size = count * sizeof(struct statfs);
 	error = kern_getfsstat(td, &buf, size, &count, UIO_SYSSPACE, uap->mode);
 	if (size > 0) {
-		sp = (struct statfs *)buf;
+		sp = buf;
 		copycount = count;
 		while (copycount > 0 && error == 0) {
 			copy_statfs(sp, &stat32);
@@ -2590,7 +2589,8 @@ freebsd32_jail(struct thread *td, struct freebsd32_jail_args *uap)
 		return (error);
 
 	switch (version) {
-	case 0: {
+	case 0:
+	{
 		/* FreeBSD single IPv4 jails. */
 		struct jail32_v0 j32_v0;
 		struct in_addr ip4;

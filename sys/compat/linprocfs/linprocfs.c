@@ -518,8 +518,7 @@ linprocfs_domtab(PFS_FILL_ARGS)
 	struct pwd *pwd;
 	size_t lep_len;
 	int error;
-	struct statfs *buf;
-	struct statfs *sp;
+	struct statfs *buf, *sp;
 	size_t count;
 
 	/*
@@ -541,8 +540,7 @@ linprocfs_domtab(PFS_FILL_ARGS)
 		goto out;
 	}
 
-	for (sp = (struct statfs *)buf; count > 0;
-	    sp++, count--) {
+	for (sp = buf; count > 0; sp++, count--) {
 		error = _mtab_helper(pn, sp, &mntfrom, &mntto, &fstype);
 		if (error != 0) {
 			MPASS(error == ECANCELED);
