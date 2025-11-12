@@ -46,7 +46,7 @@ struct cis_buffer
  */
 struct cardbus_devinfo
 {
-	struct pci_devinfo pci;
+	struct pci_devinfo pci __subobject_member_used_for_c_inheritance;
 	uint8_t        mprefetchable; /* bit mask of prefetchable BARs */
 	uint8_t        mbelow1mb; /* bit mask of BARs which require below 1Mb */
 	uint16_t	mfrid;		/* manufacturer id */

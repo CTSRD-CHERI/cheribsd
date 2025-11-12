@@ -61,7 +61,8 @@
 ACPI_MODULE_NAME("PCI")
 
 struct acpi_pci_devinfo {
-	struct pci_devinfo	ap_dinfo;
+	struct pci_devinfo	ap_dinfo
+	    __subobject_member_used_for_c_inheritance;
 	ACPI_HANDLE		ap_handle;
 	int			ap_flags;
 };
