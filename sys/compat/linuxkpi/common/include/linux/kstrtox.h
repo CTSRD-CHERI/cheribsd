@@ -248,8 +248,7 @@ kstrtobool(const char *s, bool *res)
 }
 
 static inline int
-kstrtobool_from_user(const char __user *s, size_t count,
-    bool *res)
+kstrtobool_from_user(const char __user *s, size_t count, bool *res)
 {
 	char buf[8] = {};
 
@@ -263,8 +262,8 @@ kstrtobool_from_user(const char __user *s, size_t count,
 }
 
 static inline int
-kstrtoint_from_user(const char __user *s, size_t count,
-    unsigned int base, int *p)
+kstrtoint_from_user(const char __user *s, size_t count, unsigned int base,
+    int *p)
 {
 	char buf[36] = {};
 
@@ -278,8 +277,8 @@ kstrtoint_from_user(const char __user *s, size_t count,
 }
 
 static inline int
-kstrtouint_from_user(const char __user *s, size_t count,
-    unsigned int base, unsigned int *p)
+kstrtouint_from_user(const char __user *s, size_t count, unsigned int base,
+    unsigned int *p)
 {
 	char buf[36] = {};
 
@@ -293,16 +292,16 @@ kstrtouint_from_user(const char __user *s, size_t count,
 }
 
 static inline int
-kstrtou32_from_user(const char __user *s, size_t count,
-    unsigned int base, unsigned int *p)
+kstrtou32_from_user(const char __user *s, size_t count, unsigned int base,
+    unsigned int *p)
 {
 
 	return (kstrtouint_from_user(s, count, base, p));
 }
 
 static inline int
-kstrtou8_from_user(const char __user *s, size_t count,
-    unsigned int base, uint8_t *p)
+kstrtou8_from_user(const char __user *s, size_t count, unsigned int base,
+    uint8_t *p)
 {
 	char buf[8] = {};
 
