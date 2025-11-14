@@ -147,7 +147,7 @@ addupc_task(struct thread *td, uintfptr_t pc, u_int ticks)
 {
 	struct proc *p = td->td_proc; 
 	struct uprof *prof;
-	char *addr;
+	caddr_t addr;
 	u_int i;
 	u_short v;
 	int stop = 0;

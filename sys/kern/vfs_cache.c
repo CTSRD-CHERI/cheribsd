@@ -3202,7 +3202,6 @@ vfs_cache_lookup(struct vop_lookup_args *ap)
 int
 sys___getcwd(struct thread *td, struct __getcwd_args *uap)
 {
-
 	return (kern___getcwd(td, uap->buf, uap->buflen));
 }
 
@@ -3262,8 +3261,8 @@ vn_getcwd(char *buf, char **retbuf, size_t *buflen)
  *   calling thread lacks permission to traverse "quux".
  */
 int
-kern___realpathat(struct thread *td, int fd, const char *path,
-    char *buf, size_t size, int flags, enum uio_seg pathseg)
+kern___realpathat(struct thread *td, int fd, const char *path, char *buf,
+    size_t size, int flags, enum uio_seg pathseg)
 {
 	struct nameidata nd;
 	char *retbuf, *freebuf;
@@ -3311,7 +3310,7 @@ kern___realpathat(struct thread *td, int fd, const char *path,
 		else if (pathseg == UIO_USERSPACE)
 			error = copyout(retbuf, buf, len);
 		else
-			memcpy((__cheri_fromcap char *)buf, retbuf, len);
+			memcpy(buf, retbuf, len);
 		free(freebuf, M_TEMP);
 	}
 out:
@@ -3939,8 +3938,7 @@ vn_path_to_global_path(struct thread *td, struct vnode *vp, char *path,
 	 * As a side effect, the vnode is relocked.
 	 * If vnode was renamed, return ENOENT.
 	 */
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1, UIO_SYSSPACE,
-	    path);
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1, UIO_SYSSPACE, path);
 	error = namei(&nd);
 	if (error != 0) {
 		vrele(vp);
@@ -4006,8 +4004,7 @@ vn_path_to_global_path_hardlink(struct thread *td, struct vnode *vp,
 	 * As a side effect, the vnode is relocked.
 	 * If vnode was renamed, return ENOENT.
 	 */
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1, UIO_SYSSPACE,
-	    path);
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1, UIO_SYSSPACE, path);
 	error = namei(&nd);
 	if (error != 0) {
 		vrele(vp);

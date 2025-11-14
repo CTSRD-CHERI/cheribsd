@@ -131,8 +131,8 @@ static int	shm_dotruncate_cookie(struct shmfd *shmfd, off_t length,
     void *rl_cookie);
 static int	shm_dotruncate_locked(struct shmfd *shmfd, off_t length,
     void *rl_cookie);
-static int	shm_copyin_path(struct thread *td,
-    const char *userpath_in, char **path_out);
+static int	shm_copyin_path(struct thread *td, const char *userpath_in,
+    char **path_out);
 static int	shm_deallocate(struct shmfd *shmfd, off_t *offset,
     off_t *length, int flags);
 
@@ -683,8 +683,7 @@ shm_close(struct file *fp, struct thread *td)
 }
 
 static int
-shm_copyin_path(struct thread *td, const char *userpath_in,
-    char **path_out) {
+shm_copyin_path(struct thread *td, const char *userpath_in, char **path_out) {
 	int error;
 	char *path;
 	const char *pr_path;
@@ -1403,7 +1402,6 @@ freebsd12_shm_open(struct thread *td, struct freebsd12_shm_open_args *uap)
 int
 sys_shm_unlink(struct thread *td, struct shm_unlink_args *uap)
 {
-
 	return (kern_shm_unlink(td, uap->path));
 }
 
@@ -1431,9 +1429,7 @@ kern_shm_unlink(struct thread *td, const char *userpath)
 int
 sys_shm_rename(struct thread *td, struct shm_rename_args *uap)
 {
-
-	return (kern_shm_rename(td, uap->path_from,
-	    uap->path_to, uap->flags));
+	return (kern_shm_rename(td, uap->path_from, uap->path_to, uap->flags));
 }
 
 int
@@ -2279,8 +2275,8 @@ SYSCTL_PROC(_kern_ipc, OID_AUTO, posix_shm_list,
     "POSIX SHM list");
 
 int
-kern_shm_open(struct thread *td, const char *path, int flags,
-    mode_t mode, struct filecaps *caps)
+kern_shm_open(struct thread *td, const char *path, int flags, mode_t mode,
+    struct filecaps *caps)
 {
 
 	return (kern_shm_open2(td, path, flags, mode, 0, caps, NULL, NULL));

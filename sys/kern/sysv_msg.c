@@ -1130,8 +1130,8 @@ sys_msgsnd(struct thread *td, struct msgsnd_args *uap)
 
 /* XXX msgp is actually mtext. */
 int
-kern_msgrcv(struct thread *td, int msqid, void *msgp,
-    size_t msgsz, long msgtyp, int msgflg, long *mtype)
+kern_msgrcv(struct thread *td, int msqid, void *msgp, size_t msgsz, long msgtyp,
+    int msgflg, long *mtype)
 {
 	size_t len;
 	struct msqid_kernel *msqkptr;
@@ -1501,11 +1501,8 @@ kern_get_msqids(struct thread *td, struct msqid_kernel **res, size_t *sz)
 				pmsqk->u.msg_perm.key = IPC_PRIVATE;
 		}
 		mtx_unlock(&msq_mtx);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 		pmsqk->u.__msg_first = NULL;
 		pmsqk->u.__msg_last = NULL;
-#pragma GCC diagnostic pop
 		pmsqk->label = NULL;
 		pmsqk->cred = NULL;
 	}

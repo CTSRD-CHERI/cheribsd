@@ -413,8 +413,8 @@ kern_shmdt(struct thread *td, const void *shmaddr)
 }
 
 static int
-kern_shmat_locked(struct thread *td, int shmid,
-    const void *shmaddr, int shmflg)
+kern_shmat_locked(struct thread *td, int shmid, const void *shmaddr,
+    int shmflg)
 {
 	struct prison *rpr;
 	struct proc *p = td->td_proc;
@@ -582,8 +582,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 }
 
 static int
-kern_shmat(struct thread *td, int shmid, const void *shmaddr,
-    int shmflg)
+kern_shmat(struct thread *td, int shmid, const void *shmaddr, int shmflg)
 {
 	int error;
 
@@ -743,13 +742,11 @@ struct shmctl_args {
 int
 sys_shmctl(struct thread *td, struct shmctl_args *uap)
 {
-
 	return (user_shmctl(td, uap->shmid, uap->cmd, uap->buf));
 }
 
 static int
-user_shmctl(struct thread *td, int shmid, int cmd,
-    struct shmid_ds *ubuf)
+user_shmctl(struct thread *td, int shmid, int cmd, struct shmid_ds *ubuf)
 {
 	int error;
 	struct shmid_ds buf;
@@ -1252,7 +1249,7 @@ sysctl_shmsegs(SYSCTL_HANDLER_ARGS)
 	for (i = 0; i < shmalloced; i++) {
 		if ((shmsegs[i].u.shm_perm.mode & SHMSEG_ALLOCATED) == 0 ||
 		    rpr == NULL || shm_prison_cansee(rpr, &shmsegs[i]) != 0) {
-		bzero(&tshmseg, sizeof(tshmseg));
+			bzero(&tshmseg, sizeof(tshmseg));
 			tshmseg.u.shm_perm.mode = SHMSEG_FREE;
 		} else {
 			tshmseg = shmsegs[i];
