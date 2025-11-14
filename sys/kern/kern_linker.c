@@ -1562,8 +1562,7 @@ kern_kldsym(struct thread *td, int fileid, int cmd,
 #endif
 
 	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr(symname, symstr, MAXPATHLEN, NULL);
-	if (error != 0)
+	if ((error = copyinstr(symname, symstr, MAXPATHLEN, NULL)) != 0)
 		goto done;
 	sx_xlock(&kld_sx);
 	if (fileid != 0) {
@@ -1995,7 +1994,7 @@ linker_lookup_file(const char *path, int pathlen, const char *name,
 		 * Attempt to open the file, and return the path if
 		 * we succeed and it's a regular file.
 		 */
-		NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(result));
+		NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, result);
 		flags = FREAD;
 		error = vn_open(&nd, &flags, 0, NULL);
 		if (error == 0) {
@@ -2069,7 +2068,7 @@ linker_hints_lookup(const char *path, int pathlen, const char *modname,
 		goto bad;
 	}
 	hints = malloc(vattr.va_size, M_TEMP, M_WAITOK);
-	error = vn_rdwr(UIO_READ, nd.ni_vp, hints, vattr.va_size, 0,
+	error = vn_rdwr(UIO_READ, nd.ni_vp, (caddr_t)hints, vattr.va_size, 0,
 	    UIO_SYSSPACE, IO_NODELOCKED, cred, NOCRED, &reclen, td);
 	if (error)
 		goto bad;

@@ -541,7 +541,6 @@ freebsd10_pipe(struct thread *td, struct freebsd10_pipe_args *uap __unused)
 int
 sys_pipe2(struct thread *td, struct pipe2_args *uap)
 {
-
 	return (kern_pipe2(td, uap->fildes, uap->flags));
 }
 

@@ -882,8 +882,7 @@ revert_f_setfl:
 			break;
 		}
 #endif
-		error = copyin((void *)arg, &kif_sz,
-		    sizeof(kif_sz));
+		error = copyin((void *)arg, &kif_sz, sizeof(kif_sz));
 		if (error != 0)
 			break;
 		if (kif_sz != sizeof(*kif)) {
@@ -899,8 +898,7 @@ revert_f_setfl:
 			fdrop(fp, td);
 			if ((kif->kf_status & KF_ATTR_VALID) != 0) {
 				kif->kf_structsize = sizeof(*kif);
-				error = copyout(kif, (void *)arg,
-				    sizeof(*kif));
+				error = copyout(kif, (void *)arg, sizeof(*kif));
 			} else {
 				error = EBADF;
 			}

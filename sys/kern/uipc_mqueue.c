@@ -274,8 +274,8 @@ static int	user_kmq_timedsend(struct thread *td, int mqd,
 static struct mqueue	*mqueue_alloc(const struct mq_attr *attr);
 static void	mqueue_free(struct mqueue *mq);
 static int	mqueue_send(struct mqueue *mq, const char *msg_ptr,
-			size_t msg_len, unsigned msg_prio, int waitok,
-			const struct timespec *abs_timeout);
+			size_t msg_len, unsigned msg_prio,
+			int waitok, const struct timespec *abs_timeout);
 static int	mqueue_receive(struct mqueue *mq, char *msg_ptr,
 			size_t msg_len, unsigned *msg_prio,
 			int waitok, const struct timespec *abs_timeout);
@@ -1661,7 +1661,7 @@ mqueue_loadmsg(const char *msg_ptr, size_t msg_size, int msg_prio)
 
 	len = sizeof(struct mqueue_msg) + msg_size;
 	msg = malloc(len, M_MQUEUEDATA, M_WAITOK);
-	error = copyin(msg_ptr, (char *)msg + sizeof(struct mqueue_msg),
+	error = copyin(msg_ptr, ((char *)msg) + sizeof(struct mqueue_msg),
 	    msg_size);
 	if (error) {
 		free(msg, M_MQUEUEDATA);
@@ -1677,15 +1677,13 @@ mqueue_loadmsg(const char *msg_ptr, size_t msg_size, int msg_prio)
  * Save a message to user space
  */
 static int
-mqueue_savemsg(struct mqueue_msg *msg, char *msg_ptr,
-    int *msg_prio)
+mqueue_savemsg(struct mqueue_msg *msg, char *msg_ptr, int *msg_prio)
 {
 	int error;
 
-	error = copyout((char *)msg + sizeof(*msg), msg_ptr, msg->msg_size);
+	error = copyout(((char *)msg) + sizeof(*msg), msg_ptr, msg->msg_size);
 	if (error == 0 && msg_prio != NULL)
-		error = copyout(&msg->msg_prio, msg_prio,
-		    sizeof(unsigned int));
+		error = copyout(&msg->msg_prio, msg_prio, sizeof(int));
 	return (error);
 }
 
@@ -2022,8 +2020,8 @@ notifier_remove(struct proc *p, struct mqueue *mq, int fd)
 }
 
 int
-kern_kmq_open(struct thread *td, const char *upath, int flags,
-    mode_t mode, const struct mq_attr *attr)
+kern_kmq_open(struct thread *td, const char *upath, int flags, mode_t mode,
+    const struct mq_attr *attr)
 {
 	char *path, pathbuf[MQFS_NAMELEN + 1];
 	struct mqfs_node *pn;
@@ -2136,13 +2134,12 @@ kern_kmq_open(struct thread *td, const char *upath, int flags,
 int
 sys_kmq_open(struct thread *td, struct kmq_open_args *uap)
 {
-
 	return (user_kmq_open(td, uap->path, uap->flags, uap->mode, uap->attr));
 }
 
 static int
-user_kmq_open(struct thread *td, const char *path,
-    int flags, mode_t mode, const struct mq_attr *uattr)
+user_kmq_open(struct thread *td, const char *path, int flags, mode_t mode,
+    const struct mq_attr *uattr)
 {
 	struct mq_attr attr;
 	int error;
@@ -2165,7 +2162,6 @@ user_kmq_open(struct thread *td, const char *path,
 int
 sys_kmq_unlink(struct thread *td, struct kmq_unlink_args *uap)
 {
-
 	return (kern_kmq_unlink(td, uap->path));
 }
 

@@ -73,6 +73,7 @@
 
 static int recvit(struct thread *td, int s, struct msghdr *mp,
     socklen_t *namelenp);
+static int sockargs(struct mbuf **, char *, socklen_t, int);
 
 /*
  * Convert a user file descriptor to a kernel file entry and check if required
@@ -176,7 +177,6 @@ kern_socket(struct thread *td, int domain, int type, int protocol)
 int
 sys_bind(struct thread *td, struct bind_args *uap)
 {
-
 	return (user_bind(td, uap->s, uap->name, uap->namelen));
 }
 
@@ -239,7 +239,6 @@ kern_bindat(struct thread *td, int dirfd, int fd, struct sockaddr *sa)
 int
 sys_bindat(struct thread *td, struct bindat_args *uap)
 {
-
 	return(user_bindat(td, uap->fd, uap->s, uap->name, uap->namelen));
 }
 
@@ -261,7 +260,6 @@ user_bindat(struct thread *td, int fd, int s,
 int
 sys_listen(struct thread *td, struct listen_args *uap)
 {
-
 	return (kern_listen(td, uap->s, uap->backlog));
 }
 
@@ -463,7 +461,6 @@ oaccept(struct thread *td, struct oaccept_args *uap)
 int
 sys_connect(struct thread *td, struct connect_args *uap)
 {
-
 	return (user_connectat(td, AT_FDCWD, uap->s, uap->name, uap->namelen));
 }
 
@@ -547,7 +544,6 @@ done1:
 int
 sys_connectat(struct thread *td, struct connectat_args *uap)
 {
-
 	return (user_connectat(td, uap->fd, uap->s, uap->name, uap->namelen));
 }
 
@@ -644,7 +640,6 @@ free1:
 int
 sys_socketpair(struct thread *td, struct socketpair_args *uap)
 {
-
 	return (user_socketpair(td, uap->domain, uap->type, uap->protocol,
 	    uap->rsv));
 }
@@ -702,8 +697,8 @@ user_sendit(struct thread *td, int s, struct msghdr *mp, int flags)
 			error = EINVAL;
 			goto bad;
 		}
-		error = sockargs(&control, mp->msg_control, mp->msg_controllen,
-		MT_CONTROL);
+		error = sockargs(&control, mp->msg_control,
+		    mp->msg_controllen, MT_CONTROL);
 		if (error != 0)
 			goto bad;
 #ifdef COMPAT_OLDSOCK
@@ -747,8 +742,7 @@ kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 	AUDIT_ARG_FD(s);
 	rights = &cap_send_rights;
 	if (mp->msg_name != NULL) {
-		AUDIT_ARG_SOCKADDR(td, AT_FDCWD,
-		    (struct sockaddr *)mp->msg_name);
+		AUDIT_ARG_SOCKADDR(td, AT_FDCWD, mp->msg_name);
 		rights = &cap_send_connect_rights;
 	}
 	error = getsock(td, s, rights, &fp);
@@ -760,12 +754,12 @@ kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 
 #ifdef KTRACE
 	if (mp->msg_name != NULL && KTRPOINT(td, KTR_STRUCT))
-		ktrsockaddr((void *)mp->msg_name);
+		ktrsockaddr(mp->msg_name);
 #endif
 #ifdef MAC
 	if (mp->msg_name != NULL) {
 		error = mac_socket_check_connect(td->td_ucred, so,
-		    (void *)mp->msg_name);
+		    mp->msg_name);
 		if (error != 0) {
 			m_freem(control);
 			goto bad;
@@ -778,7 +772,7 @@ kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 	}
 #endif
 
-	auio.uio_iov = (struct iovec *)mp->msg_iov;
+	auio.uio_iov = mp->msg_iov;
 	auio.uio_iovcnt = mp->msg_iovlen;
 	auio.uio_segflg = segflg;
 	auio.uio_rw = UIO_WRITE;
@@ -798,8 +792,7 @@ kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 		ktruio = cloneuio(&auio);
 #endif
 	len = auio.uio_resid;
-	error = sousrsend(so, (struct sockaddr *)mp->msg_name,
-	    &auio, control, flags, NULL);
+	error = sousrsend(so, mp->msg_name, &auio, control, flags, NULL);
 	if (error == 0)
 		td->td_retval[0] = len - auio.uio_resid;
 #ifdef KTRACE
@@ -817,15 +810,13 @@ bad:
 int
 sys_sendto(struct thread *td, struct sendto_args *uap)
 {
-
-	return (user_sendto(td, uap->s, uap->buf,
-	    uap->len, uap->flags, uap->to, uap->tolen));
+	return (user_sendto(td, uap->s, uap->buf, uap->len, uap->flags,
+	    uap->to, uap->tolen));
 }
 
 int
-user_sendto(struct thread *td, int s, const char *buf,
-    size_t len, int flags, const struct sockaddr *to,
-    socklen_t tolen)
+user_sendto(struct thread *td, int s, const char *buf, size_t len, int flags,
+    const struct sockaddr *to, socklen_t tolen)
 {
 	struct msghdr msg;
 	struct iovec aiov;
@@ -854,8 +845,7 @@ osend(struct thread *td, struct osend_args *uap)
 	msg.msg_namelen = 0;
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	IOVEC_INIT(&aiov, __DECONST(void *, uap->buf),
-	    uap->len);
+	IOVEC_INIT(&aiov, __DECONST(void *, uap->buf), uap->len);
 	msg.msg_control = 0;
 	msg.msg_flags = 0;
 	return (user_sendit(td, uap->s, &msg, uap->flags));
@@ -918,7 +908,7 @@ kern_recvit(struct thread *td, int s, struct msghdr *mp, enum uio_seg fromseg,
 	struct uio auio;
 	struct iovec *iov;
 	struct mbuf *control, *m;
-	char *ctlbuf;
+	caddr_t ctlbuf;
 	struct file *fp;
 	struct socket *so;
 	struct sockaddr *fromsa = NULL;
@@ -945,7 +935,7 @@ kern_recvit(struct thread *td, int s, struct msghdr *mp, enum uio_seg fromseg,
 	}
 #endif
 
-	auio.uio_iov = (struct iovec *)mp->msg_iov;
+	auio.uio_iov = mp->msg_iov;
 	auio.uio_iovcnt = mp->msg_iovlen;
 	auio.uio_segflg = UIO_USERSPACE;
 	auio.uio_rw = UIO_READ;
@@ -1004,9 +994,7 @@ kern_recvit(struct thread *td, int s, struct msghdr *mp, enum uio_seg fromseg,
 				if (error != 0)
 					goto out;
 			} else
-				bcopy(fromsa,
-				    (void *)mp->msg_name,
-				    len);
+				bcopy(fromsa, mp->msg_name, len);
 		}
 		mp->msg_namelen = len;
 	}
@@ -1069,8 +1057,7 @@ out:
 }
 
 static int
-recvit(struct thread *td, int s, struct msghdr *mp,
-    socklen_t *namelenp)
+recvit(struct thread *td, int s, struct msghdr *mp, socklen_t *namelenp)
 {
 	int error;
 
@@ -1078,8 +1065,7 @@ recvit(struct thread *td, int s, struct msghdr *mp,
 	if (error != 0)
 		return (error);
 	if (namelenp != NULL) {
-		error = copyout(&mp->msg_namelen, namelenp,
-		    sizeof (socklen_t));
+		error = copyout(&mp->msg_namelen, namelenp, sizeof (socklen_t));
 #ifdef COMPAT_OLDSOCK
 		if ((mp->msg_flags & MSG_COMPAT) != 0 &&
 		    SV_PROC_FLAG(td->td_proc, SV_AOUT))
@@ -1090,9 +1076,8 @@ recvit(struct thread *td, int s, struct msghdr *mp,
 }
 
 int
-kern_recvfrom(struct thread *td, int s, void *buf, size_t len,
-    int flags, struct sockaddr *__restrict from,
-    socklen_t *__restrict fromlenaddr)
+kern_recvfrom(struct thread *td, int s, void *buf, size_t len, int flags,
+    struct sockaddr *from, socklen_t *fromlenaddr)
 {
 	struct msghdr msg;
 	struct iovec aiov;
@@ -1123,6 +1108,7 @@ sys_recvfrom(struct thread *td, struct recvfrom_args *uap)
 	return (kern_recvfrom(td, uap->s, uap->buf, uap->len,
 	    uap->flags, uap->from, uap->fromlenaddr));
 }
+
 
 #ifdef COMPAT_OLDSOCK
 int
@@ -1259,8 +1245,8 @@ sys_setsockopt(struct thread *td, struct setsockopt_args *uap)
 }
 
 int
-kern_setsockopt(struct thread *td, int s, int level, int name,
-    const void *val, enum uio_seg valseg, socklen_t valsize)
+kern_setsockopt(struct thread *td, int s, int level, int name, const void *val,
+    enum uio_seg valseg, socklen_t valsize)
 {
 	struct socket *so;
 	struct file *fp;
@@ -1304,14 +1290,13 @@ kern_setsockopt(struct thread *td, int s, int level, int name,
 int
 sys_getsockopt(struct thread *td, struct getsockopt_args *uap)
 {
-
 	return (user_getsockopt(td, uap->s, uap->level, uap->name,
 	    uap->val, uap->avalsize));
 }
 
 int
-user_getsockopt(struct thread *td, int s, int level, int name,
-    void *val, socklen_t *avalsize)
+user_getsockopt(struct thread *td, int s, int level, int name, void *val,
+    socklen_t *avalsize)
 {
 	socklen_t valsize;
 	int error;
@@ -1335,8 +1320,8 @@ user_getsockopt(struct thread *td, int s, int level, int name,
  * optval can be a userland or userspace. optlen is always a kernel pointer.
  */
 int
-kern_getsockopt(struct thread *td, int s, int level, int name,
-    void *val, enum uio_seg valseg, socklen_t *valsize)
+kern_getsockopt(struct thread *td, int s, int level, int name, void *val,
+    enum uio_seg valseg, socklen_t *valsize)
 {
 	struct socket *so;
 	struct file *fp;
@@ -1378,8 +1363,7 @@ kern_getsockopt(struct thread *td, int s, int level, int name,
 }
 
 int
-user_getsockname(struct thread *td, int fdes,
-    struct sockaddr * __restrict asa,
+user_getsockname(struct thread *td, int fdes, struct sockaddr *asa,
     socklen_t *alen, bool compat)
 {
 	struct sockaddr_storage ss = { .ss_len = sizeof(ss) };
@@ -1443,8 +1427,7 @@ ogetsockname(struct thread *td, struct ogetsockname_args *uap)
 #endif /* COMPAT_OLDSOCK */
 
 int
-user_getpeername(struct thread *td, int fdes,
-    struct sockaddr * __restrict asa,
+user_getpeername(struct thread *td, int fdes, struct sockaddr *asa,
     socklen_t *alen, bool compat)
 {
 	struct sockaddr_storage ss = { .ss_len = sizeof(ss) };
@@ -1512,7 +1495,7 @@ ogetpeername(struct thread *td, struct ogetpeername_args *uap)
 }
 #endif /* COMPAT_OLDSOCK */
 
-int
+static int
 sockargs(struct mbuf **mp, char *buf, socklen_t buflen, int type)
 {
 	struct sockaddr *sa;
@@ -1551,8 +1534,7 @@ sockargs(struct mbuf **mp, char *buf, socklen_t buflen, int type)
 }
 
 int
-getsockaddr(struct sockaddr **namp, const struct sockaddr *uaddr,
-    size_t len)
+getsockaddr(struct sockaddr **namp, const struct sockaddr *uaddr, size_t len)
 {
 	struct sockaddr *sa;
 	int error;

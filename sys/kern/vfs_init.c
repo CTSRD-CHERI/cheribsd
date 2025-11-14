@@ -207,8 +207,8 @@ vfs_cachedroot_sigdefer(struct mount *mp, int flags, struct vnode **vpp)
 }
 
 static int
-vfs_quotactl_sigdefer(struct mount *mp, int cmd, uid_t uid,
-    void *arg, bool *mp_busy)
+vfs_quotactl_sigdefer(struct mount *mp, int cmd, uid_t uid, void *arg,
+    bool *mp_busy)
 {
 	int prev_stops, rc;
 

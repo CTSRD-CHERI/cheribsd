@@ -357,8 +357,7 @@ ktls_copyin_tls_enable(struct sockopt *sopt, struct tls_enable *tls)
 			if (error != 0)
 				goto done;
 		} else {
-			bcopy((const void *)tls->cipher_key,
-			    cipher_key, tls->cipher_key_len);
+			bcopy(tls->cipher_key, cipher_key, tls->cipher_key_len);
 		}
 	}
 	if (tls->iv_len != 0) {
@@ -368,8 +367,7 @@ ktls_copyin_tls_enable(struct sockopt *sopt, struct tls_enable *tls)
 			if (error != 0)
 				goto done;
 		} else {
-			bcopy((const void *)tls->iv, iv,
-			    tls->iv_len);
+			bcopy(tls->iv, iv, tls->iv_len);
 		}
 	}
 	if (tls->auth_key_len != 0) {
@@ -379,8 +377,7 @@ ktls_copyin_tls_enable(struct sockopt *sopt, struct tls_enable *tls)
 			if (error != 0)
 				goto done;
 		} else {
-			bcopy((const void *)tls->auth_key,
-			    auth_key, tls->auth_key_len);
+			bcopy(tls->auth_key, auth_key, tls->auth_key_len);
 		}
 	}
 	tls->cipher_key = cipher_key;
@@ -400,11 +397,9 @@ done:
 void
 ktls_cleanup_tls_enable(struct tls_enable *tls)
 {
-	zfree(__DECONST(void *, (const void *)tls->cipher_key),
-	    M_KTLS);
-	zfree(__DECONST(void *, (const void *)tls->iv), M_KTLS);
-	zfree(__DECONST(void *, (const void *)tls->auth_key),
-	    M_KTLS);
+	zfree(__DECONST(void *, tls->cipher_key), M_KTLS);
+	zfree(__DECONST(void *, tls->iv), M_KTLS);
+	zfree(__DECONST(void *, tls->auth_key), M_KTLS);
 }
 
 static u_int
@@ -801,14 +796,12 @@ ktls_create_session(struct socket *so, struct tls_enable *en,
 		tls->params.auth_key_len = en->auth_key_len;
 		tls->params.auth_key = malloc(en->auth_key_len, M_KTLS,
 		    M_WAITOK);
-		bcopy((const void *)en->auth_key,
-		    tls->params.auth_key, en->auth_key_len);
+		bcopy(en->auth_key, tls->params.auth_key, en->auth_key_len);
 	}
 
 	tls->params.cipher_key_len = en->cipher_key_len;
 	tls->params.cipher_key = malloc(en->cipher_key_len, M_KTLS, M_WAITOK);
-	bcopy((const void *)en->cipher_key,
-	    tls->params.cipher_key, en->cipher_key_len);
+	bcopy(en->cipher_key, tls->params.cipher_key, en->cipher_key_len);
 
 	/*
 	 * This holds the implicit portion of the nonce for AEAD
@@ -817,8 +810,7 @@ ktls_create_session(struct socket *so, struct tls_enable *en,
 	 */
 	if (en->iv_len != 0) {
 		tls->params.iv_len = en->iv_len;
-		bcopy((const void *)en->iv, tls->params.iv,
-		    en->iv_len);
+		bcopy(en->iv, tls->params.iv, en->iv_len);
 
 		/*
 		 * For TLS 1.2 with GCM, generate an 8-byte nonce as a

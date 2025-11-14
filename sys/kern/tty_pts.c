@@ -292,7 +292,7 @@ ptsdev_ioctl(struct file *fp, u_long cmd, void *data,
 		i = strlen(p) + 1;
 		if (i > fgn->len)
 			return (EINVAL);
-		return copyout(p, fiodgname_buf_get_ptr(fgn, cmd), i);
+		return (copyout(p, fiodgname_buf_get_ptr(fgn, cmd), i));
 	}
 
 	/*

@@ -1401,7 +1401,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		goto nosyms;
 	shdr = malloc(nbytes, M_LINKER, M_WAITOK | M_ZERO);
 	error = vn_rdwr(UIO_READ, nd.ni_vp,
-	    shdr, nbytes, hdr->e_shoff,
+	    (caddr_t)shdr, nbytes, hdr->e_shoff,
 	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 	    &resid, td);
 	if (error != 0)
@@ -1413,7 +1413,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	    shdr[shstrindex].sh_size != 0) {
 		nbytes = shdr[shstrindex].sh_size;
 		shstrs = malloc(nbytes, M_LINKER, M_WAITOK | M_ZERO);
-		error = vn_rdwr(UIO_READ, nd.ni_vp, shstrs, nbytes,
+		error = vn_rdwr(UIO_READ, nd.ni_vp, (caddr_t)shstrs, nbytes,
 		    shdr[shstrindex].sh_offset, UIO_SYSSPACE, IO_NODELOCKED,
 		    td->td_ucred, NOCRED, &resid, td);
 		if (error)

@@ -1362,7 +1362,7 @@ out:
 int
 sys_sendfile(struct thread *td, struct sendfile_args *uap)
 {
- 
+
 	return (kern_sendfile(td, uap->fd, uap->s, uap->offset,
 	    uap->nbytes, uap->hdtr, uap->sbytes, uap->flags, 0,
 	    (copyin_hdtr_t *)copyin_hdtr, copyinuio));

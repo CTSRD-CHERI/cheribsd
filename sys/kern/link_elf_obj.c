@@ -401,12 +401,8 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	    hdr->e_ident[EI_VERSION] != EV_CURRENT ||
 	    hdr->e_version != EV_CURRENT ||
 	    hdr->e_type != ET_REL ||
-#if __has_feature(capabilities)
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	    !ELF_IS_CHERI(hdr) ||
-#else
-	    ELF_IS_CHERI(hdr) ||
-#endif
 #endif
 	    hdr->e_machine != ELF_TARG_MACH) {
 		error = EFTYPE;
@@ -790,7 +786,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 
 	/* Read the elf header from the file. */
 	hdr = malloc(sizeof(*hdr), M_LINKER, M_WAITOK);
-	error = vn_rdwr(UIO_READ, nd->ni_vp, hdr, sizeof(*hdr), 0,
+	error = vn_rdwr(UIO_READ, nd->ni_vp, (void *)hdr, sizeof(*hdr), 0,
 	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 	    &resid, td);
 	if (error)
@@ -826,20 +822,12 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 		error = ENOEXEC;
 		goto out;
 	}
-#if __has_feature(capabilities)
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	if (!ELF_IS_CHERI(hdr)) {
 		link_elf_error(filename, "Hybrid ABI");
 		error = ENOEXEC;
 		goto out;
 	}
-#else
-	if (ELF_IS_CHERI(hdr)) {
-		link_elf_error(filename, "Pure capability ABI");
-		error = ENOEXEC;
-		goto out;
-	}
-#endif
 #endif
 
 	lf = linker_make_file(filename, &link_elf_class);
@@ -862,7 +850,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 	}
 	shdr = malloc(nbytes, M_LINKER, M_WAITOK);
 	ef->e_shdr = shdr;
-	error = vn_rdwr(UIO_READ, nd->ni_vp, shdr, nbytes,
+	error = vn_rdwr(UIO_READ, nd->ni_vp, (caddr_t)shdr, nbytes,
 	    hdr->e_shoff, UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred,
 	    NOCRED, &resid, td);
 	if (error)
@@ -952,7 +940,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 	/* Allocate space for and load the symbol table */
 	ef->ddbsymcnt = shdr[symtabindex].sh_size / sizeof(Elf_Sym);
 	ef->ddbsymtab = malloc(shdr[symtabindex].sh_size, M_LINKER, M_WAITOK);
-	error = vn_rdwr(UIO_READ, nd->ni_vp, ef->ddbsymtab,
+	error = vn_rdwr(UIO_READ, nd->ni_vp, (void *)ef->ddbsymtab,
 	    shdr[symtabindex].sh_size, shdr[symtabindex].sh_offset,
 	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 	    &resid, td);

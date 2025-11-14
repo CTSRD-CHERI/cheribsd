@@ -609,8 +609,7 @@ sequential_heuristic(struct uio *uio, struct file *fp)
  * Package up an I/O request on a vnode into a uio and do it.
  */
 int
-vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base,
-    int len, off_t offset,
+vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base, int len, off_t offset,
     enum uio_seg segflg, int ioflg, struct ucred *active_cred,
     struct ucred *file_cred, ssize_t *aresid, struct thread *td)
 {
@@ -713,8 +712,7 @@ vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base,
  * core'ing the same binary, or unrelated processes scanning the directory).
  */
 int
-vn_rdwr_inchunks(enum uio_rw rw, struct vnode *vp, void *base,
-    size_t len,
+vn_rdwr_inchunks(enum uio_rw rw, struct vnode *vp, void *base, size_t len,
     off_t offset, enum uio_seg segflg, int ioflg, struct ucred *active_cred,
     struct ucred *file_cred, size_t *aresid, struct thread *td)
 {
@@ -1299,7 +1297,7 @@ static int
 vn_io_fault_prefault_user(const struct uio *uio)
 {
 	char *base;
-	struct iovec *iov;
+	const struct iovec *iov;
 	size_t len;
 	ssize_t resid;
 	int error, i;
@@ -1576,12 +1574,12 @@ vn_io_fault_uiomove(char *data, int xfersize, struct uio *uio)
 	}
 	transp_uio.uio_td = uio->uio_td;
 	error = uiomove_fromphys(td->td_ma,
-	    ((vm_offset_t)(void *)uio->uio_iov->iov_base) & PAGE_MASK,
+	    ((vm_offset_t)uio->uio_iov->iov_base) & PAGE_MASK,
 	    xfersize, &transp_uio);
 	adv = xfersize - transp_uio.uio_resid;
 	pgadv =
-	    (((vm_offset_t)(void *)uio->uio_iov->iov_base + adv) >> PAGE_SHIFT) -
-	    (((vm_offset_t)(void *)uio->uio_iov->iov_base) >> PAGE_SHIFT);
+	    (((vm_offset_t)uio->uio_iov->iov_base + adv) >> PAGE_SHIFT) -
+	    (((vm_offset_t)uio->uio_iov->iov_base) >> PAGE_SHIFT);
 	td->td_ma += pgadv;
 	KASSERT(td->td_ma_cnt >= pgadv, ("consumed pages %d %d", td->td_ma_cnt,
 	    pgadv));
@@ -1607,7 +1605,7 @@ vn_io_fault_pgmove(vm_page_t ma[], vm_offset_t offset, int xfersize,
 
 	KASSERT(uio->uio_iovcnt == 1, ("uio_iovcnt %d", uio->uio_iovcnt));
 	cnt = xfersize > uio->uio_resid ? uio->uio_resid : xfersize;
-	iov_base = (vm_offset_t)(void *)uio->uio_iov->iov_base;
+	iov_base = (vm_offset_t)uio->uio_iov->iov_base;
 	switch (uio->uio_rw) {
 	case UIO_WRITE:
 		pmap_copy_pages(td->td_ma, iov_base & PAGE_MASK, ma,

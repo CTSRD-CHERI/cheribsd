@@ -137,7 +137,7 @@ mb_put_padbyte(struct mbchain *mbp)
 
 	/* Only add padding if address is odd */
 	if ((unsigned long)dst & 1)
-		return (mb_put_mem(mbp, (char *)&x, sizeof(x), MB_MSYSTEM));
+		return (mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM));
 	else
 		return (0);
 }
@@ -145,58 +145,57 @@ mb_put_padbyte(struct mbchain *mbp)
 int
 mb_put_uint8(struct mbchain *mbp, uint8_t x)
 {
-	return (mb_put_mem(mbp, (char *)&x, sizeof(x), MB_MSYSTEM));
+	return (mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM));
 }
 
 int
 mb_put_uint16be(struct mbchain *mbp, uint16_t x)
 {
 	x = htobe16(x);
-	return (mb_put_mem(mbp, (char *)&x, sizeof(x), MB_MSYSTEM));
+	return (mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM));
 }
 
 int
 mb_put_uint16le(struct mbchain *mbp, uint16_t x)
 {
 	x = htole16(x);
-	return (mb_put_mem(mbp, (char *)&x, sizeof(x), MB_MSYSTEM));
+	return (mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM));
 }
 
 int
 mb_put_uint32be(struct mbchain *mbp, uint32_t x)
 {
 	x = htobe32(x);
-	return (mb_put_mem(mbp, (char *)&x, sizeof(x), MB_MSYSTEM));
+	return (mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM));
 }
 
 int
 mb_put_uint32le(struct mbchain *mbp, uint32_t x)
 {
 	x = htole32(x);
-	return (mb_put_mem(mbp, (char *)&x, sizeof(x), MB_MSYSTEM));
+	return (mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM));
 }
 
 int
 mb_put_int64be(struct mbchain *mbp, int64_t x)
 {
 	x = htobe64(x);
-	return (mb_put_mem(mbp, (char *)&x, sizeof(x), MB_MSYSTEM));
+	return (mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM));
 }
 
 int
 mb_put_int64le(struct mbchain *mbp, int64_t x)
 {
 	x = htole64(x);
-	return (mb_put_mem(mbp, (char *)&x, sizeof(x), MB_MSYSTEM));
+	return (mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM));
 }
 
 int
-mb_put_mem(struct mbchain *mbp, const char *source, int size,
-    int type)
+mb_put_mem(struct mbchain *mbp, c_caddr_t source, int size, int type)
 {
 	struct mbuf *m;
 	caddr_t dst;
-	const char *src;
+	c_caddr_t src;
 	int cplen, error, mleft, count;
 	size_t srclen, dstlen;
 
@@ -219,9 +218,7 @@ mb_put_mem(struct mbchain *mbp, const char *source, int size,
 		    case MB_MCUSTOM:
 			srclen = size;
 			dstlen = mleft;
-			error = mbp->mb_copy(mbp,
-			    (const char *)source, dst, &srclen,
-			    &dstlen);
+			error = mbp->mb_copy(mbp, source, dst, &srclen, &dstlen);
 			if (error)
 				return (error);
 			break;
@@ -230,7 +227,7 @@ mb_put_mem(struct mbchain *mbp, const char *source, int size,
 				*dst++ = *src++;
 			break;
 		    case MB_MSYSTEM:
-			bcopy((const char *)source, dst, cplen);
+			bcopy(source, dst, cplen);
 			break;
 		    case MB_MUSER:
 			error = copyin(source, dst, cplen);
@@ -373,13 +370,13 @@ md_next_record(struct mdchain *mdp)
 int
 md_get_uint8(struct mdchain *mdp, uint8_t *x)
 {
-	return (md_get_mem(mdp, (char *)x, 1, MB_MINLINE));
+	return (md_get_mem(mdp, x, 1, MB_MINLINE));
 }
 
 int
 md_get_uint16(struct mdchain *mdp, uint16_t *x)
 {
-	return (md_get_mem(mdp, (char *)x, 2, MB_MINLINE));
+	return (md_get_mem(mdp, (caddr_t)x, 2, MB_MINLINE));
 }
 
 int
@@ -407,7 +404,7 @@ md_get_uint16be(struct mdchain *mdp, uint16_t *x)
 int
 md_get_uint32(struct mdchain *mdp, uint32_t *x)
 {
-	return (md_get_mem(mdp, (char *)x, 4, MB_MINLINE));
+	return (md_get_mem(mdp, (caddr_t)x, 4, MB_MINLINE));
 }
 
 int
@@ -437,7 +434,7 @@ md_get_uint32le(struct mdchain *mdp, uint32_t *x)
 int
 md_get_int64(struct mdchain *mdp, int64_t *x)
 {
-	return (md_get_mem(mdp, (char *)x, 8, MB_MINLINE));
+	return (md_get_mem(mdp, (caddr_t)x, 8, MB_MINLINE));
 }
 
 int
@@ -465,7 +462,7 @@ md_get_int64le(struct mdchain *mdp, int64_t *x)
 }
 
 int
-md_get_mem(struct mdchain *mdp, char *target, int size, int type)
+md_get_mem(struct mdchain *mdp, caddr_t target, int size, int type)
 {
 	struct mbuf *m = mdp->md_cur;
 	int error;
@@ -498,7 +495,7 @@ md_get_mem(struct mdchain *mdp, char *target, int size, int type)
 				return error;
 			break;
 		    case MB_MSYSTEM:
-			bcopy(s, (char *)target, count);
+			bcopy(s, target, count);
 			break;
 		    case MB_MINLINE:
 			while (count--)
@@ -524,6 +521,7 @@ md_get_mbuf(struct mdchain *mdp, int size, struct mbuf **ret)
 int
 md_get_uio(struct mdchain *mdp, struct uio *uiop, int size)
 {
+	char *uiocp;
 	long left;
 	int mtype, error;
 
@@ -537,9 +535,10 @@ md_get_uio(struct mdchain *mdp, struct uio *uiop, int size)
 			uiop->uio_iovcnt--;
 			continue;
 		}
+		uiocp = uiop->uio_iov->iov_base;
 		if (left > size)
 			left = size;
-		error = md_get_mem(mdp, uiop->uio_iov->iov_base, left, mtype);
+		error = md_get_mem(mdp, uiocp, left, mtype);
 		if (error)
 			return (error);
 		uiop->uio_offset += left;

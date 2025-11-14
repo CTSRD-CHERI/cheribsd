@@ -2498,9 +2498,8 @@ sys___sysctl(struct thread *td, struct __sysctl_args *uap)
 }
 
 int
-kern_sysctl(struct thread *td, int *uname, u_int namelen,
-    void *old, size_t *oldlenp,
-    const void *new, size_t newlen, int flags)
+kern_sysctl(struct thread *td, int *uname, u_int namelen, void *old,
+    size_t *oldlenp, const void *new, size_t newlen, int flags)
 {
 	int error, i, name[CTL_MAXNAME];
 	size_t j;
@@ -2525,10 +2524,9 @@ kern_sysctl(struct thread *td, int *uname, u_int namelen,
 }
 
 int
-kern___sysctlbyname(struct thread *td, const char *oname,
-    size_t namelen, void *old, size_t *oldlenp,
-    void *new, size_t newlen, size_t *retval, int flags,
-    bool inkernel)
+kern___sysctlbyname(struct thread *td, const char *oname, size_t namelen,
+    void *old, size_t *oldlenp, void *new, size_t newlen, size_t *retval,
+    int flags, bool inkernel)
 {
 	int oid[CTL_MAXNAME];
 	char namebuf[16];
@@ -2592,9 +2590,9 @@ sys___sysctlbyname(struct thread *td, struct __sysctlbyname_args *uap)
  * must be in kernel space.
  */
 int
-userland_sysctl(struct thread *td, int *name, u_int namelen,
-    void *old, size_t *oldlenp, int inkernel,
-    const void *new, size_t newlen, size_t *retval, int flags)
+userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
+    size_t *oldlenp, int inkernel, const void *new, size_t newlen,
+    size_t *retval, int flags)
 {
 	struct sysctl_req req;
 	int error = 0;
