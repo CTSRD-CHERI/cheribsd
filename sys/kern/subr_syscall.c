@@ -49,10 +49,6 @@
 #endif
 #include <security/audit/audit.h>
 
-#if __has_feature(capabilities)
-#include <cheri/cheri.h>
-#endif
-
 static inline void
 syscallenter(struct thread *td)
 {

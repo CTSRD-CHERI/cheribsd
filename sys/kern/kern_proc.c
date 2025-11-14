@@ -2216,8 +2216,8 @@ get_proc_vector(struct thread *td, struct proc *p, struct vmspace *vm,
 		 * The aux array is just above env array on the stack. Check
 		 * that the address is naturally aligned.
 		 */
-		vptr = (vm_offset_t)pss.ps_envstr +
-		    (pss.ps_nenvstr + 1) * sizeof(char *);
+		vptr = (vm_offset_t)pss.ps_envstr + (pss.ps_nenvstr + 1)
+		    * sizeof(char *);
 #if __ELF_WORD_SIZE == 64
 		if (vptr % sizeof(uint64_t) != 0)
 #else
@@ -2815,8 +2815,7 @@ proc_get_binpath(struct proc *p, char *binname, char **retbuf,
 			 * might have been renamed or replaced, in
 			 * which case we should not report old name.
 			 */
-			NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE,
-			    *retbuf);
+			NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, *retbuf);
 			error = namei(&nd);
 			if (error == 0) {
 				if (nd.ni_vp == vp)

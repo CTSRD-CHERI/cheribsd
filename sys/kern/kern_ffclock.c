@@ -431,8 +431,8 @@ kern_ffclock_setestimate(struct thread *td,
 	if ((error = priv_check(td, PRIV_CLOCK_SETTIME)) != 0)
 		return (error);
 
-	if ((error = copyin(ucest, &cest,
-	    sizeof(struct ffclock_estimate))) != 0)
+	if ((error = copyin(ucest, &cest, sizeof(struct ffclock_estimate)))
+	    != 0)
 		return (error);
 
 	mtx_lock(&ffclock_mtx);

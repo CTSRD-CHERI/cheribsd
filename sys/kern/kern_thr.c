@@ -582,8 +582,7 @@ sys_thr_set_name(struct thread *td, struct thr_set_name_args *uap)
 }
 
 int
-kern_thr_set_name(struct thread *td, lwpid_t id,
-    const char *uname)
+kern_thr_set_name(struct thread *td, lwpid_t id, const char *uname)
 {
 	struct proc *p;
 	char name[MAXCOMLEN + 1];
@@ -593,8 +592,7 @@ kern_thr_set_name(struct thread *td, lwpid_t id,
 	error = 0;
 	name[0] = '\0';
 	if (uname != NULL) {
-		error = copyinstr(uname, name, sizeof(name),
-		    NULL);
+		error = copyinstr(uname, name, sizeof(name), NULL);
 		if (error == ENAMETOOLONG) {
 			error = copyin(uname, &name[0], sizeof(name) - 1);
 			name[sizeof(name) - 1] = '\0';

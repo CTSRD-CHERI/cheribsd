@@ -577,11 +577,10 @@ sem_remove(int semidx, struct ucred *cred)
 	    ("semidx out of bounds"));
 	mtx_assert(&sem_mtx, MA_OWNED);
 	semakptr = &sema[semidx];
-	KASSERT((struct sem *)semakptr->u.__sem_base -
-	    sem + semakptr->u.sem_nsems <= semtot,
+	KASSERT(semakptr->u.__sem_base - sem + semakptr->u.sem_nsems <= semtot,
 	    ("sem_remove: sema %d corrupted sem pointer %p %p %d %d",
-	    semidx, (struct sem *)semakptr->u.__sem_base,
-	    sem, semakptr->u.sem_nsems, semtot));
+	    semidx, semakptr->u.__sem_base, sem, semakptr->u.sem_nsems,
+	    semtot));
 
 	semakptr->u.sem_perm.cuid = cred ? cred->cr_uid : 0;
 	semakptr->u.sem_perm.uid = cred ? cred->cr_uid : 0;
@@ -601,8 +600,8 @@ sem_remove(int semidx, struct ucred *cred)
 		    sema[i].u.__sem_base > semakptr->u.__sem_base)
 			mtx_lock_flags(&sema_mtx[i], LOP_DUPOK);
 	}
-	for (i = (struct sem *)semakptr->u.__sem_base -
-	    sem + semakptr->u.sem_nsems; i < semtot; i++)
+	for (i = semakptr->u.__sem_base - sem + semakptr->u.sem_nsems;
+	    i < semtot; i++)
 		sem[i - semakptr->u.sem_nsems] = sem[i];
 	for (i = 0; i < seminfo.semmni; i++) {
 		if ((sema[i].u.sem_perm.mode & SEM_ALLOC) &&
@@ -652,8 +651,7 @@ int
 sys___semctl(struct thread *td, struct __semctl_args *uap)
 {
 	struct semid_ds dsbuf;
-	union semun arg;
-	union semun semun;
+	union semun arg, semun;
 	register_t rval;
 	int error;
 
@@ -794,8 +792,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 		break;
 
 	case IPC_SET:
-		AUDIT_ARG_SVIPC_PERM((struct ipc_perm *)
-		    &arg->buf->sem_perm);
+		AUDIT_ARG_SVIPC_PERM(&arg->buf->sem_perm);
 		if ((error = semvalid(semid, rpr, semakptr)) != 0)
 			goto done2;
 		if ((error = ipcperm(td, &semakptr->u.sem_perm, IPC_M)))
@@ -1092,8 +1089,7 @@ sys_semget(struct thread *td, struct semget_args *uap)
 #endif
 		mtx_unlock(&sema_mtx[semid]);
 		DPRINTF(("sembase = %p, next = %p\n",
-		    (struct sem *)sema[semid].u.__sem_base,
-		    &sem[semtot]));
+		    sema[semid].u.__sem_base, &sem[semtot]));
 	} else {
 		DPRINTF(("didn't find it and wasn't asked to create it\n"));
 		error = ENOENT;
@@ -1131,6 +1127,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf *usops,
 {
 #define SMALL_SOPS	8
 	struct sembuf small_sops[SMALL_SOPS];
+	int semid;
 	struct prison *rpr;
 	struct sembuf *sops;
 	struct semid_kernel *semakptr;
@@ -1142,13 +1139,12 @@ kern_semop(struct thread *td, int usemid, struct sembuf *usops,
 	size_t i, j, k;
 	int error;
 	int do_wakeup, do_undos;
-	int semid;
 	unsigned short seq;
 
 #ifdef SEM_DEBUG
 	sops = NULL;
 #endif
-	DPRINTF(("call to semop(%d, %lp, %zu)\n", usemid, usops, nsops));
+	DPRINTF(("call to semop(%d, %p, %zu)\n", usemid, usops, nsops));
 
 	AUDIT_ARG_SVIPC_ID(usemid);
 
@@ -1201,7 +1197,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf *usops,
 		sops = malloc(nsops * sizeof(*sops), M_TEMP, M_WAITOK);
 	}
 	if ((error = copyin(usops, sops, nsops * sizeof(sops[0]))) != 0) {
-		DPRINTF(("error = %d from copyin(%lp, %p, %d)\n", error,
+		DPRINTF(("error = %d from copyin(%p, %p, %d)\n", error,
 		    usops, sops, nsops * sizeof(sops[0])));
 		if (sops != small_sops)
 			free(sops, M_TEMP);

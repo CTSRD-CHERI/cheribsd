@@ -185,8 +185,7 @@ sys_getloginclass(struct thread *td, struct getloginclass_args *uap)
 }
 
 int
-kern_getloginclass(struct thread *td, char *namebuf,
-    size_t namelen)
+kern_getloginclass(struct thread *td, char *namebuf, size_t namelen)
 {
 	struct loginclass *lc;
 	size_t lcnamelen;
@@ -195,7 +194,7 @@ kern_getloginclass(struct thread *td, char *namebuf,
 	lcnamelen = strlen(lc->lc_name) + 1;
 	if (lcnamelen > namelen)
 		return (ERANGE);
-	return (copyout(&lc->lc_name[0], namebuf, lcnamelen));
+	return (copyout(lc->lc_name, namebuf, lcnamelen));
 }
 
 /*
@@ -226,8 +225,7 @@ kern_setloginclass(struct thread *td, const char *namebuf)
 	error = priv_check(td, PRIV_PROC_SETLOGINCLASS);
 	if (error != 0)
 		return (error);
-	error = copyinstr(namebuf, lcname, sizeof(lcname),
-	    NULL);
+	error = copyinstr(namebuf, lcname, sizeof(lcname), NULL);
 	if (error != 0)
 		return (error);
 

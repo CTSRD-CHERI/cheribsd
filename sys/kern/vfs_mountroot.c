@@ -356,8 +356,7 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 	if (mporoot != mpdevfs) {
 		/* Remount old root under /.mount or /mnt */
 		fspath = "/.mount";
-		NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE,
-		    fspath);
+		NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, fspath);
 		error = namei(&nd);
 		if (error) {
 			fspath = "/mnt";
@@ -953,8 +952,8 @@ vfs_mountroot_readconf(struct thread *td, struct sbuf *sb)
 	len = sizeof(buf) - 1;
 	while (1) {
 		error = vn_rdwr(UIO_READ, nd.ni_vp, buf, len, ofs,
-				UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred,
-				NOCRED, &resid, td);
+		    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred,
+		    NOCRED, &resid, td);
 		if (error)
 			break;
 		if (resid == len)

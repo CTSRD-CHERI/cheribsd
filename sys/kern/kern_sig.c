@@ -785,8 +785,7 @@ sigonstack(size_t sp)
 		return ((td->td_sigstk.ss_flags & SS_ONSTACK) != 0);
 #endif
 	return (sp >= (size_t)td->td_sigstk.ss_sp &&
-	    sp < td->td_sigstk.ss_size
-	       + (size_t)td->td_sigstk.ss_sp);
+	    sp < td->td_sigstk.ss_size + (size_t)td->td_sigstk.ss_sp);
 }
 
 static __inline int
@@ -849,8 +848,8 @@ kern_sigaction(struct thread *td, int sig, const struct sigaction *act,
 			oact->sa_flags |= SA_NODEFER;
 		if (SIGISMEMBER(ps->ps_siginfo, sig)) {
 			oact->sa_flags |= SA_SIGINFO;
-			oact->sa_sigaction = (__siginfohandler_t *)
-			    ps->ps_sigact[_SIG_IDX(sig)];
+			oact->sa_sigaction =
+			    (__siginfohandler_t *)ps->ps_sigact[_SIG_IDX(sig)];
 		} else {
 			oact->sa_handler = ps->ps_sigact[_SIG_IDX(sig)];
 		}
@@ -1233,8 +1232,8 @@ sys_sigprocmask(struct thread *td, struct sigprocmask_args *uap)
 }
 
 int
-user_sigprocmask(struct thread *td, int how,
-    const sigset_t *uset, sigset_t *uoset)
+user_sigprocmask(struct thread *td, int how, const sigset_t *uset,
+    sigset_t *uoset)
 {
 	sigset_t set, oset;
 	sigset_t *setp, *osetp;
@@ -1282,8 +1281,7 @@ sys_sigwait(struct thread *td, struct sigwait_args *uap)
 }
 
 int
-user_sigwait(struct thread *td, const sigset_t *uset,
-    int *usig)
+user_sigwait(struct thread *td, const sigset_t *uset, int *usig)
 {
 	ksiginfo_t ksi;
 	sigset_t set;
@@ -1331,9 +1329,8 @@ sys_sigtimedwait(struct thread *td, struct sigtimedwait_args *uap)
 }
 
 int
-user_sigtimedwait(struct thread *td, const sigset_t *uset,
-    void *info, const struct timespec *utimeout,
-    copyout_siginfo_t *copyout_siginfop)
+user_sigtimedwait(struct thread *td, const sigset_t *uset, void *info,
+    const struct timespec *utimeout, copyout_siginfo_t *copyout_siginfop)
 {
 	struct timespec ts;
 	struct timespec *timeout;
@@ -1374,8 +1371,8 @@ sys_sigwaitinfo(struct thread *td, struct sigwaitinfo_args *uap)
 }
 
 int
-user_sigwaitinfo(struct thread *td, const sigset_t *uset,
-    void *info, copyout_siginfo_t *copyout_siginfop)
+user_sigwaitinfo(struct thread *td, const sigset_t *uset, void *info,
+    copyout_siginfo_t *copyout_siginfop)
 {
 	ksiginfo_t ksi;
 	sigset_t set;
@@ -1809,7 +1806,7 @@ osigstack(struct thread *td, struct osigstack_args *uap)
 
 #ifndef _SYS_SYSPROTO_H_
 struct sigaltstack_args {
-	const stack_t	*ss;
+	const stack_t *ss;
 	stack_t	*oss;
 };
 #endif
@@ -4532,7 +4529,7 @@ sigacts_copy(struct sigacts *dest, struct sigacts *src)
 
 	KASSERT(dest->ps_refcnt == 1, ("sigacts_copy to shared dest"));
 	mtx_lock(&src->ps_mtx);
-	memcpy(dest, src, offsetof(struct sigacts, ps_refcnt));
+	bcopy(src, dest, offsetof(struct sigacts, ps_refcnt));
 	mtx_unlock(&src->ps_mtx);
 }
 
