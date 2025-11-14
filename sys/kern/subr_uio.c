@@ -391,8 +391,7 @@ again:
 }
 
 int
-copyiniov(const struct iovec*iovp, u_int iovcnt, struct iovec **iov,
-    int error)
+copyiniov(const struct iovec*iovp, u_int iovcnt, struct iovec **iov, int error)
 {
 	struct iovec *iovs;
 	size_t iovlen;
@@ -410,8 +409,7 @@ copyiniov(const struct iovec*iovp, u_int iovcnt, struct iovec **iov,
 }
 
 int
-copyinuio(const struct iovec *iovp, u_int iovcnt,
-    struct uio **uiop)
+copyinuio(const struct iovec *iovp, u_int iovcnt, struct uio **uiop)
 {
 	struct iovec *iov;
 	struct uio *uio;

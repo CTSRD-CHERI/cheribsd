@@ -845,12 +845,3 @@ soo_aio_queue(struct file *fp, struct kaiocb *job)
 	SOCK_BUF_UNLOCK(so, which);
 	return (0);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "iovec-macros"
-//   ]
-// }
-// CHERI CHANGES END

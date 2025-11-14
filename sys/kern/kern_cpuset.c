@@ -1909,7 +1909,7 @@ struct cpuset_getid_args {
 	cpulevel_t	level;
 	cpuwhich_t	which;
 	id_t		id;
-	cpusetid_t *setid;
+	cpusetid_t	*setid;
 };
 #endif
 int
@@ -1977,7 +1977,7 @@ struct cpuset_getaffinity_args {
 	cpuwhich_t	which;
 	id_t		id;
 	size_t		cpusetsize;
-	cpuset_t *mask;
+	cpuset_t	*mask;
 };
 #endif
 int
@@ -2082,8 +2082,7 @@ kern_cpuset_getaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
 
 int
 user_cpuset_getaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
-    id_t id, size_t cpusetsize, cpuset_t *maskp,
-    const struct cpuset_copy_cb *cb)
+    id_t id, size_t cpusetsize, cpuset_t *maskp, const struct cpuset_copy_cb *cb)
 {
 	cpuset_t *mask;
 	size_t size;
@@ -2125,7 +2124,7 @@ struct cpuset_setaffinity_args {
 	cpuwhich_t	which;
 	id_t		id;
 	size_t		cpusetsize;
-	const cpuset_t *mask;
+	const cpuset_t	*mask;
 };
 #endif
 int
@@ -2229,8 +2228,7 @@ kern_cpuset_setaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
 
 int
 user_cpuset_setaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
-    id_t id, size_t cpusetsize, const cpuset_t *maskp,
-    const struct cpuset_copy_cb *cb)
+    id_t id, size_t cpusetsize, const cpuset_t *maskp, const struct cpuset_copy_cb *cb)
 {
 	cpuset_t *mask;
 	int error;
@@ -2277,8 +2275,8 @@ struct cpuset_getdomain_args {
 	cpuwhich_t	which;
 	id_t		id;
 	size_t		domainsetsize;
-	domainset_t *mask;
-	int *policy;
+	domainset_t	*mask;
+	int		*policy;
 };
 #endif
 int
@@ -2291,8 +2289,8 @@ sys_cpuset_getdomain(struct thread *td, struct cpuset_getdomain_args *uap)
 
 int
 kern_cpuset_getdomain(struct thread *td, cpulevel_t level, cpuwhich_t which,
-    id_t id, size_t domainsetsize, domainset_t *maskp,
-    int *policyp, const struct cpuset_copy_cb *cb)
+    id_t id, size_t domainsetsize, domainset_t *maskp, int *policyp,
+    const struct cpuset_copy_cb *cb)
 {
 	struct domainset outset;
 	struct thread *ttd;
@@ -2405,7 +2403,7 @@ struct cpuset_setdomain_args {
 	cpuwhich_t	which;
 	id_t		id;
 	size_t		domainsetsize;
-	domainset_t *mask;
+	domainset_t	*mask;
 	int 		policy;
 };
 #endif
@@ -2419,8 +2417,8 @@ sys_cpuset_setdomain(struct thread *td, struct cpuset_setdomain_args *uap)
 
 int
 kern_cpuset_setdomain(struct thread *td, cpulevel_t level, cpuwhich_t which,
-    id_t id, size_t domainsetsize, const domainset_t *maskp,
-    int policy, const struct cpuset_copy_cb *cb)
+    id_t id, size_t domainsetsize, const domainset_t *maskp, int policy,
+    const struct cpuset_copy_cb *cb)
 {
 	struct cpuset *nset;
 	struct cpuset *set;

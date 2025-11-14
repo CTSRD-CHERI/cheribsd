@@ -614,15 +614,14 @@ sys_clock_nanosleep(struct thread *td, struct clock_nanosleep_args *uap)
 {
 	int error;
 
-	error = user_clock_nanosleep(td, uap->clock_id, uap->flags,
-	    uap->rqtp, uap->rmtp);
+	error = user_clock_nanosleep(td, uap->clock_id, uap->flags, uap->rqtp,
+	    uap->rmtp);
 	return (kern_posix_error(td, error));
 }
 
 int
 user_clock_nanosleep(struct thread *td, clockid_t clock_id, int flags,
-    const struct timespec *ua_rqtp,
-    struct timespec *ua_rmtp)
+    const struct timespec *ua_rqtp, struct timespec *ua_rmtp)
 {
 	struct timespec rmt, rqt;
 	int error, error2;
@@ -654,8 +653,7 @@ sys_gettimeofday(struct thread *td, struct gettimeofday_args *uap)
 }
 
 int
-kern_gettimeofday(struct thread *td, struct timeval *tp,
-    struct timezone *tzp)
+kern_gettimeofday(struct thread *td, struct timeval *tp, struct timezone *tzp)
 {
 	struct timeval atv;
 	struct timezone rtz;

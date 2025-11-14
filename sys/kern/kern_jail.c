@@ -380,10 +380,10 @@ kern_jail(struct thread *td, const char *path,
 	char *u_path, *u_hostname, *u_name;
 	struct bool_flags *bf;
 #ifdef INET
-	struct in_addr * u_ip4;
+	struct in_addr *u_ip4;
 #endif
 #ifdef INET6
-	struct in6_addr * u_ip6;
+	struct in6_addr *u_ip6;
 #endif
 	char *optstr;
 	size_t tmplen;
@@ -1386,8 +1386,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 			error = EINVAL;
 			goto done_free;
 		}
-		NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE,
-		    path);
+		NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, path);
 		error = namei(&nd);
 		if (error)
 			goto done_free;
@@ -2152,7 +2151,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 		    &errmsg_len) == 0 && errmsg_len > 0) {
 			errmsg_pos = 2 * vfs_getopt_pos(opts, "errmsg") + 1;
 			if (optuio->uio_segflg == UIO_SYSSPACE)
-				bcopy(errmsg, (void *)
+				bcopy(errmsg,
 				    optuio->uio_iov[errmsg_pos].iov_base,
 				    errmsg_len);
 			else
@@ -2570,7 +2569,6 @@ kern_jail_get(struct thread *td, struct uio *optuio, int flags)
 			if (opt->value != NULL) {
 				if (optuio->uio_segflg == UIO_SYSSPACE) {
 					bcopy(opt->value,
-					    (void *)
 					    optuio->uio_iov[pos].iov_base,
 					    opt->len);
 				} else {
@@ -2596,7 +2594,7 @@ kern_jail_get(struct thread *td, struct uio *optuio, int flags)
 		errmsg_pos = 2 * errmsg_pos + 1;
 		if (errmsg_len > 0) {
 			if (optuio->uio_segflg == UIO_SYSSPACE)
-				bcopy(errmsg, (void *)
+				bcopy(errmsg,
 				    optuio->uio_iov[errmsg_pos].iov_base,
 				    errmsg_len);
 			else

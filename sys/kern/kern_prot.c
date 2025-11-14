@@ -1184,8 +1184,7 @@ sys_setgroups(struct thread *td, struct setgroups_args *uap)
 }
 
 int
-user_setgroups(struct thread *td, int gidsetsize,
-    const gid_t *gidset)
+user_setgroups(struct thread *td, int gidsetsize, const gid_t *gidset)
 {
 	gid_t smallgroups[CRED_SMALLGROUPS_NB];
 	gid_t *groups;
@@ -1590,8 +1589,7 @@ sys_getresuid(struct thread *td, struct getresuid_args *uap)
 }
 
 int
-kern_getresuid(struct thread *td, uid_t *ruid,
-    uid_t *euid, uid_t *suid)
+kern_getresuid(struct thread *td, uid_t *ruid, uid_t *euid, uid_t *suid)
 {
 	struct ucred *cred;
 	int error1 = 0, error2 = 0, error3 = 0;
@@ -1623,8 +1621,7 @@ sys_getresgid(struct thread *td, struct getresgid_args *uap)
 }
 
 int
-kern_getresgid(struct thread *td, gid_t *rgid,
-    gid_t *egid, gid_t *sgid)
+kern_getresgid(struct thread *td, gid_t *rgid, gid_t *egid, gid_t *sgid)
 {
 	struct ucred *cred;
 	int error1 = 0, error2 = 0, error3 = 0;

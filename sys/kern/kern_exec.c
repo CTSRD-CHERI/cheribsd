@@ -356,8 +356,8 @@ post_execve(struct thread *td, int error, struct vmspace *oldvmspace)
  * memory).
  */
 int
-kern_execve(struct thread *td, struct image_args *args,
-    void *mac_p, struct vmspace *oldvmspace)
+kern_execve(struct thread *td, struct image_args *args, void *mac_p,
+    struct vmspace *oldvmspace)
 {
 
 	TSEXEC(td->td_proc->p_pid, args->begin_argv);
@@ -398,8 +398,8 @@ execve_nosetid(struct image_params *imgp)
  * userspace pointers from the passed thread.
  */
 static int
-do_execve(struct thread *td, struct image_args *args,
-    void *umac, struct vmspace *oldvmspace)
+do_execve(struct thread *td, struct image_args *args, void *umac,
+    struct vmspace *oldvmspace)
 {
 	struct proc *p = td->td_proc;
 	struct nameidata nd;
@@ -1725,8 +1725,7 @@ exec_args_add_fname(struct image_args *args, const char *fname,
 	if (fname != NULL) {
 		args->fname = args->buf;
 		if (segflg == UIO_SYSSPACE)
-			error = copystr((const char *)fname,
-			    args->fname, PATH_MAX, &length);
+			error = copystr(fname, args->fname, PATH_MAX, &length);
 		else
 			error = copyinstr(fname, args->fname, PATH_MAX,
 			    &length);
@@ -1871,8 +1870,7 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		szsigcode = *(sysent->sv_szsigcode);
 		destp -= szsigcode;
 		destp = rounddown2(destp, sizeof(void *));
-		error = copyout(sysent->sv_sigcode, (void *)destp,
-		    szsigcode);
+		error = copyout(sysent->sv_sigcode, (void *)destp, szsigcode);
 		if (error != 0)
 			return (error);
 	}
@@ -1885,8 +1883,8 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		destp -= execpath_len;
 		destp = rounddown2(destp, sizeof(void *));
 #if __has_feature(capabilities)
-		imgp->execpathp = (void *)
-		    cheri_setboundsexact(destp, execpath_len);
+		imgp->execpathp =
+		    (void *)cheri_setboundsexact(destp, execpath_len);
 #else
 		imgp->execpathp = (void *)destp;
 #endif
@@ -1901,8 +1899,7 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
 #if __has_feature(capabilities)
-	imgp->canary = (void *)cheri_setboundsexact(destp,
-	    sizeof(canary));
+	imgp->canary = (void *)cheri_setboundsexact(destp, sizeof(canary));
 #else
 	imgp->canary = (void *)destp;
 #endif
@@ -1946,8 +1943,7 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	destp = rounddown2(destp, sizeof(void *));
 	imgp->c18n_info = (struct cheri_c18n_info *)
 	    cheri_setboundsexact(destp, sizeof(*imgp->c18n_info));
-	p->p_c18n_info =
-	    (struct cheri_c18n_info *)imgp->c18n_info;
+	p->p_c18n_info = (struct cheri_c18n_info *)imgp->c18n_info;
 #endif
 
 	if (imgp->auxargs) {
@@ -2202,8 +2198,7 @@ exec_unregister(const struct execsw *execsw_arg)
  * Write out a core segment to the compression stream.
  */
 static int
-compress_chunk(struct coredump_params *cp, char *base, char *buf,
-    size_t len)
+compress_chunk(struct coredump_params *cp, char *base, char *buf, size_t len)
 {
 	size_t chunk_len;
 	int error;
@@ -2239,8 +2234,8 @@ core_write(struct coredump_params *cp, const void *base, size_t len,
 }
 
 int
-core_output(char *base, size_t len, off_t offset,
-    struct coredump_params *cp, void *tmpbuf)
+core_output(char *base, size_t len, off_t offset, struct coredump_params *cp,
+    void *tmpbuf)
 {
 	vm_map_t map;
 	struct mount *mp;
@@ -2428,8 +2423,8 @@ sbuf_drain_core_output(void *arg, const char *data, int len)
 		error = compressor_write(cp->comp, __DECONST(char *, data),
 		    len);
 	else
-		error = core_write(cp, __DECONST(void *, data), len,
-		    cp->offset, UIO_SYSSPACE, NULL);
+		error = core_write(cp, __DECONST(void *, data), len, cp->offset,
+		    UIO_SYSSPACE, NULL);
 	if (locked)
 		PROC_LOCK(p);
 	if (error != 0)

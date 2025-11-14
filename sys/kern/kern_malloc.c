@@ -914,7 +914,8 @@ free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 		*mtpp = (ptraddr_t)mtp;
 #else
 	mtpp = (struct malloc_type **)rounddown2(mtpp, sizeof(struct malloc_type *));
-	mtpp += (size - sizeof(struct malloc_type *)) / sizeof(struct malloc_type *);
+	mtpp += (size - sizeof(struct malloc_type *)) /
+	    sizeof(struct malloc_type *);
 	*mtpp = mtp;
 #endif
 }

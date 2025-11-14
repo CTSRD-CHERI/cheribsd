@@ -437,8 +437,8 @@ namei_getpath(struct nameidata *ndp)
 	 */
 	cnp->cn_pnbuf = uma_zalloc(namei_zone, M_WAITOK);
 	if (ndp->ni_segflg == UIO_SYSSPACE) {
-		error = copystr((const char *)ndp->ni_dirp,
-		    cnp->cn_pnbuf, MAXPATHLEN, &ndp->ni_pathlen);
+		error = copystr(ndp->ni_dirp, cnp->cn_pnbuf, MAXPATHLEN,
+		    &ndp->ni_pathlen);
 	} else {
 		error = copyinstr(ndp->ni_dirp, cnp->cn_pnbuf, MAXPATHLEN,
 		    &ndp->ni_pathlen);

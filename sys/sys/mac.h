@@ -71,7 +71,7 @@ typedef	__size_t	size_t;
  * and ioctls between userspace and the kernel.
  */
 struct mac {
-	size_t		m_buflen;
+	size_t		 m_buflen;
 	char		*m_string;
 };
 
@@ -79,7 +79,7 @@ typedef struct mac	*mac_t;
 
 #ifdef _KERNEL
 struct mac64 {
-	size_t  m_buflen;
+	size_t   m_buflen;
 	void    *m_string;
 };
 #endif

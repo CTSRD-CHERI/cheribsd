@@ -354,8 +354,7 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 		TAILQ_INSERT_TAIL(opts, opt, link);
 
 		if (auio->uio_segflg == UIO_SYSSPACE) {
-			bcopy((void *)auio->uio_iov[i].iov_base,
-			    opt->name, namelen);
+			bcopy(auio->uio_iov[i].iov_base, opt->name, namelen);
 		} else {
 			error = copyin(auio->uio_iov[i].iov_base, opt->name,
 			    namelen);
@@ -371,8 +370,7 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 			opt->len = optlen;
 			opt->value = malloc(optlen, M_MOUNT, M_WAITOK);
 			if (auio->uio_segflg == UIO_SYSSPACE) {
-				bcopy((void *)
-				    auio->uio_iov[i + 1].iov_base, opt->value,
+				bcopy(auio->uio_iov[i + 1].iov_base, opt->value,
 				    optlen);
 			} else {
 				error = copyincap(auio->uio_iov[i + 1].iov_base,
@@ -431,7 +429,6 @@ struct nmount_args {
 int
 sys_nmount(struct thread *td, struct nmount_args *uap)
 {
-
 	return (kern_nmount(td, uap->iovp, uap->iovcnt, uap->flags,
 	    copyinuio));
 }
@@ -1030,7 +1027,6 @@ bail:
 	    && errmsg_len > 0 && errmsg != NULL) {
 		if (fsoptions->uio_segflg == UIO_SYSSPACE) {
 			bcopy(errmsg,
-			    (void *)
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_base,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_len);
 		} else {
@@ -1510,8 +1506,7 @@ vfs_domount_update(
 				if (export.ex_ngroups <= ngroups_max + 1) {
 					grps = malloc(export.ex_ngroups *
 					    sizeof(gid_t), M_TEMP, M_WAITOK);
-					export_error = copyin(
-					    export.ex_groups,
+					export_error = copyin(export.ex_groups,
 					    grps, export.ex_ngroups *
 					    sizeof(gid_t));
 					if (export_error == 0)
@@ -2872,8 +2867,7 @@ mount_argf(struct mntarg *ma, const char *name, const char *fmt, ...)
  * Add an argument which is a userland string.
  */
 struct mntarg *
-mount_argsu(struct mntarg *ma, const char *name, const void *val,
-    int len)
+mount_argsu(struct mntarg *ma, const char *name, const void *val, int len)
 {
 	struct mntaarg *maa;
 	char *tbuf;

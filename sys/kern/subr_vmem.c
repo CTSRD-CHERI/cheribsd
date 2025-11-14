@@ -1020,7 +1020,6 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 	end = BT_END(bt);
 	if (end > maxaddr)
 		end = maxaddr;
-
 	if (start > end) 
 		return (ENOMEM);
 

@@ -190,7 +190,6 @@ out:
 int
 sys_pdgetpid(struct thread *td, struct pdgetpid_args *uap)
 {
-
 	return (user_pdgetpid(td, uap->fd, uap->pidp));
 }
 

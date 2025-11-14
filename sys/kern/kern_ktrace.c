@@ -907,8 +907,8 @@ ktrstruct_error(const char *name, const void *data, size_t datalen, int error)
 }
 
 void
-ktrstructarray(const char *name, enum uio_seg seg,
-    const void *data, int num_items, size_t struct_size)
+ktrstructarray(const char *name, enum uio_seg seg, const void *data,
+    int num_items, size_t struct_size)
 {
 	struct ktr_request *req;
 	struct ktr_struct_array *ksa;
@@ -939,8 +939,7 @@ ktrstructarray(const char *name, enum uio_seg seg,
 	buf = malloc(buflen, M_KTRACE, M_WAITOK);
 	strcpy(buf, name);
 	if (seg == UIO_SYSSPACE)
-		bcopy((const void *)data, buf + namelen,
-		    datalen);
+		bcopy(data, buf + namelen, datalen);
 	else {
 		if (copyin(data, buf + namelen, datalen) != 0) {
 			free(buf, M_KTRACE);
@@ -1097,8 +1096,7 @@ sys_ktrace(struct thread *td, struct ktrace_args *uap)
 }
 
 int
-kern_ktrace(struct thread *td, const char *fname, int uops,
-    int ufacs, int pid)
+kern_ktrace(struct thread *td, const char *fname, int uops, int ufacs, int pid)
 {
 #ifdef KTRACE
 	struct vnode *vp = NULL;

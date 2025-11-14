@@ -218,8 +218,8 @@ kern_acct(struct thread *td, const char *path)
 	 * appending and make sure it's a 'normal'.
 	 */
 	if (path != NULL) {
-		NDINIT(&nd, LOOKUP, NOFOLLOW | AUDITVNODE1,
-		    UIO_USERSPACE, path);
+		NDINIT(&nd, LOOKUP, NOFOLLOW | AUDITVNODE1, UIO_USERSPACE,
+		    path);
 		flags = FWRITE | O_APPEND;
 		error = vn_open(&nd, &flags, 0, NULL);
 		if (error)
@@ -430,7 +430,7 @@ acct_process(struct thread *td)
 	/*
 	 * Write the accounting information to the file.
 	 */
-	ret = vn_rdwr(UIO_WRITE, acct_vp, &acct, sizeof (acct),
+	ret = vn_rdwr(UIO_WRITE, acct_vp, (caddr_t)&acct, sizeof (acct),
 	    (off_t)0, UIO_SYSSPACE, IO_APPEND|IO_UNIT, acct_cred, NOCRED,
 	    NULL, td);
 	sx_sunlock(&acct_sx);

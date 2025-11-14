@@ -67,15 +67,13 @@ struct extattrctl_args {
 int
 sys_extattrctl(struct thread *td, struct extattrctl_args *uap)
 {
-
 	return (kern_extattrctl(td, uap->path, uap->cmd, uap->filename,
 	    uap->attrnamespace, uap->attrname));
 }
 
 int
 kern_extattrctl(struct thread *td, const char *path, int cmd,
-    const char *filename, int attrnamespace,
-    const char *uattrname)
+    const char *filename, int attrnamespace, const char *uattrname)
 {
 
 	struct vnode *filename_vp;
@@ -230,7 +228,6 @@ struct extattr_set_fd_args {
 int
 sys_extattr_set_fd(struct thread *td, struct extattr_set_fd_args *uap)
 {
-
 	return (user_extattr_set_fd(td, uap->fd, uap->attrnamespace,
 	    uap->attrname, uap->data, uap->nbytes));
 }
@@ -309,9 +306,8 @@ sys_extattr_set_link(struct thread *td, struct extattr_set_link_args *uap)
 }
 
 int
-user_extattr_set_path(struct thread *td, const char *path,
-    int attrnamespace, const char *uattrname,
-    void *data, size_t nbytes, int follow)
+user_extattr_set_path(struct thread *td, const char *path, int attrnamespace,
+    const char *uattrname, void *data, size_t nbytes, int follow)
 {
 	char attrname[EXTATTR_MAXNAMELEN + 1];
 	int error;
@@ -319,14 +315,14 @@ user_extattr_set_path(struct thread *td, const char *path,
 	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
 	if (error)
 		return (error);
-	return (kern_extattr_set_path(td, path, attrnamespace, attrname, data,
-	    nbytes, follow, UIO_USERSPACE));
+	return (kern_extattr_set_path(td, path, attrnamespace,
+	    attrname, data, nbytes, follow, UIO_USERSPACE));
 }
 
 int
-kern_extattr_set_path(struct thread *td, const char *path,
-    int attrnamespace, const char *attrname, void *data,
-    size_t nbytes, int follow, enum uio_seg pathseg)
+kern_extattr_set_path(struct thread *td, const char *path, int attrnamespace,
+    const char *attrname, void *data, size_t nbytes, int follow,
+    enum uio_seg pathseg)
 {
 	struct nameidata nd;
 	int error;
@@ -428,15 +424,13 @@ struct extattr_get_fd_args {
 int
 sys_extattr_get_fd(struct thread *td, struct extattr_get_fd_args *uap)
 {
-
 	return (user_extattr_get_fd(td, uap->fd, uap->attrnamespace,
 	    uap->attrname, uap->data, uap->nbytes));
 }
 
 int
 user_extattr_get_fd(struct thread *td, int fd, int attrnamespace,
-    const char *uattrname, void *data,
-    size_t nbytes)
+    const char *uattrname, void *data, size_t nbytes)
 {
 	char attrname[EXTATTR_MAXNAMELEN + 1];
 	int error;
@@ -505,9 +499,8 @@ sys_extattr_get_link(struct thread *td, struct extattr_get_link_args *uap)
 }
 
 int
-user_extattr_get_path(struct thread *td, const char *path,
-    int attrnamespace, const char *uattrname,
-    void *data, size_t nbytes, int follow)
+user_extattr_get_path(struct thread *td, const char *path, int attrnamespace,
+    const char *uattrname, void *data, size_t nbytes, int follow)
 {
 	char attrname[EXTATTR_MAXNAMELEN + 1];
 	int error;
@@ -515,14 +508,14 @@ user_extattr_get_path(struct thread *td, const char *path,
 	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
 	if (error)
 		return (error);
-	return (kern_extattr_get_path(td, path, attrnamespace, attrname, data,
-	    nbytes, follow, UIO_USERSPACE));
+	return (kern_extattr_get_path(td, path, attrnamespace,
+	    attrname, data, nbytes, follow, UIO_USERSPACE));
 }
 
 int
-kern_extattr_get_path(struct thread *td, const char *path,
-    int attrnamespace, const char *attrname, void *data,
-    size_t nbytes, int follow, enum uio_seg pathseg)
+kern_extattr_get_path(struct thread *td, const char *path, int attrnamespace,
+    const char *attrname, void *data, size_t nbytes, int follow,
+    enum uio_seg pathseg)
 {
 	struct nameidata nd;
 	int error;
@@ -595,7 +588,6 @@ struct extattr_delete_fd_args {
 int
 sys_extattr_delete_fd(struct thread *td, struct extattr_delete_fd_args *uap)
 {
-
 	return (user_extattr_delete_fd(td, uap->fd, uap->attrnamespace,
 	    uap->attrname));
 }
@@ -667,8 +659,8 @@ sys_extattr_delete_link(struct thread *td, struct extattr_delete_link_args *uap)
 }
 
 int
-user_extattr_delete_path(struct thread *td, const char *path,
-    int attrnamespace, const char *uattrname, int follow)
+user_extattr_delete_path(struct thread *td, const char *path, int attrnamespace,
+    const char *uattrname, int follow)
 {
 	char attrname[EXTATTR_MAXNAMELEN + 1];
 	int error;
@@ -681,8 +673,8 @@ user_extattr_delete_path(struct thread *td, const char *path,
 }
 
 int
-kern_extattr_delete_path(struct thread *td, const char *path,
-    int attrnamespace, const char *attrname, int follow, enum uio_seg pathseg)
+kern_extattr_delete_path(struct thread *td, const char *path, int attrnamespace,
+    const char *attrname, int follow, enum uio_seg pathseg)
 {
 	struct nameidata nd;
 	int error;
@@ -761,14 +753,13 @@ struct extattr_list_fd_args {
 int
 sys_extattr_list_fd(struct thread *td, struct extattr_list_fd_args *uap)
 {
-
 	return (user_extattr_list_fd(td, uap->fd, uap->attrnamespace,
 	    uap->data, uap->nbytes));
 }
 
 int
-user_extattr_list_fd(struct thread *td, int fd, int attrnamespace,
-    void *data, size_t nbytes)
+user_extattr_list_fd(struct thread *td, int fd, int attrnamespace, void *data,
+    size_t nbytes)
 {
 	struct uio auio, *auiop;
 	struct iovec aiov;
@@ -843,8 +834,8 @@ sys_extattr_list_link(struct thread *td, struct extattr_list_link_args *uap)
 }
 
 int
-user_extattr_list_path(struct thread *td, const char *path,
-    int attrnamespace, void *data, size_t nbytes, int follow)
+user_extattr_list_path(struct thread *td, const char *path, int attrnamespace,
+    void *data, size_t nbytes, int follow)
 {
 	struct uio auio, *auiop;
 	struct iovec aiov;
@@ -867,8 +858,8 @@ user_extattr_list_path(struct thread *td, const char *path,
 }
 
 int
-kern_extattr_list_path(struct thread *td, const char *path,
-    int attrnamespace, struct uio *auiop, int follow, enum uio_seg pathseg)
+kern_extattr_list_path(struct thread *td, const char *path, int attrnamespace,
+    struct uio *auiop, int follow, enum uio_seg pathseg)
 {
 	struct nameidata nd;
 	int error;

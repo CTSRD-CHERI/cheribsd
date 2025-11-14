@@ -133,7 +133,7 @@ link_elf_ctf_get(linker_file_t lf, linker_ctf_t *lc)
 	shdr = malloc(nbytes, M_LINKER, M_WAITOK);
 
 	/* Read all the section headers */
-	if ((error = vn_rdwr(UIO_READ, nd.ni_vp, shdr, nbytes,
+	if ((error = vn_rdwr(UIO_READ, nd.ni_vp, (caddr_t)shdr, nbytes,
 	    hdr->e_shoff, UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 	    NULL, td)) != 0)
 		goto out;
@@ -239,8 +239,7 @@ link_elf_ctf_get(linker_file_t lf, linker_ctf_t *lc)
 	 * Read the CTF data into the raw buffer if compressed, or
 	 * directly into the CTF buffer otherwise.
 	 */
-	if ((error = vn_rdwr(UIO_READ, nd.ni_vp,
-	    raw == NULL ? ctftab : raw,
+	if ((error = vn_rdwr(UIO_READ, nd.ni_vp, raw == NULL ? ctftab : raw,
 	    shdr[i].sh_size, shdr[i].sh_offset, UIO_SYSSPACE, IO_NODELOCKED,
 	    td->td_ucred, NOCRED, NULL, td)) != 0)
 		goto out;

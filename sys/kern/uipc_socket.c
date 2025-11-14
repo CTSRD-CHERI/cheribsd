@@ -3735,7 +3735,7 @@ sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 	if (sopt->sopt_td != NULL)
 		return (copyin(sopt->sopt_val, buf, valsize));
 
-	bcopynocap((void *)sopt->sopt_val, buf, valsize);
+	bcopynocap(sopt->sopt_val, buf, valsize);
 	return (0);
 }
 
@@ -3754,7 +3754,7 @@ sooptcopyincap(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 	if (sopt->sopt_td != NULL)
 		return (copyincap(sopt->sopt_val, buf, valsize));
 
-	bcopy((void *)sopt->sopt_val, buf, valsize);
+	bcopy(sopt->sopt_val, buf, valsize);
 	return (0);
 }
 #endif
@@ -4069,8 +4069,7 @@ sooptcopyout(struct sockopt *sopt, const void *buf, size_t len)
 		if (sopt->sopt_td != NULL)
 			error = copyout(buf, sopt->sopt_val, valsize);
 		else
-			bcopynocap(buf, (void *)sopt->sopt_val,
-			    valsize);
+			bcopynocap(buf, sopt->sopt_val, valsize);
 	}
 	return (error);
 }
@@ -4399,8 +4398,7 @@ soopt_mcopyin(struct sockopt *sopt, struct mbuf *m)
 				return(error);
 			}
 		} else
-			bcopy((void *)sopt->sopt_val,
-			    mtod(m, char *), m->m_len);
+			bcopy(sopt->sopt_val, mtod(m, char *), m->m_len);
 		sopt->sopt_valsize -= m->m_len;
 		sopt->sopt_val = (char *)sopt->sopt_val + m->m_len;
 		m = m->m_next;
@@ -4429,8 +4427,7 @@ soopt_mcopyout(struct sockopt *sopt, struct mbuf *m)
 				return(error);
 			}
 		} else
-			bcopy(mtod(m, char *),
-			    (void *)sopt->sopt_val, m->m_len);
+			bcopy(mtod(m, char *), sopt->sopt_val, m->m_len);
 		sopt->sopt_valsize -= m->m_len;
 		sopt->sopt_val = (char *)sopt->sopt_val + m->m_len;
 		valsize += m->m_len;
