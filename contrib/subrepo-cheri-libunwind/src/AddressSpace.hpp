@@ -177,7 +177,7 @@ public:
 #if !__has_feature(capabilities)
   typedef libunwind::fake_capability_t capability_t;
 #else
-  typedef ::uintcap_t capability_t;
+  typedef ::__uintcap_t capability_t;
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
   typedef uint64_t addr_t;
@@ -341,7 +341,7 @@ public:
 
   static pint_t to_pint_t(capability_t cap) {
 #ifdef __CHERI_PURE_CAPABILITY__
-    return (uintcap_t)cap;
+    return (__uintcap_t)cap;
 #elif __has_feature(capabilities)
     return (pint_t)cap;
 #else
@@ -352,7 +352,7 @@ public:
   }
   static capability_t to_capability_t(pint_t pint) {
 #if __has_feature(capabilities)
-    return (uintcap_t)pint;
+    return (__uintcap_t)pint;
 #else
     capability_t result;
     memcpy(&result, &pint, uw_min(sizeof(result), sizeof(pint)));
