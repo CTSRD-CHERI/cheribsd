@@ -220,8 +220,8 @@ dt_print_hex(FILE *fp, caddr_t addr, size_t size)
 		    (unsigned long long)*(uint64_t *)addr);
 		break;
 #if __has_feature(capabilities)
-	case sizeof (uintcap_t):
-		xo_emit("{:value/%#lp}", *(uintcap_t *)addr);
+	case sizeof (__uintcap_t):
+		xo_emit("{:value/%#lp}", *(__uintcap_t *)addr);
 		break;
 #endif
 	default:
