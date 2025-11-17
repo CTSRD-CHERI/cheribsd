@@ -299,9 +299,9 @@ pfprint_uint(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 		return (dt_printf(dtp, fp, format,
 		    *((uint64_t *)addr) / normal));
 #if __has_feature(capabilities)
-	case sizeof (uintcap_t):
+	case sizeof (__uintcap_t):
 		return (dt_printf(dtp, fp, format,
-		    *((uintcap_t *)addr) / normal));
+		    *((__uintcap_t *)addr) / normal));
 #endif
 	default:
 		return (dt_set_errno(dtp, EDT_DMISMATCH));
@@ -313,9 +313,9 @@ static int
 pfprint_ptr(dtrace_hdl_t *dtp, FILE *fp, const char *format,
     const dt_pfargd_t *pfd, const void *addr, size_t size, uint64_t normal)
 {
-	if (size != sizeof (uintcap_t))
+	if (size != sizeof (__uintcap_t))
 		return (dt_set_errno(dtp, EDT_DMISMATCH));
-	return (dt_printf(dtp, fp, format, *((uintcap_t *)addr) / normal));
+	return (dt_printf(dtp, fp, format, *((__uintcap_t *)addr) / normal));
 }
 #endif
 
@@ -711,7 +711,7 @@ static const dt_pfconv_t _dtrace_conversions[] = {
 { "lx",	"x", "long", pfcheck_xlong, pfprint_uint },
 { "lX",	"X", "long", pfcheck_xlong, pfprint_uint },
 #if __has_feature(capabilities)
-{ "lp", "lp", "uintcap_t", pfcheck_addr, pfprint_ptr },
+{ "lp", "lp", "__uintcap_t", pfcheck_addr, pfprint_ptr },
 #endif
 { "lld", "d", "long long", pfcheck_type, pfprint_sint },
 { "lli", "i", "long long", pfcheck_type, pfprint_sint },
