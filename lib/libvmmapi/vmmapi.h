@@ -78,7 +78,7 @@ enum {
 
 #if __has_feature(capabilities) && defined(__aarch64__)
 #define	VMMAPI_CHERI
-typedef uintcap_t vm_register_t;
+typedef __uintcap_t vm_register_t;
 #else
 typedef uint64_t vm_register_t;
 #endif
