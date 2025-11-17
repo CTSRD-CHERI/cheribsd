@@ -256,10 +256,10 @@ struct drm_mode_card_res64 {
 #endif
 
 struct drm_mode_card_res {
-	kuint64cap_t fb_id_ptr;
-	kuint64cap_t crtc_id_ptr;
-	kuint64cap_t connector_id_ptr;
-	kuint64cap_t encoder_id_ptr;
+	uint64ptr_t fb_id_ptr;
+	uint64ptr_t crtc_id_ptr;
+	uint64ptr_t connector_id_ptr;
+	uint64ptr_t encoder_id_ptr;
 	__u32 count_fbs;
 	__u32 count_crtcs;
 	__u32 count_connectors;
@@ -288,7 +288,7 @@ struct drm_mode_crtc64 {
 #endif
 
 struct drm_mode_crtc {
-	kuint64cap_t set_connectors_ptr;
+	uint64ptr_t set_connectors_ptr;
 	__u32 count_connectors;
 
 	__u32 crtc_id; /**< Id */
@@ -350,7 +350,7 @@ struct drm_mode_get_plane {
 	__u32 gamma_size;
 
 	__u32 count_format_types;
-	kuint64cap_t format_type_ptr;
+	uint64ptr_t format_type_ptr;
 };
 
 #ifdef _KERNEL
@@ -361,7 +361,7 @@ struct drm_mode_get_plane_res64 {
 #endif
 
 struct drm_mode_get_plane_res {
-	kuint64cap_t plane_id_ptr;
+	uint64ptr_t plane_id_ptr;
 	__u32 count_planes;
 };
 
@@ -447,10 +447,10 @@ struct drm_mode_get_connector64 {
 
 struct drm_mode_get_connector {
 
-	kuint64cap_t encoders_ptr;
-	kuint64cap_t modes_ptr;
-	kuint64cap_t props_ptr;
-	kuint64cap_t prop_values_ptr;
+	uint64ptr_t encoders_ptr;
+	uint64ptr_t modes_ptr;
+	uint64ptr_t props_ptr;
+	uint64ptr_t prop_values_ptr;
 
 	__u32 count_modes;
 	__u32 count_props;
@@ -520,8 +520,8 @@ struct drm_mode_get_property64 {
 #endif
 
 struct drm_mode_get_property {
-	kuint64cap_t values_ptr; /* values and blob lengths */
-	kuint64cap_t enum_blob_ptr; /* enum and blob id ptrs */
+	uint64ptr_t values_ptr; /* values and blob lengths */
+	uint64ptr_t enum_blob_ptr; /* enum and blob id ptrs */
 
 	__u32 prop_id;
 	__u32 flags;
@@ -560,8 +560,8 @@ struct drm_mode_obj_get_properties64 {
 #endif
 
 struct drm_mode_obj_get_properties {
-	kuint64cap_t props_ptr;
-	kuint64cap_t prop_values_ptr;
+	uint64ptr_t props_ptr;
+	uint64ptr_t prop_values_ptr;
 	__u32 count_props;
 	__u32 obj_id;
 	__u32 obj_type;
@@ -585,7 +585,7 @@ struct drm_mode_get_blob64 {
 struct drm_mode_get_blob {
 	__u32 blob_id;
 	__u32 length;
-	kuint64cap_t data;
+	uint64ptr_t data;
 };
 
 struct drm_mode_fb_cmd {
@@ -687,7 +687,7 @@ struct drm_mode_fb_dirty_cmd {
 	__u32 flags;
 	__u32 color;
 	__u32 num_clips;
-	kuint64cap_t clips_ptr;
+	uint64ptr_t clips_ptr;
 };
 
 struct drm_mode_mode_cmd {
@@ -754,9 +754,9 @@ struct drm_mode_crtc_lut {
 	__u32 gamma_size;
 
 	/* pointers to arrays */
-	kuint64cap_t red;
-	kuint64cap_t green;
-	kuint64cap_t blue;
+	uint64ptr_t red;
+	uint64ptr_t green;
+	uint64ptr_t blue;
 };
 
 struct drm_color_ctm {
@@ -913,7 +913,7 @@ struct drm_mode_crtc_page_flip {
 	__u32 fb_id;
 	__u32 flags;
 	__u32 reserved;
-	kuint64cap_t user_data;
+	uint64ptr_t user_data;
 };
 
 /*
@@ -951,7 +951,7 @@ struct drm_mode_crtc_page_flip_target {
 	__u32 fb_id;
 	__u32 flags;
 	__u32 sequence;
-	kuint64cap_t user_data;
+	uint64ptr_t user_data;
 };
 
 /* create a dumb scanout buffer */
@@ -1011,12 +1011,12 @@ struct drm_mode_atomic64 {
 struct drm_mode_atomic {
 	__u32 flags;
 	__u32 count_objs;
-	kuint64cap_t objs_ptr;
-	kuint64cap_t count_props_ptr;
-	kuint64cap_t props_ptr;
-	kuint64cap_t prop_values_ptr;
-	kuint64cap_t reserved;
-	kuint64cap_t user_data;
+	uint64ptr_t objs_ptr;
+	uint64ptr_t count_props_ptr;
+	uint64ptr_t props_ptr;
+	uint64ptr_t prop_values_ptr;
+	uint64ptr_t reserved;
+	uint64ptr_t user_data;
 };
 
 struct drm_format_modifier_blob {
@@ -1090,7 +1090,7 @@ struct drm_mode_create_blob64 {
 
 struct drm_mode_create_blob {
 	/** Pointer to data to copy. */
-	kuint64cap_t data;
+	uint64ptr_t data;
 	/** Length of data to copy. */
 	__u32 length;
 	/** Return: new property ID. */
@@ -1169,7 +1169,7 @@ struct drm_mode_list_lessees {
 	/** Pointer to lessees.
 	 * pointer to __u64 array of lessee ids
 	 */
-	kuint64cap_t lessees_ptr;
+	uint64ptr_t lessees_ptr;
 };
 
 /**
@@ -1212,7 +1212,7 @@ struct drm_mode_get_lease {
 	/** Pointer to objects.
 	 * pointer to __u32 array of object ids
 	 */
-	kuint64cap_t objects_ptr;
+	uint64ptr_t objects_ptr;
 };
 
 /**

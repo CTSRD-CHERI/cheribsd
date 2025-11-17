@@ -102,14 +102,6 @@ typedef	__intmax_t		intmax_t;
 typedef	__uintmax_t		uintmax_t;
 #define	_UINTMAX_T_DECLARED
 #endif
-#ifndef _KUINT64CAP_T_DECLARED
-#ifdef __ILP32__
-typedef	uint64_t		kuint64cap_t;
-#else
-typedef	uintptr_t		kuint64cap_t;
-#endif
-#define	_KUINT64CAP_T_DECLARED
-#endif
 
 #ifndef _PTRADDR_T_DECLARED
 typedef	__ptraddr_t		ptraddr_t;

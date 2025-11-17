@@ -88,7 +88,7 @@ extern "C" {
 
 typedef struct zfs_iocparm {
 	uint32_t	zfs_ioctl_version;
-	kuint64cap_t	zfs_cmd;
+	uint64ptr_t	zfs_cmd;
 	uint64_t	zfs_cmd_size;
 } zfs_iocparm_t;
 

@@ -64,7 +64,7 @@ struct drm_panfrost_submit {
 	uint64_t jc;
 
 	/** An optional array of sync objects to wait on before starting this job. */
-	kuint64cap_t in_syncs;
+	uint64ptr_t in_syncs;
 
 	/** Number of sync objects to wait on before starting this job. */
 	uint32_t in_sync_count;
@@ -73,7 +73,7 @@ struct drm_panfrost_submit {
 	uint32_t out_sync;
 
 	/** Pointer to a u32 array of the BOs that are referenced by the job. */
-	kuint64cap_t bo_handles;
+	uint64ptr_t bo_handles;
 
 	/** Number of BO handles passed in (size is that times 4). */
 	uint32_t bo_handle_count;
