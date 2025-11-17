@@ -341,7 +341,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 #ifdef __CHERI_PURE_CAPABILITY__
 				cap = va_arg(ap, void *);
 #else
-				cap = (void *)(uintcap_t)
+				cap = (void *)(__uintcap_t)
 				    (uintptr_t)va_arg(ap, void *);
 #endif
 			}
