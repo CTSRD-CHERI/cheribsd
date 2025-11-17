@@ -96,8 +96,8 @@ static int ctl_size[CTLTYPE+1] = {
 	[CTLTYPE_U16] = sizeof(uint16_t),
 	[CTLTYPE_U32] = sizeof(uint32_t),
 	[CTLTYPE_U64] = sizeof(uint64_t),
-#if __has_feature(capabilities)
-	[CTLTYPE_CAP] = sizeof(uintcap_t),
+#if __CHERI__
+	[CTLTYPE_CAP] = sizeof(uintptr_t),
 #endif
 };
 
@@ -117,7 +117,7 @@ static const char *ctl_typename[CTLTYPE+1] = {
 	[CTLTYPE_NODE] = "node",
 	[CTLTYPE_STRING] = "string",
 	[CTLTYPE_OPAQUE] = "opaque",
-#if __has_feature(capabilities)
+#if __CHERI__
 	[CTLTYPE_CAP] = "capability",
 #endif
 };
@@ -1254,20 +1254,20 @@ show_var(int *oid, int nlen, bool honor_skip)
 		free(oval);
 		return (0);
 
-#if __has_feature(capabilities)
+#if __CHERI__
 	case CTLTYPE_CAP:
 		if (!nflag)
 			printf("%s%s", name, sep);
 		if (lflag)
 			printf("%zd%s", len, sep);
 		sep1 = "";
-		while (len >= sizeof(uintcap_t)) {
-			uintcap_t ptr = *(uintcap_t*)p;
+		while (len >= sizeof(uintptr_t)) {
+			__uintcap_t ptr = *(uintptr_t*)p;
 			fputs(sep1, stdout);
 			printf("%#lp", (void *)ptr);
 			sep1 = " ";
-			len -= sizeof(uintcap_t);
-			p += sizeof(uintcap_t);
+			len -= sizeof(__uintcap_t);
+			p += sizeof(__uintcap_t);
 		}
 		return (0);
 #endif
