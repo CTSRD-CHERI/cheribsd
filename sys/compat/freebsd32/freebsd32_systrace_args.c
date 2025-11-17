@@ -3407,7 +3407,7 @@ systrace_args(int sysnum, void *params, uintptr_t *uarg, int *n_args)
 	case 591: {
 		struct freebsd32_setcred_args *p = params;
 		uarg[a++] = p->flags; /* u_int */
-		uarg[a++] = (intcap_t)p->wcred; /* const struct setcred32 * */
+		uarg[a++] = (intptr_t)p->wcred; /* const struct setcred32 * */
 		uarg[a++] = p->size; /* size_t */
 		*n_args = 3;
 		break;
