@@ -41,7 +41,7 @@
 
 static ssize_t
 _strfcap(char * __restrict buf, size_t maxsize, const char * __restrict format,
-    uintcap_t cap, bool tag)
+    uintptr_t cap, bool tag)
 {
 	char tmp[(sizeof(void *) * 2) + 1], fmt[9], *fmtp;
 	const char *percent, *opt_start = NULL;
@@ -297,7 +297,7 @@ more_spec:
 
 ssize_t
 strfcap(char * __restrict buf, size_t maxsize, const char * __restrict format,
-    uintcap_t cap)
+    uintptr_t cap)
 {
 	return (_strfcap(buf, maxsize, format, cap, cheri_gettag(cap)));
 }
