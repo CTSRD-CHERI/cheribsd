@@ -70,14 +70,6 @@ typedef	__uint64_t		uint64_t;
 #define	_UINT64_T_DECLARED
 #endif
 
-#ifndef _INTCAP_T_DECLARED
-typedef	__intcap_t		intcap_t;
-#define	_INTCAP_T_DECLARED
-#endif
-#ifndef _UINTCAP_T_DECLARED
-typedef	__uintcap_t		uintcap_t;
-#define	_UINTCAP_T_DECLARED
-#endif
 #ifndef _INTPTR_T_DECLARED
 typedef	__intptr_t		intptr_t;
 #define	_INTPTR_T_DECLARED
