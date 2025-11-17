@@ -826,13 +826,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			base = 8;
 			goto handle_nosign;
 		case 'p':
-#if __has_feature(capabilities)
-#ifndef __CHERI_PURE_CAPABILITY__
-			if (!lflag) {
-				num = (uintmax_t)va_arg(ap, void *);
-				sharpflag = 0;
-			} else
-#endif
+#if __CHERI__
 			{
 				cap = va_arg(ap, void *);
 				num = cheri_getaddress(cap);
@@ -983,7 +977,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			p = va_arg(ap, char *);
 			if (p == NULL)
 				p = "(null)";
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 			else if (!cheri_can_access(p, CHERI_PERM_LOAD,
 			    (ptraddr_t)p, 1))
 				p = "(invalid)";
