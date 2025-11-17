@@ -407,32 +407,15 @@ core_read_ps_strings(struct procstat_core *core, vm_offset_t psstrings,
 
 	assert(type == PSC_TYPE_ARGV || type == PSC_TYPE_ENVV);
 
-#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-	if (core_is_cheri(core)) {
-		struct cheri_ps_strings pss;
+	struct ps_strings pss;
 
-		if (core_read_mem(core, &pss, sizeof(pss), psstrings, true) ==
-		    -1)
-			return ((vm_offset_t)0);
-		nargstr = pss.ps_nargvstr;
-		nenvstr = pss.ps_nenvstr;
-		argaddr = (vm_offset_t)pss.ps_argvstr;
-		envaddr = (vm_offset_t)pss.ps_envstr;
-		*size = sizeof(uintcap_t);
-	} else
-#endif
-	{
-		struct ps_strings pss;
-
-		if (core_read_mem(core, &pss, sizeof(pss), psstrings, true) ==
-		    -1)
-			return ((vm_offset_t)0);
-		nargstr = pss.ps_nargvstr;
-		nenvstr = pss.ps_nenvstr;
-		argaddr = (vm_offset_t)pss.ps_argvstr;
-		envaddr = (vm_offset_t)pss.ps_envstr;
-		*size = sizeof(char *);
-	}
+	if (core_read_mem(core, &pss, sizeof(pss), psstrings, true) == -1)
+		return ((vm_offset_t)0);
+	nargstr = pss.ps_nargvstr;
+	nenvstr = pss.ps_nenvstr;
+	argaddr = (vm_offset_t)pss.ps_argvstr;
+	envaddr = (vm_offset_t)pss.ps_envstr;
+	*size = sizeof(char *);
 
 	if (type == PSC_TYPE_ARGV) {
 		*nstr = nargstr;
@@ -447,14 +430,7 @@ static inline vm_offset_t
 core_image_off(struct procstat_core *core __unused, char **ptr, int i)
 {
 
-#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-	if (core_is_cheri(core)) {
-		char * __capability *cap = (char * __capability *)
-		    __builtin_assume_aligned(ptr, sizeof(char * __capability));
-		return ((vm_offset_t)cap[i]);
-	} else
-#endif
-		return ((vm_offset_t)ptr[i]);
+	return ((vm_offset_t)ptr[i]);
 }
 
 #define ARGS_CHUNK_SZ	256	/* Chunk size (bytes) for get_args operations. */
