@@ -64,7 +64,7 @@ fmt_ptr(void *ptr)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	if ((procstat_opts & PS_OPT_VERBOSE) != 0)
-		strfcap(ptrstr, sizeof(ptrstr), "%T%C", (uintcap_t)ptr);
+		strfcap(ptrstr, sizeof(ptrstr), "%T%C", (uintptr_t)ptr);
 	else
 #endif
 		snprintf(ptrstr, sizeof(ptrstr), "%p", ptr);
