@@ -367,7 +367,7 @@ guest_paging_info(struct vcpu *vcpu, struct vm_guest_paging *paging)
 		paging->paging_mode = PAGING_MODE_PAE;
 	return (0);
 #else /* __aarch64__ */
-	uintcap_t regs[6];
+	__uintcap_t regs[6];
 	const int regset[6] = {
 		VM_REG_GUEST_TTBR0_EL1,
 		VM_REG_GUEST_TTBR1_EL1,
@@ -746,7 +746,7 @@ append_unsigned_native(uintmax_t value, size_t len)
 }
 
 static void
-append_cap_native(uintcap_t value, uint8_t tag)
+append_cap_native(__uintcap_t value, uint8_t tag)
 {
 	append_byte(tag);
 	for (size_t i = 0; i < sizeof(value); i++)
@@ -1245,7 +1245,7 @@ gdb_resume_vcpus(void)
 static void
 gdb_read_regs(void)
 {
-	uintcap_t regvals[nitems(gdb_regset)];
+	__uintcap_t regvals[nitems(gdb_regset)];
 	int regnums[nitems(gdb_regset)];
 	uint8_t tags[nitems(gdb_regset)];
 
@@ -1283,7 +1283,7 @@ gdb_read_regs(void)
 static void
 gdb_read_one_reg(const uint8_t *data, size_t len)
 {
-	uintcap_t regval;
+	__uintcap_t regval;
 	uintmax_t reg;
 	uint8_t tag;
 
@@ -1932,9 +1932,9 @@ gdb_query(const uint8_t *data, size_t len)
 		(void)munmap(__DECONST(void *, xml), xmllen);
 	} else if (command_equals(data, len, "qXfer:capa:read:")) {
 #if __has_feature(capabilities)
-		uintcap_t *cap;
+		__uintcap_t *cap;
 		uint64_t gpa, gva;
-		char capbuf[sizeof(uintcap_t) + 1], buf[64];
+		char capbuf[sizeof(__uintcap_t) + 1], buf[64];
 		unsigned int doff, dlen;
 		int error;
 		uint8_t *cp;
@@ -1949,7 +1949,7 @@ gdb_query(const uint8_t *data, size_t len)
 		}
 
 		gva = parse_integer(data, cp - data);
-		if (gva % sizeof(uintcap_t) != 0) {
+		if (gva % sizeof(__uintcap_t) != 0) {
 			send_error(EINVAL);
 			return;
 		}
@@ -1982,12 +1982,12 @@ gdb_query(const uint8_t *data, size_t len)
 			send_error(errno);
 			return;
 		}
-		cap = paddr_guest2host(ctx, gpa, sizeof(uintcap_t));
+		cap = paddr_guest2host(ctx, gpa, sizeof(__uintcap_t));
 		if (cap == NULL) {
 			send_error(EFAULT);
 			return;
 		}
-		memcpy(&capbuf[1], cap, sizeof(uintcap_t));
+		memcpy(&capbuf[1], cap, sizeof(__uintcap_t));
 
 		start_packet();
 		if (doff >= sizeof(capbuf)) {
