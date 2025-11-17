@@ -3519,7 +3519,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 591: {
 		struct setcred_args *p = params;
 		uarg[a++] = p->flags; /* u_int */
-		uarg[a++] = (intcap_t)p->wcred; /* const struct setcred * __kerncap */
+		uarg[a++] = (intcap_t)p->wcred; /* const struct setcred * */
 		uarg[a++] = p->size; /* size_t */
 		*n_args = 3;
 		break;
@@ -9421,7 +9421,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "u_int";
 			break;
 		case 1:
-			p = "userland const struct setcred * __kerncap";
+			p = "userland const struct setcred *";
 			break;
 		case 2:
 			p = "size_t";
