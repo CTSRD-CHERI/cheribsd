@@ -1690,8 +1690,8 @@ print_arg(struct syscall_arg *sc, syscallarg_t *args, syscallarg_t *retval,
 		union {
 			int32_t strarray32[PAGE_SIZE / sizeof(int32_t)];
 			int64_t strarray64[PAGE_SIZE / sizeof(int64_t)];
-#if __has_feature(capabilities)
-			intcap_t strarray_cap[PAGE_SIZE / sizeof(intcap_t)];
+#ifdef __CHERI__
+			intptr_t strarray_cap[PAGE_SIZE / sizeof(intptr_t)];
 #endif
 			char buf[PAGE_SIZE];
 		} u;
@@ -1736,8 +1736,8 @@ print_arg(struct syscall_arg *sc, syscallarg_t *args, syscallarg_t *retval,
 		i = 0;
 		for (;;) {
 			psaddr_t straddr;
-#if __has_feature(capabilities)
-			if (pointer_size == sizeof(intcap_t)) {
+#ifdef __CHERI__
+			if (pointer_size == sizeof(intptr_t)) {
 				straddr = (psaddr_t)u.strarray_cap[i];
 			} else
 #endif
