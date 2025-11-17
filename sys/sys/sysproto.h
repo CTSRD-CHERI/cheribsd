@@ -1910,7 +1910,7 @@ struct fchroot_args {
 };
 struct setcred_args {
 	char flags_l_[PADL_(u_int)]; u_int flags; char flags_r_[PADR_(u_int)];
-	char wcred_l_[PADL_(const struct setcred * __kerncap)]; const struct setcred * __kerncap wcred; char wcred_r_[PADR_(const struct setcred * __kerncap)];
+	char wcred_l_[PADL_(const struct setcred *)]; const struct setcred * wcred; char wcred_r_[PADR_(const struct setcred *)];
 	char size_l_[PADL_(size_t)]; size_t size; char size_r_[PADR_(size_t)];
 };
 int	sys_exit(struct thread *, struct exit_args *);
