@@ -523,7 +523,7 @@ systrace_args(int sysnum, void *params, uintptr_t *uarg, int *n_args)
 	/* freebsd64_cheri_cidcap_alloc */
 	case 91: {
 		struct freebsd64_cheri_cidcap_alloc_args *p = params;
-		uarg[a++] = (intptr_t)p->cidp; /* uintptr_t * */
+		uarg[a++] = (intptr_t)p->cidp; /* uintptr64_t * */
 		*n_args = 1;
 		break;
 	}
@@ -4307,7 +4307,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 91:
 		switch (ndx) {
 		case 0:
-			p = "userland uintptr_t *";
+			p = "userland uintptr64_t *";
 			break;
 		default:
 			break;
