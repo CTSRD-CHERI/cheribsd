@@ -79,7 +79,7 @@ struct bnxt_dev_info {
 } __packed;
 
 struct dma_info {
-        kuint64cap_t data;
+        uint64ptr_t data;
         uint32_t length;
         uint16_t offset;
         uint8_t read_or_write;
@@ -87,8 +87,8 @@ struct dma_info {
 };
 
 struct bnxt_mgmt_fw_msg {
-        kuint64cap_t usr_req;
-        kuint64cap_t usr_resp;
+        uint64ptr_t usr_req;
+        uint64ptr_t usr_resp;
         uint32_t len_req;
         uint32_t len_resp;
         uint32_t timeout;
@@ -121,7 +121,7 @@ struct bnxt_mgmt_req_hdr {
 struct bnxt_mgmt_req {
 	struct bnxt_mgmt_req_hdr hdr;
 	union {
-		kuint64cap_t hreq;
+		uint64ptr_t hreq;
 	} req;
 };
 
