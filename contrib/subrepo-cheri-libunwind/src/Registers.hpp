@@ -1863,8 +1863,8 @@ public:
 
 #ifdef __CHERI_PURE_CAPABILITY__
   bool        validCapabilityRegister(int num) const;
-  uintcap_t   getCapabilityRegister(int num) const;
-  void        setCapabilityRegister(int num, uintcap_t value);
+  uintptr_t   getCapabilityRegister(int num) const;
+  void        setCapabilityRegister(int num, uintptr_t value);
 #else
   CAPABILITIES_NOT_SUPPORTED
 #endif // __CHERI_PURE_CAPABILITY__
@@ -1994,12 +1994,12 @@ inline bool Registers_arm64::validCapabilityRegister(int regNum) const {
   return false;
 }
 
-inline uintcap_t Registers_arm64::getCapabilityRegister(int regNum) const {
+inline uintptr_t Registers_arm64::getCapabilityRegister(int regNum) const {
   assert(validCapabilityRegister(regNum));
   return getRegister(regNum);
 }
 
-inline void Registers_arm64::setCapabilityRegister(int regNum, uintcap_t value) {
+inline void Registers_arm64::setCapabilityRegister(int regNum, uintptr_t value) {
   assert(validCapabilityRegister(regNum));
   setRegister(regNum, value);
 }
