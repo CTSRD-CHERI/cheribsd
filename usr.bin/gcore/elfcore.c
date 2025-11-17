@@ -91,7 +91,7 @@ typedef void* (*notefunc_t)(void *, size_t *);
 
 static void cb_put_phdr(struct map_entry *, void *);
 static void cb_size_segment(struct map_entry *, void *);
-#if __has_feature(capabilities)
+#if __CHERI__
 static void cb_put_memtag_phdr(struct map_entry *, void *);
 static void cb_size_memtag_segment(struct map_entry *, void *);
 #endif
@@ -206,7 +206,7 @@ elf_coredump(int efd, int fd, pid_t pid)
 	seginfo.count = 0;
 	seginfo.size = 0;
 	each_dumpable_segment(map, cb_size_segment, &seginfo);
-#if __has_feature(capabilities)
+#ifdef __CHERI__
 	each_dumpable_segment(map, cb_size_memtag_segment, &seginfo);
 #endif
 
@@ -256,7 +256,7 @@ elf_coredump(int efd, int fd, pid_t pid)
 				nwant = sizeof buf;
 			else
 				nwant = nleft;
-#if __has_feature(capabilities)
+#ifdef __CHERI__
 			if (php->p_type == PT_MEMTAG_CHERI)
 				iorequest.piod_op = PIOD_READ_CHERI_TAGS;
 			else
@@ -275,10 +275,10 @@ elf_coredump(int efd, int fd, pid_t pid)
 			if ((size_t)ngot != nwant)
 				errx(1, "short write");
 			nleft -= nwant;
-#if __has_feature(capabilities)
+#if __CHERI__
 			if (php->p_type == PT_MEMTAG_CHERI)
 				iorequest.piod_offs += ngot *
-				    sizeof(uintcap_t) * NBBY;
+				    sizeof(uintptr_t) * NBBY;
 			else
 #endif
 			iorequest.piod_offs += ngot;
@@ -321,7 +321,7 @@ cb_put_phdr(struct map_entry *entry, void *closure)
 	phc->phdr++;
 }
 
-#if __has_feature(capabilities)
+#ifdef __CHERI__
 static void
 cb_put_memtag_phdr(struct map_entry *entry, void *closure)
 {
@@ -334,7 +334,7 @@ cb_put_memtag_phdr(struct map_entry *entry, void *closure)
 		phdr->p_vaddr = entry->start;
 		phdr->p_paddr = 0;
 		phdr->p_memsz = entry->end - entry->start;
-		phdr->p_filesz = phdr->p_memsz / (sizeof(uintcap_t) * NBBY);
+		phdr->p_filesz = phdr->p_memsz / (sizeof(__uintcap_t) * NBBY);
 		phdr->p_align = 0;
 		phdr->p_flags = 0;
 		if (entry->protection & VM_PROT_READ_CAP)
@@ -361,7 +361,7 @@ cb_size_segment(struct map_entry *entry, void *closure)
 	ssc->size += entry->end - entry->start;
 }
 
-#if __has_feature(capabilities)
+#ifdef __CHERI__
 static void
 cb_size_memtag_segment(struct map_entry *entry, void *closure)
 {
@@ -370,7 +370,7 @@ cb_size_memtag_segment(struct map_entry *entry, void *closure)
 	if ((entry->protection & VM_PROT_CAP) != 0) {
 		ssc->count++;
 		ssc->size += (entry->end - entry->start) /
-		    (sizeof(uintcap_t) * NBBY);
+		    (sizeof(uintptr_t) * NBBY);
 	}
 }
 #endif
@@ -415,7 +415,7 @@ elf_putnotes(pid_t pid, struct sbuf *sb, size_t *sizep)
 
 	for (i = 0; i < threads; ++i) {
 		elf_putregnote(NT_PRSTATUS, tids[i], sb);
-#if __has_feature(capabilities)
+#ifdef __CHERI__
 		elf_putregnote(NT_CAPREGS, tids[i], sb);
 #endif
 		elf_putregnote(NT_FPREGSET, tids[i], sb);
@@ -610,7 +610,7 @@ elf_puthdr(int efd, pid_t pid, struct map_entry *map, void *hdr, size_t hdrsize,
 	phc.phdr = phdr;
 	phc.offset = segoff;
 	each_dumpable_segment(map, cb_put_phdr, &phc);
-#if __has_feature(capabilities)
+#ifdef __CHERI__
 	each_dumpable_segment(map, cb_put_memtag_phdr, &phc);
 #endif
 }
@@ -679,7 +679,7 @@ readmap(pid_t pid)
 			ent->protection |= VM_PROT_WRITE;
 		if ((kve->kve_protection & KVME_PROT_EXEC) != 0)
 			ent->protection |= VM_PROT_EXECUTE;
-#if __has_feature(capabilities)
+#ifdef __CHERI__
 		if ((kve->kve_protection & KVME_PROT_READ_CAP) != 0)
 			ent->protection |= VM_PROT_READ_CAP;
 		if ((kve->kve_protection & KVME_PROT_WRITE_CAP) != 0)
