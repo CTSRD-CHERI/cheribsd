@@ -138,7 +138,6 @@ static const int data_lengths[] = {
 	[KTR_STRUCT_ARRAY] = sizeof(struct ktr_struct_array),
 	[KTR_ARGS] = 0,
 	[KTR_ENVS] = 0,
-	[KTR_SYSERRCAUSE] = 0,
 };
 
 static STAILQ_HEAD(, ktr_request) ktr_free;
@@ -1043,37 +1042,6 @@ ktrfaultend(int result)
 	kf->result = result;
 	ktr_enqueuerequest(td, req);
 	ktrace_exit(td);
-}
-
-void
-ktrsyserrcause(const char *format, ...)
-{
-	struct ktr_request *req;
-	int namelen;
-	char *buf = NULL;
-	va_list va;
-
-	va_start(va, format);
-	namelen = vasprintf(&buf, M_KTRACE, format, va);
-	va_end(va);
-	if (buf != NULL && namelen == 0) {
-		free(buf, M_KTRACE);
-		buf = NULL;
-	}
-	if (buf == NULL)
-		return;
-
-	req = ktr_getrequest(KTR_SYSERRCAUSE);
-	if (req == NULL) {
-		if (buf != NULL)
-			free(buf, M_KTRACE);
-		return;
-	}
-	if (namelen > 0) {
-		req->ktr_header.ktr_len = namelen;
-		req->ktr_buffer = buf;
-	}
-	ktr_submitrequest(curthread, req);
 }
 #endif /* KTRACE */
 

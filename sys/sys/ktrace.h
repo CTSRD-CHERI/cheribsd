@@ -274,12 +274,6 @@ struct ktr_struct_array {
 #define KTR_ENVS 17
 
 /*
- * KTR_SYSERRCAUSE - String detailing cause of next syscall error
- */
-#define	KTR_SYSERRCAUSE	19
-	/* record contains error message */
-
-/*
  * KTR_DROP - If this bit is set in ktr_type, then at least one event
  * between the previous record and this record was dropped.
  */
@@ -313,7 +307,6 @@ struct ktr_struct_array {
 #define	KTRFAC_STRUCT_ARRAY (1<<KTR_STRUCT_ARRAY)
 #define KTRFAC_ARGS     (1<<KTR_ARGS)
 #define KTRFAC_ENVS     (1<<KTR_ENVS)
-#define	KTRFAC_SYSERRCAUSE	(1<<KTR_SYSERRCAUSE)
 
 /*
  * trace flags (also in p_traceflags)
@@ -363,8 +356,6 @@ void	ktrdata(int, const void *, size_t);
 	ktrstruct("sockaddr", (s), ((struct sockaddr *)(s))->sa_len)
 #define ktrstat(s) \
 	ktrstruct("stat", (s), sizeof(struct stat))
-void	ktrsyserrcause(const char *format, ...) __printflike(1, 2);
-
 #define ktrstat_error(s, error) \
 	ktrstruct_error("stat", (s), sizeof(struct stat), error)
 #define ktrcpuset(s, l) \
@@ -379,15 +370,6 @@ extern int ktr_filesize_limit_signal;
 #define	ktr_filesize_limit_signal 0
 #define	__ktrace_used	__unused
 #endif
-
-#ifdef KTRACE
-#define SYSERRCAUSE(fmt, ...) \
-        if (KTRPOINT(curthread, KTR_SYSERRCAUSE)) \
-                ktrsyserrcause("%s: " fmt, __func__, ##__VA_ARGS__);
-#else
-#define SYSERRCAUSE(fmt, ...)
-#endif
-
 #else
 
 #include <sys/cdefs.h>
@@ -400,14 +382,3 @@ __END_DECLS
 #endif
 
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "header",
-//   "changes": [
-//     "support",
-//     "pointer_as_integer"
-//   ],
-//   "change_comment": ""
-// }
-// CHERI CHANGES END

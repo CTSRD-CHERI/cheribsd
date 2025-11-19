@@ -69,9 +69,6 @@ getpoints(char *s)
 		case 's':
 			facs |= KTRFAC_PSIG;
 			break;
-		case 'S':
-			facs |= KTRFAC_SYSERRCAUSE;
-			break;
 		case 't':
 			facs |= KTRFAC_STRUCT;
 			break;
