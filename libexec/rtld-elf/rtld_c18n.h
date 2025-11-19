@@ -43,6 +43,7 @@ extern const char *ld_compartment_sig;
 extern const char *ld_compartment_unwind;
 extern const char *ld_compartment_stats;
 extern const char *ld_compartment_switch_count;
+extern const char *ld_compartment_no_fast_path;
 extern struct rtld_c18n_stats *c18n_stats;
 
 /*
@@ -207,10 +208,15 @@ struct tramp_header {
 	 * that the tagged value is visible to the trampoline when it is run.
 	 */
 	_Atomic(void *) target;
+	/*
+	 * INVARIANT: This field must be the last tagged member of the
+	 * trampoline. Trampoline reflection relies on this to locate the
+	 * header.
+	 */
 	const Obj_Entry *defobj;
 	size_t symnum;
 	struct func_sig sig;
-	uint32_t entry[];
+	_Alignas(INST_ALIGN) uint8_t entry[];
 };
 
 /*
