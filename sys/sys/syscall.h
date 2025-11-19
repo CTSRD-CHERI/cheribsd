@@ -234,7 +234,6 @@
 #define	SYS_aio_read	255
 #define	SYS_aio_write	256
 #define	SYS_lio_listio	257
-#define	SYS_kbounce	258
 #define	SYS_flag_captured	259
 #define	SYS_cheri_revoke_get_shadow	260
 #define	SYS_cheri_revoke	261

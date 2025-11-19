@@ -1278,16 +1278,6 @@ systrace_args(int sysnum, void *params, uintptr_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* kbounce */
-	case 258: {
-		struct kbounce_args *p = params;
-		uarg[a++] = (intptr_t)p->src; /* const void * */
-		uarg[a++] = (intptr_t)p->dst; /* void * */
-		uarg[a++] = p->len; /* size_t */
-		iarg[a++] = p->flags; /* int */
-		*n_args = 4;
-		break;
-	}
 	/* flag_captured */
 	case 259: {
 		struct flag_captured_args *p = params;
@@ -5421,25 +5411,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 3:
 			p = "userland struct sigevent32 *";
-			break;
-		default:
-			break;
-		};
-		break;
-	/* kbounce */
-	case 258:
-		switch (ndx) {
-		case 0:
-			p = "userland const void *";
-			break;
-		case 1:
-			p = "userland void *";
-			break;
-		case 2:
-			p = "size_t";
-			break;
-		case 3:
-			p = "int";
 			break;
 		default:
 			break;
@@ -9951,11 +9922,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* freebsd32_lio_listio */
 	case 257:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
-	/* kbounce */
-	case 258:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
