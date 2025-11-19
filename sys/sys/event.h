@@ -276,7 +276,7 @@ struct knlist {
 #define NOTE_SIGNAL	0x08000000
 
 /*
- * Hint values for the optional f_touch event filter.  If f_touch is not set
+ * Hint values for the optional f_touch event filter.  If f_touch is not set 
  * to NULL and f_isfd is zero the f_touch filter will be called with the type
  * argument set to EVENT_REGISTER during a kevent() system call.  It is also
  * called under the same conditions with the type argument set to EVENT_PROCESS
@@ -308,7 +308,7 @@ struct knote {
 	struct			knlist *kn_knlist;	/* f_attach populated */
 	TAILQ_ENTRY(knote)	kn_tqe;
 	struct			kqueue *kn_kq;	/* which queue we are on */
-	struct			kevent kn_kevent;
+	struct 			kevent kn_kevent;
 	void			*kn_hook;
 	int			kn_hookid;
 	int			kn_status;	/* protected by kq lock */
