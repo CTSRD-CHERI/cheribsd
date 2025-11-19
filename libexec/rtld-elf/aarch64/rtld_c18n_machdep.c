@@ -147,6 +147,8 @@ tramp_compile(char **entry, const struct tramp_data *data)
 	callee = compart_id_for_address(data->defobj, (ptraddr_t)data->target);
 
 	COPY(push_frame);
+	PATCH_MOV(push_frame, cid_fast, cid_to_index(callee).val);
+	PATCH_LDR_IMM(push_frame, target_fast, target_off);
 	PATCH_MOV(push_frame, cid, cid_to_index(callee).val);
 	landing_off = PATCH_OFF(push_frame, landing);
 	/*

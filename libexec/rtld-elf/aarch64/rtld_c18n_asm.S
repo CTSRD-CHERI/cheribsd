@@ -104,7 +104,7 @@ ENTRY(create_untrusted_stk)
 	/*
 	 * NON-STANDARD CALLING CONVENTION
 	 *
-	 * w19: Callee's compartment ID
+	 * w13: Callee's compartment ID
 	 * c26: Callee to be tail-called
 	 *
 	 * The function resolves the callee's stack, installs it, and tail-calls
@@ -123,7 +123,7 @@ ENTRY(create_untrusted_stk)
 
 	save_arguments
 
-	mov	w0, w19
+	mov	w0, w13
 	bl	resolve_untrusted_stk_impl
 	mov	c10, c0
 
@@ -166,15 +166,26 @@ ENTRY(tramp_hook)
 	 *
 	 * c10-c11 hold the first two arguments of tramp_hook.
 	 *
-	 * All argument registers and callee-saved registers must be preserved.
+	 * All argument registers, callee-saved registers, and arguments used
+	 * by the stack resolver must be preserved.
 	 */
 
 	save_arguments
+
+	/*
+	 * Save arguments used by the stack resolver.
+	 */
+	mov	w19, w13
 
 	mov	c0, c10
 	mov	c1, c11
 	mrs	c2, TRUSTED_STACK
 	bl	tramp_hook_impl
+
+	/*
+	 * Restore arguments used by the stack resolver.
+	 */
+	mov	w13, w19
 
 	restore_arguments
 
@@ -217,13 +228,54 @@ TRAMP(tramp_push_frame)
 	 */
 	ldp	x10, x11, [TRUSTED_STACK_C, #TRUSTED_FRAME_CALLER]
 	/*
-	 * Get the stack lookup table.
+	 * Extract the caller's compartment ID.
 	 */
-	mrs	STACK_TABLE_C, STACK_TABLE
+	ubfx	x12, x10, #32, #16
+	/*
+	 * Get the callee's compartment ID.
+	 */
+1:	movz	w13, #0			/* To be patched at runtime */
+
+	/*
+	 * Tail-call the target if the caller's and callee's compartment IDs
+	 * match. Otherwise, go to the middle of the slow path.
+	 */
+	cmp	w12, w13
+	b.ne	5f
+	/*
+	 * Load the target capability and overwrite c18.
+	 */
+2:	ldr	c18, #0			/* To be patched at runtime */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	br	x18
+#else
+	brr	c18
+#endif
+
+	/*
+	 * Entry point of the slow path.
+	 */
+3:	mrs	TRUSTED_STACK_C, TRUSTED_STACK
+
+	/*
+	 * Load the caller's compartment ID and the landing address from the
+	 * previous trusted frame.
+	 */
+	ldp	x10, x11, [TRUSTED_STACK_C, #TRUSTED_FRAME_CALLER]
 	/*
 	 * Extract the caller's compartment ID.
 	 */
 	ubfx	x12, x10, #32, #16
+	/*
+	 * Get the callee's compartment ID.
+	 */
+4:	movz	w13, #0			/* To be patched at runtime */
+
+5:
+	/*
+	 * Get the stack lookup table.
+	 */
+	mrs	STACK_TABLE_C, STACK_TABLE
 	/*
 	 * Load the caller's old stack top from the stack lookup table.
 	 */
@@ -239,21 +291,17 @@ TRAMP(tramp_push_frame)
 	/*
 	 * Get the length of the stack lookup table.
 	 */
-	gclen	x13, STACK_TABLE_C
+	gclen	x14, STACK_TABLE_C
 
 	stp	c19, c20, [TRUSTED_STACK_C, #(-CAP_WIDTH * TRUSTED_FRAME_SIZE + CAP_WIDTH * 2)]
 	/*
-	 * Get the callee's compartment ID.
-	 */
-1:	movz	w19, #0			/* To be patched at runtime */
-	/*
 	 * Use subs instead of cmp to clear a capability tag.
 	 */
-	subs	x14, x13, x19
+	subs	x19, x14, x13
 	/*
 	 * If the stack lookup table index is out-of-bounds, set it to zero.
 	 */
-	csel	w20, w19, wzr, hi
+	csel	w20, w13, wzr, hi
 	/*
 	 * Load the callee's stack if the stack lookup table index is within
 	 * bounds. Otherwise the resolver will be loaded.
@@ -288,18 +336,18 @@ TRAMP(tramp_push_frame)
 	/*
 	 * Get the landing address.
 	 */
-2:	adr	c24, #0			/* To be patched at runtime */
+6:	adr	c24, #0			/* To be patched at runtime */
 
 	stp	c25, c26, [TRUSTED_STACK_C, #(-CAP_WIDTH * TRUSTED_FRAME_SIZE + CAP_WIDTH * 8)]
 	/*
 	 * Compute the number of return value registers. If the call is a tail-
 	 * call, it is the minimum of that of the caller and the callee.
 	 */
-3:	ubfm	x25, x23, #48, #0	/* To be patched at runtime */
+7:	ubfm	x25, x23, #48, #0	/* To be patched at runtime */
 	/*
 	 * Load the target capability.
 	 */
-4:	ldr	c26, #0			/* To be patched at runtime */
+8:	ldr	c26, #0			/* To be patched at runtime */
 
 	/*
 	 * Save the caller's current stack top and old stack top.
@@ -347,10 +395,10 @@ TRAMP(tramp_push_frame)
 	 */
 	str	x24, [TRUSTED_STACK_C, #TRUSTED_FRAME_LANDING]
 	/*
-	 * Combine the caller's compartment ID and the number of return value
+	 * Combine the callee's compartment ID and the number of return value
 	 * registers.
 	 */
-	orr	w24, w19, w25, lsl #16
+	orr	w24, w13, w25, lsl #16
 	/*
 	 * Save the callee's compartment ID and the number of return value
 	 * registers.
@@ -369,10 +417,20 @@ TRAMP(tramp_push_frame)
 	set_untrusted_stk	c15
 TRAMPEND(tramp_push_frame)
 
-PATCH_POINT(tramp_push_frame, cid, 1b)
-PATCH_POINT(tramp_push_frame, landing, 2b)
-PATCH_POINT(tramp_push_frame, n_rets, 3b)
-PATCH_POINT(tramp_push_frame, target, 4b)
+PATCH_POINT(tramp_push_frame, cid_fast, 1b)
+PATCH_POINT(tramp_push_frame, target_fast, 2b)
+PATCH_POINT(tramp_push_frame, cid, 4b)
+PATCH_POINT(tramp_push_frame, landing, 6b)
+PATCH_POINT(tramp_push_frame, n_rets, 7b)
+PATCH_POINT(tramp_push_frame, target, 8b)
+
+.section	.rodata
+.globl	c18n_tramp_entry_slow_offset
+.balign	8
+.type	c18n_tramp_entry_slow_offset,%object
+c18n_tramp_entry_slow_offset:
+	.quad	3b - tramp_push_frame
+.size	c18n_tramp_entry_slow_offset, . - c18n_tramp_entry_slow_offset
 
 /*
  * Save the address of the current frame to c29 so that unwinders can locate it.
