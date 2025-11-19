@@ -490,7 +490,6 @@ main(int argc, char *argv[])
 			break;
 		case KTR_NAMEI:
 		case KTR_SYSCTL:
-		case KTR_SYSERRCAUSE:
 			ktrnamei(m, ktrlen);
 			break;
 		case KTR_GENIO:
@@ -719,9 +718,6 @@ dumpheader(struct ktr_header *kth, u_int sv_flags)
 	case KTR_ENVS:
 	        type = "ENVS";
 	        break;
-	case KTR_SYSERRCAUSE:
-		type = "ERR ";
-		break;
 	default:
 		sprintf(unknown, "UNKNOWN(%d)", kth->ktr_type);
 		type = unknown;
