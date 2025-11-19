@@ -933,26 +933,6 @@
 #define	__guarded_by(x)		__lock_annotate(guarded_by(x))
 #define	__pt_guarded_by(x)	__lock_annotate(pt_guarded_by(x))
 
-/* Specify that a file requires capabilities */
-#if __has_feature(capabilities)
-#define __REQUIRE_CAPABILITIES
-#else
-#define __REQUIRE_CAPABILITIES \
-	_Pragma("GCC error \"This file requires a capability-aware compiler\"")
-#endif
-
-#if 0
-#define __static_assert_if_constant(val, expr, message) \
-	_Static_assert(__builtin_choose_expr(__builtin_constant_p(val), \
-	    expr, 1), message)
-#define __static_assert_power_of_two(val) \
-	__static_assert_if_constant(val, (val & ((val)-1)) == 0, \
-	     "Alignment must be a power-of-two")
-#else
-// XXX-BD: riscv64c bringup, failing with const variable with llvm 9.0
-#define	__static_assert_power_of_two(val)
-#endif
-
 /* Alignment builtins for better type checking and improved code generation. */
 /* Provide fallback versions for other compilers (GCC/Clang < 10): */
 #if !__has_builtin(__builtin_is_aligned)
