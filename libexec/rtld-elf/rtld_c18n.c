@@ -145,9 +145,15 @@ const char *ld_compartment_stats;
 /* Export count of compartment switches to statistics */
 const char *ld_compartment_switch_count;
 
+/* Do not use the fast paths in trampolines for self-transitions */
+const char *ld_compartment_no_fast_path;
+
 /* Compartmentalisation information exported to the kernel */
 static struct cheri_c18n_info *c18n_info;
 struct rtld_c18n_stats *c18n_stats;
+
+/* Offset of a trampoline's slow path entry point relative to the fast path */
+extern const size_t c18n_tramp_entry_slow_offset;
 
 #define	INC_NUM_COMPART		(c18n_stats->rcs_compart++, comparts.size++)
 #define	INC_NUM_BYTES(n)						\
@@ -1438,10 +1444,12 @@ tramp_create(const struct tramp_data *data)
 }
 
 static void *
-tramp_make_entry(struct tramp_header *header)
+tramp_make_entry(struct tramp_header *header, bool slow)
 {
-	void *entry = header->entry;
+	uint8_t *entry = header->entry;
 
+	if (ld_compartment_no_fast_path != NULL || slow)
+		entry += c18n_tramp_entry_slow_offset;
 	entry = cheri_clearperm(entry, FUNC_PTR_REMOVE_PERMS);
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	entry = cheri_capmode(entry);
@@ -1597,7 +1605,7 @@ end:
 	 * Defensive programming: if the requester supplies an untagged target
 	 * capability, return an untagged trampoline.
 	 */
-	tramp_entry = tramp_make_entry(header);
+	tramp_entry = tramp_make_entry(header, plt != NULL);
 	if (!cheri_gettag(data->target))
 		tramp_entry = cheri_cleartag(tramp_entry);
 
@@ -1636,6 +1644,19 @@ tramp_reflect(const void *data)
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	data = (const char *)data - 1;
 #endif
+	/*
+	 * INVARIANT: The pointer being reflected never points to before the
+	 * function pointer entry point of the trampoline.
+	 *
+	 * When the fast path is enabled, the function pointer entry point is
+	 * the first instruction of the trampoline. Otherwise, the function
+	 * pointer entry point is `c18n_tramp_entry_slow_offset` bytes after
+	 * the first instruction of the trampoline, and the fast path is never
+	 * exposed. The return entry point is after either function pointer
+	 * entry point.
+	 */
+	if (ld_compartment_no_fast_path != NULL)
+		data = (const char *)data - c18n_tramp_entry_slow_offset;
 	data = __containerof(data, struct tramp_header, entry);
 
 	for (page = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);
@@ -1643,11 +1664,16 @@ tramp_reflect(const void *data)
 		ret = cheri_buildcap(page, (uintptr_t)data);
 		if (!cheri_gettag(ret))
 			continue;
-		if (cheri_gettag(ret->defobj))
+		/*
+		 * INVARIANT: The rederived pointer never points to before the
+		 * actual trampoline header.
+		 */
+		if (__is_aligned(ret, _Alignof(typeof(*ret))) &&
+		    cheri_gettag(ret->defobj))
 			/*
-			 * At this point, the provided data must have been (a)
-			 * tagged and (b) pointing to the entry point of a
-			 * trampoline.
+			 * If the rederived pointer is correctly aligned and
+			 * the `defobj` field is tagged, then it must point to
+			 * the actual trampoline header.
 			 */
 			return (ret);
 		else {
