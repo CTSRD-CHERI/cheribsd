@@ -931,33 +931,6 @@ freebsd64_kenv(struct thread *td, struct freebsd64_kenv_args *uap)
 	    USER_PTR_STR(uap->value), uap->len));
 }
 
-int
-freebsd64_kbounce(struct thread *td, struct freebsd64_kbounce_args *uap)
-{
-	void * bounce;
-	void *dst = USER_PTR(uap->dst, uap->len);
-	const void *src = USER_PTR(uap->src, uap->len);
-	size_t len = uap->len;
-	int flags = uap->flags;
-	int error;
-
-	if (len > IOSIZE_MAX)
-		return (EINVAL);
-	if (flags != 0)
-		return (EINVAL);
-	if (src == NULL || dst == NULL)
-		return (EINVAL);
-
-	bounce = malloc(len, M_TEMP, M_WAITOK);
-	error = copyin(src, bounce, len);
-	if (error != 0)
-		goto error;
-	error = copyout(bounce, dst, len);
-error:
-	free(bounce, M_TEMP);
-	return (error);
-}
-
 /*
  * audit_syscalls.c
  */

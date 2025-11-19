@@ -213,6 +213,7 @@ typedef int (__sys_ntp_gettime_t)(struct ntptimeval *);
 typedef int (__sys_minherit_t)(void *, size_t, int);
 typedef int (__sys_rfork_t)(int);
 typedef int (__sys_issetugid_t)(void);
+<<<<<<< HEAD
 typedef int (__sys_lchown_t)(const char *, int, int);
 typedef int (__sys_aio_read_t)(struct aiocb *);
 typedef int (__sys_aio_write_t)(struct aiocb *);
@@ -226,6 +227,20 @@ typedef int (__sys_lutimes_t)(const char *, const struct timeval *);
 typedef ssize_t (__sys_preadv_t)(int, struct iovec *, u_int, off_t);
 typedef ssize_t (__sys_pwritev_t)(int, struct iovec *, u_int, off_t);
 typedef int (__sys_fhopen_t)(const struct fhandle *, int);
+=======
+typedef int (__sys_lchown_t)(const char * __kerncap, int, int);
+typedef int (__sys_aio_read_t)(struct aiocb * __kerncap);
+typedef int (__sys_aio_write_t)(struct aiocb * __kerncap);
+typedef int (__sys_lio_listio_t)(int, struct aiocb * __kerncap const * __kerncap, int, struct sigevent * __kerncap);
+typedef int (__sys_cheri_revoke_get_shadow_t)(int, void * __kerncap, void * __kerncap);
+typedef void * (__sys_cheri_revoke_t)(int, uint64_t, struct cheri_revoke_syscall_info * __kerncap);
+typedef int (__sys_msetname_t)(void * __kerncap, size_t, const char * __kerncap);
+typedef int (__sys_lchmod_t)(const char * __kerncap, mode_t);
+typedef int (__sys_lutimes_t)(const char * __kerncap, const struct timeval * __kerncap);
+typedef ssize_t (__sys_preadv_t)(int, struct iovec * __kerncap, u_int, off_t);
+typedef ssize_t (__sys_pwritev_t)(int, struct iovec * __kerncap, u_int, off_t);
+typedef int (__sys_fhopen_t)(const struct fhandle * __kerncap, int);
+>>>>>>> 7cec3ca5d0 (Remove kbounce(2))
 typedef int (__sys_modnext_t)(int);
 typedef int (__sys_modstat_t)(int, struct module_stat *);
 typedef int (__sys_modfnext_t)(int);
@@ -622,6 +637,7 @@ int __sys_ntp_gettime(struct ntptimeval * ntvp);
 int __sys_minherit(void * addr, size_t len, int inherit);
 int __sys_rfork(int flags);
 int __sys_issetugid(void);
+<<<<<<< HEAD
 int __sys_lchown(const char * path, int uid, int gid);
 int __sys_aio_read(struct aiocb * aiocbp);
 int __sys_aio_write(struct aiocb * aiocbp);
@@ -635,6 +651,20 @@ int __sys_lutimes(const char * path, const struct timeval * tptr);
 ssize_t __sys_preadv(int fd, struct iovec * iovp, u_int iovcnt, off_t offset);
 ssize_t __sys_pwritev(int fd, struct iovec * iovp, u_int iovcnt, off_t offset);
 int __sys_fhopen(const struct fhandle * u_fhp, int flags);
+=======
+int __sys_lchown(const char * __kerncap path, int uid, int gid);
+int __sys_aio_read(struct aiocb * __kerncap aiocbp);
+int __sys_aio_write(struct aiocb * __kerncap aiocbp);
+int __sys_lio_listio(int mode, struct aiocb * __kerncap const * __kerncap acb_list, int nent, struct sigevent * __kerncap sig);
+int __sys_cheri_revoke_get_shadow(int flags, void * __kerncap arena, void * __kerncap shadow);
+void * __sys_cheri_revoke(int flags, uint64_t start_epoch, struct cheri_revoke_syscall_info * __kerncap crsi);
+int __sys_msetname(void * __kerncap addr, size_t len, const char * __kerncap name);
+int __sys_lchmod(const char * __kerncap path, mode_t mode);
+int __sys_lutimes(const char * __kerncap path, const struct timeval * __kerncap tptr);
+ssize_t __sys_preadv(int fd, struct iovec * __kerncap iovp, u_int iovcnt, off_t offset);
+ssize_t __sys_pwritev(int fd, struct iovec * __kerncap iovp, u_int iovcnt, off_t offset);
+int __sys_fhopen(const struct fhandle * __kerncap u_fhp, int flags);
+>>>>>>> 7cec3ca5d0 (Remove kbounce(2))
 int __sys_modnext(int modid);
 int __sys_modstat(int modid, struct module_stat * stat);
 int __sys_modfnext(int modid);

@@ -1298,6 +1298,7 @@ systrace_args(int sysnum, void *params, uintptr_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
+<<<<<<< HEAD
 	/* kbounce */
 	case 258: {
 		struct kbounce_args *p = params;
@@ -1308,6 +1309,8 @@ systrace_args(int sysnum, void *params, uintptr_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
+=======
+>>>>>>> 7cec3ca5d0 (Remove kbounce(2))
 	/* flag_captured */
 	case 259: {
 		struct flag_captured_args *p = params;
@@ -5602,6 +5605,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+<<<<<<< HEAD
 	/* kbounce */
 	case 258:
 		switch (ndx) {
@@ -5621,6 +5625,8 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+=======
+>>>>>>> 7cec3ca5d0 (Remove kbounce(2))
 	/* flag_captured */
 	case 259:
 		switch (ndx) {
@@ -10257,11 +10263,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* lio_listio */
 	case 257:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
-	/* kbounce */
-	case 258:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
