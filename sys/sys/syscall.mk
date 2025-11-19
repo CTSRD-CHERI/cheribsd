@@ -170,7 +170,6 @@ MIASM =  \
 	aio_read.o \
 	aio_write.o \
 	lio_listio.o \
-	kbounce.o \
 	cheri_revoke_get_shadow.o \
 	cheri_revoke.o \
 	freebsd11_getdents.o \

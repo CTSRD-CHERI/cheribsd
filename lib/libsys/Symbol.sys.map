@@ -346,7 +346,6 @@ FBSD_1.5 {
 	getdirentries;
 	getfsstat;
 	getrandom;
-	kbounce;
 	mknodat;
 	statfs;
 	cpuset_getdomain;
