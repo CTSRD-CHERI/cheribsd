@@ -1844,7 +1844,6 @@ struct cpuset_args {
 int
 sys_cpuset(struct thread *td, struct cpuset_args *uap)
 {
-
 	return (kern_cpuset(td, uap->setid));
 }
 
@@ -1880,7 +1879,6 @@ struct cpuset_setid_args {
 int
 sys_cpuset_setid(struct thread *td, struct cpuset_setid_args *uap)
 {
-
 	return (kern_cpuset_setid(td, uap->which, uap->id, uap->setid));
 }
 
@@ -1915,7 +1913,6 @@ struct cpuset_getid_args {
 int
 sys_cpuset_getid(struct thread *td, struct cpuset_getid_args *uap)
 {
-
 	return (kern_cpuset_getid(td, uap->level, uap->which, uap->id,
 	    uap->setid));
 }
@@ -1983,7 +1980,6 @@ struct cpuset_getaffinity_args {
 int
 sys_cpuset_getaffinity(struct thread *td, struct cpuset_getaffinity_args *uap)
 {
-
 	return (user_cpuset_getaffinity(td, uap->level, uap->which,
 	    uap->id, uap->cpusetsize, uap->mask, &copy_set));
 }
@@ -2130,7 +2126,6 @@ struct cpuset_setaffinity_args {
 int
 sys_cpuset_setaffinity(struct thread *td, struct cpuset_setaffinity_args *uap)
 {
-
 	return (user_cpuset_setaffinity(td, uap->level, uap->which,
 	    uap->id, uap->cpusetsize, uap->mask, &copy_set));
 }
@@ -2282,7 +2277,6 @@ struct cpuset_getdomain_args {
 int
 sys_cpuset_getdomain(struct thread *td, struct cpuset_getdomain_args *uap)
 {
-
 	return (kern_cpuset_getdomain(td, uap->level, uap->which,
 	    uap->id, uap->domainsetsize, uap->mask, uap->policy, &copy_set));
 }
@@ -2410,7 +2404,6 @@ struct cpuset_setdomain_args {
 int
 sys_cpuset_setdomain(struct thread *td, struct cpuset_setdomain_args *uap)
 {
-
 	return (kern_cpuset_setdomain(td, uap->level, uap->which,
 	    uap->id, uap->domainsetsize, uap->mask, uap->policy, &copy_set));
 }
