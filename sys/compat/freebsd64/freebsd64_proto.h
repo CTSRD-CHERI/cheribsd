@@ -504,10 +504,6 @@ struct freebsd64_lio_listio_args {
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char sig_l_[PADL_(struct sigevent64 *)]; struct sigevent64 * sig; char sig_r_[PADR_(struct sigevent64 *)];
 };
-struct freebsd64_flag_captured_args {
-	char message_l_[PADL_(const char *)]; const char * message; char message_r_[PADR_(const char *)];
-	char key_l_[PADL_(uint32_t)]; uint32_t key; char key_r_[PADR_(uint32_t)];
-};
 struct freebsd64_lchmod_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
@@ -1623,7 +1619,6 @@ int	freebsd64_lchown(struct thread *, struct freebsd64_lchown_args *);
 int	freebsd64_aio_read(struct thread *, struct freebsd64_aio_read_args *);
 int	freebsd64_aio_write(struct thread *, struct freebsd64_aio_write_args *);
 int	freebsd64_lio_listio(struct thread *, struct freebsd64_lio_listio_args *);
-int	freebsd64_flag_captured(struct thread *, struct freebsd64_flag_captured_args *);
 int	freebsd64_lchmod(struct thread *, struct freebsd64_lchmod_args *);
 int	freebsd64_lutimes(struct thread *, struct freebsd64_lutimes_args *);
 int	freebsd64_preadv(struct thread *, struct freebsd64_preadv_args *);
@@ -2178,7 +2173,6 @@ int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swap
 #define	FREEBSD64_SYS_AUE_freebsd64_aio_read	AUE_AIO_READ
 #define	FREEBSD64_SYS_AUE_freebsd64_aio_write	AUE_AIO_WRITE
 #define	FREEBSD64_SYS_AUE_freebsd64_lio_listio	AUE_LIO_LISTIO
-#define	FREEBSD64_SYS_AUE_freebsd64_flag_captured	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd11_freebsd64_getdents	AUE_O_GETDENTS
 #define	FREEBSD64_SYS_AUE_freebsd64_lchmod	AUE_LCHMOD
 #define	FREEBSD64_SYS_AUE_freebsd64_lutimes	AUE_LUTIMES

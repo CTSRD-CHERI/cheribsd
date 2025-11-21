@@ -234,7 +234,6 @@
 #define	FREEBSD64_SYS_freebsd64_aio_read	255
 #define	FREEBSD64_SYS_freebsd64_aio_write	256
 #define	FREEBSD64_SYS_freebsd64_lio_listio	257
-#define	FREEBSD64_SYS_freebsd64_flag_captured	259
 #define	FREEBSD64_SYS_freebsd11_freebsd64_getdents	272
 #define	FREEBSD64_SYS_freebsd64_lchmod	274
 				/* 275 is obsolete netbsd_lchown */

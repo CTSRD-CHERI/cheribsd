@@ -707,10 +707,6 @@ struct lio_listio_args {
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char sig_l_[PADL_(struct sigevent *)]; struct sigevent * sig; char sig_r_[PADR_(struct sigevent *)];
 };
-struct flag_captured_args {
-	char message_l_[PADL_(const char *)]; const char * message; char message_r_[PADR_(const char *)];
-	char key_l_[PADL_(uint32_t)]; uint32_t key; char key_r_[PADR_(uint32_t)];
-};
 struct cheri_revoke_get_shadow_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 	char arena_l_[PADL_(void *)]; void * arena; char arena_r_[PADR_(void *)];
@@ -2060,7 +2056,6 @@ int	sys_lchown(struct thread *, struct lchown_args *);
 int	sys_aio_read(struct thread *, struct aio_read_args *);
 int	sys_aio_write(struct thread *, struct aio_write_args *);
 int	sys_lio_listio(struct thread *, struct lio_listio_args *);
-int	sys_flag_captured(struct thread *, struct flag_captured_args *);
 int	sys_cheri_revoke_get_shadow(struct thread *, struct cheri_revoke_get_shadow_args *);
 int	sys_cheri_revoke(struct thread *, struct cheri_revoke_args *);
 int	sys_lchmod(struct thread *, struct lchmod_args *);
@@ -3022,7 +3017,6 @@ int	freebsd13_swapoff(struct thread *, struct freebsd13_swapoff_args *);
 #define	SYS_AUE_aio_read	AUE_AIO_READ
 #define	SYS_AUE_aio_write	AUE_AIO_WRITE
 #define	SYS_AUE_lio_listio	AUE_LIO_LISTIO
-#define	SYS_AUE_flag_captured	AUE_NULL
 #define	SYS_AUE_cheri_revoke_get_shadow	AUE_NULL
 #define	SYS_AUE_cheri_revoke	AUE_NULL
 #define	SYS_AUE_freebsd11_getdents	AUE_O_GETDENTS
