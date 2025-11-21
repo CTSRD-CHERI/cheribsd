@@ -161,13 +161,12 @@ kenv_dump(struct thread *td, char **envp, int what, char *value, int len)
 int
 sys_kenv(struct thread *td, struct kenv_args *uap)
 {
-
 	return (kern_kenv(td, uap->what, uap->name, uap->value, uap->len));
 }
 
 int
-kern_kenv(struct thread *td, int what, const char *namep,
-    char *val, int vallen)
+kern_kenv(struct thread *td, int what, const char *namep, char *u_val,
+    int u_len)
 {
 	char *name, *value;
 	size_t len;
@@ -184,7 +183,7 @@ kern_kenv(struct thread *td, int what, const char *namep,
 		if (error)
 			return (error);
 #endif
-		return (kenv_dump(td, kenvp, what, val, vallen));
+		return (kenv_dump(td, kenvp, what, u_val, u_len));
 	case KENV_DUMP_LOADER:
 	case KENV_DUMP_STATIC:
 #ifdef MAC
@@ -195,7 +194,7 @@ kern_kenv(struct thread *td, int what, const char *namep,
 #ifdef PRESERVE_EARLY_KENV
 		return (kenv_dump(td,
 		    what == KENV_DUMP_LOADER ? (char **)md_envp :
-		    (char **)kern_envp, what, value, vallen));
+		    (char **)kern_envp, what, u_val, u_len));
 #else
 		return (ENOENT);
 #endif
@@ -231,16 +230,16 @@ kern_kenv(struct thread *td, int what, const char *namep,
 			goto done;
 		}
 		len = strlen(value) + 1;
-		if (len > vallen)
-			len = vallen;
-		error = copyout(value, val, len);
+		if (len > u_len)
+			len = u_len;
+		error = copyout(value, u_val, len);
 		freeenv(value);
 		if (error)
 			goto done;
 		td->td_retval[0] = len;
 		break;
 	case KENV_SET:
-		len = vallen;
+		len = u_len;
 		if (len < 1) {
 			error = EINVAL;
 			goto done;
@@ -248,7 +247,7 @@ kern_kenv(struct thread *td, int what, const char *namep,
 		if (len > kenv_mvallen + 1)
 			len = kenv_mvallen + 1;
 		value = malloc(len, M_TEMP, M_WAITOK);
-		error = copyinstr(val, value, len, NULL);
+		error = copyinstr(u_val, value, len, NULL);
 		if (error) {
 			free(value, M_TEMP);
 			goto done;
