@@ -112,6 +112,11 @@ int	kern___acl_set_fd(struct thread *td, int filedes, acl_type_t type,
 int	kern___acl_set_path(struct thread *td, const char *path,
 	    acl_type_t type, const struct acl *aclp, int follow);
 int	kern___getcwd(struct thread *td, char *buf, size_t buflen);
+int	kern___mac_get_fd(struct thread *td, int fd, void *mac_p);
+int	kern___mac_get_pid(struct thread *td, pid_t pid, void *mac_p);
+int	kern___mac_get_proc(struct thread *td, void *mac_p);
+int	kern___mac_set_fd(struct thread *td, int fd, void *mac_p);
+int	kern___mac_set_proc(struct thread *td, void *mac_p);
 int	kern___realpathat(struct thread *td, int fd, const char *path,
 	    char *buf, size_t size, int flags, enum uio_seg pathseg);
 int	kern_abort2(struct thread *td, const char *why, int nargs,
@@ -307,15 +312,10 @@ int	kern_listen(struct thread *td, int s, int backlog);
 int	kern_lseek(struct thread *td, int fd, off_t offset, int whence);
 int	kern_lutimes(struct thread *td, const char *path, enum uio_seg pathseg,
 	    const struct timeval *tptr, enum uio_seg tptrseg);
-int	kern_mac_get_fd(struct thread *td, int fd, void *mac_p);
-int	kern_mac_get_pid(struct thread *td, pid_t pid, void *mac_p);
 int	kern_mac_get_path(struct thread *td, const char *path_p, void *mac_p,
 	    int follow);
-int	kern_mac_get_proc(struct thread *td, void *mac_p);
-int	kern_mac_set_fd(struct thread *td, int fd, void *mac_p);
 int	kern_mac_set_path(struct thread *td, const char *path_p, void *mac_p,
 	    int follow);
-int	kern_mac_set_proc(struct thread *td, void *mac_p);
 int	kern_mac_syscall(struct thread *td, const char *policy, int call,
 	    void *arg);
 int	kern_madvise(struct thread *td, uintptr_t addr, size_t len, int behav);

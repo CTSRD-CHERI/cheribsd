@@ -52,28 +52,28 @@ int
 freebsd64___mac_get_pid(struct thread *td,
     struct freebsd64___mac_get_pid_args *uap)
 {
-	return (kern_mac_get_pid(td, uap->pid, USER_PTR_OBJ(uap->mac_p)));
+	return (kern___mac_get_pid(td, uap->pid, USER_PTR_OBJ(uap->mac_p)));
 }
 
 int
 freebsd64___mac_get_proc(struct thread *td,
     struct freebsd64___mac_get_proc_args *uap)
 {
-	return (kern_mac_get_proc(td, USER_PTR_OBJ(uap->mac_p)));
+	return (kern___mac_get_proc(td, USER_PTR_OBJ(uap->mac_p)));
 }
 
 int
 freebsd64___mac_set_proc(struct thread *td,
     struct freebsd64___mac_set_proc_args *uap)
 {
-	return (kern_mac_set_proc(td, USER_PTR_OBJ(uap->mac_p)));
+	return (kern___mac_set_proc(td, USER_PTR_OBJ(uap->mac_p)));
 }
 
 int
 freebsd64___mac_get_fd(struct thread *td,
     struct freebsd64___mac_get_fd_args *uap)
 {
-	return (kern_mac_get_fd(td, uap->fd, USER_PTR_OBJ(uap->mac_p)));
+	return (kern___mac_get_fd(td, uap->fd, USER_PTR_OBJ(uap->mac_p)));
 }
 
 int
@@ -96,7 +96,7 @@ int
 freebsd64___mac_set_fd(struct thread *td,
     struct freebsd64___mac_set_fd_args *uap)
 {
-	return (kern_mac_set_fd(td, uap->fd, USER_PTR_OBJ(uap->mac_p)));
+	return (kern___mac_set_fd(td, uap->fd, USER_PTR_OBJ(uap->mac_p)));
 }
 
 int

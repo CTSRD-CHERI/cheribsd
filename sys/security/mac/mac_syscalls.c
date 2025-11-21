@@ -121,11 +121,11 @@ free_copied_label(const struct mac *const mac)
 int
 sys___mac_get_pid(struct thread *td, struct __mac_get_pid_args *uap)
 {
-	return (kern_mac_get_pid(td, uap->pid, uap->mac_p));
+	return (kern___mac_get_pid(td, uap->pid, uap->mac_p));
 }
 
 int
-kern_mac_get_pid(struct thread *td, pid_t pid, void *mac_p)
+kern___mac_get_pid(struct thread *td, pid_t pid, void *mac_p)
 {
 	char *buffer, *u_buffer;
 	struct mac mac;
@@ -167,11 +167,11 @@ free_mac_and_exit:
 int
 sys___mac_get_proc(struct thread *td, struct __mac_get_proc_args *uap)
 {
-	return (kern_mac_get_proc(td, uap->mac_p));
+	return (kern___mac_get_proc(td, uap->mac_p));
 }
 
 int
-kern_mac_get_proc(struct thread *td, void *mac_p)
+kern___mac_get_proc(struct thread *td, void *mac_p)
 {
 	char *buffer, *u_buffer;
 	struct mac mac;
@@ -276,11 +276,11 @@ mac_set_proc_finish(struct thread *const td, bool proc_label_set,
 int
 sys___mac_set_proc(struct thread *td, struct __mac_set_proc_args *uap)
 {
-	return (kern_mac_set_proc(td, uap->mac_p));
+	return (kern___mac_set_proc(td, uap->mac_p));
 }
 
 int
-kern_mac_set_proc(struct thread *td, void *mac_p)
+kern___mac_set_proc(struct thread *td, void *mac_p)
 {
 	struct ucred *newcred, *oldcred;
 	void *intlabel;
@@ -324,11 +324,11 @@ free_label:
 int
 sys___mac_get_fd(struct thread *td, struct __mac_get_fd_args *uap)
 {
-	return (kern_mac_get_fd(td, uap->fd, uap->mac_p));
+	return (kern___mac_get_fd(td, uap->fd, uap->mac_p));
 }
 
 int
-kern_mac_get_fd(struct thread *td, int fd, void *mac_p)
+kern___mac_get_fd(struct thread *td, int fd, void *mac_p)
 {
 	char *u_buffer, *buffer;
 	struct label *intlabel;
@@ -465,11 +465,11 @@ out:
 int
 sys___mac_set_fd(struct thread *td, struct __mac_set_fd_args *uap)
 {
-	return (kern_mac_set_fd(td, uap->fd, uap->mac_p));
+	return (kern___mac_set_fd(td, uap->fd, uap->mac_p));
 }
 
 int
-kern_mac_set_fd(struct thread *td, int fd, void *mac_p)
+kern___mac_set_fd(struct thread *td, int fd, void *mac_p)
 {
 	struct label *intlabel;
 	struct pipe *pipe;

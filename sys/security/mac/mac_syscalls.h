@@ -19,8 +19,8 @@
 #error "no user-serviceable parts inside"
 #endif
 
-int	mac_label_copyin(const struct mac *const __capability u_mac,
-	    struct mac *const mac, char * __capability *const u_string);
+int	mac_label_copyin(const struct mac *const u_mac,
+	    struct mac *const mac, char **const u_string);
 void	free_copied_label(const struct mac *const mac);
 
 int	mac_set_proc_prepare(struct thread *const td,
