@@ -68,7 +68,6 @@
 int
 sys_audit(struct thread *td, struct audit_args *uap)
 {
-
 	return (kern_audit(td, uap->record, uap->length));
 }
 
@@ -168,7 +167,6 @@ free_out:
 int
 sys_auditon(struct thread *td, struct auditon_args *uap)
 {
-
 	return (kern_auditon(td, uap->cmd, uap->data, uap->length));
 }
 
@@ -605,7 +603,6 @@ kern_auditon(struct thread *td, int cmd, void *data, u_int length)
 int
 sys_getauid(struct thread *td, struct getauid_args *uap)
 {
-
 	return (kern_getauid(td, uap->auid));
 }
 
@@ -627,7 +624,6 @@ kern_getauid(struct thread *td, uid_t *auid)
 int
 sys_setauid(struct thread *td, struct setauid_args *uap)
 {
-
 	return (kern_setauid(td, uap->auid));
 }
 
@@ -674,7 +670,6 @@ fail:
 int
 sys_getaudit(struct thread *td, struct getaudit_args *uap)
 {
-
 	return (kern_getaudit(td, uap->auditinfo));
 }
 
@@ -706,7 +701,6 @@ kern_getaudit(struct thread *td, struct auditinfo *auditinfo)
 int
 sys_setaudit(struct thread *td, struct setaudit_args *uap)
 {
-
 	return (kern_setaudit(td, uap->auditinfo));
 }
 
@@ -756,7 +750,6 @@ fail:
 int
 sys_getaudit_addr(struct thread *td, struct getaudit_addr_args *uap)
 {
-
 	return (kern_getaudit_addr(td, uap->auditinfo_addr, uap->length));
 }
 
@@ -781,7 +774,6 @@ kern_getaudit_addr(struct thread *td,
 int
 sys_setaudit_addr(struct thread *td, struct setaudit_addr_args *uap)
 {
-
 	return (kern_setaudit_addr(td, uap->auditinfo_addr, uap->length));
 }
 
@@ -832,7 +824,6 @@ fail:
 int
 sys_auditctl(struct thread *td, struct auditctl_args *uap)
 {
-
 	return (kern_auditctl(td, uap->path));
 }
 
