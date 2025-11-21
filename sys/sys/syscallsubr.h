@@ -224,8 +224,6 @@ int	kern_fhreadlink(struct thread *td, fhandle_t *fhp, char *buf,
 	    size_t bufsize);
 int	kern_fhstat(struct thread *td, fhandle_t fh, struct stat *buf);
 int	kern_fhstatfs(struct thread *td, fhandle_t fh, struct statfs *buf);
-int	kern_flag_captured(struct thread *td, const char *message,
-	    uint32_t key, const char *source);
 int	kern_fpathconf(struct thread *td, int fd, int name, long *valuep);
 int	kern_freebsd11_getfsstat(struct thread *td,
 	    struct freebsd11_statfs *ubuf, long bufsize, int mode);
