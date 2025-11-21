@@ -701,12 +701,3 @@ unsigned int		 if_nametoindex(const char *);
 __END_DECLS
 #endif
 #endif /* !_NET_IF_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "header",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END
