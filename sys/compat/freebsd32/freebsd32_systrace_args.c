@@ -1278,14 +1278,6 @@ systrace_args(int sysnum, void *params, uintptr_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* flag_captured */
-	case 259: {
-		struct flag_captured_args *p = params;
-		uarg[a++] = (intptr_t)p->message; /* const char * */
-		uarg[a++] = p->key; /* uint32_t */
-		*n_args = 2;
-		break;
-	}
 	/* lchmod */
 	case 274: {
 		struct lchmod_args *p = params;
@@ -5411,19 +5403,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 3:
 			p = "userland struct sigevent32 *";
-			break;
-		default:
-			break;
-		};
-		break;
-	/* flag_captured */
-	case 259:
-		switch (ndx) {
-		case 0:
-			p = "userland const char *";
-			break;
-		case 1:
-			p = "uint32_t";
 			break;
 		default:
 			break;
@@ -9922,11 +9901,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* freebsd32_lio_listio */
 	case 257:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
-	/* flag_captured */
-	case 259:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

@@ -1488,12 +1488,7 @@
 		);
 	}
 258	AUE_NULL	RESERVED
-259	AUE_NULL	STD|NOLIB {
-		int flag_captured(
-		    _In_z_ const char *message,
-		    uint32_t key
-		);
-	}
+259	AUE_NULL	RESERVED
 260	AUE_NULL	STD|CAPENABLED	{
 		int cheri_revoke_get_shadow(
 			int flags,
