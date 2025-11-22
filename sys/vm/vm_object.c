@@ -2018,7 +2018,7 @@ vm_object_page_remove(vm_object_t object, vm_pindex_t start, vm_pindex_t end,
 	    (options & (OBJPR_CLEANONLY | OBJPR_NOTMAPPED)) == OBJPR_NOTMAPPED,
 	    ("vm_object_page_remove: illegal options for object %p", object));
 	if (object->resident_page_count == 0)
-		return;
+		goto remove_pager;
 	vm_object_pip_add(object, 1);
 	vm_page_iter_limit_init(&pages, object, end);
 again:
@@ -2091,6 +2091,7 @@ wired:
 	}
 	vm_object_pip_wakeup(object);
 
+remove_pager:
 	vm_pager_freespace(object, start, (end == 0 ? object->size : end) -
 	    start);
 }
