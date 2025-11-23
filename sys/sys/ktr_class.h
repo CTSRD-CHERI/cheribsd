@@ -75,6 +75,10 @@
 #define	KTR_PTRACE	0x80000000		/* Process debugging. */
 #define	KTR_ALL		0xffffffff
 
+#ifdef CHERI_CAPREVOKE_KERNEL
+#define	KTR_CAPREVOKE	KTR_SPARE5
+#endif
+
 /* KTR trace classes to compile in */
 #ifdef KTR
 #ifndef KTR_COMPILE

@@ -168,16 +168,22 @@ void cheri_revoke_vmspace_fork(struct vmspace *dst, struct vmspace *src);
 extern struct vm_object kernel_shadow_object_store;
 #define	kernel_shadow_object (&kernel_shadow_object_store)
 
+/* Note: this is protected by the kernel_map lock. */
 extern struct cheri_revoke_info kernel_revoke_info_store;
 #define	kernel_revoke_info (&kernel_revoke_info_store)
 
 /* Root capability for the kernel shadow bitmap */
 extern void *kernel_shadow_root_cap;
 
+/* Sync CPUs reaching the trapframe revocation barrier. */
+extern volatile int kmem_revoke_barrier;
+extern volatile int kmem_revoke_release;
+
 void kmem_cheri_revoke_init(void);
 int kmem_quarantine(void *mem, size_t size);
-void kmem_revoke(void);
+cheri_revoke_epoch_t kmem_revoke(void);
 void kmem_shadow_map(vm_offset_t addr, size_t size);
+void kmem_wait_epoch_clears(cheri_revoke_epoch_t epoch);
 
 /* MD interface */
 bool kmem_shadow_set_first_word(uint64_t *shadow, void *obj, uint64_t mask);
