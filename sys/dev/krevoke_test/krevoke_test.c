@@ -87,7 +87,7 @@ test_uma_krevoke_zone(uma_zone_t zone)
  * fail otherwise.
  */
 static int
-krevoke_test_handler(SYSCTL_HANDLER_ARGS)
+uma_krevoke_test_handler(SYSCTL_HANDLER_ARGS)
 {
 	bool fail = false;
 	int error = 0;
@@ -114,9 +114,9 @@ krevoke_test_handler(SYSCTL_HANDLER_ARGS)
 SYSCTL_NODE(_debug, OID_AUTO, krevoke, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "krevoke debug namespace");
 
-SYSCTL_PROC(_debug_krevoke, OID_AUTO, krevoke_test,
+SYSCTL_PROC(_debug_krevoke, OID_AUTO, uma_test,
     CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
-    NULL, 0, krevoke_test_handler, "I", "Trigger krevoke test");
+    NULL, 0, uma_krevoke_test_handler, "I", "Trigger krevoke test");
 
 
 static int
