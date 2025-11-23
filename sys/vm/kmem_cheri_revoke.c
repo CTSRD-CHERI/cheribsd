@@ -245,8 +245,8 @@ kmem_revoke_kproc(void *arg __unused)
 		 * Update CLG
 		 * Note: we reuse the kernel pmap uclg.
 		 */
-		/* pmap_caploadgen_next(kernel_pmap); */
-		/* pmap_update_kernel_clg(kernel_pmap); */
+		pmap_caploadgen_next(kernel_pmap);
+		pmap_update_clg(kernel_pmap);
 #ifdef SMP
 		atomic_add_int(&kmem_revoke_release, mp_ncpus);
 #endif
