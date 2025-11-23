@@ -6412,15 +6412,21 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 }
 
 #if __has_feature(capabilities)
-static inline void
-pmap_update_user_clg(pmap_t pmap)
+void
+pmap_update_clg(pmap_t pmap)
 {
+	uint64_t tgen_mask = CCTLR_EL1_TGEN0_MASK;
+#ifdef CHERI_CAPREVOKE_KERNEL
+	if (pmap == kernel_pmap) {
+		tgen_mask = CCTLR_EL1_TGEN1_MASK;
+	}
+#endif
 	if (pmap->flags.uclg) {
 		WRITE_SPECIALREG(cctlr_el1,
-		    READ_SPECIALREG(cctlr_el1) | CCTLR_EL1_TGEN0_MASK);
+		    READ_SPECIALREG(cctlr_el1) | tgen_mask);
 	} else {
 		WRITE_SPECIALREG(cctlr_el1,
-		    READ_SPECIALREG(cctlr_el1) & ~CCTLR_EL1_TGEN0_MASK);
+		    READ_SPECIALREG(cctlr_el1) & ~tgen_mask);
 	}
 }
 
@@ -7066,19 +7072,6 @@ pmap_krevoke_shadow_enter(vm_offset_t va)
 	KASSERT((pmap_load(l2) & ATTR_DESCR_MASK) == L2_BLOCK,
 	    ("Unexpected shadow bitmap L2 PTE entry: %lx", pmap_load(l2)));
 }
-
-void
-pmap_update_kernel_clg(pmap_t pmap)
-{
-	if (pmap->flags.uclg) {
-		WRITE_SPECIALREG(cctlr_el1,
-		    READ_SPECIALREG(cctlr_el1) | CCTLR_EL1_TGEN1_MASK);
-	} else {
-		WRITE_SPECIALREG(cctlr_el1,
-		    READ_SPECIALREG(cctlr_el1) & ~CCTLR_EL1_TGEN1_MASK);
-	}
-}
-
 #endif /* CHERI_CAPREVOKE_KERNEL*/
 #endif /* CHERI_CAPREVOKE */
 #endif /* __has_feature(capabilities) */
@@ -9869,7 +9862,7 @@ pmap_activate_int(pmap_t pmap)
 	    (pmap->pm_stage == PM_STAGE2 && pmap == PCPU_GET(curvmpmap))) {
 #if __has_feature(capabilities)
 		if (pmap->pm_stage == PM_STAGE1)
-			pmap_update_user_clg(pmap);
+			pmap_update_clg(pmap);
 #endif
 		/*
 		 * Handle the possibility that the old thread was preempted
@@ -9893,7 +9886,7 @@ pmap_activate_int(pmap_t pmap)
 	if (pmap->pm_stage == PM_STAGE1) {
 		PCPU_SET(curpmap, pmap);
 #if __has_feature(capabilities)
-		pmap_update_user_clg(pmap);
+		pmap_update_clg(pmap);
 #endif
 	} else
 		PCPU_SET(curvmpmap, pmap);
