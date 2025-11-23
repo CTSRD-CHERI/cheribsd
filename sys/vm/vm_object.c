@@ -147,10 +147,6 @@ struct object_q vm_object_list;
 struct mtx vm_object_list_mtx;	/* lock for object list and count */
 
 struct vm_object kernel_object_store;
-#ifdef CHERI_CAPREVOKE_KERNEL
-/* Kernel shadow bitmap */
-struct vm_object kernel_shadow_object_store;
-#endif
 
 static SYSCTL_NODE(_vm_stats, OID_AUTO, object, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "VM object stats");
@@ -296,30 +292,6 @@ vm_object_init(void)
 #endif
 	kernel_object->un_pager.phys.ops = &default_phys_pg_ops;
 	vm_object_set_flag(kernel_object, OBJ_HASCAP);
-
-#ifdef CHERI_CAPREVOKE_KERNEL
-	/*
-	 * Initialize the kernel shadow-bitmap object.
-	 * This needs to live here so that we can reuse the internal
-	 * initalization functions.
-	 *
-	 * XXX do we use OBJ_SWAP or OBJ_PHYS here?
-	 * Note that this assumes that the kernel memory size is representable.
-	 */
-	rw_init(&kernel_shadow_object->lock, "kernel revoker shadow object");
-	vm_radix_init(&kernel_shadow_object->rtree);
-	_vm_object_allocate(OBJT_PHYS, atop(CHERI_REVOKE_KSHADOW_MAX -
-	    CHERI_REVOKE_KSHADOW_MIN), OBJ_UNMANAGED, kernel_shadow_object,
-	    NULL);
-#if VM_NRESERVLEVEL > 0
-	// XXX is coloring a thing for the shadow bitmap?
-	/* kernel_shadow_object->flags |= OBJ_COLORED; */
-	/* kernel_shadow_object->pg_color = (u_short)atop(VM_MIN_KERNEL_ADDRESS); */
-#endif
-	kernel_shadow_object->un_pager.phys.ops = &default_phys_pg_ops;
-	vm_object_set_flag(kernel_shadow_object, OBJ_NOCAP);
-	vm_object_set_flag(kernel_shadow_object, OBJ_CHERISHADOW);
-#endif
 
 	/*
 	 * The lock portion of struct vm_object must be type stable due

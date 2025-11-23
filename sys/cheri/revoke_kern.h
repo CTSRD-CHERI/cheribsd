@@ -165,9 +165,6 @@ struct vmspace;
 void cheri_revoke_vmspace_fork(struct vmspace *dst, struct vmspace *src);
 
 #ifdef CHERI_CAPREVOKE_KERNEL
-extern struct vm_object kernel_shadow_object_store;
-#define	kernel_shadow_object (&kernel_shadow_object_store)
-
 /* Note: this is protected by the kernel_map lock. */
 extern struct cheri_revoke_info kernel_revoke_info_store;
 #define	kernel_revoke_info (&kernel_revoke_info_store)
