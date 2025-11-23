@@ -75,6 +75,10 @@
 #include <dev/ofw/ofw_cpu.h>
 #endif
 
+#ifdef CHERI_CAPREVOKE_KERNEL
+#include <cheri/revoke_kern.h>
+#endif
+
 #include <dev/psci/psci.h>
 
 #define	MP_BOOTSTACK_SIZE	(kstack_pages * PAGE_SIZE)
@@ -101,6 +105,9 @@ static void ipi_hardclock(void *);
 static void ipi_preempt(void *);
 static void ipi_rendezvous(void *);
 static void ipi_stop(void *);
+#ifdef CHERI_CAPREVOKE_KERNEL
+static void ipi_kernel_revoke(void *);
+#endif
 
 #ifdef FDT
 static u_int fdt_cpuid;
@@ -152,6 +159,10 @@ release_aps(void *dummy __unused)
 	intr_ipi_setup(IPI_STOP, "stop", ipi_stop, NULL);
 	intr_ipi_setup(IPI_STOP_HARD, "stop hard", ipi_stop, NULL);
 	intr_ipi_setup(IPI_HARDCLOCK, "hardclock", ipi_hardclock, NULL);
+#ifdef CHERI_CAPREVOKE_KERNEL
+	intr_ipi_setup(IPI_KERNEL_REVOKE_BARRIER, "krevoke barrier",
+	    ipi_kernel_revoke, NULL);
+#endif
 
 	atomic_store_rel_int(&aps_ready, 1);
 	/* Wake up the other CPUs */
@@ -354,6 +365,30 @@ ipi_stop(void *dummy __unused)
 	CPU_CLR_ATOMIC(cpu, &stopped_cpus);
 	CTR0(KTR_SMP, "IPI_STOP (restart)");
 }
+
+#ifdef CHERI_CAPREVOKE_KERNEL
+static void
+ipi_kernel_revoke(void *dummy __unused)
+{
+	CTR0(KTR_SMP, "IPI_KERNEL_REVOKE_BARRIER");
+
+	/* Indicate that we reached the barrier */
+	atomic_add_int(&kmem_revoke_barrier, 1);
+
+	/* Revoke the preempted thread trapframe here? */
+	CTR4(KTR_CAPREVOKE, "Barrier preemepted tid=%lu pid=%lu at %#p user=%d",
+	    curthread->td_tid, curproc->p_pid,
+	    curthread->td_frame->tf_elr, TRAPF_USERMODE(curthread->td_frame));
+
+	while (atomic_load_int(&kmem_revoke_release) == 0)
+		cpu_spinwait();
+
+	// XXX lock the pmap?
+	/* pmap_update_kernel_clg(kernel_pmap); */
+
+	CTR0(KTR_SMP, "IP_KERNEL_REVOKE_BARRIER (release)");
+}
+#endif
 
 struct cpu_group *
 cpu_topo(void)

@@ -5074,12 +5074,14 @@ zone_free_item(uma_zone_t zone, void *item, void *udata, enum zfreeskip skip)
 	 * If a free is sent directly to a KREVOKE zone, we
 	 * have to trigger revocation immediately, because the
 	 * item can instantly be reallocated.
-	 * XXX-AM: This is similar to SMR zones, but the revocation pass
-	 * is probably more costly.
+	 * XXX-AM: This is similar to SMR zones with srm_syncrhonize,
+	 * but the revocation pass is likely more costly.
 	 */
 	if ((zone->uz_flags & UMA_ZONE_KREVOKE) != 0) {
+		cheri_revoke_epoch_t now;
 		kmem_quarantine(item, zone->uz_size);
-		kmem_revoke();
+		now = kmem_revoke();
+		kmem_wait_epoch_clears(now);
 	}
 #endif
 

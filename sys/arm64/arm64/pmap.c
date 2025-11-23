@@ -7067,6 +7067,18 @@ pmap_krevoke_shadow_enter(vm_offset_t va)
 	    ("Unexpected shadow bitmap L2 PTE entry: %lx", pmap_load(l2)));
 }
 
+void
+pmap_update_kernel_clg(pmap_t pmap)
+{
+	if (pmap->flags.uclg) {
+		WRITE_SPECIALREG(cctlr_el1,
+		    READ_SPECIALREG(cctlr_el1) | CCTLR_EL1_TGEN1_MASK);
+	} else {
+		WRITE_SPECIALREG(cctlr_el1,
+		    READ_SPECIALREG(cctlr_el1) & ~CCTLR_EL1_TGEN1_MASK);
+	}
+}
+
 #endif /* CHERI_CAPREVOKE_KERNEL*/
 #endif /* CHERI_CAPREVOKE */
 #endif /* __has_feature(capabilities) */
