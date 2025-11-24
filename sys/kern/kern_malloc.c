@@ -399,10 +399,8 @@ malloc_type_zone_allocated(struct malloc_type *mtp, void *addr,
 	if (size > 0) {
 		mtsp->mts_memalloced += size;
 		mtsp->mts_numallocs++;
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 		mtsp->mts_memreserved += cheri_getlen(addr);
-#elif __has_feature(capabilities)
-		mtsp->mts_memreserved += size;
 #endif
 	}
 	if (zindx != -1)
@@ -451,10 +449,8 @@ malloc_type_freed(struct malloc_type *mtp, void *addr, unsigned long size)
 	mtsp = zpcpu_get(mtip->mti_stats);
 	mtsp->mts_memfreed += size;
 	mtsp->mts_numfrees++;
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	mtsp->mts_memunreserved += cheri_getlen(addr);
-#elif __has_feature(capabilities)
-	mtsp->mts_memunreserved += size;
 #endif
 
 #ifdef KDTRACE_HOOKS
@@ -507,7 +503,7 @@ contigmalloc(unsigned long size, struct malloc_type *type, int flags,
 		vsetzoneslab((uintptr_t)ret, NULL, CONTIG_MALLOC_SLAB(size));
 		malloc_type_allocated(type, ret, round_page(size));
 	}
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	KASSERT(cheri_gettag(ret), ("Expected valid capability"));
 #endif
 	return (ret);
@@ -622,7 +618,7 @@ malloc_large(size_t size, struct malloc_type *mtp, struct domainset *policy,
 		/* Use low bits unused for slab pointers. */
 		vsetzoneslab((uintptr_t)va, NULL, MALLOC_LARGE_SLAB(size));
 		uma_total_inc(size);
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 		KASSERT(cheri_getlen(va) <= CHERI_REPRESENTABLE_LENGTH(size),
 		    ("Invalid bounds: expected %#zx found %#zx",
 		        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
@@ -707,7 +703,7 @@ void *
 	if (va != NULL)
 		kasan_mark((void *)va, osize, size, KASAN_MALLOC_REDZONE);
 #endif
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	KASSERT(cheri_getlen(va) <= CHERI_REPRESENTABLE_LENGTH(size),
 	    ("Invalid bounds: expected %#zx found %#zx",
 	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
@@ -736,7 +732,7 @@ malloc_domain(size_t *sizep, int *indxp, struct malloc_type *mtp, int domain,
 	if (va != NULL)
 		*sizep = zone->uz_size;
 	*indxp = indx;
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	KASSERT(cheri_gettag(va), ("Expected valid capability"));
 #endif
 
@@ -890,7 +886,7 @@ mallocarray_domainset(size_t nmemb, size_t size, struct malloc_type *type,
 static void
 free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 {
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	ptraddr_t *mtpp = addr;
 #else
 	struct malloc_type **mtpp = addr;
@@ -904,7 +900,7 @@ free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 	 * This code assumes that size is a multiple of 8 bytes for
 	 * 64 bit machines
 	 */
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	/*
 	 * This is for debugging only, so we just store the va of the
 	 * malloc_type, not a capability to it.
@@ -967,7 +963,7 @@ _free(void *addr, struct malloc_type *mtp, bool dozero)
 	if (addr == NULL)
 		return;
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	if (__predict_false(!cheri_gettag(addr)))
 		panic("Expect valid capability");
 	if (__predict_false(cheri_getsealed(addr)))
@@ -982,7 +978,7 @@ _free(void *addr, struct malloc_type *mtp, bool dozero)
 	switch (GET_SLAB_COOKIE(slab)) {
 	case __predict_true(SLAB_COOKIE_SLAB_PTR):
 		size = zone->uz_size;
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 		if (__predict_false(cheri_getlen(addr) !=
 		    CHERI_REPRESENTABLE_LENGTH(size)))
 			panic("Invalid bounds: expected %#zx found %#zx",
@@ -1000,7 +996,7 @@ _free(void *addr, struct malloc_type *mtp, bool dozero)
 		break;
 	case SLAB_COOKIE_MALLOC_LARGE:
 		size = malloc_large_size(slab);
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 		if (__predict_false(cheri_getlen(addr) !=
 		    CHERI_REPRESENTABLE_LENGTH(size)))
 			panic("Invalid bounds: expected %#zx found %#zx",
@@ -1070,7 +1066,7 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 	/* realloc(NULL, ...) is equivalent to malloc(...) */
 	if (addr == NULL)
 		return (malloc(size, mtp, flags));
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	if (__predict_false(!cheri_gettag(addr)))
 		panic("Expect valid capability");
 	if (__predict_false(cheri_getsealed(addr)))
