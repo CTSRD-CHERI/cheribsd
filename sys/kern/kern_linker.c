@@ -1528,8 +1528,7 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 	int error;
 
 	user_lookup = uap->data;
-	error = copyincap(user_lookup, &lookup, sizeof(lookup));
-	if (error != 0)
+	if ((error = copyincap(user_lookup, &lookup, sizeof(lookup))) !=0)
 		return (error);
 	if (lookup.version != sizeof(lookup) ||
 	    uap->cmd != KLDSYM_LOOKUP)
@@ -1563,7 +1562,7 @@ kern_kldsym(struct thread *td, int fileid, int cmd,
 
 	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
 	if ((error = copyinstr(symname, symstr, MAXPATHLEN, NULL)) != 0)
-		goto done;
+		goto out;
 	sx_xlock(&kld_sx);
 	if (fileid != 0) {
 		lf = linker_find_file_by_id(fileid);
@@ -1590,7 +1589,7 @@ kern_kldsym(struct thread *td, int fileid, int cmd,
 			error = ENOENT;
 	}
 	sx_xunlock(&kld_sx);
-done:
+out:
 	free(symstr, M_TEMP);
 	return (error);
 }
