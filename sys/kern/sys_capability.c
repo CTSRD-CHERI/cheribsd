@@ -316,11 +316,11 @@ user_cap_rights_limit(struct thread *td, int fd, cap_rights_t *rightsp)
 int
 sys___cap_rights_get(struct thread *td, struct __cap_rights_get_args *uap)
 {
-	return (kern_cap_rights_get(td, uap->version, uap->fd, uap->rightsp));
+	return (kern___cap_rights_get(td, uap->version, uap->fd, uap->rightsp));
 }
 
 int
-kern_cap_rights_get(struct thread *td, int version, int fd,
+kern___cap_rights_get(struct thread *td, int version, int fd,
     cap_rights_t *rightsp)
 {
 	struct filedesc *fdp;
