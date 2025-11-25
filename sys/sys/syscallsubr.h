@@ -44,7 +44,6 @@ struct cpuset_copy_cb;
 struct ffclock_estimate;
 struct file;
 struct filecaps;
-struct g_kevent_args;
 enum idtype;
 struct itimerval;
 struct image_args;
@@ -76,6 +75,15 @@ struct uio;
 struct uuid;
 struct vm_map;
 struct vmspace;
+
+struct g_kevent_args {
+	int	fd;
+	const void *changelist;
+	int	nchanges;
+	void	*eventlist;
+	int	nevents;
+	const struct timespec *timeout;
+};
 
 typedef int (*mmap_check_fp_fn)(struct file *, int, int, int);
 
