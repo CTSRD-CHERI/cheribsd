@@ -2607,8 +2607,7 @@ userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 		if (inkernel) {
 			req.oldlen = *oldlenp;
 		} else {
-			error = copyin(oldlenp, &req.oldlen,
-			    sizeof(*oldlenp));
+			error = copyin(oldlenp, &req.oldlen, sizeof(*oldlenp));
 			if (error)
 				return (error);
 		}
