@@ -2941,8 +2941,8 @@ swaponsomething(struct vnode *vp, void *id, u_long nblks,
  * only to make this work.
  */
 int
-kern_swapoff(struct thread *td, const char *name,
-    enum uio_seg name_seg, u_int flags)
+kern_swapoff(struct thread *td, const char *name, enum uio_seg name_seg,
+    u_int flags)
 {
 	struct vnode *vp;
 	struct nameidata nd;
