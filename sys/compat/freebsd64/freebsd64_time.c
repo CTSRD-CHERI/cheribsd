@@ -52,14 +52,7 @@ freebsd64_ffclock_getcounter(struct thread *td,
     struct freebsd64_ffclock_getcounter_args *uap)
 {
 #ifdef	FFCLOCK
-	ffcounter ffcount;
-
-	ffcount = 0;
-	ffclock_read_counter(&ffcount);
-	if (ffcount == 0)
-		return (EAGAIN);
-	return (copyout(&ffcount, USER_PTR_OBJ(uap->ffcount),
-	    sizeof(ffcounter)));
+	return (kern_ffclock_getcounter(td, USER_PTR_OBJ(uap->ffcount)));
 #else
 	return (ENOSYS);
 #endif
