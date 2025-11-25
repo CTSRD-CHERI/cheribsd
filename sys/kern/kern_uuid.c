@@ -183,7 +183,7 @@ sys_uuidgen(struct thread *td, struct uuidgen_args *uap)
 }
 
 int
-user_uuidgen(struct thread *td, struct uuid *storep, int count)
+user_uuidgen(struct thread *td, struct uuid *ustore, int count)
 {
 	struct uuid *store;
 	int error;
@@ -199,7 +199,7 @@ user_uuidgen(struct thread *td, struct uuid *storep, int count)
 
 	store = malloc(count * sizeof(struct uuid), M_TEMP, M_WAITOK);
 	kern_uuidgen(store, count);
-	error = copyout(store, storep, count * sizeof(struct uuid));
+	error = copyout(store, ustore, count * sizeof(struct uuid));
 	free(store, M_TEMP);
 	return (error);
 }

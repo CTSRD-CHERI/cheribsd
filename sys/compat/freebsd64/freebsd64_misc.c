@@ -1812,7 +1812,7 @@ int
 freebsd64___cap_rights_get(struct thread *td,
     struct freebsd64___cap_rights_get_args *uap)
 {
-	return (kern_cap_rights_get(td, uap->version, uap->fd,
+	return (kern___cap_rights_get(td, uap->version, uap->fd,
 	    USER_PTR_OBJ(uap->rightsp)));
 }
 
