@@ -835,9 +835,8 @@ kern_sigaction(struct thread *td, int sig, const struct sigaction *act,
 			oact->sa_flags |= SA_SIGINFO;
 			oact->sa_sigaction =
 			    (__siginfohandler_t *)ps->ps_sigact[_SIG_IDX(sig)];
-		} else {
+		} else
 			oact->sa_handler = ps->ps_sigact[_SIG_IDX(sig)];
-		}
 		if (sig == SIGCHLD && ps->ps_flag & PS_NOCLDSTOP)
 			oact->sa_flags |= SA_NOCLDSTOP;
 		if (sig == SIGCHLD && ps->ps_flag & PS_NOCLDWAIT)
@@ -3527,8 +3526,7 @@ postsig(int sig)
 		/*
 		 * If we get here, the signal must be caught.
 		 */
-		KASSERT(action != SIG_IGN, ("postsig action %p",
-		    (void *)action));
+		KASSERT(action != SIG_IGN, ("postsig action %p", action));
 		KASSERT(!SIGISMEMBER(td->td_sigmask, sig),
 		    ("postsig action: blocked sig %d", sig));
 

@@ -677,7 +677,7 @@ user_sendit(struct thread *td, int s, struct msghdr *mp, int flags)
 		mp->msg_name = to;
 #ifdef CAPABILITY_MODE
 		if (CAP_TRACING(td))
-			ktrcapfail(CAPFAIL_SOCKADDR, to);
+			ktrcapfail(CAPFAIL_SOCKADDR, mp->msg_name);
 		if (IN_CAPABILITY_MODE(td)) {
 			error = ECAPMODE;
 			goto bad;

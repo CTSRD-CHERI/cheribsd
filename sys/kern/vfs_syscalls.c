@@ -812,8 +812,8 @@ freebsd11_getfsstat(struct thread *td, struct freebsd11_getfsstat_args *uap)
 }
 
 int
-kern_freebsd11_getfsstat(struct thread *td,
-    struct freebsd11_statfs *ubuf, long bufsize, int mode)
+kern_freebsd11_getfsstat(struct thread *td, struct freebsd11_statfs *ubuf,
+    long bufsize, int mode)
 {
 	struct freebsd11_statfs osb;
 	struct statfs *buf;
@@ -3502,8 +3502,8 @@ sys_utimensat(struct thread *td, struct utimensat_args *uap)
 
 int
 kern_utimensat(struct thread *td, int fd, const char *path,
-    enum uio_seg pathseg,
-    const struct timespec *tptr, enum uio_seg tptrseg, int flag)
+    enum uio_seg pathseg, const struct timespec *tptr, enum uio_seg tptrseg,
+    int flag)
 {
 	struct nameidata nd;
 	struct timespec ts[2];

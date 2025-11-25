@@ -399,8 +399,8 @@ sys___acl_set_link(struct thread *td, struct __acl_set_link_args *uap)
 }
 
 int
-kern___acl_set_path(struct thread *td, const char *path, acl_type_t type,
-    const struct acl *aclp, int follow)
+kern___acl_set_path(struct thread *td, const char *path,
+    acl_type_t type, const struct acl *aclp, int follow)
 {
 	struct nameidata nd;
 	int error;

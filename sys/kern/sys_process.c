@@ -1667,8 +1667,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		td2->td_dbgflags |= TDB_USERWR;
 		PROC_UNLOCK(p);
 		error = 0;
-		if (proc_writemem(td, p, (vm_offset_t)addr,
-		    &data, sizeof(int)) != sizeof(int))
+		if (proc_writemem(td, p, (vm_offset_t)addr, &data,
+		    sizeof(int)) != sizeof(int))
 			error = ENOMEM;
 		else
 			CTR3(KTR_PTRACE, "PT_WRITE: pid %d: %lx <= %#x",
@@ -1680,8 +1680,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 	case PT_READ_D:
 		PROC_UNLOCK(p);
 		error = tmp = 0;
-		if (proc_readmem(td, p, (vm_offset_t)addr,
-		    &tmp, sizeof(int)) != sizeof(int))
+		if (proc_readmem(td, p, (vm_offset_t)addr, &tmp,
+		    sizeof(int)) != sizeof(int))
 			error = ENOMEM;
 		else
 			CTR3(KTR_PTRACE, "PT_READ: pid %d: %lx >= %#x",
