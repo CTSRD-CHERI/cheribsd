@@ -1922,7 +1922,7 @@ selsocket(struct socket *so, int events, struct timeval *tvp, struct thread *td)
  * have two select sets, one for read and another for write.
  */
 static void
-selfdalloc(struct thread *td, void * cookie)
+selfdalloc(struct thread *td, void *cookie)
 {
 	struct seltd *stp;
 

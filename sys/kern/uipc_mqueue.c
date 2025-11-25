@@ -274,11 +274,11 @@ static int	user_kmq_timedsend(struct thread *td, int mqd,
 static struct mqueue	*mqueue_alloc(const struct mq_attr *attr);
 static void	mqueue_free(struct mqueue *mq);
 static int	mqueue_send(struct mqueue *mq, const char *msg_ptr,
-			size_t msg_len, unsigned msg_prio,
-			int waitok, const struct timespec *abs_timeout);
+			size_t msg_len, unsigned msg_prio, int waitok,
+			const struct timespec *abs_timeout);
 static int	mqueue_receive(struct mqueue *mq, char *msg_ptr,
-			size_t msg_len, unsigned *msg_prio,
-			int waitok, const struct timespec *abs_timeout);
+			size_t msg_len, unsigned *msg_prio, int waitok,
+			const struct timespec *abs_timeout);
 static int	_mqueue_send(struct mqueue *mq, struct mqueue_msg *msg,
 			int timo);
 static int	_mqueue_recv(struct mqueue *mq, struct mqueue_msg **msg,
@@ -1681,7 +1681,8 @@ mqueue_savemsg(struct mqueue_msg *msg, char *msg_ptr, int *msg_prio)
 {
 	int error;
 
-	error = copyout(((char *)msg) + sizeof(*msg), msg_ptr, msg->msg_size);
+	error = copyout(((char *)msg) + sizeof(*msg), msg_ptr,
+	    msg->msg_size);
 	if (error == 0 && msg_prio != NULL)
 		error = copyout(&msg->msg_prio, msg_prio, sizeof(int));
 	return (error);
