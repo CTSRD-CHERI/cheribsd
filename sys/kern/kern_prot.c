@@ -555,7 +555,7 @@ user_setcred(struct thread *td, const u_int flags, struct setcred *wcred)
 #ifdef MAC
 	struct mac mac;
 	/* Pointer to 'struct mac' or 'struct mac32'. */
-	void * __capability umac;
+	void *umac;
 #endif
 	gid_t smallgroups[CRED_SMALLGROUPS_NB];
 	gid_t *groups = NULL;
@@ -600,8 +600,7 @@ user_setcred(struct thread *td, const u_int flags, struct setcred *wcred)
 
 #ifdef MAC
 	if (wcred->sc_label != NULL)
-		free_copied_label(
-		    (__cheri_fromcap const struct mac *) wcred->sc_label);
+		free_copied_label(wcred->sc_label);
 #endif
 
 free_groups:
@@ -676,16 +675,14 @@ kern_setcred(struct thread *const td, const u_int flags,
 			    smallgroups :
 			    malloc((wcred->sc_supp_groups_nb + 1) *
 			    sizeof(*groups), M_TEMP, M_WAITOK);
-			memcpy(groups + 1,
-			    (__cheri_fromcap gid_t *)wcred->sc_supp_groups,
+			memcpy(groups + 1, wcred->sc_supp_groups,
 			    wcred->sc_supp_groups_nb * sizeof(*groups));
 		}
 	}
 
 	if (flags & SETCREDF_MAC_LABEL) {
 #ifdef MAC
-		error = mac_set_proc_prepare(td,
-		    (__cheri_fromcap const struct mac *)wcred->sc_label,
+		error = mac_set_proc_prepare(td, wcred->sc_label,
 		    &mac_set_proc_data);
 		if (error != 0)
 			goto free_groups;
