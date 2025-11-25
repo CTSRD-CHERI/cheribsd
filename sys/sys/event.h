@@ -89,17 +89,6 @@ struct kevent {
 	__uint64_t	ext[4];		/* extensions */
 };
 
-#ifdef _KERNEL
-struct g_kevent_args {
-	int	fd;
-	const void *changelist;
-	int	nchanges;
-	void	*eventlist;
-	int	nevents;
-	const struct timespec *timeout;
-};
-#endif /* _KERNEL */
-
 #if defined(_WANT_FREEBSD11_KEVENT)
 /* Older structure used in FreeBSD 11.x and older. */
 struct freebsd11_kevent {
