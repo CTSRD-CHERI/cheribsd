@@ -115,6 +115,9 @@ static struct syscall_helper_data sctp64_syscalls[] = {
 };
 #endif
 
+typedef int(copyiniov_t)(const struct iovec *iovp, unsigned int iovcnt,
+    struct iovec **iov, int error);
+
 static int	kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
 		    void *msg, int mlen,
 		    const struct sockaddr *uto, socklen_t tolen,
