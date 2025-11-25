@@ -387,6 +387,12 @@ struct ffclock_getcounter_args {
 int
 sys_ffclock_getcounter(struct thread *td, struct ffclock_getcounter_args *uap)
 {
+	kern_ffclock_getcounter(td, uap->ffcount);
+}
+
+int
+kern_ffclock_getcounter(struct thread *td, ffcounter *ffcountp)
+{
 	ffcounter ffcount;
 	int error;
 
@@ -394,7 +400,7 @@ sys_ffclock_getcounter(struct thread *td, struct ffclock_getcounter_args *uap)
 	ffclock_read_counter(&ffcount);
 	if (ffcount == 0)
 		return (EAGAIN);
-	error = copyout(&ffcount, uap->ffcount, sizeof(ffcounter));
+	error = copyout(&ffcount, ffcountp, sizeof(ffcounter));
 
 	return (error);
 }
