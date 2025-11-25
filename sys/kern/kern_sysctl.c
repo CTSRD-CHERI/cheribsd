@@ -2498,7 +2498,7 @@ sys___sysctl(struct thread *td, struct __sysctl_args *uap)
 }
 
 int
-kern_sysctl(struct thread *td, int *uname, u_int namelen, void *old,
+kern_sysctl(struct thread *td, const int *uname, u_int namelen, void *old,
     size_t *oldlenp, const void *new, size_t newlen, int flags)
 {
 	int error, i, name[CTL_MAXNAME];
