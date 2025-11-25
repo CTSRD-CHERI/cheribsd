@@ -69,8 +69,6 @@ struct iovec {
 
 struct uio;
 
-typedef int(copyiniov_t)(const struct iovec *iovp, unsigned int iovcnt,
-    struct iovec **iov, int error);
 typedef int(updateiov_t)(const struct uio *uiop, struct iovec *iovp);
 #endif
 
