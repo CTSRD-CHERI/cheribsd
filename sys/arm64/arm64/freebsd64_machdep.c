@@ -53,6 +53,7 @@
 #include <sys/imgact_elf.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
+#include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/reg.h>
 #include <sys/syscallsubr.h>
