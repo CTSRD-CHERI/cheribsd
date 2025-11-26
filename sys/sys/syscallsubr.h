@@ -105,6 +105,7 @@ struct mmap_req {
 
 typedef int (copyinuio_t)(const struct iovec *iovp, unsigned int iovcnt,
     struct uio **iov);
+typedef int(updateiov_t)(const struct uio *uiop, struct iovec *iovp);
 
 uint64_t at2cnpflags(u_int at_flags, u_int mask);
 int	kern___acl_aclcheck_fd(struct thread *td, int filedes,
