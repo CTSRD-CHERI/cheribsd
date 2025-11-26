@@ -551,6 +551,8 @@ int	kern_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int *rsv);
 int	kern_unmount(struct thread *td, const char *path, int flags);
 
+int	user___specialfd(struct thread *td, int type, const void *req,
+	    size_t len);
 int	user_accept(struct thread *td, int s, struct sockaddr *uname,
 	    socklen_t *anamelen, int flags);
 int	user_bind(struct thread *td, int s, const struct sockaddr *name,
@@ -665,8 +667,6 @@ int	user_sigwaitinfo(struct thread *td, const sigset_t *uset, void *info,
 	    copyout_siginfo_t *copyout_siginfop);
 int	user_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int *rsv);
-int	user_specialfd(struct thread *td, int type, const void *req,
-	    size_t len);
 int	user_statfs(struct thread *td, const char *path, struct statfs *buf);
 int	user_uuidgen(struct thread *td, struct uuid *ustore, int count);
 int	user_wait6(struct thread *td, enum idtype idtype, id_t id,
