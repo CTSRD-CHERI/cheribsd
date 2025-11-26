@@ -2583,6 +2583,7 @@ freebsd32_jail(struct thread *td, struct freebsd32_jail_args *uap)
 {
 	uint32_t version;
 	int error;
+	struct jail j;
 
 	error = copyin(uap->jailp, &version, sizeof(version));
 	if (error)
@@ -2593,16 +2594,16 @@ freebsd32_jail(struct thread *td, struct freebsd32_jail_args *uap)
 	{
 		/* FreeBSD single IPv4 jails. */
 		struct jail32_v0 j32_v0;
-		struct in_addr ip4;
 
+		bzero(&j, sizeof(struct jail));
 		error = copyin(uap->jailp, &j32_v0, sizeof(struct jail32_v0));
 		if (error)
 			return (error);
-		/* jail_v0 is host order */
-		ip4.s_addr = htonl(j32_v0.ip_number);
-		return (kern_jail(td, __USER_CAP_STR(PTRIN(j32_v0.path)),
-		    __USER_CAP_STR(PTRIN(j32_v0.hostname)), NULL, &ip4, 1,
-		    NULL, 0, UIO_SYSSPACE));
+		CP(j32_v0, j, version);
+		PTRIN_CP(j32_v0, j, path);
+		PTRIN_CP(j32_v0, j, hostname);
+		j.ip4s = htonl(j32_v0.ip_number);	/* jail_v0 is host order */
+		break;
 	}
 
 	case 1:
@@ -2620,18 +2621,22 @@ freebsd32_jail(struct thread *td, struct freebsd32_jail_args *uap)
 		error = copyin(uap->jailp, &j32, sizeof(struct jail32));
 		if (error)
 			return (error);
-		return (kern_jail(td, __USER_CAP_STR(PTRIN(j32.path)),
-		    __USER_CAP_STR(PTRIN(j32.hostname)),
-		    __USER_CAP_STR(PTRIN(j32.jailname)),
-		    __USER_CAP_ARRAY(PTRIN(j32.ip4), j32.ip4s), j32.ip4s,
-		    __USER_CAP_ARRAY(PTRIN(j32.ip6), j32.ip6s), j32.ip6s,
-		    UIO_USERSPACE));
+		CP(j32, j, version);
+		PTRIN_CP(j32, j, path);
+		PTRIN_CP(j32, j, hostname);
+		PTRIN_CP(j32, j, jailname);
+		CP(j32, j, ip4s);
+		CP(j32, j, ip6s);
+		PTRIN_CP(j32, j, ip4);
+		PTRIN_CP(j32, j, ip6);
+		break;
 	}
 
 	default:
 		/* Sci-Fi jails are not supported, sorry. */
 		return (EINVAL);
 	}
+	return (kern_jail(td, &j));
 }
 
 int

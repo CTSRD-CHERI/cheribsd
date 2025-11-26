@@ -48,8 +48,6 @@ struct filecaps;
 enum idtype;
 struct itimerval;
 struct image_args;
-struct in_addr;
-struct in6_addr;
 struct jail;
 struct kevent_copyops;
 struct kld_file_stat;
@@ -283,9 +281,7 @@ int	kern_getsockopt(struct thread *td, int s, int level, int name,
 int	kern_gettimeofday(struct thread *td, struct timeval *tp,
 	    struct timezone *tzp);
 int	kern_ioctl(struct thread *td, int fd, u_long com, caddr_t data);
-int	kern_jail(struct thread *td, const char *path, const char *hostname,
-	    const char *jailname, struct in_addr *ip4, size_t ip4s,
-	    struct in6_addr *ip6, size_t ip6s, enum uio_seg ipseg);
+int	kern_jail(struct thread *td, struct jail *j);
 int	kern_jail_get(struct thread *td, struct uio *options, int flags);
 int	kern_jail_set(struct thread *td, struct uio *options, int flags);
 int	kern_kcmp(struct thread *td, pid_t pid1, pid_t pid2, int type,

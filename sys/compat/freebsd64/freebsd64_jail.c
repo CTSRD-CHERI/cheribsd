@@ -33,6 +33,8 @@
 #include "opt_inet6.h"
 
 #include <sys/param.h>
+#include <sys/abi_compat.h>
+#include <sys/jail.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
 #include <sys/syscallsubr.h>
@@ -65,6 +67,7 @@ freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 	uint32_t version;
 	int error;
 	void *jail = uap->jailp;
+	struct jail j;
 
 	error = copyin(__USER_CAP(jail, sizeof(version)), &version,
 	    sizeof(version));
@@ -73,18 +76,20 @@ freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 
 	switch (version) {
 	case 0: {
-		struct jail64_v0 j0;
-		struct in_addr ip4;
-
 		/* FreeBSD single IPv4 jails. */
-		error = copyin(__USER_CAP(jail, sizeof(j0)), &j0, sizeof(j0));
+		struct jail64_v0 j64_v0;
+
+		bzero(&j, sizeof(j));
+		error = copyin(__USER_CAP(jail, sizeof(j64_v0)), &j64_v0,
+		    sizeof(j64_v0));
 		if (error)
 			return (error);
-		/* jail_v0 is host order */
-		ip4.s_addr = htonl(j0.ip_number);
-		return (kern_jail(td, __USER_CAP_STR(j0.path),
-		    __USER_CAP_STR(j0.hostname), NULL, &ip4, 1,
-		    NULL, 0, UIO_SYSSPACE)); }
+		CP(j64_v0, j, version);
+		j.path = __USER_CAP_PATH(PTRIN(j64_v0.path));
+		j.hostname = __USER_CAP_STR(PTRIN(j64_v0.hostname));
+		j.ip4s = htonl(j64_v0.ip_number);	/* jail_v0 is host order */
+		break;
+	}
 
 	case 1:
 		/*
@@ -94,21 +99,27 @@ freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 		return (EINVAL);
 
 	case 2:	{ /* JAIL_API_VERSION */
-		struct jail64 j;
+		struct jail64 j64;
 		/* FreeBSD multi-IPv4/IPv6,noIP jails. */
 		error = copyin(__USER_CAP(jail, sizeof(j)), &j, sizeof(j));
 		if (error)
 			return (error);
-		return (kern_jail(td, __USER_CAP_STR(j.path),
-		    __USER_CAP_STR(j.hostname), __USER_CAP_STR(j.jailname),
-		    __USER_CAP_STR(j.ip4), j.ip4s, __USER_CAP_STR(j.ip6),
-		    j.ip6s, UIO_USERSPACE));
+		CP(j64, j, version);
+		j.path = __USER_CAP_PATH(PTRIN(j.path));
+		j.hostname = __USER_CAP_STR(PTRIN(j64.hostname));
+		j.jailname = __USER_CAP_STR(PTRIN(j.jailname));
+		CP(j64, j, ip4s);
+		CP(j64, j, ip6s);
+		j.ip4 = __USER_CAP(PTRIN(j.ip4), j.ip4s * sizeof(*j.ip4));
+		j.ip6 = __USER_CAP(PTRIN(j.ip6), j.ip4s * sizeof(*j.ip6));
+		break;
 	}
 
 	default:
 		/* Sci-Fi jails are not supported, sorry. */
 		return (EINVAL);
 	}
+	return (kern_jail(td, &j));
 }
 /*
  * CHERI CHANGES START

@@ -314,7 +314,7 @@ done:
 
 /*
  * struct jail_args {
- *	struct jail *jailp;
+ *	struct jail *jail;
  * };
  */
 int
@@ -322,25 +322,31 @@ sys_jail(struct thread *td, struct jail_args *uap)
 {
 	uint32_t version;
 	int error;
+	struct jail j;
 
-	error = copyin(uap->jailp, &version, sizeof(version));
+	error = copyin(uap->jailp, &version, sizeof(uint32_t));
 	if (error)
 		return (error);
 
 	switch (version) {
 	case 0:
 	{
+#ifndef __CHERI__
 		struct jail_v0 j0;
-		struct in_addr ip4;
 
 		/* FreeBSD single IPv4 jails. */
+		bzero(&j, sizeof(struct jail));
 		error = copyin(uap->jailp, &j0, sizeof(struct jail_v0));
 		if (error)
 			return (error);
-		/* jail_v0 is host order */
-		ip4.s_addr = htonl(j0.ip_number);
-		return (kern_jail(td, j0.path, j0.hostname, NULL, &ip4, 1,
-		    NULL, 0, UIO_SYSSPACE));
+		j.version = j0.version;
+		j.path = j0.path;
+		j.hostname = j0.hostname;
+		j.ip4s = htonl(j0.ip_number);	/* jail_v0 is host order */
+		break;
+#else
+		return (EINVAL);
+#endif
 	}
 
 	case 1:
@@ -351,28 +357,21 @@ sys_jail(struct thread *td, struct jail_args *uap)
 		return (EINVAL);
 
 	case 2:	/* JAIL_API_VERSION */
-	{
-		struct jail j;
-
 		/* FreeBSD multi-IPv4/IPv6,noIP jails. */
 		error = copyin(uap->jailp, &j, sizeof(struct jail));
 		if (error)
 			return (error);
-		return (kern_jail(td, j.path, j.hostname, j.jailname, j.ip4,
-		    j.ip4s, j.ip6, j.ip6s, UIO_USERSPACE));
-	}
+		break;
 
 	default:
 		/* Sci-Fi jails are not supported, sorry. */
 		return (EINVAL);
 	}
+	return (kern_jail(td, &j));
 }
 
 int
-kern_jail(struct thread *td, const char *path,
-    const char *hostname, const char *jailname,
-    struct in_addr *ip4, size_t ip4s,
-    struct in6_addr *ip6, size_t ip6s, enum uio_seg ipseg)
+kern_jail(struct thread *td, struct jail *j)
 {
 	struct iovec optiov[2 * (4 + nitems(pr_flag_allow)
 #ifdef INET
@@ -386,6 +385,7 @@ kern_jail(struct thread *td, const char *path,
 	char *u_path, *u_hostname, *u_name;
 	struct bool_flags *bf;
 #ifdef INET
+	uint32_t ip4s;
 	struct in_addr *u_ip4;
 #endif
 #ifdef INET6
@@ -426,19 +426,20 @@ kern_jail(struct thread *td, const char *path,
 
 	tmplen = MAXPATHLEN + MAXHOSTNAMELEN + MAXHOSTNAMELEN;
 #ifdef INET
+	ip4s = (j->version == 0) ? 1 : j->ip4s;
 	if (ip4s > jail_max_af_ips)
 		return (EINVAL);
 	tmplen += ip4s * sizeof(struct in_addr);
 #else
-	if (ip4s > 0)
+	if (j->ip4s > 0)
 		return (EINVAL);
 #endif
 #ifdef INET6
-	if (ip6s > jail_max_af_ips)
+	if (j->ip6s > jail_max_af_ips)
 		return (EINVAL);
-	tmplen += ip6s * sizeof(struct in6_addr);
+	tmplen += j->ip6s * sizeof(struct in6_addr);
 #else
-	if (ip6s > 0)
+	if (j->ip6s > 0)
 		return (EINVAL);
 #endif
 	u_path = malloc(tmplen, M_TEMP, M_WAITOK);
@@ -458,28 +459,34 @@ kern_jail(struct thread *td, const char *path,
 	optstr = "path";
 	IOVEC_INIT_CSTR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
-	error = copyinstr(path, u_path, MAXPATHLEN, &tmplen);
-	if (error)
-		goto done;
+	error = copyinstr(j->path, u_path, MAXPATHLEN, &tmplen);
+	if (error) {
+		free(u_path, M_TEMP);
+		return (error);
+	}
 	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_path, tmplen);
 	opt.uio_iovcnt++;
 
 	optstr = "host.hostname";
 	IOVEC_INIT_CSTR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
-	error = copyinstr(hostname, u_hostname, MAXHOSTNAMELEN, &tmplen);
-	if (error)
-		goto done;
+	error = copyinstr(j->hostname, u_hostname, MAXHOSTNAMELEN, &tmplen);
+	if (error) {
+		free(u_path, M_TEMP);
+		return (error);
+	}
 	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_hostname, tmplen);
 	opt.uio_iovcnt++;
 
-	if (jailname != NULL) {
+	if (j->jailname != NULL) {
 		optstr = "name";
 		IOVEC_INIT_CSTR(&optiov[opt.uio_iovcnt], optstr);
 		opt.uio_iovcnt++;
-		error = copyinstr(jailname, u_name, MAXHOSTNAMELEN, &tmplen);
-		if (error)
-			goto done;
+		error = copyinstr(j->jailname, u_name, MAXHOSTNAMELEN, &tmplen);
+		if (error) {
+			free(u_path, M_TEMP);
+			return (error);
+		}
 		IOVEC_INIT(&optiov[opt.uio_iovcnt], u_name, tmplen);
 		opt.uio_iovcnt++;
 	}
@@ -488,12 +495,15 @@ kern_jail(struct thread *td, const char *path,
 	optstr = "ip4.addr";
 	IOVEC_INIT_CSTR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
-	if (ipseg == UIO_USERSPACE) {
-		error = copyin(ip4, u_ip4, ip4s * sizeof(struct in_addr));
-		if (error != 0)
-			goto done;
-	} else
-		u_ip4 = (struct in_addr *)ip4;
+	if (j->version == 0)
+		u_ip4->s_addr = j->ip4s;
+	else {
+		error = copyin(j->ip4, u_ip4, ip4s * sizeof(struct in_addr));
+		if (error) {
+			free(u_path, M_TEMP);
+			return (error);
+		}
+	}
 	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_ip4,
 	    ip4s * sizeof(struct in_addr));
 	opt.uio_iovcnt++;
@@ -503,21 +513,19 @@ kern_jail(struct thread *td, const char *path,
 	optstr = "ip6.addr";
 	IOVEC_INIT_CSTR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
-	if (ipseg == UIO_USERSPACE) {
-		error = copyin(ip6, u_ip6, ip6s * sizeof(struct in6_addr));
-		if (error != 0)
-			goto done;
-	} else
-		u_ip6 = (struct in6_addr *)ip6;
+
+	error = copyin(j->ip6, u_ip6, j->ip6s * sizeof(struct in6_addr));
+	if (error) {
+		free(u_path, M_TEMP);
+		return (error);
+	}
 	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_ip6,
-	    ip6s * sizeof(struct in6_addr));
+	    j->ip6s * sizeof(struct in6_addr));
 	opt.uio_iovcnt++;
 #endif
-
 	KASSERT(opt.uio_iovcnt <= nitems(optiov),
 		("kern_jail: too many iovecs (%d)", opt.uio_iovcnt));
 	error = kern_jail_set(td, &opt, JAIL_CREATE | JAIL_ATTACH);
-done:
 	free(u_path, M_TEMP);
 	return (error);
 }
