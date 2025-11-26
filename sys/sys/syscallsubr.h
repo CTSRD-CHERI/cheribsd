@@ -310,13 +310,13 @@ int	kern_kldsym(struct thread *td, int fileid, int cmd,
 int	kern_kldunload(struct thread *td, int fileid, int flags);
 int	kern_kmq_notify(struct thread *, int, struct sigevent *);
 int	kern_kmq_open(struct thread *, const char *, int, mode_t,
-		const struct mq_attr *);
+	    const struct mq_attr *);
 int	kern_kmq_setattr(struct thread *, int, const struct mq_attr *,
-		struct mq_attr *);
+	    struct mq_attr *);
 int	kern_kmq_timedreceive(struct thread *, int, char *,
-		size_t, unsigned int *, const struct timespec *);
+	    size_t, unsigned int *, const struct timespec *);
 int	kern_kmq_timedsend(struct thread *td, int, const char *,
-		size_t, unsigned int, const struct timespec *);
+	    size_t, unsigned int, const struct timespec *);
 int	kern_kqueue(struct thread *td, int flags, struct filecaps *fcaps);
 int	kern_ktrace(struct thread *td, const char *fname, int uops, int ufacs,
 	    int pid);
@@ -616,7 +616,7 @@ int	user_getsockname(struct thread *td, int fdes, struct sockaddr *asa,
 	    socklen_t *alen, bool compat);
 int	user_getsockopt(struct thread *td, int s, int level, int name,
 	    void *val, socklen_t *avalsize);
-int	user_ioctl(struct thread *td, int fd, u_long com, void *udata,
+int	user_ioctl(struct thread *td, int fd, u_long ucom, void *udata,
 	    void *datap, int copycaps);
 int	user_jail_get(struct thread *td, struct iovec *iovp,
 	    unsigned int iovcnt, int flags, copyinuio_t *copyinuio_f,
@@ -651,10 +651,8 @@ int	user_select(struct thread *td, int nd, fd_set *in, fd_set *ou,
 int	user_sendit(struct thread *td, int s, struct msghdr *mp, int flags);
 int	user_sendto(struct thread *td, int s, const char *buf, size_t len,
 	    int flags, const struct sockaddr *to, socklen_t tolen);
-int	user_setcred(struct thread *const td, const u_int flags,
-	    struct setcred *const wcred);
 int	user_setgroups(struct thread *td, int gidsetsize, const gid_t *gidset);
-int	user_settimeofday(struct thread *td, const struct timeval *tp,
+int	user_settimeofday(struct thread *td, const struct timeval *tv,
 	    const struct timezone *tz);
 int	user_sigprocmask(struct thread *td, int how, const sigset_t *uset,
 	    sigset_t *uoset);
