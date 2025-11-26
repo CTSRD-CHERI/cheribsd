@@ -33,6 +33,7 @@
  */
 
 #include <sys/param.h>
+#include <sys/acl.h>
 #include <sys/fcntl.h>
 #include <sys/inotify.h>
 #include <sys/namei.h>
