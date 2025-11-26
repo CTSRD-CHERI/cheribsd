@@ -33,6 +33,8 @@
 #include "opt_inet6.h"
 
 #include <sys/param.h>
+#include <sys/abi_compat.h>
+#include <sys/jail.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
 #include <sys/syscallsubr.h>
@@ -55,6 +57,7 @@ freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 	uint32_t version;
 	int error;
 	void *jail = uap->jailp;
+	struct jail j;
 
 	error = copyin(USER_PTR(jail, sizeof(version)), &version,
 	    sizeof(version));
@@ -63,18 +66,20 @@ freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 
 	switch (version) {
 	case 0: {
-		struct jail64_v0 j0;
-		struct in_addr ip4;
-
 		/* FreeBSD single IPv4 jails. */
-		error = copyin(USER_PTR(jail, sizeof(j0)), &j0, sizeof(j0));
+		struct jail64_v0 j64_v0;
+
+		bzero(&j, sizeof(j));
+		error = copyin(USER_PTR(jail, sizeof(j64_v0)), &j64_v0,
+		    sizeof(j64_v0));
 		if (error)
 			return (error);
-		/* jail_v0 is host order */
-		ip4.s_addr = htonl(j0.ip_number);
-		return (kern_jail(td, USER_PTR_PATH(j0.path),
-		    USER_PTR_STR(j0.hostname), NULL, &ip4, 1,
-		    NULL, 0, UIO_SYSSPACE)); }
+		CP(j64_v0, j, version);
+		j.path = USER_PTR_PATH(PTRIN(j64_v0.path));
+		j.hostname = USER_PTR_STR(PTRIN(j64_v0.hostname));
+		j.ip4s = htonl(j64_v0.ip_number);	/* jail_v0 is host order */
+		break;
+	}
 
 	case 1:
 		/*
@@ -84,21 +89,27 @@ freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 		return (EINVAL);
 
 	case 2:	{ /* JAIL_API_VERSION */
-		struct jail64 j;
+		struct jail64 j64;
 		/* FreeBSD multi-IPv4/IPv6,noIP jails. */
 		error = copyin(USER_PTR(jail, sizeof(j)), &j, sizeof(j));
 		if (error)
 			return (error);
-		return (kern_jail(td, USER_PTR_PATH(j.path),
-		    USER_PTR_STR(j.hostname), USER_PTR_STR(j.jailname),
-		    USER_PTR_STR(j.ip4), j.ip4s, USER_PTR_STR(j.ip6),
-		    j.ip6s, UIO_USERSPACE));
+		CP(j64, j, version);
+		j.path = USER_PTR_PATH(PTRIN(j.path));
+		j.hostname = USER_PTR_STR(PTRIN(j64.hostname));
+		j.jailname = USER_PTR_STR(PTRIN(j.jailname));
+		CP(j64, j, ip4s);
+		CP(j64, j, ip6s);
+		j.ip4 = USER_PTR(PTRIN(j.ip4), j.ip4s * sizeof(*j.ip4));
+		j.ip6 = USER_PTR(PTRIN(j.ip6), j.ip4s * sizeof(*j.ip6));
+		break;
 	}
 
 	default:
 		/* Sci-Fi jails are not supported, sorry. */
 		return (EINVAL);
 	}
+	return (kern_jail(td, &j));
 }
 /*
  * CHERI CHANGES START
