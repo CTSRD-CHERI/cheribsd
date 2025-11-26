@@ -43,6 +43,7 @@
 #include <cheri/cherireg.h>
 #endif
 
+#include <vm/vm.h>
 #include <vm/vm_extern.h>
 
 #if __has_feature(capabilities) && defined(CHERI_PERM_COMPARTMENT_ID)
