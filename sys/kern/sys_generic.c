@@ -1019,7 +1019,7 @@ kern_specialfd(struct thread *td, int type, void *arg)
 }
 
 int
-user_specialfd(struct thread *td, int type, const void *req, size_t len)
+user___specialfd(struct thread *td, int type, const void *req, size_t len)
 {
 	struct specialfd_eventfd ae;
 	int error;
@@ -1050,7 +1050,7 @@ user_specialfd(struct thread *td, int type, const void *req, size_t len)
 int
 sys___specialfd(struct thread *td, struct __specialfd_args *args)
 {
-	return(user_specialfd(td, args->type, args->req, args->len));
+	return(user___specialfd(td, args->type, args->req, args->len));
 }
 
 int
