@@ -43,6 +43,7 @@
 struct slirp_priv {
 	Slirp *slirp;		/* libslirp handle */
 	int sock;		/* data and control socket */
+	int pipe;		/* used to signal termination */
 	int wakeup[2];		/* used to wake up the pollfd thread */
 	struct pollfd *pollfds;
 	size_t npollfds;
@@ -240,7 +241,7 @@ slirp_pollfd_loop(struct slirp_priv *priv)
 	int error;
 
 	for (;;) {
-		int input, wakeup;
+		int control, input, wakeup;
 
 		for (size_t i = 0; i < priv->npollfds; i++)
 			priv->pollfds[i].fd = -1;
@@ -250,6 +251,8 @@ slirp_pollfd_loop(struct slirp_priv *priv)
 		wakeup = slirp_addpoll(priv, priv->wakeup[0], POLLIN);
 		/* Register for input from our parent process. */
 		input = slirp_addpoll(priv, priv->sock, POLLIN | POLLRDHUP);
+		/* Make sure we get woken up if the parent exits. */
+		control = slirp_addpoll(priv, priv->pipe, POLLIN | POLLHUP);
 
 		timeout = UINT32_MAX;
 		slirp_pollfds_fill_p(priv->slirp, &timeout, slirp_addpoll_cb,
@@ -283,7 +286,8 @@ slirp_pollfd_loop(struct slirp_priv *priv)
 		 * If new packets arrived from our parent, feed them to
 		 * libslirp.
 		 */
-		if ((pollfds[input].revents & (POLLHUP | POLLRDHUP)) != 0)
+		if ((pollfds[input].revents & (POLLHUP | POLLRDHUP)) != 0 ||
+		    (pollfds[control].revents & POLLHUP) != 0)
 			errx(1, "parent process closed connection");
 		if ((pollfds[input].revents & POLLIN) != 0) {
 			ssize_t n;
@@ -462,12 +466,17 @@ main(int argc, char **argv)
 	Slirp *slirp;
 	nvlist_t *config;
 	const char *hostfwd, *vmname;
-	int ch, fd, sd;
+	int ch, fd, pipe, sd;
 	bool restricted;
 
 	sd = -1;
-	while ((ch = getopt(argc, argv, "S:")) != -1) {
+	while ((ch = getopt(argc, argv, "P:S:")) != -1) {
 		switch (ch) {
+		case 'P':
+			pipe = atoi(optarg);
+			if (fcntl(pipe, F_GETFD) == -1)
+				err(1, "invalid pipe %s", optarg);
+			break;
 		case 'S':
 			sd = atoi(optarg);
 			if (fcntl(sd, F_GETFD) == -1)
@@ -498,11 +507,15 @@ main(int argc, char **argv)
 		err(1, "dup2(stderr)");
 	if (dup2(sd, 3) == -1)
 		err(1, "dup2(slirp socket)");
+	if (dup2(pipe, 4) == -1)
+		err(1, "dup2(control pipe)");
 	sd = 3;
-	closefrom(sd + 1);
+	pipe = 4;
+	closefrom(pipe + 1);
 
 	memset(&priv, 0, sizeof(priv));
 	priv.sock = sd;
+	priv.pipe = pipe;
 	if (pipe2(priv.wakeup, O_CLOEXEC | O_NONBLOCK) != 0)
 		err(1, "pipe2");
 
