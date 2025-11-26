@@ -196,6 +196,10 @@ struct setcred64 {
 struct proc;
 struct thread;
 
+/* Common native and 32-bit compatibility entry point. */
+int	user_setcred(struct thread *const td, const u_int flags,
+	    struct setcred *const wcred);
+
 struct credbatch {
 	struct ucred *cred;
 	int users;
