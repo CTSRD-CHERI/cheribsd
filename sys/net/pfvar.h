@@ -2051,7 +2051,6 @@ struct pfioc_iface {
 #define DIOCGETALTQV1	_IOWR('D', 48, struct pfioc_altq_v1)
 #define DIOCCHANGEALTQV0 _IOWR('D', 49, struct pfioc_altq_v0)
 #define DIOCCHANGEALTQV1 _IOWR('D', 49, struct pfioc_altq_v1)
-#define DIOCGETQSTATSV0	_IOWR('D', 50, struct pfioc_qstats_v0)
 #define DIOCGETQSTATSV1	_IOWR('D', 50, struct pfioc_qstats_v1)
 #define DIOCBEGINADDRS	_IOWR('D', 51, struct pfioc_pooladdr)
 #define DIOCADDADDR	_IOWR('D', 52, struct pfioc_pooladdr)
