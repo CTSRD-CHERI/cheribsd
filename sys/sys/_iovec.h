@@ -66,10 +66,6 @@ struct iovec {
 	__iovp->iov_len -= __amt;					\
 	__iovp->iov_base = (char *)__iovp->iov_base + __amt;		\
 } while(0)
-
-struct uio;
-
-typedef int(updateiov_t)(const struct uio *uiop, struct iovec *iovp);
 #endif
 
 #endif /* !_SYS__IOVEC_H_ */
