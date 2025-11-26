@@ -2797,7 +2797,6 @@ pfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags, struct thread *td
 		case DIOCGETALTQSV1:
 		case DIOCGETALTQV0:
 		case DIOCGETALTQV1:
-		case DIOCGETQSTATSV0:
 		case DIOCGETQSTATSV1:
 		case DIOCGETRULESETS:
 		case DIOCGETRULESET:
@@ -2856,7 +2855,6 @@ pfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags, struct thread *td
 		case DIOCGETALTQSV1:
 		case DIOCGETALTQV0:
 		case DIOCGETALTQV1:
-		case DIOCGETQSTATSV0:
 		case DIOCGETQSTATSV1:
 		case DIOCGETRULESETS:
 		case DIOCGETRULESET:
@@ -4368,7 +4366,6 @@ DIOCGETSTATESV2_full:
 		error = ENODEV;
 		break;
 
-	case DIOCGETQSTATSV0:
 	case DIOCGETQSTATSV1: {
 		struct pfioc_qstats_v1	*pq = (struct pfioc_qstats_v1 *)addr;
 		struct pf_altq		*altq;
@@ -4395,10 +4392,7 @@ DIOCGETSTATESV2_full:
 			break;
 		}
 		PF_RULES_RUNLOCK();
-		if (cmd == DIOCGETQSTATSV0)
-			version = 0;  /* DIOCGETQSTATSV0 means stats struct v0 */
-		else
-			version = pq->version;
+		version = pq->version;
 		error = altq_getqstats(altq, pq->buf, &nbytes, version);
 		if (error == 0) {
 			pq->scheduler = altq->scheduler;
