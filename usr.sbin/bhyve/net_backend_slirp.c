@@ -68,6 +68,7 @@
 #define	SLIRP_MTU	2048
 
 struct slirp_priv {
+	int p;
 	int s;
 	pid_t helper;
 	struct mevent *mevp;
@@ -84,12 +85,17 @@ slirp_init(struct net_backend *be, const char *devname __unused,
 	posix_spawn_file_actions_t fa;
 	pid_t child;
 	const char **argv;
-	char sockname[32];
-	int error, s[2];
+	char pipename[32], sockname[32];
+	int error, p[2], s[2];
 
-	if (socketpair(PF_LOCAL, SOCK_SEQPACKET | SOCK_NONBLOCK, 0, s) != 0) {
+	if (socketpair(PF_LOCAL, SOCK_DGRAM | SOCK_NONBLOCK, 0, s) != 0) {
 		EPRINTLN("socketpair");
 		return (-1);
+	}
+
+	if (pipe(p) != 0) {
+		EPRINTLN("pipe");
+		goto err;
 	}
 
 	/*
@@ -107,8 +113,10 @@ slirp_init(struct net_backend *be, const char *devname __unused,
 	}
 
 	(void)snprintf(sockname, sizeof(sockname), "%d", s[1]);
+	(void)snprintf(pipename, sizeof(pipename), "%d", p[1]);
 	argv = (const char *[]){
-	    "/usr/libexec/bhyve-slirp-helper", "-S", sockname, NULL
+	    "/usr/libexec/bhyve-slirp-helper", "-S", sockname, "-P", pipename,
+	    NULL
 	};
 	error = posix_spawn(&child, "/usr/libexec/bhyve-slirp-helper",
 	    &fa, NULL, __DECONST(char **, argv), environ);
@@ -140,12 +148,16 @@ slirp_init(struct net_backend *be, const char *devname __unused,
 	}
 
 	priv->helper = child;
+	priv->p = p[0];
+	(void)close(p[1]);
 	priv->s = s[0];
 	(void)close(s[1]);
 
 	return (0);
 
 err:
+	(void)close(p[0]);
+	(void)close(p[1]);
 	(void)close(s[0]);
 	(void)close(s[1]);
 	return (-1);
