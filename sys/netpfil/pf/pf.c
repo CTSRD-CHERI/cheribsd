@@ -4221,7 +4221,7 @@ pf_return(struct pf_krule *r, struct pf_krule *nr, struct pf_pdesc *pd,
 			*pd->dport = sk->port[pd->didx];
 		if (pd->ip_sum)
 			*pd->ip_sum = bip_sum;
-		m_copyback(pd->m, pd->off, pd->hdrlen, pd->hdr.any);
+		m_copyback(pd->m, pd->off, pd->hdrlen, (caddr_t)&pd->hdr);
 	}
 	if (pd->proto == IPPROTO_TCP &&
 	    ((r->rule_flag & PFRULE_RETURNRST) ||
@@ -5853,7 +5853,7 @@ nextrule:
 
 	if (r->log || pd->act.log & PF_LOG_MATCHES) {
 		if (rewrite)
-			m_copyback(pd->m, pd->off, pd->hdrlen, pd->hdr.any);
+			m_copyback(pd->m, pd->off, pd->hdrlen, (caddr_t)&pd->hdr);
 		PFLOG_PACKET(r->action, reason, r, a, ruleset, pd, 1);
 	}
 
@@ -5948,7 +5948,7 @@ nextrule:
 
 	/* copy back packet headers if we performed NAT operations */
 	if (rewrite)
-		m_copyback(pd->m, pd->off, pd->hdrlen, pd->hdr.any);
+		m_copyback(pd->m, pd->off, pd->hdrlen, (caddr_t)&pd->hdr);
 
 	if (*sm != NULL && !((*sm)->state_flags & PFSTATE_NOSYNC) &&
 	    pd->dir == PF_OUT &&
@@ -6183,7 +6183,7 @@ pf_create_state(struct pf_krule *r, struct pf_krule *nr, struct pf_krule *a,
 				*pd->dport = skt->port[pd->didx];
 			if (pd->ip_sum)
 				*pd->ip_sum = bip_sum;
-			m_copyback(pd->m, pd->off, pd->hdrlen, pd->hdr.any);
+			m_copyback(pd->m, pd->off, pd->hdrlen, (caddr_t)&pd->hdr);
 		}
 		s->src.seqhi = htonl(arc4random());
 		/* Find mss option */
@@ -9102,7 +9102,7 @@ pf_route6(struct mbuf **m, struct pf_krule *r, struct ifnet *oifp,
 		if (pd->proto == IPPROTO_UDP && uh->uh_sum == 0) {
 			uh->uh_sum = in6_cksum_pseudo(ip6,
 			    ntohs(uh->uh_ulen), IPPROTO_UDP, 0);
-			m_copyback(m0, pd->off, sizeof(*uh), pd->hdr.any);
+			m_copyback(m0, pd->off, sizeof(*uh), (caddr_t)&pd->hdr);
 		}
 	}
 
