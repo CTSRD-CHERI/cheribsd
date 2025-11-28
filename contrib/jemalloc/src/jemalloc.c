@@ -3799,22 +3799,18 @@ je_malloc_underlying_allocation(void *ptr) {
 	if (unlikely(ptr == NULL)) {
 		ret = NULL;
 	} else {
-		size_t underlying_size = ivsalloc(tsdn, ptr);
-		if (underlying_size == 0) {
+		ret = get_underlying_allocation(tsdn, ptr);
+		ret = cheri_andperm(ret,
+		    CHERI_PERMS_USERSPACE_DATA | CHERI_PERM_SW_VMEM);
+	}
+
+	/*
+	 * Check that ptr corresponds to a ptr returned by malloc.
+	 */
+	if (ret != NULL) {
+		void *ret_check = cheri_andperm(ret, ~CHERI_PERM_SW_VMEM);
+		if (unlikely(!cheri_equal_exact(ptr, ret_check))) {
 			ret = NULL;
-		} else {
-			/*
-			 * XXX unbound_ptr will actually work if this isn't
-			 * a pointer to an original allocation but is
-			 * contained within an extent - we can
-			 * probably fix this in rtree functions.
-			 */
-			ret = unbound_ptr(tsdn, ptr);
-			/* Bounds as with BOUND_PTR, but preserve SW_VMEM */
-			if (ret != NULL)
-				ret = cheri_andperm(
-				    cheri_setbounds(ret, underlying_size),
-				    CHERI_PERMS_USERSPACE_DATA | CHERI_PERM_SW_VMEM);
 		}
 	}
 
