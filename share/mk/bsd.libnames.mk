@@ -175,10 +175,8 @@ LIBZFSBOOTENV?=	${LIBDESTDIR}${LIBDIR_BASE}/libzfsbootenv.a
 LIBZPOOL?=	${LIBDESTDIR}${LIBDIR_BASE}/libzpool.a
 LIBZUTIL?=	${LIBDESTDIR}${LIBDIR_BASE}/libzutil.a
 
-LIBC_NOSYSCALLS?=	${DESTDIR}${LIBDIR_BASE}/libc_nosyscalls.a
 LIBCHERI_CAPREVOKE?=	${DESTDIR}${LIBDIR_BASE}/libcheri_caprevoke.a
 LIBMALLOC_SIMPLE=	${DESTDIR}${LIBDIR_BASE}/libmalloc_simple.a
-LIBSYSCALLS?=	${DESTDIR}${LIBDIR_BASE}/libsyscalls.a
 
 # enforce that the following libraries are last in this exact order:
 #	-lpthread
