@@ -36,7 +36,6 @@
 #include <sys/mac.h>
 #include <sys/mount.h>
 #include <sys/signal.h>
-#include <sys/sem.h>
 #include <sys/socket.h>
 
 struct __wrusage;
