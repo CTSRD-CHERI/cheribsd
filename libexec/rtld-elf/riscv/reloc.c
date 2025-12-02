@@ -571,13 +571,13 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			break;
 		case R_RISCV_FUNC_RELATIVE:
 			*where = (Elf_Addr)(obj->relocbase + rela->r_addend);
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 			*where = (Elf_Addr)tramp_intern(NULL, RTLD_COMPART_ID,
 			    &(struct tramp_data) {
 				.target = (void *)(uintptr_t)*where,
 				.defobj = obj
 			});
-#endif /* __CHERI_PURE_CAPABILITY__ */
+#endif /* __CHERI_PURE_CAPABILITY__ && CHERI_LIB_C18N */
 			break;
 		case R_RISCV_IRELATIVE:
 			obj->irelative_nonplt = true;
