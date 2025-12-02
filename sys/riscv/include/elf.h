@@ -33,8 +33,7 @@
 
 #ifndef __ELF_WORD_SIZE
 #define	__ELF_WORD_SIZE	64
-#if defined(__CHERI_PURE_CAPABILITY__) || \
-    (__has_feature(capabilities) && defined(_KERNEL))
+#if defined(__CHERI__)
 #define	__ELF_CHERI
 #endif
 #endif
@@ -58,14 +57,14 @@ typedef struct {	/* Auxiliary vector entry on initial stack */
 	int64_t	a_type;			/* Entry type. */
 	union {
 		int64_t	a_val;		/* Integer value. */
-#if __ELF_WORD_SIZE == 64 && !defined(__CHERI_PURE_CAPABILITY__)
+#if __ELF_WORD_SIZE == 64 && !defined(__CHERI__)
 		void	*a_ptr;		/* Address. */
 		void	(*a_fcn)(void);	/* Function pointer (not used). */
 #endif
 	} a_un;
 } Elf64_Auxinfo;
 
-#if __has_feature(capabilities)
+#ifdef __CHERI__
 typedef struct {	/* Auxiliary vector entry on initial stack */
 	int64_t	a_type;			/* Entry type. */
 	union {

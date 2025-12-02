@@ -44,7 +44,6 @@
  * NOTE: keep this structure in sync with struct reg and struct mcontext.
  */
 struct trapframe {
-#if __has_feature(capabilities)
 	uintptr_t tf_ra;
 	uintptr_t tf_sp;
 	uintptr_t tf_gp;
@@ -53,16 +52,8 @@ struct trapframe {
 	uintptr_t tf_s[12];
 	uintptr_t tf_a[8];
 	uintptr_t tf_sepc;
+#ifdef __CHERI__
 	uintptr_t tf_ddc;
-#else
-	uint64_t tf_ra;
-	uint64_t tf_sp;
-	uint64_t tf_gp;
-	uint64_t tf_tp;
-	uint64_t tf_t[7];
-	uint64_t tf_s[12];
-	uint64_t tf_a[8];
-	uint64_t tf_sepc;
 #endif
 	uint64_t tf_sstatus;
 	uint64_t tf_stval;
@@ -95,9 +86,6 @@ struct sigframe64 {
  */
 struct kernframe {
 	uintptr_t	kf_tp;
-#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-	uintptr_t	kf_ddc;
-#endif
 };
 #endif
 
