@@ -18,7 +18,7 @@ LIBC_ARCH=${M}
 LIBC_ARCH=${MACHINE_CPUARCH}
 .endif
 
-.if ${MACHINE_ABI:Mpurecap}
+.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPU:Mxcheri} == ""
 SHARED_CFLAGS+=-DCHERI_LIB_C18N
 CHERI_LIB_C18N=yes
 .endif
