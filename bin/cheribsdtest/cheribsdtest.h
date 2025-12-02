@@ -147,6 +147,10 @@ extern struct cheribsdtest_child_state *ccsp;
 #endif
 #endif
 
+#ifndef XFAIL_VARARG_BOUNDS
+#define	XFAIL_VARARG_BOUNDS	NULL
+#endif
+
 struct cheri_test {
 	const char	*ct_name;
 	const char	*ct_desc;
