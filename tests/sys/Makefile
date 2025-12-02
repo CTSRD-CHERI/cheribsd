@@ -2,6 +2,7 @@
 
 TESTSDIR=		${TESTSBASE}/sys
 
+TESTS_SUBDIRS+=		ace2
 TESTS_SUBDIRS+=		acl
 TESTS_SUBDIRS+=		aio
 TESTS_SUBDIRS+=		${_audit}
