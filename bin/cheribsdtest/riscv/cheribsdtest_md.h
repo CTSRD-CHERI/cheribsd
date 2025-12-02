@@ -70,4 +70,4 @@
 
 #define	CAPREG_PCC(capreg)	((capreg)->sepcc)
 
-#endif /* !_CHERIBSDTEST_H_ */
+#endif /* !_CHERIBSDTEST_MD_H_ */
