@@ -10,9 +10,12 @@
  */
 
 #include <sys/linker.h>
+#include <sys/malloc.h>
 #include <sys/sysctl.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <memstat.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -95,9 +98,98 @@ ATF_TC_BODY(toggle_bootverbose, tc)
 	ATF_REQUIRE_INTEQ(new, old);
 }
 
+static struct memory_type_list *
+fetch_malloc_stats(void)
+{
+	struct memory_type_list *mtlp;
+
+	mtlp = memstat_mtl_alloc();
+	ATF_REQUIRE(mtlp != NULL);
+	ATF_REQUIRE_MSG(memstat_sysctl_malloc(mtlp, 0) == 0,
+	    "memstat_sysctl_malloc: %s",
+	    memstat_strerror(memstat_mtl_geterror(mtlp)));
+	return (mtlp);
+}
+
+/*
+ * Temporarily adjust the address of the M_LINKER.ks_shortdesc pointer
+ * by one byte.  Fetch the malloc stats before and after the change to
+ * ensure that the reported description of M_LINKER changes from
+ * "linker" to "inker".
+ */
+ATF_TC_WITHOUT_HEAD(adjust_malloc_description);
+ATF_TC_BODY(adjust_malloc_description, tc)
+{
+	const char descr[] = "linker";
+	struct memory_type_list *mtlp;
+	ptraddr_t cap_addr, desc_addr;
+	char *data_descr;
+	size_t len;
+	ssize_t rv;
+	int fd[2];
+
+	fd[0] = open("/dev/ace2-ace-data", O_RDONLY);
+	ATF_REQUIRE_MSG(fd[0] != -1, "/dev/ace2-ace-data: %s", strerror(errno));
+	fd[1] = open("/dev/ace2-ace-capability", O_RDWR);
+	ATF_REQUIRE_MSG(fd[1] != -1, "/dev/ace2-ace-capability: %s",
+	    strerror(errno));
+
+	/* cap_addr holds the address of M_LINKER.ks_shortdesc */
+	cap_addr = symbol_address("M_LINKER");
+	cap_addr += offsetof(struct malloc_type, ks_shortdesc);
+
+	/* Ensure M_LINKER exists with the normal description. */
+	mtlp = fetch_malloc_stats();
+	ATF_REQUIRE_MSG(memstat_mtl_find(mtlp, ALLOCATOR_MALLOC, descr) !=
+	    NULL, "No malloc stat named \"%s\" exists", descr);
+	ATF_REQUIRE_MSG(memstat_mtl_find(mtlp, ALLOCATOR_MALLOC, descr + 1) ==
+	    NULL, "Malloc stat named \"%s\" exists", descr + 1);
+	memstat_mtl_free(mtlp);
+
+	/* Read the current address of ks_shortdesc. */
+	rv = pread(fd[1], &desc_addr, sizeof(desc_addr), cap_addr);
+	ATF_REQUIRE_MSG(rv != -1, "cap pread: %s", strerror(errno));
+	ATF_REQUIRE_INTEQ(sizeof(desc_addr), rv);
+	printf("Original address: %p\n", (void *)(uintptr_t)desc_addr);
+
+	/*
+	 * Read the string at desc_addr and check that it matches the
+	 * sysctl description.
+	 */
+	len = strlen(descr) + 1;
+	data_descr = malloc(len);
+	rv = pread(fd[0], data_descr, len, desc_addr);
+	ATF_REQUIRE_MSG(rv != -1, "data pread: %s", strerror(errno));
+	ATF_REQUIRE_INTEQ(len, rv);
+
+	printf("Description read from address: %.*s\n", (int)len, data_descr);
+	ATF_REQUIRE(memcmp(descr, data_descr, len) == 0);
+
+	/* Move the ks_shortdesc address one byte forward. */
+	desc_addr++;
+	rv = pwrite(fd[1], &desc_addr, sizeof(desc_addr), cap_addr);
+	ATF_REQUIRE_MSG(rv != -1, "cap pwrite: %s", strerror(errno));
+	ATF_REQUIRE_INTEQ(sizeof(desc_addr), rv);
+
+	/* Ensure M_LINKER now uses the adjusted description. */
+	mtlp = fetch_malloc_stats();
+	ATF_REQUIRE_MSG(memstat_mtl_find(mtlp, ALLOCATOR_MALLOC, descr + 1) !=
+	    NULL, "No malloc stat named \"%s\" exists", descr + 1);
+	ATF_REQUIRE_MSG(memstat_mtl_find(mtlp, ALLOCATOR_MALLOC, descr) ==
+	    NULL, "Malloc stat named \"%s\" exists", descr);
+	memstat_mtl_free(mtlp);
+
+	/* Restore the ks_shortdesc address. */
+	desc_addr--;
+	rv = pwrite(fd[1], &desc_addr, sizeof(desc_addr), cap_addr);
+	ATF_REQUIRE_MSG(rv != -1, "cap pwrite: %s", strerror(errno));
+	ATF_REQUIRE_INTEQ(sizeof(desc_addr), rv);
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, read_version);
 	ATF_TP_ADD_TC(tp, toggle_bootverbose);
+	ATF_TP_ADD_TC(tp, adjust_malloc_description);
 	return (atf_no_error());
 }
