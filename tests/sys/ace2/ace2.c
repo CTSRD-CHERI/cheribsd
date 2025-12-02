@@ -11,9 +11,12 @@
 
 #include <sys/linker.h>
 #include <sys/malloc.h>
+#include <sys/mutex.h>
 #include <sys/sysctl.h>
+#include <sys/user.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <libutil.h>
 #include <memstat.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -186,10 +189,79 @@ ATF_TC_BODY(adjust_malloc_description, tc)
 	ATF_REQUIRE_INTEQ(sizeof(desc_addr), rv);
 }
 
+/*
+ * Temporarily replace the M_LINKER.ks_shortdesc pointer with the name
+ * of the Giant mutex.  Fetch the malloc stats before and after the
+ * change to ensure that the reported description of M_LINKER changes
+ * from "linker" to "Giant".
+ *
+ * To restore the description after the test, save a copy of the original
+ * pointer at the bottom of the thread0 stack.
+ */
+ATF_TC_WITHOUT_HEAD(swap_malloc_description);
+ATF_TC_BODY(swap_malloc_description, tc)
+{
+	const char descr[] = "linker", giant[] = "Giant";
+	struct memory_type_list *mtlp;
+	struct kinfo_proc *kp;
+	ptraddr_t cap_addr, giant_addr, stack_addr;
+	ssize_t rv;
+	int fd;
+
+	fd = open("/dev/ace2-ace-copycap", O_WRONLY);
+	ATF_REQUIRE_MSG(fd != -1, "/dev/ace2-ace-copycap: %s", strerror(errno));
+
+	/* stack_addr holds the address of thread0's kstack */
+	kp = kinfo_getproc(0);
+	ATF_REQUIRE(kp != NULL);
+	stack_addr = (uintptr_t)kp->ki_kstack;
+	free(kp);
+
+	/* cap_addr holds the address of M_LINKER.ks_shortdesc */
+	cap_addr = symbol_address("M_LINKER");
+	cap_addr += offsetof(struct malloc_type, ks_shortdesc);
+
+	/* giant_addr holds the address of Giant.lock_object.lo_name */
+	giant_addr = symbol_address("Giant");
+	giant_addr += offsetof(struct mtx, lock_object.lo_name);
+
+	/* Ensure M_LINKER exists with the normal description. */
+	mtlp = fetch_malloc_stats();
+	ATF_REQUIRE_MSG(memstat_mtl_find(mtlp, ALLOCATOR_MALLOC, descr) !=
+	    NULL, "No malloc stat named \"%s\" exists", descr);
+	ATF_REQUIRE_MSG(memstat_mtl_find(mtlp, ALLOCATOR_MALLOC, giant) ==
+	    NULL, "Malloc stat named \"%s\" exists", giant);
+	memstat_mtl_free(mtlp);
+
+	/* Copy the current pointer to the kernel stack. */
+	rv = pwrite(fd, &cap_addr, sizeof(cap_addr), stack_addr);
+	ATF_REQUIRE_MSG(rv != -1, "copycap to stack: %s", strerror(errno));
+	ATF_REQUIRE_INTEQ(sizeof(cap_addr), rv);
+
+	/* Copy the Giant name to the M_LINKER description. */
+	rv = pwrite(fd, &giant_addr, sizeof(giant_addr), cap_addr);
+	ATF_REQUIRE_MSG(rv != -1, "copycap from Giant: %s", strerror(errno));
+	ATF_REQUIRE_INTEQ(sizeof(giant_addr), rv);
+
+	/* Ensure M_LINKER now uses the adjusted description. */
+	mtlp = fetch_malloc_stats();
+	ATF_REQUIRE_MSG(memstat_mtl_find(mtlp, ALLOCATOR_MALLOC, giant) !=
+	    NULL, "No malloc stat named \"%s\" exists", giant);
+	ATF_REQUIRE_MSG(memstat_mtl_find(mtlp, ALLOCATOR_MALLOC, descr) ==
+	    NULL, "Malloc stat named \"%s\" exists", descr);
+	memstat_mtl_free(mtlp);
+
+	/* Restore the ks_shortdesc address. */
+	rv = pwrite(fd, &stack_addr, sizeof(stack_addr), cap_addr);
+	ATF_REQUIRE_MSG(rv != -1, "copycap from stack: %s", strerror(errno));
+	ATF_REQUIRE_INTEQ(sizeof(stack_addr), rv);
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, read_version);
 	ATF_TP_ADD_TC(tp, toggle_bootverbose);
 	ATF_TP_ADD_TC(tp, adjust_malloc_description);
+	ATF_TP_ADD_TC(tp, swap_malloc_description);
 	return (atf_no_error());
 }
