@@ -72,7 +72,7 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 			td->td_md.md_flags &= ~MDTD_QTRACE_USERMODE;
 		return (0);
 #endif
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && defined(__riscv_zcheripurecap)
 	case RISCV_SET_UTIDC: {
 		uintcap_t val;
 		int error = fuecap(uap->parms, &val);
