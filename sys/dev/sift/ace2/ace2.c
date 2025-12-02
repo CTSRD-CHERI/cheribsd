@@ -25,6 +25,7 @@
 static d_open_t ace2_open;
 static d_read_t ace2_data_rdwr;
 static d_read_t ace2_capability_rdwr;
+static d_write_t ace2_copycap_write;
 
 static struct cdevsw ace2_data_cdevsw = {
 	.d_version = D_VERSION,
@@ -40,6 +41,13 @@ static struct cdevsw ace2_capability_cdevsw = {
 	.d_open = ace2_open,
 	.d_read = ace2_capability_rdwr,
 	.d_write = ace2_capability_rdwr
+};
+
+static struct cdevsw ace2_copycap_cdevsw = {
+	.d_version = D_VERSION,
+	.d_name = "ace2_copycap",
+	.d_open = ace2_open,
+	.d_write = ace2_copycap_write
 };
 
 static int
@@ -177,10 +185,53 @@ ace2_capability_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 }
 
 static int
+ace2_copycap_write(struct cdev *dev, struct uio *uio, int ioflag)
+{
+	uintptr_t *dst, *src;
+	ptraddr_t addr;
+	int error;
+
+	if (uio->uio_resid != sizeof(addr) ||
+	    !is_aligned(uio->uio_offset, sizeof(void *)))
+		return (EINVAL);
+
+	error = validate_kva_range(uio->uio_offset, sizeof(void *),
+	    VM_PROT_WRITE);
+	if (error != 0)
+		return (error);
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	dst = cheri_setaddress(kernel_root_cap, uio->uio_offset);
+	dst = cheri_setboundsexact(dst, sizeof(void *));
+#else
+	dst = (void *)(uintptr_t)uio->uio_offset;
+#endif
+
+	error = uiomove(&addr, sizeof(addr), uio);
+	if (error != 0)
+		return (error);
+
+	error = validate_kva_range(addr, sizeof(void *), VM_PROT_READ);
+	if (error != 0)
+		return (error);
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	src = cheri_setaddress(kernel_root_cap, addr);
+	src = cheri_setboundsexact(src, sizeof(void *));
+#else
+	src = (void *)(uintptr_t)addr;
+#endif
+	*dst = *src;
+	printf("ACE2_COPY_CAPABILITY from %p to %p\n", src, dst);
+	return (0);
+}
+
+static int
 ace2_modevent(module_t mod, int type, void *data)
 {
 	static struct cdev *ace2_data;
 	static struct cdev *ace2_capability;
+	static struct cdev *ace2_copycap;
 
 	switch (type) {
 	case MOD_LOAD:
@@ -188,10 +239,13 @@ ace2_modevent(module_t mod, int type, void *data)
 		    0600, "ace2-ace-data");
 		ace2_capability = make_dev(&ace2_capability_cdevsw, 0,
 		    UID_ROOT, GID_WHEEL, 0600, "ace2-ace-capability");
+		ace2_copycap = make_dev(&ace2_copycap_cdevsw, 0,
+		    UID_ROOT, GID_WHEEL, 0600, "ace2-ace-copycap");
 		return (0);
 	case MOD_UNLOAD:
 		destroy_dev(ace2_data);
 		destroy_dev(ace2_capability);
+		destroy_dev(ace2_copycap);
 		return (0);
 	default:
 		return (EOPNOTSUPP);
