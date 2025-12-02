@@ -133,10 +133,6 @@ extern struct cheribsdtest_child_state *ccsp;
 #endif
 #endif
 
-#ifndef XFAIL_VARARG_BOUNDS
-#define	XFAIL_VARARG_BOUNDS	NULL
-#endif
-
 #ifndef XFAIL_C18N_SIGALTSTACK
 #ifdef CHERIBSD_C18N_TESTS
 #define	XFAIL_C18N_SIGALTSTACK \
@@ -153,6 +149,10 @@ extern struct cheribsdtest_child_state *ccsp;
 #else
 #define	XFAIL_FLAKY_C18N_CONTEXT	NULL
 #endif
+#endif
+
+#ifndef XFAIL_VARARG_BOUNDS
+#define	XFAIL_VARARG_BOUNDS	NULL
 #endif
 
 struct cheri_test {
