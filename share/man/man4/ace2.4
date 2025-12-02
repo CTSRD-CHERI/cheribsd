@@ -7,7 +7,7 @@
 .\" Technology), and Capabilities Limited under Defense Advanced Research
 .\" Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
 .\"
-.Dd December 1, 2025
+.Dd December 2, 2025
 .Dt ACE2 4
 .Os
 .Sh NAME
@@ -37,10 +37,20 @@ while write operations set addresses of existing capabilities in the requested
 range preserving other capability metadata.
 Note that setting an address of a capability may clear the capability's tag
 if the new address is unrepresentable.
+.It Pa ace2-ace-copycap
+Each write operation copies a single capability from one kernel address to
+another.
+The offset of the write operation specifies the destination kernel virtual
+address.
+The write payload contains the source kernel virtual address
+(as a binary
+.Vt ptraddr_t
+value) of the capability to copy.
 .El
 .Sh FILES
 .Bl -tag -width "/dev/ace2-ace-capability" -compact
 .It Pa /boot/kernel/ace2.ko
 .It Pa /dev/ace2-ace-capability
+.It Pa /dev/ace2-ace-copycap
 .It Pa /dev/ace2-ace-data
 .El
