@@ -45,9 +45,7 @@
 #define	MACHINE		"riscv"
 #endif
 
-/* Always use the purecap arch for the kernel. */
-#if defined(__CHERI_PURE_CAPABILITY__) || (defined(_KERNEL) && \
-    __has_feature(capabilities))
+#if defined(__CHERI__)
 # ifndef MACHINE_ARCH
 #  define	MACHINE_ARCH	"riscv64c"
 # endif
@@ -96,7 +94,7 @@
 #define	MAXPAGESIZES	3	/* maximum number of supported page sizes */
 
 #ifndef KSTACK_PAGES
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 #define	KSTACK_PAGES	6	/* pages of kernel stack (with pcb) */
 #else
 #define	KSTACK_PAGES	4	/* pages of kernel stack (with pcb) */

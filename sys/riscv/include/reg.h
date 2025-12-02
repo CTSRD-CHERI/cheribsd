@@ -64,10 +64,10 @@ struct capreg {
 	__uintptr_t csp;		/* stack pointer */
 	__uintptr_t cgp;		/* global pointer */
 	__uintptr_t ctp;		/* thread pointer */
-	__uintptr_t ct[7];	/* temporaries */
-	__uintptr_t cs[12];	/* saved registers */
-	__uintptr_t ca[8];	/* function arguments */
-	__uintptr_t sepcc;	/* exception program counter */
+	__uintptr_t ct[7];		/* temporaries */
+	__uintptr_t cs[12];		/* saved registers */
+	__uintptr_t ca[8];		/* function arguments */
+	__uintptr_t sepcc;		/* exception program counter */
 	__uintptr_t ddc;
 	__uint64_t tagmask;
 	__uint64_t pad;
