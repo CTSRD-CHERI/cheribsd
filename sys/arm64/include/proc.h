@@ -73,13 +73,14 @@ struct mdthread {
 };
 
 struct mdproc {
-#if __has_feature(capabilities)
+#ifdef __CHERI__
 	void *md_sigcode;
-#endif
+#else
 	long	md_dummy;
+#endif
 };
 
-#if __has_feature(capabilities)
+#ifdef __CHERI__
 #define	KINFO_PROC_SIZE		1248
 #define	KINFO_PROC64_SIZE	1088
 #else

@@ -40,8 +40,7 @@
 
 #ifndef __ELF_WORD_SIZE
 #define	__ELF_WORD_SIZE	64	/* Used by <sys/elf_generic.h> */
-#if defined(__CHERI_PURE_CAPABILITY__) || \
-    (__has_feature(capabilities) && defined(_KERNEL))
+#ifdef __CHERI__
 #define	__ELF_CHERI
 #endif
 #endif
@@ -63,14 +62,14 @@ typedef struct {	/* Auxiliary vector entry on initial stack */
 	long	a_type;			/* Entry type. */
 	union {
 		long	a_val;		/* Integer value. */
-#if __ELF_WORD_SIZE == 64 && !defined(__CHERI_PURE_CAPABILITY__)
+#if __ELF_WORD_SIZE == 64 && !defined(__CHERI__)
 		void	*a_ptr;		/* Address. */
 		void	(*a_fcn)(void);	/* Function pointer (not used). */
 #endif
 	} a_un;
 } Elf64_Auxinfo;
 
-#if __has_feature(capabilities)
+#ifdef __CHERI__
 typedef struct {	/* Auxiliary vector entry on initial stack */
 	int64_t	a_type;			/* Entry type. */
 	union {
@@ -233,7 +232,7 @@ __ElfType(Auxinfo);
 #define	HWCAP32_2_CRC32		0x00000010
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 void elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap);
 #endif
 
