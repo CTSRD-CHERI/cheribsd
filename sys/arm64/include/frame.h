@@ -44,25 +44,19 @@
  * NOTE: keep this structure in sync with struct reg and struct mcontext.
  */
 struct trapframe {
-#if __has_feature(capabilities)
 	uintptr_t tf_sp;
 	uintptr_t tf_lr;
 	uintptr_t tf_elr;
+#ifdef __CHERI__
 	uintptr_t tf_ddc;
-#else
-	uint64_t tf_sp;
-	uint64_t tf_lr;
-	uint64_t tf_elr;
 #endif
 	uint64_t tf_spsr;
 	uint64_t tf_esr;
 	uint64_t tf_far;
-#if __has_feature(capabilities)
+#ifdef __CHERI__
 	uint64_t tf_pad;
-	uintptr_t tf_x[30];
-#else
-	uint64_t tf_x[30];
 #endif
+	uintptr_t tf_x[30];
 };
 
 /*

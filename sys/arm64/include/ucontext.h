@@ -51,7 +51,7 @@ struct fpregs {
 	int		fp_pad;
 };
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 struct capregs {
 	__uintptr_t	cap_x[30];
 	__uintptr_t	cap_lr;
@@ -82,7 +82,7 @@ struct sve_context {
 };
 
 struct __mcontext {
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	struct capregs	mc_capregs;
 #else
 	struct gpregs	mc_gpregs;
@@ -91,7 +91,7 @@ struct __mcontext {
 	int		mc_flags;
 #define	_MC_FP_VALID	0x1		/* Set when mc_fpregs has valid data */
 #define	_MC_CAP_VALID	(1u<<31)	/* Set when mc_capregs has valid data */
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	__uint32_t	mc_spsr;
 	__uint64_t	mc_pad;		/* Padding */
 	__uintptr_t	mc_ptr;		/* Address of extra_regs struct */
