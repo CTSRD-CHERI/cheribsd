@@ -518,7 +518,7 @@ SYSCTL_PROC(_debug, OID_AUTO, ftry_reclaim_vnode,
 #ifdef __CHERI_PURE_CAPABILITY__
 #define vnsz2log 9
 #else
-#define vnsz2log 8
+#define vnsz2log 9
 #endif
 #ifndef DEBUG_LOCKS
 _Static_assert(sizeof(struct vnode) >= 1UL << vnsz2log &&

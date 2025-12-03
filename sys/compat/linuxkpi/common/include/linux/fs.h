@@ -56,6 +56,7 @@ struct poll_table_struct;
 struct files_struct;
 struct pfs_node;
 struct linux_cdev;
+struct dir_context;
 
 #define	inode	vnode
 #define	i_cdev	v_rdev
@@ -67,6 +68,135 @@ struct linux_cdev;
 typedef struct files_struct *fl_owner_t;
 
 struct file_operations;
+struct kstat;
+struct fileattr;
+
+#define	kuid_t uid_t
+#define	kgid_t gid_t
+#define	uuid_t void * // wtf
+#define	sector_t uint64_t
+#define	i_data v_data
+#define	I_NEW	0x01
+#define	FS_REQUIRES_DEV	0x01
+#define	S_IRWXUGO ACCESSPERMS
+#define	MODULE_ALIAS_FS(X) // XXX
+#define	block_device g_consumer
+#define	umin MIN
+#define	DT_UNKNOWN	0x0
+#define	kfree_link NULL // XXX
+#define	ATTR_SIZE	0x01
+
+struct super_block {
+	void                    *s_fs_info;     /* Filesystem private info */
+	struct block_device     *s_bdev;
+	unsigned long           s_blocksize;
+	long			s_magic; // XXX
+	long			s_time_gran; // XXX
+	long			s_maxbytes; // XXX
+	const struct super_operations	*s_op;
+	struct dentry           *s_root;
+	struct mount		*s_mnt;
+	struct vnode		*s_devvp;
+};
+
+// XXX: This often gets cast to 'struct buf'.
+struct buffer_head {
+	struct bufobj	*b_bufobj;
+	long		b_bcount;
+	void		*b_caller1;
+	caddr_t		b_data;
+	int		b_error;
+	uint16_t	b_iocmd;	/* BIO_* bio_cmd from bio.h */
+	uint16_t	b_ioflags;	/* BIO_* bio_flags from bio.h */
+	off_t		b_iooffset;
+	long		b_resid;
+};
+
+struct writeback_control {
+};
+
+struct mnt_idmap {
+};
+
+struct delayed_call {
+};
+
+static struct mnt_idmap nop_mnt_idmap; // XXX
+
+struct user_namespace {
+};
+
+static struct user_namespace init_user_ns;
+
+struct dir_context {
+	off_t	pos;
+};
+
+struct address_space {
+};
+
+struct path {
+};
+
+struct file_system_type {
+	void	*owner;
+	char	*name;
+	int	fs_flags;
+	struct dentry *	(*mount)(struct file_system_type *, int, const char *, void *);
+	void	(*kill_sb)(struct super_block *);
+};
+
+struct __kernel_fsid_s {
+	int	val[2];
+};
+
+typedef struct __kernel_fsid_s __kernel_fsid_t;
+
+struct kstatfs {
+	long f_type;
+	__kernel_fsid_t f_fsid;
+	long f_blocks;
+	long f_namelen;
+	long f_ffree;
+	long f_files;
+	long f_bfree;
+	long f_bavail;
+	long f_bsize;
+};
+
+struct iattr {
+	unsigned int	ia_valid;
+	mode_t		ia_mode;
+	off_t		ia_size;
+};
+
+struct super_operations {
+	int	(*write_inode)(struct inode *, struct writeback_control *wbc);
+	int	(*sync_fs)(struct super_block *sb, int wait);
+	void	(*destroy_inode)(struct inode *);
+	void	(*put_super)(struct super_block *);
+	void	(*umount_begin)(struct super_block *);
+	void	(*evict_inode)(struct inode *);
+	int	(*statfs)(struct dentry *, struct kstatfs *);
+};
+
+struct inode_operations {
+	struct dentry *	(*lookup)(struct inode *,struct dentry *, unsigned int);
+	int	(*create)(struct mnt_idmap *, struct inode *,struct dentry *,
+			umode_t, bool);
+	int	(*mkdir)(struct mnt_idmap *, struct inode *,struct dentry *,
+			umode_t);
+	int	(*rmdir)(struct inode *,struct dentry *);
+	int	(*unlink)(struct inode *,struct dentry *);
+	int	(*symlink)(struct mnt_idmap *, struct inode *,struct dentry *,
+			const char *);
+	int	(*link)(struct dentry *,struct inode *,struct dentry *);
+	int	(*rename)(struct mnt_idmap *, struct inode *, struct dentry *,
+			struct inode *, struct dentry *, unsigned int);
+	int	(*setattr)(struct mnt_idmap *, struct dentry *, struct iattr *);
+	const char *	(*get_link)(struct dentry *, struct inode *,
+			struct delayed_call *);
+};
 
 struct linux_file_wait_queue {
 	struct wait_queue wq;
@@ -175,6 +305,7 @@ struct file_operations {
 	    struct pipe_inode_info *, size_t, unsigned int);
 	int (*setlease)(struct file *, long, struct file_lock **);
 #endif
+	int (*iterate_shared) (struct file *, struct dir_context *);
 };
 #define	fops_get(fops)		(fops)
 #define	replace_fops(f, fops)	((f)->f_op = (fops))
@@ -415,5 +546,54 @@ ssize_t simple_attr_write(struct file *filp, const char *buf, size_t write_size,
 
 ssize_t simple_attr_write_signed(struct file *filp, const char *buf,
 	    size_t write_size, loff_t *ppos);
+
+void	setattr_copy(struct mnt_idmap *idmap, struct inode *inode, const struct iattr *attr);
+off_t	i_size_read(const struct inode *inode);
+void	set_delayed_call(struct delayed_call *call, void (*fn)(void *cb), void *arg);
+void	mark_buffer_dirty(struct buffer_head *bh);
+struct buffer_head	*sb_bread(struct super_block *sb, sector_t bn);
+void	inode_init_owner(struct mnt_idmap *idmap, struct inode *inode, const struct inode *dir, umode_t mode);
+void	inode_set_ctime_to_ts(struct inode *inode, struct timespec64 ts);
+void	inode_set_atime_to_ts(struct inode *inode, struct timespec64 ts);
+void	inode_set_mtime_to_ts(struct inode *inode, struct timespec64 ts);
+kuid_t	make_kuid(struct user_namespace *from, uid_t uid);
+kuid_t	make_kgid(struct user_namespace *from, uid_t uid);
+void	set_nlink(struct inode *inode, unsigned int nlink);
+void	inode_nohighmem(struct inode *inode);
+struct inode	*iget_locked(struct super_block *sb, unsigned long num);
+void	__destroy_inode(struct inode *inode);
+void	unlock_new_inode(struct inode *inode);
+void	mark_inode_dirty(struct inode *inode);
+bool	dir_emit(struct dir_context *ctx, const char *name, int namelen, u64 ino, unsigned type);
+bool	dir_emit_dots(struct file *file, struct dir_context *ctx);
+int	unregister_filesystem(struct file_system_type *fst);
+void	truncate_inode_pages_final(void *as);
+void	kill_block_super(struct super_block *sb);
+void	d_add(struct dentry *d, struct inode *add);
+struct inode	*new_inode(struct super_block *sb);
+time64_t	inode_get_atime_sec(const struct inode *inode);
+time64_t	inode_get_mtime_sec(const struct inode *inode);
+time64_t	inode_get_ctime_sec(const struct inode *inode);
+gid_t	from_kgid(struct user_namespace *to, kgid_t gid);
+gid_t	from_kuid(struct user_namespace *to, kuid_t uid);
+struct timespec64	simple_inode_init_ts(struct inode *inode);
+void	insert_inode_hash(struct inode *inode);
+void	inode_dec_link_count(struct inode *inode);
+void	inc_nlink(struct inode *inode);
+void	d_instantiate(struct dentry *dentry, struct inode *inode);
+void	ihold(struct inode *inode);
+int	setattr_prepare(struct mnt_idmap *idmap, struct dentry *dentry, struct iattr *ia);
+int	inode_newsize_ok(const struct inode *inode, loff_t offset);
+int	truncate_setsize(struct inode *inode, loff_t offset);
+void	clear_inode(struct inode *inode);
+void	invalidate_inode_buffers(struct inode *inode);
+int	sb_set_blocksize(struct super_block *sb, int size);
+struct dentry	*d_make_root(struct inode *vp);
+struct dentry	*mount_bdev(struct file_system_type *fs_type, int flags,
+	    const char *dev_name, void *data,
+	    int (*fill_super)(struct super_block *, void *, int));
+int	register_filesystem(struct file_system_type *fst);
+void	brelse(struct buffer_head *bh);
+size_t	bdev_nr_sectors(struct block_device *);
 
 #endif /* _LINUXKPI_LINUX_FS_H_ */
