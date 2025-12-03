@@ -16,10 +16,14 @@
 #include <linux/stddef.h>
 #include <linux/statfs.h>
 #include <linux/string.h>
-#include <sift/ace2_syncpoint.h>
+//#include <sift/ace2_syncpoint.h> // XXX
+
+#define PACMANFS_MAGIC          0x73697269
 
 #include "pacmanfs.h"
 #include "pacmanfs_on_disk.h"
+
+struct file_system_type *global_fst = NULL; // XXX
 
 #define INODES_PER_BLOCK \
 	(PACMANFS_BLOCKSIZE / sizeof(struct pacmanfs_inode_disk))
@@ -586,7 +590,7 @@ static ssize_t pacmanfs_read(struct file *filp, char __user *buf, size_t len,
 			     loff_t *ppos)
 {
 	struct inode *inode = file_inode(filp);
-	ace2_syncpoint("PACMANFS_EXP1", "inode = 0x%px\n", inode->i_private);
+	//ace2_syncpoint("PACMANFS_EXP1", "inode = 0x%px\n", inode->i_private);
 	struct super_block *sb = inode->i_sb;
 	// Check bounds
 	if (*ppos >= inode->i_size)
@@ -605,7 +609,7 @@ static ssize_t pacmanfs_read(struct file *filp, char __user *buf, size_t len,
 	loff_t i = (*ppos) / PACMANFS_BLOCKSIZE;
 	size_t have_read = 0;
 	loff_t offset = (*ppos) % PACMANFS_BLOCKSIZE;
-	char __user *current_buf = buf;
+	char __user * __capability current_buf = (__cheri_tocap char * __capability)buf;
 	while (to_read > 0 && (block = get_nth_block(inode, i))) {
 		// Read data block
 		if (!(bh = sb_bread(sb, block))) {
@@ -660,7 +664,7 @@ static ssize_t pacmanfs_write(struct file *filp, const char __user *buf,
 	int i = (*ppos) / PACMANFS_BLOCKSIZE;
 	size_t have_written = 0;
 	loff_t offset = (*ppos) % PACMANFS_BLOCKSIZE;
-	const char __user *current_buf = buf;
+	const char __user * __capability current_buf = (__cheri_tocap const char * __capability)buf;
 	struct buffer_head *block_bh;
 	while (to_write > 0 && (block = get_nth_block(inode, i))) {
 		// Read data block
@@ -748,7 +752,7 @@ static int add_dirent(struct inode *parent_dir, struct dentry *new_dentry,
 	loff_t block_idx = dirent_offset / PACMANFS_BLOCKSIZE;
 	block_number_t block;
 	if (!(block = get_nth_block(parent_dir, block_idx))) {
-		pr_err("pacmanfs: couldn't find block index %llu (even after allocating...)",
+		pr_err("pacmanfs: couldn't find block index %ld (even after allocating...)",
 		       block_idx);
 		return -EIO;
 	}
@@ -1393,7 +1397,7 @@ static int pacmanfs_statfs(struct dentry *dentry, struct kstatfs *kstat)
 {
 	struct super_block *sb = dentry->d_sb;
 	long long total_blocks =
-		sb->s_bdev->bd_nr_sectors / (sb->s_blocksize / 512);
+		bdev_nr_sectors(sb->s_bdev) / (sb->s_blocksize / 512);
 	kstat->f_type = PACMANFS_MAGIC;
 	// TODO don't fix me :)
 	kstat->f_fsid = (__kernel_fsid_t){
@@ -1449,7 +1453,8 @@ static int pacmanfs_fill_super(struct super_block *sb, void *data, int silent)
 
 	sbi->s_disk = sb_disk;
 	if (sb_disk->s_magic != PACMANFS_MAGIC) {
-		pr_err("pacmanfs: bad magic (trapped in a labyrinth!)");
+		pr_err("pacmanfs: bad magic %#x (trapped in a labyrinth!)", sb_disk->s_magic);
+		brelse(bh);
 		return -EINVAL;
 	}
 
@@ -1469,15 +1474,19 @@ static int pacmanfs_fill_super(struct super_block *sb, void *data, int silent)
 	// set up root inode
 	struct pacmanfs_inode_disk *root_inode_disk =
 		kzalloc(sizeof(struct pacmanfs_inode_disk), GFP_KERNEL);
-	if (!root_inode_disk)
+	if (!root_inode_disk) {
+		brelse(bh);
 		return -ENOMEM;
+	}
 
 	memcpy(root_inode_disk, (struct pacmanfs_inode_disk *)bh->b_data,
 	       sizeof(struct pacmanfs_inode_disk));
 
 	struct inode *root_inode = new_inode(sb);
-	if (!root_inode)
+	if (!root_inode) {
+		brelse(bh);
 		return -ENOMEM;
+	}
 	insert_inode_hash(root_inode);
 	inode_init_owner(&nop_mnt_idmap, root_inode, NULL,
 			 root_inode_disk->mode);
@@ -1493,7 +1502,7 @@ static int pacmanfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_root = d_make_root(root_inode);
 
 	long long total_blocks =
-		sb->s_bdev->bd_nr_sectors / (sb->s_blocksize / 512);
+		bdev_nr_sectors(sb->s_bdev) / (sb->s_blocksize / 512);
 	pr_info("pacmanfs: Device has %lld total blocks\n", total_blocks);
 
 	brelse(bh);
@@ -1544,6 +1553,10 @@ static void __exit pacmanfs_exit(void)
 	unregister_filesystem(&pacmanfs_type);
 	pr_info("Goodbye world 1.\n");
 }
+
+
+MODULE_VERSION(pacmanfs, 1);
+MODULE_DEPEND(pacmanfs, linuxkpi, 1, 1, 1);
 
 MODULE_DESCRIPTION("File system for the PACMAN project");
 MODULE_LICENSE("GPL");
