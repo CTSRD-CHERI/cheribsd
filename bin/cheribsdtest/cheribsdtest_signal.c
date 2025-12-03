@@ -340,7 +340,7 @@ CHERIBSDTEST(null_pointer_exec_sigsegv,
     .ct_si_code = SEGV_MAPERR,
     .ct_si_trapno = TRAPNO_EXEC_PF)
 {
-	void (*p)(void) = (void *)(uintptr_t)1;
+	void (*p)(void) = (void *)(uintptr_t)4;
 
 	p();
 	cheribsdtest_failure_errx("Unexpected branch to NULL pointer");
