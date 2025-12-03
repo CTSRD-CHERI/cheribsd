@@ -331,3 +331,21 @@ g_vfs_close(struct g_consumer *cp)
 	KASSERT(sc->sc_event == NULL, ("g_vfs %p event is non-NULL", sc));
 	g_free(sc);
 }
+
+void
+_g_topology_lock(void)
+{
+	g_topology_lock();
+}
+
+void
+_g_topology_unlock(void)
+{
+	g_topology_unlock();
+}
+
+size_t
+bdev_nr_sectors(struct g_consumer *cp)
+{
+	return (cp->provider->mediasize);
+}

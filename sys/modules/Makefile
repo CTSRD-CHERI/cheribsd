@@ -305,6 +305,7 @@ SUBDIR=	\
 	${_otusfw} \
 	ow \
 	p9fs \
+	pacmanfs \
 	${_padlock} \
 	${_padlock_rng} \
 	${_pchtherm} \

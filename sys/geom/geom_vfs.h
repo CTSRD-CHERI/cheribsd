@@ -39,4 +39,8 @@ void g_vfs_strategy(struct bufobj *bo, struct buf *bp);
 int g_vfs_open(struct vnode *vp, struct g_consumer **cpp, const char *fsname, int wr);
 void g_vfs_close(struct g_consumer *cp);
 
+void _g_topology_lock(void);
+void _g_topology_unlock(void);
+size_t bdev_nr_sectors(struct g_consumer *cp);
+
 #endif /* _GEOM_GEOM_VFS_H_ */

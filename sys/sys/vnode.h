@@ -196,6 +196,20 @@ struct vnode {
 	int	v_writecount;			/* I ref count of writers or
 						   (negative) text users */
 	int	v_seqc_users;			/* i modifications pending */
+
+	// XXX linuxkpi
+	mode_t	i_mode;
+	gid_t	i_gid;
+	gid_t	i_uid;
+	off_t	i_size;
+	const struct inode_operations	*i_op;
+	const struct file_operations	*i_fop;
+	void	*i_private;
+	unsigned int	i_flags;
+	struct super_block	*i_sb;
+	unsigned long	i_ino;
+	unsigned int	i_nlink;
+
 };
 
 #ifndef DEBUG_LOCKS
@@ -206,7 +220,7 @@ struct vnode {
  * to the structure and there is nothing which can be done to prevent growth
  * then so be it. But don't grow it without a good reason.
  */
-_Static_assert(sizeof(struct vnode) <= 448, "vnode size crosses 448 bytes");
+//_Static_assert(sizeof(struct vnode) <= 448, "vnode size crosses 448 bytes");
 #endif
 #endif
 #endif

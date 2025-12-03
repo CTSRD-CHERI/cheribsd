@@ -31,9 +31,16 @@
 
 #include <fs/pseudofs/pseudofs.h>
 
+struct qstr {
+	const char *name;
+	size_t len;
+};
+
 struct dentry {
 	struct vnode *d_inode;
 	struct pfs_node *d_pfs_node;	/* FreeBSD specific field */
+	struct qstr d_name;
+	struct super_block *d_sb;
 };
 
 static inline struct vnode *
