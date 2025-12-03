@@ -40,7 +40,7 @@ typedef int (*pcpu_bp_harden)(void);
 typedef int (*pcpu_ssbd)(int);
 struct debug_monitor_state;
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 #define	PCPU_MD_FIELDS_PAD 0
 #else
 #define	PCPU_MD_FIELDS_PAD 197
