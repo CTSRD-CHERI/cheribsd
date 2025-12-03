@@ -54,9 +54,6 @@
 /*
  * Fault handler for the copy{in,out} functions below.
  */
-#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-	.code	c64
-#endif
 ENTRY(copyio_c64_fault)
 	EXIT_C64
 EENTRY(copyio_fault)
@@ -77,10 +74,6 @@ ENTRY(copyout)
 	cbz	x2, 1f
 	check_user_access 1, 2, copyio_fault_nopcb
 
-#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-	cvtd	c0, x0			/* Store through a capability */
-	scbnds	c0, c0, x2		/* Set the bounds */
-#endif
 	b	copycommon
 
 1:	mov	x0, xzr		/* return 0 */
@@ -96,11 +89,6 @@ END(copyout)
 ENTRY(copyin)
 	cbz	x2, 1f
 	check_user_access 0, 2, copyio_fault_nopcb
-
-#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-	cvtd	c1, x1			/* Store through a capability */
-	scbnds	c1, c1, x2		/* Set the bounds */
-#endif
 
 	b	copycommon
 
@@ -119,11 +107,6 @@ ENTRY(copyinstr)
 	mov	x5, xzr		/* count = 0 */
 	mov	w4, #1		/* If zero return faulure */
 	cbz	x2, 3f		/* If len == 0 then skip loop */
-
-#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-	cvtd	c1, x1			/* Store through a capability */
-	scbnds	c1, c1, x2		/* Set the bounds */
-#endif
 
 	adr	PTR(6), copyio_fault /* Get the handler address */
 	SET_FAULT_HANDLER(PTR(6), PTR(7)) /* Set the handler */
@@ -278,12 +261,6 @@ ENTRY(copyinptr)
 	cbz	x2, 1f
 	check_user_access 0, 2, copyio_fault_nopcb
 
-	/* Create a capability from kdaddr */
-#ifndef __CHERI_PURE_CAPABILITY__
-	cvtd	c1, x1			/* Store through a capability */
-	scbnds	c1, c1, x2		/* Set the bounds */
-#endif
-
 	/* Check the length is greater than 1 capability */
 	cmp	x2, #16
 	b.lo	copycommon
@@ -308,12 +285,6 @@ END(copyinptr)
 ENTRY(copyoutptr)
 	cbz	x2, 1f
 	check_user_access 1, 2, copyio_fault_nopcb
-
-	/* Create a capability from kaddr */
-#ifndef __CHERI_PURE_CAPABILITY__
-	cvtd	c0, x0			/* Store through a capability */
-	scbnds	c0, c0, x2		/* Set the bounds */
-#endif
 
 	/* Check the length is greater than 1 capability */
 	cmp	x2, #16
