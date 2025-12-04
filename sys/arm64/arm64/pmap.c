@@ -10632,6 +10632,10 @@ sysctl_kmaps_dump(struct sbuf *sb, struct pmap_kernel_map_range *range,
     vm_offset_t eva)
 {
 	const char *mode;
+#if __has_feature(capabilities)
+	char lc_mode, sc_mode, cdbm_mode;
+#endif
+	pt_entry_t attr;
 	int index;
 
 	if (eva <= range->sva)
@@ -10662,13 +10666,50 @@ sysctl_kmaps_dump(struct sbuf *sb, struct pmap_kernel_map_range *range,
 		break;
 	}
 
-	sbuf_printf(sb, "0x%016lx-0x%016lx r%c%c%c%c%c %6s %d %d %d %d %d\n",
+#if __has_feature(capabilities)
+	attr = range->attrs & ATTR_LC_MASK;
+	switch (attr) {
+	case ATTR_LC_DISABLED:
+		lc_mode = 'L';
+		break;
+	case ATTR_LC_ENABLED:
+		lc_mode = 'C';
+		break;
+	case ATTR_LC_GEN0:
+		lc_mode = '0';
+		break;
+	case ATTR_LC_GEN1:
+		lc_mode = '1';
+		break;
+	default:
+		lc_mode = '?';
+		printf("%s: unknown LC state %lx\n", __func__, attr);
+		break;
+	}
+	if (range->attrs & ATTR_SC)
+		sc_mode = 'S';
+	else
+		sc_mode = '-';
+	if (range->attrs & ATTR_CDBM)
+		cdbm_mode = 'D';
+	else
+		cdbm_mode = '-';
+#endif
+
+	sbuf_printf(sb, "0x%016lx-0x%016lx r%c%c%c%c%c "
+#if __has_feature(capabilities)
+	    "c%c%c%c"
+#endif
+	    " %6s %d %d %d %d %d\n",
 	    range->sva, eva,
 	    (range->attrs & ATTR_S1_AP_RW_BIT) == ATTR_S1_AP_RW ? 'w' : '-',
 	    (range->attrs & ATTR_S1_PXN) != 0 ? '-' : 'x',
 	    (range->attrs & ATTR_S1_UXN) != 0 ? '-' : 'X',
 	    (range->attrs & ATTR_S1_AP(ATTR_S1_AP_USER)) != 0 ? 'u' : 's',
 	    (range->attrs & ATTR_S1_GP) != 0 ? 'g' : '-',
+#if __has_feature(capabilities)
+	    lc_mode, sc_mode, cdbm_mode,
+#endif
 	    mode, range->l1blocks, range->l2contig, range->l2blocks,
 	    range->l3contig, range->l3pages);
 
@@ -10718,8 +10759,13 @@ sysctl_kmaps_table_attrs(pd_entry_t table)
 static pt_entry_t
 sysctl_kmaps_block_attrs(pt_entry_t block)
 {
-	return (block & (ATTR_S1_AP_MASK | ATTR_S1_XN | ATTR_S1_IDX_MASK |
-	    ATTR_S1_GP));
+	pt_entry_t attr_mask = (ATTR_S1_AP_MASK | ATTR_S1_XN | ATTR_S1_IDX_MASK |
+	    ATTR_S1_GP);
+#if __has_feature(capabilities)
+	attr_mask |= ATTR_LC_MASK | ATTR_SC | ATTR_CDBM;
+#endif
+
+	return (block & attr_mask);
 }
 
 /*
@@ -10787,6 +10833,10 @@ sysctl_kmaps(SYSCTL_HANDLER_ARGS)
 			sbuf_printf(sb, "\nDirect map:\n");
 		else if (i == pmap_l0_index(VM_MIN_KERNEL_ADDRESS))
 			sbuf_printf(sb, "\nKernel map:\n");
+#ifdef CHERI_CAPREVOKE_KERNEL
+		else if (i == pmap_l0_index(CHERI_REVOKE_KSHADOW_MIN))
+			sbuf_printf(sb, "\nKernel revocation shadow bitmap:\n");
+#endif
 #ifdef KASAN
 		else if (i == pmap_l0_index(KASAN_MIN_ADDRESS))
 			sbuf_printf(sb, "\nKASAN shadow map:\n");
