@@ -1094,6 +1094,16 @@ snl_realloc_msg_buffer(struct snl_writer *nw, size_t sz)
 		}
 		nw->base = (char *)new_base;
 	}
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (cheri_getlen(new_base) != cheri_getlen(nw->base)) {
+		nw->base = (char *)cheri_setboundsexact(new_base, nw->size);
+		if (nw->hdr != NULL) {
+			int hdr_off = (char *)(nw->hdr) - nw->base;
+			nw->hdr = (struct nlmsghdr *)
+						(void *)((char *)nw->base + hdr_off);
+		}
+	}
+#endif
 
 	return (true);
 }
