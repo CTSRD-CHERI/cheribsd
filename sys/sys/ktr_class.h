@@ -75,7 +75,7 @@
 #define	KTR_PTRACE	0x80000000		/* Process debugging. */
 #define	KTR_ALL		0xffffffff
 
-#ifdef CHERI_CAPREVOKE_KERNEL
+#ifdef CHERI_CAPREVOKE
 #define	KTR_CAPREVOKE	KTR_SPARE5
 #endif
 
