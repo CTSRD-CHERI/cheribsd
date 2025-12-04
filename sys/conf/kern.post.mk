@@ -180,6 +180,12 @@ ${KERNEL_KO}.debug: ${FULLKERNEL}
 install.debug reinstall.debug: gdbinit
 	cd ${.CURDIR}; ${MAKE} ${.TARGET:R}
 
+${COMPILATION_DB_FILE}: ${FULLKERNEL}
+	sed -e '1s/^/[/' -e '$$s/,$$/]/' ${COMPILATION_DB_DIR}/*.json > $@
+
+all: ${COMPILATION_DB_FILE}
+
+
 # Install gdbinit files for kernel debugging.
 gdbinit:
 	grep -v '# XXX' ${S}/../tools/debugscripts/dot.gdbinit | \
