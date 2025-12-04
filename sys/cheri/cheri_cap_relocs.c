@@ -31,15 +31,31 @@
  */
 
 #include <sys/types.h>
+#include <machine/cherireg.h>
 #include <cheri_init_globals.h>
 
-/* Invoked from locore. */
-extern void init_cap_relocs(void *data_cap, void *code_cap);
+/* Referenced from locore. */
+void kernel_cap_relocs_cb(void *arg, bool function, bool constant,
+    ptraddr_t object, void **src);
 
 void
-init_cap_relocs(void *data_cap, void *code_cap)
+kernel_cap_relocs_cb(void *arg, bool function, bool constant,
+    ptraddr_t object, void **src)
 {
-	cheri_init_globals_3(data_cap, code_cap, data_cap);
+	void *cap;
+
+	cap = __builtin_cheri_address_set(arg, object);
+	if (function) {
+		cap = __builtin_cheri_perms_and(cap, CHERI_PERMS_KERNEL_CODE);
+#ifdef CHERI_FLAGS_CAP_MODE
+		cap = __builtin_cheri_flags_set(cap, CHERI_FLAGS_CAP_MODE);
+#endif
+	} else if (constant) {
+		cap = __builtin_cheri_perms_and(cap, CHERI_PERMS_KERNEL_RODATA);
+	} else {
+		cap = __builtin_cheri_perms_and(cap, CHERI_PERMS_KERNEL_DATA);
+	}
+	*src = cap;
 }
 
 /* Can't include <sys/cheri.h>. */
@@ -48,26 +64,16 @@ typedef void (cap_relocs_cb)(void *arg, bool function, bool constant,
 
 int	init_linker_file_cap_relocs(const void *start_relocs,
 	    const void *stop_relocs, void *data_cap, ptraddr_t base_addr,
-	    cap_relocs_cb *cb, void *cb_arg);
+	    bool can_set_code_bounds, cap_relocs_cb *cb, void *cb_arg);
 
 /* Can't include <sys/systm.h>. */
 int	printf(const char *, ...) __printflike(1, 2);
 
 int
 init_linker_file_cap_relocs(const void *start_relocs, const void *stop_relocs,
-    void *data_cap, ptraddr_t base_addr, cap_relocs_cb *cb, void *cb_arg)
+    void *data_cap, ptraddr_t base_addr, bool can_set_code_bounds,
+    cap_relocs_cb *cb, void *cb_arg)
 {
-	/*
-	 * Set code bounds if the ABI allows it.
-	 * When building for hybrid or with the pc-relative captable ABI we do
-	 * not further constrain the given code_cap.
-	 */
-#if !defined(__CHERI_PURE_CAPABILITY__) || __CHERI_CAPABILITY_TABLE__ == 3
-	bool can_set_code_bounds = false;
-#else
-	bool can_set_code_bounds = true;
-#endif
-
 	/*
 	 * This cannot use cheri_init_globals_impl directly as symbols
 	 * for kernel modules in the vnet and dpcpu sets need to use

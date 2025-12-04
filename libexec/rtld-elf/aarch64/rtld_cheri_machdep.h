@@ -49,8 +49,7 @@
 	(CHERI_PERM_SW_VMEM)
 
 #ifdef __CHERI_PURE_CAPABILITY__
-/* TODO: ABIs with tight bounds */
-#define can_use_tight_pcc_bounds(obj) ((void)(obj), false)
+#define can_use_tight_pcc_bounds(obj) ((obj)->npcc_caps != 0)
 #endif
 
 /*
