@@ -300,7 +300,9 @@ ext2_htree_find_leaf(struct inode *ip, const char *name, int namelen,
 	if ((levels = rootp->h_info.h_ind_levels) > 1)
 		goto error;
 
-	entp = (struct ext2fs_htree_entry *)(((char *)&rootp->h_info) +
+	/* Preserve capability bound here. */
+	entp = (struct ext2fs_htree_entry *)(((char *)rootp) +
+	    offsetof(struct ext2fs_htree_root, h_info) +
 	    rootp->h_info.h_info_len);
 
 	if (ext2_htree_get_limit(entp) !=
