@@ -82,6 +82,9 @@ print_utrace_mrs(FILE *fp, void *p)
 	case UTRACE_MRS_QUARANTINE_REVOKE_DONE:
 		fprintf(fp, "quarantine_revoke() done");
 		break;
+	case UTRACE_MRS_REAL_FREE:
+		fprintf(fp, "REAL(free)(%p)", ut->p);
+		break;
 	default:
 		return (0);
 	}
