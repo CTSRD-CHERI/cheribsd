@@ -56,6 +56,8 @@ _Static_assert((CHERI_REVOKE_KSHADOW_MAX - CHERI_REVOKE_KSHADOW_MIN) ==
     ((VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS) / 8 / sizeof(void *)),
 	"Invalid kernel revoke shadow bitmap size");
 
+FEATURE(cheri_revoke_kernel, "CHERI kernel capability revocation support");
+
 /*
  * Kernel revocation info context.
  * This is a statically allocated version of the user info page.

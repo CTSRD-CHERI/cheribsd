@@ -416,7 +416,11 @@ static char cheri_notice[] =
     "CHERI hybrid kernel"
 #endif
 #ifdef CHERI_CAPREVOKE
-    " with revocation support"
+#ifdef CHERI_CAPREVOKE_KERNEL
+    " with user/kernel revocation support"
+#else
+    " with user revocation support"
+#endif
 #endif
     "\n";
 SYSINIT(cherinotice, SI_SUB_COPYRIGHT, SI_ORDER_ANY, print_caddr_t,
