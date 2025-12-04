@@ -901,26 +901,27 @@ pmap_pte_cr(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 {
 	if (prot & VM_PROT_READ_CAP) {
 #ifdef CHERI_CAPREVOKE
-		if ((va < VM_MAX_USER_ADDRESS) &&
-		    (pmap->pm_stage == PM_STAGE1)) {
-			/* Stage 1 user pages gated by CLG */
+		if (pmap->pm_stage == PM_STAGE1) {
+#ifndef CHERI_CAPREVOKE_KERNEL
+			/* Kernel pages always load OK. */
+			if (va >= VM_MAX_USER_ADDRESS)
+				return ATTR_LC_ENABLED;
+#endif
+			/* Stage 1 pages gated by CLG. */
 			return pmap->flags.uclg ? ATTR_LC_GEN1 : ATTR_LC_GEN0;
 		} else {
-			/*
-			 * Kernel pages always load OK; Stage 2 doesn't support
-			 * CLG.
-			 */
+			/* Stage 2 doesn't support CLG. */
 			return ATTR_LC_ENABLED;
 		}
-#else
+#else /* !defined(CHERI_CAPREVOKE) */
 		return ATTR_LC_ENABLED;
-#endif
+#endif /* !defined(CHERI_CAPREVOKE) */
 	} else {
 		/* XXX Let's see what happens! */
 		return ATTR_LC_DISABLED;
 	}
 }
-#endif
+#endif /* __has_feature(capabilities) */
 
 static pt_entry_t
 pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
@@ -2545,10 +2546,15 @@ pmap_qenter(vm_offset_t sva, vm_page_t *ma, int count)
 		m = ma[i];
 		attr = ATTR_AF | pmap_sh_attr |
 		    ATTR_S1_AP(ATTR_S1_AP_RW) | ATTR_S1_XN |
-#if __has_feature(capabilities)
-		    ATTR_CAP_RW |
-#endif
 		    ATTR_KERN_GP | ATTR_S1_IDX(m->md.pv_memattr) | L3_PAGE;
+#if __has_feature(capabilities)
+#ifdef CHERI_CAPREVOKE_KERNEL
+		attr |= (kernel_pmap->flags.uclg ?
+		    ATTR_LC_GEN1 : ATTR_LC_GEN0) | ATTR_SC;
+#else
+		attr |= ATTR_CAP_RW;
+#endif
+#endif
 		pte = pmap_l2_to_l3(pde, va);
 		old_l3e |= pmap_load_store(pte, VM_PAGE_TO_PTE(m) | attr);
 
