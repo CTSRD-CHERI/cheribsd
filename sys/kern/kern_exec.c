@@ -34,6 +34,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/abi_compat.h>
 #include <sys/acct.h>
 #include <sys/asan.h>
 #include <sys/capsicum.h>

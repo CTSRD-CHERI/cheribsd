@@ -37,6 +37,7 @@
 #include <cheri/cheric.h>
 #include <cheri/cherireg.h>
 
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 
 int

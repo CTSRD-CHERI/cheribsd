@@ -40,6 +40,7 @@
 #endif
 
 #include <sys/param.h>
+#include <sys/abi_compat.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/nv.h>

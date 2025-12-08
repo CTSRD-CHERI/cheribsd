@@ -31,6 +31,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/abi_compat.h>
 #include <sys/sysproto.h>
 #include <sys/kernel.h>
 #include <sys/priv.h>

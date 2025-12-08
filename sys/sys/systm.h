@@ -117,57 +117,6 @@ extern bool scheduler_stopped;
  */
 #define	SCHEDULER_STOPPED()	__predict_false(scheduler_stopped)
 
-/*
- * Macros to create userspace capabilities from virtual addresses.
- * Addresses are assumed to be relative to the current userspace
- * thread's address space and are created from the DDC or PCC of
- * the current PCB.
- */
-#if __has_feature(capabilities)
-/*
- * Derive out-of-bounds and small values from NULL.  This allows common
- * sentinel values to work.
- */
-#define ___USER_CFROMPTR(ptr, cap, is_offset)				\
-    ((void *)(uintptr_t)(ptr) == NULL ? NULL :				\
-     ((vm_offset_t)(ptr) < 4096 ||					\
-      (vm_offset_t)(ptr) > VM_MAXUSER_ADDRESS) ?			\
-	(void * __capability)(uintcap_t)(ptraddr_t)(ptr) :		\
-	(is_offset) ?							\
-	__builtin_cheri_offset_set((cap), (ptraddr_t)(ptr)) :		\
-	__builtin_cheri_address_set((cap), (ptraddr_t)(ptr)))
-
-#define	USER_PTR_UNBOUND(ptr)						\
-	___USER_CFROMPTR((ptr), __USER_DDC, __USER_DDC_OFFSET_ENABLED)
-
-#define	USER_CODE_PTR(ptr)						\
-	___USER_CFROMPTR((ptr), __USER_PCC, __USER_PCC_OFFSET_ENABLED)
-
-#define	USER_PTR(ptr, len)						\
-({									\
-	void * __capability unbound = USER_PTR_UNBOUND(ptr);		\
-	(security_cheri_bound_legacy_capabilities &&			\
-	    __builtin_cheri_tag_get(unbound) ?				\
-	    __builtin_cheri_bounds_set(unbound, (len)) : unbound);	\
-})
-
-#else /* !has_feature(capabilities) */
-#define	USER_PTR_UNBOUND(ptr)	((void *)(uintptr_t)(ptr))
-#define	USER_CODE_PTR(ptr)	((void *)(uintptr_t)(ptr))
-#define	USER_PTR(ptr, len)	((void *)(uintptr_t)(ptr))
-#endif /* !has_feature(capabilities) */
-
-#define	USER_PTR_ADDR(ptr)	USER_PTR_UNBOUND(ptr)
-#define	USER_PTR_ARRAY(objp, cnt) \
-     USER_PTR((objp), sizeof(*(objp)) * (cnt))
-#define	USER_PTR_OBJ(objp)	USER_PTR((objp), sizeof(*(objp)))
-/*
- * NOTE: we can't place tigher bounds because we don't know what the
- * length is until after we use it.
- */
-#define	USER_PTR_STR(strp)	USER_PTR_UNBOUND(strp)
-#define	USER_PTR_PATH(path)	USER_PTR((path), MAXPATHLEN)
-
 extern const int osreldate;
 
 extern const void *zero_region;	/* address space maps to a zeroed page	*/

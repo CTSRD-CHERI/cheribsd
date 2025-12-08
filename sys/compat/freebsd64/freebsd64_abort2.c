@@ -32,6 +32,7 @@
 #include <sys/syscallsubr.h>
 #include <sys/syslog.h>
 
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 
 int

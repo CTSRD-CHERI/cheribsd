@@ -109,6 +109,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/abi_compat.h>
 #include <sys/capsicum.h>
 #include <sys/fcntl.h>
 #include <sys/limits.h>

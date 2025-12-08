@@ -29,6 +29,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/abi_compat.h>
 #include <sys/pmc.h>
 #include <sys/sysent.h>
 

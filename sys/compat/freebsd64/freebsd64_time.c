@@ -41,6 +41,7 @@
 #include <sys/timeffc.h>
 #include <sys/timex.h>
 
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 
 /*

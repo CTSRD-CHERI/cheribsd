@@ -52,6 +52,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/abi_compat.h>
 #include <sys/bio.h>
 #include <sys/conf.h>
 #include <sys/disk.h>

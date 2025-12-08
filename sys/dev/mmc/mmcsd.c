@@ -55,6 +55,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/abi_compat.h>
 #include <sys/bio.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
