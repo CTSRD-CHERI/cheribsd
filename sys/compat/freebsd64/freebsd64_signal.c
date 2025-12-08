@@ -98,7 +98,7 @@ freebsd64_sigaction(struct thread *td, struct freebsd64_sigaction_args *uap)
 		if (is_magic_sighandler_constant(act64.sa_u))
 			actp->sa_handler = cheri_fromint(act64.sa_u);
 		else
-			actp->sa_handler = __USER_CODE_CAP(act64.sa_u);
+			actp->sa_handler = USER_CODE_PTR(act64.sa_u);
 		actp->sa_flags = act64.sa_flags;
 		actp->sa_mask = act64.sa_mask;
 	}
