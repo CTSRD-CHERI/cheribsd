@@ -782,7 +782,7 @@ copyin_mac(const void * const __capability mac_p, struct mac *mac)
 		return (0);
 	}
 #endif
-	error = copyincap(mac_p, mac, sizeof(*mac));
+	error = copyinptr(mac_p, mac, sizeof(*mac));
 	return (error);
 }
 

@@ -205,7 +205,7 @@ cpu_fetch_syscall_args(struct thread *td)
 
 #if __has_feature(capabilities)
 	if (__predict_false(stack_args != NULL)) {
-		error = copyincap(stack_args, dst_ap, sa->callp->sy_narg *
+		error = copyinptr(stack_args, dst_ap, sa->callp->sy_narg *
 		    sizeof(*dst_ap));
 		if (error)
 			return (error);

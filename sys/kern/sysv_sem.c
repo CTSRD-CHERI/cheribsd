@@ -664,7 +664,7 @@ sys___semctl(struct thread *td, struct __semctl_args *uap)
 	case GETALL:
 	case SETVAL:
 	case SETALL:
-		error = copyincap(uap->arg, &arg, sizeof(arg));
+		error = copyinptr(uap->arg, &arg, sizeof(arg));
 		if (error)
 			return (error);
 		break;
@@ -1878,7 +1878,7 @@ freebsd7___semctl(struct thread *td, struct freebsd7___semctl_args *uap)
 	case GETALL:
 	case SETVAL:
 	case SETALL:
-		error = copyincap(uap->arg, &arg, sizeof(arg));
+		error = copyinptr(uap->arg, &arg, sizeof(arg));
 		if (error)
 			return (error);
 		break;
@@ -1923,7 +1923,7 @@ freebsd7___semctl(struct thread *td, struct freebsd7___semctl_args *uap)
 		CP(dsbuf, dsold, sem_nsems);
 		CP(dsbuf, dsold, sem_otime);
 		CP(dsbuf, dsold, sem_ctime);
-		error = copyoutcap(&dsold, arg.buf, sizeof(dsold));
+		error = copyoutptr(&dsold, arg.buf, sizeof(dsold));
 		break;
 	}
 

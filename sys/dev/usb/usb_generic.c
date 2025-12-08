@@ -1496,7 +1496,7 @@ ugen_fs_copyin(struct usb_fifo *f, uint8_t ep_index,
 
 	switch (f->fs_ep_sz) {
 	case sizeof(struct usb_fs_endpoint):
-		error = copyincap(ugen_fs_ep_uptr(f, ep_index), fs_ep,
+		error = copyinptr(ugen_fs_ep_uptr(f, ep_index), fs_ep,
 		    f->fs_ep_sz);
 		if (error != 0)
 			return (error);
