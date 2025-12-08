@@ -840,7 +840,7 @@ kern_cheri_revoke_get_shadow(struct thread *td, int flags,
 	}
 	vm_map_unlock(vmm);
 
-	error = copyoutcap(&cres, shadow, sizeof(cres));
+	error = copyoutptr(&cres, shadow, sizeof(cres));
 
 	return (error);
 }

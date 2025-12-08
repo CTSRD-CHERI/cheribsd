@@ -121,7 +121,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_AGGDESC\n",__func__,__LINE__);
 
-		if (copyincap(paggdesc, &aggdesc, sizeof (aggdesc)) != 0)
+		if (copyinptr(paggdesc, &aggdesc, sizeof (aggdesc)) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
@@ -203,7 +203,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		mutex_exit(&dtrace_lock);
 
-		if (copyoutcap(buf, paggdesc, dest - (uintptr_t)buf) != 0) {
+		if (copyoutptr(buf, paggdesc, dest - (uintptr_t)buf) != 0) {
 			kmem_free(buf, size);
 			return (EFAULT);
 		}
@@ -220,7 +220,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		dtrace_debug_output();
 
-		if (copyincap(pdesc, &desc, sizeof (desc)) != 0)
+		if (copyinptr(pdesc, &desc, sizeof (desc)) != 0)
 			return (EFAULT);
 
 		DTRACE_IOCTL_PRINTF("%s(%d): %s curcpu %d cpu %d\n",
@@ -262,7 +262,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 				desc.dtbd_oldest = 0;
 				sz = sizeof (desc);
 
-				if (copyoutcap(&desc, pdesc, sz) != 0)
+				if (copyoutptr(&desc, pdesc, sz) != 0)
 					return (EFAULT);
 
 				return (0);
@@ -290,7 +290,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 			mutex_exit(&dtrace_lock);
 
-			if (copyoutcap(&desc, pdesc, sizeof (desc)) != 0)
+			if (copyoutptr(&desc, pdesc, sizeof (desc)) != 0)
 				return (EFAULT);
 
 			buf->dtb_flags |= DTRACEBUF_CONSUMED;
@@ -350,7 +350,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		/*
 		 * Finally, copy out the buffer description.
 		 */
-		if (copyoutcap(&desc, pdesc, sizeof (desc)) != 0)
+		if (copyoutptr(&desc, pdesc, sizeof (desc)) != 0)
 			return (EFAULT);
 
 		return (0);
@@ -378,7 +378,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_DOFGET\n",__func__,__LINE__);
 
-		if (copyincap(pdof, &hdr, sizeof (hdr)) != 0)
+		if (copyinptr(pdof, &hdr, sizeof (hdr)) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
@@ -386,7 +386,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		mutex_exit(&dtrace_lock);
 
 		len = MIN(hdr.dofh_loadsz, dof->dofh_loadsz);
-		rval = copyoutcap(dof, pdof, len);
+		rval = copyoutptr(dof, pdof, len);
 		dtrace_dof_destroy(dof);
 
 		return (rval == 0 ? 0 : EFAULT);
@@ -465,7 +465,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_EPROBE\n",__func__,__LINE__);
 
-		if (copyincap(pepdesc, &epdesc, sizeof (dtrace_eprobedesc_t)) != 0)
+		if (copyinptr(pepdesc, &epdesc, sizeof (dtrace_eprobedesc_t)) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
@@ -528,7 +528,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		mutex_exit(&dtrace_lock);
 
-		if (copyoutcap(buf, pepdesc, dest - (uintptr_t)buf) != 0) {
+		if (copyoutptr(buf, pepdesc, dest - (uintptr_t)buf) != 0) {
 			kmem_free(buf, size);
 			return (EFAULT);
 		}

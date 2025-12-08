@@ -103,12 +103,12 @@ copyout_nofault(const void *kaddr, void * __capability udaddr, size_t len)
 
 #if __has_feature(capabilities)
 int
-copyoutcap_nofault(const void *kaddr, void * __capability udaddr, size_t len)
+copyoutptr_nofault(const void *kaddr, void * __capability udaddr, size_t len)
 {
 	int error, save;
 
 	save = vm_fault_disable_pagefaults();
-	error = copyoutcap(kaddr, udaddr, len);
+	error = copyoutptr(kaddr, udaddr, len);
 	vm_fault_enable_pagefaults(save);
 	return (error);
 }
@@ -277,10 +277,10 @@ uiomove_flags(void *cp, int n, struct uio *uio, bool nofault)
 			switch (uio->uio_rw) {
 #if __has_feature(capabilities)
 			case UIO_READ_CAP:
-				error = copyoutcap(cp, iov->iov_base, cnt);
+				error = copyoutptr(cp, iov->iov_base, cnt);
 				break;
 			case UIO_WRITE_CAP:
-				error = copyincap(iov->iov_base, cp, cnt);
+				error = copyinptr(iov->iov_base, cp, cnt);
 				break;
 #endif
 			case UIO_READ:
@@ -402,7 +402,7 @@ copyiniov(const struct iovec* __capability iovp, u_int iovcnt, struct iovec **io
 		return (error);
 	iovlen = iovcnt * sizeof(struct iovec);
 	iovs = malloc(iovlen, M_IOV, M_WAITOK);
-	error = copyincap(iovp, iovs, iovlen);
+	error = copyinptr(iovp, iovs, iovlen);
 	if (error != 0)
 		free(iovs, M_IOV);
 	*iov = iovs;
@@ -424,7 +424,7 @@ copyinuio(const struct iovec * __capability iovp, u_int iovcnt,
 	iovlen = iovcnt * sizeof(struct iovec);
 	uio = allocuio(iovcnt);
 	iov = uio->uio_iov;
-	error = copyincap(iovp, iov, iovlen);
+	error = copyinptr(iovp, iov, iovlen);
 	if (error != 0) {
 		freeuio(uio);
 		return (error);

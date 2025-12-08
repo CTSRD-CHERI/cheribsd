@@ -189,7 +189,7 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 
 	memset(&mc, 0, sizeof(mc));
 	if (mcp->mc_flags & _MC_CAP_VALID) {
-		error = copyincap(USER_PTR(mcp->mc_capregs,
+		error = copyinptr(USER_PTR(mcp->mc_capregs,
 		    sizeof(mc.mc_capregs)), &mc.mc_capregs,
 		    sizeof(mc.mc_capregs));
 		if (error)
@@ -282,7 +282,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_UNLOCK(td->td_proc);
 
 	/* Copy the capability registers out to the user's stack. */
-	if (copyoutcap(&mc.mc_capregs, USER_PTR(capregs,
+	if (copyoutptr(&mc.mc_capregs, USER_PTR(capregs,
 	    sizeof(mc.mc_capregs)), sizeof(mc.mc_capregs)) != 0) {
 		PROC_LOCK(p);
 		printf("pid %d, tid %d: could not copy out cap registers\n",
@@ -292,7 +292,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyoutcap(&frame, USER_PTR(fp, sizeof(frame)), sizeof(frame)) !=
+	if (copyoutptr(&frame, USER_PTR(fp, sizeof(frame)), sizeof(frame)) !=
 	    0) {
 		/* Process has trashed its stack. Kill it. */
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
@@ -327,7 +327,7 @@ freebsd64_sigreturn(struct thread *td, struct freebsd64_sigreturn_args *uap)
 	ucontext64_t uc;
 	int error;
 
-	error = copyincap(USER_PTR_OBJ(uap->sigcntxp), &uc, sizeof(uc));
+	error = copyinptr(USER_PTR_OBJ(uap->sigcntxp), &uc, sizeof(uc));
 	if (error != 0)
 		return (error);
 

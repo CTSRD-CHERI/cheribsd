@@ -398,10 +398,10 @@ int __result_use_check copyinstr(const void * __restrict __capability udaddr,
 int __result_use_check copyin(const void * __restrict __capability udaddr,
     void * _Nonnull __restrict kaddr, size_t len);
 #if __has_feature(capabilities)
-int __result_use_check copyincap(const void * __restrict __capability udaddr,
+int __result_use_check copyinptr(const void * __restrict __capability udaddr,
     void * _Nonnull __restrict kaddr, size_t len);
 #else
-#define	copyincap	copyin
+#define	copyinptr	copyin
 #endif
 int __result_use_check copyin_nofault(
     const void * __capability __restrict udaddr,
@@ -409,21 +409,21 @@ int __result_use_check copyin_nofault(
 int __result_use_or_ignore_check copyout(const void * _Nonnull __restrict kaddr,
     void * __restrict __capability udaddr, size_t len);
 #if __has_feature(capabilities)
-int __result_use_or_ignore_check copyoutcap(
+int __result_use_or_ignore_check copyoutptr(
     const void * _Nonnull __restrict kaddr,
     void * __capability __restrict udaddr, size_t len);
 #else
-#define	copyoutcap	copyout
+#define	copyoutptr	copyout
 #endif
 int __result_use_or_ignore_check copyout_nofault(
     const void * _Nonnull __restrict kaddr,
     void * __capability __restrict udaddr, size_t len);
 #if __has_feature(capabilities)
-int __result_use_or_ignore_check copyoutcap_nofault(
+int __result_use_or_ignore_check copyoutptr_nofault(
     const void * _Nonnull __restrict kaddr,
     void * __capability __restrict udaddr, size_t len);
 #else
-#define	copyoutcap_nofault	copyout_nofault
+#define	copyoutptr_nofault	copyout_nofault
 #endif
 
 #ifdef SAN_NEEDS_INTERCEPTORS

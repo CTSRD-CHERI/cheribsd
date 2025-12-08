@@ -3742,7 +3742,7 @@ sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 #if __has_feature(capabilities)
 /* Version of sooptcopyin that preserves tags. */
 int
-sooptcopyincap(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
+sooptcopyinptr(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 {
 	size_t	valsize;
 
@@ -3752,7 +3752,7 @@ sooptcopyincap(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 		sopt->sopt_valsize = valsize = len;
 
 	if (sopt->sopt_td != NULL)
-		return (copyincap(sopt->sopt_val, buf, valsize));
+		return (copyinptr(sopt->sopt_val, buf, valsize));
 
 	bcopy((__cheri_fromcap void *)sopt->sopt_val, buf, valsize);
 	return (0);
@@ -3939,7 +3939,7 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 				    tmpmac.m_buflen);
 			} else
 #endif
-				error = sooptcopyincap(sopt, &extmac,
+				error = sooptcopyinptr(sopt, &extmac,
 				    sizeof extmac, sizeof extmac);
 			if (error)
 				goto bad;
@@ -4219,7 +4219,7 @@ integer:
 				    tmpmac.m_buflen);
 			} else
 #endif
-				error = sooptcopyincap(sopt, &extmac,
+				error = sooptcopyinptr(sopt, &extmac,
 				    sizeof(extmac), sizeof(extmac));
 			if (error)
 				goto bad;
@@ -4250,7 +4250,7 @@ integer:
 				    tmpmac.m_buflen);
 			} else
 #endif
-				error = sooptcopyincap(sopt, &extmac,
+				error = sooptcopyinptr(sopt, &extmac,
 				    sizeof(extmac), sizeof(extmac));
 			if (error)
 				goto bad;

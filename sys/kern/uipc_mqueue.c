@@ -2522,7 +2522,7 @@ sys_kmq_notify(struct thread *td, struct kmq_notify_args *uap)
 	if (uap->sigev == NULL) {
 		evp = NULL;
 	} else {
-		error = copyincap(uap->sigev, &ev, sizeof(ev));
+		error = copyinptr(uap->sigev, &ev, sizeof(ev));
 		if (error != 0)
 			return (error);
 		evp = &ev;

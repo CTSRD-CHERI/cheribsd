@@ -471,7 +471,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 			error = EINVAL;
 			break;
 		}
-		error = copyincap(addr, &sstr, sizeof(sstr));
+		error = copyinptr(addr, &sstr, sizeof(sstr));
 		if (error)
 			break;
 		cam_periph_lock(periph);
@@ -504,7 +504,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 	case ENCIOC_GETELMDESC: {
 		encioc_elm_desc_t elmd;
 
-		error = copyincap(addr, &elmd, sizeof(elmd));
+		error = copyinptr(addr, &elmd, sizeof(elmd));
 		if (error)
 			break;
 		if (elmd.elm_idx >= cache->nelms) {
@@ -517,7 +517,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 				break;
 		} else
 			elmd.elm_desc_len = 0;
-		error = copyoutcap(&elmd, addr, sizeof(elmd));
+		error = copyoutptr(&elmd, addr, sizeof(elmd));
 		break;
 	}
 	case ENCIOC_GETELMDEVNAMES: {
@@ -527,7 +527,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 			error = EINVAL;
 			break;
 		}
-		error = copyincap(addr, &elmdn, sizeof(elmdn));
+		error = copyinptr(addr, &elmdn, sizeof(elmdn));
 		if (error)
 			break;
 		if (elmdn.elm_idx >= cache->nelms) {
@@ -539,7 +539,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 		cam_periph_unlock(periph);
 		if (error)
 			break;
-		error = copyoutcap(&elmdn, addr, sizeof(elmdn));
+		error = copyoutptr(&elmdn, addr, sizeof(elmdn));
 		break;
 	}
 	case ENCIOC_SETELMSTAT: {

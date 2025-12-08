@@ -62,10 +62,10 @@ int	sosetopt(struct socket *so, struct sockopt *sopt);
 int	sogetopt(struct socket *so, struct sockopt *sopt);
 int	sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen);
 #if __has_feature(capabilities)
-int	sooptcopyincap(struct sockopt *sopt, void *buf, size_t len,
+int	sooptcopyinptr(struct sockopt *sopt, void *buf, size_t len,
     size_t minlen);
 #else
-#define	sooptcopyincap	sooptcopyin
+#define	sooptcopyinptr	sooptcopyin
 #endif
 int	sooptcopyout(struct sockopt *sopt, const void *buf, size_t len);
 int	soopt_getm(struct sockopt *sopt, struct mbuf **mp);

@@ -892,7 +892,7 @@ sys_wait6(struct thread *td, struct wait6_args *uap)
 	    uap->wrusage, sip);
 	if (uap->info != NULL && error == 0) {
 		/*
-		 * This does not use copyoutcap() as a fail-safe.  The
+		 * This does not use copyoutptr() as a fail-safe.  The
 		 * returned signal information object shouldn't
 		 * contain any capabilities as neither the si_addr nor
 		 * si_value fields are relevant for SIGCHLD.

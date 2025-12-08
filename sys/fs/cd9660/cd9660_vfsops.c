@@ -98,7 +98,7 @@ cd9660_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 	struct iso_args args;
 	int error;
 
-	error = copyincap(data, &args, sizeof args);
+	error = copyinptr(data, &args, sizeof args);
 	if (error)
 		return (error);
 

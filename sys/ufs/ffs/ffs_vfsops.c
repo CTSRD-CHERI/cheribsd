@@ -721,7 +721,7 @@ ffs_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 
 	if (data == NULL)
 		return (EINVAL);
-	error = copyincap(data, &args, sizeof args);
+	error = copyinptr(data, &args, sizeof args);
 	if (error)
 		return (error);
 
