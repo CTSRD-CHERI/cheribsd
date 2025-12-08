@@ -1080,7 +1080,7 @@ sndstat_ioctl(
 	case SNDSTIOC_GET_DEVS64:
 		arg64 = (struct sndstioc_nv_arg64 *)data;
 		nbytes = arg64->nbytes;
-		err = sndstat_get_devs(pf, __USER_CAP(arg64->buf, nbytes),
+		err = sndstat_get_devs(pf, USER_PTR(arg64->buf, nbytes),
 		    &nbytes);
 		if (err == 0) {
 			arg64->nbytes = nbytes;
@@ -1101,7 +1101,7 @@ sndstat_ioctl(
 #ifdef COMPAT_FREEBSD64
 	case SNDSTIOC_ADD_USER_DEVS64:
 		arg64 = (struct sndstioc_nv_arg64 *)data;
-		err = sndstat_add_user_devs(pf, __USER_CAP(arg64->buf,
+		err = sndstat_add_user_devs(pf, USER_PTR(arg64->buf,
 		    arg64->nbytes), arg64->nbytes);
 		break;
 #endif

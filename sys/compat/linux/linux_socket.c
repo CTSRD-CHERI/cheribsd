@@ -1285,7 +1285,7 @@ linux_sendto(struct thread *td, struct linux_sendto_args *args)
 		return (error);
 	so = fp->f_data;
 	if ((so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING)) == 0) {
-		msg.msg_name = __USER_CAP(PTRIN(args->to), args->tolen);
+		msg.msg_name = USER_PTR(PTRIN(args->to), args->tolen);
 		msg.msg_namelen = args->tolen;
 	}
 	msg.msg_iov = &aiov;

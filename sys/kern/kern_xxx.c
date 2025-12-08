@@ -400,7 +400,7 @@ freebsd4_getdomainname(struct thread *td,
 
 	name[0] = CTL_KERN;
 	name[1] = KERN_NISDOMAINNAME;
-	return (userland_sysctl(td, name, 2, __USER_CAP(uap->domainname, len),
+	return (userland_sysctl(td, name, 2, USER_PTR(uap->domainname, len),
 	    &len, 1, 0, 0, 0, 0));
 }
 
@@ -420,6 +420,6 @@ freebsd4_setdomainname(struct thread *td,
 	name[0] = CTL_KERN;
 	name[1] = KERN_NISDOMAINNAME;
 	return (userland_sysctl(td, name, 2, 0, 0, 0,
-	    __USER_CAP(uap->domainname, uap->len), uap->len, 0, 0));
+	    USER_PTR(uap->domainname, uap->len), uap->len, 0, 0));
 }
 #endif /* COMPAT_FREEBSD4 */

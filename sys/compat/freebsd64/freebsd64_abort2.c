@@ -49,13 +49,13 @@ freebsd64_abort2(struct thread *td, struct freebsd64_abort2_args *uap)
 	uargsp = NULL;
 	if (nargs > 0) {
 		if (uap->args != NULL) {
-			uargscap = __USER_CAP_ARRAY(uap->args, nargs);
+			uargscap = USER_PTR_ARRAY(uap->args, nargs);
 			for (i = 0; i < nargs; i++) {
 				if (fueword64(uargscap + i, &ptr) != 0) {
 					nargs = -1;
 					break;
 				} else
-					uargs[i] = __USER_CAP_UNBOUND(
+					uargs[i] = USER_PTR_UNBOUND(
 					    (void *)(uintptr_t)ptr);
 			}
 			if (nargs > 0)
@@ -63,7 +63,7 @@ freebsd64_abort2(struct thread *td, struct freebsd64_abort2_args *uap)
 		} else
 			nargs = -1;
 	}
-	return (kern_abort2(td, __USER_CAP_STR(uap->why), nargs, uargsp));
+	return (kern_abort2(td, USER_PTR_STR(uap->why), nargs, uargsp));
 }
 /*
  * CHERI CHANGES START

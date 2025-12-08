@@ -137,36 +137,36 @@ extern bool scheduler_stopped;
 	__builtin_cheri_offset_set((cap), (ptraddr_t)(ptr)) :		\
 	__builtin_cheri_address_set((cap), (ptraddr_t)(ptr)))
 
-#define	__USER_CAP_UNBOUND(ptr)						\
+#define	USER_PTR_UNBOUND(ptr)						\
 	___USER_CFROMPTR((ptr), __USER_DDC, __USER_DDC_OFFSET_ENABLED)
 
 #define	__USER_CODE_CAP(ptr)						\
 	___USER_CFROMPTR((ptr), __USER_PCC, __USER_PCC_OFFSET_ENABLED)
 
-#define	__USER_CAP(ptr, len)						\
+#define	USER_PTR(ptr, len)						\
 ({									\
-	void * __capability unbound = __USER_CAP_UNBOUND(ptr);		\
+	void * __capability unbound = USER_PTR_UNBOUND(ptr);		\
 	(security_cheri_bound_legacy_capabilities &&			\
 	    __builtin_cheri_tag_get(unbound) ?				\
 	    __builtin_cheri_bounds_set(unbound, (len)) : unbound);	\
 })
 
 #else /* !has_feature(capabilities) */
-#define	__USER_CAP_UNBOUND(ptr)	((void *)(uintptr_t)(ptr))
+#define	USER_PTR_UNBOUND(ptr)	((void *)(uintptr_t)(ptr))
 #define	__USER_CODE_CAP(ptr)	((void *)(uintptr_t)(ptr))
-#define	__USER_CAP(ptr, len)	((void *)(uintptr_t)(ptr))
+#define	USER_PTR(ptr, len)	((void *)(uintptr_t)(ptr))
 #endif /* !has_feature(capabilities) */
 
-#define	__USER_CAP_ADDR(ptr)	__USER_CAP_UNBOUND(ptr)
-#define	__USER_CAP_ARRAY(objp, cnt) \
-     __USER_CAP((objp), sizeof(*(objp)) * (cnt))
-#define	__USER_CAP_OBJ(objp)	__USER_CAP((objp), sizeof(*(objp)))
+#define	USER_PTR_ADDR(ptr)	USER_PTR_UNBOUND(ptr)
+#define	USER_PTR_ARRAY(objp, cnt) \
+     USER_PTR((objp), sizeof(*(objp)) * (cnt))
+#define	USER_PTR_OBJ(objp)	USER_PTR((objp), sizeof(*(objp)))
 /*
  * NOTE: we can't place tigher bounds because we don't know what the
  * length is until after we use it.
  */
-#define	__USER_CAP_STR(strp)	__USER_CAP_UNBOUND(strp)
-#define	__USER_CAP_PATH(path)	__USER_CAP((path), MAXPATHLEN)
+#define	USER_PTR_STR(strp)	USER_PTR_UNBOUND(strp)
+#define	USER_PTR_PATH(path)	USER_PTR((path), MAXPATHLEN)
 
 extern const int osreldate;
 

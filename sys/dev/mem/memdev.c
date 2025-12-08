@@ -236,7 +236,7 @@ memioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags,
 	case MEM_READ_CHERI_CAP64:
 		cap_arg64 = (const struct mem_cheri_cap_arg64 *)data;
 		cap_arg_thunk.vaddr = cap_arg64->vaddr;
-		cap_arg_thunk.buf = __USER_CAP(cap_arg64->buf, cap_arg64->len);
+		cap_arg_thunk.buf = USER_PTR(cap_arg64->buf, cap_arg64->len);
 		cap_arg_thunk.len = cap_arg64->len;
 		error = mem_read_cheri_caps(dev, &cap_arg_thunk);
 		break;

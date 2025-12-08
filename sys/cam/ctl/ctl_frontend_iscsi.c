@@ -1927,7 +1927,7 @@ cfiscsi_ioctl_listen(struct ctl_iscsi *ci)
 		return;
 	}
 
-	error = getsockaddr(&sa, __USER_CAP(cilp->addr, cilp->addrlen),
+	error = getsockaddr(&sa, USER_PTR(cilp->addr, cilp->addrlen),
 	    cilp->addrlen);
 	if (error != 0) {
 		CFISCSI_DEBUG("getsockaddr, error %d", error);

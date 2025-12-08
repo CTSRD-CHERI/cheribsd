@@ -589,7 +589,7 @@ int drm_mode_setcrtc(struct drm_device *dev, void *data,
 		CP(*crtc_req64, *crtc_req, mode_valid);
 		CP(*crtc_req64, *crtc_req, mode);
 
-		crtc_req->set_connectors_ptr = (uintcap_t)__USER_CAP(
+		crtc_req->set_connectors_ptr = (uintcap_t)USER_PTR(
 		    crtc_req64->set_connectors_ptr,
 		    crtc_req64->count_connectors * sizeof(uint32_t));
 	}

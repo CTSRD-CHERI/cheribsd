@@ -274,10 +274,10 @@ int drm_mode_gamma_set_ioctl(struct drm_device *dev,
 		CP(*crtc_lut64, *crtc_lut, crtc_id);
 		CP(*crtc_lut64, *crtc_lut, gamma_size);
 		size = crtc_lut64->gamma_size * sizeof(uint16_t);
-		crtc_lut->red = (uintcap_t)__USER_CAP(crtc_lut64->red, size);
-		crtc_lut->green = (uintcap_t)__USER_CAP(crtc_lut64->green,
+		crtc_lut->red = (uintcap_t)USER_PTR(crtc_lut64->red, size);
+		crtc_lut->green = (uintcap_t)USER_PTR(crtc_lut64->green,
 		    size);
-		crtc_lut->blue = (uintcap_t)__USER_CAP(crtc_lut64->blue, size);
+		crtc_lut->blue = (uintcap_t)USER_PTR(crtc_lut64->blue, size);
 	}
 #endif
 
@@ -360,10 +360,10 @@ int drm_mode_gamma_get_ioctl(struct drm_device *dev,
 		CP(*crtc_lut64, *crtc_lut, crtc_id);
 		CP(*crtc_lut64, *crtc_lut, gamma_size);
 		size = crtc_lut64->gamma_size * sizeof(uint16_t);
-		crtc_lut->red = (uintcap_t)__USER_CAP(crtc_lut64->red, size);
-		crtc_lut->green = (uintcap_t)__USER_CAP(crtc_lut64->green,
+		crtc_lut->red = (uintcap_t)USER_PTR(crtc_lut64->red, size);
+		crtc_lut->green = (uintcap_t)USER_PTR(crtc_lut64->green,
 		    size);
-		crtc_lut->blue = (uintcap_t)__USER_CAP(crtc_lut64->blue, size);
+		crtc_lut->blue = (uintcap_t)USER_PTR(crtc_lut64->blue, size);
 	}
 #endif
 

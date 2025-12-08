@@ -664,7 +664,7 @@ hidraw_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 		cmd = _IOC_NEWTYPE(cmd, struct hidraw_gen_descriptor);
 		hgd64 = (struct hidraw_gen_descriptor64 *)addr;
 		hgd = &local_hgd;
-		hgd->hgd_data = __USER_CAP(hgd64->hgd_data, hgd64->hgd_maxlen);
+		hgd->hgd_data = USER_PTR(hgd64->hgd_data, hgd64->hgd_maxlen);
 		CP(*hgd64, *hgd, hgd_lang_id);
 		CP(*hgd64, *hgd, hgd_maxlen);
 		CP(*hgd64, *hgd, hgd_actlen);

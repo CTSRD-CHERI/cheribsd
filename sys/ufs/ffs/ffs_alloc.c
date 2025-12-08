@@ -3304,7 +3304,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		CP(cmd_compat, cmd, version);
 		CP(cmd_compat, cmd, handle);
 		if (oidp->oid_number == FFS_UNLINK)
-			cmd.value = (uintcap_t)__USER_CAP_STR(cmd_compat.value);
+			cmd.value = (uintcap_t)USER_PTR_STR(cmd_compat.value);
 		else
 			CP(cmd_compat, cmd, value);
 		CP(cmd_compat, cmd, size);

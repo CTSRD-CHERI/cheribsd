@@ -1673,7 +1673,7 @@ usb_static_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 #endif
 #ifdef COMPAT_FREEBSD64
 		case USB_READ_DIR64:
-			err = usb_read_symlink(__USER_CAP(u.urd64->urd_data,
+			err = usb_read_symlink(USER_PTR(u.urd64->urd_data,
 			    u.urd64->urd_maxlen), u.urd64->urd_startentry,
 			    u.urd64->urd_maxlen);
 			break;

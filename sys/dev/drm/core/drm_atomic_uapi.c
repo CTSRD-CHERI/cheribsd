@@ -465,7 +465,7 @@ static int drm_atomic_crtc_set_property(struct drm_crtc *crtc,
 		state->color_mgmt_changed |= replaced;
 		return ret;
 	} else if (property == config->prop_out_fence_ptr) {
-		s32 __user * __capability fence_ptr = __USER_CAP(val, sizeof(uint64_t));
+		s32 __user * __capability fence_ptr = USER_PTR(val, sizeof(uint64_t));
 
 		if (!fence_ptr)
 			return 0;
@@ -765,7 +765,7 @@ static int drm_atomic_connector_set_property(struct drm_connector *connector,
 			drm_framebuffer_put(fb);
 		return ret;
 	} else if (property == config->writeback_out_fence_ptr_property) {
-		s32 __user * __capability fence_ptr = __USER_CAP(val, sizeof(uint64_t));
+		s32 __user * __capability fence_ptr = USER_PTR(val, sizeof(uint64_t));
 
 		return set_out_fence_for_connector(state->state, connector,
 						   fence_ptr);
@@ -1309,10 +1309,10 @@ int drm_mode_atomic_ioctl(struct drm_device *dev,
 		CP(*arg64, *arg, count_objs);
 		CP(*arg64, *arg, user_data);
 		CP(*arg64, *arg, reserved);
-		arg->objs_ptr = (uintcap_t)__USER_CAP(
+		arg->objs_ptr = (uintcap_t)USER_PTR(
 		    arg64->objs_ptr,
 		    arg64->count_objs * sizeof(uint32_t));
-		arg->count_props_ptr = (uintcap_t)__USER_CAP(
+		arg->count_props_ptr = (uintcap_t)USER_PTR(
 		    arg64->count_props_ptr,
 		    arg64->count_objs * sizeof(uint32_t));
 	}
@@ -1386,9 +1386,9 @@ retry:
 
 #ifdef COMPAT_FREEBSD64
 		if (!SV_CURPROC_FLAG(SV_CHERI)) {
-			props_ptr = (uint32_t __user * __capability)__USER_CAP(arg64->props_ptr,
+			props_ptr = (uint32_t __user * __capability)USER_PTR(arg64->props_ptr,
 			    (copied_props + count_props) * sizeof(uint32_t));
-			prop_values_ptr = (uint64_t __user * __capability)__USER_CAP(arg64->prop_values_ptr,
+			prop_values_ptr = (uint64_t __user * __capability)USER_PTR(arg64->prop_values_ptr,
 			    (copied_props + count_props) * sizeof(uint64_t));
 		} else
 #endif
