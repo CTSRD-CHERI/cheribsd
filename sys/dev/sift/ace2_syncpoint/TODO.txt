@@ -1,0 +1,7 @@
+- Add pr_sift() and pr_sift() printfs compliant with the Linux version.
+- Very carefully check concurrency properties around teardown of syncpoint
+  instances, especially relating to device nodes.  We probably may need a
+  "closing" flag of some sort.
+- Either fix concurrency issues or remove support for module unload.
+- Find or write test cases.
+- Write man page.
