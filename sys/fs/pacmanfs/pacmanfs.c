@@ -23,8 +23,6 @@
 #include "pacmanfs.h"
 #include "pacmanfs_on_disk.h"
 
-struct file_system_type *global_fst = NULL; // XXX
-
 #define INODES_PER_BLOCK \
 	(PACMANFS_BLOCKSIZE / sizeof(struct pacmanfs_inode_disk))
 #define INO_BLOCK(sb, ino)                            \
