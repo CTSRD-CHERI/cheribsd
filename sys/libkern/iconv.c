@@ -29,6 +29,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/abi_compat.h>
 #include <sys/iconv.h>
 #include <sys/malloc.h>
 #include <sys/mount.h>

@@ -18,6 +18,7 @@
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/abi_compat.h>
 #include <sys/time.h>
 #if defined(_KERNEL) && defined(__FreeBSD__)
 #  if !defined(IPFILTER_LKM)

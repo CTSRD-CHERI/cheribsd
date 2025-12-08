@@ -36,6 +36,7 @@
 #include "opt_ddb.h"
 
 #include <sys/param.h>
+#include <sys/abi_compat.h>
 #include <sys/capsicum.h>
 #include <sys/conf.h>
 #include <sys/eventhandler.h>
