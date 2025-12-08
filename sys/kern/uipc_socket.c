@@ -3935,7 +3935,7 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
-				extmac.m_string = __USER_CAP(tmpmac.m_string,
+				extmac.m_string = USER_PTR(tmpmac.m_string,
 				    tmpmac.m_buflen);
 			} else
 #endif
@@ -4215,7 +4215,7 @@ integer:
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
-				extmac.m_string = __USER_CAP(tmpmac.m_string,
+				extmac.m_string = USER_PTR(tmpmac.m_string,
 				    tmpmac.m_buflen);
 			} else
 #endif
@@ -4246,7 +4246,7 @@ integer:
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
-				extmac.m_string = __USER_CAP(tmpmac.m_string,
+				extmac.m_string = USER_PTR(tmpmac.m_string,
 				    tmpmac.m_buflen);
 			} else
 #endif

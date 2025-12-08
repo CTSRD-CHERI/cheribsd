@@ -1943,10 +1943,10 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (mdio->md_version != MDIOVERSION)
 			return (EINVAL);
 		MD_IOCTL2REQ(mdio, &mdr);
-		mdr.md_file = __USER_CAP_STR((void *)(uintptr_t)mdio->md_file);
+		mdr.md_file = USER_PTR_STR((void *)(uintptr_t)mdio->md_file);
 		mdr.md_file_seg = UIO_USERSPACE;
 		mdr.md_label =
-		    __USER_CAP_STR((void *)(uintptr_t)mdio->md_label);
+		    USER_PTR_STR((void *)(uintptr_t)mdio->md_label);
 		break;
 	}
 #endif
@@ -1959,10 +1959,10 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (mdio->md_version != MDIOVERSION)
 			return (EINVAL);
 		MD_IOCTL2REQ(mdio, &mdr);
-		mdr.md_file = __USER_CAP_STR((void *)(uintptr_t)mdio->md_file);
+		mdr.md_file = USER_PTR_STR((void *)(uintptr_t)mdio->md_file);
 		mdr.md_file_seg = UIO_USERSPACE;
 		mdr.md_label =
-		    __USER_CAP_STR((void *)(uintptr_t)mdio->md_label);
+		    USER_PTR_STR((void *)(uintptr_t)mdio->md_label);
 		break;
 	}
 #endif

@@ -432,10 +432,10 @@ int drm_mode_obj_get_properties_ioctl(struct drm_device *dev, void *data,
 		CP(*arg64, *arg, count_props);
 		CP(*arg64, *arg, obj_id);
 		CP(*arg64, *arg, obj_type);
-		arg->props_ptr = (uintcap_t)__USER_CAP(
+		arg->props_ptr = (uintcap_t)USER_PTR(
 		    arg64->props_ptr,
 		    arg64->count_props * sizeof(uint32_t));
-		arg->prop_values_ptr = (uintcap_t)__USER_CAP(
+		arg->prop_values_ptr = (uintcap_t)USER_PTR(
 		    arg64->prop_values_ptr,
 		    arg64->count_props * sizeof(uint64_t));
 	}

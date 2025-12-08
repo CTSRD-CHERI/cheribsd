@@ -4669,7 +4669,7 @@ frrequest(ipf_main_softc_t *softc, int unit, ioctlcmd_t req, caddr_t data,
 				 * changes.
 				 */
 #ifndef __CHERI_PURE_CAPABILITY__
-				error = COPYIN(__USER_CAP(uptr, fp->fr_dsize), ptr, fp->fr_dsize);
+				error = COPYIN(USER_PTR(uptr, fp->fr_dsize), ptr, fp->fr_dsize);
 #else
 				error = COPYIN(uptr, ptr, fp->fr_dsize);
 #endif
@@ -4913,7 +4913,7 @@ frrequest(ipf_main_softc_t *softc, int unit, ioctlcmd_t req, caddr_t data,
 			if (error == 0) {
 				if ((f->fr_dsize != 0) && (uptr != NULL)) {
 #ifndef __CHERI_PURE_CAPABILITY__
-					error = COPYOUT(f->fr_data, __USER_CAP(uptr, f->fr_dsize),
+					error = COPYOUT(f->fr_data, USER_PTR(uptr, f->fr_dsize),
 							f->fr_dsize);
 #else
 					error = COPYOUT(f->fr_data, uptr,

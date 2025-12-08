@@ -118,7 +118,7 @@ pmc_save_user_callchain(uintptr_t *cc, int maxsamples,
 #ifdef COMPAT_FREEBSD64
 		if (SV_CURPROC_FLAG(SV_CHERI | SV_LP64) == SV_LP64) {
 			r = fp + sizeof(r64);
-			if (fueword64(__USER_CAP(r, sizeof(r64)), &r64) != 0)
+			if (fueword64(USER_PTR(r, sizeof(r64)), &r64) != 0)
 				break;
 			pc = r64;
 		} else
@@ -139,7 +139,7 @@ pmc_save_user_callchain(uintptr_t *cc, int maxsamples,
 		r = fp;
 #ifdef COMPAT_FREEBSD64
 		if (SV_CURPROC_FLAG(SV_CHERI | SV_LP64) == SV_LP64) {
-			if (fueword64(__USER_CAP(r, sizeof(r64)), &r64) != 0)
+			if (fueword64(USER_PTR(r, sizeof(r64)), &r64) != 0)
 				break;
 			fp = r64;
 		} else

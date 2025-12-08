@@ -57,7 +57,7 @@ freebsd64_ffclock_getcounter(struct thread *td,
 	ffclock_read_counter(&ffcount);
 	if (ffcount == 0)
 		return (EAGAIN);
-	return (copyout(&ffcount, __USER_CAP_OBJ(uap->ffcount),
+	return (copyout(&ffcount, USER_PTR_OBJ(uap->ffcount),
 	    sizeof(ffcounter)));
 #else
 	return (ENOSYS);
@@ -69,7 +69,7 @@ freebsd64_ffclock_setestimate(struct thread *td,
     struct freebsd64_ffclock_setestimate_args *uap)
 {
 #ifdef	FFCLOCK
-	return (kern_ffclock_setestimate(td, __USER_CAP_OBJ(uap->cest)));
+	return (kern_ffclock_setestimate(td, USER_PTR_OBJ(uap->cest)));
 #else
 	return (ENOSYS);
 #endif
@@ -80,7 +80,7 @@ freebsd64_ffclock_getestimate(struct thread *td,
     struct freebsd64_ffclock_getestimate_args *uap)
 {
 #ifdef	FFCLOCK
-	return (kern_ffclock_getestimate(td, __USER_CAP_OBJ(uap->cest)));
+	return (kern_ffclock_getestimate(td, USER_PTR_OBJ(uap->cest)));
 #else
 	return (ENOSYS);
 #endif
@@ -92,7 +92,7 @@ freebsd64_ffclock_getestimate(struct thread *td,
 int
 freebsd64_ntp_gettime(struct thread *td, struct freebsd64_ntp_gettime_args *uap)
 {
-	return (kern_ntp_gettime(td, __USER_CAP_OBJ(uap->ntvp)));
+	return (kern_ntp_gettime(td, USER_PTR_OBJ(uap->ntvp)));
 }
 
 int
@@ -101,13 +101,13 @@ freebsd64_ntp_adjtime(struct thread *td, struct freebsd64_ntp_adjtime_args *uap)
 	struct timex ntv;
 	int error, retval;
 
-	error = copyin(__USER_CAP_OBJ(uap->tp), &ntv, sizeof(ntv));
+	error = copyin(USER_PTR_OBJ(uap->tp), &ntv, sizeof(ntv));
 	if (error != 0)
 		return (error);
 	error = kern_ntp_adjtime(td, &ntv, &retval);
 	if (error != 0)
 		return (error);
-	error = copyout(&ntv, __USER_CAP_OBJ(uap->tp), sizeof(ntv));
+	error = copyout(&ntv, USER_PTR_OBJ(uap->tp), sizeof(ntv));
 	if (error == 0)
 		td->td_retval[0] = retval;
 	return (error);
@@ -120,7 +120,7 @@ freebsd64_adjtime(struct thread *td, struct freebsd64_adjtime_args *uap)
 	int error;
 
 	if (uap->delta) {
-		error = copyin(__USER_CAP_OBJ(uap->delta), &delta,
+		error = copyin(USER_PTR_OBJ(uap->delta), &delta,
 		    sizeof(delta));
 		if (error != 0)
 			return (error);
@@ -129,7 +129,7 @@ freebsd64_adjtime(struct thread *td, struct freebsd64_adjtime_args *uap)
 		deltap = NULL;
 	error = kern_adjtime(td, deltap, &olddelta);
 	if (uap->olddelta && error == 0)
-		error = copyout(&olddelta, __USER_CAP_OBJ(uap->olddelta),
+		error = copyout(&olddelta, USER_PTR_OBJ(uap->olddelta),
 		    sizeof(olddelta));
 	return (error);
 }
@@ -147,7 +147,7 @@ freebsd64_clock_getcpuclockid2(struct thread *td,
 
 	error = kern_clock_getcpuclockid2(td, uap->id, uap->which, &clk_id);
 	if (error == 0)
-		error = copyout(&clk_id, __USER_CAP_OBJ(uap->clock_id),
+		error = copyout(&clk_id, USER_PTR_OBJ(uap->clock_id),
 		    sizeof(clockid_t));
 
 	return (error);
@@ -162,7 +162,7 @@ freebsd64_clock_gettime(struct thread *td,
 
 	error = kern_clock_gettime(td, uap->clock_id, &ats);
 	if (error == 0)
-		error = copyout(&ats, __USER_CAP_OBJ(uap->tp), sizeof(ats));
+		error = copyout(&ats, USER_PTR_OBJ(uap->tp), sizeof(ats));
 
 	return (error);
 }
@@ -174,7 +174,7 @@ freebsd64_clock_settime(struct thread *td,
 	struct timespec ats;
 	int error;
 
-	error = copyin(__USER_CAP_OBJ(uap->tp), &ats, sizeof(ats));
+	error = copyin(USER_PTR_OBJ(uap->tp), &ats, sizeof(ats));
 	if (error != 0)
 		return (error);
 
@@ -193,7 +193,7 @@ freebsd64_clock_getres(struct thread *td,
 
 	error = kern_clock_getres(td, uap->clock_id, &ats);
 	if (error == 0)
-		error = copyout(&ats, __USER_CAP_OBJ(uap->tp), sizeof(ats));
+		error = copyout(&ats, USER_PTR_OBJ(uap->tp), sizeof(ats));
 	
 	return (error);
 }
@@ -202,7 +202,7 @@ int
 freebsd64_nanosleep(struct thread *td, struct freebsd64_nanosleep_args *uap)
 {
 	return (user_clock_nanosleep(td, CLOCK_REALTIME, TIMER_RELTIME,
-	    __USER_CAP_OBJ(uap->rqtp), __USER_CAP_OBJ(uap->rmtp)));
+	    USER_PTR_OBJ(uap->rqtp), USER_PTR_OBJ(uap->rmtp)));
 }
 
 int
@@ -212,7 +212,7 @@ freebsd64_clock_nanosleep(struct thread *td,
 	int error;
 
 	error = user_clock_nanosleep(td, uap->clock_id, uap->flags,
-	    __USER_CAP_OBJ(uap->rqtp), __USER_CAP_OBJ(uap->rmtp));
+	    USER_PTR_OBJ(uap->rqtp), USER_PTR_OBJ(uap->rmtp));
 	return (kern_posix_error(td, error));
 }
 
@@ -220,16 +220,16 @@ int
 freebsd64_gettimeofday(struct thread *td,
     struct freebsd64_gettimeofday_args *uap)
 {
-	return (kern_gettimeofday(td, __USER_CAP_OBJ(uap->tp),
-	     __USER_CAP_OBJ(uap->tzp)));
+	return (kern_gettimeofday(td, USER_PTR_OBJ(uap->tp),
+	     USER_PTR_OBJ(uap->tzp)));
 }
 
 int
 freebsd64_settimeofday(struct thread *td,
     struct freebsd64_settimeofday_args *uap)
 {
-	return (user_settimeofday(td, __USER_CAP_OBJ(uap->tv),
-	    __USER_CAP_OBJ(uap->tzp)));
+	return (user_settimeofday(td, USER_PTR_OBJ(uap->tv),
+	    USER_PTR_OBJ(uap->tzp)));
 }
 
 int
@@ -241,7 +241,7 @@ freebsd64_getitimer(struct thread *td, struct freebsd64_getitimer_args *uap)
 	error = kern_getitimer(td, uap->which, &aitv);
 	if (error != 0)
 		return (error);
-	return (copyout(&aitv, __USER_CAP_OBJ(uap->itv),
+	return (copyout(&aitv, USER_PTR_OBJ(uap->itv),
 	    sizeof(struct itimerval)));
 }
 
@@ -255,18 +255,18 @@ freebsd64_setitimer(struct thread *td, struct freebsd64_setitimer_args *uap)
 		error = kern_getitimer(td, uap->which, &aitv);
 		if (error != 0)
 			return (error);
-		return (copyout(&aitv, __USER_CAP_OBJ(uap->oitv),
+		return (copyout(&aitv, USER_PTR_OBJ(uap->oitv),
 		    sizeof(struct itimerval)));
 	}
 
-	error = copyin(__USER_CAP_OBJ(uap->itv), &aitv,
+	error = copyin(USER_PTR_OBJ(uap->itv), &aitv,
 	    sizeof(struct itimerval));
 	if (error != 0)
 		return (error);
 	error = kern_setitimer(td, uap->which, &aitv, &oitv);
 	if (error != 0 || uap->oitv == NULL)
 		return (error);
-	return (copyout(&oitv, __USER_CAP_OBJ(uap->oitv),
+	return (copyout(&oitv, USER_PTR_OBJ(uap->oitv),
 	    sizeof(struct itimerval)));
 }
 
@@ -281,7 +281,7 @@ freebsd64_ktimer_create(struct thread *td,
 	if (uap->evp == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(__USER_CAP_OBJ(uap->evp), &ev64, sizeof(ev64));
+		error = copyin(USER_PTR_OBJ(uap->evp), &ev64, sizeof(ev64));
 		if (error != 0)
 			return (error);
 		error = convert_sigevent64(&ev64, &ev);
@@ -292,7 +292,7 @@ freebsd64_ktimer_create(struct thread *td,
 	error = kern_ktimer_create(td, uap->clock_id, evp, &id, -1);
 	if (error != 0)
 		return (error);
-	error = copyout(&id, __USER_CAP_OBJ(uap->timerid), sizeof(int));
+	error = copyout(&id, USER_PTR_OBJ(uap->timerid), sizeof(int));
 	if (error != 0)
 		kern_ktimer_delete(td, id);
 	return (error);
@@ -305,13 +305,13 @@ freebsd64_ktimer_settime(struct thread *td,
 	struct itimerspec val, oval, *ovalp;
 	int error;
 
-	error = copyin(__USER_CAP_OBJ(uap->value), &val, sizeof(val));
+	error = copyin(USER_PTR_OBJ(uap->value), &val, sizeof(val));
 	if (error != 0)
 		return (error);
 	ovalp = uap->ovalue != NULL ? &oval : NULL;
 	error = kern_ktimer_settime(td, uap->timerid, uap->flags, &val, ovalp);
 	if (error == 0 && uap->ovalue != NULL)
-		error = copyout(ovalp, __USER_CAP_OBJ(uap->ovalue),
+		error = copyout(ovalp, USER_PTR_OBJ(uap->ovalue),
 		    sizeof(*ovalp));
 	return (error);
 }
@@ -325,7 +325,7 @@ freebsd64_ktimer_gettime(struct thread *td,
 
 	error = kern_ktimer_gettime(td, uap->timerid, &val);
 	if (error == 0)
-		error = copyout(&val, __USER_CAP_OBJ(uap->value), sizeof(val));
+		error = copyout(&val, USER_PTR_OBJ(uap->value), sizeof(val));
 	return (error);
 }
 
@@ -338,7 +338,7 @@ freebsd64_timerfd_gettime(struct thread *td,
 
 	error = kern_timerfd_gettime(td, uap->fd, &curr_value);
 	if (error == 0)
-		error = copyout(&curr_value, __USER_CAP_OBJ(uap->curr_value),
+		error = copyout(&curr_value, USER_PTR_OBJ(uap->curr_value),
 		    sizeof(curr_value));
 
 	return (error);
@@ -351,7 +351,7 @@ freebsd64_timerfd_settime(struct thread *td,
 	struct itimerspec new_value, old_value;
 	int error;
 
-	error = copyin(__USER_CAP_OBJ(uap->new_value), &new_value,
+	error = copyin(USER_PTR_OBJ(uap->new_value), &new_value,
 	    sizeof(new_value));
 	if (error != 0)
 		return (error);
@@ -363,7 +363,7 @@ freebsd64_timerfd_settime(struct thread *td,
 		    &new_value, &old_value);
 		if (error == 0)
 			error = copyout(&old_value,
-			    __USER_CAP_OBJ(uap->old_value), sizeof(old_value));
+			    USER_PTR_OBJ(uap->old_value), sizeof(old_value));
 	}
 	return (error);
 }

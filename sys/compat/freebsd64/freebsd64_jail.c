@@ -66,7 +66,7 @@ freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 	int error;
 	void *jail = uap->jailp;
 
-	error = copyin(__USER_CAP(jail, sizeof(version)), &version,
+	error = copyin(USER_PTR(jail, sizeof(version)), &version,
 	    sizeof(version));
 	if (error)
 		return (error);
@@ -77,13 +77,13 @@ freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 		struct in_addr ip4;
 
 		/* FreeBSD single IPv4 jails. */
-		error = copyin(__USER_CAP(jail, sizeof(j0)), &j0, sizeof(j0));
+		error = copyin(USER_PTR(jail, sizeof(j0)), &j0, sizeof(j0));
 		if (error)
 			return (error);
 		/* jail_v0 is host order */
 		ip4.s_addr = htonl(j0.ip_number);
-		return (kern_jail(td, __USER_CAP_STR(j0.path),
-		    __USER_CAP_STR(j0.hostname), NULL, &ip4, 1,
+		return (kern_jail(td, USER_PTR_STR(j0.path),
+		    USER_PTR_STR(j0.hostname), NULL, &ip4, 1,
 		    NULL, 0, UIO_SYSSPACE)); }
 
 	case 1:
@@ -96,12 +96,12 @@ freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 	case 2:	{ /* JAIL_API_VERSION */
 		struct jail64 j;
 		/* FreeBSD multi-IPv4/IPv6,noIP jails. */
-		error = copyin(__USER_CAP(jail, sizeof(j)), &j, sizeof(j));
+		error = copyin(USER_PTR(jail, sizeof(j)), &j, sizeof(j));
 		if (error)
 			return (error);
-		return (kern_jail(td, __USER_CAP_STR(j.path),
-		    __USER_CAP_STR(j.hostname), __USER_CAP_STR(j.jailname),
-		    __USER_CAP_STR(j.ip4), j.ip4s, __USER_CAP_STR(j.ip6),
+		return (kern_jail(td, USER_PTR_STR(j.path),
+		    USER_PTR_STR(j.hostname), USER_PTR_STR(j.jailname),
+		    USER_PTR_STR(j.ip4), j.ip4s, USER_PTR_STR(j.ip6),
 		    j.ip6s, UIO_USERSPACE));
 	}
 

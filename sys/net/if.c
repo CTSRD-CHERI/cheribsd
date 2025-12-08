@@ -2352,11 +2352,11 @@ ifr_buffer_get_buffer(u_long cmd, void *data)
 	case sizeof(struct ifreq64):
 #ifdef COMPAT_FREEBSD32
 		if (SV_CURPROC_FLAG(SV_ILP32))
-			return (__USER_CAP(
+			return (USER_PTR(
 			    ifrup->ifr32.ifr_ifru.ifru_buffer.buffer,
 			    ifrup->ifr32.ifr_ifru.ifru_buffer.length));
 #endif
-		return (__USER_CAP(ifrup->ifr64.ifr_ifru.ifru_buffer.buffer,
+		return (USER_PTR(ifrup->ifr64.ifr_ifru.ifru_buffer.buffer,
 		    ifrup->ifr64.ifr_ifru.ifru_buffer.length));
 #endif
 	case sizeof(struct ifreq):
@@ -2471,10 +2471,10 @@ ifr_data_get_ptr(u_long cmd, void *ifrp)
 	case sizeof(struct ifreq64):
 #ifdef COMPAT_FREEBSD32
 		if (SV_CURPROC_FLAG(SV_ILP32))
-			return (__USER_CAP_UNBOUND(
+			return (USER_PTR_UNBOUND(
 			    ifrup->ifr32.ifr_ifru.ifru_data));
 #endif
-		return (__USER_CAP_UNBOUND(ifrup->ifr64.ifr_ifru.ifru_data));
+		return (USER_PTR_UNBOUND(ifrup->ifr64.ifr_ifru.ifru_data));
 #endif
 	case sizeof(struct ifreq):
 #if !__has_feature(capabilities) && defined(COMPAT_FREEBSD32)
@@ -3101,7 +3101,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case SIOCGIFCONF32:
 		ifc32 = (struct ifconf32 *)data;
 		thunk.ifc.ifc_len = ifc32->ifc_len;
-		thunk.ifc.ifc_buf = __USER_CAP(ifc32->ifc_buf, ifc32->ifc_len);
+		thunk.ifc.ifc_buf = USER_PTR(ifc32->ifc_buf, ifc32->ifc_len);
 		data = (caddr_t)&thunk.ifc;
 		cmd = SIOCGIFCONF;
 		break;
@@ -3112,7 +3112,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		    sizeof(thunk.ifd.ifd_name));
 		thunk.ifd.ifd_cmd = ifd32->ifd_cmd;
 		thunk.ifd.ifd_len = ifd32->ifd_len;
-		thunk.ifd.ifd_data = __USER_CAP(ifd32->ifd_data,
+		thunk.ifd.ifd_data = USER_PTR(ifd32->ifd_data,
 		    ifd32->ifd_len);
 		data = (caddr_t)&thunk.ifd;
 		cmd = _IOC_NEWTYPE(cmd, struct ifdrv);
@@ -3133,7 +3133,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 			break;
 		case SIOCGIFGROUP32:
 		case SIOCGIFGMEMB32:
-			thunk.ifgr.ifgr_groups = __USER_CAP(ifgr32->ifgr_groups,
+			thunk.ifgr.ifgr_groups = USER_PTR(ifgr32->ifgr_groups,
 			    ifgr32->ifgr_len);
 			break;
 		}
@@ -3150,7 +3150,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		thunk.ifmr.ifm_status = ifmr32->ifm_status;
 		thunk.ifmr.ifm_active = ifmr32->ifm_active;
 		thunk.ifmr.ifm_count = ifmr32->ifm_count;
-		thunk.ifmr.ifm_ulist = __USER_CAP(ifmr32->ifm_ulist,
+		thunk.ifmr.ifm_ulist = USER_PTR(ifmr32->ifm_ulist,
 		    ifmr32->ifm_count * sizeof(int));
 		data = (caddr_t)&thunk.ifmr;
 		cmd = _IOC_NEWTYPE(cmd, struct ifmediareq);
@@ -3160,7 +3160,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case SIOCGIFCONF64:
 		ifc64 = (struct ifconf64 *)data;
 		thunk.ifc.ifc_len = ifc64->ifc_len;
-		thunk.ifc.ifc_buf = __USER_CAP(ifc64->ifc_buf, ifc64->ifc_len);
+		thunk.ifc.ifc_buf = USER_PTR(ifc64->ifc_buf, ifc64->ifc_len);
 		data = (caddr_t)&thunk.ifc;
 		cmd = SIOCGIFCONF;
 		break;
@@ -3171,7 +3171,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		    sizeof(thunk.ifd.ifd_name));
 		thunk.ifd.ifd_cmd = ifd64->ifd_cmd;
 		thunk.ifd.ifd_len = ifd64->ifd_len;
-		thunk.ifd.ifd_data = __USER_CAP(ifd64->ifd_data,
+		thunk.ifd.ifd_data = USER_PTR(ifd64->ifd_data,
 		    ifd64->ifd_len);
 		data = (caddr_t)&thunk.ifd;
 		cmd = _IOC_NEWTYPE(cmd, struct ifdrv);
@@ -3192,7 +3192,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 			break;
 		case SIOCGIFGROUP64:
 		case SIOCGIFGMEMB64:
-			thunk.ifgr.ifgr_groups = __USER_CAP(ifgr64->ifgr_groups,
+			thunk.ifgr.ifgr_groups = USER_PTR(ifgr64->ifgr_groups,
 			    ifgr64->ifgr_len);
 			break;
 		}
@@ -3209,7 +3209,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		thunk.ifmr.ifm_status = ifmr64->ifm_status;
 		thunk.ifmr.ifm_active = ifmr64->ifm_active;
 		thunk.ifmr.ifm_count = ifmr64->ifm_count;
-		thunk.ifmr.ifm_ulist = __USER_CAP(ifmr64->ifm_ulist,
+		thunk.ifmr.ifm_ulist = USER_PTR(ifmr64->ifm_ulist,
 		    ifmr64->ifm_count * sizeof(int));
 		data = (caddr_t)&thunk.ifmr;
 		cmd = _IOC_NEWTYPE(cmd, struct ifmediareq);
@@ -3218,7 +3218,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		ifcr64 = (struct if_clonereq64 *)data;
 		thunk.ifcr.ifcr_total = ifcr64->ifcr_total;
 		thunk.ifcr.ifcr_count = ifcr64->ifcr_count;
-		thunk.ifcr.ifcr_buffer = __USER_CAP(ifcr64->ifcr_buffer,
+		thunk.ifcr.ifcr_buffer = USER_PTR(ifcr64->ifcr_buffer,
 		    ifcr64->ifcr_count * IFNAMSIZ);
 		data = (caddr_t)&thunk.ifmr;
 		cmd = SIOCIFGCLONERS;
