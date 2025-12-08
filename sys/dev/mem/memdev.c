@@ -28,6 +28,7 @@
  */
 
 #include <sys/param.h>
+#include <sys/abi_compat.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
 #include <sys/ioccom.h>

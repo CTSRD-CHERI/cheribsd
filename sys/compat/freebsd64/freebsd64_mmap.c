@@ -48,6 +48,7 @@
 #include <vm/vm_object.h>
 #include <vm/vm_extern.h>
 
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 
 #if 0
