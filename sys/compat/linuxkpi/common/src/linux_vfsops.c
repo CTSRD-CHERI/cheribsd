@@ -19,7 +19,9 @@
 #include <linux/atomic.h>
 #include <linux/fs.h>
 
-extern struct file_system_type *global_fst; // XXX
+static struct file_system_type *global_fst = NULL; // XXX
+struct mnt_idmap	nop_mnt_idmap; // XXX
+struct user_namespace	init_user_ns;
 
 #define VFSTOSB(mp)    ((struct super_block *)((mp)->mnt_data))
 

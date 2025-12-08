@@ -121,12 +121,12 @@ struct mnt_idmap {
 struct delayed_call {
 };
 
-static struct mnt_idmap nop_mnt_idmap; // XXX
+extern struct mnt_idmap nop_mnt_idmap; // XXX
 
 struct user_namespace {
 };
 
-static struct user_namespace init_user_ns;
+extern struct user_namespace init_user_ns;
 
 struct dir_context {
 	off_t	pos;
