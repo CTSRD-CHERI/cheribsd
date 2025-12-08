@@ -2153,7 +2153,9 @@ MLINKS+=socket.9 soabort.9 \
 	socket.9 solisten_proto_check.9 \
 	socket.9 sonewconn.9 \
 	socket.9 sooptcopyin.9 \
+	socket.9 sooptcopyinptr.9 \
 	socket.9 sooptcopyout.9 \
+	socket.9 sooptcopyoutptr.9 \
 	socket.9 sopoll.9 \
 	socket.9 sopoll_generic.9 \
 	socket.9 soreceive.9 \
