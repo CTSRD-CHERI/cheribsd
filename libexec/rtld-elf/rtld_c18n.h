@@ -227,7 +227,7 @@ void tramp_hook(void);
 size_t tramp_compile(char **, const struct tramp_data *);
 
 void *tramp_intern(const Plt_Entry *, compart_id_t, const struct tramp_data *);
-struct tramp_header *tramp_reflect(const void *);
+struct tramp_header *tramp_get_header(const void *);
 struct func_sig sigtab_get(const Obj_Entry *, unsigned long);
 
 static inline long

@@ -3523,7 +3523,7 @@ obj_from_addr(const void *addr)
     struct tramp_header *header;
 
     if (C18N_ENABLED) {
-	header = tramp_reflect(addr);
+	header = tramp_get_header(addr);
 	if (header != NULL)
 	    return (__DECONST(Obj_Entry *, header->defobj));
     }
