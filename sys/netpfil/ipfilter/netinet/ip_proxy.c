@@ -702,8 +702,8 @@ ipf_proxy_ioctl(ipf_main_softc_t *softc, caddr_t data, ioctlcmd_t cmd,
 				IPFERROR(80003);
 				error = ENOMEM;
 			} else {
-				error = copyinptr(softc, &ctl.apc_udata, ptr,
-						  ctl.apc_dsize);
+				error = copyin_indirect(softc, &ctl.apc_udata,
+							ptr, ctl.apc_dsize);
 				if (error == 0)
 					ctl.apc_data = ptr;
 			}

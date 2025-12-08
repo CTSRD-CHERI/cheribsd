@@ -4050,7 +4050,7 @@ ipf_sync(ipf_main_softc_t *softc, void *ifp)
  * end up being unaligned) and on the kernel's local stack.
  */
 /* ------------------------------------------------------------------------ */
-/* Function:    copyinptr                                                   */
+/* Function:    copyin_indirect                                             */
 /* Returns:     int - 0 = success, else failure                             */
 /* Parameters:  src(I)  - pointer to the source address                     */
 /*              dst(I)  - destination address                               */
@@ -4061,7 +4061,7 @@ ipf_sync(ipf_main_softc_t *softc, void *ifp)
 /* NB: src - pointer to user space pointer, dst - kernel space pointer      */
 /* ------------------------------------------------------------------------ */
 int
-copyinptr(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
+copyin_indirect(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
 {
 	char * __capability ca;
 	int error;
@@ -4083,7 +4083,7 @@ copyinptr(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    copyoutptr                                                  */
+/* Function:    copyout_indirect                                            */
 /* Returns:     int - 0 = success, else failure                             */
 /* Parameters:  src(I)  - pointer to the source address                     */
 /*              dst(I)  - destination address                               */
@@ -4094,7 +4094,7 @@ copyinptr(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
 /* NB: src - kernel space pointer, dst - pointer to user space pointer.     */
 /* ------------------------------------------------------------------------ */
 int
-copyoutptr(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
+copyout_indirect(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
 {
 	char * __capability ca;
 	int error;
