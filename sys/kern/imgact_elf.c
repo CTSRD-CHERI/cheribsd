@@ -1983,7 +1983,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	imgp->auxargs = NULL;
 	KASSERT(pos - argarray <= AT_COUNT, ("Too many auxargs"));
 
-	error = copyoutcap(argarray, (void * __capability)base,
+	error = copyoutptr(argarray, (void * __capability)base,
 	    sizeof(*argarray) * AT_COUNT);
 	free(argarray, M_TEMP);
 	return (error);

@@ -845,7 +845,7 @@ mpi3mr_app_mptcmds(struct cdev *dev, u_long cmd, void *uarg,
 		rval = ENOMEM;
 		goto out;
 	}
-	if (copyincap(karg->buf_entry_list, buffer_list, karg->buf_entry_list_size)) {
+	if (copyinptr(karg->buf_entry_list, buffer_list, karg->buf_entry_list_size)) {
 		printf(IOCNAME "failure at %s:%d/%s()!\n", sc->name,
 		       __FILE__, __LINE__, __func__);
 		rval = EFAULT;

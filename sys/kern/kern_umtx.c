@@ -4051,7 +4051,7 @@ __umtx_op_nwake_private_native(struct thread *td, struct _umtx_op_args *uap)
 	for (count = uap->val, pos = 0; count > 0; count -= tocopy,
 	    pos += tocopy) {
 		tocopy = MIN(count, BATCH_SIZE);
-		error = copyincap(upp + pos, uaddrs,
+		error = copyinptr(upp + pos, uaddrs,
 		    tocopy * sizeof(char * __capability));
 		if (error != 0)
 			break;
@@ -5698,7 +5698,7 @@ umtx_handle_rb(struct thread *td, uintcap_t rbp, uintcap_t *rb_list, bool inact,
 	} else
 #endif
 
-		error = copyincap((void * __capability)rbp, &mu.m, sizeof(mu.m));
+		error = copyinptr((void * __capability)rbp, &mu.m, sizeof(mu.m));
 	if (error != 0)
 		return (error);
 	if (rb_list != NULL)

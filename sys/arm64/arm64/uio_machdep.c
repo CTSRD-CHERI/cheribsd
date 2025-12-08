@@ -100,10 +100,10 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			switch (uio->uio_rw) {
 #if __has_feature(capabilities)
 			case UIO_READ_CAP:
-				error = copyoutcap(cp, iov->iov_base, cnt);
+				error = copyoutptr(cp, iov->iov_base, cnt);
 				break;
 			case UIO_WRITE_CAP:
-				error = copyincap(iov->iov_base, cp, cnt);
+				error = copyinptr(iov->iov_base, cp, cnt);
 				break;
 #endif
 			case UIO_READ:
