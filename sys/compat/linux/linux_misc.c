@@ -267,9 +267,9 @@ linux_select(struct thread *td, struct linux_select_args *args)
 	} else
 		tvp = NULL;
 
-	error = kern_select(td, args->nfds, __USER_CAP_UNBOUND(args->readfds),
-	    __USER_CAP_UNBOUND(args->writefds),
-	    __USER_CAP_UNBOUND(args->exceptfds), tvp, LINUX_NFDBITS);
+	error = kern_select(td, args->nfds, USER_PTR_UNBOUND(args->readfds),
+	    USER_PTR_UNBOUND(args->writefds),
+	    USER_PTR_UNBOUND(args->exceptfds), tvp, LINUX_NFDBITS);
 	if (error)
 		goto select_out;
 
@@ -2158,9 +2158,9 @@ linux_common_pselect6(struct thread *td, l_int nfds, l_fd_set *readfds,
 	} else
 		tvp = NULL;
 
-	error = kern_pselect(td, nfds, __USER_CAP_UNBOUND(readfds),
-	    __USER_CAP_UNBOUND(writefds),
-	    __USER_CAP_UNBOUND(exceptfds), tvp, ssp, LINUX_NFDBITS);
+	error = kern_pselect(td, nfds, USER_PTR_UNBOUND(readfds),
+	    USER_PTR_UNBOUND(writefds),
+	    USER_PTR_UNBOUND(exceptfds), tvp, ssp, LINUX_NFDBITS);
 
 	if (tsp != NULL) {
 		/*
@@ -2489,7 +2489,7 @@ linux_mincore(struct thread *td, struct linux_mincore_args *args)
 	if (args->start & PAGE_MASK)
 		return (EINVAL);
 	return (kern_mincore(td, args->start, args->len,
-	    __USER_CAP(args->vec, args->len)));
+	    USER_PTR(args->vec, args->len)));
 }
 
 #define	SYSLOG_TAG	"<6>"
@@ -2628,12 +2628,12 @@ get_argenv_ptr(l_uintptr_t * __capability *arrayp, void * __capability *ptrp)
 	if (fueword32(array, &ptr32) == -1)
 		return (EFAULT);
 	array += sizeof(ptr32);
-	*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr32);
+	*ptrp = USER_PTR_STR((void *)(uintptr_t)ptr32);
 #elif defined(COMPAT_LINUX64)
 	if (fueword64(array, &ptr64) == -1)
 		return (EFAULT);
 	array += sizeof(ptr64);
-	*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr64);
+	*ptrp = USER_PTR_STR((void *)(uintptr_t)ptr64);
 #else
 	if (fueptr(array, &ptr) == -1)
 		return (EFAULT);
@@ -2731,9 +2731,9 @@ linux_execve(struct thread *td, struct linux_execve_args *args)
 
 	LINUX_CTR(execve);
 
-	error = linux_exec_copyin_args(&eargs, __USER_CAP_PATH(args->path),
-	    UIO_USERSPACE, __USER_CAP_UNBOUND(args->argp),
-	    __USER_CAP_UNBOUND(args->envp));
+	error = linux_exec_copyin_args(&eargs, USER_PTR_PATH(args->path),
+	    UIO_USERSPACE, USER_PTR_UNBOUND(args->argp),
+	    USER_PTR_UNBOUND(args->envp));
 	if (error == 0)
 		error = linux_common_execve(td, &eargs);
 	AUDIT_SYSCALL_EXIT(error == EJUSTRETURN ? 0 : error, td);

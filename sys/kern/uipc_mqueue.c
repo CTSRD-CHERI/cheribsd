@@ -2851,7 +2851,7 @@ freebsd32_kmq_open(struct thread *td, struct freebsd32_kmq_open_args *uap)
 			return (error);
 		mq_attr_from32(&attr32, &attr);
 	}
-	return (kern_kmq_open(td, __USER_CAP_STR(uap->path), flags, uap->mode,
+	return (kern_kmq_open(td, USER_PTR_STR(uap->path), flags, uap->mode,
 	    uap->attr != NULL ? &attr : NULL));
 }
 
@@ -2964,39 +2964,39 @@ static struct syscall_helper_data mq32_syscalls[] = {
 int
 freebsd64_kmq_open(struct thread *td, struct freebsd64_kmq_open_args *uap)
 {
-	return (user_kmq_open(td, __USER_CAP_PATH(uap->path), uap->flags,
-	    uap->mode, __USER_CAP_OBJ(uap->attr)));
+	return (user_kmq_open(td, USER_PTR_PATH(uap->path), uap->flags,
+	    uap->mode, USER_PTR_OBJ(uap->attr)));
 }
 
 int
 freebsd64_kmq_unlink(struct thread *td, struct freebsd64_kmq_unlink_args *uap)
 {
-	return (kern_kmq_unlink(td, __USER_CAP_PATH(uap->path)));
+	return (kern_kmq_unlink(td, USER_PTR_PATH(uap->path)));
 }
 
 int
 freebsd64_kmq_setattr(struct thread *td, struct freebsd64_kmq_setattr_args *uap)
 {
-	return (user_kmq_setattr(td, uap->mqd, __USER_CAP_OBJ(uap->attr),
-	    __USER_CAP_OBJ(uap->oattr)));
+	return (user_kmq_setattr(td, uap->mqd, USER_PTR_OBJ(uap->attr),
+	    USER_PTR_OBJ(uap->oattr)));
 }
 
 int
 freebsd64_kmq_timedsend(struct thread *td,
     struct freebsd64_kmq_timedsend_args *uap)
 {
-	return (user_kmq_timedsend(td, uap->mqd, __USER_CAP(uap->msg_ptr,
+	return (user_kmq_timedsend(td, uap->mqd, USER_PTR(uap->msg_ptr,
 	    uap->msg_len), uap->msg_len, uap->msg_prio,
-	    __USER_CAP_OBJ(uap->abs_timeout)));
+	    USER_PTR_OBJ(uap->abs_timeout)));
 }
 
 int
 freebsd64_kmq_timedreceive(struct thread *td,
     struct freebsd64_kmq_timedreceive_args *uap)
 {
-	return (user_kmq_timedreceive(td, uap->mqd, __USER_CAP(uap->msg_ptr,
-	    uap->msg_len), uap->msg_len, __USER_CAP_OBJ(uap->msg_prio),
-	    __USER_CAP_OBJ(uap->abs_timeout)));
+	return (user_kmq_timedreceive(td, uap->mqd, USER_PTR(uap->msg_ptr,
+	    uap->msg_len), uap->msg_len, USER_PTR_OBJ(uap->msg_prio),
+	    USER_PTR_OBJ(uap->abs_timeout)));
 }
 
 int
@@ -3009,7 +3009,7 @@ freebsd64_kmq_notify(struct thread *td, struct freebsd64_kmq_notify_args *uap)
 	if (uap->sigev == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(__USER_CAP_OBJ(uap->sigev), &ev64,
+		error = copyin(USER_PTR_OBJ(uap->sigev), &ev64,
 		    sizeof(ev64));
 		if (error != 0)
 			return (error);

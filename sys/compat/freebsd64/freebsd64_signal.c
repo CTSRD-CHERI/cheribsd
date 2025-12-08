@@ -92,7 +92,7 @@ freebsd64_sigaction(struct thread *td, struct freebsd64_sigaction_args *uap)
 	actp = (uap->act != NULL) ? &act : NULL;
 	oactp = (uap->oact != NULL) ? &oact : NULL;
 	if (actp) {
-		error = copyin(__USER_CAP_OBJ(uap->act), &act64, sizeof(act64));
+		error = copyin(USER_PTR_OBJ(uap->act), &act64, sizeof(act64));
 		if (error)
 			return (error);
 		if (is_magic_sighandler_constant(act64.sa_u))
@@ -108,7 +108,7 @@ freebsd64_sigaction(struct thread *td, struct freebsd64_sigaction_args *uap)
 		oact64.sa_u = (__cheri_addr ptraddr_t)oactp->sa_handler;
 		oact64.sa_flags = oactp->sa_flags;
 		oact64.sa_mask = oactp->sa_mask;
-		error = copyout(&oact64, __USER_CAP_OBJ(uap->oact),
+		error = copyout(&oact64, USER_PTR_OBJ(uap->oact),
 		    sizeof(oact64));
 	}
 	return (error);
@@ -117,15 +117,15 @@ freebsd64_sigaction(struct thread *td, struct freebsd64_sigaction_args *uap)
 int
 freebsd64_sigprocmask(struct thread *td, struct freebsd64_sigprocmask_args *uap)
 {
-	return (user_sigprocmask(td, uap->how, __USER_CAP_OBJ(uap->set),
-	    __USER_CAP_OBJ(uap->oset)));
+	return (user_sigprocmask(td, uap->how, USER_PTR_OBJ(uap->set),
+	    USER_PTR_OBJ(uap->oset)));
 }
 
 int
 freebsd64_sigwait(struct thread *td, struct freebsd64_sigwait_args *uap)
 {
-	return (user_sigwait(td, __USER_CAP_OBJ(uap->set),
-	    __USER_CAP_OBJ(uap->sig)));
+	return (user_sigwait(td, USER_PTR_OBJ(uap->set),
+	    USER_PTR_OBJ(uap->sig)));
 }
 
 void
@@ -158,29 +158,29 @@ int
 freebsd64_sigtimedwait(struct thread *td,
     struct freebsd64_sigtimedwait_args *uap)
 {
-	return (user_sigtimedwait(td, __USER_CAP_OBJ(uap->set),
-	    __USER_CAP_OBJ(uap->info), __USER_CAP_OBJ(uap->timeout),
+	return (user_sigtimedwait(td, USER_PTR_OBJ(uap->set),
+	    USER_PTR_OBJ(uap->info), USER_PTR_OBJ(uap->timeout),
 	    (copyout_siginfo_t *)freebsd64_copyout_siginfo));
 }
 
 int
 freebsd64_sigwaitinfo(struct thread *td, struct freebsd64_sigwaitinfo_args *uap)
 {
-	return (user_sigwaitinfo(td, __USER_CAP_OBJ(uap->set),
-	    __USER_CAP_OBJ(uap->info),
+	return (user_sigwaitinfo(td, USER_PTR_OBJ(uap->set),
+	    USER_PTR_OBJ(uap->info),
 	    (copyout_siginfo_t *)freebsd64_copyout_siginfo));
 }
 
 int
 freebsd64_sigpending(struct thread *td, struct freebsd64_sigpending_args *uap)
 {
-	return (kern_sigpending(td, __USER_CAP_OBJ(uap->set)));
+	return (kern_sigpending(td, USER_PTR_OBJ(uap->set)));
 }
 
 int
 freebsd64_sigsuspend(struct thread *td, struct freebsd64_sigsuspend_args *uap)
 {
-	return (user_sigsuspend(td, __USER_CAP_OBJ(uap->sigmask)));
+	return (user_sigsuspend(td, USER_PTR_OBJ(uap->sigmask)));
 }
 
 int
@@ -192,10 +192,10 @@ freebsd64_sigaltstack(struct thread *td,
 	int error;
 
 	if (uap->ss != NULL) {
-		error = copyin(__USER_CAP_OBJ(uap->ss), &ss64, sizeof(ss64));
+		error = copyin(USER_PTR_OBJ(uap->ss), &ss64, sizeof(ss64));
 		if (error != 0)
 			return (error);
-		ss.ss_sp = __USER_CAP_UNBOUND(ss64.ss_sp);
+		ss.ss_sp = USER_PTR_UNBOUND(ss64.ss_sp);
 		ss.ss_size = ss64.ss_size;
 		ss.ss_flags = ss64.ss_flags;
 	}
@@ -208,7 +208,7 @@ freebsd64_sigaltstack(struct thread *td,
 		ss64.ss_sp = (__cheri_addr uint64_t)oss.ss_sp;
 		ss64.ss_size = oss.ss_size;
 		ss64.ss_flags = oss.ss_flags;
-		error = copyout(&ss64, __USER_CAP_OBJ(uap->oss), sizeof(ss64));
+		error = copyout(&ss64, USER_PTR_OBJ(uap->oss), sizeof(ss64));
 	}
 	return (error);
 }
@@ -232,7 +232,7 @@ int freebsd64_sigfastblock(struct thread *td,
     struct freebsd64_sigfastblock_args *uap)
 {
 	return (kern_sigfastblock(td, uap->cmd,
-	    __USER_CAP(uap->ptr, sizeof(uint32_t))));
+	    USER_PTR(uap->ptr, sizeof(uint32_t))));
 }
 /*
  * CHERI CHANGES START

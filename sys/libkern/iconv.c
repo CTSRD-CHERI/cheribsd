@@ -444,14 +444,14 @@ iconv_sysctl_add(SYSCTL_HANDLER_ARGS)
 #ifdef COMPAT_FREEBSD32
 	if (req->flags & SCTL_MASK32) {
 		error = SYSCTL_IN(req, &du.din32, sizeof(du.din32));
-		ia_data = __USER_CAP((void*)(uintptr_t)du.din32.ia_data,
+		ia_data = USER_PTR((void*)(uintptr_t)du.din32.ia_data,
 		    du.din32.ia_datalen);
 	} else
 #endif
 #ifdef COMPAT_FREEBSD64
 	if (req->flags & SCTL_MASK64) {
 		error = SYSCTL_IN(req, &du.din64, sizeof(du.din64));
-		ia_data = __USER_CAP((void*)(uintptr_t)du.din64.ia_data,
+		ia_data = USER_PTR((void*)(uintptr_t)du.din64.ia_data,
 		    du.din64.ia_datalen);
 	} else
 #endif

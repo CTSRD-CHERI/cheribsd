@@ -343,7 +343,7 @@ iic_copyinmsgs32(struct iic_rdwr_data *d, struct iic_msg_user *buf)
 		CP(msg32, buf[i], slave);
 		CP(msg32, buf[i], flags);
 		CP(msg32, buf[i], len);
-		buf[i].buf = __USER_CAP(PTRIN(msg32.buf), msg32.len);
+		buf[i].buf = USER_PTR(PTRIN(msg32.buf), msg32.len);
 	}
 	return (0);
 }

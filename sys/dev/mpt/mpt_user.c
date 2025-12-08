@@ -631,7 +631,7 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		page_req = &page_req_swab;
 		page_req->header = page_req32->header;
 		page_req->page_address = page_req32->page_address;
-		page_req->buf = __USER_CAP(PTRIN(page_req32->buf),
+		page_req->buf = USER_PTR(PTRIN(page_req32->buf),
 		    page_req32->len);
 		page_req->len = page_req32->len;
 		page_req->ioc_status = page_req32->ioc_status;
@@ -641,7 +641,7 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		ext_page_req = &ext_page_req_swab;
 		ext_page_req->header = ext_page_req32->header;
 		ext_page_req->page_address = ext_page_req32->page_address;
-		ext_page_req->buf = __USER_CAP(PTRIN(ext_page_req32->buf),
+		ext_page_req->buf = USER_PTR(PTRIN(ext_page_req32->buf),
 		    ext_page_req32->len);
 		ext_page_req->len = ext_page_req32->len;
 		ext_page_req->ioc_status = ext_page_req32->ioc_status;
@@ -653,7 +653,7 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		raid_act->volume_id = raid_act32->volume_id;
 		raid_act->phys_disk_num = raid_act32->phys_disk_num;
 		raid_act->action_data_word = raid_act32->action_data_word;
-		raid_act->buf = __USER_CAP(PTRIN(raid_act32->buf),
+		raid_act->buf = USER_PTR(PTRIN(raid_act32->buf),
 		    raid_act32->len);
 		raid_act->len = raid_act32->len;
 		raid_act->volume_status = raid_act32->volume_status;
@@ -677,7 +677,7 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		page_req = &page_req_swab;
 		page_req->header = page_req64->header;
 		page_req->page_address = page_req64->page_address;
-		page_req->buf = __USER_CAP(PTRIN(page_req64->buf),
+		page_req->buf = USER_PTR(PTRIN(page_req64->buf),
 		    page_req64->len);
 		page_req->len = page_req64->len;
 		page_req->ioc_status = page_req64->ioc_status;
@@ -687,7 +687,7 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		ext_page_req = &ext_page_req_swab;
 		ext_page_req->header = ext_page_req64->header;
 		ext_page_req->page_address = ext_page_req64->page_address;
-		ext_page_req->buf = __USER_CAP(PTRIN(ext_page_req64->buf),
+		ext_page_req->buf = USER_PTR(PTRIN(ext_page_req64->buf),
 		    ext_page_req64->len);
 		ext_page_req->len = ext_page_req64->len;
 		ext_page_req->ioc_status = ext_page_req64->ioc_status;
@@ -699,7 +699,7 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		raid_act->volume_id = raid_act64->volume_id;
 		raid_act->phys_disk_num = raid_act64->phys_disk_num;
 		raid_act->action_data_word = raid_act64->action_data_word;
-		raid_act->buf = __USER_CAP(PTRIN(raid_act64->buf),
+		raid_act->buf = USER_PTR(PTRIN(raid_act64->buf),
 		    raid_act64->len);
 		raid_act->len = raid_act64->len;
 		raid_act->volume_status = raid_act64->volume_status;

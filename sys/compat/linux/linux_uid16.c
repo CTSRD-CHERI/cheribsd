@@ -70,7 +70,7 @@ int
 linux_chown16(struct thread *td, struct linux_chown16_args *args)
 {
 
-	return (kern_fchownat(td, AT_FDCWD, __USER_CAP_PATH(args->path),
+	return (kern_fchownat(td, AT_FDCWD, USER_PTR_PATH(args->path),
 	    UIO_USERSPACE, CAST_NOCHG(args->uid), CAST_NOCHG(args->gid), 0));
 }
 
@@ -78,7 +78,7 @@ int
 linux_lchown16(struct thread *td, struct linux_lchown16_args *args)
 {
 
-	return (kern_fchownat(td, AT_FDCWD, __USER_CAP_PATH(args->path),
+	return (kern_fchownat(td, AT_FDCWD, USER_PTR_PATH(args->path),
 	    UIO_USERSPACE, CAST_NOCHG(args->uid), CAST_NOCHG(args->gid),
 	    AT_SYMLINK_NOFOLLOW));
 }

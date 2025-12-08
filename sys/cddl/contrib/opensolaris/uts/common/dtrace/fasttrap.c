@@ -2254,7 +2254,7 @@ fasttrap_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int fflag,
 
 #if __has_feature(capabilities)
 		if (!SV_PROC_FLAG(td->td_proc, SV_CHERI))
-			uprobe = __USER_CAP(*(uint64_t *)arg,
+			uprobe = USER_PTR(*(uint64_t *)arg,
 			    sizeof(fasttrap_probe_spec_t));
 		else
 #endif
