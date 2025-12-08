@@ -82,7 +82,7 @@ freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 			return (error);
 		/* jail_v0 is host order */
 		ip4.s_addr = htonl(j0.ip_number);
-		return (kern_jail(td, USER_PTR_STR(j0.path),
+		return (kern_jail(td, USER_PTR_PATH(j0.path),
 		    USER_PTR_STR(j0.hostname), NULL, &ip4, 1,
 		    NULL, 0, UIO_SYSSPACE)); }
 
@@ -99,7 +99,7 @@ freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 		error = copyin(USER_PTR(jail, sizeof(j)), &j, sizeof(j));
 		if (error)
 			return (error);
-		return (kern_jail(td, USER_PTR_STR(j.path),
+		return (kern_jail(td, USER_PTR_PATH(j.path),
 		    USER_PTR_STR(j.hostname), USER_PTR_STR(j.jailname),
 		    USER_PTR_STR(j.ip4), j.ip4s, USER_PTR_STR(j.ip6),
 		    j.ip6s, UIO_USERSPACE));

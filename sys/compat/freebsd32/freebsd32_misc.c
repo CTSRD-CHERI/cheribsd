@@ -405,7 +405,7 @@ freebsd32_execve(struct thread *td, struct freebsd32_execve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = exec_copyin_args(&eargs, USER_PTR_STR(uap->fname),
+	error = exec_copyin_args(&eargs, USER_PTR_PATH(uap->fname),
 	    UIO_USERSPACE, USER_PTR_UNBOUND(uap->argv),
 	    USER_PTR_UNBOUND(uap->envv));
 	if (error == 0)
@@ -1830,7 +1830,7 @@ freebsd4_freebsd32_statfs(struct thread *td, struct freebsd4_freebsd32_statfs_ar
 	int error;
 
 	sp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
-	error = kern_statfs(td, USER_PTR_STR(uap->path), UIO_USERSPACE, sp);
+	error = kern_statfs(td, USER_PTR_PATH(uap->path), UIO_USERSPACE, sp);
 	if (error == 0) {
 		copy_statfs(sp, &s32);
 		error = copyout(&s32, uap->buf, sizeof(s32));
@@ -2168,7 +2168,7 @@ ofreebsd32_stat(struct thread *td, struct ofreebsd32_stat_args *uap)
 	struct ostat32 sb32;
 	int error;
 
-	error = kern_statat(td, 0, AT_FDCWD, USER_PTR_STR(uap->path),
+	error = kern_statat(td, 0, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, &sb);
 	if (error)
 		return (error);
@@ -2217,7 +2217,7 @@ freebsd32_fstatat(struct thread *td, struct freebsd32_fstatat_args *uap)
 	struct stat32 ub32;
 	int error;
 
-	error = kern_statat(td, uap->flag, uap->fd, USER_PTR_STR(uap->path),
+	error = kern_statat(td, uap->flag, uap->fd, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, &ub);
 	if (error)
 		return (error);
@@ -2235,7 +2235,7 @@ ofreebsd32_lstat(struct thread *td, struct ofreebsd32_lstat_args *uap)
 	int error;
 
 	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
-	    USER_PTR_STR(uap->path), UIO_USERSPACE, &sb);
+	    USER_PTR_PATH(uap->path), UIO_USERSPACE, &sb);
 	if (error)
 		return (error);
 	copy_ostat(&sb, &sb32);
@@ -2353,7 +2353,7 @@ freebsd11_freebsd32_stat(struct thread *td,
 	struct freebsd11_stat32 sb32;
 	int error;
 
-	error = kern_statat(td, 0, AT_FDCWD, USER_PTR_STR(uap->path),
+	error = kern_statat(td, 0, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
@@ -2388,7 +2388,7 @@ freebsd11_freebsd32_fstatat(struct thread *td,
 	struct freebsd11_stat32 sb32;
 	int error;
 
-	error = kern_statat(td, uap->flag, uap->fd, USER_PTR_STR(uap->path),
+	error = kern_statat(td, uap->flag, uap->fd, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
@@ -2407,7 +2407,7 @@ freebsd11_freebsd32_lstat(struct thread *td,
 	int error;
 
 	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
-	    USER_PTR_STR(uap->path), UIO_USERSPACE, &sb);
+	    USER_PTR_PATH(uap->path), UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
 	error = freebsd11_cvtstat32(&sb, &sb32);
@@ -2600,7 +2600,7 @@ freebsd32_jail(struct thread *td, struct freebsd32_jail_args *uap)
 			return (error);
 		/* jail_v0 is host order */
 		ip4.s_addr = htonl(j32_v0.ip_number);
-		return (kern_jail(td, USER_PTR_STR(PTRIN(j32_v0.path)),
+		return (kern_jail(td, USER_PTR_PATH(PTRIN(j32_v0.path)),
 		    USER_PTR_STR(PTRIN(j32_v0.hostname)), NULL, &ip4, 1,
 		    NULL, 0, UIO_SYSSPACE));
 	}
@@ -2620,7 +2620,7 @@ freebsd32_jail(struct thread *td, struct freebsd32_jail_args *uap)
 		error = copyin(uap->jailp, &j32, sizeof(struct jail32));
 		if (error)
 			return (error);
-		return (kern_jail(td, USER_PTR_STR(PTRIN(j32.path)),
+		return (kern_jail(td, USER_PTR_PATH(PTRIN(j32.path)),
 		    USER_PTR_STR(PTRIN(j32.hostname)),
 		    USER_PTR_STR(PTRIN(j32.jailname)),
 		    USER_PTR_ARRAY(PTRIN(j32.ip4), j32.ip4s), j32.ip4s,

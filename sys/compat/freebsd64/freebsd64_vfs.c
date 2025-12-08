@@ -211,7 +211,7 @@ freebsd11_freebsd64_stat(struct thread *td,
 	struct freebsd11_stat64 osb;
 	int error;
 
-	error = kern_statat(td, 0, AT_FDCWD, USER_PTR_STR(uap->path),
+	error = kern_statat(td, 0, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
@@ -248,7 +248,7 @@ int
 freebsd64___acl_get_file(struct thread *td,
     struct freebsd64___acl_get_file_args *uap)
 {
-	return (kern___acl_get_path(td, USER_PTR_STR(uap->path), uap->type,
+	return (kern___acl_get_path(td, USER_PTR_PATH(uap->path), uap->type,
 	    USER_PTR_OBJ(uap->aclp), FOLLOW));
 }
 
@@ -256,7 +256,7 @@ int
 freebsd64___acl_get_link(struct thread *td,
     struct freebsd64___acl_get_link_args *uap)
 {
-	return (kern___acl_get_path(td, USER_PTR_STR(uap->path), uap->type,
+	return (kern___acl_get_path(td, USER_PTR_PATH(uap->path), uap->type,
 	    USER_PTR_OBJ(uap->aclp), NOFOLLOW));
 }
 
@@ -264,7 +264,7 @@ int
 freebsd64___acl_set_file(struct thread *td,
     struct freebsd64___acl_set_file_args *uap)
 {
-	return(kern___acl_set_path(td, USER_PTR_STR(uap->path), uap->type,
+	return(kern___acl_set_path(td, USER_PTR_PATH(uap->path), uap->type,
 	    USER_PTR_OBJ(uap->aclp), FOLLOW));
 }
 
@@ -272,7 +272,7 @@ int
 freebsd64___acl_set_link(struct thread *td,
     struct freebsd64___acl_set_link_args *uap)
 {
-	return(kern___acl_set_path(td, USER_PTR_STR(uap->path), uap->type,
+	return(kern___acl_set_path(td, USER_PTR_PATH(uap->path), uap->type,
 	    USER_PTR_OBJ(uap->aclp), NOFOLLOW));
 }
 
@@ -296,7 +296,7 @@ int
 freebsd64___acl_delete_file(struct thread *td,
     struct freebsd64___acl_delete_file_args *uap)
 {
-	return (kern___acl_delete_path(td, USER_PTR_STR(uap->path),
+	return (kern___acl_delete_path(td, USER_PTR_PATH(uap->path),
 	    uap->type, FOLLOW));
 }
 
@@ -304,7 +304,7 @@ int
 freebsd64___acl_delete_link(struct thread *td,
     struct freebsd64___acl_delete_link_args *uap)
 {
-	return (kern___acl_delete_path(td, USER_PTR_STR(uap->path),
+	return (kern___acl_delete_path(td, USER_PTR_PATH(uap->path),
 	    uap->type, NOFOLLOW));
 }
 
@@ -312,7 +312,7 @@ int
 freebsd64___acl_aclcheck_file(struct thread *td,
     struct freebsd64___acl_aclcheck_file_args *uap)
 {
-	return (kern___acl_aclcheck_path(td, USER_PTR_STR(uap->path),
+	return (kern___acl_aclcheck_path(td, USER_PTR_PATH(uap->path),
 	    uap->type, USER_PTR_OBJ(uap->aclp), FOLLOW));
 }
 
@@ -320,7 +320,7 @@ int
 freebsd64___acl_aclcheck_link(struct thread *td,
     struct freebsd64___acl_aclcheck_link_args *uap)
 {
-	return (kern___acl_aclcheck_path(td, USER_PTR_STR(uap->path),
+	return (kern___acl_aclcheck_path(td, USER_PTR_PATH(uap->path),
 	    uap->type, USER_PTR_OBJ(uap->aclp), NOFOLLOW));
 }
 
@@ -346,7 +346,7 @@ int
 freebsd64___realpathat(struct thread *td,
     struct freebsd64___realpathat_args *uap)
 {
-	return (kern___realpathat(td, uap->fd, USER_PTR_STR(uap->path),
+	return (kern___realpathat(td, uap->fd, USER_PTR_PATH(uap->path),
 	    USER_PTR(uap->buf, uap->size), uap->size, uap->flags,
 	    UIO_USERSPACE));
 }
@@ -357,8 +357,8 @@ freebsd64___realpathat(struct thread *td,
 int
 freebsd64_extattrctl(struct thread *td, struct freebsd64_extattrctl_args *uap)
 {
-	return (kern_extattrctl(td, USER_PTR_STR(uap->path), uap->cmd,
-	    USER_PTR_STR(uap->filename), uap->attrnamespace,
+	return (kern_extattrctl(td, USER_PTR_PATH(uap->path), uap->cmd,
+	    USER_PTR_PATH(uap->filename), uap->attrnamespace,
 	    USER_PTR_STR(uap->attrname)));
 }
 
@@ -375,7 +375,7 @@ int
 freebsd64_extattr_set_file(struct thread *td,
     struct freebsd64_extattr_set_file_args *uap)
 {
-	return (user_extattr_set_path(td, USER_PTR_STR(uap->path),
+	return (user_extattr_set_path(td, USER_PTR_PATH(uap->path),
 	    uap->attrnamespace, USER_PTR_STR(uap->attrname),
 	    USER_PTR(uap->data, uap->nbytes), uap->nbytes, FOLLOW));
 }
@@ -384,7 +384,7 @@ int
 freebsd64_extattr_set_link(struct thread *td,
     struct freebsd64_extattr_set_link_args *uap)
 {
-	return (user_extattr_set_path(td, USER_PTR_STR(uap->path),
+	return (user_extattr_set_path(td, USER_PTR_PATH(uap->path),
 	    uap->attrnamespace, USER_PTR_STR(uap->attrname),
 	    USER_PTR(uap->data, uap->nbytes), uap->nbytes, NOFOLLOW));
 }
@@ -402,7 +402,7 @@ int
 freebsd64_extattr_get_file(struct thread *td,
     struct freebsd64_extattr_get_file_args *uap)
 {
-	return (user_extattr_get_path(td, USER_PTR_STR(uap->path),
+	return (user_extattr_get_path(td, USER_PTR_PATH(uap->path),
 	    uap->attrnamespace, USER_PTR_STR(uap->attrname),
 	    USER_PTR(uap->data, uap->nbytes), uap->nbytes, FOLLOW));
 }
@@ -411,7 +411,7 @@ int
 freebsd64_extattr_get_link(struct thread *td,
     struct freebsd64_extattr_get_link_args *uap)
 {
-	return (user_extattr_get_path(td, USER_PTR_STR(uap->path),
+	return (user_extattr_get_path(td, USER_PTR_PATH(uap->path),
 	    uap->attrnamespace, USER_PTR_STR(uap->attrname),
 	    USER_PTR(uap->data, uap->nbytes), uap->nbytes, NOFOLLOW));
 }
@@ -428,7 +428,7 @@ int
 freebsd64_extattr_delete_file(struct thread *td,
     struct freebsd64_extattr_delete_file_args *uap)
 {
-	return (user_extattr_delete_path(td, USER_PTR_STR(uap->path),
+	return (user_extattr_delete_path(td, USER_PTR_PATH(uap->path),
 	    uap->attrnamespace, USER_PTR_STR(uap->attrname), FOLLOW));
 }
 
@@ -436,7 +436,7 @@ int
 freebsd64_extattr_delete_link(struct thread *td,
     struct freebsd64_extattr_delete_link_args *uap)
 {
-	return (user_extattr_delete_path(td, USER_PTR_STR(uap->path),
+	return (user_extattr_delete_path(td, USER_PTR_PATH(uap->path),
 	    uap->attrnamespace, USER_PTR_STR(uap->attrname), NOFOLLOW));
 }
 
@@ -452,7 +452,7 @@ int
 freebsd64_extattr_list_file(struct thread *td,
     struct freebsd64_extattr_list_file_args *uap)
 {
-	return (user_extattr_list_path(td, USER_PTR_STR(uap->path),
+	return (user_extattr_list_path(td, USER_PTR_PATH(uap->path),
 	    uap->attrnamespace, USER_PTR(uap->data, uap->nbytes),
 	    uap->nbytes, FOLLOW));
 }
@@ -461,7 +461,7 @@ int
 freebsd64_extattr_list_link(struct thread *td,
     struct freebsd64_extattr_list_link_args *uap)
 {
-	return (user_extattr_list_path(td, USER_PTR_STR(uap->path),
+	return (user_extattr_list_path(td, USER_PTR_PATH(uap->path),
 	    uap->attrnamespace, USER_PTR(uap->data, uap->nbytes),
 	    uap->nbytes, NOFOLLOW));
 }
@@ -480,7 +480,7 @@ freebsd11_freebsd64_lstat(struct thread *td,
 	int error;
 
 	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
-	    USER_PTR_STR(uap->path), UIO_USERSPACE, &sb);
+	    USER_PTR_PATH(uap->path), UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
 	error = freebsd11_freebsd64_cvtstat(&sb, &osb);
@@ -518,7 +518,7 @@ freebsd11_freebsd64_fstatat(struct thread *td,
 	struct freebsd11_stat64 osb;
 	int error;
 
-	error = kern_statat(td, uap->flag, uap->fd, USER_PTR_STR(uap->path),
+	error = kern_statat(td, uap->flag, uap->fd, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
@@ -578,7 +578,7 @@ freebsd11_freebsd64_nstat(struct thread *td,
 	struct nstat64 nsb;
 	int error;
 
-	error = kern_statat(td, 0, AT_FDCWD, USER_PTR_STR(uap->path),
+	error = kern_statat(td, 0, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
@@ -598,7 +598,7 @@ freebsd11_freebsd64_nlstat(struct thread *td,
 	int error;
 
 	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
-	    USER_PTR_STR(uap->path), UIO_USERSPACE, &sb);
+	    USER_PTR_PATH(uap->path), UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
 	freebsd11_freebsd64_cvtnstat(&sb, &nsb);
@@ -638,14 +638,14 @@ freebsd11_freebsd64_getdents(struct thread *td,
 int
 freebsd64_quotactl(struct thread *td, struct freebsd64_quotactl_args *uap)
 {
-	return (kern_quotactl(td, USER_PTR_STR(uap->path),
+	return (kern_quotactl(td, USER_PTR_PATH(uap->path),
 	    uap->cmd, uap->uid, USER_PTR_UNBOUND(uap->arg)));
 }
 
 int
 freebsd64_statfs(struct thread *td, struct freebsd64_statfs_args *uap)
 {
-	return (user_statfs(td, USER_PTR_STR(uap->path),
+	return (user_statfs(td, USER_PTR_PATH(uap->path),
 	    USER_PTR_OBJ(uap->buf)));
 }
 
@@ -678,7 +678,7 @@ freebsd11_freebsd64_statfs(struct thread *td,
 	int error;
 
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
-	error = kern_statfs(td, USER_PTR_STR(uap->path), UIO_USERSPACE, sfp);
+	error = kern_statfs(td, USER_PTR_PATH(uap->path), UIO_USERSPACE, sfp);
 	if (error == 0) {
 		freebsd11_freebsd64_cvtstatfs(sfp, &osb);
 		error = copyout(&osb, USER_PTR_OBJ(uap->buf), sizeof(osb));
@@ -805,26 +805,26 @@ freebsd11_freebsd64_cvtstatfs(struct statfs *nsp,
 int
 freebsd64_chdir(struct thread *td, struct freebsd64_chdir_args *uap)
 {
-	return (kern_chdir(td, USER_PTR_STR(uap->path), UIO_USERSPACE));
+	return (kern_chdir(td, USER_PTR_PATH(uap->path), UIO_USERSPACE));
 }
 
 int
 freebsd64_chroot(struct thread *td, struct freebsd64_chroot_args *uap)
 {
-	return (user_chroot(td, USER_PTR_STR(uap->path)));
+	return (user_chroot(td, USER_PTR_PATH(uap->path)));
 }
 
 int
 freebsd64_open(struct thread *td, struct freebsd64_open_args *uap)
 {
-	return (kern_openat(td, AT_FDCWD, USER_PTR_STR(uap->path),
+	return (kern_openat(td, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->flags, uap->mode));
 }
 
 int
 freebsd64_openat(struct thread *td, struct freebsd64_openat_args *uap)
 {
-	return (kern_openat(td, uap->fd, USER_PTR_STR(uap->path),
+	return (kern_openat(td, uap->fd, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->flag, uap->mode));
 }
 
@@ -832,7 +832,7 @@ freebsd64_openat(struct thread *td, struct freebsd64_openat_args *uap)
 int
 freebsd64_mknodat(struct thread *td, struct freebsd64_mknodat_args *uap)
 {
-	return (kern_mknodat(td, uap->fd, USER_PTR_STR(uap->path),
+	return (kern_mknodat(td, uap->fd, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->mode, uap->dev));
 }
 
@@ -841,7 +841,7 @@ int
 freebsd11_freebsd64_mknod(struct thread *td,
     struct freebsd11_freebsd64_mknod_args *uap)
 {
-	return (kern_mknodat(td, AT_FDCWD, USER_PTR_STR(uap->path),
+	return (kern_mknodat(td, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->mode, uap->dev));
 }
 
@@ -849,7 +849,7 @@ int
 freebsd11_freebsd64_mknodat(struct thread *td,
     struct freebsd11_freebsd64_mknodat_args *uap)
 {
-	return (kern_mknodat(td, uap->fd, USER_PTR_STR(uap->path),
+	return (kern_mknodat(td, uap->fd, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->mode, uap->dev));
 }
 #endif /* COMPAT_FREEBSD11 */
@@ -857,97 +857,97 @@ freebsd11_freebsd64_mknodat(struct thread *td,
 int
 freebsd64_mkfifo(struct thread *td, struct freebsd64_mkfifo_args *uap)
 {
-	return (kern_mkfifoat(td, AT_FDCWD, USER_PTR_STR(uap->path),
+	return (kern_mkfifoat(td, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->mode));
 }
 
 int
 freebsd64_mkfifoat(struct thread *td, struct freebsd64_mkfifoat_args *uap)
 {
-	return (kern_mkfifoat(td, uap->fd, USER_PTR_STR(uap->path),
+	return (kern_mkfifoat(td, uap->fd, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->mode));
 }
 
 int
 freebsd64_link(struct thread *td, struct freebsd64_link_args *uap)
 {
-	return (kern_linkat(td, AT_FDCWD, AT_FDCWD, USER_PTR_STR(uap->path),
-	    USER_PTR_STR(uap->to), UIO_USERSPACE, AT_SYMLINK_FOLLOW));
+	return (kern_linkat(td, AT_FDCWD, AT_FDCWD, USER_PTR_PATH(uap->path),
+	    USER_PTR_PATH(uap->to), UIO_USERSPACE, AT_SYMLINK_FOLLOW));
 }
 
 int
 freebsd64_linkat(struct thread *td, struct freebsd64_linkat_args *uap)
 {
-	return (kern_linkat(td, uap->fd1, uap->fd2, USER_PTR_STR(uap->path1),
-	    USER_PTR_STR(uap->path2), UIO_USERSPACE, uap->flag));
+	return (kern_linkat(td, uap->fd1, uap->fd2, USER_PTR_PATH(uap->path1),
+	    USER_PTR_PATH(uap->path2), UIO_USERSPACE, uap->flag));
 }
 
 int
 freebsd64_symlink(struct thread *td, struct freebsd64_symlink_args *uap)
 {
-	return (kern_symlinkat(td, USER_PTR_STR(uap->path), AT_FDCWD,
-	    USER_PTR_STR(uap->link), UIO_USERSPACE));
+	return (kern_symlinkat(td, USER_PTR_PATH(uap->path), AT_FDCWD,
+	    USER_PTR_PATH(uap->link), UIO_USERSPACE));
 }
 
 int
 freebsd64_symlinkat(struct thread *td, struct freebsd64_symlinkat_args *uap)
 {
-	return (kern_symlinkat(td, USER_PTR_STR(uap->path1), uap->fd,
-	    USER_PTR_STR(uap->path2), UIO_USERSPACE));
+	return (kern_symlinkat(td, USER_PTR_PATH(uap->path1), uap->fd,
+	    USER_PTR_PATH(uap->path2), UIO_USERSPACE));
 }
 
 int
 freebsd64_undelete(struct thread *td, struct freebsd64_undelete_args *uap)
 {
-	return (kern_undelete(td, USER_PTR_STR(uap->path), UIO_USERSPACE));
+	return (kern_undelete(td, USER_PTR_PATH(uap->path), UIO_USERSPACE));
 }
 
 int
 freebsd64_unlink(struct thread *td, struct freebsd64_unlink_args *uap)
 {
-	return (kern_funlinkat(td, AT_FDCWD, USER_PTR_STR(uap->path),
+	return (kern_funlinkat(td, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    FD_NONE, UIO_USERSPACE, 0, 0));
 }
 
 int
 freebsd64_unlinkat(struct thread *td, struct freebsd64_unlinkat_args *uap)
 {
-	return (kern_funlinkat_ex(td, uap->fd, USER_PTR_STR(uap->path),
+	return (kern_funlinkat_ex(td, uap->fd, USER_PTR_PATH(uap->path),
 	    FD_NONE, uap->flag, UIO_USERSPACE, 0));
 }
 
 int
 freebsd64_funlinkat(struct thread *td, struct freebsd64_funlinkat_args *uap)
 {
-	return (kern_funlinkat_ex(td, uap->dfd, USER_PTR_STR(uap->path),
+	return (kern_funlinkat_ex(td, uap->dfd, USER_PTR_PATH(uap->path),
 	    uap->fd, uap->flag, UIO_USERSPACE, 0));
 }
 
 int
 freebsd64_access(struct thread *td, struct freebsd64_access_args *uap)
 {
-	return (kern_accessat(td, AT_FDCWD, USER_PTR_STR(uap->path),
+	return (kern_accessat(td, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, 0, uap->amode));
 }
 
 int
 freebsd64_faccessat(struct thread *td, struct freebsd64_faccessat_args *uap)
 {
-	return (kern_accessat(td, uap->fd, USER_PTR_STR(uap->path),
+	return (kern_accessat(td, uap->fd, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->flag, uap->amode));
 }
 
 int
 freebsd64_eaccess(struct thread *td, struct freebsd64_eaccess_args *uap)
 {
-	return (kern_accessat(td, AT_FDCWD, USER_PTR_STR(uap->path),
+	return (kern_accessat(td, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, AT_EACCESS, uap->amode));
 }
 
 int
 freebsd64_fstatat(struct thread *td, struct freebsd64_fstatat_args *uap)
 {
-	return (user_fstatat(td, uap->fd, USER_PTR_STR(uap->path),
+	return (user_fstatat(td, uap->fd, USER_PTR_PATH(uap->path),
 	    USER_PTR_OBJ(uap->buf), uap->flag));
 }
 
@@ -957,7 +957,7 @@ freebsd64_pathconf(struct thread *td, struct freebsd64_pathconf_args *uap)
 	long value;
 	int error;
 
-	error = kern_pathconf(td, USER_PTR_STR(uap->path), UIO_USERSPACE,
+	error = kern_pathconf(td, USER_PTR_PATH(uap->path), UIO_USERSPACE,
 	    uap->name, FOLLOW, &value);
 	if (error == 0)
 		td->td_retval[0] = value;
@@ -970,7 +970,7 @@ freebsd64_lpathconf(struct thread *td, struct freebsd64_lpathconf_args *uap)
 	long value;
 	int error;
 
-	error = kern_pathconf(td, USER_PTR_STR(uap->path), UIO_USERSPACE,
+	error = kern_pathconf(td, USER_PTR_PATH(uap->path), UIO_USERSPACE,
 	    uap->name, NOFOLLOW, &value);
 	if (error == 0)
 		td->td_retval[0] = value;
@@ -980,7 +980,7 @@ freebsd64_lpathconf(struct thread *td, struct freebsd64_lpathconf_args *uap)
 int
 freebsd64_readlink(struct thread *td, struct freebsd64_readlink_args *uap)
 {
-	return (kern_readlinkat(td, AT_FDCWD, USER_PTR_STR(uap->path),
+	return (kern_readlinkat(td, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, USER_PTR(uap->buf, uap->count), UIO_USERSPACE,
 	    uap->count));
 }
@@ -988,7 +988,7 @@ freebsd64_readlink(struct thread *td, struct freebsd64_readlink_args *uap)
 int
 freebsd64_readlinkat(struct thread *td, struct freebsd64_readlinkat_args *uap)
 {
-	return (kern_readlinkat(td, uap->fd, USER_PTR_STR(uap->path),
+	return (kern_readlinkat(td, uap->fd, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, USER_PTR(uap->buf, uap->bufsize), UIO_USERSPACE,
 	    uap->bufsize));
 }
@@ -996,77 +996,77 @@ freebsd64_readlinkat(struct thread *td, struct freebsd64_readlinkat_args *uap)
 int
 freebsd64_chflags(struct thread *td, struct freebsd64_chflags_args *uap)
 {
-	return (kern_chflagsat(td, AT_FDCWD, USER_PTR_STR(uap->path),
+	return (kern_chflagsat(td, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->flags, 0));
 }
 
 int
 freebsd64_chflagsat(struct thread *td, struct freebsd64_chflagsat_args *uap)
 {
-	return (kern_chflagsat(td, uap->fd, USER_PTR_STR(uap->path),
+	return (kern_chflagsat(td, uap->fd, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->flags, uap->atflag));
 }
 
 int
 freebsd64_lchflags(struct thread *td, struct freebsd64_lchflags_args *uap)
 {
-	return (kern_chflagsat(td, AT_FDCWD, USER_PTR_STR(uap->path),
+	return (kern_chflagsat(td, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->flags, AT_SYMLINK_NOFOLLOW));
 }
 
 int
 freebsd64_chmod(struct thread *td, struct freebsd64_chmod_args *uap)
 {
-	return (kern_fchmodat(td, AT_FDCWD, USER_PTR_STR(uap->path),
+	return (kern_fchmodat(td, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->mode, 0));
 }
 
 int
 freebsd64_fchmodat(struct thread *td, struct freebsd64_fchmodat_args *uap)
 {
-	return (kern_fchmodat(td, uap->fd, USER_PTR_STR(uap->path),
+	return (kern_fchmodat(td, uap->fd, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->mode, uap->flag));
 }
 
 int
 freebsd64_lchmod(struct thread *td, struct freebsd64_lchmod_args *uap)
 {
-	return (kern_fchmodat(td, AT_FDCWD, USER_PTR_STR(uap->path),
+	return (kern_fchmodat(td, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->mode, AT_SYMLINK_NOFOLLOW));
 }
 
 int
 freebsd64_chown(struct thread *td, struct freebsd64_chown_args *uap)
 {
-	return (kern_fchownat(td, AT_FDCWD, USER_PTR_STR(uap->path),
+	return (kern_fchownat(td, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->uid, uap->gid, 0));
 }
 
 int
 freebsd64_fchownat(struct thread *td, struct freebsd64_fchownat_args *uap)
 {
-	return (kern_fchownat(td, uap->fd, USER_PTR_STR(uap->path),
+	return (kern_fchownat(td, uap->fd, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->uid, uap->gid, uap->flag));
 }
 
 int
 freebsd64_lchown(struct thread *td, struct freebsd64_lchown_args *uap)
 {
-	return (kern_fchownat(td, AT_FDCWD, USER_PTR_STR(uap->path),
+	return (kern_fchownat(td, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->uid, uap->gid, AT_SYMLINK_NOFOLLOW));
 }
 
 int
 freebsd64_utimes(struct thread *td, struct freebsd64_utimes_args *uap)
 {
-	return (kern_utimesat(td, AT_FDCWD, USER_PTR_STR(uap->path),
+	return (kern_utimesat(td, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, USER_PTR_OBJ(uap->tptr), UIO_USERSPACE));
 }
 
 int
 freebsd64_futimesat(struct thread *td, struct freebsd64_futimesat_args *uap)
 {
-	return (kern_utimesat(td, uap->fd, USER_PTR_STR(uap->path),
+	return (kern_utimesat(td, uap->fd, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, USER_PTR_OBJ(uap->times), UIO_USERSPACE));
 }
 
@@ -1095,7 +1095,7 @@ freebsd64_futimens(struct thread *td, struct freebsd64_futimens_args *uap)
 int
 freebsd64_utimensat(struct thread *td, struct freebsd64_utimensat_args *uap)
 {
-	return (kern_utimensat(td, uap->fd, USER_PTR_STR(uap->path),
+	return (kern_utimensat(td, uap->fd, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, USER_PTR_OBJ(uap->times), UIO_USERSPACE,
 	    uap->flag));
 }
@@ -1103,7 +1103,7 @@ freebsd64_utimensat(struct thread *td, struct freebsd64_utimensat_args *uap)
 int
 freebsd64_truncate(struct thread *td, struct freebsd64_truncate_args *uap)
 {
-	return (kern_truncate(td, USER_PTR_STR(uap->path), UIO_USERSPACE,
+	return (kern_truncate(td, USER_PTR_PATH(uap->path), UIO_USERSPACE,
 	    uap->length));
 }
 
@@ -1112,7 +1112,7 @@ freebsd64_truncate(struct thread *td, struct freebsd64_truncate_args *uap)
 int
 freebsd6_truncate(struct thread *td, struct freebsd6_truncate_args *uap)
 {
-	return (kern_truncate(td, USER_PTR_STR(uap->path), UIO_USERSPACE,
+	return (kern_truncate(td, USER_PTR_PATH(uap->path), UIO_USERSPACE,
 	    uap->length));
 }
 #endif
@@ -1120,35 +1120,35 @@ freebsd6_truncate(struct thread *td, struct freebsd6_truncate_args *uap)
 int
 freebsd64_rename(struct thread *td, struct freebsd64_rename_args *uap)
 {
-	return (kern_renameat(td, AT_FDCWD, USER_PTR_STR(uap->from),
-	    AT_FDCWD, USER_PTR_STR(uap->to), UIO_USERSPACE));
+	return (kern_renameat(td, AT_FDCWD, USER_PTR_PATH(uap->from),
+	    AT_FDCWD, USER_PTR_PATH(uap->to), UIO_USERSPACE));
 }
 
 int
 freebsd64_renameat(struct thread *td, struct freebsd64_renameat_args *uap)
 {
-	return (kern_renameat(td, uap->oldfd, USER_PTR_STR(uap->old),
-	    uap->newfd, USER_PTR_STR(uap->new), UIO_USERSPACE));
+	return (kern_renameat(td, uap->oldfd, USER_PTR_PATH(uap->old),
+	    uap->newfd, USER_PTR_PATH(uap->new), UIO_USERSPACE));
 }
 
 int
 freebsd64_mkdir(struct thread *td, struct freebsd64_mkdir_args *uap)
 {
-	return (kern_mkdirat(td, AT_FDCWD, USER_PTR_STR(uap->path),
+	return (kern_mkdirat(td, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->mode));
 }
 
 int
 freebsd64_mkdirat(struct thread *td, struct freebsd64_mkdirat_args *uap)
 {
-	return (kern_mkdirat(td, uap->fd, USER_PTR_STR(uap->path),
+	return (kern_mkdirat(td, uap->fd, USER_PTR_PATH(uap->path),
 	    UIO_USERSPACE, uap->mode));
 }
 
 int
 freebsd64_rmdir(struct thread *td, struct freebsd64_rmdir_args *uap)
 {
-	return (kern_frmdirat(td, AT_FDCWD, USER_PTR_STR(uap->path),
+	return (kern_frmdirat(td, AT_FDCWD, USER_PTR_PATH(uap->path),
 	    FD_NONE, UIO_USERSPACE, 0));
 }
 
@@ -1164,20 +1164,20 @@ freebsd64_getdirentries(struct thread *td,
 int
 freebsd64_unmount(struct thread *td, struct freebsd64_unmount_args *uap)
 {
-	return (kern_unmount(td, USER_PTR_STR(uap->path), uap->flags));
+	return (kern_unmount(td, USER_PTR_PATH(uap->path), uap->flags));
 }
 
 int
 freebsd64_revoke(struct thread *td, struct freebsd64_revoke_args *uap)
 {
-	return (kern_revoke(td, USER_PTR_STR(uap->path), UIO_USERSPACE));
+	return (kern_revoke(td, USER_PTR_PATH(uap->path), UIO_USERSPACE));
 }
 
 int
 freebsd64_lgetfh(struct thread *td, struct freebsd64_lgetfh_args *uap)
 {
 	return (kern_getfhat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
-	    USER_PTR_STR(uap->fname), UIO_USERSPACE,
+	    USER_PTR_PATH(uap->fname), UIO_USERSPACE,
 	    USER_PTR_OBJ(uap->fhp), UIO_USERSPACE));
 }
 
@@ -1185,7 +1185,7 @@ int
 freebsd64_getfh(struct thread *td, struct freebsd64_getfh_args *uap)
 {
 	return (kern_getfhat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
-	    USER_PTR_STR(uap->fname), UIO_USERSPACE,
+	    USER_PTR_PATH(uap->fname), UIO_USERSPACE,
 	    USER_PTR_OBJ(uap->fhp), UIO_USERSPACE));
 }
 
@@ -1193,21 +1193,21 @@ int
 freebsd64_getfhat(struct thread *td, struct freebsd64_getfhat_args *uap)
 {
 	return (kern_getfhat(td, uap->flags, uap->fd,
-	    USER_PTR_STR(uap->path), UIO_USERSPACE,
+	    USER_PTR_PATH(uap->path), UIO_USERSPACE,
 	    USER_PTR_OBJ(uap->fhp), UIO_USERSPACE));
 }
 
 int
 freebsd64_fhlink(struct thread *td, struct freebsd64_fhlink_args *uap)
 {
-	return (kern_fhlinkat(td, AT_FDCWD, USER_PTR_STR(uap->to),
+	return (kern_fhlinkat(td, AT_FDCWD, USER_PTR_PATH(uap->to),
 	    UIO_USERSPACE, USER_PTR_OBJ(uap->fhp)));
 }
 
 int
 freebsd64_fhlinkat(struct thread *td, struct freebsd64_fhlinkat_args *uap)
 {
-	return (kern_fhlinkat(td, uap->tofd, USER_PTR_STR(uap->to),
+	return (kern_fhlinkat(td, uap->tofd, USER_PTR_PATH(uap->to),
 	    UIO_USERSPACE, USER_PTR_OBJ(uap->fhp)));
 }
 

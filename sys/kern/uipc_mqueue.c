@@ -2851,7 +2851,7 @@ freebsd32_kmq_open(struct thread *td, struct freebsd32_kmq_open_args *uap)
 			return (error);
 		mq_attr_from32(&attr32, &attr);
 	}
-	return (kern_kmq_open(td, USER_PTR_STR(uap->path), flags, uap->mode,
+	return (kern_kmq_open(td, USER_PTR_PATH(uap->path), flags, uap->mode,
 	    uap->attr != NULL ? &attr : NULL));
 }
 
