@@ -398,7 +398,6 @@ int __strerror_rl(int errnum, char *strerrbuf, size_t buflen,
 
 #ifdef CHERI_LIB_C18N
 bool	_rtld_c18n_is_enabled(void);
-ptraddr_t	_rtld_tramp_reflect(const void *);
 void	_rtld_thr_exit(long *);
 int	_rtld_sigaction(int, const struct sigaction *, struct sigaction *);
 #endif
