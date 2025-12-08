@@ -39,6 +39,7 @@
 
 #include <netinet/in.h>
 
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 
 struct jail64_v0 {
@@ -46,17 +47,6 @@ struct jail64_v0 {
 	uint64_t	path;
 	uint64_t	hostname;
 	uint32_t	ip_number;
-};
-
-struct jail64 {
-	uint32_t	version;
-	uint64_t	path;
-	uint64_t	hostname;
-	uint64_t	jailname;
-	uint32_t	ip4s;
-	uint32_t	ip6s;
-	uint64_t	ip4;
-	uint64_t	ip6;
 };
 
 int
