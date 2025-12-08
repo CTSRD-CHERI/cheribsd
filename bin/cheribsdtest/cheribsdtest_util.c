@@ -137,6 +137,22 @@ skip_need_cheri_revoke(const struct cheri_test *ctp __unused)
 }
 
 const char *
+skip_need_default_cheri_revoke(const struct cheri_test *ctp __unused)
+{
+	int value = 0;
+	size_t len = sizeof(value);
+
+	if (sysctlbyname("security.cheri.runtime_revocation_default",
+	    &value, &len, NULL, 0)) {
+		return (NULL);
+	}
+	if (value == 0) {
+		return ("System disables revocation");
+	}
+	return (NULL);
+}
+
+const char *
 skip_need_xcheri_revoke(const struct cheri_test *ctp __unused)
 {
 #ifdef __riscv_zcheripurecap
