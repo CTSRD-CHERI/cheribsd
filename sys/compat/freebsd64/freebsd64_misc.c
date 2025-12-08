@@ -179,7 +179,7 @@ freebsd64_execve(struct thread *td, struct freebsd64_execve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = exec_copyin_args(&eargs, USER_PTR_STR(uap->fname),
+	error = exec_copyin_args(&eargs, USER_PTR_PATH(uap->fname),
 	    UIO_USERSPACE, USER_PTR_UNBOUND(uap->argv),
 	    USER_PTR_UNBOUND(uap->envv));
 	if (error == 0)
@@ -1015,7 +1015,7 @@ int
 freebsd64_auditctl(struct thread *td, struct freebsd64_auditctl_args *uap)
 {
 #ifdef	AUDIT
-	return (kern_auditctl(td, USER_PTR_STR(uap->path)));
+	return (kern_auditctl(td, USER_PTR_PATH(uap->path)));
 #else
 	return (ENOSYS);
 #endif
@@ -1029,7 +1029,7 @@ freebsd64_auditctl(struct thread *td, struct freebsd64_auditctl_args *uap)
 int
 freebsd64_acct(struct thread *td, struct freebsd64_acct_args *uap)
 {
-	return (kern_acct(td, USER_PTR_STR(uap->path)));
+	return (kern_acct(td, USER_PTR_PATH(uap->path)));
 }
 
 /*
@@ -1204,7 +1204,7 @@ freebsd64_fstat(struct thread *td, struct freebsd64_fstat_args *uap)
 int
 freebsd64_ktrace(struct thread *td, struct freebsd64_ktrace_args *uap)
 {
-	return (kern_ktrace(td, USER_PTR_STR(uap->fname), uap->ops,
+	return (kern_ktrace(td, USER_PTR_PATH(uap->fname), uap->ops,
 	    uap->facs, uap->pid));
 }
 
@@ -1222,13 +1222,13 @@ freebsd64_utrace(struct thread *td, struct freebsd64_utrace_args *uap)
 int
 freebsd64_kldload(struct thread *td, struct freebsd64_kldload_args *uap)
 {
-	return (user_kldload(td, USER_PTR_STR(uap->file)));
+	return (user_kldload(td, USER_PTR_PATH(uap->file)));
 }
 
 int
 freebsd64_kldfind(struct thread *td, struct freebsd64_kldfind_args *uap)
 {
-	return (kern_kldfind(td, USER_PTR_STR(uap->file)));
+	return (kern_kldfind(td, USER_PTR_PATH(uap->file)));
 }
 
 int
@@ -1773,13 +1773,13 @@ freebsd64_profil(struct thread *td, struct freebsd64_profil_args *uap)
 int
 freebsd64_swapon(struct thread *td, struct freebsd64_swapon_args *uap)
 {
-	return (kern_swapon(td, USER_PTR_STR(uap->name)));
+	return (kern_swapon(td, USER_PTR_PATH(uap->name)));
 }
 
 int
 freebsd64_swapoff(struct thread *td, struct freebsd64_swapoff_args *uap)
 {
-	return (kern_swapoff(td, USER_PTR_STR(uap->name), UIO_USERSPACE,
+	return (kern_swapoff(td, USER_PTR_PATH(uap->name), UIO_USERSPACE,
 	    uap->flags));
 }
 
@@ -1788,7 +1788,7 @@ int
 freebsd13_freebsd64_swapoff(struct thread *td,
     struct freebsd13_freebsd64_swapoff_args *uap)
 {
-	return (kern_swapoff(td, USER_PTR_STR(uap->name), UIO_USERSPACE, 0));
+	return (kern_swapoff(td, USER_PTR_PATH(uap->name), UIO_USERSPACE, 0));
 }
 #endif
 

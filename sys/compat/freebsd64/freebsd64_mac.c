@@ -79,7 +79,7 @@ int
 freebsd64___mac_get_file(struct thread *td,
     struct freebsd64___mac_get_file_args *uap)
 {
-	return (kern_mac_get_path(td, USER_PTR_STR(uap->path_p),
+	return (kern_mac_get_path(td, USER_PTR_PATH(uap->path_p),
 	    USER_PTR_OBJ(uap->mac_p), FOLLOW));
 }
 
@@ -87,7 +87,7 @@ int
 freebsd64___mac_get_link(struct thread *td,
     struct freebsd64___mac_get_link_args *uap)
 {
-	return (kern_mac_get_path(td, USER_PTR_STR(uap->path_p),
+	return (kern_mac_get_path(td, USER_PTR_PATH(uap->path_p),
 	    USER_PTR_OBJ(uap->mac_p), NOFOLLOW));
 }
 
@@ -102,7 +102,7 @@ int
 freebsd64___mac_set_file(struct thread *td,
     struct freebsd64___mac_set_file_args *uap)
 {
-	return (kern_mac_set_path(td, USER_PTR_STR(uap->path_p),
+	return (kern_mac_set_path(td, USER_PTR_PATH(uap->path_p),
 	    USER_PTR_OBJ(uap->mac_p), FOLLOW));
 }
 
@@ -110,7 +110,7 @@ int
 freebsd64___mac_set_link(struct thread *td,
     struct freebsd64___mac_set_link_args *uap)
 {
-	return (kern_mac_set_path(td, USER_PTR_STR(uap->path_p),
+	return (kern_mac_set_path(td, USER_PTR_PATH(uap->path_p),
 	    USER_PTR_OBJ(uap->mac_p), NOFOLLOW));
 }
 
