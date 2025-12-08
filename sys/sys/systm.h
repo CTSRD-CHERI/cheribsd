@@ -138,7 +138,7 @@ extern bool scheduler_stopped;
 #define	USER_PTR_UNBOUND(ptr)						\
 	___USER_CFROMPTR((ptr), __USER_DDC)
 
-#define	__USER_CODE_CAP(ptr)						\
+#define	USER_CODE_PTR(ptr)						\
 	___USER_CFROMPTR((ptr), __USER_PCC)
 
 #define	USER_PTR(ptr, len)						\
@@ -151,7 +151,7 @@ extern bool scheduler_stopped;
 
 #else /* !has_feature(capabilities) */
 #define	USER_PTR_UNBOUND(ptr)	((void *)(uintptr_t)(ptr))
-#define	__USER_CODE_CAP(ptr)	((void *)(uintptr_t)(ptr))
+#define	USER_CODE_PTR(ptr)	((void *)(uintptr_t)(ptr))
 #define	USER_PTR(ptr, len)	((void *)(uintptr_t)(ptr))
 #endif /* !has_feature(capabilities) */
 
