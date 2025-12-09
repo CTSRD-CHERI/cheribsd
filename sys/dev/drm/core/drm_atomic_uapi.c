@@ -26,8 +26,8 @@
  * Daniel Vetter <daniel.vetter@ffwll.ch>
  */
 
-#ifdef COMPAT_FREEBSD64
 #include <sys/abi_compat.h>
+#ifdef COMPAT_FREEBSD64
 #include <sys/sysent.h>
 #endif
 
@@ -465,6 +465,10 @@ static int drm_atomic_crtc_set_property(struct drm_crtc *crtc,
 		state->color_mgmt_changed |= replaced;
 		return ret;
 	} else if (property == config->prop_out_fence_ptr) {
+		/*
+		 * XXX-CHERI: this is a bug.  We need to be passing a
+		 * capability down from userspace.
+		 */
 		s32 __user * __capability fence_ptr = USER_PTR(val, sizeof(uint64_t));
 
 		if (!fence_ptr)
