@@ -1824,6 +1824,7 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 	if (!quarantining)
 		return (mrs_real_rallocx(ptr, size, flags));
 
+	assert(ptr != NULL);
 	old_size = cheri_getlen(ptr);
 
 	mrs_debug_printf("%s: called ptr %p ptr size %zu new size %zu\n",
