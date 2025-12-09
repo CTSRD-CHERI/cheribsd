@@ -639,7 +639,8 @@ MAN=	aac.4 \
 	xpt.4 \
 	zero.4
 
-MLINKS=	ads111x.4 ads1013.4 \
+MLINKS=	ace2_syncpoint.4 ace2_observe.4
+MLINKS+=ads111x.4 ads1013.4 \
 	ads111x.4 ads1014.4 \
 	ads111x.4 ads1015.4 \
 	ads111x.4 ads1113.4 \
