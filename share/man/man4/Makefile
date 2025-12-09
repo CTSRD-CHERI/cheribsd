@@ -8,6 +8,7 @@
 MAN=	aac.4 \
 	aacraid.4 \
 	ace2.4 \
+	ace2_syncpoint.4 \
 	acpi.4 \
 	${_acpi_asus.4} \
 	${_acpi_asus_wmi.4} \
