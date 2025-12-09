@@ -1,0 +1,38 @@
+Quick tour of features in ace2_syncpoint:
+
+First, load the kernel module:
+
+tty1# kldload ace2_syncpoint
+
+Now on another terminal, trigger one of the two example syncpoints included in
+the module:
+
+tty2# sysctl dev.ace2.syncpoint.test.example=1
+dev.ace2.syncpoint.test.example1: 0
+
+Observe that the process now bocks; you can use ^T to see where:
+
+load: 0.05  cmd: sysctl 22666 [asc_cv_written] 0.77r 0.00u 0.01s 0% 3208k
+mi_switch+0x18c sleepq_switch+0x110 _cv_wait+0x194 __ace2_syncpoint+0x250 syncpoint_example1+0x8c sysctl_root_handler_locked+0xd8 sysctl_root+0x214 userland_sysctl+0x17c sys___sysctl+0x9c do_el0_sync+0x5f0 handle_el0_sync+0x38 
+
+On the original terminal, now inspect its properties:
+
+tty1# sysctl -b dev.ace2.syncpoint.list
+    ID LABEL      PID    TID COMM         FLAGS FUNC               LOCATION
+     0 example1 22663 100172 sysctl       ---   syncpoint_example1 /usr/src/sys/dev/sift/ace2_syncpoint/ace2_syncpoint_test.c:35
+
+And use the device interface to see what is going on:
+
+tty1# cat /dev/ace2_syncpoint/0 
+BARRIER_ID: 0
+STATUS: WAITING
+LABEL: example1
+FILE: /usr/src/sys/dev/sift/ace2_syncpoint/ace2_syncpoint_test.c
+LINE: 35
+FUNC: syncpoint_example1
+
+Finally, issue a completion:
+
+tty1# echo done > /dev/ace2_syncpoint/0 
+
+Observe that the second terminal, we are now back at the prompt.
