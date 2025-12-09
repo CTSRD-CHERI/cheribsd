@@ -138,9 +138,8 @@ __ace2_syncpoint(const char *label, const char *caller_file,
 	/*
 	 * XXX: Not quite right on format string handling.
 	 */
-	pr_sift("ACE2_SYNC_BARRIER %s:%ju %s:%d:%s: %p\n", ascp->asc_label,
-	    ascp->asc_id, ascp->asc_file, ascp->asc_line, ascp->asc_func,
-	    &ap);
+	pr_sift("ACE2_SYNC_BARRIER %s:%ju %s:%d:%s: ", ascp->asc_label,
+	    ascp->asc_id, ascp->asc_file, ascp->asc_line, ascp->asc_func);
 	va_start(ap, fmt);
 	(void)vprintf(fmt, ap);
 	va_end(ap);
@@ -181,8 +180,8 @@ __ace2_observe(uint64_t seq_id, const char *label, const char *caller_file,
 	/*
 	 * XXX: Not quite right on format string handling.
 	 */
-	pr_sift("ACE2_OBSERVE %s:%ju %s:%d:%s: %p\n", label, seq_id,
-	    caller_file, caller_line, caller_func, &ap);
+	pr_sift("ACE2_OBSERVE %s:%ju %s:%d:%s: ", label, seq_id,
+	    caller_file, caller_line, caller_func);
 	va_start(ap, fmt);
 	(void)vprintf(fmt, ap);
 	va_end(ap);
