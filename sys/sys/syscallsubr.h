@@ -63,6 +63,7 @@ struct rusage;
 struct rtprio;
 struct sched_param;
 struct sembuf;
+struct sendfile_args;
 union semun;
 struct sockaddr;
 struct spacectl_range;
@@ -443,8 +444,7 @@ int	kern_sched_rr_get_interval_td(struct thread *td, struct thread *targettd,
 	    struct timespec *ts);
 int	kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 	    union semun *arg, register_t *rval);
-int	kern_sendfile(struct thread *td, int fd, int s, off_t offset,
-	    size_t nbytes, void *uhdtr, off_t *usbytes, int flags, int compat,
+int	kern_sendfile(struct thread *td, struct sendfile_args *uap, bool compat,
 	    copyin_hdtr_t *copyin_hdtr_f, copyinuio_t *copyinuio_f);
 int	kern_select(struct thread *td, int nd, fd_set *fd_in, fd_set *fd_ou,
 	    fd_set *fd_ex, struct timeval *tvp, int abi_nfdbits);

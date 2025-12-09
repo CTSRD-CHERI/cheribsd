@@ -2129,11 +2129,15 @@ int
 freebsd4_freebsd32_sendfile(struct thread *td,
     struct freebsd4_freebsd32_sendfile_args *uap)
 {
-
-	return (kern_sendfile(td, uap->fd, uap->s,
-	    PAIR32TO64(off_t, uap->offset), uap->nbytes,
-	    USER_PTR_OBJ(uap->hdtr), USER_PTR_OBJ(uap->sbytes),
-	    uap->flags, 1, (copyin_hdtr_t *)freebsd32_copyin_hdtr,
+	return (kern_sendfile(td, &(struct sendfile_args){
+		.fd = uap->fd,
+		.s = uap->s,
+		.offset = PAIR32TO64(off_t, uap->offset),
+		.nbytes = uap->nbytes,
+		.hdtr = USER_PTR_OBJ(uap->hdtr),
+		.sbytes = USER_PTR_OBJ(uap->sbytes),
+		.flags = uap->flags,
+	    }, true, (copyin_hdtr_t *)freebsd32_copyin_hdtr,
 	    freebsd32_copyinuio));
 }
 #endif
@@ -2141,11 +2145,15 @@ freebsd4_freebsd32_sendfile(struct thread *td,
 int
 freebsd32_sendfile(struct thread *td, struct freebsd32_sendfile_args *uap)
 {
-
-	return (kern_sendfile(td, uap->fd, uap->s,
-	    PAIR32TO64(off_t, uap->offset), uap->nbytes,
-	    USER_PTR_OBJ(uap->hdtr), USER_PTR_OBJ(uap->sbytes),
-	    uap->flags, 0, (copyin_hdtr_t *)freebsd32_copyin_hdtr,
+	return (kern_sendfile(td, &(struct sendfile_args){
+		.fd = uap->fd,
+		.s = uap->s,
+		.offset = PAIR32TO64(off_t, uap->offset),
+		.nbytes = uap->nbytes,
+		.hdtr = USER_PTR_OBJ(uap->hdtr),
+		.sbytes = USER_PTR_OBJ(uap->sbytes),
+		.flags = uap->flags,
+	    }, false, (copyin_hdtr_t *)freebsd32_copyin_hdtr,
 	    freebsd32_copyinuio));
 }
 

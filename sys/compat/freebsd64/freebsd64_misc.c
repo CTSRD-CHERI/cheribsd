@@ -518,9 +518,15 @@ freebsd64_copyin_hdtr(const struct sf_hdtr64 *uhdtr,
 int
 freebsd64_sendfile(struct thread *td, struct freebsd64_sendfile_args *uap)
 {
-	return (kern_sendfile(td, uap->fd, uap->s, uap->offset, uap->nbytes,
-	    USER_PTR_OBJ(uap->hdtr), USER_PTR_OBJ(uap->sbytes),
-	    uap->flags, 0, (copyin_hdtr_t *)freebsd64_copyin_hdtr,
+	return (kern_sendfile(td, &(struct sendfile_args){
+		.fd = uap->fd,
+		.s = uap->s,
+		.offset = uap->offset,
+		.nbytes = uap->nbytes,
+		.hdtr = USER_PTR_OBJ(uap->hdtr),
+		.sbytes = USER_PTR_OBJ(uap->sbytes),
+		.flags = uap->flags,
+	    }, false, (copyin_hdtr_t *)freebsd64_copyin_hdtr,
 	    freebsd64_copyinuio));
 }
 
