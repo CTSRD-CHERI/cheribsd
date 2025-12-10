@@ -2057,7 +2057,7 @@ pfr_match_addr(struct pfr_ktable *kt, struct pf_addr *a, sa_family_t af)
 		bzero(&sin, sizeof(sin));
 		sin.sin_len = sizeof(sin);
 		sin.sin_family = AF_INET;
-		sin.sin_addr.s_addr = a->addr32[0];
+		sin.sin_addr.s_addr = a->v4.s_addr;
 		ke = (struct pfr_kentry *)rn_match(&sin, &kt->pfrkt_ip4->rh);
 		if (ke && KENTRY_RNF_ROOT(ke))
 			ke = NULL;
