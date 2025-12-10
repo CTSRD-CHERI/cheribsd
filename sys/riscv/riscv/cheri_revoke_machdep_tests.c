@@ -53,6 +53,11 @@ vm_cheri_revoke_test_mem_map(const uint8_t * __capability crshadow,
 	const uint8_t * __capability bmloc;
 
 	ptraddr_t va = cheri_getbase(cut);
+	if (__predict_false(va >= VM_MAX_USER_ADDRESS)) {
+		printf("%s: kernel capability leaked to userspace: %#lp\n",
+		    __func__, (void * __capability)cut);
+		return (0);
+	}
 
 	bmloc = crshadow - VM_CHERI_REVOKE_BSZ_OTYPE -
 	    (va / VM_CHERI_REVOKE_GSZ_MEM_MAP / 8);
@@ -91,6 +96,11 @@ vm_cheri_revoke_test_mem_nomap(const uint8_t * __capability crshadow,
 	const uint8_t * __capability bmloc;
 
 	ptraddr_t va = cheri_getbase(cut);
+	if (__predict_false(va >= VM_MAX_USER_ADDRESS)) {
+		printf("%s: kernel capability leaked to userspace: %#lp\n",
+		    __func__, (void * __capability)cut);
+		return (0);
+	}
 
 	bmloc = crshadow + (va / VM_CHERI_REVOKE_GSZ_MEM_NOMAP / 8);
 
