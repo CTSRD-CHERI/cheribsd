@@ -77,6 +77,9 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_andperm(ctemp, CHERI_PERMS_KERNEL_DATA);
 	devmap_init_capability(ctemp);
 
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	kroot = cheri_clearperm(kroot, CHERI_PERM_GLOBAL);
+#endif
 	kernel_root_cap = cheri_andperm(kroot,
 	    ~(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL));
 #endif

@@ -144,8 +144,13 @@
  * currently a bit broad, and should be narrowed over time as the kernel
  * becomes more capability-aware.
  */
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
 #define	CHERI_PERMS_KERNEL						\
-	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)	\
+	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
+#else
+#define	CHERI_PERMS_KERNEL						\
+	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
+#endif
 
 #define	CHERI_PERMS_KERNEL_CODE						\
 	(CHERI_PERMS_KERNEL | CHERI_PERM_EXECUTE | CHERI_PERM_SYSTEM_REGS)
