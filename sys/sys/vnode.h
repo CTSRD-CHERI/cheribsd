@@ -204,12 +204,14 @@ struct vnode {
 	off_t	i_size;
 	const struct inode_operations	*i_op;
 	const struct file_operations	*i_fop;
-	void	*i_private;
+	void		*i_private;
 	unsigned int	i_flags;
 	struct super_block	*i_sb;
 	unsigned long	i_ino;
 	unsigned int	i_nlink;
-
+	struct timespec	i_ctime;
+	struct timespec	i_atime;
+	struct timespec	i_mtime;
 };
 
 #ifndef DEBUG_LOCKS
