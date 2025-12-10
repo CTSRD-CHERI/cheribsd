@@ -57,6 +57,7 @@ struct files_struct;
 struct pfs_node;
 struct linux_cdev;
 struct dir_context;
+struct uio;
 
 #define	inode	vnode
 #define	i_cdev	v_rdev
@@ -82,7 +83,9 @@ struct fileattr;
 #define	MODULE_ALIAS_FS(X) // XXX
 #define	block_device g_consumer
 #define	umin MIN
+#ifndef DT_UNKNOWN
 #define	DT_UNKNOWN	0x0
+#endif
 #define	kfree_link NULL // XXX
 #define	ATTR_SIZE	0x01
 
@@ -129,7 +132,10 @@ struct user_namespace {
 extern struct user_namespace init_user_ns;
 
 struct dir_context {
-	off_t	pos;
+	off_t		pos;
+	struct uio	*uio;
+	int		dot;
+	int		dotdot;
 };
 
 struct address_space {

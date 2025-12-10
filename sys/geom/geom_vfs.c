@@ -347,5 +347,5 @@ _g_topology_unlock(void)
 size_t
 bdev_nr_sectors(struct g_consumer *cp)
 {
-	return (cp->provider->mediasize);
+	return (cp->provider->mediasize / 512);
 }

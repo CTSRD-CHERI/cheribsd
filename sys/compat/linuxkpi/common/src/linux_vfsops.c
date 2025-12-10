@@ -9,6 +9,8 @@
  * Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
  */
 
+#include <sys/systm.h>
+#include <sys/dirent.h>
 #include <sys/fcntl.h>
 #include <sys/mount.h>
 #include <sys/namei.h>
@@ -28,22 +30,27 @@ struct user_namespace	init_user_ns;
 // XXX: all this circus is here because we can't include buf.h
 extern int breadn_flags(struct vnode *, daddr_t, daddr_t, int, daddr_t *, int *, 
 	    int, struct ucred *, int, void (*)(struct buf *), struct buf **);
+#define bread(vp, blkno, size, cred, bpp) \
+	    breadn_flags(vp, blkno, blkno, size, NULL, NULL, 0, cred, 0, \
+		NULL, bpp)
 
 struct buffer_head *
-sb_bread(struct super_block *sb, sector_t bn)
+sb_bread(struct super_block *sb, sector_t lbn)
 {
 	struct buf *bp = NULL;
+	size_t size = 512;
 	int error;
 
-	printf("%s: %p, mnt %p, vnode %p\n", __func__, sb, sb->s_mnt, sb->s_devvp);
+	// XXX why
+	lbn *= 8;
 
-	/*
-	 * XXX: Our native API's for this is so sad...
-	 */
-	error = breadn_flags(sb->s_devvp, (daddr_t)bn, (daddr_t)bn,
-	    4096 /* PACMANFS_BLOCKSIZE */, NULL, NULL, 0, NOCRED /* curthread->td_ucred */, 0, NULL, &bp);
-	printf("%s: bread returned %d\n", __func__, error);
+	if (sb->s_blocksize != 0)
+		size = sb->s_blocksize;
+
+	error = bread(sb->s_devvp, lbn, size, NOCRED, &bp);
 	if (error != 0) {
+		printf("%s: bread %zd from %lu returned %d\n", __func__, size, lbn, error);
+		brelse((struct buffer_head *)bp);
 		return (NULL);
 	}
 
@@ -53,25 +60,47 @@ sb_bread(struct super_block *sb, sector_t bn)
 static int
 lkpi_access(struct vop_access_args *ap)
 {
+	struct vnode *vp = ap->a_vp;
+	accmode_t accmode = ap->a_accmode;
+	int error;
 
-	printf("%s: %p\n", __func__, ap);
+	/*
+	 * Disallow write attempts on read-only filesystems;
+	 * unless the file is a socket, fifo, or a block or
+	 * character device resident on the filesystem.
+	 */
+	if (accmode & VMODIFY_PERMS) {
+		switch (vp->v_type) {
+		case VDIR:
+		case VLNK:
+		case VREG:
+			if (vp->v_mount->mnt_flag & MNT_RDONLY)
+				return (EROFS);
+			break;
+		default:
+			break;
+		}
+	}
 
-	return (0);
+	error = vaccess(vp->v_type, vp->i_mode, vp->i_uid, vp->i_gid,
+	    accmode, ap->a_cred);
+
+	return (error);
 }
 
 static int
 lkpi_lookup(struct vop_lookup_args *ap)
 {
-	struct vnode *dvp, **vpp;
+	struct vnode *dvp, *vp, **vpp;
 	struct dentry child_dentry, *dentry;
 	struct componentname *cnp;
 	int error;
 
-	printf("%s: %p\n", __func__, ap);
-
 	dvp = ap->a_dvp;
 	vpp = ap->a_vpp;
 	cnp = ap->a_cnp;
+
+	MPASS(dvp->v_type != VNON);
 
 	if (cnp->cn_flags & ISDOTDOT) {
 #if 0
@@ -91,6 +120,7 @@ lkpi_lookup(struct vop_lookup_args *ap)
 			return (error);
 		}
 #else
+		//printf("%s: ISDOTDOT\n", __func__);
 		error = EDOOFUS;
 #endif
 		return (error);
@@ -106,53 +136,138 @@ lkpi_lookup(struct vop_lookup_args *ap)
 	memset(&child_dentry, 0, sizeof(child_dentry));
 	// XXX: free
 	child_dentry.d_name.name = strndup(cnp->cn_nameptr, cnp->cn_namelen, M_TEMP);
-	//printf("%s: looking up '%s'\n", __func__, child_dentry.d_name.name);
 	dentry = dvp->i_op->lookup(dvp, &child_dentry, 0 /* flags */);
-	printf("%s: dentry %p\n", __func__, dentry);
-	error = EDOOFUS;
+	if (IS_ERR(dentry)) {
+		printf("%s: lookup returned %ld (%p)\n", __func__, PTR_ERR(dentry), dentry);
+		return (-PTR_ERR(dentry));
+	}
+	if (child_dentry.d_inode == NULL) {
+		if ((cnp->cn_flags & ISLASTCN) && cnp->cn_nameiop == CREATE) {
+			printf("%s: enoent, but create\n", __func__);
+			return (EJUSTRETURN);
+		}
+		return (ENOENT);
+	}
 
-	return (error);
+	vp = child_dentry.d_inode;
+	MPASS(vp->v_type != VNON);
+
+	if (!VOP_ISLOCKED(vp)) {
+		printf("%s: locking %p\n", __func__, vp);
+		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+	} else {
+		//printf("%s: %p already locked\n", __func__, vp);
+	}
+	vref(vp);
+	*vpp = vp;
+
+	return (0);
+}
+
+static int
+lkpi_create(struct vop_create_args *ap)
+{
+	printf("%s: EDOOFUS\n", __func__);
+	return (EDOOFUS);
 }
 
 static int
 lkpi_getattr(struct vop_getattr_args *ap)
 {
 	struct vnode *vp;
+	struct super_block *sb;
 	struct mount *mp;
 	struct vattr *vap;
-	//int error;
 
 	vp = ap->a_vp;
-	//anp = vp->v_data;
 	mp = vp->v_mount;
+	sb = VFSTOSB(mp);
 	vap = ap->a_vap;
 
-	// XXX pacmanfs doesn't have specialised getattr
-	printf("%s: %p\n", __func__, ap);
+	vap->va_type = vp->v_type;
+	if (vp->v_type != VREG &&
+	    vp->v_type != VDIR &&
+	    vp->v_type != VLNK) {
+		panic("%s: wrong type %d, should be %d\n", __func__, vp->v_type, VDIR);
+	}
 
-	KASSERT(ap->a_vp->v_type == VDIR, ("!VDIR"));
-
-	vap->va_type = VDIR;
 	vap->va_mode = vp->i_mode;
-	vap->va_nlink = vp->i_nlink;
+	//vap->va_bsdflags = 0;
 	vap->va_uid = vp->i_uid;
 	vap->va_gid = vp->i_gid;
-	vap->va_rdev = NODEV;
+	vap->va_nlink = vp->i_nlink;
 	vap->va_fsid = mp->mnt_stat.f_fsid.val[0];
-	//vap->va_fileid = anp->an_fileno;
+	vap->va_fileid = vp->i_ino;
 	vap->va_size = vp->i_size;
-	vap->va_blocksize = S_BLKSIZE;
-	//vap->va_mtime = anp->an_ctime;
-	//vap->va_atime = anp->an_ctime;
-	//vap->va_ctime = anp->an_ctime;
-	//vap->va_birthtime = anp->an_ctime;
+	vap->va_blocksize = sb->s_blocksize;
+	vap->va_mtime = vp->i_mtime;
+	vap->va_atime = vp->i_atime;
+	vap->va_ctime = vp->i_ctime;
+	vap->va_birthtime = vp->i_ctime; // XXX
 	vap->va_gen = 0;
 	vap->va_flags = 0;
-	vap->va_rdev = 0;
-	vap->va_bytes = S_BLKSIZE;
+	vap->va_rdev = NODEV;
+	vap->va_bytes = vp->i_size;
 	vap->va_filerev = 0;
+	vap->va_vaflags = 0;
 	vap->va_spare = 0;
 
+	return (0);
+}
+
+static int
+lkpi_link(struct vop_link_args *ap)
+{
+	printf("%s: EDOOFUS\n", __func__);
+
+	return (EDOOFUS);
+}
+
+static int
+lkpi_read(struct vop_read_args *ap)
+{
+	struct vnode *vp;
+	struct uio *uio;
+	struct iovec *iov;
+	void * __capability base;
+	size_t len, off;
+	int nbytes;
+	struct file file; // XXX: we shouldn't need this
+
+	uio = ap->a_uio;
+	vp = ap->a_vp;
+
+	vp = ap->a_vp;
+	uio = ap->a_uio;
+
+	KASSERT(vp->v_type == VREG, ("!VREG"));
+
+	off = uio->uio_offset;
+	if (uio->uio_offset < 0)
+		return (EINVAL);
+
+	// XXX: not this
+	iov = uio->uio_iov;
+	base = iov[0].iov_base;
+	len = iov[0].iov_len;
+	off = uio->uio_offset;
+
+#if 0
+	printf("%s: vp %p, base %p, len %zd, off %zd, iovcnt %d\n",
+	    __func__, vp, base, len, off, uio->uio_iovcnt);
+#endif
+	memset(&file, 0, sizeof(file));
+	file.f_inode = vp;
+	nbytes = vp->i_fop->read(&file, (__cheri_fromcap char *)base, len, &off);
+	if (nbytes < 0) {
+		printf("%s: read failed with error %d\n", __func__, nbytes);
+		// XXX now what
+		return (-nbytes);
+	}
+
+	//printf("%s: read %d bytes, old uio_resid %zd\n", __func__, nbytes, uio->uio_resid);
+	uio->uio_resid -= nbytes;
+	uio->uio_offset += nbytes;
 	return (0);
 }
 
@@ -163,47 +278,116 @@ lkpi_readdir(struct vop_readdir_args *ap)
 	struct dir_context ctx;
 	struct file file; // XXX: we shouldn't need this
 	struct uio *uio;
-	size_t reclen;
-	ssize_t initial_resid;
+	ssize_t off;
 	int error;
 
 	vp = ap->a_vp;
 	uio = ap->a_uio;
-	initial_resid = ap->a_uio->uio_resid;
 
 	KASSERT(vp->v_type == VDIR, ("!VDIR"));
 
-	if (uio->uio_offset < 0)
+	off = uio->uio_offset;
+	if (off < 0)
 		return (EINVAL);
+
+	// XXX: make it less ugly
+	if (off > 0)
+		goto eof;
 
 	if (ap->a_eofflag != NULL)
 		*ap->a_eofflag = FALSE;
 
 	memset(&ctx, 0, sizeof(ctx));
+	ctx.uio = uio;
+	ctx.dot = 42; // XXX
+	ctx.dotdot = 43; // XXX
 	memset(&file, 0, sizeof(file));
 	file.f_inode = vp;
 
 	error = vp->i_fop->iterate_shared(&file, &ctx);
+	if (error != 0) {
+		printf("%s: iterate_shared returned %d\n", __func__, error);
+		return (error);
+	}
 
+eof:
 	if (ap->a_eofflag != NULL)
 		*ap->a_eofflag = TRUE;
-
 	return (0);
+}
 
-//out:
-	/*
-	 * Return error if the initial buffer was too small to do anything.
-	 */
-	if (uio->uio_resid == initial_resid)
-		return (error);
+static int
+lkpi_readlink(struct vop_readlink_args *ap)
+{
+	struct vnode *vp;
+	struct uio *uio;
+	int error;
+	const char *target;
 
-	/*
-	 * Don't return an error if we managed to copy out some entries.
-	 */
-	if (uio->uio_resid < reclen)
-		return (0);
+	uio = ap->a_uio;
+	vp = ap->a_vp;
 
+	MPASS(uio->uio_offset == 0);
+	MPASS(vp->v_type == VLNK);
+
+	target = vp->i_op->get_link((void *)42 /* XXX */, vp, NULL /* XXX */);
+	if (IS_ERR(target)) {
+		printf("%s: get_link returned %ld (%p)\n",
+		    __func__, PTR_ERR(target), target);
+		return (-PTR_ERR(target));
+	}
+
+	error = uiomove((void *)(uintptr_t)target,
+	    MIN(strlen(target), uio->uio_resid), uio);
 	return (error);
+}
+
+static int
+lkpi_remove(struct vop_remove_args *ap)
+{
+	printf("%s: EDOOFUS\n", __func__);
+
+	return (EDOOFUS);
+}
+
+static int
+lkpi_rename(struct vop_rename_args *ap)
+{
+	printf("%s: EDOOFUS\n", __func__);
+
+	return (EDOOFUS);
+}
+
+static int
+lkpi_rmdir(struct vop_rmdir_args *ap)
+{
+	printf("%s: EDOOFUS\n", __func__);
+
+	return (EDOOFUS);
+}
+
+static int
+lkpi_setattr(struct vop_setattr_args *ap)
+{
+	printf("%s: EDOOFUS\n", __func__);
+
+	return (EDOOFUS);
+}
+
+static int
+lkpi_symlink(struct vop_symlink_args *ap)
+{
+	printf("%s: EDOOFUS\n", __func__);
+
+	return (EDOOFUS);
+}
+
+static int
+lkpi_write(struct vop_write_args *ap)
+{
+	printf("%s: EDOOFUS\n", __func__);
+
+	return (EDOOFUS);
 }
 
 static int
@@ -214,6 +398,9 @@ lkpi_reclaim(struct vop_reclaim_args *ap)
 	vp = ap->a_vp;
 
 	printf("%s: %p\n", __func__, ap);
+
+	// XXX panics and then backtrace in kgdb is broken
+	//vfs_hash_remove(vp);
 
 	// XXX
 	vp->v_data = NULL;
@@ -226,18 +413,19 @@ struct vop_vector lkpi_vnodeops = {
 
 	.vop_access =		lkpi_access,
 	.vop_lookup =		lkpi_lookup,
-	.vop_create =		VOP_EOPNOTSUPP,
+	.vop_create =		lkpi_create,
 	.vop_getattr =		lkpi_getattr,
-	.vop_link =		VOP_EOPNOTSUPP,
+	.vop_link =		lkpi_link,
 	.vop_mknod =		VOP_EOPNOTSUPP,
-	.vop_read =		VOP_EOPNOTSUPP,
+	.vop_read =		lkpi_read,
 	.vop_readdir =		lkpi_readdir,
-	.vop_remove =		VOP_EOPNOTSUPP,
-	.vop_rename =		VOP_EOPNOTSUPP,
-	.vop_rmdir =		VOP_EOPNOTSUPP,
-	.vop_setattr =		VOP_EOPNOTSUPP,
-	.vop_symlink =		VOP_EOPNOTSUPP,
-	.vop_write =		VOP_EOPNOTSUPP,
+	.vop_readlink =		lkpi_readlink,
+	.vop_remove =		lkpi_remove,
+	.vop_rename =		lkpi_rename,
+	.vop_rmdir =		lkpi_rmdir,
+	.vop_setattr =		lkpi_setattr,
+	.vop_symlink =		lkpi_symlink,
+	.vop_write =		lkpi_write,
 	.vop_reclaim =		lkpi_reclaim,
 };
 VFS_VOP_VECTOR_REGISTER(lkpi_vnodeops);
@@ -262,12 +450,11 @@ new_inode(struct super_block *sb)
 
 	lp = malloc(sizeof(*lp), M_TEMP, M_WAITOK | M_ZERO);
 	vp->v_data = lp;
-	vp->v_type = VDIR;
 
 	error = insmntque(vp, sb->s_mnt);
 	if (error != 0) {
 		VOP_UNLOCK(vp);
-		printf("%s: insmntque returned %d, vp %p\n", __func__, error, vp);
+		printf("%s: insmntque returned %d\n", __func__, error);
 		return (NULL);
 	}
 
@@ -275,6 +462,9 @@ new_inode(struct super_block *sb)
 	MNT_ILOCK(sb->s_mnt);
 	MNT_REL(sb->s_mnt);
 	MNT_IUNLOCK(sb->s_mnt);
+
+	vp->i_sb = sb;
+	vp->i_flags |= I_NEW;
 
 	vn_set_state(vp, VSTATE_CONSTRUCTED);
 	VOP_UNLOCK(vp);
@@ -294,7 +484,6 @@ d_make_root(struct inode *vp)
 	d->d_inode = vp;
 	d->d_sb = sb;
 	vp->v_vflag |= VV_ROOT;
-	//vn_set_state(vp, VSTATE_CONSTRUCTED);
 
 	return (d);
 }
@@ -394,7 +583,6 @@ fail:
 	 * We don't need to return the actual dentry here;
 	 * FreeBSD's upper layer code doesn't need it.
 	 */
-	//printf("%s: returning -%d\n", __func__, error);
 	return (ERR_PTR(-error));
 }
 
@@ -453,6 +641,8 @@ lkpi_unmount(struct mount *mp, int mntflags)
 	}
 
 	mp->mnt_data = NULL;
+
+	printf("%s: done\n", __func__);
 
 	return (0);
 }
@@ -563,58 +753,94 @@ mark_buffer_dirty(struct buffer_head *bh __unused)
 void
 inode_init_owner(struct mnt_idmap *idmap, struct inode *inode, const struct inode *dir, umode_t mode)
 {
-	printf("%s: %p\n", __func__, idmap);
+	inode->i_mode = mode;
+
+	if (S_ISREG(inode->i_mode))
+		inode->v_type = VREG;
+	else if (S_ISDIR(inode->i_mode))
+		inode->v_type = VDIR;
+	else if (S_ISLNK(inode->i_mode))
+		inode->v_type = VLNK;
+	else
+		panic("%s: wrong i_mode %o", __func__, inode->i_mode);
 }
 
 void
 inode_set_ctime_to_ts(struct inode *inode, struct timespec64 ts)
 {
-	printf("%s: %p\n", __func__, inode);
+	inode->i_ctime = ts;
 }
 
 void
 inode_set_atime_to_ts(struct inode *inode, struct timespec64 ts)
 {
-	printf("%s: %p\n", __func__, inode);
+	inode->i_atime = ts;
 }
 
 void
 inode_set_mtime_to_ts(struct inode *inode, struct timespec64 ts)
 {
-	printf("%s: %p\n", __func__, inode);
+	inode->i_mtime = ts;
 }
 
 kuid_t
 make_kuid(struct user_namespace *from, uid_t uid)
 {
-	printf("%s: %p\n", __func__, from);
-	return (0);
+	return (uid);
 }
 
 kuid_t
-make_kgid(struct user_namespace *from, uid_t uid)
+make_kgid(struct user_namespace *from, uid_t gid)
 {
-	printf("%s: %p\n", __func__, from);
-	return (0);
+	return (gid);
 }
 
 void
 set_nlink(struct inode *inode, unsigned int nlink)
 {
-	printf("%s: %p\n", __func__, inode);
+	inode->i_nlink = nlink;
 }
 
 void
 inode_nohighmem(struct inode *inode)
 {
-	printf("%s: %p\n", __func__, inode);
+	//printf("%s: %p\n", __func__, inode);
 }
 
 struct inode *
-iget_locked(struct super_block *sb, unsigned long num)
+iget_locked(struct super_block *sb, unsigned long ino)
 {
-	printf("%s: %p\n", __func__, sb);
-	return (NULL);
+	struct mount *mp;
+	struct inode *inode, *oldinode;
+	int error, lkflags;
+
+	// XXX: should be in VFS_VGET() maybe
+
+	mp = sb->s_mnt;
+	lkflags = LK_SHARED | LK_RETRY;
+
+	error = vfs_hash_get(mp, ino, lkflags, curthread, &inode, NULL, NULL);
+	if (error != 0 || inode == NULL) {
+		inode = new_inode(sb);
+		//printf("%s: vfs_hash_get returned %d; inserting %p for inode %lu\n", __func__, error, inode, ino);
+		error = vfs_hash_insert(inode, ino, lkflags, curthread, &oldinode, NULL, NULL);
+		if (error != 0 || oldinode != NULL) {
+			printf("%s: vfs_hash_insert returned %d\n", __func__, error);
+			// XXX and?
+		}
+
+		if (inode->i_ino == 0)
+			inode->i_ino = ino;
+		return (inode);
+	} else {
+		//printf("%s: xoxo, vfs_hash_get found %p for inode %lu\n", __func__, inode, ino);
+	}
+
+	MPASS(inode->i_ino != 0);
+	MPASS(inode->i_ino == ino);
+
+	// NB: callers don't expect NULL, will panic
+	return (inode);
 }
 
 void
@@ -626,7 +852,17 @@ __destroy_inode(struct inode *inode)
 void
 unlock_new_inode(struct inode *inode)
 {
-	printf("%s: %p\n", __func__, inode);
+
+	MPASS(inode->v_type != VNON);
+
+	inode->i_flags &= ~I_NEW;
+
+	if (VOP_ISLOCKED(inode)) {
+		printf("%s: unlocking %p\n", __func__, inode);
+		VOP_UNLOCK(inode);
+	} else {
+		printf("%s: not unlocking %p\n", __func__, inode);
+	}
 }
 
 void
@@ -636,23 +872,66 @@ mark_inode_dirty(struct inode *inode)
 }
 
 bool
-dir_emit(struct dir_context *ctx, const char *name, int namelen, u64 ino, unsigned type)
+dir_emit(struct dir_context *ctx, const char *name, int namelen, u64 fileno, unsigned type)
 {
-	printf("%s: %p\n", __func__, ctx);
-	return (false);
+	struct dirent dirent;
+	struct uio *uio;
+	size_t reclen;
+	int error;
+
+	uio = ctx->uio;
+
+#if 0
+	printf("%s: pos %ld, name %s, namelen %d, ino %lu, type %d\n",
+	    __func__, ctx->pos, name, namelen, fileno, type);
+#endif
+
+	reclen = _GENERIC_DIRLEN(namelen);
+
+	if (uio->uio_resid < reclen) {
+		printf("%s: foo\n", __func__);
+		return (false);
+	}
+
+	dirent.d_fileno = fileno;
+	dirent.d_off = uio->uio_offset + reclen;
+	dirent.d_reclen = reclen;
+	dirent.d_type = type;
+	dirent.d_namlen = namelen;
+	memcpy(dirent.d_name, name, namelen);
+	dirent_terminate(&dirent);
+	error = uiomove(&dirent, reclen, uio);
+	if (error != 0) {
+		printf("%s: uiomove returned %d\n", __func__, error);
+		return (false);
+	}
+
+	// is this valid unix
+	ctx->pos++;
+	uio->uio_offset += reclen;
+
+	return (true);
 }
 
 bool
-dir_emit_dots(struct file *file, struct dir_context *ctx)
+dir_emit_dots(struct file *file __unused, struct dir_context *ctx)
 {
-	printf("%s: %p\n", __func__, file);
-	return (false);
+	bool ok;
+
+	ok = dir_emit(ctx, ".", 1, ctx->dot, VDIR);
+	if (!ok)
+		return (false);
+	ok = dir_emit(ctx, "..", 2, ctx->dotdot, VDIR);
+	if (!ok)
+		return (false);
+
+	return (true);
 }
 
 int
 unregister_filesystem(struct file_system_type *fst)
 {
-	printf("%s: %p\n", __func__, fst);
+	printf("%s: no.\n", __func__);
 	return (-1);
 }
 
@@ -670,9 +949,10 @@ kill_block_super(struct super_block *sb)
 }
 
 void
-d_add(struct dentry *d, struct inode *add)
+d_add(struct dentry *d, struct inode *inode)
 {
-	printf("%s: %p\n", __func__, d);
+	//printf("%s: inode %p\n", __func__, inode);
+	d->d_inode = inode;
 }
 
 time64_t
@@ -699,15 +979,17 @@ inode_get_ctime_sec(const struct inode *inode)
 gid_t
 from_kgid(struct user_namespace *to, kgid_t gid)
 {
-	printf("%s: %p\n", __func__, to);
-	return (-1);
+	printf("%s: %d\n", __func__, gid);
+
+	return (gid);
 }
 
 gid_t
 from_kuid(struct user_namespace *to, kuid_t uid)
 {
-	printf("%s: %p\n", __func__, to);
-	return (-1);
+	printf("%s: %d\n", __func__, uid);
+
+	return (uid);
 }
 
 struct timespec64
@@ -722,7 +1004,7 @@ simple_inode_init_ts(struct inode *inode)
 void
 insert_inode_hash(struct inode *inode)
 {
-	printf("%s: %p\n", __func__, inode);
+	//printf("%s: %p\n", __func__, inode);
 }
 
 void
