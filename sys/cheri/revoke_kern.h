@@ -34,6 +34,7 @@
 #define	__SYS_CHERI_REVOKE_KERN_H__
 
 #include <sys/types.h>
+#include <machine/cheri_revoke.h>
 
 #ifdef _KERNEL
 #include <sys/sysctl.h>
@@ -165,6 +166,10 @@ struct vmspace;
 void cheri_revoke_vmspace_fork(struct vmspace *dst, struct vmspace *src);
 
 #ifdef CHERI_CAPREVOKE_KERNEL
+struct cheri_kernel_revoke_info {
+	struct cheri_revoke_epochs epochs;
+};
+
 /* Note: this is protected by the kernel_map lock. */
 extern struct cheri_revoke_info kernel_revoke_info_store;
 #define	kernel_revoke_info (&kernel_revoke_info_store)
