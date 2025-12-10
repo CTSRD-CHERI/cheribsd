@@ -36,6 +36,19 @@
 	.text
 
 /*
+ * Load the pcpu pointer into x/c18.
+ * When kernel revocation is enabled, this goes through an extra layer of
+ * indirection, because the tpidr register is used to hold the revocation
+ * root state.
+ */
+.macro load_kernel_pcpu
+	mrs	PTR(18), PTRN(tpidr_el1)
+#ifdef CHERI_CAPREVOKE_KERNEL
+	ldr	c18, [c18]
+#endif
+.endmacro
+
+/*
  * This is limited to 28 instructions as it's placed in the exception vector
  * slot that is 32 instructions long. We need one for the branch, and three
  * for the prologue.
@@ -79,7 +92,7 @@
 	stp	x10, x11, [sp, #(TF_ELR)]
 #endif
 	stp	x12, x13, [PTRN(sp), #(TF_ESR)]
-	mrs	PTR(18), PTRN(tpidr_el1)
+	load_kernel_pcpu
 .endm
 
 .macro	save_registers el
@@ -208,7 +221,7 @@
 	add	PTRN(sp), PTRN(sp), #(TF_SIZE)
 .else
 	mov	PTRN(sp), PTR(18)
-	mrs	PTR(18), PTRN(tpidr_el1)
+	load_kernel_pcpu
 .endif
 .endm
 

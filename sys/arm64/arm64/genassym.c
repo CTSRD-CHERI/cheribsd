@@ -36,6 +36,8 @@
 #include <machine/machdep.h>
 #include <machine/pcb.h>
 
+#include <machine/cheri_revoke.h>
+
 /* Sizeof arm64_bootparams, rounded to keep stack alignment */
 ASSYM(BOOTPARAMS_SIZE, roundup2(sizeof(struct arm64_bootparams),
     STACKALIGNBYTES + 1));
@@ -59,6 +61,11 @@ ASSYM(PCPU_SIZE, sizeof(struct pcpu));
 ASSYM(PC_CURPCB, offsetof(struct pcpu, pc_curpcb));
 ASSYM(PC_CURTHREAD, offsetof(struct pcpu, pc_curthread));
 ASSYM(PC_SSBD, offsetof(struct pcpu, pc_ssbd));
+#ifdef CHERI_CAPREVOKE_KERNEL
+ASSYM(PC_CPUID, offsetof(struct pcpu, pc_cpuid));
+ASSYM(KMEM_REVOKE_PCPU_ROOT_SIZE, sizeof(struct kmem_revoke_pcpu_root));
+ASSYM(KMEM_REVOKE_PCPU_ROOT_DMAP, offsetof(struct kmem_revoke_pcpu_root, dmap_cap));
+#endif
 
 /* Size of pcb, rounded to keep stack alignment */
 ASSYM(PCB_SIZE, roundup2(sizeof(struct pcb), STACKALIGNBYTES + 1));
