@@ -60,9 +60,12 @@ FEATURE(cheri_revoke_kernel, "CHERI kernel capability revocation support");
 
 /*
  * Kernel revocation info context.
- * This is a statically allocated version of the user info page.
+ * This is the moral equivalent of the user info page for the kernel.
  *
- * XXX I think only the epochs are used here, we should simplify this.
+ * The info context is placed in a special section that has load-side
+ * barriers disabled. This must also be reachable from the trap handler
+ * PCC, so that the trap handler can recover capabilities to the direct
+ * map and the shadow bitmap to bootstrap revocation on fault.
  */
 struct cheri_revoke_info kernel_revoke_info_store;
 
@@ -247,7 +250,7 @@ kmem_revoke_kproc(void *arg __unused)
 		 * Update CLG
 		 * Note: we reuse the kernel pmap uclg.
 		 */
-		pmap_caploadgen_next(kernel_pmap);
+		pmap_kernel_caploadgen_next();
 		pmap_update_clg(kernel_pmap);
 #ifdef SMP
 		atomic_add_int(&kmem_revoke_release, mp_ncpus);
