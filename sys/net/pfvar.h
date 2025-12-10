@@ -497,14 +497,14 @@ extern struct sx pf_end_lock;
 #ifdef PF_INET_INET6
 
 #define PF_AEQ(a, b, c) \
-	((c == AF_INET && (a)->addr32[0] == (b)->addr32[0]) || \
+	((c == AF_INET && (a)->v4.s_addr == (b)->v4.s_addr) || \
 	(c == AF_INET6 && (a)->addr32[3] == (b)->addr32[3] && \
 	(a)->addr32[2] == (b)->addr32[2] && \
 	(a)->addr32[1] == (b)->addr32[1] && \
 	(a)->addr32[0] == (b)->addr32[0])) \
 
 #define PF_ANEQ(a, b, c) \
-	((c == AF_INET && (a)->addr32[0] != (b)->addr32[0]) || \
+	((c == AF_INET && (a)->v4.s_addr != (b)->v4.s_addr) || \
 	(c == AF_INET6 && ((a)->addr32[0] != (b)->addr32[0] || \
 	(a)->addr32[1] != (b)->addr32[1] || \
 	(a)->addr32[2] != (b)->addr32[2] || \
@@ -1252,8 +1252,10 @@ VNET_DECLARE(pflow_export_state_t *,	pflow_export_state_ptr);
 #define V_pflow_export_state_ptr	VNET(pflow_export_state_ptr)
 extern pfsync_detach_ifnet_t	*pfsync_detach_ifnet_ptr;
 
-void			pfsync_state_export(union pfsync_state_union *,
-			    struct pf_kstate *, int);
+void			pfsync_state_export_1301(struct pfsync_state_1301 *,
+			    struct pf_kstate *);
+void			pfsync_state_export_1400(struct pfsync_state_1400 *,
+			    struct pf_kstate *);
 void			pf_state_export(struct pf_state_export *,
 			    struct pf_kstate *);
 
@@ -2051,7 +2053,6 @@ struct pfioc_iface {
 #define DIOCGETALTQV1	_IOWR('D', 48, struct pfioc_altq_v1)
 #define DIOCCHANGEALTQV0 _IOWR('D', 49, struct pfioc_altq_v0)
 #define DIOCCHANGEALTQV1 _IOWR('D', 49, struct pfioc_altq_v1)
-#define DIOCGETQSTATSV0	_IOWR('D', 50, struct pfioc_qstats_v0)
 #define DIOCGETQSTATSV1	_IOWR('D', 50, struct pfioc_qstats_v1)
 #define DIOCBEGINADDRS	_IOWR('D', 51, struct pfioc_pooladdr)
 #define DIOCADDADDR	_IOWR('D', 52, struct pfioc_pooladdr)
