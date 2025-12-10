@@ -117,57 +117,6 @@ extern bool scheduler_stopped;
  */
 #define	SCHEDULER_STOPPED()	__predict_false(scheduler_stopped)
 
-/*
- * Macros to create userspace capabilities from virtual addresses.
- * Addresses are assumed to be relative to the current userspace
- * thread's address space and are created from the DDC or PCC of
- * the current PCB.
- */
-#if __has_feature(capabilities)
-/*
- * Derive out-of-bounds and small values from NULL.  This allows common
- * sentinel values to work.
- */
-#define ___USER_CFROMPTR(ptr, cap, is_offset)				\
-    ((void *)(uintptr_t)(ptr) == NULL ? NULL :				\
-     ((vm_offset_t)(ptr) < 4096 ||					\
-      (vm_offset_t)(ptr) > VM_MAXUSER_ADDRESS) ?			\
-	(void * __capability)(uintcap_t)(ptraddr_t)(ptr) :		\
-	(is_offset) ?							\
-	__builtin_cheri_offset_set((cap), (ptraddr_t)(ptr)) :		\
-	__builtin_cheri_address_set((cap), (ptraddr_t)(ptr)))
-
-#define	__USER_CAP_UNBOUND(ptr)						\
-	___USER_CFROMPTR((ptr), __USER_DDC, __USER_DDC_OFFSET_ENABLED)
-
-#define	__USER_CODE_CAP(ptr)						\
-	___USER_CFROMPTR((ptr), __USER_PCC, __USER_PCC_OFFSET_ENABLED)
-
-#define	__USER_CAP(ptr, len)						\
-({									\
-	void * __capability unbound = __USER_CAP_UNBOUND(ptr);		\
-	(security_cheri_bound_legacy_capabilities &&			\
-	    __builtin_cheri_tag_get(unbound) ?				\
-	    __builtin_cheri_bounds_set(unbound, (len)) : unbound);	\
-})
-
-#else /* !has_feature(capabilities) */
-#define	__USER_CAP_UNBOUND(ptr)	((void *)(uintptr_t)(ptr))
-#define	__USER_CODE_CAP(ptr)	((void *)(uintptr_t)(ptr))
-#define	__USER_CAP(ptr, len)	((void *)(uintptr_t)(ptr))
-#endif /* !has_feature(capabilities) */
-
-#define	__USER_CAP_ADDR(ptr)	__USER_CAP_UNBOUND(ptr)
-#define	__USER_CAP_ARRAY(objp, cnt) \
-     __USER_CAP((objp), sizeof(*(objp)) * (cnt))
-#define	__USER_CAP_OBJ(objp)	__USER_CAP((objp), sizeof(*(objp)))
-/*
- * NOTE: we can't place tigher bounds because we don't know what the
- * length is until after we use it.
- */
-#define	__USER_CAP_STR(strp)	__USER_CAP_UNBOUND(strp)
-#define	__USER_CAP_PATH(path)	__USER_CAP((path), MAXPATHLEN)
-
 extern const int osreldate;
 
 extern const void *zero_region;	/* address space maps to a zeroed page	*/
@@ -398,10 +347,10 @@ int __result_use_check copyinstr(const void * __restrict __capability udaddr,
 int __result_use_check copyin(const void * __restrict __capability udaddr,
     void * _Nonnull __restrict kaddr, size_t len);
 #if __has_feature(capabilities)
-int __result_use_check copyincap(const void * __restrict __capability udaddr,
+int __result_use_check copyinptr(const void * __restrict __capability udaddr,
     void * _Nonnull __restrict kaddr, size_t len);
 #else
-#define	copyincap	copyin
+#define	copyinptr	copyin
 #endif
 int __result_use_check copyin_nofault(
     const void * __capability __restrict udaddr,
@@ -409,21 +358,21 @@ int __result_use_check copyin_nofault(
 int __result_use_or_ignore_check copyout(const void * _Nonnull __restrict kaddr,
     void * __restrict __capability udaddr, size_t len);
 #if __has_feature(capabilities)
-int __result_use_or_ignore_check copyoutcap(
+int __result_use_or_ignore_check copyoutptr(
     const void * _Nonnull __restrict kaddr,
     void * __capability __restrict udaddr, size_t len);
 #else
-#define	copyoutcap	copyout
+#define	copyoutptr	copyout
 #endif
 int __result_use_or_ignore_check copyout_nofault(
     const void * _Nonnull __restrict kaddr,
     void * __capability __restrict udaddr, size_t len);
 #if __has_feature(capabilities)
-int __result_use_or_ignore_check copyoutcap_nofault(
+int __result_use_or_ignore_check copyoutptr_nofault(
     const void * _Nonnull __restrict kaddr,
     void * __capability __restrict udaddr, size_t len);
 #else
-#define	copyoutcap_nofault	copyout_nofault
+#define	copyoutptr_nofault	copyout_nofault
 #endif
 
 #ifdef SAN_NEEDS_INTERCEPTORS

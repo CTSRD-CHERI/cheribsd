@@ -32,6 +32,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/abi_compat.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
@@ -826,7 +827,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 	case GIO_KEYMAP:	/* get keyboard translation table */
 #if __has_feature(capabilities)
 		if (!SV_CURPROC_FLAG(SV_CHERI))
-			data = __USER_CAP_UNBOUND(*(uint64_t *)arg);
+			data = USER_PTR_UNBOUND(*(uint64_t *)arg);
 		else
 #endif
 			data = *(void * __capability *)arg;
@@ -868,7 +869,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		{
 #if __has_feature(capabilities)
 			if (!SV_CURPROC_FLAG(SV_CHERI))
-				data = __USER_CAP_UNBOUND(*(uint64_t *)arg);
+				data = USER_PTR_UNBOUND(*(uint64_t *)arg);
 			else
 #endif
 				data = *(void * __capability *)arg;

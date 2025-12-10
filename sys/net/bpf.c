@@ -1950,13 +1950,13 @@ bf_insns_get_ptr(void *fpp)
 	fpup = fpp;
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (__USER_CAP(
+		return (USER_PTR(
 		    (struct bpf_insn *)(uintptr_t)fpup->fp32.bf_insns,
 		    fpup->fp32.bf_len * sizeof(struct bpf_insn)));
 #endif
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI))
-		return (__USER_CAP(
+		return (USER_PTR(
 		    (struct bpf_insn *)(uintptr_t)fpup->fp64.bf_insns,
 		    fpup->fp64.bf_len * sizeof(struct bpf_insn)));
 #endif
@@ -2910,12 +2910,12 @@ bfl_list_get_ptr(void *bflp)
 	bflup = bflp;
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (__USER_CAP((u_int *)(uintptr_t)bflup->bfl32.bfl_list,
+		return (USER_PTR((u_int *)(uintptr_t)bflup->bfl32.bfl_list,
 		    bflup->bfl32.bfl_len * sizeof(u_int)));
 #endif
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI))
-		return (__USER_CAP((u_int *)(uintptr_t)bflup->bfl64.bfl_list,
+		return (USER_PTR((u_int *)(uintptr_t)bflup->bfl64.bfl_list,
 		    bflup->bfl64.bfl_len * sizeof(u_int)));
 #endif
 	return (bflup->bfl.bfl_list);

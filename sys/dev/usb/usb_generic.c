@@ -937,7 +937,7 @@ ugen_do_request64(struct usb_fifo *f, struct usb_ctl_request64 *ur64)
 	struct usb_ctl_request ur;
 	int error;
 
-	ur.ucr_data = __USER_CAP(ur64->ucr_data,
+	ur.ucr_data = USER_PTR(ur64->ucr_data,
 	    UGETW(ur64->ucr_request.wLength));
 	CP(*ur64, ur, ucr_flags);
 	CP(*ur64, ur, ucr_actlen);
@@ -1298,7 +1298,7 @@ ugen_fs_getbuffer(void * __capability *uptrp, struct usb_fifo *f,
 			return (EFAULT);
 		if (fueword32(lengths + n, &len32) != 0)
 			return (EFAULT);
-		*uptrp = __USER_CAP(uptr64, len32);
+		*uptrp = USER_PTR(uptr64, len32);
 		return (0);
 #endif
 	default:
@@ -1496,7 +1496,7 @@ ugen_fs_copyin(struct usb_fifo *f, uint8_t ep_index,
 
 	switch (f->fs_ep_sz) {
 	case sizeof(struct usb_fs_endpoint):
-		error = copyincap(ugen_fs_ep_uptr(f, ep_index), fs_ep,
+		error = copyinptr(ugen_fs_ep_uptr(f, ep_index), fs_ep,
 		    f->fs_ep_sz);
 		if (error != 0)
 			return (error);
@@ -1524,9 +1524,9 @@ ugen_fs_copyin(struct usb_fifo *f, uint8_t ep_index,
 		    f->fs_ep_sz);
 		if (error != 0)
 			return (error);
-		fs_ep->ppBuffer = __USER_CAP(fs_ep64.ppBuffer,
+		fs_ep->ppBuffer = USER_PTR(fs_ep64.ppBuffer,
 		    fs_ep64.nFrames * sizeof(uint64_t));
-		fs_ep->pLength = __USER_CAP(fs_ep64.pLength,
+		fs_ep->pLength = USER_PTR(fs_ep64.pLength,
 		    fs_ep64.nFrames * sizeof(uint32_t));
 		CP(fs_ep64, *fs_ep, nFrames);
 		CP(fs_ep64, *fs_ep, aFrames);
@@ -2555,7 +2555,7 @@ ugen_ioctl_post(struct usb_fifo *f, u_long cmd, void *addr, int fflags)
 #endif
 #ifdef COMPAT_FREEBSD64
 	case USB_FS_INIT64:
-		error = ugen_fs_init(f, __USER_CAP(u.pinit64->pEndpoints,
+		error = ugen_fs_init(f, USER_PTR(u.pinit64->pEndpoints,
 		    sizeof(struct usb_fs_endpoint64) * u.pinit64->ep_index_max),
 		    sizeof(struct usb_fs_endpoint64), fflags,
 		    u.pinit64->ep_index_max);
@@ -2683,7 +2683,7 @@ void
 usb_gen_descriptor_from64(struct usb_gen_descriptor *ugd,
     const struct usb_gen_descriptor64 *ugd64)
 {
-	ugd->ugd_data = __USER_CAP(ugd64->ugd_data, ugd64->ugd_maxlen);
+	ugd->ugd_data = USER_PTR(ugd64->ugd_data, ugd64->ugd_maxlen);
 	CP(*ugd64, *ugd, ugd_lang_id);
 	CP(*ugd64, *ugd, ugd_maxlen);
 	CP(*ugd64, *ugd, ugd_actlen);

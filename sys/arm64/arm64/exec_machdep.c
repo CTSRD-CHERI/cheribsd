@@ -992,7 +992,7 @@ sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 	ucontext_t uc;
 	int error;
 
-	if (copyincap(uap->sigcntxp, &uc, sizeof(uc)))
+	if (copyinptr(uap->sigcntxp, &uc, sizeof(uc)))
 		return (EFAULT);
 
 	/* Stop an interrupt from causing the sve state to be dropped */
@@ -1146,7 +1146,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	fp = (struct sigframe * __capability)STACKALIGN(fp);
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyoutcap(&frame, fp, sizeof(*fp)) != 0) {
+	if (copyoutptr(&frame, fp, sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td,
 		    (__cheri_fromcap void *)fp);

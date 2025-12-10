@@ -175,7 +175,7 @@ geom_alloc_copyin(struct gctl_req *req, void * __capability uaddr, size_t len,
 
 	ptr = g_malloc(len, M_WAITOK);
 	if (preserve_tags)
-		req->nerror = copyincap(uaddr, ptr, len);
+		req->nerror = copyinptr(uaddr, ptr, len);
 	else
 		req->nerror = copyin(uaddr, ptr, len);
 	if (!req->nerror)

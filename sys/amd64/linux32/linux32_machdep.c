@@ -99,7 +99,7 @@ linux_copyout_rusage(struct rusage *ru, void *uaddr)
 int
 linux_readv(struct thread *td, struct linux_readv_args *uap)
 {
-	return (user_readv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	return (user_readv(td, uap->fd, USER_PTR_ARRAY(uap->iovp,
 	    uap->iovcnt), uap->iovcnt, freebsd32_copyinuio));
 }
 

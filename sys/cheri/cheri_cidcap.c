@@ -64,7 +64,7 @@ kern_cheri_cidcap_alloc(struct thread *td, uintcap_t * __capability cidp)
 
 	KASSERT(cheri_gettag(cidcap), ("untagged cidcap allocated"));
 
-	return (copyoutcap(&cidcap, cidp, sizeof(cidcap)));
+	return (copyoutptr(&cidcap, cidp, sizeof(cidcap)));
 }
 
 int

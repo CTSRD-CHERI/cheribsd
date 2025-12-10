@@ -1878,7 +1878,7 @@ passdoioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread 
 		xpt_print(periph->path, "Copying user CCB %p to "
 			  "kernel address %p\n", *user_ccb, ccb);
 #endif
-		error = copyincap(*user_ccb, ccb, sizeof(*ccb));
+		error = copyinptr(*user_ccb, ccb, sizeof(*ccb));
 		if (error != 0) {
 			xpt_print(periph->path, "Copy of user CCB %p to "
 				  "kernel address %p failed with error %d\n",
@@ -2069,7 +2069,7 @@ camioqueue_error:
 			  "kernel address %p\n", *user_ccb, &io_req->ccb);
 #endif
 
-		error = copyoutcap(&io_req->ccb, *user_ccb, sizeof(union ccb));
+		error = copyoutptr(&io_req->ccb, *user_ccb, sizeof(union ccb));
 		if (error != 0) {
 			xpt_print(periph->path, "Copy to user CCB %p from "
 				  "kernel address %p failed with error %d\n",

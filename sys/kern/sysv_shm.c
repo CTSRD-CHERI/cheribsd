@@ -1858,14 +1858,14 @@ done:
 int
 freebsd64_shmat(struct thread *td, struct freebsd64_shmat_args *uap)
 {
-	return (kern_shmat(td, uap->shmid, __USER_CAP_UNBOUND(uap->shmaddr),
+	return (kern_shmat(td, uap->shmid, USER_PTR_UNBOUND(uap->shmaddr),
 	    uap->shmflg));
 }
 
 int
 freebsd64_shmdt(struct thread *td, struct freebsd64_shmdt_args *uap)
 {
-	return (kern_shmdt(td, __USER_CAP_UNBOUND(uap->shmaddr)));
+	return (kern_shmdt(td, USER_PTR_UNBOUND(uap->shmaddr)));
 }
 
 #ifdef COMPAT_FREEBSD7
@@ -1883,7 +1883,7 @@ freebsd7_freebsd64_shmctl(struct thread *td,
 	size_t sz;
 
 	if (uap->cmd == IPC_SET) {
-		if ((error = copyin(__USER_CAP_OBJ(uap->buf), &shmid_ds64,
+		if ((error = copyin(USER_PTR_OBJ(uap->buf), &shmid_ds64,
 		    sizeof(shmid_ds64))))
 			goto done;
 		ipcperm_old2new(&shmid_ds64.shm_perm, &u.shmid_ds.shm_perm);
@@ -1904,12 +1904,12 @@ freebsd7_freebsd64_shmctl(struct thread *td,
 	switch (uap->cmd) {
 	case IPC_INFO:
 		error = copyout(&u.shminfo,
-		    __USER_CAP(uap->buf, sizeof(u.shminfo)),
+		    USER_PTR(uap->buf, sizeof(u.shminfo)),
 		    sizeof(u.shminfo));
 		break;
 	case SHM_INFO:
 		error = copyout(&u.shm_info,
-		    __USER_CAP(uap->buf, sizeof(u.shm_info)),
+		    USER_PTR(uap->buf, sizeof(u.shm_info)),
 		    sizeof(u.shm_info));
 		break;
 	case SHM_STAT:
@@ -1924,7 +1924,7 @@ freebsd7_freebsd64_shmctl(struct thread *td,
 		CP(u.shmid_ds, shmid_ds64, shm_dtime);
 		CP(u.shmid_ds, shmid_ds64, shm_ctime);
 		shmid_ds64.shm_internal = 0;
-		error = copyout(&shmid_ds64, __USER_CAP_OBJ(uap->buf),
+		error = copyout(&shmid_ds64, USER_PTR_OBJ(uap->buf),
 		    sizeof(shmid_ds64));
 		break;
 	}
@@ -1951,7 +1951,7 @@ freebsd64_shmctl(struct thread *td, struct freebsd64_shmctl_args *uap)
 	size_t sz;
 
 	if (uap->cmd == IPC_SET) {
-		if ((error = copyin(__USER_CAP_OBJ(uap->buf), &shmid_ds64,
+		if ((error = copyin(USER_PTR_OBJ(uap->buf), &shmid_ds64,
 		    sizeof(shmid_ds64))))
 			goto done;
 		CP(shmid_ds64, u.shmid_ds, shm_perm);
@@ -1972,12 +1972,12 @@ freebsd64_shmctl(struct thread *td, struct freebsd64_shmctl_args *uap)
 	switch (uap->cmd) {
 	case IPC_INFO:
 		error = copyout(&u.shminfo,
-		    __USER_CAP(uap->buf, sizeof(u.shminfo)),
+		    USER_PTR(uap->buf, sizeof(u.shminfo)),
 		    sizeof(u.shminfo));
 		break;
 	case SHM_INFO:
 		error = copyout(&u.shm_info,
-		    __USER_CAP(uap->buf, sizeof(u.shm_info)),
+		    USER_PTR(uap->buf, sizeof(u.shm_info)),
 		    sizeof(u.shm_info));
 		break;
 	case SHM_STAT:
@@ -1990,7 +1990,7 @@ freebsd64_shmctl(struct thread *td, struct freebsd64_shmctl_args *uap)
 		CP(u.shmid_ds, shmid_ds64, shm_atime);
 		CP(u.shmid_ds, shmid_ds64, shm_dtime);
 		CP(u.shmid_ds, shmid_ds64, shm_ctime);
-		error = copyout(&shmid_ds64, __USER_CAP_OBJ(uap->buf),
+		error = copyout(&shmid_ds64, USER_PTR_OBJ(uap->buf),
 		    sizeof(shmid_ds64));
 		break;
 	}
@@ -2033,7 +2033,7 @@ freebsd7_shmctl(struct thread *td, struct freebsd7_shmctl_args *uap)
 
 	/* IPC_SET needs to copyin the buffer before calling kern_shmctl */
 	if (uap->cmd == IPC_SET) {
-		if ((error = copyincap(uap->buf, &old, sizeof(old))))
+		if ((error = copyinptr(uap->buf, &old, sizeof(old))))
 			goto done;
 		ipcperm_old2new(&old.shm_perm, &buf.shm_perm);
 		CP(old, buf, shm_segsz);
@@ -2068,7 +2068,7 @@ freebsd7_shmctl(struct thread *td, struct freebsd7_shmctl_args *uap)
 		CP(buf, old, shm_dtime);
 		CP(buf, old, shm_ctime);
 		old.shm_internal = NULL;
-		error = copyoutcap(&old, uap->buf, sizeof(old));
+		error = copyoutptr(&old, uap->buf, sizeof(old));
 		break;
 	}
 

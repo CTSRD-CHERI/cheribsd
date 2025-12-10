@@ -34,6 +34,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/abi_compat.h>
 #include <sys/acct.h>
 #include <sys/asan.h>
 #include <sys/capsicum.h>
@@ -1472,7 +1473,7 @@ get_argenv_ptr(void * __capability *arrayp, void * __capability *ptrp)
 		if (fueword32(array, &ptr32) == -1)
 			return (EFAULT);
 		array += sizeof(ptr32);
-		*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr32);
+		*ptrp = USER_PTR_STR((void *)(uintptr_t)ptr32);
 	} else
 #endif
 #ifdef COMPAT_FREEBSD64
@@ -1480,7 +1481,7 @@ get_argenv_ptr(void * __capability *arrayp, void * __capability *ptrp)
 		if (fueword64(array, &ptr64) == -1)
 			return (EFAULT);
 		array += sizeof(ptr64);
-		*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr64);
+		*ptrp = USER_PTR_STR((void *)(uintptr_t)ptr64);
 	} else
 #endif
 	{

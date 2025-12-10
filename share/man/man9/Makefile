@@ -918,9 +918,13 @@ MLINKS+=casuword.9 casueword.9 \
 	casuword.9 casuword32.9
 MLINKS+=copy.9 copyin.9 \
 	copy.9 copyin_nofault.9 \
+	copy.9 copyinptr.9 \
+	copy.9 copyinptr_nofault.9 \
 	copy.9 copyinstr.9 \
 	copy.9 copyout.9 \
 	copy.9 copyout_nofault.9 \
+	copy.9 copyoutptr.9 \
+	copy.9 copyoutptr_nofault.9 \
 	copy.9 copystr.9
 MLINKS+=counter.9 counter_u64_alloc.9 \
 	counter.9 counter_u64_free.9 \
@@ -2149,7 +2153,9 @@ MLINKS+=socket.9 soabort.9 \
 	socket.9 solisten_proto_check.9 \
 	socket.9 sonewconn.9 \
 	socket.9 sooptcopyin.9 \
+	socket.9 sooptcopyinptr.9 \
 	socket.9 sooptcopyout.9 \
+	socket.9 sooptcopyoutptr.9 \
 	socket.9 sopoll.9 \
 	socket.9 sopoll_generic.9 \
 	socket.9 soreceive.9 \

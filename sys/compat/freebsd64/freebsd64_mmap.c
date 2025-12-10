@@ -48,6 +48,7 @@
 #include <vm/vm_object.h>
 #include <vm/vm_extern.h>
 
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 
 #if 0
@@ -157,7 +158,7 @@ int
 freebsd64_mincore(struct thread *td, struct freebsd64_mincore_args *uap)
 {
 	return (kern_mincore(td, (uintptr_t)uap->addr, uap->len,
-	    __USER_CAP(uap->vec, uap->len)));
+	    USER_PTR(uap->vec, uap->len)));
 }
 
 int

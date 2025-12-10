@@ -13420,7 +13420,7 @@ dtrace_dof_copyin(uintcap_t uarg, int *errp)
 
 	dof = kmem_alloc(hdr.dofh_loadsz, KM_SLEEP);
 
-	if (copyincap((void *__capability)uarg, dof, hdr.dofh_loadsz) != 0 ||
+	if (copyinptr((void *__capability)uarg, dof, hdr.dofh_loadsz) != 0 ||
 	    dof->dofh_loadsz != hdr.dofh_loadsz) {
 		kmem_free(dof, hdr.dofh_loadsz);
 		*errp = EFAULT;

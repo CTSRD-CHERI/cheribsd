@@ -52,6 +52,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/abi_compat.h>
 #include <sys/bio.h>
 #include <sys/conf.h>
 #include <sys/disk.h>
@@ -1750,12 +1751,12 @@ te_data_get_ptr(void *irtep, u_long cmd)
 		return (irteup->irte.data);
 #ifdef COMPAT_FREEBSD32
 	case sizeof(irteup->irte32):
-		return (__USER_CAP(irteup->irte32.data,
+		return (USER_PTR(irteup->irte32.data,
 		    irteup->irte32.data_len));
 #endif
 #ifdef COMPAT_FREEBSD64
 	case sizeof(irteup->irte64):
-		return (__USER_CAP(irteup->irte64.data,
+		return (USER_PTR(irteup->irte64.data,
 		    irteup->irte64.data_len));
 #endif
 	default:

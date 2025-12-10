@@ -549,9 +549,9 @@ int drm_version(struct drm_device *dev, void *data,
 		CP(*version64, *version, name_len);
 		CP(*version64, *version, date_len);
 		CP(*version64, *version, desc_len);
-		version->name = __USER_CAP(version64->name, version->name_len);
-		version->date = __USER_CAP(version64->date, version->date_len);
-		version->desc = __USER_CAP(version64->desc, version->desc_len);
+		version->name = USER_PTR(version64->name, version->name_len);
+		version->date = USER_PTR(version64->date, version->date_len);
+		version->desc = USER_PTR(version64->desc, version->desc_len);
 	}
 #endif
 

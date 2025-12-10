@@ -28,6 +28,7 @@
 
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/abi_compat.h>
 #include <sys/capsicum.h>
 #include <sys/module.h>
 #include <sys/systm.h>
@@ -332,10 +333,10 @@ smbioc_ossn32_to_ossn(struct smbioc_ossn *ossn, const void *data)
 	ossn32 = data;
 	ossn->ioc_opt = ossn32->ioc_opt;
 	ossn->ioc_svlen = ossn32->ioc_svlen;
-	ossn->ioc_server = __USER_CAP((void *)(uintptr_t)ossn32->ioc_server,
+	ossn->ioc_server = USER_PTR((void *)(uintptr_t)ossn32->ioc_server,
 	    ossn32->ioc_svlen);
 	ossn->ioc_lolen = ossn32->ioc_lolen;
-	ossn->ioc_local = __USER_CAP((void *)(uintptr_t)ossn32->ioc_local,
+	ossn->ioc_local = USER_PTR((void *)(uintptr_t)ossn32->ioc_local,
 	    ossn32->ioc_lolen);
 	/* Do not include padding */
 	copysize = min(
@@ -353,13 +354,13 @@ smbioc_rq32_to_rq(struct smbioc_rq *rq, const void *data)
 	rq32 = data;
 	rq->ioc_cmd = rq32->ioc_cmd;
 	rq->ioc_twc = rq32->ioc_twc;
-	rq->ioc_twords = __USER_CAP((void *)(uintptr_t)rq32->ioc_twords,
+	rq->ioc_twords = USER_PTR((void *)(uintptr_t)rq32->ioc_twords,
 	    rq32->ioc_twc);
 	rq->ioc_tbc = rq32->ioc_tbc;
-	rq->ioc_tbytes = __USER_CAP((void *)(uintptr_t)rq32->ioc_tbytes,
+	rq->ioc_tbytes = USER_PTR((void *)(uintptr_t)rq32->ioc_tbytes,
 	    rq32->ioc_tbc);
 	rq->ioc_rpbufsz = rq32->ioc_rpbufsz;
-	rq->ioc_rpbuf = __USER_CAP((char *)(uintptr_t)rq32->ioc_rpbuf,
+	rq->ioc_rpbuf = USER_PTR((char *)(uintptr_t)rq32->ioc_rpbuf,
 	    rq32->ioc_rpbufsz);
 	memcpy(&rq->ioc_rwc, &rq32->ioc_rwc,
 	    sizeof(*rq) - offsetof(struct smbioc_rq, ioc_rwc));
@@ -389,18 +390,18 @@ smbioc_t2rq32_to_t2rq(struct smbioc_t2rq *t2rq, const void *data)
 	memset(t2rq, 0, sizeof(*t2rq));
 	memcpy(&t2rq->ioc_setup, &t2rq32->ioc_setup, sizeof(t2rq->ioc_setup));
 	t2rq->ioc_setupcnt = t2rq32->ioc_setupcnt;
-	t2rq->ioc_name = __USER_CAP_STR((char *)(uintptr_t)t2rq32->ioc_name);
+	t2rq->ioc_name = USER_PTR_STR((char *)(uintptr_t)t2rq32->ioc_name);
 	t2rq->ioc_tparamcnt = t2rq32->ioc_tparamcnt;
-	t2rq->ioc_tparam = __USER_CAP((void *)(uintptr_t)t2rq32->ioc_tparam,
+	t2rq->ioc_tparam = USER_PTR((void *)(uintptr_t)t2rq32->ioc_tparam,
 	    t2rq32->ioc_tparamcnt);
 	t2rq->ioc_tdatacnt = t2rq32->ioc_tdatacnt;
-	t2rq->ioc_tdata = __USER_CAP((void *)(uintptr_t)t2rq32->ioc_tdata,
+	t2rq->ioc_tdata = USER_PTR((void *)(uintptr_t)t2rq32->ioc_tdata,
 	    t2rq32->ioc_tdatacnt);
 	t2rq->ioc_rparamcnt = t2rq32->ioc_rparamcnt;
-	t2rq->ioc_rparam = __USER_CAP((void *)(uintptr_t)t2rq32->ioc_rparam,
+	t2rq->ioc_rparam = USER_PTR((void *)(uintptr_t)t2rq32->ioc_rparam,
 	    t2rq32->ioc_rparamcnt);
 	t2rq->ioc_rdatacnt = t2rq32->ioc_rdatacnt;
-	t2rq->ioc_rdata = __USER_CAP((void *)(uintptr_t)t2rq32->ioc_rdata,
+	t2rq->ioc_rdata = USER_PTR((void *)(uintptr_t)t2rq32->ioc_rdata,
 	    t2rq32->ioc_rdatacnt);
 }
 
@@ -440,7 +441,7 @@ smbioc_rw32_to_rw(struct smbioc_rw *rw, const void *data)
 	rw32 = data;
 	memset(rw, 0, sizeof(*rw));
 	rw->ioc_fh = rw32->ioc_fh;
-	rw->ioc_base = __USER_CAP((char *)(uintptr_t)rw32->ioc_base,
+	rw->ioc_base = USER_PTR((char *)(uintptr_t)rw32->ioc_base,
 	    rw32->ioc_cnt);
 	rw->ioc_offset = rw32->ioc_offset;
 	rw->ioc_cnt = rw32->ioc_cnt;
@@ -469,10 +470,10 @@ smbioc_ossn64_to_ossn(struct smbioc_ossn *ossn, const void *data)
 	ossn64 = data;
 	ossn->ioc_opt = ossn64->ioc_opt;
 	ossn->ioc_svlen = ossn64->ioc_svlen;
-	ossn->ioc_server = __USER_CAP((void *)(uintptr_t)ossn64->ioc_server,
+	ossn->ioc_server = USER_PTR((void *)(uintptr_t)ossn64->ioc_server,
 	    ossn64->ioc_svlen);
 	ossn->ioc_lolen = ossn64->ioc_lolen;
-	ossn->ioc_local = __USER_CAP((void *)(uintptr_t)ossn64->ioc_local,
+	ossn->ioc_local = USER_PTR((void *)(uintptr_t)ossn64->ioc_local,
 	    ossn64->ioc_lolen);
 	/* Do not include padding */
 	copysize = min(
@@ -490,13 +491,13 @@ smbioc_rq64_to_rq(struct smbioc_rq *rq, const void *data)
 	rq64 = data;
 	rq->ioc_cmd = rq64->ioc_cmd;
 	rq->ioc_twc = rq64->ioc_twc;
-	rq->ioc_twords = __USER_CAP((void *)(uintptr_t)rq64->ioc_twords,
+	rq->ioc_twords = USER_PTR((void *)(uintptr_t)rq64->ioc_twords,
 	    rq64->ioc_twc);
 	rq->ioc_tbc = rq64->ioc_tbc;
-	rq->ioc_tbytes = __USER_CAP((void *)(uintptr_t)rq64->ioc_tbytes,
+	rq->ioc_tbytes = USER_PTR((void *)(uintptr_t)rq64->ioc_tbytes,
 	    rq64->ioc_tbc);
 	rq->ioc_rpbufsz = rq64->ioc_rpbufsz;
-	rq->ioc_rpbuf = __USER_CAP((char *)(uintptr_t)rq64->ioc_rpbuf,
+	rq->ioc_rpbuf = USER_PTR((char *)(uintptr_t)rq64->ioc_rpbuf,
 	    rq64->ioc_rpbufsz);
 	memcpy(&rq->ioc_rwc, &rq64->ioc_rwc,
 	    sizeof(*rq) - offsetof(struct smbioc_rq, ioc_rwc));
@@ -526,18 +527,18 @@ smbioc_t2rq64_to_t2rq(struct smbioc_t2rq *t2rq, const void *data)
 	memset(t2rq, 0, sizeof(*t2rq));
 	memcpy(&t2rq->ioc_setup, &t2rq64->ioc_setup, sizeof(t2rq->ioc_setup));
 	t2rq->ioc_setupcnt = t2rq64->ioc_setupcnt;
-	t2rq->ioc_name = __USER_CAP_STR((char *)(uintptr_t)t2rq64->ioc_name);
+	t2rq->ioc_name = USER_PTR_STR((char *)(uintptr_t)t2rq64->ioc_name);
 	t2rq->ioc_tparamcnt = t2rq64->ioc_tparamcnt;
-	t2rq->ioc_tparam = __USER_CAP((void *)(uintptr_t)t2rq64->ioc_tparam,
+	t2rq->ioc_tparam = USER_PTR((void *)(uintptr_t)t2rq64->ioc_tparam,
 	    t2rq64->ioc_tparamcnt);
 	t2rq->ioc_tdatacnt = t2rq64->ioc_tdatacnt;
-	t2rq->ioc_tdata = __USER_CAP((void *)(uintptr_t)t2rq64->ioc_tdata,
+	t2rq->ioc_tdata = USER_PTR((void *)(uintptr_t)t2rq64->ioc_tdata,
 	    t2rq64->ioc_tdatacnt);
 	t2rq->ioc_rparamcnt = t2rq64->ioc_rparamcnt;
-	t2rq->ioc_rparam = __USER_CAP((void *)(uintptr_t)t2rq64->ioc_rparam,
+	t2rq->ioc_rparam = USER_PTR((void *)(uintptr_t)t2rq64->ioc_rparam,
 	    t2rq64->ioc_rparamcnt);
 	t2rq->ioc_rdatacnt = t2rq64->ioc_rdatacnt;
-	t2rq->ioc_rdata = __USER_CAP((void *)(uintptr_t)t2rq64->ioc_rdata,
+	t2rq->ioc_rdata = USER_PTR((void *)(uintptr_t)t2rq64->ioc_rdata,
 	    t2rq64->ioc_rdatacnt);
 }
 
@@ -577,7 +578,7 @@ smbioc_rw64_to_rw(struct smbioc_rw *rw, const void *data)
 	rw64 = data;
 	memset(rw, 0, sizeof(*rw));
 	rw->ioc_fh = rw64->ioc_fh;
-	rw->ioc_base = __USER_CAP((char *)(uintptr_t)rw64->ioc_base,
+	rw->ioc_base = USER_PTR((char *)(uintptr_t)rw64->ioc_base,
 	    rw64->ioc_cnt);
 	rw->ioc_offset = rw64->ioc_offset;
 	rw->ioc_cnt = rw64->ioc_cnt;

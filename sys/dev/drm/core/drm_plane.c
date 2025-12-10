@@ -505,7 +505,7 @@ int drm_mode_getplane_res(struct drm_device *dev, void *data,
 		plane_resp64 = (struct drm_mode_get_plane_res64 *)data;
 		plane_resp = &local_plane_resp;
 		CP(*plane_resp64, *plane_resp, count_planes);
-		plane_resp->plane_id_ptr = (uintcap_t)__USER_CAP(
+		plane_resp->plane_id_ptr = (uintcap_t)USER_PTR(
 		    plane_resp64->plane_id_ptr,
 		    plane_resp64->count_planes * sizeof(uint32_t));
 	}
@@ -576,7 +576,7 @@ int drm_mode_getplane(struct drm_device *dev, void *data,
 
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
-		plane_resp->format_type_ptr = (uintcap_t)__USER_CAP(
+		plane_resp->format_type_ptr = (uintcap_t)USER_PTR(
 		    plane_resp64->format_type_ptr,
 		    plane->format_count * sizeof(uint32_t));
 	}

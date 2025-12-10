@@ -109,6 +109,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/abi_compat.h>
 #include <sys/capsicum.h>
 #include <sys/fcntl.h>
 #include <sys/limits.h>
@@ -3742,7 +3743,7 @@ sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 #if __has_feature(capabilities)
 /* Version of sooptcopyin that preserves tags. */
 int
-sooptcopyincap(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
+sooptcopyinptr(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 {
 	size_t	valsize;
 
@@ -3752,7 +3753,7 @@ sooptcopyincap(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 		sopt->sopt_valsize = valsize = len;
 
 	if (sopt->sopt_td != NULL)
-		return (copyincap(sopt->sopt_val, buf, valsize));
+		return (copyinptr(sopt->sopt_val, buf, valsize));
 
 	bcopy((__cheri_fromcap void *)sopt->sopt_val, buf, valsize);
 	return (0);
@@ -3935,11 +3936,11 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
-				extmac.m_string = __USER_CAP(tmpmac.m_string,
+				extmac.m_string = USER_PTR(tmpmac.m_string,
 				    tmpmac.m_buflen);
 			} else
 #endif
-				error = sooptcopyincap(sopt, &extmac,
+				error = sooptcopyinptr(sopt, &extmac,
 				    sizeof extmac, sizeof extmac);
 			if (error)
 				goto bad;
@@ -4215,11 +4216,11 @@ integer:
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
-				extmac.m_string = __USER_CAP(tmpmac.m_string,
+				extmac.m_string = USER_PTR(tmpmac.m_string,
 				    tmpmac.m_buflen);
 			} else
 #endif
-				error = sooptcopyincap(sopt, &extmac,
+				error = sooptcopyinptr(sopt, &extmac,
 				    sizeof(extmac), sizeof(extmac));
 			if (error)
 				goto bad;
@@ -4246,11 +4247,11 @@ integer:
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
-				extmac.m_string = __USER_CAP(tmpmac.m_string,
+				extmac.m_string = USER_PTR(tmpmac.m_string,
 				    tmpmac.m_buflen);
 			} else
 #endif
-				error = sooptcopyincap(sopt, &extmac,
+				error = sooptcopyinptr(sopt, &extmac,
 				    sizeof(extmac), sizeof(extmac));
 			if (error)
 				goto bad;

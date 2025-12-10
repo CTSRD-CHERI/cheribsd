@@ -375,7 +375,7 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 				    auio->uio_iov[i + 1].iov_base, opt->value,
 				    optlen);
 			} else {
-				error = copyincap(auio->uio_iov[i + 1].iov_base,
+				error = copyinptr(auio->uio_iov[i + 1].iov_base,
 				    opt->value, optlen);
 				if (error)
 					goto bad;

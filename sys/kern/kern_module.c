@@ -542,7 +542,7 @@ freebsd32_modstat(struct thread *td, struct freebsd32_modstat_args *uap)
 	MOD_SUNLOCK;
 	stat32 = uap->stat;
 
-	if (fueword32(__USER_CAP_OBJ(&stat32->version), &version) != 0)
+	if (fueword32(USER_PTR_OBJ(&stat32->version), &version) != 0)
 		return (EFAULT);
 	is_v1v2 = (version == sizeof(struct module_stat_v1) ||
 	    version == sizeof(struct module_stat32_v2));

@@ -1380,7 +1380,7 @@ vm_cheri_revoke_publish_epochs(
 	    &info_page->pub.epochs;
 	int res __diagused;
 
-	res = copyoutcap(ip, target, sizeof(*target));
+	res = copyoutptr(ip, target, sizeof(*target));
 	KASSERT(res == 0, ("%s: bad copyout %d\n", __func__, res));
 }
 

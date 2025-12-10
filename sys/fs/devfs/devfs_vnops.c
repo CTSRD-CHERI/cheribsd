@@ -39,6 +39,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/abi_compat.h>
 #include <sys/conf.h>
 #include <sys/dirent.h>
 #include <sys/eventhandler.h>
@@ -903,12 +904,12 @@ fiodgname_buf_get_ptr(void *fgnp, u_long com)
 		return (fgnup->fgn.buf);
 #ifdef COMPAT_FREEBSD32
 	case FIODGNAME_32:
-		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn32.buf,
+		return (USER_PTR((void *)(uintptr_t)fgnup->fgn32.buf,
 		    fgnup->fgn32.len));
 #endif
 #ifdef COMPAT_FREEBSD64
 	case FIODGNAME_64:
-		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn64.buf,
+		return (USER_PTR((void *)(uintptr_t)fgnup->fgn64.buf,
 		    fgnup->fgn64.len));
 #endif
 	default:

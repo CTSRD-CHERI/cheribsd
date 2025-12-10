@@ -931,7 +931,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		break;
 	case PT_GETREGSET:
 	case PT_SETREGSET:
-		error = copyincap(uap->addr, &r.vec, sizeof(r.vec));
+		error = copyinptr(uap->addr, &r.vec, sizeof(r.vec));
 		break;
 	case PT_SETREGS:
 		error = copyin(uap->addr, &r.reg, sizeof(r.reg));
@@ -954,10 +954,10 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 			error = copyin(uap->addr, &r.ptevents, uap->data);
 		break;
 	case PT_IO:
-		error = copyincap(uap->addr, &r.piod, sizeof(r.piod));
+		error = copyinptr(uap->addr, &r.piod, sizeof(r.piod));
 		break;
 	case PT_VM_ENTRY:
-		error = copyincap(uap->addr, &r.pve, sizeof(r.pve));
+		error = copyinptr(uap->addr, &r.pve, sizeof(r.pve));
 		break;
 	case PT_COREDUMP:
 		if (uap->data != sizeof(r.pc))
@@ -998,7 +998,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	case PT_VM_ENTRY:
 		/*
 		 * Only copy out updated fields prior to pve_path to
-		 * avoid the use of copyoutcap.
+		 * avoid the use of copyoutptr.
 		 */
 		error = copyout(&r.pve, uap->addr,
 		    offsetof(struct ptrace_vm_entry, pve_path));
@@ -1006,7 +1006,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	case PT_IO:
 		/*
 		 * Only copy out the updated piod_len to avoid the use
-		 * of copyoutcap.
+		 * of copyoutptr.
 		 */
 		error = copyout(&r.piod.piod_len, uap->addr +
 		    offsetof(struct ptrace_io_desc, piod_len),

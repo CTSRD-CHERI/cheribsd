@@ -53,14 +53,14 @@
 int
 freebsd64_read(struct thread *td, struct freebsd64_read_args *uap)
 {
-	return (user_read(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	return (user_read(td, uap->fd, USER_PTR(uap->buf, uap->nbyte),
 	    uap->nbyte));
 }
 
 int
 freebsd64_pread(struct thread *td, struct freebsd64_pread_args *uap)
 {
-	return (kern_pread(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	return (kern_pread(td, uap->fd, USER_PTR(uap->buf, uap->nbyte),
 	    uap->nbyte, uap->offset));
 }
 
@@ -69,7 +69,7 @@ int
 freebsd6_freebsd64_pread(struct thread *td,
     struct freebsd6_freebsd64_pread_args *uap)
 {
-	return (kern_pread(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	return (kern_pread(td, uap->fd, USER_PTR(uap->buf, uap->nbyte),
 	    uap->nbyte, uap->offset));
 }
 #endif
@@ -77,28 +77,28 @@ freebsd6_freebsd64_pread(struct thread *td,
 int
 freebsd64_readv(struct thread *td, struct freebsd64_readv_args *uap)
 {
-	return (user_readv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	return (user_readv(td, uap->fd, USER_PTR_ARRAY(uap->iovp,
 	    uap->iovcnt), uap->iovcnt, freebsd64_copyinuio));
 }
 
 int
 freebsd64_preadv(struct thread *td, struct freebsd64_preadv_args *uap)
 {
-	return (user_preadv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	return (user_preadv(td, uap->fd, USER_PTR_ARRAY(uap->iovp,
 	    uap->iovcnt), uap->iovcnt, uap->offset, freebsd64_copyinuio));
 }
 
 int
 freebsd64_write(struct thread *td, struct freebsd64_write_args *uap)
 {
-	return (kern_write(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	return (kern_write(td, uap->fd, USER_PTR(uap->buf, uap->nbyte),
 	    uap->nbyte));
 }
 
 int
 freebsd64_pwrite(struct thread *td, struct freebsd64_pwrite_args *uap)
 {
-	return (kern_pwrite(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	return (kern_pwrite(td, uap->fd, USER_PTR(uap->buf, uap->nbyte),
 	    uap->nbyte, uap->offset));
 }
 
@@ -107,7 +107,7 @@ int
 freebsd6_freebsd64_pwrite(struct thread *td,
     struct freebsd6_freebsd64_pwrite_args *uap)
 {
-	return (kern_pwrite(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	return (kern_pwrite(td, uap->fd, USER_PTR(uap->buf, uap->nbyte),
 	    uap->nbyte, uap->offset));
 }
 #endif
@@ -115,7 +115,7 @@ freebsd6_freebsd64_pwrite(struct thread *td,
 int
 freebsd64_writev(struct thread *td, struct freebsd64_writev_args *uap)
 {
-	return (user_writev(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	return (user_writev(td, uap->fd, USER_PTR_ARRAY(uap->iovp,
 	    uap->iovcnt), uap->iovcnt, freebsd64_copyinuio));
 }
 
@@ -123,7 +123,7 @@ int
 freebsd64_pwritev(struct thread *td, struct freebsd64_pwritev_args *uap)
 {
 	return (user_pwritev(td, uap->fd,
-	    (struct iovec *__capability)__USER_CAP_ARRAY(uap->iovp,
+	    (struct iovec *__capability)USER_PTR_ARRAY(uap->iovp,
 		uap->iovcnt), uap->iovcnt, uap->offset, freebsd64_copyinuio));
 }
 
@@ -137,7 +137,7 @@ freebsd64_ioctl(struct thread *td, struct freebsd64_ioctl_args *uap)
 	if (com & IOC_VOID)
 		udata = (void * __capability)(intcap_t)uap->data;
 	else
-		udata = __USER_CAP(uap->data, IOCPARM_LEN(com));
+		udata = USER_PTR(uap->data, IOCPARM_LEN(com));
 
 	return (user_ioctl(td, uap->fd, com, udata, &uap->data, 0));
 }
@@ -146,8 +146,8 @@ int
 freebsd64_fspacectl(struct thread *td, struct freebsd64_fspacectl_args *uap)
 {
 	return (user_fspacectl(td, uap->fd, uap->cmd,
-	    (const void * __capability)__USER_CAP_OBJ(uap->rqsr), uap->flags,
-	    __USER_CAP_OBJ(uap->rmsr)));
+	    (const void * __capability)USER_PTR_OBJ(uap->rqsr), uap->flags,
+	    USER_PTR_OBJ(uap->rmsr)));
 }
 
 int
@@ -158,7 +158,7 @@ freebsd64___specialfd(struct thread *td,
 
 	switch(args->type) {
 	case SPECIALFD_EVENTFD:
-		req = __USER_CAP(args->req, sizeof(struct specialfd_eventfd));
+		req = USER_PTR(args->req, sizeof(struct specialfd_eventfd));
 		break;
 	default:
 		return (EINVAL);
@@ -170,31 +170,31 @@ freebsd64___specialfd(struct thread *td,
 int
 freebsd64_pselect(struct thread *td, struct freebsd64_pselect_args *uap)
 {
-	return (user_pselect(td, uap->nd, __USER_CAP_UNBOUND(uap->in),
-	    __USER_CAP_UNBOUND(uap->ou), __USER_CAP_UNBOUND(uap->ex),
-	    __USER_CAP_OBJ(uap->ts), __USER_CAP_OBJ(uap->sm)));
+	return (user_pselect(td, uap->nd, USER_PTR_UNBOUND(uap->in),
+	    USER_PTR_UNBOUND(uap->ou), USER_PTR_UNBOUND(uap->ex),
+	    USER_PTR_OBJ(uap->ts), USER_PTR_OBJ(uap->sm)));
 }
 
 int
 freebsd64_select(struct thread *td, struct freebsd64_select_args *uap)
 {
-	return (user_select(td, uap->nd, __USER_CAP_UNBOUND(uap->in),
-	    __USER_CAP_UNBOUND(uap->ou), __USER_CAP_UNBOUND(uap->ex),
-	    __USER_CAP_OBJ(uap->tv)));
+	return (user_select(td, uap->nd, USER_PTR_UNBOUND(uap->in),
+	    USER_PTR_UNBOUND(uap->ou), USER_PTR_UNBOUND(uap->ex),
+	    USER_PTR_OBJ(uap->tv)));
 }
 
 int
 freebsd64_poll(struct thread *td, struct freebsd64_poll_args *uap)
 {
-	return (user_poll(td, __USER_CAP_ARRAY(uap->fds, uap->nfds),
+	return (user_poll(td, USER_PTR_ARRAY(uap->fds, uap->nfds),
 	    uap->nfds, uap->timeout));
 }
 
 int
 freebsd64_ppoll(struct thread *td, struct freebsd64_ppoll_args *uap)
 {
-	return (user_ppoll(td, __USER_CAP_ARRAY(uap->fds, uap->nfds),
-	    uap->nfds, __USER_CAP_OBJ(uap->ts), __USER_CAP_OBJ(uap->set)));
+	return (user_ppoll(td, USER_PTR_ARRAY(uap->fds, uap->nfds),
+	    uap->nfds, USER_PTR_OBJ(uap->ts), USER_PTR_OBJ(uap->set)));
 }
 
 int
