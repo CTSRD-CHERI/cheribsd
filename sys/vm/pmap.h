@@ -142,6 +142,9 @@ enum pmap_caploadgen_res pmap_caploadgen_update(pmap_t, vm_offset_t,
 void		 pmap_caploadgen_next(pmap_t pmap);
 void		 pmap_update_clg(pmap_t pmap);
 void		 pmap_assert_consistent_clg(pmap_t, vm_offset_t);
+#ifdef CHERI_CAPREVOKE_KERNEL
+void		 pmap_kernel_caploadgen_next(void);
+#endif
 #endif
 void		 pmap_clear_modify(vm_page_t m);
 void		 pmap_copy(pmap_t, pmap_t, vm_offset_t, vm_size_t, vm_offset_t);
