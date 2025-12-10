@@ -31,6 +31,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/stddef.h>
 #include <cheri_init_globals.h>
 
 /* Invoked from locore. */

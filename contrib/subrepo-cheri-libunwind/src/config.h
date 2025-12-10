@@ -14,6 +14,7 @@
 #define LIBUNWIND_CONFIG_H
 
 #include <assert.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>

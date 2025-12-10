@@ -34,6 +34,8 @@
 #ifndef __SYS_CHERI_REVOKE_H__
 #define	__SYS_CHERI_REVOKE_H__
 
+#include <sys/stddef.h>
+
 #if __has_feature(capabilities)
 #include <cheri/cherireg.h> /* For CHERI_OTYPE_BITS */
 #endif

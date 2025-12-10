@@ -6,6 +6,7 @@
 #ifndef AUTOOPTS_PROTO_H_GUARD
 #define AUTOOPTS_PROTO_H_GUARD 1
 
+#include <stddef.h>
 
 /*
  * Static declarations from alias.c

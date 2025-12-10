@@ -40,6 +40,9 @@
 #include <libsys.h>
 
 #include <stdbool.h>
+#ifdef CHERI_LIB_C18N
+#include <stddef.h>
+#endif
 
 extern char **environ;
 

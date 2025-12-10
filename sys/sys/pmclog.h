@@ -34,6 +34,7 @@
 #define	_SYS_PMCLOG_H_
 
 #include <sys/pmc.h>
+#include <sys/stddef.h>
 
 enum pmclog_type {
 	/* V1 ABI */

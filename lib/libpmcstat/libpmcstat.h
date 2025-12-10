@@ -34,6 +34,7 @@
 #include <sys/_cpuset.h>
 #include <sys/queue.h>
 
+#include <stddef.h>
 #include <stdio.h>
 #include <gelf.h>
 
