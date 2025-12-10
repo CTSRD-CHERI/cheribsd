@@ -501,7 +501,17 @@ mp_virtdone:
 	 */
 	adrp	PTR(18), bootpcpu
 	ldr	PTR(18), [PTR(18), :lo12:bootpcpu]
+#ifdef CHERI_CAPREVOKE_KERNEL
+	adrp	c15, kmem_revoke_root_page
+	add	c15, c15, :lo12:kmem_revoke_root_page
+	ldr	x14, [c18, #PC_CPUID]
+	add	c15, c15, x14
+	ldr	x14, =KMEM_REVOKE_PCPU_ROOT_SIZE
+	scbndse	c15, c15, x14
+	msr	ctpidr_el1, c15
+#else
 	msr	PTRN(tpidr_el1), PTR(18)
+#endif
 
 	b	init_secondary
 LEND(mpentry_common)
@@ -1316,6 +1326,21 @@ initstack:
 	.space	BOOT_STACK_SIZE
 initstack_end:
 	.size	initstack, initstack_end - initstack
+
+#ifdef CHERI_CAPREVOKE_KERNEL
+	.align	PAGE_SHIFT
+	.globl	kmem_revoke_root_page
+	.type	kmem_revoke_root_page,#object
+	/*
+	 * Reserve space for the revocation root page.
+	 * XXX-AM: This is a quick and dirty solution, there is nothing
+	 * requiring this to be pre-allocated.
+	 */
+kmem_revoke_root_page:
+	.space	12 * PAGE_SIZE
+kmem_revoke_root_page_end:
+	.size	kmem_revoke_root_page, kmem_revoke_root_page_end - kmem_revoke_root_page
+#endif
 
 	.section .init_pagetable, "aw", %nobits
 	.align PAGE_SHIFT

@@ -268,7 +268,12 @@ efi_arch_leave(void)
 	 */
 	__asm __volatile(
 #ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CHERI_CAPREVOKE_KERNEL
 	    "mrs c18, ctpidr_el1\n"
+	    "ldr c18, [c18]\n"
+#else
+	    "mrs c18, ctpidr_el1\n"
+#endif
 #else
 	    "mrs x18, tpidr_el1	\n"
 #endif

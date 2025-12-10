@@ -914,6 +914,32 @@ memory_mapping_mode(vm_paddr_t pa)
 	return (VM_MEMATTR_DEVICE);
 }
 
+/*
+ * Set the pcpu pointer with a backup in tpidr_el1 to be
+ * loaded when entering the kernel from userland.
+ */
+static void
+init_cpu_pcpup(struct pcpu *pcpup)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CHERI_CAPREVOKE_KERNEL
+	kmem_revoke_root_page[pcpup->pc_cpuid].pcpup = pcpup;
+	__asm __volatile(
+		"mov c18, %0 \n"
+		"msr ctpidr_el1, %1"
+		:: "C"(pcpup), "C"(&kmem_revoke_root_page[pcpup->pc_cpuid]));
+#else /* ! CHERI_CAPREVOKE_MACHDEP */
+	__asm __volatile(
+		"mov c18, %0 \n"
+		"msr ctpidr_el1, %0" :: "C"(pcpup));
+#endif /* ! CHERI_CAPREVOKE_MACHDEP */
+#else
+	__asm __volatile(
+		"mov x18, %0 \n"
+		"msr tpidr_el1, %0" :: "r"(pcpup));
+#endif
+}
+
 void
 initarm(struct arm64_bootparams *abp)
 {

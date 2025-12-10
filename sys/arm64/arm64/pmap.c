@@ -6909,31 +6909,38 @@ pmap_krevoke_bootstrap_allocate_l2(vm_paddr_t plow, vm_paddr_t phigh,
 }
 
 /*
+ * This initializes the revocation shadow map between KERNBASE and
+ * kernel_vm_end.
+ * This includes the entirety of the initial kernel mapping, including:
+ * - base kernel map
+ * - early devmap reserved pages
+ * - dpcpu area
+ * - msgbuf pages
+ * - BIOS/ACPI mappings
+ *
+ * However this currently omits the direct map.
+ *
+ * This also replaces the kmem_revoke_root_page pointer in ctpidr_el1 since
+ * we couldn't do that before the direct map and pmap are bootstrapped.
+ *
  * XXX-AM: I wonder whether this can be unified with pmap_bootstrap_san(),
  * as they are both initializing a shadow bitmap, just in different places.
- *
- * XXX-AM: By using virtual_avail and virtual_end we cut out some of the
- * memory regions from the shadow map:
- * - the base kernel mapping
- * - the early devmap reserved pages
- * - the dynamic per-cpu ares
- * - msgbuf
- * - BIOS/ACPI mappings
- * - the direct map
- *
- * Presumably we want to have the option of revoking capabilities
- * to kernel globals and such. Similarly we need to eventually support
- * the direct map. We should be able to add these at a later point.
  */
 void
 pmap_krevoke_bootstrap(void)
 {
+	void *pcpu_root;
 	pd_entry_t *l0, *l1;
 	vm_paddr_t l1_pa, l2_pa;
 	vm_paddr_t plow, phigh;
 	vm_offset_t kva;
 	vm_offset_t shadow_va;
 	int i;
+
+	__asm __volatile("mrs %0, ctpidr_el1" : "=C"(pcpu_root) :);
+	pcpu_root = (void *)PHYS_TO_DMAP_LEN(vtophys(pcpu_root),
+	    sizeof(struct kmem_revoke_pcpu_root));
+	__asm __volatile("msr ctpidr_el1, %0" :: "C"(pcpu_root));
 
 	/*
 	 * Rebuild physmap, we may have excluded more regions from
