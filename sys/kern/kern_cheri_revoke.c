@@ -359,6 +359,7 @@ kern_cheri_revoke(struct thread *td, int flags,
 #else
 	struct cheri_revoke_stats *crstp = NULL;
 #endif
+	struct proc *proc;
 	struct vmspace *vm;
 	vm_map_t vmm;
 	struct vm_cheri_revoke_cookie vmcrc;
@@ -613,6 +614,7 @@ fast_out:
 				return (ERESTART);
 			}
 		}
+		stop_vmspace_proc(td->td_proc);
 
 		/*
 		 * Drop the process lock *then* iterate the threads in this
@@ -635,20 +637,27 @@ fast_out:
 		 * This also risks the use of ptrace() to expose to userspace
 		 * the trap frame of a stalled thread that has not yet scanned
 		 * itself.  Yick.
+		 *
+		 * XXX-BD: is it safe to walk the proc list and run the
+		 * revokers or do we need to PHOLD them first?
 		 */
 
 		_PHOLD(td->td_proc);
 		PROC_UNLOCK(td->td_proc);
 
 		/* Per-thread kernel hoarders */
-		FOREACH_THREAD_IN_PROC (td->td_proc, ptd) {
-			cheri_revoke_td_frame(ptd, &vmcrc);
-			sig_thread_cheri_revoke(ptd, &vmcrc);
+		LIST_FOREACH(proc, &td->td_proc->p_vmspace->vm_proclist,
+		    p_vm_proclist) {
+			FOREACH_THREAD_IN_PROC (proc, ptd) {
+				cheri_revoke_td_frame(ptd, &vmcrc);
+				sig_thread_cheri_revoke(ptd, &vmcrc);
+			}
 		}
 	}
 
 	/* Per-process kernel hoarders */
-	cheri_revoke_hoarders(td->td_proc, &vmcrc);
+	LIST_FOREACH(proc, &td->td_proc->p_vmspace->vm_proclist, p_vm_proclist)
+		cheri_revoke_hoarders(proc, &vmcrc);
 
 	KASSERT(myst == CHERI_REVOKE_ST_INITING ||
 	    myst == CHERI_REVOKE_ST_CLOSING,
@@ -686,6 +695,7 @@ fast_out:
 
 	PROC_LOCK(td->td_proc);
 	_PRELE(td->td_proc);
+	resume_vmspace_proc(td->td_proc);
 	if ((td->td_proc->p_flag & P_HADTHREADS) != 0) {
 		thread_single_end(td->td_proc, SINGLE_BOUNDARY);
 	}
