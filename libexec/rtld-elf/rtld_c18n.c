@@ -1629,7 +1629,7 @@ sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 }
 
 struct tramp_header *
-tramp_reflect(const void *data)
+tramp_get_header(const void *data)
 {
 	struct tramp_header *ret;
 	struct tramp_pg *page;
@@ -1645,7 +1645,7 @@ tramp_reflect(const void *data)
 	data = (const char *)data - 1;
 #endif
 	/*
-	 * INVARIANT: The pointer being reflected never points to before the
+	 * INVARIANT: The pointer being inspected never points to before the
 	 * function pointer entry point of the trampoline.
 	 *
 	 * When the fast path is enabled, the function pointer entry point is
@@ -1678,7 +1678,8 @@ tramp_reflect(const void *data)
 			return (ret);
 		else {
 			rtld_fdprintf(STDERR_FILENO,
-			    "c18n: Cannot reflect trampoline %#p\n", ret);
+			    "c18n: Cannot get header for trampoline %#p\n",
+			    ret);
 			break;
 		}
 	}
@@ -1686,21 +1687,32 @@ tramp_reflect(const void *data)
 	return (NULL);
 }
 
-ptraddr_t _rtld_tramp_reflect(const void *);
+ptraddr_t dl_c18n_get_trampoline_target(const void *);
 
 ptraddr_t
-_rtld_tramp_reflect(const void *addr)
+dl_c18n_get_trampoline_target(const void *addr)
 {
 	struct tramp_header *header;
 
 	if (!C18N_ENABLED)
 		return (0);
 
-	header = tramp_reflect(addr);
+	header = tramp_get_header(addr);
 	if (header == NULL)
 		return (0);
 
 	return ((ptraddr_t)header->target);
+}
+
+/*
+ * XXX: This is for compatibility with libc in version 25.03.
+ */
+ptraddr_t _rtld_tramp_reflect(const void *);
+
+ptraddr_t
+_rtld_tramp_reflect(const void *addr)
+{
+	return (dl_c18n_get_trampoline_target(addr));
 }
 
 /*
@@ -2264,7 +2276,7 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	else
 		sigfunc = act->sa_handler;
 
-	header = tramp_reflect(sigfunc);
+	header = tramp_get_header(sigfunc);
 
 	/*
 	 * The signal handler must be wrapped by a trampoline if function
