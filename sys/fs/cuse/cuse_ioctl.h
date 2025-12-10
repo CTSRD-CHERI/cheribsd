@@ -47,6 +47,14 @@ struct cuse_data_chunk {
 	unsigned long length;
 };
 
+#ifdef COMPAT_FREEBSD64
+struct cuse_data_chunk64 {
+	uint64_t local_ptr;
+	uint64_t peer_ptr;
+	unsigned long length;
+};
+#endif
+
 struct cuse_alloc_info {
 	unsigned long page_count;
 	unsigned long alloc_nr;
@@ -61,6 +69,17 @@ struct cuse_command {
 	unsigned long command;		/* see CUSE_CMD_XXX */
 };
 
+#ifdef COMPAT_FREEBSD64
+struct cuse_command64 {
+	uint64_t dev;
+	unsigned long fflags;
+	uint64_t per_file_handle;
+	uint64_t data_pointer;
+	unsigned long argument;
+	unsigned long command;		/* see CUSE_CMD_XXX */
+};
+#endif
+
 struct cuse_create_dev {
 	struct cuse_dev * __kerncap dev;
 	uid_t	user_id;
@@ -69,7 +88,25 @@ struct cuse_create_dev {
 	char	devname[80];		/* /dev/xxxxx */
 };
 
+#ifdef COMPAT_FREEBSD64
+struct cuse_create_dev64 {
+	uint64_t dev;
+	uid_t	user_id;
+	gid_t	group_id;
+	int	permissions;
+	char	devname[80];		/* /dev/xxxxx */
+};
+#endif
+
 /* Definition of internal IOCTLs for /dev/cuse */
+
+#ifdef COMPAT_FREEBSD64
+#define	CUSE_IOCTL_GET_COMMAND64	_IOR('C', 0, struct cuse_command64)
+#define	CUSE_IOCTL_WRITE_DATA64		_IOW('C', 1, struct cuse_data_chunk64)
+#define	CUSE_IOCTL_READ_DATA64		_IOW('C', 2, struct cuse_data_chunk64)
+#define	CUSE_IOCTL_CREATE_DEV64		_IOW('C', 8, struct cuse_create_dev64)
+#define	CUSE_IOCTL_SET_PFH64		_IOW('C', 7, uint64_t)
+#endif
 
 #define	CUSE_IOCTL_GET_COMMAND		_IOR('C', 0, struct cuse_command)
 #define	CUSE_IOCTL_WRITE_DATA		_IOW('C', 1, struct cuse_data_chunk)
