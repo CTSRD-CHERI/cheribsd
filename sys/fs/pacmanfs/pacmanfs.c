@@ -20,6 +20,8 @@
 
 #define PACMANFS_MAGIC          0x73697269
 
+#undef i_private
+
 #include "pacmanfs.h"
 #include "pacmanfs_on_disk.h"
 
