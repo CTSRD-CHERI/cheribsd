@@ -7078,6 +7078,20 @@ pmap_krevoke_shadow_enter(vm_offset_t va)
 	KASSERT((pmap_load(l2) & ATTR_DESCR_MASK) == L2_BLOCK,
 	    ("Unexpected shadow bitmap L2 PTE entry: %lx", pmap_load(l2)));
 }
+
+/*
+ * This deviates from the user pmap_caploadgen_next because
+ * it is intended to run in a critical section.
+ * As a result we can't hold the pmap lock, but we use the
+ * barrier phase synchronisation to ensure exclusive access
+ * to the pmap anyway.
+ */
+void
+pmap_kernel_caploadgen_next(void)
+{
+	pmap_s1_invalidate_all(kernel_pmap);
+	kernel_pmap->flags.uclg++;
+}
 #endif /* CHERI_CAPREVOKE_KERNEL*/
 #endif /* CHERI_CAPREVOKE */
 #endif /* __has_feature(capabilities) */
