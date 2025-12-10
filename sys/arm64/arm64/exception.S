@@ -29,6 +29,8 @@
 
 #include <machine/asm.h>
 #include <machine/armreg.h>
+#include <machine/param.h>
+#include <machine/vmparam.h>
 
 #include "assym.inc"
 #include <sys/intr.h>
@@ -254,6 +256,35 @@
 2:
 .endm
 
+#ifdef CHERI_CAPREVOKE_KERNEL
+/*
+ * Handle kernel CLG faults.
+ * Note that kernel CLG faults are special. We can't load from anywhere
+ * but the direct map to perform the fault scan.
+ *
+ * XXX-AM: This should probably be done in assembly to prevent stray loads from
+ * occurring.
+ */
+ENTRY(do_kmem_fault_revoke)
+	/* Grab the pcpu revoke root */
+	mrs	c19, ctpidr_el1
+	ldr	c20, [c19, #KMEM_REVOKE_PCPU_ROOT_DMAP]
+	/* PTE walk to the page */
+
+	/*
+	 * Page scan loop. Superpage demotion is complicated here and
+	 * we need more support for this. We may have to pay the price
+	 * to scan the whole superpage.
+	 * XXX-AM: I think this may be a problem for the large L2 mappings
+	 * used the initial kernel image.
+	 */
+
+	/* Update PTE */
+
+	ret
+END(do_kmem_fault_revoke)
+#endif
+
 #ifdef KMSAN
 /*
  * The KMSAN runtime relies on a TLS block to track initialization and origin
@@ -278,11 +309,43 @@
 
 ENTRY(handle_el1h_sync)
 	save_registers 1
+#ifdef CHERI_CAPREVOKE_KERNEL
+	/*
+	 * Note this must occur before any loads and we are
+	 * not allowed to load any capabilities from normal
+	 * memory.
+	 * XXX-AM: Data loads should be allowed though, so
+	 * we are not completely blind and useless.
+	 * Capability-wide data loads are not permitted,
+	 * because the arch may decide to trap.
+	 */
+	mrs	x13, far_el1
+	ldr	x14, =VM_MAX_USER_ADDRESS
+	cmp	x13, x14
+	b.le	1f
+	mrs	x13, esr_el1
+	ldr	x14, =ESR_ELx_EC_MASK
+	and	x13, x13, x14
+	lsr	x13, x13, #ESR_ELx_EC_SHIFT
+	ldr	x14, =EXCP_DATA_ABORT
+	cmp	x13, x14
+	b.ne	1f
+	mrs	x13, esr_el1
+	ldr	x14, =ISS_DATA_DFSC_MASK
+	and	x13, x13, x14
+	ldr	x14, =ISS_DATA_DFSC_LC_SC
+	cmp	x13, x14
+	b.ne	1f
+	bl do_kmem_fault_revoke
+	b	2f
+1:
+#endif
 	KMSAN_ENTER
 	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
 	mov	PTR(1), PTRN(sp)
 	bl	do_el1h_sync
 	KMSAN_LEAVE
+2:
 	restore_registers 1
 	ERET
 END(handle_el1h_sync)
