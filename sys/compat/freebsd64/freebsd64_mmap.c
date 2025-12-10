@@ -51,22 +51,6 @@
 #include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 
-#if 0
-int
-freebsd64_sbrk(struct thread *td, struct freebsd64_sbrk_arg *uap)
-{
-	/* Never implemented, real implementation on sys_break */
-	return (EOPNOTSUPP);
-}
-
-int
-freebsd64_sstk(struct thread *td, struct freebsd64_sstk_args *uap)
-{
-	/* Never implemented */
-	return (EOPNOTSUPP);
-}
-#endif
-
 int
 freebsd64_break(struct thread *td, struct freebsd64_break_args *uap)
 {
