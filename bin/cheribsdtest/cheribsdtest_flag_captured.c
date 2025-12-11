@@ -115,6 +115,6 @@ CHERIBSDTEST(flag_captured_empty,
 {
 	char buf[] = "";
 
-	call_flag_captured(cheri_setbounds(buf, 0), CORRECT_KEY);
+	call_flag_captured(cheri_bounds_set(buf, 0), CORRECT_KEY);
 }
 #endif

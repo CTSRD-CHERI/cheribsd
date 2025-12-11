@@ -73,7 +73,7 @@ test_bounds_precise(void * __capability c, size_t expected_len)
 #ifndef __CHERI_PURE_CAPABILITY__
 	size_t len;
 
-	len = cheri_getlen(c);
+	len = cheri_length_get(c);
 
 	/*
 	 * In hybrid mode we do not set bounds on capabilities created

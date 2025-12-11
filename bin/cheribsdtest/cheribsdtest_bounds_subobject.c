@@ -273,8 +273,8 @@ CHERIBSDTEST(bounds_subobject_union_two_chararrays,
 
 	chararray16p = &twoarrays.chararray16;
 	chararray32p = &twoarrays.chararray32;
-	CHERIBSDTEST_VERIFY(cheri_getlength(chararray16p) == sizeof(twoarrays));
-	CHERIBSDTEST_VERIFY(cheri_getlength(chararray32p) == sizeof(twoarrays));
+	CHERIBSDTEST_VERIFY(cheri_length_get(chararray16p) == sizeof(twoarrays));
+	CHERIBSDTEST_VERIFY(cheri_length_get(chararray32p) == sizeof(twoarrays));
 	cheribsdtest_success();
 }
 
@@ -342,7 +342,7 @@ CHERIBSDTEST(bounds_subobject_struct_exempt_char,
 	 */
 	cp = &sec.c;
 	refcp = &sec;
-	CHERIBSDTEST_VERIFY(cheri_getoffset(cp) ==
+	CHERIBSDTEST_VERIFY(cheri_offset_get(cp) ==
 	    offsetof(struct struct_exempt_char, c));
 	cp = (void *)((intptr_t)cp - offsetof(struct struct_exempt_char, c));
 	CHERIBSDTEST_CHECK_EQ_CAP(cp, refcp);
