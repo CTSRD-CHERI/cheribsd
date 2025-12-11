@@ -241,13 +241,13 @@ _cheribsdtest_check_cap_eq(void *__capability a, void *__capability b,
 	CHERIBSDTEST_VERIFY2(accessor(a) == accessor(b),			\
 	    __STRING(accessor) "(%s) (" fmt ") == " __STRING(accessor)		\
 	    "(%s) (" fmt ") failed!", a_str, accessor(a), b_str, accessor(b))
-	CHECK_CAP_ATTR(cheri_getaddress, "0x%lx");
-	CHECK_CAP_ATTR(cheri_gettag, "%d");
-	CHECK_CAP_ATTR(cheri_getoffset, "0x%lx");
-	CHECK_CAP_ATTR(cheri_getlength, "0x%lx");
-	CHECK_CAP_ATTR(cheri_getperm, "0x%lx");
-	CHECK_CAP_ATTR(cheri_gettype, "%ld");
-	CHECK_CAP_ATTR(cheri_getflags, "0x%lx");
+	CHECK_CAP_ATTR(cheri_address_get, "0x%lx");
+	CHECK_CAP_ATTR(cheri_tag_get, "%d");
+	CHECK_CAP_ATTR(cheri_offset_get, "0x%lx");
+	CHECK_CAP_ATTR(cheri_length_get, "0x%lx");
+	CHECK_CAP_ATTR(cheri_perms_get, "0x%x");
+	CHECK_CAP_ATTR(cheri_type_get, "%ld");
+	CHECK_CAP_ATTR(cheri_flags_get, "0x%lx");
 #undef CHECK_CAP_ATTR
 }
 #define CHERIBSDTEST_CHECK_EQ_CAP(a, b)	\
@@ -267,8 +267,8 @@ _cheribsdtest_check_cap_bounds_precise(void *__capability c,
 {
 	size_t len, offset;
 
-	offset = cheri_getoffset(c);
-	len = cheri_getlen(c);
+	offset = cheri_offset_get(c);
+	len = cheri_length_get(c);
 
 	/* Confirm precise lower bound: offset of zero. */
 	CHERIBSDTEST_VERIFY2(offset == 0,

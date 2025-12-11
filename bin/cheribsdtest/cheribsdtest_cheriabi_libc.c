@@ -62,7 +62,7 @@ CHERIBSDTEST(cheriabi_libc_memchr,
 	 * This means the implementation needs to not trust the supplied
 	 * length when doing optimized word-wise reads and compares.
 	 */
-	CHERIBSDTEST_CHECK_EQ_INT(*(char *)memchr(cheri_setbounds(string,
+	CHERIBSDTEST_CHECK_EQ_INT(*(char *)memchr(cheri_bounds_set(string,
 	    sizeof(string) - 1), 'e', sizeof(string)), 'e');
 
 	cheribsdtest_success();

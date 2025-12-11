@@ -86,7 +86,7 @@ CHERIBSDTEST(vm_swap,
     .ct_check_skip = skip_swap_required})
 {
 
-	if (cheri_getdefault() == NULL)
+	if (cheri_ddc_get() == NULL)
 		cheribsdtest_failure_errx("test depends on non-NULL DDC");
 
 	(void)dotest(1);
@@ -100,13 +100,13 @@ caps2(const char *nam, void * __capability p)
 	snprintf(s, sizeof(s),
 	    "%s: b=%zx l=%zx o=%zx t=%d s=%d ty=%zx p=%zx",
 	    nam,
-	    (size_t)cheri_getbase(p),
-	    (size_t)cheri_getlen(p),
-	    (size_t)cheri_getoffset(p),
-	    (int)cheri_gettag(p),
-	    (int)cheri_getsealed(p),
-	    (size_t)cheri_gettype(p),
-	    (size_t)cheri_getperm(p));
+	    (size_t) cheri_base_get(p),
+	    (size_t) cheri_length_get(p),
+	    (size_t) cheri_offset_get(p),
+	    (int) cheri_tag_get(p),
+	    (int) cheri_is_sealed(p),
+	    (size_t) cheri_type_get(p),
+	    (size_t) cheri_perms_get(p));
 
 	return (s);
 }
@@ -115,13 +115,13 @@ static int
 cne2(void * __capability p1, void * __capability p2)
 {
 
-	if (cheri_gettag(p1) != cheri_gettag(p2) ||
-	    cheri_getbase(p1) != cheri_getbase(p2) ||
-	    cheri_getlen(p1) != cheri_getlen(p2) ||
-	    cheri_getoffset(p1) != cheri_getoffset(p2) ||
-	    cheri_getsealed(p1) != cheri_getsealed(p2) ||
-	    cheri_gettype(p1) != cheri_gettype(p2) ||
-	    cheri_getperm(p1) != cheri_getperm(p2))
+	if (cheri_tag_get(p1) != cheri_tag_get(p2) ||
+	    cheri_base_get(p1) != cheri_base_get(p2) ||
+	    cheri_length_get(p1) != cheri_length_get(p2) ||
+	    cheri_offset_get(p1) != cheri_offset_get(p2) ||
+	    cheri_is_sealed(p1) != cheri_is_sealed(p2) ||
+	    cheri_type_get(p1) != cheri_type_get(p2) ||
+	    cheri_perms_get(p1) != cheri_perms_get(p2))
 		return (1);
 
 	return (0);
@@ -270,7 +270,7 @@ dotest(int force_pageout)
 			sealer = cheri_ptr(				\
 			    (void*)(((hash & ~0xFFULL) | j) & 0x007FFFFF),\
 			    ((j << 8) | i | 0x000F0000) & 0x00FFFFFF);	\
-			sealer = cheri_setoffset(sealer, i);		\
+			sealer = cheri_offset_set(sealer, i);		\
 			tmp = cheri_seal(tmp, sealer);			\
 			nsealed++;					\
 		}							\
@@ -337,7 +337,7 @@ dotest(int force_pageout)
 
 		LOOP_INNER;
 
-		if (cheri_gettag(p[i]))
+		if (cheri_tag_get(p[i]))
 			found_tags |= (1ULL << (uint64_t)(j - 1));
 
 		if (CNE(p[i], tmp)) {

@@ -127,10 +127,10 @@ CHERIBSDTEST(illegal_perm_seal,
 	if (sysctlbyname("security.cheri.sealcap", &sealcap, &sealcap_size,
 	    NULL, 0) < 0)
 		cheribsdtest_failure_err("sysctlbyname(security.cheri.sealcap)");
-	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_SEAL);
+	sealcap = cheri_perms_and(sealcap, ~CHERI_PERM_SEAL);
 	sealed = cheri_seal(ip, sealcap);
 	/* cheri_seal() should tag-clear on failure on all architectures. */
-	if (!cheri_gettag(sealed)) {
+	if (!cheri_tag_get(sealed)) {
 #if CHERI_SEAL_VIOLATION_EXCEPTION
 		/*
 		 * For the transition period from trapping to tag-clearing
@@ -183,13 +183,13 @@ CHERIBSDTEST(illegal_perm_unseal,
 	if (sysctlbyname("security.cheri.sealcap", &sealcap, &sealcap_size,
 	    NULL, 0) < 0)
 		cheribsdtest_failure_err("sysctlbyname(security.cheri.sealcap)");
-	if ((cheri_getperm(sealcap) & CHERI_PERM_SEAL) == 0)
+	if ((cheri_perms_get(sealcap) & CHERI_PERM_SEAL) == 0)
 		cheribsdtest_failure_errx("unexpected !seal perm on sealcap");
 	sealed = cheri_seal(ip, sealcap);
-	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_UNSEAL);
+	sealcap = cheri_perms_and(sealcap, ~CHERI_PERM_UNSEAL);
 	unsealed = cheri_unseal(sealed, sealcap);
 	/* cheri_unseal() should tag-clear on failure on all architectures. */
-	if (!cheri_gettag(unsealed)) {
+	if (!cheri_tag_get(unsealed)) {
 #if CHERI_SEAL_VIOLATION_EXCEPTION
 		/*
 		 * For the transition period from trapping to tag-clearing
@@ -214,7 +214,7 @@ CHERIBSDTEST(fault_tag, "Store via untagged capability",
 	char ch;
 	char * __capability chp = cheri_ptr(&ch, sizeof(ch));
 
-	chp = cheri_cleartag(chp);
+	chp = cheri_tag_clear(chp);
 	*chp = '\0';
 }
 
