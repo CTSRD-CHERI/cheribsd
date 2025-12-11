@@ -64,7 +64,7 @@ CHERIBSDTEST(store_local_allowed,
 	    strcmp(STR_VAL, (__cheri_fromcap char *)target) == 0);
 
 	/* Make cap local */
-	cap = cheri_andperm(cap, ~CHERI_PERM_GLOBAL);
+	cap = cheri_perms_and(cap, ~CHERI_PERM_GLOBAL);
 
 	/* Store local cap through cap with store-local permission */
 	*targetp = cap;
@@ -92,10 +92,10 @@ CHERIBSDTEST(store_local_disallowed,
 	    strcmp(STR_VAL, (__cheri_fromcap char *)target) == 0);
 
 	/* Make cap local */
-	cap = cheri_andperm(cap, ~CHERI_PERM_GLOBAL);
+	cap = cheri_perms_and(cap, ~CHERI_PERM_GLOBAL);
 
 	/* Store local cap through cap without store-local permission */
-	targetp = cheri_andperm(targetp, ~CHERI_PERM_STORE_LOCAL_CAP);
+	targetp = cheri_perms_and(targetp, ~CHERI_PERM_STORE_LOCAL_CAP);
 	/* This should fault */
 	*targetp = cap;
 

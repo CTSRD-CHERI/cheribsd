@@ -150,7 +150,7 @@ CHERIBSDTEST(cheriabi_open_bad_len,
 	char *path;
 	int fd;
 
-	path = cheri_setbounds(pathbuf, strlen(pathbuf));
+	path = cheri_bounds_set(pathbuf, strlen(pathbuf));
 
 	fd = open(path, O_RDONLY);
 	if (fd > 0)
@@ -168,7 +168,7 @@ CHERIBSDTEST(cheriabi_open_bad_len_2, "Path with offset past its bounds")
 	char *path;
 	int fd;
 
-	path = cheri_setbounds(pathbuf, 3);
+	path = cheri_bounds_set(pathbuf, 3);
 	path += 4;
 
 	fd = open(path, O_RDONLY);
@@ -187,7 +187,7 @@ CHERIBSDTEST(cheriabi_open_bad_tag, "Path with tag bit missing")
 	char *path;
 	int fd;
 
-	path = cheri_cleartag(pathbuf);
+	path = cheri_tag_clear(pathbuf);
 
 	fd = open(path, O_RDONLY);
 	if (fd > 0)
@@ -206,7 +206,7 @@ CHERIBSDTEST(cheriabi_open_bad_perm,
 	char *path;
 	int fd;
 
-	path = cheri_andperm(pathbuf, ~CHERI_PERM_LOAD);
+	path = cheri_perms_and(pathbuf, ~CHERI_PERM_LOAD);
 
 	fd = open(path, O_RDONLY);
 	if (fd > 0)

@@ -51,9 +51,9 @@ check_fptr(uintptr_t fptr)
 {
 	register_t perms;
 
-	perms = cheri_getperm((void *)fptr);
+	perms = cheri_perms_get((void *)fptr);
 
-	CHERIBSDTEST_VERIFY(cheri_gettag((void *)fptr));
+	CHERIBSDTEST_VERIFY(cheri_tag_get((void *)fptr));
 	/* Check that execute is present and store permissions aren't */
 	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_EXECUTE) == CHERI_PERM_EXECUTE,
 	    "perms %jx (execute missing)", (uintmax_t)perms);
@@ -64,8 +64,8 @@ check_fptr(uintptr_t fptr)
 	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_LOCAL_CAP) == 0,
 	    "perms %jx (store_local_cap present)", (uintmax_t)perms);
 
-	CHERIBSDTEST_VERIFY2(cheri_gettype((void *)fptr) == CHERI_OTYPE_SENTRY,
-	    "otype %jx (expected %jx)", cheri_gettype((void *)fptr),
+	CHERIBSDTEST_VERIFY2(cheri_type_get((void *)fptr) == CHERI_OTYPE_SENTRY,
+	    "otype %jx (expected %jx)", cheri_type_get((void *)fptr),
 	    (uintmax_t)CHERI_OTYPE_SENTRY);
 
 	cheribsdtest_success();

@@ -86,9 +86,9 @@ CHERIBSDTEST(malloc_revoke_basic,
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 	malloc_revoke();
 #pragma GCC diagnostic pop
-	CHERIBSDTEST_VERIFY2(!cheri_gettag(ptr),
+	CHERIBSDTEST_VERIFY2(!cheri_tag_get(ptr),
 	    "revoked ptr not revoked %#lp", ptr);
-	CHERIBSDTEST_VERIFY2(!cheri_gettag(eptr),
+	CHERIBSDTEST_VERIFY2(!cheri_tag_get(eptr),
 	    "revoked eptr not revoked %#lp", eptr);
 
 	cheribsdtest_success();
@@ -110,9 +110,9 @@ CHERIBSDTEST(malloc_revoke_quarantine_force_flush_basic,
 
 	CHERIBSDTEST_VERIFY2((ret = malloc_revoke_quarantine_force_flush()) == 0,
 	    "malloc_revoke_quarantine_force_flush returned %d", ret);
-	CHERIBSDTEST_VERIFY2(!cheri_gettag(ptr),
+	CHERIBSDTEST_VERIFY2(!cheri_tag_get(ptr),
 	    "revoked ptr not revoked %#lp", ptr);
-	CHERIBSDTEST_VERIFY2(!cheri_gettag(eptr),
+	CHERIBSDTEST_VERIFY2(!cheri_tag_get(eptr),
 	    "revoked eptr not revoked %#lp", eptr);
 
 	cheribsdtest_success();
@@ -138,18 +138,18 @@ CHERIBSDTEST(malloc_revoke_quarantine_force_flush_twice,
 
 	CHERIBSDTEST_VERIFY2((ret = malloc_revoke_quarantine_force_flush()) == 0,
 	    "malloc_revoke_quarantine_force_flush returned %d", ret);
-	CHERIBSDTEST_VERIFY2(!cheri_gettag(ptr1),
+	CHERIBSDTEST_VERIFY2(!cheri_tag_get(ptr1),
 	    "revoked ptr1 not revoked %#lp", ptr1);
-	CHERIBSDTEST_VERIFY2(!cheri_gettag(eptr1),
+	CHERIBSDTEST_VERIFY2(!cheri_tag_get(eptr1),
 	    "revoked eptr1 not revoked %#lp", eptr1);
 
 	free(__DEVOLATILE(void *, ptr2));
 
 	CHERIBSDTEST_VERIFY2((ret = malloc_revoke_quarantine_force_flush()) == 0,
 	    "malloc_revoke_quarantine_force_flush returned %d", ret);
-	CHERIBSDTEST_VERIFY2(!cheri_gettag(ptr2),
+	CHERIBSDTEST_VERIFY2(!cheri_tag_get(ptr2),
 	    "revoked ptr2 not revoked %#lp", ptr2);
-	CHERIBSDTEST_VERIFY2(!cheri_gettag(eptr2),
+	CHERIBSDTEST_VERIFY2(!cheri_tag_get(eptr2),
 	    "revoked eptr2 not revoked %#lp", eptr2);
 
 	cheribsdtest_success();

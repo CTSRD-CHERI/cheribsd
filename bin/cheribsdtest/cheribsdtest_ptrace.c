@@ -103,8 +103,8 @@ CHERIBSDTEST(ptrace_readcap, "Basic tests of PIOD_READ_CHERI_CAP")
 	pp[0] = (uintcap_t)(__cheri_tocap void * __capability)&piod;
 	pp[1] = 42;
 
-	CHERIBSDTEST_VERIFY(cheri_gettag(pp[0]) != 0);
-	CHERIBSDTEST_VERIFY(cheri_gettag(pp[1]) == 0);
+	CHERIBSDTEST_VERIFY(cheri_tag_get(pp[0]) != 0);
+	CHERIBSDTEST_VERIFY(cheri_tag_get(pp[1]) == 0);
 
 	pid = fork_child();
 
@@ -118,12 +118,12 @@ CHERIBSDTEST(ptrace_readcap, "Basic tests of PIOD_READ_CHERI_CAP")
 	CHERIBSDTEST_VERIFY2(capbuf[0][0] == 1,
 	    "Tag not set in returned buffer");
 	memcpy(&cap, &capbuf[0][1], sizeof(cap));
-	CHERIBSDTEST_VERIFY2(cheri_equal_exact(cheri_cleartag(pp[0]), cap),
+	CHERIBSDTEST_VERIFY2(cheri_is_equal_exact(cheri_tag_clear(pp[0]), cap),
 	    "Mismatch in non-tag bits of first capability");
 	CHERIBSDTEST_VERIFY2(capbuf[1][0] == 0,
 	    "Tag set in returned buffer");
 	memcpy(&cap, &capbuf[1][1], sizeof(cap));
-	CHERIBSDTEST_VERIFY2(cheri_equal_exact(pp[1], cap),
+	CHERIBSDTEST_VERIFY2(cheri_is_equal_exact(pp[1], cap),
 	    "Mismatch in non-tag bits of second capability");
 
 	finish_child(pid);
@@ -145,14 +145,14 @@ CHERIBSDTEST(ptrace_readtags, "Basic test of PIOD_READ_CHERI_TAGS")
 	pp[0] = (uintcap_t)(__cheri_tocap void * __capability)&piod;
 	pp[2] = (uintcap_t)(__cheri_tocap void * __capability)tagbuf;
 
-	CHERIBSDTEST_VERIFY(cheri_gettag(pp[0]) != 0);
-	CHERIBSDTEST_VERIFY(cheri_gettag(pp[1]) == 0);
-	CHERIBSDTEST_VERIFY(cheri_gettag(pp[2]) != 0);
-	CHERIBSDTEST_VERIFY(cheri_gettag(pp[3]) == 0);
-	CHERIBSDTEST_VERIFY(cheri_gettag(pp[4]) == 0);
-	CHERIBSDTEST_VERIFY(cheri_gettag(pp[5]) == 0);
-	CHERIBSDTEST_VERIFY(cheri_gettag(pp[6]) == 0);
-	CHERIBSDTEST_VERIFY(cheri_gettag(pp[7]) == 0);
+	CHERIBSDTEST_VERIFY(cheri_tag_get(pp[0]) != 0);
+	CHERIBSDTEST_VERIFY(cheri_tag_get(pp[1]) == 0);
+	CHERIBSDTEST_VERIFY(cheri_tag_get(pp[2]) != 0);
+	CHERIBSDTEST_VERIFY(cheri_tag_get(pp[3]) == 0);
+	CHERIBSDTEST_VERIFY(cheri_tag_get(pp[4]) == 0);
+	CHERIBSDTEST_VERIFY(cheri_tag_get(pp[5]) == 0);
+	CHERIBSDTEST_VERIFY(cheri_tag_get(pp[6]) == 0);
+	CHERIBSDTEST_VERIFY(cheri_tag_get(pp[7]) == 0);
 
 	pid = fork_child();
 
@@ -186,7 +186,7 @@ CHERIBSDTEST(ptrace_readcap_pageend,
 	last_index = (page_size / sizeof(uintcap_t)) - 1;
 	pp[last_index] = (uintcap_t)(__cheri_tocap void * __capability)&piod;
 
-	CHERIBSDTEST_VERIFY(cheri_gettag(pp[last_index]) != 0);
+	CHERIBSDTEST_VERIFY(cheri_tag_get(pp[last_index]) != 0);
 
 	pid = fork_child();
 
@@ -200,8 +200,9 @@ CHERIBSDTEST(ptrace_readcap_pageend,
 	CHERIBSDTEST_VERIFY2(capbuf[0] == 1,
 	    "Tag not set in returned buffer");
 	memcpy(&cap, &capbuf[1], sizeof(cap));
-	CHERIBSDTEST_VERIFY2(cheri_equal_exact(cheri_cleartag(pp[last_index]),
-	    cap), "Mismatch in non-tag bits of first capability");
+	CHERIBSDTEST_VERIFY2(cheri_is_equal_exact(
+	    cheri_tag_clear(pp[last_index]), cap),
+	    "Mismatch in non-tag bits of first capability");
 
 	finish_child(pid);
 
@@ -246,13 +247,14 @@ CHERIBSDTEST(ptrace_writecap, "Basic tests of PIOD_WRITE_CHERI_CAP")
 
 	CHERIBSDTEST_VERIFY(piod.piod_len == sizeof(capbuf));
 
-	CHERIBSDTEST_VERIFY2(cheri_gettag(map[0]) == 1,
+	CHERIBSDTEST_VERIFY2(cheri_tag_get(map[0]) == 1,
 	    "Tag not set in first injected capability");
-	CHERIBSDTEST_VERIFY2(cheri_equal_exact(cheri_cleartag(map[0]), pp[0]),
+	CHERIBSDTEST_VERIFY2(cheri_is_equal_exact(
+	    cheri_tag_clear(map[0]), pp[0]),
 	    "Mismatch in non-tag bits of first capability");
-	CHERIBSDTEST_VERIFY2(cheri_gettag(map[1]) == 0,
+	CHERIBSDTEST_VERIFY2(cheri_tag_get(map[1]) == 0,
 	    "Tag set in second injected capability");
-	CHERIBSDTEST_VERIFY2(cheri_equal_exact(map[1], pp[1]),
+	CHERIBSDTEST_VERIFY2(cheri_is_equal_exact(map[1], pp[1]),
 	    "Mismatch in non-tag bits of second capability");
 
 	finish_child(pid);
