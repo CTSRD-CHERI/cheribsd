@@ -83,6 +83,7 @@ typedef struct elf_file {
 	caddr_t		address;	/* Relocation address */
 #ifdef __CHERI_PURE_CAPABILITY__
 	caddr_t		mapbase;	/* Capability for derived pointers */
+	caddr_t		pccbase;	/* Capability for code pointers */
 #endif
 #ifdef SPARSE_MAPPING
 	vm_object_t	object;		/* VM object to hold file pages */
@@ -403,6 +404,89 @@ ef_address(elf_file_t ef, ptraddr_t offset)
 #endif
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Given a pointer into a linker file derived from ef->{map|pcc}base, narrow
+ * its permissions and bounds.
+ */
+static caddr_t
+make_capability(const Elf_Sym *sym, caddr_t val)
+{
+
+	switch (ELF_ST_TYPE(sym->st_info)) {
+	case STT_FUNC:
+	case STT_GNU_IFUNC:
+		val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
+#ifdef CHERI_FLAGS_CAP_MODE
+		val = cheri_setflags(val, CHERI_FLAGS_CAP_MODE);
+#endif
+		val = cheri_sealentry(val);
+		break;
+	default:
+		val = cheri_setbounds(val, sym->st_size);
+		val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
+		break;
+	}
+	return (val);
+}
+#endif
+
+static caddr_t
+ef_symbol_address(elf_file_t ef, const Elf_Sym *sym)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	caddr_t base, val;
+
+	switch (ELF_ST_TYPE(sym->st_info)) {
+	case STT_FUNC:
+	case STT_GNU_IFUNC:
+		base = ef->pccbase;
+		break;
+	default:
+		base = ef->mapbase;
+		break;
+	}
+
+	val = cheri_setaddress(base, (ptraddr_t)ef->address + sym->st_value);
+	return (make_capability(sym, val));
+#else
+	return (ef_address(ef, sym->st_value));
+#endif
+}
+
+#ifdef __CHERI_PURE_CAPABILITY__
+static void
+preload_init_pccbase(elf_file_t ef)
+{
+	const Elf_Ehdr *hdr;
+	const Elf_Phdr *phdr, *phlimit;
+	caddr_t pccbase;
+
+#ifdef __riscv
+	/* RISC-V kernels do not map phdrs into memory. */
+	if (ef == (elf_file_t)linker_kernel_file) {
+		ef->pccbase = ef->mapbase;
+		return;
+	}
+#endif
+	pccbase = ef->mapbase;
+	hdr = (const Elf_Ehdr *)ef->mapbase;
+	phdr = (const Elf_Phdr *)((const char *)hdr + hdr->e_phoff);
+	phlimit = phdr + hdr->e_phnum;
+	for (; phdr < phlimit; phdr++) {
+		if (phdr->p_type == PT_CHERI_PCC) {
+			ef->lf.flags |= LINKER_FILE_PCC_BOUNDS;
+			pccbase = ef_address(ef, phdr->p_vaddr);
+			pccbase = cheri_setbounds(pccbase,
+			    phdr->p_memsz);
+			break;
+		}
+	}
+
+	ef->pccbase = pccbase;
+}
+#endif
+
 /*
  * Actions performed after linking/loading both the preloaded kernel and any
  * modules; whether preloaded or dynamicly loaded.
@@ -506,6 +590,7 @@ link_elf_init(void* arg)
 	ef->address = cheri_setaddress(kernel_root_cap, 0);
 	ef->mapbase = cheri_setbounds(ef->address + KERNBASE,
 	    (ptraddr_t)_end - KERNBASE);
+	preload_init_pccbase(ef);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
 #ifdef SPARSE_MAPPING
@@ -1018,6 +1103,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	ef->address = cheri_andperm(ef->address, CHERI_PERMS_KERNEL_CODE |
 	    CHERI_PERMS_KERNEL_DATA);
 	ef->mapbase = ef->address;
+	preload_init_pccbase(ef);
 #else
 	ef->address = *(caddr_t *)baseptr;
 #endif
@@ -1097,6 +1183,9 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	Elf_Phdr *segs[MAXSEGS];
 	int nsegs;
 	Elf_Phdr *phdyn;
+#ifdef __CHERI_PURE_CAPABILITY__
+	Elf_Phdr *phpcc;
+#endif
 	caddr_t mapbase;
 	size_t mapsize;
 	Elf_Addr base_vaddr;
@@ -1212,6 +1301,9 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	phlimit = phdr + hdr->e_phnum;
 	nsegs = 0;
 	phdyn = NULL;
+#ifdef __CHERI_PURE_CAPABILITY__
+	phpcc = NULL;
+#endif
 	while (phdr < phlimit) {
 		switch (phdr->p_type) {
 		case PT_LOAD:
@@ -1234,6 +1326,18 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		case PT_INTERP:
 			error = ENOSYS;
 			goto out;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+		case PT_CHERI_PCC:
+			if (phpcc != NULL) {
+				link_elf_error(filename,
+				    "Too many PCC segments");
+				error = ENOEXEC;
+				goto out;
+			}
+			phpcc = phdr;
+			break;
+#endif
 		}
 
 		++phdr;
@@ -1296,6 +1400,13 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	ef->address = mapbase;
 #ifdef __CHERI_PURE_CAPABILITY__
 	ef->mapbase = mapbase;
+	if (phpcc != NULL) {
+		lf->flags |= LINKER_FILE_PCC_BOUNDS;
+		ef->pccbase = mapbase + (phpcc->p_vaddr - base_vaddr);
+		ef->pccbase = cheri_setbounds(ef->pccbase, phpcc->p_memsz);
+	} else {
+		ef->pccbase = mapbase;
+	}
 #endif
 
 	/*
@@ -1743,33 +1854,6 @@ link_elf_lookup_debug_symbol(linker_file_t lf, const char *name,
 	return (ENOENT);
 }
 
-#ifdef __CHERI_PURE_CAPABILITY__
-/*
- * Given a pointer into a linker file derived from ef->mapbase, narrow
- * its permissions and bounds.
- */
-static caddr_t
-make_capability(const Elf_Sym *sym, caddr_t val)
-{
-
-	switch (ELF_ST_TYPE(sym->st_info)) {
-	case STT_FUNC:
-	case STT_GNU_IFUNC:
-		val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
-#ifdef CHERI_FLAGS_CAP_MODE
-		val = cheri_setflags(val, CHERI_FLAGS_CAP_MODE);
-#endif
-		val = cheri_sealentry(val);
-		break;
-	default:
-		val = cheri_setbounds(val, sym->st_size);
-		val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
-		break;
-	}
-	return (val);
-}
-#endif
-
 static int
 link_elf_lookup_debug_symbol_ctf(linker_file_t lf, const char *name,
     c_linker_sym_t *sym, linker_ctf_t *lc)
@@ -1843,10 +1927,7 @@ link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
 		if (!see_local && ELF_ST_BIND(es->st_info) == STB_LOCAL)
 			return (ENOENT);
 		symval->name = ef->strtab + es->st_name;
-		val = ef_address(ef, es->st_value);
-#ifdef __CHERI_PURE_CAPABILITY__
-		val = make_capability(es, val);
-#endif
+		val = ef_symbol_address(ef, es);
 		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC) {
 			link_elf_ifunc_symbol_value(lf, &val, &size);
 		} else {
@@ -1884,10 +1965,7 @@ link_elf_debug_symbol_values(linker_file_t lf, c_linker_sym_t sym,
 
 	if (es >= ef->ddbsymtab && es < (ef->ddbsymtab + ef->ddbsymcnt)) {
 		symval->name = ef->ddbstrtab + es->st_name;
-		val = ef_address(ef, es->st_value);
-#ifdef __CHERI_PURE_CAPABILITY__
-		val = make_capability(es, val);
-#endif
+		val = ef_symbol_address(ef, es);
 		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC) {
 			link_elf_ifunc_symbol_value(lf, &val, &size);
 		} else {
@@ -2093,10 +2171,7 @@ elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, uintptr_t *res)
 			*res = 0;
 			return (EINVAL);
 		}
-		addr = ef_address(ef, sym->st_value);
-#ifdef __CHERI_PURE_CAPABILITY__
-		addr = make_capability(sym, addr);
-#endif
+		addr = ef_symbol_address(ef, sym);
 		*res = (uintptr_t)addr;
 		return (0);
 	}
@@ -2194,7 +2269,9 @@ link_elf_reloc_local(linker_file_t lf)
 		data_cap = cheri_andperm(ef->mapbase, CHERI_PERMS_KERNEL_DATA);
 		if (init_linker_file_cap_relocs(ef->caprelocs,
 		    (char *)ef->caprelocs + ef->caprelocssize, data_cap,
-		    (ptraddr_t)ef->address, resolve_cap_reloc, ef) != 0)
+		    (ptraddr_t)ef->address,
+		    (lf->flags & LINKER_FILE_PCC_BOUNDS) != 0,
+		    resolve_cap_reloc, ef) != 0)
 			return (ENOEXEC);
 	}
 #endif
@@ -2280,10 +2357,7 @@ elf_lookup_ifunc(linker_file_t lf, Elf_Size symidx, int deps __unused,
 	ef = (elf_file_t)lf;
 	symp = ef->symtab + symidx;
 	if (ELF_ST_TYPE(symp->st_info) == STT_GNU_IFUNC) {
-		val = ef_address(ef, symp->st_value);
-#ifdef __CHERI_PURE_CAPABILITY__
-		val = make_capability(symp, val);
-#endif
+		val = ef_symbol_address(ef, symp);
 		*res = ((uintptr_t (*)(void))val)();
 		return (0);
 	}
@@ -2317,6 +2391,7 @@ link_elf_ireloc(caddr_t kmdp)
 	ef->address = cheri_setaddress(kernel_root_cap, 0);
 	ef->mapbase = cheri_setbounds(ef->address + KERNBASE,
 	    (ptraddr_t)_end - KERNBASE);
+	preload_init_pccbase(ef);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
 	parse_dynamic(ef);
