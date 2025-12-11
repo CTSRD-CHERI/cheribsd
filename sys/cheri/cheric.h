@@ -96,22 +96,6 @@
 #endif
 
 /*
- * Return whether the two pointers are equal, including capability metadata if
- * in purecap mode.
- */
-static inline bool
-cheri_ptr_equal_exact(void *x, void *y)
-{
-#ifdef __CHERI_PURE_CAPABILITY__
-	/* For purecap compare the entire capability including metadata */
-	return (cheri_equal_exact(x, y));
-#else
-	/* In hybrid mode void * is just an address */
-	return (x == y);
-#endif
-}
-
-/*
  * Soft implementation of cheri_subset_test().
  * Test whether a capability is a subset of another.
  * NOTE: This is to be replaced by LLVM intrinsic once the intrinsic and
@@ -155,37 +139,8 @@ cheri_can_access(const void * __capability cap, ptraddr_t perms, ptraddr_t base,
 {
 	return (cheri_gettag(cap) && !cheri_getsealed(cap) &&
 	    (cheri_getperm(cap) & perms) == perms &&
-	    base >= cheri_getbase(cap) && base + length <= cheri_gettop(cap));
+	    base >= cheri_getbase(cap) && base + length <= cheri_top_get(cap));
 }
-
-/*
- * Two variations on cheri_ptr() based on whether we are looking for a code or
- * data capability.  The compiler's use of CFromPtr will be with respect to
- * $ddc or $pcc depending on the type of the pointer derived, so we need to
- * use types to differentiate the two versions at compile time.  We don't
- * provide the full set of function variations for code pointers as they
- * haven't proven necessary as yet.
- *
- * XXXRW: Ideally, casting via a function pointer would cause the compiler to
- * derive the capability using CFromPtr on $pcc rather than on $ddc.  This
- * appears not currently to be the case, so manually derive using
- * cheri_getpcc() for now.
- */
-#define cheri_codeptr(ptr, len)	\
-	cheri_setbounds(__builtin_cheri_cap_from_pointer(cheri_getpcc(), ptr), len)
-
-#define cheri_codeptrperm(ptr, len, perm)	\
-	cheri_andperm(cheri_codeptr(ptr, len), perm | CHERI_PERM_GLOBAL)
-
-#define cheri_ptr(ptr, len)	\
-	cheri_setbounds(    \
-	    (__cheri_tocap __typeof__((ptr)[0]) *__capability)ptr, len)
-
-#define cheri_ptrperm(ptr, len, perm)	\
-	cheri_andperm(cheri_ptr(ptr, len), perm | CHERI_PERM_GLOBAL)
-
-#define cheri_ptrpermoff(ptr, len, perm, off)	\
-	cheri_setoffset(cheri_ptrperm(ptr, len, perm), off)
 
 /*
  * Construct a capability suitable to describe a type identified by 'ptr';
@@ -215,38 +170,7 @@ cheri_bytes_remaining(const void * __capability cap)
 	return cheri_getlen(cap) - cheri_getoffset(cap);
 }
 
-/*
- * Turn a pointer into a capability with the bounds set to
- * sizeof(*ptr)
- */
-/* XXX: work around CTSRD-CHERI/clang#157 */
-#ifdef __CHERI_PURE_CAPABILITY__
-#define cheri_ptr_to_bounded_cap(ptr)	__extension__({	\
-	typedef __typeof__(ptr) __ptr_type;		\
-	(__ptr_type)cheri_ptr((ptr), sizeof(*(ptr)));	\
-	})
-#else
-#define	cheri_ptr_to_bounded_cap(ptr) cheri_ptr((ptr), sizeof(*(ptr)))
-#endif
 
-/*
- * Convert a capability to a pointer. Returns NULL if there are less than
- * min_size accessible bytes remaining in cap.
- */
-#define cheri_cap_to_ptr(cap, min_size)	__extension__({			\
-	typedef __typeof__(*(cap)) __underlying_type;			\
-	__underlying_type* __result = 0;				\
-	if (cheri_gettag(cap) && cheri_bytes_remaining(cap) >= min_size) { \
-		__result = (__cheri_fromcap __underlying_type*)(cap);	\
-	} __result; })
-
-/*
- * Convert an untyped capability to a pointer of type \p type.
- * This macro checks that there are at least sizeof(type) bytes accessible
- * from \p cap.
- */
-#define cheri_cap_to_typed_ptr(cap, type)				\
-	(type *)cheri_cap_to_ptr(cap, sizeof(type))
 
 #endif	/* __has_feature(capabilities) */
 

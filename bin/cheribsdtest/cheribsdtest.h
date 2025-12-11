@@ -336,6 +336,30 @@ _cheribsdtest_check_errno(const char *context, int actual, int expected)
 		    expected_errno);					\
 	} while (0)
 
+#define cheri_ptr(ptr, len)    \
+	cheri_bounds_set(    \
+	    (__cheri_tocap __typeof__((ptr)[0]) *__capability)ptr, len)
+
+#define cheri_ptrperm(ptr, len, perm)	\
+	cheri_perms_and(cheri_ptr(ptr, len), perm | CHERI_PERM_GLOBAL)
+
+/*
+ * Return whether the two pointers are equal, including capability metadata if
+ * in purecap mode.
+ */
+static inline bool
+cheri_ptr_equal_exact(void *x, void *y)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* For purecap compare the entire capability including metadata */
+	return (cheri_is_equal_exact(x, y));
+#else
+	/* In hybrid mode void * is just an address */
+	return (x == y);
+#endif
+}
+
+
 /* For libc_memcpy and libc_memset tests and the unaligned copy tests: */
 extern void *cheribsdtest_memcpy(void *dst, const void *src, size_t n);
 extern void *cheribsdtest_memmove(void *dst, const void *src, size_t n);
