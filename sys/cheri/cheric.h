@@ -142,35 +142,6 @@ cheri_can_access(const void * __capability cap, ptraddr_t perms, ptraddr_t base,
 	    base >= cheri_getbase(cap) && base + length <= cheri_top_get(cap));
 }
 
-/*
- * Construct a capability suitable to describe a type identified by 'ptr';
- * set it to zero-length with the offset equal to the base.  The caller must
- * provide a root sealing capability.
- *
- * The caller may wish to assert various properties about the returned
- * capability, including that CHERI_PERM_SEAL is set.
- */
-static inline otype_t
-cheri_maketype(void * __capability root_type, register_t type)
-{
-	void * __capability c;
-
-	c = root_type;
-	c = cheri_setoffset(c, type);	/* Set type as desired. */
-	c = cheri_setbounds(c, 1);	/* ISA implies length of 1. */
-	c = cheri_andperm(c, CHERI_PERM_GLOBAL | CHERI_PERM_SEAL); /* Perms. */
-	return (c);
-}
-
-static inline size_t
-cheri_bytes_remaining(const void * __capability cap)
-{
-	if (cheri_getoffset(cap) >= cheri_getlen(cap))
-		return 0;
-	return cheri_getlen(cap) - cheri_getoffset(cap);
-}
-
-
 
 #endif	/* __has_feature(capabilities) */
 
