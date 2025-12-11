@@ -403,6 +403,46 @@ ef_address(elf_file_t ef, ptraddr_t offset)
 #endif
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Given a pointer into a linker file derived from ef->{map|pcc}base, narrow
+ * its permissions and bounds.
+ */
+static caddr_t
+make_capability(const Elf_Sym *sym, caddr_t val)
+{
+
+	switch (ELF_ST_TYPE(sym->st_info)) {
+	case STT_FUNC:
+	case STT_GNU_IFUNC:
+		val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
+#ifdef CHERI_FLAGS_CAP_MODE
+		val = cheri_setflags(val, CHERI_FLAGS_CAP_MODE);
+#endif
+		val = cheri_sealentry(val);
+		break;
+	default:
+		val = cheri_setbounds(val, sym->st_size);
+		val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
+		break;
+	}
+	return (val);
+}
+#endif
+
+static caddr_t
+ef_symbol_address(elf_file_t ef, const Elf_Sym *sym)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	caddr_t val;
+
+	val = ef_address(ef, sym->st_value);
+	return (make_capability(sym, val));
+#else
+	return (ef_address(ef, sym->st_value));
+#endif
+}
+
 /*
  * Actions performed after linking/loading both the preloaded kernel and any
  * modules; whether preloaded or dynamicly loaded.
@@ -1743,33 +1783,6 @@ link_elf_lookup_debug_symbol(linker_file_t lf, const char *name,
 	return (ENOENT);
 }
 
-#ifdef __CHERI_PURE_CAPABILITY__
-/*
- * Given a pointer into a linker file derived from ef->mapbase, narrow
- * its permissions and bounds.
- */
-static caddr_t
-make_capability(const Elf_Sym *sym, caddr_t val)
-{
-
-	switch (ELF_ST_TYPE(sym->st_info)) {
-	case STT_FUNC:
-	case STT_GNU_IFUNC:
-		val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
-#ifdef CHERI_FLAGS_CAP_MODE
-		val = cheri_setflags(val, CHERI_FLAGS_CAP_MODE);
-#endif
-		val = cheri_sealentry(val);
-		break;
-	default:
-		val = cheri_setbounds(val, sym->st_size);
-		val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
-		break;
-	}
-	return (val);
-}
-#endif
-
 static int
 link_elf_lookup_debug_symbol_ctf(linker_file_t lf, const char *name,
     c_linker_sym_t *sym, linker_ctf_t *lc)
@@ -1843,10 +1856,7 @@ link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
 		if (!see_local && ELF_ST_BIND(es->st_info) == STB_LOCAL)
 			return (ENOENT);
 		symval->name = ef->strtab + es->st_name;
-		val = ef_address(ef, es->st_value);
-#ifdef __CHERI_PURE_CAPABILITY__
-		val = make_capability(es, val);
-#endif
+		val = ef_symbol_address(ef, es);
 		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC) {
 			link_elf_ifunc_symbol_value(lf, &val, &size);
 		} else {
@@ -1884,10 +1894,7 @@ link_elf_debug_symbol_values(linker_file_t lf, c_linker_sym_t sym,
 
 	if (es >= ef->ddbsymtab && es < (ef->ddbsymtab + ef->ddbsymcnt)) {
 		symval->name = ef->ddbstrtab + es->st_name;
-		val = ef_address(ef, es->st_value);
-#ifdef __CHERI_PURE_CAPABILITY__
-		val = make_capability(es, val);
-#endif
+		val = ef_symbol_address(ef, es);
 		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC) {
 			link_elf_ifunc_symbol_value(lf, &val, &size);
 		} else {
@@ -2093,10 +2100,7 @@ elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, uintptr_t *res)
 			*res = 0;
 			return (EINVAL);
 		}
-		addr = ef_address(ef, sym->st_value);
-#ifdef __CHERI_PURE_CAPABILITY__
-		addr = make_capability(sym, addr);
-#endif
+		addr = ef_symbol_address(ef, sym);
 		*res = (uintptr_t)addr;
 		return (0);
 	}
@@ -2280,10 +2284,7 @@ elf_lookup_ifunc(linker_file_t lf, Elf_Size symidx, int deps __unused,
 	ef = (elf_file_t)lf;
 	symp = ef->symtab + symidx;
 	if (ELF_ST_TYPE(symp->st_info) == STT_GNU_IFUNC) {
-		val = ef_address(ef, symp->st_value);
-#ifdef __CHERI_PURE_CAPABILITY__
-		val = make_capability(symp, val);
-#endif
+		val = ef_symbol_address(ef, symp);
 		*res = ((uintptr_t (*)(void))val)();
 		return (0);
 	}
