@@ -207,12 +207,6 @@ cheri_maketype(void * __capability root_type, register_t type)
 	return (c);
 }
 
-static inline void * __capability
-cheri_zerocap(void)
-{
-	return (void * __capability)0;
-}
-
 static inline size_t
 cheri_bytes_remaining(const void * __capability cap)
 {
@@ -398,14 +392,8 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 #define	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) \
 	__builtin_cheri_representable_alignment_mask(len)
 
-/*
- * These should be avoided on CHERI MIPS and RISCV64 since count
- * leading/trailing zeroes is expensive.
- */
 #define	CHERI_ALIGN_SHIFT(l)	\
 	__builtin_ctzll(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
-#define	CHERI_SEAL_ALIGN_SHIFT(l)	\
-	__builtin_ctzll(CHERI_SEALABLE_ALIGNMENT_MASK(l))
 
 #else /* !__has_feature(capabilities) */
 #define	CHERI_REPRESENTABLE_LENGTH(len) (len)
@@ -425,24 +413,6 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 #define	CHERI_REPRESENTABLE_ALIGN_UP(base, len) (base)
 #endif
 
-/* Backwards compat. */
-#define	CHERI_REPRESENTABLE_BASE	CHERI_REPRESENTABLE_ALIGNMENT_DOWN
-
-/*
- * In the current encoding sealed and unsealed capabilities have the same
- * alignment constraints.
- */
-#define	CHERI_SEALABLE_LENGTH(len)	\
-	CHERI_REPRESENTABLE_LENGTH(len)
-#define	CHERI_SEALABLE_ALIGNMENT_MASK(len)	\
-	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len)
-#define	CHERI_SEALABLE_ALIGNMENT(len)	\
-	CHERI_REPRESENTABLE_ALIGNMENT(len)
-#define	CHERI_SEALABLE_BASE(base, len)	\
-	CHERI_REPRESENTABLE_ALIGN_DOWN(base, len)
-
-/* A mask for the lower bits, i.e. the negated alignment mask */
-#define	CHERI_SEAL_ALIGN_MASK(l)	~(CHERI_SEALABLE_ALIGNMENT_MASK(l))
 #define	CHERI_ALIGN_MASK(l)		~(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
 
 #if __has_feature(capabilities)
