@@ -83,6 +83,7 @@ typedef struct elf_file {
 	caddr_t		address;	/* Relocation address */
 #ifdef __CHERI_PURE_CAPABILITY__
 	caddr_t		mapbase;	/* Capability for derived pointers */
+	caddr_t		pccbase;	/* Capability for code pointers */
 #endif
 #ifdef SPARSE_MAPPING
 	vm_object_t	object;		/* VM object to hold file pages */
@@ -434,14 +435,57 @@ static caddr_t
 ef_symbol_address(elf_file_t ef, const Elf_Sym *sym)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
-	caddr_t val;
+	caddr_t base, val;
 
-	val = ef_address(ef, sym->st_value);
+	switch (ELF_ST_TYPE(sym->st_info)) {
+	case STT_FUNC:
+	case STT_GNU_IFUNC:
+		base = ef->pccbase;
+		break;
+	default:
+		base = ef->mapbase;
+		break;
+	}
+
+	val = cheri_setaddress(base, (ptraddr_t)ef->address + sym->st_value);
 	return (make_capability(sym, val));
 #else
 	return (ef_address(ef, sym->st_value));
 #endif
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+static void
+preload_init_pccbase(elf_file_t ef)
+{
+	const Elf_Ehdr *hdr;
+	const Elf_Phdr *phdr, *phlimit;
+	caddr_t pccbase;
+
+#ifdef __riscv
+	/* RISC-V kernels do not map phdrs into memory. */
+	if (ef == (elf_file_t)linker_kernel_file) {
+		ef->pccbase = ef->mapbase;
+		return;
+	}
+#endif
+	pccbase = ef->mapbase;
+	hdr = (const Elf_Ehdr *)ef->mapbase;
+	phdr = (const Elf_Phdr *)((const char *)hdr + hdr->e_phoff);
+	phlimit = phdr + hdr->e_phnum;
+	for (; phdr < phlimit; phdr++) {
+		if (phdr->p_type == PT_CHERI_PCC) {
+			ef->lf.flags |= LINKER_FILE_PCC_BOUNDS;
+			pccbase = ef_address(ef, phdr->p_vaddr);
+			pccbase = cheri_setbounds(pccbase,
+			    phdr->p_memsz);
+			break;
+		}
+	}
+
+	ef->pccbase = pccbase;
+}
+#endif
 
 /*
  * Actions performed after linking/loading both the preloaded kernel and any
@@ -546,6 +590,7 @@ link_elf_init(void* arg)
 	ef->address = cheri_setaddress(kernel_root_cap, 0);
 	ef->mapbase = cheri_setbounds(ef->address + KERNBASE,
 	    (ptraddr_t)_end - KERNBASE);
+	preload_init_pccbase(ef);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
 #ifdef SPARSE_MAPPING
@@ -1058,6 +1103,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	ef->address = cheri_andperm(ef->address, CHERI_PERMS_KERNEL_CODE |
 	    CHERI_PERMS_KERNEL_DATA);
 	ef->mapbase = ef->address;
+	preload_init_pccbase(ef);
 #else
 	ef->address = *(caddr_t *)baseptr;
 #endif
@@ -1137,6 +1183,9 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	Elf_Phdr *segs[MAXSEGS];
 	int nsegs;
 	Elf_Phdr *phdyn;
+#ifdef __CHERI_PURE_CAPABILITY__
+	Elf_Phdr *phpcc;
+#endif
 	caddr_t mapbase;
 	size_t mapsize;
 	Elf_Addr base_vaddr;
@@ -1252,6 +1301,9 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	phlimit = phdr + hdr->e_phnum;
 	nsegs = 0;
 	phdyn = NULL;
+#ifdef __CHERI_PURE_CAPABILITY__
+	phpcc = NULL;
+#endif
 	while (phdr < phlimit) {
 		switch (phdr->p_type) {
 		case PT_LOAD:
@@ -1274,6 +1326,18 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		case PT_INTERP:
 			error = ENOSYS;
 			goto out;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+		case PT_CHERI_PCC:
+			if (phpcc != NULL) {
+				link_elf_error(filename,
+				    "Too many PCC segments");
+				error = ENOEXEC;
+				goto out;
+			}
+			phpcc = phdr;
+			break;
+#endif
 		}
 
 		++phdr;
@@ -1336,6 +1400,13 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	ef->address = mapbase;
 #ifdef __CHERI_PURE_CAPABILITY__
 	ef->mapbase = mapbase;
+	if (phpcc != NULL) {
+		lf->flags |= LINKER_FILE_PCC_BOUNDS;
+		ef->pccbase = mapbase + (phpcc->p_vaddr - base_vaddr);
+		ef->pccbase = cheri_setbounds(ef->pccbase, phpcc->p_memsz);
+	} else {
+		ef->pccbase = mapbase;
+	}
 #endif
 
 	/*
@@ -2198,7 +2269,9 @@ link_elf_reloc_local(linker_file_t lf)
 		data_cap = cheri_andperm(ef->mapbase, CHERI_PERMS_KERNEL_DATA);
 		if (init_linker_file_cap_relocs(ef->caprelocs,
 		    (char *)ef->caprelocs + ef->caprelocssize, data_cap,
-		    (ptraddr_t)ef->address, false, resolve_cap_reloc, ef) != 0)
+		    (ptraddr_t)ef->address,
+		    (lf->flags & LINKER_FILE_PCC_BOUNDS) != 0,
+		    resolve_cap_reloc, ef) != 0)
 			return (ENOEXEC);
 	}
 #endif
@@ -2318,6 +2391,7 @@ link_elf_ireloc(caddr_t kmdp)
 	ef->address = cheri_setaddress(kernel_root_cap, 0);
 	ef->mapbase = cheri_setbounds(ef->address + KERNBASE,
 	    (ptraddr_t)_end - KERNBASE);
+	preload_init_pccbase(ef);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
 	parse_dynamic(ef);

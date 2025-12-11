@@ -461,7 +461,13 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 	const Elf_Rel *rel;
 	const Elf_Rela *rela;
 	int error;
+#if __has_feature(capabilities)
+	bool use_code_bounds = false;
+#endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	use_code_bounds = (lf->flags & LINKER_FILE_PCC_BOUNDS) != 0;
+#endif
 	switch (type) {
 	case ELF_RELOC_REL:
 		rel = (const Elf_Rel *)data;
@@ -520,7 +526,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			    (val == addr1 ? relocbase :
 			    linker_kernel_file->address);
 			*(uintcap_t *)(void *)where = build_reloc_cap(addr1,
-			    size, perms, addend, base, base, false);
+			    size, perms, addend, base, base, use_code_bounds);
 		}
 #endif
 		return (0);
@@ -622,7 +628,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		} else
 			addr = build_cap_from_fragment(where,
 			    (Elf_Addr)relocbase, rela->r_addend,
-			    relocbase, relocbase, false);
+			    relocbase, relocbase, use_code_bounds);
 		addr = ((uintptr_t (*)(void))addr)();
 		*(uintptr_t *)where = addr;
 		break;
@@ -761,10 +767,24 @@ arm64_exec_protect(struct image_params *imgp, int flags __unused)
 void __nosanitizecoverage
 elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
 {
+	const Elf_Ehdr *hdr;
+	const Elf_Phdr *phdr, *phlimit;
 	const Elf_Rela *rela = NULL, *rela_end;
 	Elf_Addr *fragment;
 	uintptr_t cap;
 	size_t rela_size = 0;
+	bool use_code_bounds = false;
+
+	/* Assume ELF header is at KERNBASE. */
+	hdr = data_cap;
+	phdr = (const Elf_Phdr *)((const char *)hdr + hdr->e_phoff);
+	phlimit = phdr + hdr->e_phnum;
+	for (; phdr < phlimit; phdr++) {
+		if (phdr->p_type == PT_CHERI_PCC) {
+			use_code_bounds = true;
+			break;
+		}
+	}
 
 	for (; dynp->d_tag != DT_NULL; dynp++) {
 		switch (dynp->d_tag) {
@@ -789,7 +809,8 @@ elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
 			fragment = (Elf_Addr *)cheri_setaddress(data_cap,
 			    rela->r_offset);
 			cap = build_cap_from_fragment(fragment, 0,
-			    rela->r_addend, data_cap, code_cap, false);
+			    rela->r_addend, data_cap, code_cap,
+			    use_code_bounds);
 			*((uintptr_t *)fragment) = cap;
 			break;
 		}
