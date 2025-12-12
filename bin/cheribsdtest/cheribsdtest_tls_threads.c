@@ -36,8 +36,6 @@
 
 #include <sys/types.h>
 
-#include <cheri/cheri.h>
-
 #include <pthread.h>
 #include <string.h>
 

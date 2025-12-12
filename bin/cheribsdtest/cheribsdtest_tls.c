@@ -36,8 +36,6 @@
 
 #include <sys/types.h>
 
-#include <cheri/cheri.h>
-
 #ifdef CHERIBSD_DYNAMIC_TESTS
 #include <cheribsdtest_dynamic.h>
 #include <dlfcn.h>

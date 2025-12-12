@@ -33,11 +33,15 @@
 #ifndef _CHERIBSDTEST_H_
 #define	_CHERIBSDTEST_H_
 
+#include <sys/types.h>
 #include <sys/linker_set.h>
 
-#include <string.h>
+#include <cheri/cherireg.h>
 
-#include <cheri/cheric.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+#include <cheriintrin.h>
 
 #include "cheribsdtest_md.h"
 

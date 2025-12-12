@@ -39,9 +39,6 @@
 #include <sys/sysctl.h>
 #include <sys/time.h>
 
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-
 #include <netinet/in.h>
 
 #include <err.h>

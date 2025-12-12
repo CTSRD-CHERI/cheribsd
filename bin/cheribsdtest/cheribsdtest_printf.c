@@ -36,9 +36,6 @@
 #error "This code requires a CHERI-aware compiler"
 #endif
 
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>

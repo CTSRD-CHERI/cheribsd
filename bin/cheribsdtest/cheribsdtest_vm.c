@@ -58,7 +58,6 @@
 #include <machine/trap.h>
 #include <machine/vmparam.h>
 
-#include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
 #include <err.h>
