@@ -39,21 +39,6 @@
 #include <sys/types.h>
 #include <cheri/cherireg.h>
 
-/*
- * Canonical C-language representation of a CHERI object capability -- code and
- * data capabilities in registers or memory.
- */
-struct cheri_object {
-	void * __capability	co_codecap;
-	void * __capability	co_datacap;
-};
-
-#if !defined(_KERNEL) && __has_feature(capabilities)
-#define	CHERI_OBJECT_INIT_NULL	{NULL, NULL}
-#define	CHERI_OBJECT_ISNULL(co)	\
-    ((co).co_codecap == NULL && (co).co_datacap == NULL)
-#endif
-
 #ifdef _KERNEL
 /*
  * Functions to construct userspace capabilities.
