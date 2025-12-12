@@ -35,7 +35,7 @@
 #include <sys/mman.h>
 #include <machine/atomic.h>
 #ifdef __CHERI_PURE_CAPABILITY__
-#include <cheri/cheric.h>
+#include <cheriintrin.h>
 #endif
 #include <assert.h>
 #include <dlfcn.h>

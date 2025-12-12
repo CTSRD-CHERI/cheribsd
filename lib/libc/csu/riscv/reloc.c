@@ -37,7 +37,7 @@ ifunc_init(const Elf_Auxinfo *aux)
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#include <cheri/cheric.h>
+#include <cheriintrin.h>
 
 #include <cheri_init_globals.h>
 

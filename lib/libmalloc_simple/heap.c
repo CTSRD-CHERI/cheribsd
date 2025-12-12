@@ -48,7 +48,6 @@ static char *rcsid = "$FreeBSD$";
 #include <sys/types.h>
 #include <sys/mman.h>
 
-#include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
 #ifdef CAPREVOKE

@@ -15,7 +15,8 @@
 #include <sys/types.h>
 #include <machine/elf.h>
 
-#include <cheri/cheric.h>
+#include <cheri/cherireg.h>
+#include <cheriintrin.h>
 
 #define	FUNC_PTR_REMOVE_PERMS						\
 	(CHERI_PERM_SEAL | CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |	\

@@ -37,14 +37,13 @@
 #include <sys/queue.h>
 #include <sys/sysctl.h>
 
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
 #include <cheri/revoke.h>
 #include <cheri/libcaprevoke.h>
 
 #include <machine/vmparam.h>
 
 #include <assert.h>
+#include <cheriintrin.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <inttypes.h>

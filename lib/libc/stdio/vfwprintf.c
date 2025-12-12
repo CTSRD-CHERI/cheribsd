@@ -59,7 +59,6 @@
 #include <sys/types.h>
 
 #if __has_feature(capabilities)
-#include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #endif
 

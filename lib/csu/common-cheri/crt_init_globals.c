@@ -33,7 +33,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include <cheri/cheric.h>
+#include <cheri/cherireg.h>
+#include <cheriintrin.h>
 
 #ifdef PIC
 #error "PIEs never need to initialise their own globals"

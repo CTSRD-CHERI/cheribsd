@@ -23,10 +23,6 @@
 #include "jemalloc/internal/assert.h"
 #include "jemalloc/internal/malloc_io.h"
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#include <cheri/cheric.h>
-#endif
-
 #ifdef JEMALLOC_SYSCTL_VM_OVERCOMMIT
 #include <sys/sysctl.h>
 #ifdef __FreeBSD__

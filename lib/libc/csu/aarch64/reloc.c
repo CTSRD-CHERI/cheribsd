@@ -33,7 +33,8 @@ ifunc_init(const Elf_Auxinfo *aux __unused)
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#include <cheri/cheric.h>
+#include <cheri/cherireg.h>
+#include <cheriintrin.h>
 
 /*
  * Fragments consist of a 64-bit address followed by a 56-bit length and an
