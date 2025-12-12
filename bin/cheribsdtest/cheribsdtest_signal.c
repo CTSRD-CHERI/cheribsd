@@ -38,8 +38,6 @@
 
 #include <machine/vmparam.h>
 
-#include <cheri/cheri.h>
-
 #include <errno.h>
 #include <signal.h>
 #include <stdlib.h>

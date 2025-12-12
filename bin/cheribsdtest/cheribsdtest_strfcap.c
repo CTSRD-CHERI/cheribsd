@@ -38,7 +38,6 @@
 
 #include <sys/param.h>
 
-#include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
 #include <assert.h>
