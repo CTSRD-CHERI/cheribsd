@@ -1818,10 +1818,10 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int domain, int flags,
 		goto fail;
 	}
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_getlen(mem) <= CHERI_REPRESENTABLE_LENGTH(size),
+	KASSERT(cheri_length_get(mem) <= CHERI_REPRESENTABLE_LENGTH(size),
 	    ("Invalid bounds expected %zx found %zx",
 	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
-	        (size_t)cheri_getlen(mem)));
+	        (size_t)cheri_length_get(mem)));
 #endif
 	uma_total_inc(size);
 
@@ -2014,10 +2014,10 @@ pcpu_page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	if ((addr = kva_alloc(bytes)) == 0)
 		goto fail;
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_getlen(addr) <= CHERI_REPRESENTABLE_LENGTH(bytes),
+	KASSERT(cheri_length_get(addr) <= CHERI_REPRESENTABLE_LENGTH(bytes),
 	    ("Invalid bounds expected %zx found %zx",
 	        (size_t)CHERI_REPRESENTABLE_LENGTH(bytes),
-	        cheri_getlen(addr)));
+	        cheri_length_get(addr)));
 #endif
 	zkva = addr;
 	TAILQ_FOREACH(p, &alloctail, listq) {
@@ -2093,7 +2093,7 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 	}
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(retkva), ("Expected valid capability"));
+	KASSERT(cheri_tag_get(retkva), ("Expected valid capability"));
 #endif
 	return (cheri_kern_setboundsexact((void *)retkva, bytes));
 }
@@ -2205,9 +2205,9 @@ uma_small_free(void *mem, vm_size_t size, uint8_t flags)
 	vm_paddr_t pa;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(!cheri_getsealed(mem),
+	KASSERT(!cheri_is_sealed(mem),
 	    ("uma_small_free: Unexpected sealed capability %#p", mem));
-	KASSERT(cheri_gettag(mem),
+	KASSERT(cheri_tag_get(mem),
 	    ("uma_small_free: Attempt to free invalid capability %#p", mem));
 #endif
 	pa = DMAP_TO_PHYS((vm_offset_t)mem);
@@ -2228,7 +2228,7 @@ zero_init(void *mem, int size, int flags)
 {
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(mem), ("Expected valid capability"));
+	KASSERT(cheri_tag_get(mem), ("Expected valid capability"));
 #endif
 	bzero(mem, size);
 	return (0);
@@ -2941,7 +2941,7 @@ zone_ctor(void *mem, int size, void *udata, int flags)
 	 */
 	if (arg->import) {
 #ifdef __CHERI_PURE_CAPABILITY__
-		KASSERT(cheri_gettag(arg->import),
+		KASSERT(cheri_tag_get(arg->import),
 		    ("Expected valid capability"));
 #endif
 		KASSERT((arg->flags & UMA_ZFLAG_CACHE) != 0,
@@ -4159,7 +4159,7 @@ slab_alloc_item(uma_keg_t keg, uma_slab_t slab)
 	}
 #ifdef __CHERI_PURE_CAPABILITY__
 	if ((keg->uk_flags & UMA_ZONE_PCPU) == 0)
-		item = cheri_setboundsexact(item, keg->uk_size);
+		item = cheri_bounds_set_exact(item, keg->uk_size);
 #endif
 
 	return (item);
@@ -4605,9 +4605,9 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
                 return;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	if (__predict_false(!cheri_gettag(item)))
+	if (__predict_false(!cheri_tag_get(item)))
 		panic("Expect valid capability");
-	if (__predict_false(cheri_getsealed(item)))
+	if (__predict_false(cheri_is_sealed(item)))
 		panic("Expect unsealed capability");
 	/*
 	 * XXX-AM: Only check non-cache zones as the caches for
@@ -4619,10 +4619,10 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 			expected_size = zone->uz_size;
 		else
 			expected_size = zone->uz_keg->uk_ppera * PAGE_SIZE;
-		if (__predict_false(cheri_getlen(item) != expected_size))
+		if (__predict_false(cheri_length_get(item) != expected_size))
 			panic("UMA zone %s invalid bounds: expected %zx "
 			      "found %zx", zone->uz_name, expected_size,
-			      cheri_getlen(item));
+			      cheri_length_get(item));
 	}
 #endif
 
@@ -4999,9 +4999,9 @@ zone_free_item(uma_zone_t zone, void *item, void *udata, enum zfreeskip skip)
 {
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	if (__predict_false(!cheri_gettag(item)))
+	if (__predict_false(!cheri_tag_get(item)))
 		panic("Expect valid capability");
-	if (__predict_false(cheri_getsealed(item)))
+	if (__predict_false(cheri_is_sealed(item)))
 		panic("Expect unsealed capability");
 #endif
 	/*

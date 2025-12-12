@@ -520,7 +520,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			bcopy(&act->dta_rec, &rec, sizeof (dtrace_recdesc_t));
 #ifdef __CHERI_PURE_CAPABILITY__
 			/* Avoid leaking kernel capabilities to userspace. */
-			rec.dtrd_arg = cheri_cleartag(rec.dtrd_arg);
+			rec.dtrd_arg = cheri_tag_clear(rec.dtrd_arg);
 #endif
 			bcopy(&rec, (void *)dest, sizeof (dtrace_recdesc_t));
 			dest += sizeof (dtrace_recdesc_t);

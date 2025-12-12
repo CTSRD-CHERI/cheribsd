@@ -157,7 +157,7 @@ kva_alloc(vm_size_t size)
 		return (0);
 	addr = cheri_kern_andperm(addr, CHERI_PERMS_KERNEL_DATA);
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+	KASSERT(cheri_tag_get(addr), ("Expected valid capability"));
 #endif
 	TSEXIT();
 
@@ -182,7 +182,7 @@ kva_alloc_aligned(vm_size_t size, vm_size_t align)
 		return (0);
 	addr = cheri_kern_andperm(addr, CHERI_PERMS_KERNEL_DATA);
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+	KASSERT(cheri_tag_get(addr), ("Expected valid capability"));
 #endif
 	TSEXIT();
 
@@ -318,10 +318,10 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	VM_OBJECT_WUNLOCK(object);
 	kmem_alloc_san(addr, size, asize, flags);
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
-	KASSERT(cheri_getlen(addr) == asize,
+	KASSERT(cheri_tag_get(addr), ("Expected valid capability"));
+	KASSERT(cheri_length_get(addr) == asize,
 	    ("Inexact bounds expected %zx found %zx",
-	    (size_t)asize, (size_t)cheri_getlen(addr)));
+	    (size_t)asize, (size_t)cheri_length_get(addr)));
 #endif
 	return ((void *)addr);
 }
@@ -424,10 +424,10 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	VM_OBJECT_WUNLOCK(object);
 	kmem_alloc_san(addr, size, asize, flags);
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
-	KASSERT(cheri_getlen(addr) == asize,
+	KASSERT(cheri_tag_get(addr), ("Expected valid capability"));
+	KASSERT(cheri_length_get(addr) == asize,
 	    ("Inexact bounds expected %zx found %zx",
-	    (size_t)asize, (size_t)cheri_getlen(addr)));
+	    (size_t)asize, (size_t)cheri_length_get(addr)));
 #endif
 	return ((void *)addr);
 }
@@ -491,8 +491,8 @@ kmem_subinit(vm_map_t map, vm_map_t parent, vm_pointer_t *min, vm_pointer_t *max
 	int ret;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(min), ("Expected valid capability min"));
-	KASSERT(cheri_gettag(max), ("Expected valid capability max"));
+	KASSERT(cheri_tag_get(min), ("Expected valid capability min"));
+	KASSERT(cheri_tag_get(max), ("Expected valid capability max"));
 #endif
 	size = round_page(size);
 
@@ -546,7 +546,7 @@ kmem_malloc_domain(int domain, vm_size_t size, int flags)
 	}
 	kasan_mark((void *)addr, size, asize, KASAN_KMEM_REDZONE);
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+	KASSERT(cheri_tag_get(addr), ("Expected valid capability"));
 #endif
 	return ((void *)addr);
 }
@@ -601,7 +601,7 @@ kmem_back_domain(int domain, vm_object_t object, vm_pointer_t addr,
 	KASSERT(object == kernel_object,
 	    ("kmem_back_domain: only supports kernel object."));
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+	KASSERT(cheri_tag_get(addr), ("Expected valid capability"));
 #endif
 
 	offset = addr - VM_MIN_KERNEL_ADDRESS;
@@ -924,8 +924,8 @@ kmem_init(vm_pointer_t start, vm_pointer_t end)
 	vm_size_t size;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(start), ("Expected valid start capability"));
-	KASSERT(cheri_gettag(end), ("Expected valid end capability"));
+	KASSERT(cheri_tag_get(start), ("Expected valid start capability"));
+	KASSERT(cheri_tag_get(end), ("Expected valid end capability"));
 #endif
 
 	vm_map_init_system(kernel_map, kernel_pmap,

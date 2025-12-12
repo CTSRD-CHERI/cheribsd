@@ -54,7 +54,7 @@ lb_alloc(struct linear_buffer *lb, int len)
 		return (NULL);
 	lb->offset = (data + len) - lb->base;
 #ifdef __CHERI_PURE_CAPABILITY__
-	return (cheri_setboundsexact(data, len));
+	return (cheri_bounds_set_exact(data, len));
 #else
 	return (data);
 #endif

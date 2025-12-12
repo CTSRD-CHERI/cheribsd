@@ -629,7 +629,7 @@ proc_read_cheri_cap_page(vm_map_t map, vm_offset_t va, struct uio *uio)
 	src = (uintcap_t *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(m)) + pageoff /
 	    sizeof(uintcap_t);
 	while (todo > 0) {
-		capbuf[0] = cheri_gettag(*src);
+		capbuf[0] = cheri_tag_get(*src);
 		memcpy(capbuf + 1, src, sizeof(*src));
 
 		error = uiomove(capbuf, sizeof(capbuf), uio);

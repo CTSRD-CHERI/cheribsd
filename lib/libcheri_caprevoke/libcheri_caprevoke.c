@@ -172,7 +172,7 @@ caprev_shadow_nomap_common_pfx(ptraddr_t sbase, uint64_t * __capability sb,
     uint64_t * __capability *fw)
 {
 	caprev_shadow_nomap_offsets(ob, len, fwo, lwo);
-	*fw = cheri_setaddress(sb, sbase + *fwo);
+	*fw = cheri_address_set(sb, sbase + *fwo);
 }
 
 /*
@@ -245,7 +245,7 @@ caprev_shadow_nomap_set_len(ptraddr_t sbase, uint64_t * __capability sb,
 		 * special handling.
 		 */
 
-		lw = cheri_setaddress(sb, sbase + lwo);
+		lw = cheri_address_set(sb, sbase + lwo);
 		lwm = caprev_shadow_nomap_last_word_mask(ob, len);
 
 		/*
@@ -312,7 +312,7 @@ caprev_shadow_nomap_set(ptraddr_t sbase, uint64_t * __capability sb,
     void * __capability priv_obj, void * __capability user_obj)
 {
 	return (caprev_shadow_nomap_set_len(sbase, sb,
-	    (__cheri_addr ptraddr_t)priv_obj, cheri_getlen(priv_obj),
+	    (__cheri_addr ptraddr_t)priv_obj, cheri_length_get(priv_obj),
 	    user_obj));
 }
 
@@ -345,7 +345,7 @@ caprev_shadow_nomap_clear_len(ptraddr_t sbase, uint64_t * __capability sb,
 		uint64_t * __capability sbo;
 		ptrdiff_t wo;
 
-		lw = cheri_setaddress(sb, sbase + lwo);
+		lw = cheri_address_set(sb, sbase + lwo);
 		lwm = ~caprev_shadow_nomap_last_word_mask(ob, len);
 
 		/*
@@ -388,7 +388,7 @@ caprev_shadow_nomap_clear(ptraddr_t sbase, uint64_t * __capability sb,
     void * __capability obj)
 {
 	return (caprev_shadow_nomap_clear_len(sbase, sb,
-	    (__cheri_addr ptraddr_t)obj, cheri_getlen(obj)));
+	    (__cheri_addr ptraddr_t)obj, cheri_length_get(obj)));
 }
 
 /*
@@ -411,7 +411,7 @@ caprev_shadow_nomap_set_raw(ptraddr_t sbase, uint64_t * __capability sb,
 
 	caprev_shadow_nomap_offsets(heap_start, len, &fwo, &lwo);
 
-	fw = cheri_setaddress(sb, sbase + fwo);
+	fw = cheri_address_set(sb, sbase + fwo);
 	*fw |= caprev_shadow_nomap_first_word_mask(heap_start, len);
 
 	if (lwo != fwo) {
@@ -422,7 +422,7 @@ caprev_shadow_nomap_set_raw(ptraddr_t sbase, uint64_t * __capability sb,
 			*w = ~(uint64_t)0;
 		}
 
-		w = cheri_setaddress(sb, sbase + lwo);
+		w = cheri_address_set(sb, sbase + lwo);
 		*w |= caprev_shadow_nomap_last_word_mask(heap_start, len);
 	}
 }
@@ -437,7 +437,7 @@ caprev_shadow_nomap_clear_raw(ptraddr_t sbase, uint64_t * __capability sb,
 
 	caprev_shadow_nomap_offsets(heap_start, len, &fwo, &lwo);
 
-	fw = cheri_setaddress(sb, sbase + fwo);
+	fw = cheri_address_set(sb, sbase + fwo);
 	*fw &= ~caprev_shadow_nomap_first_word_mask(heap_start, len);
 
 	if (lwo != fwo) {
@@ -448,7 +448,7 @@ caprev_shadow_nomap_clear_raw(ptraddr_t sbase, uint64_t * __capability sb,
 			*w = 0;
 		}
 
-		w = cheri_setaddress(sb, sbase + lwo);
+		w = cheri_address_set(sb, sbase + lwo);
 		*w &= ~caprev_shadow_nomap_last_word_mask(heap_start, len);
 	}
 }

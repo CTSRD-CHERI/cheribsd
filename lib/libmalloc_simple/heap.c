@@ -148,8 +148,8 @@ __rederive_pointer(void *ptr)
 	pp = curpp;
 	while (pp != NULL) {
 		char *pool = (char *)pp;
-		if (cheri_is_address_inbounds(pool, cheri_getbase(ptr)))
-			return (cheri_setaddress(pool, cheri_getaddress(ptr)));
+		if (cheri_is_address_inbounds(pool, cheri_base_get(ptr)))
+			return (cheri_address_set(pool, cheri_address_get(ptr)));
 		pp = pp->ph_next;
 	}
 
@@ -163,7 +163,7 @@ __paint_shadow(void *mem, size_t size)
 {
 	struct pagepool_header *pp;
 
-	pp = cheri_setoffset(mem, 0);
+	pp = cheri_offset_set(mem, 0);
 	/*
 	 * Defer initializing ph_shadow since odds are good we'll never
 	 * need it.
@@ -181,7 +181,7 @@ __clear_shadow(void *mem, size_t size)
 {
 	struct pagepool_header *pp;
 
-	pp = cheri_setoffset(mem, 0);
+	pp = cheri_offset_set(mem, 0);
 	caprev_shadow_nomap_clear_raw(cri->base_mem_nomap,
 	    pp->ph_shadow, (ptraddr_t)mem, size);
 }

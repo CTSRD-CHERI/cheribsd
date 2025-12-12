@@ -38,7 +38,7 @@
 #endif
 
 #ifdef _KERNEL
-#define	__USER_DDC ((cheri_getperm(__USER_PCC) & CHERI_PERM_EXECUTIVE) ? \
+#define	__USER_DDC ((cheri_perms_get(__USER_PCC) & CHERI_PERM_EXECUTIVE) ? \
     (void * __capability)curthread->td_frame->tf_ddc :			\
     (void * __capability)READ_SPECIALREG_CAP(rddc_el0))
 #define	__USER_PCC	((void * __capability)curthread->td_frame->tf_elr)

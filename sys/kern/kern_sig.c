@@ -2111,7 +2111,7 @@ sys_sigqueue(struct thread *td, struct sigqueue_args *uap)
 		 * CheriABI processess? (Would have to happen in
 		 * delivery code to avoid a race).
 		 */
-		if (cheri_gettag(uap->value))
+		if (cheri_tag_get(uap->value))
 			return (EPROT);
 		memset(&sv2, 0, sizeof(sv2));
 		sv2.sival_int = sv.sival_int;

@@ -402,25 +402,25 @@ build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
 
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
 	    (uintcap_t)code_cap : (uintcap_t)data_cap;
-	cap = cheri_setaddress(cap, addr);
+	cap = cheri_address_set(cap, addr);
 
 	if (perms == MORELLO_FRAG_EXECUTABLE ||
 	    perms == MORELLO_FRAG_RODATA) {
-		cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
+		cap = cheri_perms_clear(cap, CHERI_PERM_SEAL |
 		    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
 		    CHERI_PERM_STORE_LOCAL_CAP);
 	}
 	if (perms == MORELLO_FRAG_RWDATA ||
 	    perms == MORELLO_FRAG_RODATA) {
-		cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
+		cap = cheri_perms_clear(cap, CHERI_PERM_SEAL |
 		    CHERI_PERM_EXECUTE);
-		cap = cheri_setbounds(cap, size);
+		cap = cheri_bounds_set(cap, size);
 	}
 	cap += offset;
 	if (perms == MORELLO_FRAG_EXECUTABLE) {
-		cap = cheri_sealentry(cap);
+		cap = cheri_sentry_create(cap);
 	}
-	KASSERT(cheri_gettag(cap) != 0,
+	KASSERT(cheri_tag_get(cap) != 0,
 	    ("Relocation produce invalid capability %#lp",
 	    (void * __capability)cap));
 	return (cap);
@@ -587,7 +587,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		 * the lookup function instead.
 		 */
 		if (addend != 0) {
-			KASSERT(!cheri_getsealed(addr),
+			KASSERT(!cheri_is_sealed(addr),
 			    ("%s: sentry %#p with non-zero addend %#lx",
 			    __func__, (void *)addr, addend));
 
@@ -611,10 +611,10 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		if ((where[0] == 0 && where[1] == 0) ||
 		    (Elf_Ssize)where[0] == rela->r_addend) {
 			addr = (uintptr_t)(relocbase + rela->r_addend);
-			addr = cheri_clearperm(addr, CHERI_PERM_SEAL |
+			addr = cheri_perms_clear(addr, CHERI_PERM_SEAL |
 			    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
 			    CHERI_PERM_STORE_LOCAL_CAP);
-			addr = cheri_sealentry(addr);
+			addr = cheri_sentry_create(addr);
 		} else
 			addr = build_cap_from_fragment(where,
 			    (Elf_Addr)relocbase, rela->r_addend,
@@ -765,7 +765,7 @@ elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
 	for (; dynp->d_tag != DT_NULL; dynp++) {
 		switch (dynp->d_tag) {
 		case DT_RELA:
-			rela = (const Elf_Rela *)cheri_setaddress(data_cap,
+			rela = (const Elf_Rela *)cheri_address_set(data_cap,
 			    dynp->d_un.d_ptr);
 			break;
 		case DT_RELASZ:
@@ -774,7 +774,7 @@ elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
 		}
 	}
 
-	rela = cheri_setbounds(rela, rela_size);
+	rela = cheri_bounds_set(rela, rela_size);
 	rela_end = (const Elf_Rela *)((const char *)rela + rela_size);
 
 	for (; rela < rela_end; rela++) {
@@ -782,7 +782,7 @@ elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
 		switch (ELF_R_TYPE(rela->r_info)) {
 		case R_MORELLO_RELATIVE:
 		case R_MORELLO_FUNC_RELATIVE:
-			fragment = (Elf_Addr *)cheri_setaddress(data_cap,
+			fragment = (Elf_Addr *)cheri_address_set(data_cap,
 			    rela->r_offset);
 			cap = build_cap_from_fragment(fragment, 0,
 			    rela->r_addend, data_cap, code_cap);

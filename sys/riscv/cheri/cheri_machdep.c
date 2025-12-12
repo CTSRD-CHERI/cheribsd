@@ -52,32 +52,32 @@ cheri_init_capabilities(void * __capability kroot)
 {
 	void * __capability ctemp;
 
-	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_KERNEL_BASE);
-	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_KERNEL_LENGTH);
-	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_KERNEL_PERMS);
+	ctemp = cheri_address_set(kroot, CHERI_SEALCAP_KERNEL_BASE);
+	ctemp = cheri_bounds_set(ctemp, CHERI_SEALCAP_KERNEL_LENGTH);
+	ctemp = cheri_perms_and(ctemp, CHERI_SEALCAP_KERNEL_PERMS);
 	kernel_root_sealcap = ctemp;
 
-	ctemp = cheri_setaddress(kroot, CHERI_CAP_USER_DATA_BASE);
-	ctemp = cheri_setbounds(ctemp, CHERI_CAP_USER_DATA_LENGTH);
-	ctemp = cheri_andperm(ctemp, CHERI_CAP_USER_DATA_PERMS |
+	ctemp = cheri_address_set(kroot, CHERI_CAP_USER_DATA_BASE);
+	ctemp = cheri_bounds_set(ctemp, CHERI_CAP_USER_DATA_LENGTH);
+	ctemp = cheri_perms_and(ctemp, CHERI_CAP_USER_DATA_PERMS |
 	    CHERI_CAP_USER_CODE_PERMS | CHERI_PERM_SW_VMEM);
 	userspace_root_cap = ctemp;
 
-	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_USERSPACE_BASE);
-	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_USERSPACE_LENGTH);
-	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_USERSPACE_PERMS);
+	ctemp = cheri_address_set(kroot, CHERI_SEALCAP_USERSPACE_BASE);
+	ctemp = cheri_bounds_set(ctemp, CHERI_SEALCAP_USERSPACE_LENGTH);
+	ctemp = cheri_perms_and(ctemp, CHERI_SEALCAP_USERSPACE_PERMS);
 	userspace_root_sealcap = ctemp;
 
 	swap_restore_cap = kroot;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	ctemp = cheri_setaddress(kroot, VM_MAX_KERNEL_ADDRESS -
+	ctemp = cheri_address_set(kroot, VM_MAX_KERNEL_ADDRESS -
 	    PMAP_MAPDEV_EARLY_SIZE);
-	ctemp = cheri_setboundsexact(ctemp, PMAP_MAPDEV_EARLY_SIZE);
-	ctemp = cheri_andperm(ctemp, CHERI_PERMS_KERNEL_DATA);
+	ctemp = cheri_bounds_set_exact(ctemp, PMAP_MAPDEV_EARLY_SIZE);
+	ctemp = cheri_perms_and(ctemp, CHERI_PERMS_KERNEL_DATA);
 	devmap_init_capability(ctemp);
 
-	kernel_root_cap = cheri_andperm(kroot,
+	kernel_root_cap = cheri_perms_and(kroot,
 	    ~(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL));
 #endif
 }

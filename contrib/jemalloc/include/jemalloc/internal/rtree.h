@@ -206,9 +206,9 @@ JEMALLOC_ALWAYS_INLINE extent_t *
 rtree_leaf_elm_bits_extent_get(uintptr_t bits) {
 #    ifdef __CHERI_PURE_CAPABILITY__
 	/* We use the offset to store the other bits -> set offset to zero */
-	assert(cheri_getoffset(bits) < (1 << 10) &&
+	assert(cheri_offset_get(bits) < (1 << 10) &&
 	    "Should store at most 9 bits in the offset field!");
-	return (extent_t *)cheri_setoffset(bits, 0);
+	return (extent_t *)cheri_offset_set(bits, 0);
 #    elif defined(__aarch64__)
 	/*
 	 * aarch64 doesn't sign extend the highest virtual address bit to set
@@ -230,7 +230,7 @@ JEMALLOC_ALWAYS_INLINE szind_t
 rtree_leaf_elm_bits_szind_get(uintptr_t bits) {
 #    ifdef __CHERI_PURE_CAPABILITY__
 	/* Lowest bit of offset is the boolean flag -> shift by one for szind */
-	uintptr_t szind_raw = cheri_getoffset((void*)bits) >> 1;
+	uintptr_t szind_raw = cheri_offset_get((void*)bits) >> 1;
 	assert((szind_raw >> 8) == 0 && "All offset bits above szind should be zero!");
 	return (szind_t)szind_raw;
 #    else
@@ -242,7 +242,7 @@ JEMALLOC_ALWAYS_INLINE bool
 rtree_leaf_elm_bits_slab_get(uintptr_t bits) {
 #    ifdef __CHERI_PURE_CAPABILITY__
 	/* Lowest bit of offset is the boolean flag */
-	return (bool)(cheri_getoffset((void*)bits) & 0x1);
+	return (bool)(cheri_offset_get((void*)bits) & 0x1);
 #    else
 	return (bool)(bits & (uintptr_t)0x1);
 #    endif
@@ -260,7 +260,7 @@ rtree_leaf_elm_extent_read(tsdn_t *tsdn, rtree_t *rtree,
 	extent_t *extent = (extent_t *)atomic_load_p(&elm->le_extent, dependent
 	    ? ATOMIC_RELAXED : ATOMIC_ACQUIRE);
 #ifdef __CHERI_PURE_CAPABILITY__
-	assert(cheri_getoffset(extent) == 0 && "Offset must be zero for packing");
+	assert(cheri_offset_get(extent) == 0 && "Offset must be zero for packing");
 #endif
 	return extent;
 #endif
@@ -296,10 +296,10 @@ rtree_leaf_elm_extent_write(tsdn_t *tsdn, rtree_t *rtree,
 #ifdef RTREE_LEAF_COMPACT
 	uintptr_t old_bits = rtree_leaf_elm_bits_read(tsdn, rtree, elm, true);
 #ifdef __CHERI_PURE_CAPABILITY__
-	assert(cheri_getoffset(extent) == 0 && "Offset must be zero for packing");
+	assert(cheri_offset_get(extent) == 0 && "Offset must be zero for packing");
 	/* Copying the old offset to the new pointer copies szind and slab information */
-	uintptr_t bits = (uintptr_t)cheri_setoffset((void*)extent,
-	    cheri_getoffset((void*)old_bits));
+	uintptr_t bits = (uintptr_t)cheri_offset_set((void*)extent,
+	    cheri_offset_get((void*)old_bits));
 #else
 	uintptr_t bits = ((uintptr_t)rtree_leaf_elm_bits_szind_get(old_bits) <<
 	    LG_VADDR) | ((uintptr_t)extent & (((uintptr_t)0x1 << LG_VADDR) - 1))
@@ -320,7 +320,7 @@ rtree_leaf_elm_szind_write(tsdn_t *tsdn, rtree_t *rtree,
 	uintptr_t old_bits = rtree_leaf_elm_bits_read(tsdn, rtree, elm,
 	    true);
 #ifdef __CHERI_PURE_CAPABILITY__
-	uintptr_t bits = (uintptr_t)cheri_setoffset((void*)old_bits,
+	uintptr_t bits = (uintptr_t)cheri_offset_set((void*)old_bits,
 	    (uintptr_t)szind << 1 | (uintptr_t)rtree_leaf_elm_bits_slab_get(old_bits));
 #else
 	uintptr_t bits = ((uintptr_t)szind << LG_VADDR) |
@@ -341,7 +341,7 @@ rtree_leaf_elm_slab_write(tsdn_t *tsdn, rtree_t *rtree,
 	uintptr_t old_bits = rtree_leaf_elm_bits_read(tsdn, rtree, elm,
 	    true);
 #ifdef __CHERI_PURE_CAPABILITY__
-	uintptr_t bits = (uintptr_t)cheri_setoffset((void*)old_bits,
+	uintptr_t bits = (uintptr_t)cheri_offset_set((void*)old_bits,
 	    (uintptr_t)rtree_leaf_elm_bits_szind_get(old_bits) << 1 | (uintptr_t)slab);
 #else
 	uintptr_t bits = ((uintptr_t)rtree_leaf_elm_bits_szind_get(old_bits) <<
@@ -359,8 +359,8 @@ rtree_leaf_elm_write(tsdn_t *tsdn, rtree_t *rtree,
     rtree_leaf_elm_t *elm, extent_t *extent, szind_t szind, bool slab) {
 #ifdef RTREE_LEAF_COMPACT
 #ifdef __CHERI_PURE_CAPABILITY__
-	assert(cheri_getoffset(extent) == 0 && "Offset must be zero for packing");
-	uintptr_t bits = (uintptr_t)cheri_setoffset((void*)extent,
+	assert(cheri_offset_get(extent) == 0 && "Offset must be zero for packing");
+	uintptr_t bits = (uintptr_t)cheri_offset_set((void*)extent,
 	    szind << 1 | (uintptr_t)slab);
 #else
 	uintptr_t bits = ((uintptr_t)szind << LG_VADDR) |

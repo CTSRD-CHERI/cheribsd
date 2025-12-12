@@ -567,7 +567,7 @@ pagecopy_cleartags(void *s, void *d)
 	dst = d;
 	src = s;
 	for (i = 0; i < PAGE_SIZE / sizeof(*dst); i++)
-		*dst++ = cheri_cleartag(*src++);
+		*dst++ = cheri_tag_clear(*src++);
 #else
 	pagecopy(s, d);
 #endif
@@ -1400,10 +1400,10 @@ pmap_bootstrap_dmap(void)
 	}
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	dmap_base_cap = cheri_setaddress(kernel_root_cap, DMAP_MIN_ADDRESS);
-	dmap_base_cap = cheri_setbounds(dmap_base_cap,
+	dmap_base_cap = cheri_address_set(kernel_root_cap, DMAP_MIN_ADDRESS);
+	dmap_base_cap = cheri_bounds_set(dmap_base_cap,
 	    dmap_phys_max - dmap_phys_base);
-	dmap_base_cap = cheri_andperm(dmap_base_cap,
+	dmap_base_cap = cheri_perms_and(dmap_base_cap,
 	    CHERI_PERMS_KERNEL_DATA);
 #endif
 
@@ -1471,9 +1471,9 @@ pmap_bootstrap(vm_size_t kernlen)
 
 	bs_state.freemempos = KERNBASE;
 #ifdef __CHERI_PURE_CAPABILITY__
-	bs_state.freemempos = (vm_pointer_t)cheri_setaddress(kernel_root_cap,
+	bs_state.freemempos = (vm_pointer_t)cheri_address_set(kernel_root_cap,
 	    bs_state.freemempos);
-	bs_state.freemempos = cheri_setbounds(bs_state.freemempos,
+	bs_state.freemempos = cheri_bounds_set(bs_state.freemempos,
 	    VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE - KERNBASE);
 #endif
 	bs_state.freemempos = roundup2(bs_state.freemempos + kernlen, PAGE_SIZE);
@@ -1503,8 +1503,8 @@ pmap_bootstrap(vm_size_t kernlen)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define alloc_pages(var, np)						\
-	(var) = cheri_setbounds(bs_state.freemempos, (np * PAGE_SIZE));	\
-	bs_state.freemempos += cheri_getlen((void *)(var));		\
+	(var) = cheri_bounds_set(bs_state.freemempos, (np * PAGE_SIZE));	\
+	bs_state.freemempos += cheri_length_get((void *)(var));		\
 	memset((char *)(var), 0, ((np) * PAGE_SIZE));
 #else
 #define alloc_pages(var, np)						\
@@ -2508,7 +2508,7 @@ vm_pointer_t
 pmap_map(vm_pointer_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
-	return cheri_andperm(cheri_setbounds(PHYS_TO_DMAP(start), end - start),
+	return cheri_perms_and(cheri_bounds_set(PHYS_TO_DMAP(start), end - start),
 	    vm_map_prot2perms(prot));
 #else
 	return PHYS_TO_DMAP(start);

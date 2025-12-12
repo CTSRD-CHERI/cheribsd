@@ -1195,7 +1195,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #ifdef CHERI_LIB_C18N
     return ((func_ptr_type)tramp_intern(NULL, RTLD_COMPART_ID,
 	&(struct tramp_data) {
-	    .target = cheri_sealentry(obj_main->entry),
+	    .target = cheri_sentry_create(obj_main->entry),
 	    .defobj = obj_main,
 	    .sig = (struct func_sig) {
 		    .valid = true,
@@ -1503,19 +1503,19 @@ create_pcc_caps(Obj_Entry *obj, const char *name)
 		switch (ph->p_type) {
 		case PT_CHERI_PCC:
 			pcc_cap = obj->text_rodata_cap + ph->p_vaddr;
-			pcc_cap = cheri_setbounds(pcc_cap, ph->p_memsz);
+			pcc_cap = cheri_bounds_set(pcc_cap, ph->p_memsz);
 
 			/*
-			 * TODO: Use cheri_setbounds_exact once we can
+			 * TODO: Use cheri_bounds_set_exact once we can
 			 * assume that never traps (ISAv9).
 			 */
-			if (cheri_getbase(pcc_cap) !=
-			    cheri_getaddress(pcc_cap)) {
+			if (cheri_base_get(pcc_cap) !=
+			    cheri_address_get(pcc_cap)) {
 				_rtld_error("pcc_cap %#p start is not aligned for %s",
 				    pcc_cap, name);
 				return (false);
 			}
-			if (cheri_getlen(pcc_cap) != ph->p_memsz) {
+			if (cheri_length_get(pcc_cap) != ph->p_memsz) {
 				_rtld_error("pcc_cap %#p length is not %zu for %s",
 				    pcc_cap, (size_t)ph->p_memsz, name);
 				return (false);
@@ -1534,9 +1534,9 @@ create_pcc_caps(Obj_Entry *obj, const char *name)
 		pcc_cap = obj->pcc_caps[i];
 		for (j = 0; j < i; j++) {
 			if (cheri_is_address_inbounds(pcc_cap,
-			    cheri_getbase(obj->pcc_caps[j])) ||
+			    cheri_base_get(obj->pcc_caps[j])) ||
 			    cheri_is_address_inbounds(obj->pcc_caps[j],
-			    cheri_getbase(pcc_cap))) {
+			    cheri_base_get(pcc_cap))) {
 				_rtld_error("Overlapping PCC capabilities for %s",
 				    name);
 				return (false);
@@ -1560,15 +1560,15 @@ pcc_cap(const Obj_Entry *obj, Elf_Off offset)
 
 	if (obj->npcc_caps == 0) {
 		pcc_cap = obj->text_rodata_cap + offset;
-		return (cheri_clearperm(pcc_cap, CAP_RELOC_REMOVE_PERMS));
+		return (cheri_perms_clear(pcc_cap, CAP_RELOC_REMOVE_PERMS));
 	}
 
 	addr = (Elf_Addr)(uintptr_t)obj->relocbase + offset;
 	for (unsigned long i = 0; i < obj->npcc_caps; i++) {
 		pcc_cap = obj->pcc_caps[i];
-		if (addr >= (ptraddr_t)pcc_cap && addr < cheri_gettop(pcc_cap)) {
-			pcc_cap = cheri_setaddress(pcc_cap, addr);
-			return (cheri_clearperm(pcc_cap, CAP_RELOC_REMOVE_PERMS));
+		if (addr >= (ptraddr_t)pcc_cap && addr < cheri_top_get(pcc_cap)) {
+			pcc_cap = cheri_address_set(pcc_cap, addr);
+			return (cheri_perms_clear(pcc_cap, CAP_RELOC_REMOVE_PERMS));
 		}
 	}
 	return (NULL);
@@ -2099,7 +2099,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 
 	obj->phsize = ph->p_memsz;
 #ifdef __CHERI_PURE_CAPABILITY__
-	obj->phdr = cheri_setbounds(phdr, ph->p_memsz);
+	obj->phdr = cheri_bounds_set(phdr, ph->p_memsz);
 #else
 	obj->phdr = phdr;
 #endif
@@ -2114,11 +2114,11 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
      * towards being able to run everything as co-processes we now reject
      * loading any positition dependent CheriABI binaries.
      */
-    if (cheri_getaddress(obj->relocbase) == 0) {
+    if (cheri_address_get(obj->relocbase) == 0) {
 	_rtld_error("%s: Cannot load position dependent CheriABI binary with "
 	     "zero relocation base", path);
 	return NULL;
-    } else if (!cheri_gettag(obj->relocbase)) {
+    } else if (!cheri_tag_get(obj->relocbase)) {
 	_rtld_error("%s: Cannot load CheriABI binary with unrepresentable"
 	    "relocation base (" PTR_FMT ")", path, obj->relocbase);
 	return NULL;
@@ -2193,7 +2193,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
      * Derive text_rodata cap from AT_ENTRY (but set the address to the beginning
      * of the object).
      */
-    obj->text_rodata_cap = (const char *)cheri_copyaddress(entry, obj->relocbase);
+    obj->text_rodata_cap = (const char *)cheri_address_copy(entry, obj->relocbase);
     fix_obj_mapping_cap_permissions(obj, path);
     if (!create_pcc_caps(obj, path))
 	return (NULL);
@@ -4652,7 +4652,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    sym = __tls_get_addr(&ti);
 	    /* CHERI-RISC-V ABI does not yet set TLS bounds; mirror in dlsym */
 #if !defined(__riscv) && defined(__CHERI_PURE_CAPABILITY__)
-	    sym = cheri_setbounds(sym, def->st_size);
+	    sym = cheri_bounds_set(sym, def->st_size);
 #endif
 	    dbg("dlsym(%s) is TLS. Resolved to: " PTR_FMT, name, sym);
 	} else {
@@ -4663,7 +4663,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(DEBUG)
 	// FIXME: this warning breaks some tests that expect clean stdout/stderr
 	// FIXME: See https://github.com/CTSRD-CHERI/cheribsd/issues/257
-	if (cheri_getlen(sym) <= 0) {
+	if (cheri_length_get(sym) <= 0) {
 		rtld_fdprintf(STDERR_FILENO, "Warning: created zero length "
 		    "capability for %s (in %s): " PTR_FMT "\n", name, defobj->path, sym);
 	}
@@ -4750,7 +4750,7 @@ dladdr(const void *addr, Dl_info *info)
     info->dli_fbase = obj->mapbase;
 #ifdef __CHERI_PURE_CAPABILITY__
     /* Clear all permissions from dli_fbase to avoid direct access */
-    info->dli_fbase = cheri_andperm(info->dli_fbase, 0);
+    info->dli_fbase = cheri_perms_and(info->dli_fbase, 0);
 #endif
     info->dli_saddr = (void *)0;
     info->dli_sname = NULL;
@@ -4781,7 +4781,7 @@ dladdr(const void *addr, Dl_info *info)
         symbol_addr = obj->relocbase + def->st_value;
 #ifdef __CHERI_PURE_CAPABILITY__
         /* Clear all permissions from the symbol_addr */
-        symbol_addr = cheri_andperm(symbol_addr, 0);
+        symbol_addr = cheri_perms_and(symbol_addr, 0);
 #endif
         if (symbol_addr > addr || symbol_addr < info->dli_saddr)
             continue;
@@ -4854,9 +4854,9 @@ static void
 rtld_fill_dl_phdr_info(const Obj_Entry *obj, struct dl_phdr_info *phdr_info)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
-	phdr_info->dlpi_addr = (uintptr_t)cheri_andperm(obj->relocbase,
+	phdr_info->dlpi_addr = (uintptr_t)cheri_perms_and(obj->relocbase,
 	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP);
-	phdr_info->dlpi_phdr = cheri_andperm(obj->phdr, CHERI_PERM_LOAD |
+	phdr_info->dlpi_phdr = cheri_perms_and(obj->phdr, CHERI_PERM_LOAD |
 	    CHERI_PERM_LOAD_CAP);
 #else
 	phdr_info->dlpi_addr = (Elf_Addr)obj->relocbase;
@@ -6502,9 +6502,9 @@ c18n_assign_plt_compartments(Obj_Entry *obj)
 static const void *
 c18n_clear_pcc_perms(const char *name, const void *pcc)
 {
-	pcc = cheri_clearperm(pcc, CHERI_PERM_EXECUTIVE);
+	pcc = cheri_perms_clear(pcc, CHERI_PERM_EXECUTIVE);
 	if (strcmp("libsys.so.7", name) != 0)
-		pcc = cheri_clearperm(pcc, CHERI_PERM_SYSCALL);
+		pcc = cheri_perms_clear(pcc, CHERI_PERM_SYSCALL);
 	return (pcc);
 }
 

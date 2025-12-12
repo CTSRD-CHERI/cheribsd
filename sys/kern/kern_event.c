@@ -2882,9 +2882,9 @@ kqueue_cheri_revoke_note(const struct vm_cheri_revoke_cookie *crc,
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 	int res = 1;
 
-	if (!cheri_gettag(id)) {
+	if (!cheri_tag_get(id)) {
 		; /* nothing to be done */
-	} else if (__builtin_cheri_equal_exact(id, kn->kn_kevent.ident)) {
+	} else if (cheri_is_equal_exact(id, kn->kn_kevent.ident)) {
 		CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 		kn->kn_kevent.ident = (kuintcap_t)cheri_revoke_cap(id);
 	} else {
@@ -2895,9 +2895,9 @@ kqueue_cheri_revoke_note(const struct vm_cheri_revoke_cookie *crc,
 		res = 0;
 	}
 
-	if (!cheri_gettag(ud)) {
+	if (!cheri_tag_get(ud)) {
 		;
-	} else if (__builtin_cheri_equal_exact(ud, kn->kn_kevent.udata)) {
+	} else if (cheri_is_equal_exact(ud, kn->kn_kevent.udata)) {
 		CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 		kn->kn_kevent.udata = (void * __capability)cheri_revoke_cap(ud);
 	} else {
@@ -2928,13 +2928,13 @@ kqueue_cheri_revoke_list(struct kqueue *kq,
 
 		uintcap_t ud = (uintcap_t)kn->kn_kevent.udata;
 		uintcap_t id = kn->kn_kevent.ident;
-		if (!cheri_gettag(ud) && !cheri_gettag(id)) {
+		if (!cheri_tag_get(ud) && !cheri_tag_get(id)) {
 			continue;
 		} else {
-			if (cheri_gettag(id)) {
+			if (cheri_tag_get(id)) {
 				CHERI_REVOKE_STATS_BUMP(crst, caps_found);
 			}
-			if (cheri_gettag(ud)) {
+			if (cheri_tag_get(ud)) {
 				CHERI_REVOKE_STATS_BUMP(crst, caps_found);
 			}
 		}

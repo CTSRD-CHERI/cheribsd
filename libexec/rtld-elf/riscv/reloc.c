@@ -125,7 +125,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 			break;
 		}
 	}
-	caprelocs = cheri_setbounds(caprelocs, caprelocssz);
+	caprelocs = cheri_bounds_set(caprelocs, caprelocssz);
 	caprelocslim = (const struct capreloc *)((const char *)caprelocs + caprelocssz);
 	pcc = __builtin_cheri_program_counter_get();
 	/* TODO: allow using tight bounds for RTLD */

@@ -385,10 +385,10 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	ef = (elf_file_t)lf;
 	ef->preloaded = 1;
 #ifdef __CHERI_PURE_CAPABILITY__
-	ef->address = cheri_setaddress(kernel_root_cap,
+	ef->address = cheri_address_set(kernel_root_cap,
 	    *(ptraddr_t *)baseptr);
-	ef->address = cheri_setbounds(ef->address, *(size_t *)sizeptr);
-	ef->address = cheri_andperm(ef->address, CHERI_PERMS_KERNEL_CODE |
+	ef->address = cheri_bounds_set(ef->address, *(size_t *)sizeptr);
+	ef->address = cheri_perms_and(ef->address, CHERI_PERMS_KERNEL_CODE |
 	    CHERI_PERMS_KERNEL_DATA);
 #else
 	ef->address = *(caddr_t *)baseptr;
@@ -494,7 +494,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	section_ptr(shdr)					       \
-	cheri_setbounds(cheri_setaddress(ef->address, (shdr).sh_addr), \
+	cheri_bounds_set(cheri_address_set(ef->address, (shdr).sh_addr), \
 	    (shdr).sh_size)
 #else
 #define	section_ptr(shdr)	(void *)((shdr).sh_addr)
@@ -1568,15 +1568,15 @@ make_capability(const Elf_Sym *sym, caddr_t val)
 	switch (ELF_ST_TYPE(sym->st_info)) {
 	case STT_FUNC:
 	case STT_GNU_IFUNC:
-		val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
+		val = cheri_perms_and(val, CHERI_PERMS_KERNEL_CODE);
 #ifdef CHERI_FLAGS_CAP_MODE
-		val = cheri_setflags(val, CHERI_FLAGS_CAP_MODE);
+		val = cheri_flags_set(val, CHERI_FLAGS_CAP_MODE);
 #endif
-		val = cheri_sealentry(val);
+		val = cheri_sentry_create(val);
 		break;
 	default:
-		val = cheri_setbounds(val, sym->st_size);
-		val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
+		val = cheri_bounds_set(val, sym->st_size);
+		val = cheri_perms_and(val, CHERI_PERMS_KERNEL_DATA);
 		break;
 	}
 	return (val);
@@ -1625,7 +1625,7 @@ link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
 	ef = (elf_file_t) lf;
 	es = (const Elf_Sym*) sym;
 #ifdef __CHERI_PURE_CAPABILITY__
-	val = cheri_setaddress(ef->address, es->st_value);
+	val = cheri_address_set(ef->address, es->st_value);
 #else
 	val = (caddr_t)es->st_value;
 #endif
@@ -1817,7 +1817,7 @@ elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps, uintptr_t *res)
 	/* Quick answer if there is a definition included. */
 	if (sym->st_shndx != SHN_UNDEF) {
 #ifdef __CHERI_PURE_CAPABILITY__
-		res1 = make_capability(sym, cheri_setaddress(ef->address,
+		res1 = make_capability(sym, cheri_address_set(ef->address,
 		    sym->st_value));
 #else
 		res1 = (Elf_Addr)sym->st_value;

@@ -269,7 +269,7 @@ preload_fetch_addr(caddr_t mod)
 #ifdef __CHERI_PURE_CAPABILITY__
 	mod_size = preload_fetch_size(mod);
 	/* XXX-AM: Which permission do we leave? */
-	return (cheri_setbounds(cheri_setaddress(kernel_root_cap,
+	return (cheri_bounds_set(cheri_address_set(kernel_root_cap,
 	    *mdp + preload_addr_relocate), mod_size));
 #else
 	return ((void *)(*mdp + preload_addr_relocate));
