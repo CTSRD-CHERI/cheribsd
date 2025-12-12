@@ -34,17 +34,67 @@
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
+
+#if __has_feature(capabilities)
 #if !defined(_KERNEL) && !defined(_STANDALONE)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-attributes"
+#include <cheriintrin.h>
+#pragma GCC diagnostic pop
 #include <stdbool.h>
 #endif
 
-#if __has_feature(capabilities)
 #include <cheri/cherireg.h>	/* Permission definitions. */
 
+#if defined(_KERNEL) || defined(_STANDALONE)
 /*
- * Programmer-friendly macros for CHERI-aware C code -- requires use of
- * CHERI-aware Clang/LLVM, and full capability context switching.
+ * Programmer-friendly macros for CHERI-aware C code.  Mirrors
+ * cheriintrin.h from Clang.
  */
+#define	cheri_flags_get(x)	__builtin_cheri_flags_get(x)
+#define	cheri_flags_set(x, y)	__builtin_cheri_flags_set((x), (y))
+#define cheri_address_get(x)	__builtin_cheri_address_get(x)
+#define cheri_address_set(x, y)	__builtin_cheri_address_set((x), (y))
+#define cheri_base_get(x)	__builtin_cheri_base_get(x)
+#define cheri_bounds_get(x)	__builtin_cheri_bounds_get(x)
+#define cheri_bounds_set(x, y) __builtin_cheri_bounds_set((x), (y))
+#define cheri_bounds_set_exact(x, y)					\
+    __builtin_cheri_bounds_set_exact((x), (y))
+#define cheri_cap_build(x, y)	__builtin_cheri_cap_build((x), (y))
+#define cheri_ddc_get()		__builtin_cheri_global_data_get()
+#define cheri_high_get(x)	__builtin_cheri_high_get(x)
+#define cheri_high_set(x, y)	__builtin_cheri_high_set((x), (y))
+#define cheri_is_equal_exact(x, y)					\
+    __builtin_cheri_equal_exact((x), (y))
+#define cheri_is_invalid(x)	(!__builtin_cheri_tag_get(x))
+#define cheri_is_sealed(x)	__builtin_cheri_sealed_get(x)
+#define cheri_is_sentry(x)						\
+    (__builtin_cheri_type_get(x) == CHERI_OTYPE_SENTRY)
+#define cheri_is_unsealed(x)	(!__builtin_cheri_sealed_get(x))
+#define cheri_is_valid(x)	__builtin_cheri_tag_get(x)
+#define cheri_length_get(x)	__builtin_cheri_length_get(x)
+#define cheri_offset_get(x)	__builtin_cheri_offset_get(x)
+#define cheri_offset_set(x, y)	__builtin_cheri_offset_set((x), (y))
+#define cheri_pcc_get()		__builtin_cheri_program_counter_get()
+#define cheri_perms_and(x, y)						\
+    __builtin_cheri_perms_and((x), (__SIZE_TYPE__)(y))
+#define cheri_perms_clear(x, y)						\
+    __builtin_cheri_perms_and((x), ~(__SIZE_TYPE__)(y))
+#define cheri_perms_get(x)	__builtin_cheri_perms_get(x)
+#define cheri_seal(x, y)	__builtin_cheri_seal((x), (y))
+#define cheri_seal_conditionally(x, y)				 	\
+    __builtin_cheri_conditional_seal((x), (y))
+#define cheri_sentry_create(x)	__builtin_cheri_seal_entry(x)
+#define cheri_tag_clear(x)	__builtin_cheri_tag_clear(x)
+#define cheri_tag_get(x)	__builtin_cheri_tag_get(x)
+#define cheri_type_copy(x, y)	__builtin_cheri_cap_type_copy((x), (y))
+#define cheri_type_get(x)	__builtin_cheri_type_get(x)
+#define cheri_unseal(x, y)	__builtin_cheri_unseal((x), (y))
+
+#endif /* defined(_KERNEL) || defined(_STANDALONE) */
+
+#define __WANT_OLD_CHERI_MACROS
+#ifdef __WANT_OLD_CHERI_MACROS
 #define	cheri_getlen(x)		__builtin_cheri_length_get((x))
 #define	cheri_getlength(x)	__builtin_cheri_length_get((x))
 #define	cheri_getbase(x)	__builtin_cheri_base_get((x))
@@ -88,6 +138,8 @@
 /* Compare capabilities including bounds and perms etc. */
 #define cheri_equal_exact(x, y) __builtin_cheri_equal_exact(x, y)
 
+#endif /* __WANT_OLD_CHERI_MACROS */
+
 #ifdef __riscv
 #define	cheri_loadtags(m)						\
 	__builtin_cheri_cap_load_tags((__cheri_tocap void * __capability)(m))
@@ -101,34 +153,39 @@
  * NOTE: This is to be replaced by LLVM intrinsic once the intrinsic and
  * related instruction arguments are stable.
  */
-#define	cheri_is_subset(parent, ptr)					\
-	(cheri_gettag(parent) == cheri_gettag(ptr) &&			\
-	 cheri_getbase(ptr) >= cheri_getbase(parent) &&			\
-	 cheri_gettop(ptr) <= cheri_gettop(parent) &&			\
-	 (cheri_getperm(ptr) & cheri_getperm(parent)) == cheri_getperm(ptr))
+#undef cheri_is_subset
+#define        cheri_is_subset(parent, ptr)				\
+	(cheri_tag_get(parent) == cheri_tag_get(ptr) &&			\
+	 cheri_base_get(ptr) >= cheri_base_get(parent) &&		\
+	 cheri_top_get(ptr) <= cheri_top_get(parent) &&			\
+	 (cheri_perms_get(ptr) & cheri_perms_get(parent)) == cheri_perms_get(ptr))
 
 #define	cheri_is_null_derived(x)					\
-	__builtin_cheri_equal_exact((uintcap_t)cheri_getaddress(x), x)
+	cheri_is_equal_exact((uintcap_t)cheri_address_get(x), x)
 
 /* Create an untagged capability from an integer */
-#define cheri_fromint(x)	cheri_incoffset(NULL, x)
+#define cheri_fromint(x)	cheri_offset_set(NULL, x)
 
 /* Increment @p dst to have the address of @p src */
-#define cheri_copyaddress(dst, src)	(cheri_setaddress(dst, cheri_getaddress(src)))
+#define cheri_address_copy(dst, src)					\
+	(cheri_address_set(dst, cheri_address_get(src)))
+
+#define	cheri_offset_inc(x, y)	__builtin_cheri_offset_increment((x), (y))
 
 /* Get the top of a capability (i.e. one byte past the last accessible one) */
-#define	cheri_gettop(cap)	__extension__({			\
+#define	cheri_top_get(cap)	__extension__({			\
 	__typeof__(cap) c = (cap);				\
-	(cheri_getbase(c) + cheri_getlen(c));			\
+	(cheri_base_get(c) + cheri_length_get(c));		\
 })
 
 /* Check if the address is between cap.base and cap.top, i.e. in bounds */
 static inline bool
 cheri_is_address_inbounds(const void * __capability cap, ptraddr_t addr)
 {
-	return (addr >= cheri_getbase(cap) && addr < cheri_gettop(cap));
+	return (addr >= cheri_base_get(cap) && addr < cheri_top_get(cap));
 }
 
+#ifdef _KERNEL
 /*
  * Check if the capability is valid, unsealed, has the given permissions and
  * grants access to length bytes at address base.
@@ -137,22 +194,32 @@ static inline bool
 cheri_can_access(const void * __capability cap, ptraddr_t perms, ptraddr_t base,
     size_t length)
 {
-	return (cheri_gettag(cap) && !cheri_getsealed(cap) &&
-	    (cheri_getperm(cap) & perms) == perms &&
-	    base >= cheri_getbase(cap) && base + length <= cheri_top_get(cap));
+	return (cheri_tag_get(cap) && !cheri_is_sealed(cap) &&
+	    (cheri_perms_get(cap) & perms) == perms &&
+	    base >= cheri_base_get(cap) && base + length <= cheri_top_get(cap));
+}
+#endif
+
+static inline size_t
+cheri_bytes_remaining(const void * __capability cap)
+{
+	if (cheri_offset_get(cap) >= cheri_length_get(cap))
+		return 0;
+	return cheri_length_get(cap) - cheri_offset_get(cap);
 }
 
+#define	cheri_stack_get()	__builtin_cheri_stack_get()
 
 #endif	/* __has_feature(capabilities) */
 
 #ifdef _KERNEL
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	cheri_kern_gettag(x)		cheri_gettag(x)
-#define	cheri_kern_setbounds(x, y)	cheri_setbounds(x, y)
-#define	cheri_kern_setboundsexact(x, y)	cheri_setboundsexact(x, y)
-#define	cheri_kern_setaddress(x, y)	cheri_setaddress(x, y)
-#define	cheri_kern_getaddress(x)	cheri_setaddress(x)
-#define	cheri_kern_andperm(x, y)	cheri_andperm(x, y)
+#define	cheri_kern_gettag(x)		cheri_tag_get(x)
+#define	cheri_kern_setbounds(x, y)	cheri_bounds_set(x, y)
+#define	cheri_kern_setboundsexact(x, y)	cheri_bounds_set_exact(x, y)
+#define	cheri_kern_setaddress(x, y)	cheri_address_set(x, y)
+#define	cheri_kern_getaddress(x)	cheri_address_get(x)
+#define	cheri_kern_andperm(x, y)	cheri_perms_and(x, y)
 #else
 #define	cheri_kern_gettag(x)		1
 #define	cheri_kern_setbounds(x, y)	(x)
