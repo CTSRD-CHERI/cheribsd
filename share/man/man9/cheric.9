@@ -29,89 +29,88 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd June 17, 2019
+.Dd December 12, 2025
 .Dt CHERIC 9
 .Os
 .Sh NAME
-.Nm cheri_andperm
-.Nm cheri_clear_low_ptr_bits
-.Nm cheri_setbounds
+.Nm cheri_address_get
+.Nm cheri_address_set
+.Nm cheri_base_get
+.Nm cheri_bounds_set
+.Nm cheri_ddc_get
 .Nm cheri_fromint
-.Nm cheri_get_low_ptr_bits
-.Nm cheri_getaddress
-.Nm cheri_getbase
-.Nm cheri_getdefault
-.Nm cheri_getlen
-.Nm cheri_getoffset
-.Nm cheri_getpcc
-.Nm cheri_getperm
-.Nm cheri_getsealed
-.Nm cheri_getstack
-.Nm cheri_gettop
-.Nm cheri_gettag
-.Nm cheri_gettype
-.Nm cheri_clearperm
-.Nm cheri_cleartag
-.Nm cheri_incoffset
+.Nm cheri_is_sealed
+.Nm cheri_length_get
+.Nm cheri_offset_get
+.Nm cheri_offset_inc
+.Nm cheri_offset_set
+.Nm cheri_pcc_get
+.Nm cheri_perms_and
+.Nm cheri_perms_clear
+.Nm cheri_perms_get
 .Nm cheri_seal
-.Nm cheri_set_low_ptr_bits
-.Nm cheri_setaddress
-.Nm cheri_setoffset
+.Nm cheri_stack_get
+.Nm cheri_tag_clear
+.Nm cheri_tag_get
+.Nm cheri_top_get
+.Nm cheri_type_get
 .Nm cheri_unseal
+.Nm cheri_clear_low_ptr_bits
+.Nm cheri_get_low_ptr_bits
+.Nm cheri_set_low_ptr_bits
 .Nd CHERI C built-in functions
 .Sh SYNOPSIS
-.In cheri/cheri.h
 .In cheri/cheric.h
+.Ft ptraddr_t
+.Fn cheri_address_get "void * __capability c"
 .Ft void * __capability
-.Fn cheri_andperm "void * __capability c" "size_t mask"
+.Fn cheri_address_set "void * __capability c" "ptraddr_t address"
+.Ft ptraddr_t
+.Fn cheri_base_get "void * __capability c"
 .Ft void * __capability
-.Fn cheri_clear_low_ptr_bits "void * __capability c" "size_t mask"
+.Fn cheri_bounds_set "void * __capability c" "size_t length"
 .Ft void * __capability
-.Fn cheri_setbounds "void * __capability c" "size_t length"
+.Fn cheri_ddc_get "void"
 .Ft void * __capability
 .Fn cheri_fromint "ptraddr_t"
+.Ft bool
+.Fn cheri_is_sealed "void * __capability c"
 .Ft size_t
-.Fn cheri_get_low_ptr_bits "void * __capability c" "size_t mask"
-.Ft ptraddr_t
-.Fn cheri_getaddress "void * __capability c"
-.Ft ptraddr_t
-.Fn cheri_getbase "void * __capability c"
-.Ft void * __capability
-.Fn cheri_getdefault "void"
+.Fn cheri_length_get "void * __capability c"
 .Ft size_t
-.Fn cheri_getlen "void * __capability c"
+.Fn cheri_offset_get "void * __capability c"
+.Ft void * __capability
+.Fn cheri_offset_inc "void * __capability c" "size_t offset"
+.Ft void * __capability
+.Fn cheri_offset_set "void * __capability c" "size_t offset"
+.Ft void * __capability
+.Fn cheri_pcc_get "void"
+.Ft void * __capability
+.Fn cheri_perms_and "void * __capability c" "size_t mask"
+.Ft void * __capability
+.Fn cheri_perms_clear "void * __capability c" "size_t mask"
 .Ft size_t
-.Fn cheri_getoffset "void * __capability c"
-.Ft void * __capability
-.Fn cheri_getpcc "void"
-.Ft size_t
-.Fn cheri_getperm "void * __capability c"
-.Ft _Bool
-.Fn cheri_getsealed "void * __capability c"
-.Ft void * __capability
-.Fn cheri_getstack "void"
-.Ft ptraddr_t
-.Fn cheri_gettop "void * __capability c"
-.Ft _Bool
-.Fn cheri_gettag "void * __capability c"
-.Ft ptraddr_t
-.Fn cheri_gettype "void * __capability c"
-.Ft void * __capability
-.Fn cheri_clearperm "void * __capability c" "size_t mask"
-.Ft void * __capability
-.Fn cheri_cleartag "void * __capability c"
-.Ft void * __capability
-.Fn cheri_incoffset "void * __capability c" "size_t offset"
+.Fn cheri_perms_get "void * __capability c"
 .Ft void * __capability
 .Fn cheri_seal "void * __capability c" "void * __capability typecap"
 .Ft void * __capability
-.Fn cheri_set_low_ptr_bits "void * __capability c" "size_t mask"
+.Fn cheri_stack_get "void"
 .Ft void * __capability
-.Fn cheri_setaddress "void * __capability c" "ptraddr_t address"
-.Ft void * __capability
-.Fn cheri_setoffset "void * __capability c" "size_t offset"
+.Fn cheri_tag_clear "void * __capability c"
+.Ft bool
+.Fn cheri_tag_get "void * __capability c"
+.Ft ptraddr_t
+.Fn cheri_top_get "void * __capability c"
+.Ft ptraddr_t
+.Fn cheri_type_get "void * __capability c"
 .Ft void * __capability
 .Fn cheri_unseal "void * __capability c" "void * __capability typecap"
+.Ft void * __capability
+.Fn cheri_clear_low_ptr_bits "void * __capability c" "size_t mask"
+.Ft size_t
+.Fn cheri_get_low_ptr_bits "void * __capability c" "size_t mask"
+.Ft void * __capability
+.Fn cheri_set_low_ptr_bits "void * __capability c" "size_t mask"
 .Sh DESCRIPTION
 The
 .Xr cheric 9
@@ -123,31 +122,31 @@ applied.
 The following APIs allow capability fields to be queried:
 .Pp
 .Bl -tag -width short
-.It Fn cheri_getaddress "c"
+.It Fn cheri_address_get "c"
 Return the address field of the capability
 .Fa c .
 This value will normally be the the same as the integer cast of a capability
 pointer.
-.It Fn cheri_getbase "c"
+.It Fn cheri_base_get "c"
 Return the base (bottom) address associated with the capability
 .Fa c ;
 this is its lower bound.
-.It Fn cheri_getoffset "c"
+.It Fn cheri_offset_get "c"
 Return the offset associated with capability
 .Fa c ;
 this is the difference between its address and its lower bound.
-.It Fn cheri_getperm "c"
+.It Fn cheri_perms_get "c"
 Return the permissions associated with the capability
 .Fa c .
-.It Fn cheri_getsealed "c"
+.It Fn cheri_is_sealed "c"
 Return a boolean indicating whether the capability
 .Fa c
 is sealed.
-.It Fn cheri_gettag "c"
+.It Fn cheri_tag_get "c"
 Return a boolean indicating whether the capability
 .Fa c
 has a valid tag.
-.It Fn cheri_gettype "c"
+.It Fn cheri_type_get "c"
 Return the object type of the capability
 .Fa c .
 .El
@@ -156,23 +155,23 @@ The following APIs allow capability fields to be set, with a new capability
 returned:
 .Pp
 .Bl -tag -width short
-.It Fn cheri_andperm "c" "mask"
+.It Fn cheri_perms_and "c" "mask"
 Return a capability derived from
 .Fa c
 that has its permissions mask bit-wise AND'd with the value of
 .Fa mask .
-.It Fn cheri_cleartag "c"
+.It Fn cheri_tag_clear "c"
 Return a capability derived from
 .Fa c
 that has its validity tag cleared.
-.It Fn cheri_setbounds "c" "length"
+.It Fn cheri_bounds_set "c" "length"
 Return a capability derived from
 .Fa c
 that has its base set to the current address of
 .Fa c ,
 and length set to
 .Fa length .
-.It Fn cheri_incoffset "c" "offset"
+.It Fn cheri_offset_inc "c" "offset"
 Return a capability derived from
 .Fa c
 that has its offset incremented by
@@ -182,7 +181,7 @@ Return a capability derived from
 .Fa c
 that is sealed using capability
 .Fa typecap .
-.It Fn cheri_setoffset "c" "offset"
+.It Fn cheri_offset_set "c" "offset"
 Return a capability derived from
 .Fa c
 that has its offset field set to
@@ -216,11 +215,11 @@ To be added.
 The following APIs return capability pointers for certain well-defined
 capabilities in the run-time environment:
 .Bl -tag -width short
-.It Fn cheri_getdefault "void"
+.It Fn cheri_ddc_get "void"
 Return the Default Data Capability (DDC).
-.It Fn cheri_getpcc "void"
+.It Fn cheri_pcc_get "void"
 Return the Program-Counter Capability (PCC).
-.It Fn cheri_getstack "void"
+.It Fn cheri_stack_get "void"
 Return the current stack capability.
 .El
 .Sh AUTHORS
