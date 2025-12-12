@@ -33,11 +33,15 @@
 #ifndef _CHERIBSDTEST_H_
 #define	_CHERIBSDTEST_H_
 
+#include <sys/types.h>
 #include <sys/linker_set.h>
 
-#include <string.h>
+#include <cheri/cherireg.h>
 
-#include <cheri/cheric.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+#include <cheriintrin.h>
 
 #include "cheribsdtest_md.h"
 
@@ -241,13 +245,13 @@ _cheribsdtest_check_cap_eq(void *__capability a, void *__capability b,
 	CHERIBSDTEST_VERIFY2(accessor(a) == accessor(b),			\
 	    __STRING(accessor) "(%s) (" fmt ") == " __STRING(accessor)		\
 	    "(%s) (" fmt ") failed!", a_str, accessor(a), b_str, accessor(b))
-	CHECK_CAP_ATTR(cheri_getaddress, "0x%lx");
-	CHECK_CAP_ATTR(cheri_gettag, "%d");
-	CHECK_CAP_ATTR(cheri_getoffset, "0x%lx");
-	CHECK_CAP_ATTR(cheri_getlength, "0x%lx");
-	CHECK_CAP_ATTR(cheri_getperm, "0x%lx");
-	CHECK_CAP_ATTR(cheri_gettype, "%ld");
-	CHECK_CAP_ATTR(cheri_getflags, "0x%lx");
+	CHECK_CAP_ATTR(cheri_address_get, "0x%lx");
+	CHECK_CAP_ATTR(cheri_tag_get, "%d");
+	CHECK_CAP_ATTR(cheri_offset_get, "0x%lx");
+	CHECK_CAP_ATTR(cheri_length_get, "0x%lx");
+	CHECK_CAP_ATTR(cheri_perms_get, "0x%x");
+	CHECK_CAP_ATTR(cheri_type_get, "%ld");
+	CHECK_CAP_ATTR(cheri_flags_get, "0x%lx");
 #undef CHECK_CAP_ATTR
 }
 #define CHERIBSDTEST_CHECK_EQ_CAP(a, b)	\
@@ -267,8 +271,8 @@ _cheribsdtest_check_cap_bounds_precise(void *__capability c,
 {
 	size_t len, offset;
 
-	offset = cheri_getoffset(c);
-	len = cheri_getlen(c);
+	offset = cheri_offset_get(c);
+	len = cheri_length_get(c);
 
 	/* Confirm precise lower bound: offset of zero. */
 	CHERIBSDTEST_VERIFY2(offset == 0,
@@ -335,6 +339,30 @@ _cheribsdtest_check_errno(const char *context, int actual, int expected)
 		_cheribsdtest_check_errno(#call, call_errno,		\
 		    expected_errno);					\
 	} while (0)
+
+#define cheri_ptr(ptr, len)    \
+	cheri_bounds_set(    \
+	    (__cheri_tocap __typeof__((ptr)[0]) *__capability)ptr, len)
+
+#define cheri_ptrperm(ptr, len, perm)	\
+	cheri_perms_and(cheri_ptr(ptr, len), perm | CHERI_PERM_GLOBAL)
+
+/*
+ * Return whether the two pointers are equal, including capability metadata if
+ * in purecap mode.
+ */
+static inline bool
+cheri_ptr_equal_exact(void *x, void *y)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* For purecap compare the entire capability including metadata */
+	return (cheri_is_equal_exact(x, y));
+#else
+	/* In hybrid mode void * is just an address */
+	return (x == y);
+#endif
+}
+
 
 /* For libc_memcpy and libc_memset tests and the unaligned copy tests: */
 extern void *cheribsdtest_memcpy(void *dst, const void *src, size_t n);

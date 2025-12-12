@@ -33,7 +33,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include <cheri/cheric.h>
+#include <cheri/cherireg.h>
+#include <cheriintrin.h>
 
 #ifdef PIC
 #error "PIEs never need to initialise their own globals"
@@ -53,12 +54,12 @@ crt_init_rela(const Elf_Phdr *phdr __unused)
 #ifdef __CHERI_PURE_CAPABILITY__
 	data_cap = __DECONST(void *, phdr);
 #else
-	data_cap = cheri_getdefault();
+	data_cap = cheri_ddc_get();
 #endif
-	data_cap = cheri_clearperm(data_cap,
+	data_cap = cheri_perms_clear(data_cap,
 	    CHERI_PERM_EXECUTE | CHERI_PERM_SW_VMEM);
 
-	code_cap = cheri_getpcc();
+	code_cap = cheri_pcc_get();
 
 	rela = RODATA_PTR(__rela_dyn_start);
 	relalim = RODATA_PTR(__rela_dyn_end);
@@ -181,30 +182,30 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 #ifdef __CHERI_PURE_CAPABILITY__
 		data_cap = __DECONST(void *, phdr);
 #else
-		data_cap = cheri_getdefault();
+		data_cap = cheri_ddc_get();
 #endif
-		data_cap = cheri_clearperm(data_cap,
+		data_cap = cheri_perms_clear(data_cap,
 		   CHERI_PERM_EXECUTE | CHERI_PERM_SW_VMEM);
 
-		code_cap = cheri_getpcc();
-		rodata_cap = cheri_clearperm(data_cap,
+		code_cap = cheri_pcc_get();
+		rodata_cap = cheri_perms_clear(data_cap,
 		    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
 		    CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_SW_VMEM);
 
-		data_cap = cheri_setaddress(data_cap, writable_start);
-		rodata_cap = cheri_setaddress(rodata_cap, readonly_start);
+		data_cap = cheri_address_set(data_cap, writable_start);
+		rodata_cap = cheri_address_set(rodata_cap, readonly_start);
 
 		/* TODO: should we use exact setbounds? */
 		data_cap =
-		    cheri_setbounds(data_cap, writable_end - writable_start);
+		    cheri_bounds_set(data_cap, writable_end - writable_start);
 		rodata_cap =
-		    cheri_setbounds(rodata_cap, readonly_end - readonly_start);
+		    cheri_bounds_set(rodata_cap, readonly_end - readonly_start);
 
-		if (!cheri_gettag(data_cap))
+		if (!cheri_tag_get(data_cap))
 			__builtin_trap();
-		if (!cheri_gettag(rodata_cap))
+		if (!cheri_tag_get(rodata_cap))
 			__builtin_trap();
-		if (!cheri_gettag(code_cap))
+		if (!cheri_tag_get(code_cap))
 			__builtin_trap();
 	}
 	cheri_init_globals_3(data_cap, code_cap, rodata_cap);

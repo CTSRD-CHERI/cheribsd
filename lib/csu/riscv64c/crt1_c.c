@@ -37,7 +37,7 @@
 #include "libc_private.h"
 #include "csu_common.h"
 
-#include <cheri/cheric.h>
+#include <cheriintrin.h>
 
 /*
  * For -pie executables rtld will process the __cap_relocs, so we don't need
@@ -88,7 +88,7 @@ _start(void *auxv,
 		__builtin_trap(); /* RTLD missing? Wrong *crt1.o linked? */
 #endif
 
-	if (cheri_getdefault() != NULL)
+	if (cheri_ddc_get() != NULL)
 		__builtin_trap(); /* $ddc should be NULL */
 
 	/*

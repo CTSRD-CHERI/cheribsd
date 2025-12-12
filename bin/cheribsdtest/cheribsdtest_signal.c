@@ -38,8 +38,6 @@
 
 #include <machine/vmparam.h>
 
-#include <cheri/cheri.h>
-
 #include <errno.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -262,7 +260,7 @@ CHERIBSDTEST(signal_returncap,
 		                       strerror(errno));
 
 	/* Length. */
-	v = cheri_getlen(handler_returncap);
+	v = cheri_length_get(handler_returncap);
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/* The purecap benchmark ABI does not bound PCC capabilities. */
 	expect = CHERI_CAP_USER_CODE_LENGTH;
@@ -277,18 +275,18 @@ CHERIBSDTEST(signal_returncap,
 	    v, expect);
 
 	/* Type -- should be a sentry capability. */
-	v = cheri_gettype(handler_returncap);
+	v = cheri_type_get(handler_returncap);
 	CHERIBSDTEST_VERIFY2(v == (uintmax_t)CHERI_OTYPE_SENTRY,
 	    "otype %jx (expected %jx)", v, (uintmax_t)CHERI_OTYPE_SENTRY);
 
 	/* Sealed bit. */
-	CHERIBSDTEST_VERIFY(cheri_getsealed(handler_returncap));
+	CHERIBSDTEST_VERIFY(cheri_is_sealed(handler_returncap));
 
 	/* Tag bit. */
-	CHERIBSDTEST_VERIFY(cheri_gettag(handler_returncap));
+	CHERIBSDTEST_VERIFY(cheri_tag_get(handler_returncap));
 
 	/* Permissions -- should have execute but no store permissions. */
-	v = cheri_getperm(handler_returncap);
+	v = cheri_perms_get(handler_returncap);
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_EXECUTE) == CHERI_PERM_EXECUTE,
 	    "perms %jx (execute missing)", v);
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_STORE) == 0,

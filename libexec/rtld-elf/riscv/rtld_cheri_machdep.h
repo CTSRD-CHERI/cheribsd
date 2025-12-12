@@ -63,15 +63,15 @@ make_code_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
 
 	ret = pcc_cap(defobj, def->st_value);
 	/* Remove store and seal permissions */
-	ret = cheri_clearperm(ret, FUNC_PTR_REMOVE_PERMS);
+	ret = cheri_perms_clear(ret, FUNC_PTR_REMOVE_PERMS);
 	if (tight_bounds) {
-		ret = cheri_setbounds(ret, def->st_size);
+		ret = cheri_bounds_set(ret, def->st_size);
 	}
 	/*
 	 * Note: The addend is required for C++ exceptions since capabilities
 	 * for catch blocks point to the middle of a function.
 	 */
-	ret = cheri_incoffset(ret, addend);
+	ret = cheri_offset_inc(ret, addend);
 	/* All code pointers should be sentries: */
 	ret = __builtin_cheri_seal_entry(ret);
 	return __DECONST_CAP(dlfunc_t __capability, ret);
@@ -100,23 +100,23 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 	void * __capability ret;
 	ret = get_datasegment_cap(defobj) + def->st_value;
 	/* Remove execute and seal permissions */
-	ret = cheri_clearperm(ret, DATA_PTR_REMOVE_PERMS);
-	ret = cheri_setbounds(ret, def->st_size);
+	ret = cheri_perms_clear(ret, DATA_PTR_REMOVE_PERMS);
+	ret = cheri_bounds_set(ret, def->st_size);
 	return ret;
 }
 
 #define set_bounds_if_nonnull(cap, size)	\
-	do { if (cap) { cap = cheri_setbounds(cap, size); } } while(0)
+	do { if (cap) { cap = cheri_bounds_set(cap, size); } } while(0)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 static inline void
 fix_obj_mapping_cap_permissions(Obj_Entry *obj, const char *path __unused)
 {
-	obj->text_rodata_cap = (const char*)cheri_clearperm(obj->text_rodata_cap, FUNC_PTR_REMOVE_PERMS);
-	obj->relocbase = (char*)cheri_clearperm(obj->relocbase, DATA_PTR_REMOVE_PERMS);
-	obj->mapbase = (char*)cheri_clearperm(obj->mapbase, DATA_PTR_REMOVE_PERMS);
+	obj->text_rodata_cap = (const char*)cheri_perms_clear(obj->text_rodata_cap, FUNC_PTR_REMOVE_PERMS);
+	obj->relocbase = (char*)cheri_perms_clear(obj->relocbase, DATA_PTR_REMOVE_PERMS);
+	obj->mapbase = (char*)cheri_perms_clear(obj->mapbase, DATA_PTR_REMOVE_PERMS);
 	/* Purecap code also needs the capmode flag */
-	obj->text_rodata_cap = cheri_setflags(obj->text_rodata_cap, CHERI_FLAGS_CAP_MODE);
+	obj->text_rodata_cap = cheri_flags_set(obj->text_rodata_cap, CHERI_FLAGS_CAP_MODE);
 }
 #endif
 

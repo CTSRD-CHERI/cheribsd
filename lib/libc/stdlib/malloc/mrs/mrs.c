@@ -37,14 +37,13 @@
 #include <sys/queue.h>
 #include <sys/sysctl.h>
 
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
 #include <cheri/revoke.h>
 #include <cheri/libcaprevoke.h>
 
 #include <machine/vmparam.h>
 
 #include <assert.h>
+#include <cheriintrin.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -348,7 +347,7 @@ static void *
 mrs_bound_pointer(void *p, size_t size)
 {
 	if (p != NULL && bound_pointers && size > 0)
-		p = cheri_setbounds(p, size);
+		p = cheri_bounds_set(p, size);
 	return (p);
 }
 
@@ -592,7 +591,7 @@ alloc_descriptor_slab(void)
 static inline void
 increment_allocated_size(void *allocated)
 {
-	allocated_size += cheri_getlen(allocated);
+	allocated_size += cheri_length_get(allocated);
 	if (allocated_size > max_allocated_size) {
 		max_allocated_size = allocated_size;
 	}
@@ -674,7 +673,7 @@ validate_freed_pointer(void *ptr)
 	 * catches NULL and other invalid caps that may cause a rude
 	 * implementation of malloc_underlying_allocation() to crash.
 	 */
-	if (!cheri_gettag(ptr)) {
+	if (!cheri_tag_get(ptr)) {
 		mrs_debug_printf("validate_freed_pointer: untagged capability addr %p\n",
 		    ptr);
 		return (NULL);
@@ -748,8 +747,8 @@ validate_freed_pointer(void *ptr)
 	 * aligned.
 	 */
 	if (caprev_shadow_nomap_set_len(cri->base_mem_nomap, entire_shadow,
-	    cheri_getbase(ptr),
-	    __builtin_align_up(cheri_getlen(underlying_allocation),
+	    cheri_base_get(ptr),
+	    __builtin_align_up(cheri_length_get(underlying_allocation),
 	    CAPREVOKE_BITMAP_ALIGNMENT), ptr)) {
 		mrs_debug_printf("validate_freed_pointer: setting bitmap failed\n");
 		return (NULL);
@@ -984,11 +983,11 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 			 * 16-byte aligned.
 			 */
 			size_t len = __builtin_align_up(
-			    cheri_getlen(iter->slab[i].ptr),
+			    cheri_length_get(iter->slab[i].ptr),
 			    CAPREVOKE_BITMAP_ALIGNMENT);
 			caprev_shadow_nomap_clear_len(
 			    cri->base_mem_nomap, entire_shadow,
-			    cheri_getbase(iter->slab[i].ptr), len);
+			    cheri_base_get(iter->slab[i].ptr), len);
 
 			/*
 			 * Don't construct a pointer to a
@@ -999,7 +998,7 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 
 #ifdef CLEAR_ON_RETURN
 			clear_region(iter->slab[i].ptr,
-			    cheri_getlen(iter->slab[i].ptr));
+			    cheri_length_get(iter->slab[i].ptr));
 #endif /* CLEAR_ON_RETURN */
 
 			/*
@@ -1527,7 +1526,7 @@ mrs_malloc(size_t size)
 	}
 
 #ifdef CLEAR_ON_ALLOC
-	clear_region(allocated_region, cheri_getlen(allocated_region));
+	clear_region(allocated_region, cheri_length_get(allocated_region));
 #endif /* CLEAR_ON_ALLOC */
 
 	increment_allocated_size(allocated_region);
@@ -1630,7 +1629,7 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 	}
 
 #ifdef CLEAR_ON_ALLOC
-	clear_region(*ptr, cheri_getlen(*ptr));
+	clear_region(*ptr, cheri_length_get(*ptr));
 #endif /* CLEAR_ON_ALLOC */
 
 	increment_allocated_size(*ptr);
@@ -1669,7 +1668,7 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	}
 
 #ifdef CLEAR_ON_ALLOC
-	clear_region(allocated_region, cheri_getlen(allocated_region));
+	clear_region(allocated_region, cheri_length_get(allocated_region));
 #endif /* CLEAR_ON_ALLOC */
 
 	increment_allocated_size(allocated_region);
@@ -1699,7 +1698,7 @@ mrs_realloc(void *ptr, size_t size)
 	if (!quarantining)
 		return (mrs_real_realloc(ptr, size));
 
-	size_t old_size = cheri_getlen(ptr);
+	size_t old_size = cheri_length_get(ptr);
 	mrs_debug_printf("mrs_realloc: called ptr %p ptr size %zu new size %zu\n",
 	    ptr, old_size, size);
 
@@ -1714,7 +1713,7 @@ mrs_realloc(void *ptr, size_t size)
 	 * power-of-two buckets by 1K) and we especially want to avoid
 	 * copying such cases.
 	 */
-	if (ptr != NULL && cheri_gettag(ptr) && cheri_getoffset(ptr) == 0 &&
+	if (ptr != NULL && cheri_tag_get(ptr) && cheri_offset_get(ptr) == 0 &&
 	    size <= old_size && old_size - size <= (old_size >> 1))
 		return (ptr);
 
@@ -1767,11 +1766,11 @@ mrs_free(void *ptr)
 #endif /* !OFFLOAD_QUARANTINE */
 
 #ifdef CLEAR_ON_FREE
-	bzero(cheri_setoffset(ptr, 0), cheri_getlen(ptr));
+	bzero(cheri_offset_set(ptr, 0), cheri_length_get(ptr));
 #endif
 
 	mrs_lock(&app_quarantine_lock);
-	quarantine_insert(app_quarantine, ins, cheri_getlen(ins));
+	quarantine_insert(app_quarantine, ins, cheri_length_get(ins));
 	mrs_unlock(&app_quarantine_lock);
 
 	check_and_perform_flush(true);
@@ -1802,7 +1801,7 @@ mrs_mallocx(size_t size, int flags)
 #ifndef CLEAR_ON_ALLOC
 	/* Clear if requested and we aren't clearing above. */
 	if (ret != NULL && (flags & MALLOCX_ZERO) != 0)
-		clear_region(ret, cheri_getlen(ret));
+		clear_region(ret, cheri_length_get(ret));
 #endif
 	return (ret);
 }
@@ -1825,7 +1824,7 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 		return (mrs_real_rallocx(ptr, size, flags));
 
 	assert(ptr != NULL);
-	old_size = cheri_getlen(ptr);
+	old_size = cheri_length_get(ptr);
 
 	mrs_debug_printf("%s: called ptr %p ptr size %zu new size %zu\n",
 	    __func__, ptr, old_size, size);

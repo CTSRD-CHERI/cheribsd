@@ -357,9 +357,9 @@ try_load_dtb(caddr_t kmdp)
 	dtbp = MD_FETCH(kmdp, MODINFOMD_DTBP, vm_offset_t);
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (dtbp != (vm_pointer_t)NULL) {
-		dtbp = (vm_pointer_t)cheri_andperm(cheri_setaddress(
+		dtbp = (vm_pointer_t)cheri_perms_and(cheri_address_set(
 		    kernel_root_cap, dtbp), CHERI_PERMS_KERNEL_DATA);
-		dtbp = cheri_setbounds(dtbp, fdt_totalsize((void *)dtbp));
+		dtbp = cheri_bounds_set(dtbp, fdt_totalsize((void *)dtbp));
 	}
 #endif
 
@@ -434,7 +434,7 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	 */
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	const void *dtbp_virt = cheri_setaddress(kernel_root_cap,
+	const void *dtbp_virt = cheri_address_set(kernel_root_cap,
 	    rvbp->dtbp_phys);
 	dtb_size = fdt_totalsize(dtbp_virt);
 	lastaddr = CHERI_REPRESENTABLE_ALIGN_UP(lastaddr, dtb_size);
@@ -451,10 +451,10 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(vm_offset_t));
 	PRELOAD_PUSH_VALUE(vm_offset_t, lastaddr);
 #ifdef __CHERI_PURE_CAPABILITY__
-	void *dtbp = cheri_setbounds(cheri_setaddress(kernel_root_cap,
+	void *dtbp = cheri_bounds_set(cheri_address_set(kernel_root_cap,
 	    lastaddr), dtb_size);
 	memmove(dtbp, dtbp_virt, dtb_size);
-	lastaddr = roundup(lastaddr + cheri_getlen(dtbp), sizeof(int));
+	lastaddr = roundup(lastaddr + cheri_length_get(dtbp), sizeof(int));
 #else
 	memmove((void *)lastaddr, (const void *)rvbp->dtbp_phys, dtb_size);
 	lastaddr = roundup(lastaddr + dtb_size, sizeof(int));

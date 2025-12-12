@@ -38,7 +38,6 @@
 
 #include <sys/param.h>
 
-#include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
 #include <assert.h>
@@ -68,45 +67,45 @@ test_strfcap_C_cap_one(void * __capability p, int expected_tokens,
 		cheribsdtest_failure_errx("Mismatched tokens for %s, "
 		    "expected %d got %d", descr, expected_tokens, tokens);
 
-	if (addr != cheri_getaddress(p))
+	if (addr != cheri_address_get(p))
 		cheribsdtest_failure_errx("Mismatched address for %s", descr);
 
 	if (tokens == 1)
 		return;
 
 	permsp = perms;
-	if ((cheri_getperm(p) & CHERI_PERM_LOAD) != 0) {
+	if ((cheri_perms_get(p) & CHERI_PERM_LOAD) != 0) {
 		if (*permsp != 'r')
 			cheribsdtest_failure_errx("Missing 'r' permission for %s",
 			    descr);
 		permsp++;
 	}
-	if ((cheri_getperm(p) & CHERI_PERM_STORE) != 0) {
+	if ((cheri_perms_get(p) & CHERI_PERM_STORE) != 0) {
 		if (*permsp != 'w')
 			cheribsdtest_failure_errx("Missing 'w' permission for %s",
 			    descr);
 		permsp++;
 	}
-	if ((cheri_getperm(p) & CHERI_PERM_EXECUTE) != 0) {
+	if ((cheri_perms_get(p) & CHERI_PERM_EXECUTE) != 0) {
 		if (*permsp != 'x')
 			cheribsdtest_failure_errx("Missing 'x' permission for %s",
 			    descr);
 		permsp++;
 	}
-	if ((cheri_getperm(p) & CHERI_PERM_LOAD) != 0) {
+	if ((cheri_perms_get(p) & CHERI_PERM_LOAD) != 0) {
 		if (*permsp != 'R')
 			cheribsdtest_failure_errx("Missing 'R' permission for %s",
 			    descr);
 		permsp++;
 	}
-	if ((cheri_getperm(p) & CHERI_PERM_STORE) != 0) {
+	if ((cheri_perms_get(p) & CHERI_PERM_STORE) != 0) {
 		if (*permsp != 'W')
 			cheribsdtest_failure_errx("Missing 'W' permission for %s",
 			    descr);
 		permsp++;
 	}
 #ifdef __aarch64__
-	if ((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) != 0) {
+	if ((cheri_perms_get(p) & CHERI_PERM_EXECUTIVE) != 0) {
 		if (*permsp != 'E')
 			cheribsdtest_failure_errx("Missing 'E' permission for %s",
 			    descr);
@@ -117,15 +116,15 @@ test_strfcap_C_cap_one(void * __capability p, int expected_tokens,
 		cheribsdtest_failure_errx("Extra permissions '%s' for %s", permsp,
 		    descr);
 
-	if (base != cheri_getbase(p))
+	if (base != cheri_base_get(p))
 		cheribsdtest_failure_errx("Mismatched base for %s", descr);
-	if (top != cheri_getbase(p) + cheri_getlength(p))
+	if (top != cheri_base_get(p) + cheri_length_get(p))
 		cheribsdtest_failure_errx("Mismatched top for %s", descr);
 
 	if (tokens == 4)
 		return;
 
-	if (cheri_gettag(p)) {
+	if (cheri_tag_get(p)) {
 		if (strstr(attr, "invalid") != NULL)
 			cheribsdtest_failure_errx("Tagged cap marked invalid "
 			    "for %s", descr);
@@ -135,7 +134,7 @@ test_strfcap_C_cap_one(void * __capability p, int expected_tokens,
 			    "invalid for %s", descr);
 	}
 
-	switch (cheri_gettype(p)) {
+	switch (cheri_type_get(p)) {
 	case CHERI_OTYPE_UNSEALED:
 		if (strstr(attr, "sealed") != NULL)
 			cheribsdtest_failure_errx("Unsealed cap marked as "
@@ -163,8 +162,8 @@ test_strfcap_C_cap_one(void * __capability p, int expected_tokens,
 	}
 
 #ifdef CHERI_FLAGS_CAP_MODE
-	if ((cheri_getperm(p) & CHERI_PERM_EXECUTE) != 0 &&
-	    cheri_getflags(p) == CHERI_FLAGS_CAP_MODE) {
+	if ((cheri_perms_get(p) & CHERI_PERM_EXECUTE) != 0 &&
+	    cheri_flags_get(p) == CHERI_FLAGS_CAP_MODE) {
 		if (strstr(attr, "capmode") == NULL)
 			cheribsdtest_failure_errx("Capability mode code cap "
 			    "not marked capmode for %s", descr);
@@ -216,15 +215,15 @@ test_strfcap_number_one_cap(uintcap_t cap, const char *cap_desc)
 			ret_s = strfcap(str_s, sizeof(str_s), format, cap);
 
 			switch (*scp) {
-			case 'a':	value = cheri_getaddress(cap); break;
-			case 'b':	value = cheri_getbase(cap); break;
-			case 'l':	value = cheri_getlength(cap); break;
-			case 'o':	value = cheri_getoffset(cap); break;
-			case 'p':	value = cheri_getperm(cap); break;
-			case 's':	value = cheri_gettype(cap); break;
-			case 'S':	value = cheri_gettype(cap); break;
-			case 't':	value = cheri_gettop(cap); break;
-			case 'v':	value = cheri_gettag(cap); break;
+			case 'a':	value = cheri_address_get(cap); break;
+			case 'b':	value = cheri_base_get(cap); break;
+			case 'l':	value = cheri_length_get(cap); break;
+			case 'o':	value = cheri_offset_get(cap); break;
+			case 'p':	value = cheri_perms_get(cap); break;
+			case 's':	value = cheri_type_get(cap); break;
+			case 'S':	value = cheri_type_get(cap); break;
+			case 't':	value = cheri_top_get(cap); break;
+			case 'v':	value = cheri_tag_get(cap); break;
 			default:
 				cheribsdtest_failure_errx("Internal error: "
 				    "unknown specifier %c", *scp);
@@ -276,7 +275,7 @@ CHERIBSDTEST(strfcap_numbers, "Checks of formats of a single number")
 
 	test_strfcap_number_one_cap((uintcap_t)foop, "stack array");
 
-	test_strfcap_number_one_cap((uintcap_t)cheri_cleartag(foop),
+	test_strfcap_number_one_cap((uintcap_t)cheri_tag_clear(foop),
 	    "stack array");
 
 	test_strfcap_number_one_cap(
@@ -294,12 +293,12 @@ CHERIBSDTEST(strfcap_T, "Check of tag in format")
 	char * __capability cap = (__cheri_tocap char * __capability)str_t;
 
 	strfcap(str_t, sizeof(str_t), "%C", (uintcap_t)cap);
-	strfcap(str_u, sizeof(str_u), "%C", (uintcap_t)cheri_cleartag(cap));
+	strfcap(str_u, sizeof(str_u), "%C", (uintcap_t)cheri_tag_clear(cap));
 	if (strcmp(str_t, str_u) == 0)
 		cheribsdtest_failure_errx("Tagged (%s) and untagged (%s) %%C "
 		    "formatted output is identical", str_t, str_u);
 
-	strfcap(str_u, sizeof(str_u), "%T%C", (uintcap_t)cheri_cleartag(cap));
+	strfcap(str_u, sizeof(str_u), "%T%C", (uintcap_t)cheri_tag_clear(cap));
 	if (strcmp(str_t, str_u) != 0)
 		cheribsdtest_failure_errx("Tagged (%s) and untagged (%s) "
 		    "differs when untagged formatted with %%T%%C",
@@ -332,7 +331,7 @@ CHERIBSDTEST(strfcap_textual, "Checks of %? and %%")
 		    fmt, str);
 
 	fmt = "%?12345%A";
-	strfcap(str, sizeof(str), fmt, (uintcap_t)cheri_cleartag(cap));
+	strfcap(str, sizeof(str), fmt, (uintcap_t)cheri_tag_clear(cap));
 	if (strncmp(str, "12345", 5) != 0)
 		cheribsdtest_failure_errx("(%s) of untagged cap did not "
 		    "include 12345 (%s)", fmt, str);
@@ -380,17 +379,17 @@ CHERIBSDTEST(strfcap_C, "Various checks of %C (%A and %P indirectly)")
 
 #ifdef CHERI_FLAGS_CAP_MODE
 #ifdef __CHERI_PURE_CAPABILITY__
-	pcc_alt = cheri_setflags(pcc_alt, 0);
+	pcc_alt = cheri_flags_set(pcc_alt, 0);
 	test_strfcap_C_cap_one(pcc_alt, 4, "non-capability mode PCC");
 #else
-	pcc_alt = cheri_setflags(pcc_alt, CHERI_FLAGS_CAP_MODE);
+	pcc_alt = cheri_flags_set(pcc_alt, CHERI_FLAGS_CAP_MODE);
 	test_strfcap_C_cap_one(pcc_alt, 5, "capability mode PCC");
 #endif
 #endif
 
 	test_strfcap_C_cap_one(datap, 4, "stack array");
 
-	test_strfcap_C_cap_one(cheri_cleartag(datap), 5, "untagged stack array");
+	test_strfcap_C_cap_one(cheri_tag_clear(datap), 5, "untagged stack array");
 
 	cheribsdtest_success();
 }

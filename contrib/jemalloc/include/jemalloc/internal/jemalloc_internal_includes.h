@@ -76,7 +76,7 @@
 /******************************************************************************/
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#include <cheri/cheric.h>
+#include <cheriintrin.h>
 #endif
 
 #include "jemalloc/internal/jemalloc_internal_inlines_a.h"

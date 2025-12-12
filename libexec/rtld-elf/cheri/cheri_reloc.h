@@ -152,21 +152,21 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 #endif
 	} else {
 		/* Remove execute permissions and set bounds */
-		symval = cheri_incoffset(make_data_cap(def, defobj), addend);
+		symval = cheri_offset_inc(make_data_cap(def, defobj), addend);
 	}
 #ifdef DEBUG
 	// FIXME: this warning breaks some tests that expect clean stdout/stderr
 	// FIXME: See https://github.com/CTSRD-CHERI/cheribsd/issues/257
 	// TODO: or use this approach:
 	// https://github.com/CTSRD-CHERI/cheribsd/commit/c1920496c0086d9c5214fb0f491e4d6cdff3828e?
-	if (__predict_false(symval != NULL && cheri_getlen(symval) <= 0)) {
+	if (__predict_false(symval != NULL && cheri_length_get(symval) <= 0)) {
 		rtld_fdprintf(STDERR_FILENO,
 		    "Warning: created zero length "
 		    "capability for %s (in %s): %#lp\n",
 		    symname(obj, r_symndx), obj->path, symval);
 	}
 #endif
-	if (__predict_false(!cheri_gettag(symval) && !is_undef_weak)) {
+	if (__predict_false(!cheri_tag_get(symval) && !is_undef_weak)) {
 		_rtld_error("%s: constructed invalid capability for %s: %#lp",
 		    obj->path, symname(obj, r_symndx), symval);
 		return -1;

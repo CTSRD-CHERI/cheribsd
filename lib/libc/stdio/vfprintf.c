@@ -58,7 +58,6 @@
 #include <sys/types.h>
 
 #if __has_feature(capabilities)
-#include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #endif
 
@@ -918,7 +917,7 @@ fp_common:
 #endif
 			{
 				cap = GETARG(void * __capability);
-				ujval = cheri_getaddress(cap);
+				ujval = cheri_address_get(cap);
 			}
 			if (flags & ALT) {
 				cp = buf + BUF;

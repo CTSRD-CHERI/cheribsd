@@ -79,8 +79,8 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 			/* If the address is in the DMAP just copy it */
 			if (VIRT_IN_DMAP(v)) {
 #ifdef __CHERI_PURE_CAPABILITY__
-				error = uiomove(cheri_setboundsexact(
-				    cheri_setaddress(dmap_base_cap, v), cnt),
+				error = uiomove(cheri_bounds_set_exact(
+				    cheri_address_set(dmap_base_cap, v), cnt),
 				    cnt, uio);
 #else
 				error = uiomove((void *)v, cnt, uio);

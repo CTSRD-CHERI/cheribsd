@@ -34,15 +34,7 @@
 #define	_MACHINE_CHERIC_H_
 
 #if __has_feature(capabilities)
-#define	cheri_capmode(cap)	cheri_setflags(cap, CHERI_FLAGS_CAP_MODE)
-#endif
-
-#ifdef _KERNEL
-/* XXX: Convert faulting CBuildCap into tag-stripping. */
-extern void * __capability cheri_buildcap_safe(void * __capability, intcap_t);
-
-#undef cheri_buildcap
-#define	cheri_buildcap(x, y)	cheri_buildcap_safe((x), (y))
+#define	cheri_capmode(cap)	cheri_flags_set(cap, CHERI_FLAGS_CAP_MODE)
 #endif
 
 #endif /* !_MACHINE_CHERIC_H_ */

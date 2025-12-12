@@ -57,6 +57,27 @@ cheri_otype_init(void *dummy __unused)
 }
 SYSINIT(cheri_otype_init, SI_SUB_LOCK, SI_ORDER_FIRST, cheri_otype_init, NULL);
 
+/*
+ * Construct a capability suitable to describe a type identified by 'ptr';
+ * set it to zero-length with the offset equal to the base.  The caller must
+ * provide a root sealing capability.
+ *
+ * The caller may wish to assert various properties about the returned
+ * capability, including that CHERI_PERM_SEAL is set.
+ */
+static otype_t
+cheri_maketype(void * __capability root_type, register_t type)
+{
+	void * __capability c;
+
+	c = root_type;
+	c = cheri_offset_set(c, type);	/* Set type as desired. */
+	c = cheri_bounds_set(c, 1);	/* ISA implies length of 1. */
+	c = cheri_perms_and(c, CHERI_PERM_GLOBAL | CHERI_PERM_SEAL); /* Perms. */
+	return (c);
+}
+
+
 otype_t
 cheri_otype_alloc(void)
 {
@@ -79,7 +100,7 @@ cheri_otype_free(otype_t cap)
 {
 	u_int type;
 
-	type = cheri_getbase(cap);
+	type = cheri_base_get(cap);
 	free_unr(cheri_otypes, type);
 }
 
@@ -91,7 +112,7 @@ uintcap_t
 cheri_revoke_sealed(uintcap_t c)
 {
 	c = cheri_unseal(c, kernel_root_sealcap);
-	c = cheri_andperm(c, 0);
+	c = cheri_perms_and(c, 0);
 	return c;
 }
 

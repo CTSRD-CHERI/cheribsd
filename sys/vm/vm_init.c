@@ -241,9 +241,9 @@ again:
 #endif
 	firstaddr = (caddr_t)kva_alloc(size);
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_getlen(firstaddr) == size,
+	KASSERT(cheri_length_get(firstaddr) == size,
 	    ("Inexact bounds expected %zx found %zx",
-	    (size_t)size, (size_t)cheri_getlen(firstaddr)));
+	    (size_t)size, (size_t)cheri_length_get(firstaddr)));
 #endif
 	kmi->buffer_sva = (vm_pointer_t)firstaddr;
 	kmi->buffer_eva = kmi->buffer_sva + size;
@@ -261,9 +261,9 @@ again:
 #endif
 		firstaddr = (caddr_t)kva_alloc(size);
 #ifdef __CHERI_PURE_CAPABILITY__
-		KASSERT(cheri_getlen(firstaddr) == size,
+		KASSERT(cheri_length_get(firstaddr) == size,
 		    ("Inexact bounds expected %zx found %zx",
-		    (size_t)size, (size_t)cheri_getlen(firstaddr)));
+		    (size_t)size, (size_t)cheri_length_get(firstaddr)));
 #endif
 		kmi->transient_sva = (vm_pointer_t)firstaddr;
 		kmi->transient_eva = kmi->transient_sva + size;

@@ -43,6 +43,7 @@
 
 #define	CHERICAP_SIZE		__SIZEOF_CHERI_CAPABILITY__
 
+#ifdef _KERNEL
 /*
  * CHERI ISA-defined constants for capabilities -- suitable for inclusion from
  * assembly source code.
@@ -68,6 +69,17 @@
 #define	CHERI_PERM_SW1			(1 << 16)	/* 0x00010000 */
 #define	CHERI_PERM_SW2			(1 << 17)	/* 0x00020000 */
 #define	CHERI_PERM_SW3			(1 << 18)	/* 0x00040000 */
+#else /* !_KERNEL */
+/*
+ * These should be defined in cheriintrin.h, but aren't yet.
+ */
+#define	CHERI_PERM_SET_CID		(1 << 11)	/* 0x00000800 */
+#define	CHERI_PERM_SW0			(1 << 15)	/* 0x00008000 */
+#define	CHERI_PERM_SW1			(1 << 16)	/* 0x00010000 */
+#define	CHERI_PERM_SW2			(1 << 17)	/* 0x00020000 */
+#define	CHERI_PERM_SW3			(1 << 18)	/* 0x00040000 */
+#endif /* !_KERNEL */
+
 
 /*
  * CHERI_PERMS_SWALL: Mask of all available software-defined permissions
@@ -179,9 +191,11 @@
 #define	CHERI_OTYPE_ISKERN(x)	(((x) & CHERI_OTYPE_KERN_FLAG) != 0)
 #define	CHERI_OTYPE_ISUSER(x)	(!(CHERI_OTYPE_ISKERN(x)))
 
+#ifdef _KERNEL
 /* Reserved CHERI object types: */
 #define	CHERI_OTYPE_UNSEALED	(-1l)
 #define	CHERI_OTYPE_SENTRY	(-2l)
+#endif
 
 /*
  * List of CHERI capability cause code constants.

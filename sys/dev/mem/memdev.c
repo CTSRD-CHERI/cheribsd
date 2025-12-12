@@ -169,7 +169,7 @@ mem_read_cheri_caps(struct cdev *dev, const struct mem_cheri_cap_arg *arg)
 
 		src = (uintcap_t *)((char *)mapped_ptr + page_off);
 		while (todo != 0) {
-			capbuf[0] = cheri_gettag(*src);
+			capbuf[0] = cheri_tag_get(*src);
 			memcpy(capbuf + 1, src, sizeof(*src));
 
 			error = copyout(capbuf, dst, sizeof(capbuf));

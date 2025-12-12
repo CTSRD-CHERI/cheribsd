@@ -471,7 +471,7 @@ allocuio(u_int iovcnt)
 	    ("Requested %u iovecs exceed UIO_MAXIOV", iovcnt));
 	uio = uma_zalloc_arg(uio_zone, (void *)(uintptr_t)iovcnt, M_WAITOK);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(__CHERI_SUBOBJECT_BOUNDS__)
-	KASSERT(cheri_getlen(uio->uio_inline_iov) ==
+	KASSERT(cheri_length_get(uio->uio_inline_iov) ==
 	    UIO_INLINE_IOV * sizeof(struct iovec),
 	    ("Malformed UIO structure, uio_inline_iov is not representable"));
 #endif

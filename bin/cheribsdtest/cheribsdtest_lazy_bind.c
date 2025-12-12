@@ -25,9 +25,6 @@
 
 #include <sys/types.h>
 
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-
 #include <err.h>
 
 #include <cheribsdtest_dynamic.h>

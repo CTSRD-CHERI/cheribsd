@@ -80,8 +80,8 @@
 #include "spinlock.h"
 
 #ifndef __CHERI_PURE_CAPABILITY__
-#define	cheri_setbounds(ptr, size)	((void *)(ptr))
-#define	cheri_andperm(ptr, size)	((void *)(ptr))
+#define	cheri_bounds_set(ptr, size)	((void *)(ptr))
+#define	cheri_perms_and(ptr, size)	((void *)(ptr))
 #define	CHERI_PERMS_USERSPACE_DATA	0
 #define	CHERI_PERM_SW_VMEM		0
 #endif
@@ -200,9 +200,9 @@ __rederive_pointer(void *ptr)
 
 	TLS_MALLOC_LOCK;
 	SLIST_FOREACH(pp, &curpp, ph_next) {
-		if (cheri_is_address_inbounds(pp, cheri_getbase(ptr))) {
+		if (cheri_is_address_inbounds(pp, cheri_base_get(ptr))) {
 			TLS_MALLOC_UNLOCK;
-			return (cheri_setaddress(pp, cheri_getaddress(ptr)));
+			return (cheri_address_set(pp, cheri_address_get(ptr)));
 		}
 	}
 	TLS_MALLOC_UNLOCK;
@@ -217,8 +217,8 @@ bound_ptr(void *mem, size_t nbytes)
 
 	if (mem == NULL)
 		return (NULL);
-	ptr = cheri_setbounds(mem, nbytes);
-	ptr = cheri_andperm(ptr,
+	ptr = cheri_bounds_set(mem, nbytes);
+	ptr = cheri_perms_and(ptr,
 	    CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_SW_VMEM);
 	return (ptr);
 }
@@ -389,7 +389,7 @@ morecore(int bucket)
 		if (__morepages(amt/pagesz) == 0)
 			return;
 
-	buf = cheri_setbounds(pagepool_start, amt);
+	buf = cheri_bounds_set(pagepool_start, amt);
 	pagepool_start += amt;
 
 	/*
@@ -397,7 +397,7 @@ morecore(int bucket)
 	 * free list for this hash bucket.
 	 */
 	for (; nblks > 0; nblks--) {
-		op = (struct overhead *)(void *)cheri_setbounds(buf, sz);
+		op = (struct overhead *)(void *)cheri_bounds_set(buf, sz);
 		SLIST_INSERT_HEAD(&nextf[bucket], op, ov_next);
 		buf += sz;
 	}
@@ -409,7 +409,7 @@ find_overhead(void * cp)
 	struct overhead *op;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	if (!cheri_gettag(cp))
+	if (!cheri_tag_get(cp))
 		return (NULL);
 #endif
 	op = __rederive_pointer(cp);
@@ -426,13 +426,13 @@ find_overhead(void * cp)
 	 *  - Be an internal allocator pointer (have the SW_VMEM permision).
 	 *  - Point somewhere before us and within the current pagepool.
 	 */
-	if (cheri_gettag(op->ov_real_allocation) &&
-	    (cheri_getperm(op->ov_real_allocation) & CHERI_PERM_SW_VMEM) != 0) {
+	if (cheri_tag_get(op->ov_real_allocation) &&
+	    (cheri_perms_get(op->ov_real_allocation) & CHERI_PERM_SW_VMEM) != 0) {
 		ptraddr_t base, pp_base;
 
-		pp_base = cheri_getbase(op);
-		base = cheri_getbase(op->ov_real_allocation);
-		if (base >= pp_base && base < cheri_getaddress(op)) {
+		pp_base = cheri_base_get(op);
+		base = cheri_base_get(op->ov_real_allocation);
+		if (base >= pp_base && base < cheri_address_get(op)) {
 			op = op->ov_real_allocation;
 			op--;
 		}
@@ -457,7 +457,7 @@ paint_shadow(void *mem, size_t size)
 {
 	struct pagepool_header *pp;
 
-	pp = cheri_setoffset(pp, 0);
+	pp = cheri_offset_set(pp, 0);
 	/*
 	 * Defer initializing ph_shadow since odds are good we'll never
 	 * need it.
@@ -475,7 +475,7 @@ clear_shadow(void *mem, size_t size)
 {
 	struct pagepool_header *pp;
 
-	pp = cheri_setoffset(pp, 0);
+	pp = cheri_offset_set(pp, 0);
 	caprev_shadow_nomap_clear_raw(cri->base_mem_nomap, pp->ph_shadow,
 	    (ptraddr_t)mem, size);
 }

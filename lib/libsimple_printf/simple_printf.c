@@ -356,7 +356,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 					PCHAR(*cap_repr++);
 				break;
 			} else {
-				num = cheri_getaddress(cap);
+				num = cheri_address_get(cap);
 			}
 #else
 			num = (uintmax_t)(uintptr_t)va_arg(ap, void *);

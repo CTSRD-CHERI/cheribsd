@@ -835,7 +835,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 #endif
 			{
 				cap = va_arg(ap, void * __capability);
-				num = cheri_getaddress(cap);
+				num = cheri_address_get(cap);
 			}
 			if (sharpflag) {
 				int orig_dwidth;
@@ -847,7 +847,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				orig_dwidth = dwidth;
 
 				/* address */
-				num = cheri_getaddress(cap);
+				num = cheri_address_get(cap);
 				PCHAR('0');
 				PCHAR('x');
 				p = ksprintn(nbuf, num, 16, &n, 0);
@@ -869,7 +869,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				PCHAR('[');
 
 				/* permissions */
-				num = cheri_getperm(cap);
+				num = cheri_perms_get(cap);
 				if (num & CHERI_PERM_LOAD)
 					PCHAR('r');
 				if (num & CHERI_PERM_STORE)
@@ -883,7 +883,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				PCHAR(',');
 
 				/* bounds */
-				num = cheri_getbase(cap);
+				num = cheri_base_get(cap);
 				PCHAR('0');
 				PCHAR('x');
 				p = ksprintn(nbuf, num, 16, &n, 0);
@@ -895,7 +895,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 
 				PCHAR('-');
 
-				num += cheri_getlen(cap);
+				num += cheri_length_get(cap);
 				PCHAR('0');
 				PCHAR('x');
 				p = ksprintn(nbuf, num, 16, &n, 0);
@@ -908,16 +908,16 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				PCHAR(']');
 
 				/* attributes */
-				tagged = cheri_gettag(cap);
+				tagged = cheri_tag_get(cap);
 				have_attributes = !tagged;
-				if (cheri_gettype(cap) != CHERI_OTYPE_UNSEALED)
+				if (cheri_type_get(cap) != CHERI_OTYPE_UNSEALED)
 					have_attributes = true;
 
 #ifdef CHERI_FLAGS_CAP_MODE
 				capmode = false;
-				if ((cheri_getperm(cap) &
+				if ((cheri_perms_get(cap) &
 				    CHERI_PERM_EXECUTE) != 0 &&
-				    cheri_getflags(cap) ==
+				    cheri_flags_get(cap) ==
 				    CHERI_FLAGS_CAP_MODE) {
 					capmode = true;
 					have_attributes = true;
@@ -942,7 +942,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 
 				if (!tagged)
 					PATTR("invalid");
-				switch (cheri_gettype(cap)) {
+				switch (cheri_type_get(cap)) {
 				case CHERI_OTYPE_UNSEALED:
 					break;
 				case CHERI_OTYPE_SENTRY:

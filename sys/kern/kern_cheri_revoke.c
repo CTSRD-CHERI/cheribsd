@@ -779,16 +779,16 @@ kern_cheri_revoke_get_shadow(struct thread *td, int flags,
 	switch (sel) {
 	case CHERI_REVOKE_SHADOW_NOVMEM:
 
-		if (cheri_gettag(arena) == 0)
+		if (cheri_tag_get(arena) == 0)
 			return (EINVAL);
 
-		arena_perms = cheri_getperm(arena);
+		arena_perms = cheri_perms_get(arena);
 
 		if ((arena_perms & CHERI_PERM_SW_VMEM) == 0)
 			return (EPERM);
 
-		base = cheri_getbase(arena);
-		size = cheri_getlen(arena);
+		base = cheri_base_get(arena);
+		size = cheri_length_get(arena);
 
 		cres = vm_cheri_revoke_shadow_cap(curproc->p_sysent,
 			sel, base, size, arena_perms);
@@ -799,18 +799,18 @@ kern_cheri_revoke_get_shadow(struct thread *td, int flags,
 	    {
 		int reqperms;
 
-		if (cheri_gettag(arena) == 0)
+		if (cheri_tag_get(arena) == 0)
 			return (EINVAL);
 
 		/* XXX Require all of SW_VMEM, SEAL, and UNSEAL permissions? */
 		reqperms = CHERI_PERM_SEAL | CHERI_PERM_UNSEAL |
 		    CHERI_PERM_SW_VMEM;
-		arena_perms = cheri_getperm(arena);
+		arena_perms = cheri_perms_get(arena);
 		if ((arena_perms & reqperms) != reqperms)
 			return (EPERM);
 
-		base = cheri_getbase(arena);
-		size = cheri_getlen(arena);
+		base = cheri_base_get(arena);
+		size = cheri_length_get(arena);
 
 		cres = vm_cheri_revoke_shadow_cap(curproc->p_sysent,
 			sel, base, size, 0);
@@ -829,7 +829,7 @@ kern_cheri_revoke_get_shadow(struct thread *td, int flags,
 		return (EINVAL);
 	}
 
-	if (!cheri_gettag(cres))
+	if (!cheri_tag_get(cres))
 		return (EINVAL);
 
 	vm = td->td_proc->p_vmspace;

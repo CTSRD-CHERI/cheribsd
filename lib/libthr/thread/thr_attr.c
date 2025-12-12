@@ -302,7 +302,7 @@ _pthread_attr_getstack(const pthread_attr_t * __restrict attr,
 	 * XXX-AR: maybe we should allow this and simply treat
 	 * pthread_attr_getstack() as an unsafe API.
 	 */
-	cheri_cleartag(*stackaddr);
+	cheri_tag_clear(*stackaddr);
 #endif
 	*stacksize = (*attr)->stacksize_attr;
 	return (0);
@@ -327,7 +327,7 @@ _thr_attr_getstackaddr(const pthread_attr_t *attr, void **stackaddr)
 	 * XXX-AR: maybe we should allow this and simply treat
 	 * pthread_attr_getstackaddr() as an unsafe API
 	 */
-	cheri_cleartag(*stackaddr);
+	cheri_tag_clear(*stackaddr);
 #endif
 	return (0);
 }

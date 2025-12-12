@@ -379,7 +379,7 @@ extent_init(extent_t *extent, arena_t *arena, void *addr, size_t size,
     bool committed, bool dumpable, extent_head_state_t is_head) {
 	assert(addr == PAGE_ADDR2BASE(addr) || !slab);
 #ifdef __CHERI_PURE_CAPABILITY__
-	assert(cheri_getoffset(extent) == 0 && "extent offset must be zero for packing in rtree");
+	assert(cheri_offset_get(extent) == 0 && "extent offset must be zero for packing in rtree");
 #endif
 	extent_arena_set(extent, arena);
 	extent_addr_set(extent, addr);

@@ -667,10 +667,10 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 #ifdef __CHERI_PURE_CAPABILITY__
 	reservation_cap = (void *)reservation;
 #else
-	reservation_cap = cheri_setbounds(
-	    cheri_setaddress(userspace_root_cap, reservation), end - start);
+	reservation_cap = cheri_bounds_set(
+	    cheri_address_set(userspace_root_cap, reservation), end - start);
 #endif
-	*imgact_cap = cheri_andperm(reservation_cap, perm);
+	*imgact_cap = cheri_perms_and(reservation_cap, perm);
 
 	return (0);
 }
@@ -832,7 +832,7 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 	else
 		map_len = round_page(offset + filsz) - file_addr;
 #if __has_feature(capabilities)
-	map_addr = cheri_setbounds(map_addr, map_len);
+	map_addr = cheri_bounds_set(map_addr, map_len);
 #endif
 
 	if (map_len != 0) {
@@ -861,7 +861,7 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 	map_addr = trunc_page(vmaddr + filsz);
 	map_len = (ptraddr_t)round_page(vmaddr + memsz) - (ptraddr_t)map_addr;
 #if __has_feature(capabilities)
-	map_addr = cheri_setbounds(map_addr, map_len);
+	map_addr = cheri_bounds_set(map_addr, map_len);
 #endif
 
 	/* This had damn well better be true! */
@@ -918,7 +918,7 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 
 		/* Loadable segment */
 #if __has_feature(capabilities)
-		section_addr = (uintcap_t)cheri_setaddress(
+		section_addr = (uintcap_t)cheri_address_set(
 		    imgp->imgact_capability, phdr[i].p_vaddr + rbase);
 #else
 		section_addr = phdr[i].p_vaddr + rbase;
@@ -1783,8 +1783,8 @@ timekeep_cap(struct image_params *imgp)
 	KASSERT(timekeep_len == CHERI_REPRESENTABLE_LENGTH(timekeep_len),
 	    ("timekeep_len needs rounding"));
 
-	tmpcap = (void * __capability)cheri_setboundsexact(
-	    cheri_andperm(timekeep_base, CHERI_PERMS_USERSPACE_RODATA),
+	tmpcap = (void * __capability)cheri_bounds_set_exact(
+	    cheri_perms_and(timekeep_base, CHERI_PERMS_USERSPACE_RODATA),
 	    timekeep_len);
 
 	return (tmpcap);
@@ -1818,7 +1818,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	 * program and AT_PHDR a writable one.  RTLD is responsible for
 	 * setting bounds.  Needs SW_VMEM so relro pages can be made RO.
 	 */
-	AUXARGS_ENTRY_PTR(pos, AT_PHDR, cheri_setaddress(prog_cap(imgp,
+	AUXARGS_ENTRY_PTR(pos, AT_PHDR, cheri_address_set(prog_cap(imgp,
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM),
 	    args->phdr));
 #else
@@ -1829,14 +1829,14 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY(pos, AT_PAGESZ, args->pagesz);
 	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
 #ifdef __ELF_CHERI
-	entry = cheri_setaddress(prog_cap(imgp, CHERI_CAP_USER_CODE_PERMS),
+	entry = cheri_address_set(prog_cap(imgp, CHERI_CAP_USER_CODE_PERMS),
 	    args->entry);
 #ifdef CHERI_FLAGS_CAP_MODE
 	/*
 	 * On architectures with a mode flag bit, we must ensure the flag is set in
 	 * AT_ENTRY for RTLD to be able to jump to it.
 	 */
-	entry = cheri_setflags(entry, CHERI_FLAGS_CAP_MODE);
+	entry = cheri_flags_set(entry, CHERI_FLAGS_CAP_MODE);
 #endif
 	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, entry);
 
@@ -1868,7 +1868,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		exec_base = interp_cap(imgp, args,
 		    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
 	}
-	AUXARGS_ENTRY_PTR(pos, AT_BASE, cheri_setaddress(exec_base,
+	AUXARGS_ENTRY_PTR(pos, AT_BASE, cheri_address_set(exec_base,
 	    args->base));
 #else
 	AUXARGS_ENTRY(pos, AT_ENTRY, args->entry);

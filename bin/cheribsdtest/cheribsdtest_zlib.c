@@ -37,8 +37,6 @@
 
 #include <sys/types.h>
 
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

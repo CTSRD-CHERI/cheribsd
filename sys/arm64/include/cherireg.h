@@ -37,6 +37,7 @@
 #define	CHERICAP_SIZE   16
 #define	CHERICAP_SHIFT	4
 
+#ifdef _KERNEL
 /*
  * CHERI ISA-defined constants for capabilities -- suitable for inclusion from
  * assembly source code.
@@ -61,6 +62,19 @@
 #define	CHERI_PERM_EXECUTE			(1 << 15)	/* 0x00008000 */
 #define	CHERI_PERM_STORE			(1 << 16)	/* 0x00010000 */
 #define	CHERI_PERM_LOAD				(1 << 17)	/* 0x00020000 */
+#else
+/*
+ * These should be defined in cheriintrin.h, but aren't yet.
+ */
+#define	CHERI_PERM_EXECUTIVE			(1 << 1)	/* 0x00000002 */
+#define	CHERI_PERM_SW0				(1 << 2)	/* 0x00000004 */
+#define	CHERI_PERM_SW1				(1 << 3)	/* 0x00000008 */
+#define	CHERI_PERM_SW2				(1 << 4)	/* 0x00000010 */
+#define	CHERI_PERM_SW3				(1 << 5)	/* 0x00000020 */
+#define	CHERI_PERM_MUTABLE_LOAD			(1 << 6)	/* 0x00000040 */
+#define	CHERI_PERM_BRANCH_SEALED_PAIR		(1 << 8)	/* 0x00000100 */
+#define	CHERI_PERM_INVOKE CHERI_PERM_BRANCH_SEALED_PAIR
+#endif
 
 /*
  * Macros defining initial permission sets:
@@ -192,9 +206,11 @@
 #define	CHERI_OTYPE_ISKERN(x)	(((x) & CHERI_OTYPE_KERN_FLAG) != 0)
 #define	CHERI_OTYPE_ISUSER(x)	(!(CHERI_OTYPE_ISKERN(x)))
 
+#ifdef _KERNEL
 /* Reserved CHERI object types: */
 #define	CHERI_OTYPE_UNSEALED	(0l)
 #define	CHERI_OTYPE_SENTRY	(1l)
+#endif
 
 /*
  * Root compartment ID capablity for userspace.

@@ -33,7 +33,8 @@ ifunc_init(const Elf_Auxinfo *aux __unused)
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#include <cheri/cheric.h>
+#include <cheri/cherireg.h>
+#include <cheriintrin.h>
 
 /*
  * Fragments consist of a 64-bit address followed by a 56-bit length and an
@@ -54,18 +55,18 @@ init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
 
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
 	    (uintcap_t)text_rodata_cap : (uintcap_t)data_cap;
-	cap = cheri_setaddress(cap, base_addr + address);
-	cap = cheri_clearperm(cap, CHERI_PERM_SW_VMEM);
+	cap = cheri_address_set(cap, base_addr + address);
+	cap = cheri_perms_clear(cap, CHERI_PERM_SW_VMEM);
 
 	if (perms == MORELLO_FRAG_EXECUTABLE || perms == MORELLO_FRAG_RODATA) {
-		cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
+		cap = cheri_perms_clear(cap, CHERI_PERM_SEAL |
 		    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
 		    CHERI_PERM_STORE_LOCAL_CAP);
 	}
 	if (perms == MORELLO_FRAG_RWDATA || perms == MORELLO_FRAG_RODATA) {
-		cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
+		cap = cheri_perms_clear(cap, CHERI_PERM_SEAL |
 		    CHERI_PERM_EXECUTE);
-		cap = cheri_setbounds(cap, len);
+		cap = cheri_bounds_set(cap, len);
 	}
 
 	cap += addend;
@@ -75,7 +76,7 @@ init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
 		 * TODO tight bounds: lower bound and len should be set
 		 * with LSB == 0 for C64 code.
 		 */
-		cap = cheri_sealentry(cap);
+		cap = cheri_sentry_create(cap);
 	}
 
 	return (cap);

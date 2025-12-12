@@ -93,19 +93,19 @@ fbt_make_tracepoint_capability(uint32_t *instr)
 	fbt_patchval_t *cap;
 	ptraddr_t addr;
 
-	if (cheri_getsealed(instr))
+	if (cheri_is_sealed(instr))
 		return (NULL);
-	if (!cheri_gettag(instr))
+	if (!cheri_tag_get(instr))
 		return (NULL);
 	addr = (ptraddr_t)instr;
 	if (addr + INSN_SIZE < addr ||
-	    addr < cheri_getbase(instr) ||
-	    addr + INSN_SIZE > cheri_getbase(instr) + cheri_getlength(instr))
+	    addr < cheri_base_get(instr) ||
+	    addr + INSN_SIZE > cheri_base_get(instr) + cheri_length_get(instr))
 		return (NULL);
 
-	cap = cheri_setaddress(kernel_root_cap, addr);
-	cap = cheri_setbounds(cap, INSN_SIZE);
-	cap = cheri_andperm(cap, CHERI_PERM_STORE);
+	cap = cheri_address_set(kernel_root_cap, addr);
+	cap = cheri_bounds_set(cap, INSN_SIZE);
+	cap = cheri_perms_and(cap, CHERI_PERM_STORE);
 	return (cap);
 }
 
@@ -121,7 +121,7 @@ fbt_unseal_symval(linker_symval_t *sym)
 	uintcap_t val;
 
 	val = cheri_unseal((uintcap_t)sym->value, sentry_unsealcap);
-	val = cheri_andperm(val, CHERI_PERM_LOAD);
+	val = cheri_perms_and(val, CHERI_PERM_LOAD);
 	return (val);
 }
 #endif

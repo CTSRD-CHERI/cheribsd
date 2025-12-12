@@ -3287,7 +3287,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 			thunk.ifr.ifr_phys = ifr64->ifr_phys;
 			break;
 		case IFREQ64(SIOCGI2C):
-			thunk.ifr.ifr_ifru.ifru_data = cheri_setbounds(
+			thunk.ifr.ifr_ifru.ifru_data = cheri_bounds_set(
 			    ifr_data_get_ptr(cmd, ifr64),
 			    sizeof(struct ifi2creq));
 			break;

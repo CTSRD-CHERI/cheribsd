@@ -38,9 +38,6 @@
 #include <sys/sysctl.h>
 #include <sys/time.h>
 
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -65,9 +62,9 @@ CHERIBSDTEST(bounds_calloc,
 		calloc_allocation = calloc(1, sizes[i]);
 		if (calloc_allocation == NULL)
 			cheribsdtest_failure_err("calloc failed");
-		if (cheri_getoffset(calloc_allocation) != 0)
+		if (cheri_offset_get(calloc_allocation) != 0)
 			cheribsdtest_failure_errx("non-zero offset returned");
-		if (cheri_getlen(calloc_allocation) < sizes[i])
+		if (cheri_length_get(calloc_allocation) < sizes[i])
 			cheribsdtest_failure_errx("returned length too small");
 		free((void *)calloc_allocation);
 	}

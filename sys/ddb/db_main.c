@@ -218,8 +218,8 @@ db_fetch_ksymtab(vm_pointer_t ksym_start, vm_pointer_t ksym_end,
 			    = 0;
 		} else {
 #ifdef __CHERI_PURE_CAPABILITY__
-			ksymtab = cheri_setbounds(ksymtab, ksymtab_size);
-			kstrtab = cheri_setbounds(kstrtab, strsz);
+			ksymtab = cheri_bounds_set(ksymtab, ksymtab_size);
+			kstrtab = cheri_bounds_set(kstrtab, strsz);
 #endif
 		}
 	}
@@ -244,8 +244,8 @@ db_init(void)
 	}
 	db_add_symbol_table(NULL, NULL, "kld", NULL);
 #ifdef __CHERI_PURE_CAPABILITY__
-	db_code_cap = cheri_andperm(kernel_root_cap, CHERI_PERMS_KERNEL_CODE);
-	db_data_cap = cheri_andperm(kernel_root_cap, CHERI_PERMS_KERNEL_DATA);
+	db_code_cap = cheri_perms_and(kernel_root_cap, CHERI_PERMS_KERNEL_CODE);
+	db_data_cap = cheri_perms_and(kernel_root_cap, CHERI_PERMS_KERNEL_DATA);
 #endif
 	return (1);	/* We're the default debugger. */
 }
@@ -321,19 +321,19 @@ db_trace_thread_wrapper(struct thread *td)
 void *
 db_code_ptr(db_addr_t addr)
 {
-	return (cheri_setaddress(db_code_cap, addr));
+	return (cheri_address_set(db_code_cap, addr));
 }
 
 void *
 db_data_ptr_unbound(db_addr_t addr)
 {
-	return (cheri_setaddress(db_data_cap, addr));
+	return (cheri_address_set(db_data_cap, addr));
 }
 
 void *
 db_data_ptr(db_addr_t addr, size_t len)
 {
-	return (cheri_setbounds(db_data_ptr_unbound(addr), len));
+	return (cheri_bounds_set(db_data_ptr_unbound(addr), len));
 }
 #endif
 // CHERI CHANGES START
