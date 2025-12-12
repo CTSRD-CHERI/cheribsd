@@ -33,7 +33,7 @@
 #include <sys/reg.h>
 
 #if defined(__aarch64__) && defined(__CHERI_PURE_CAPABILITY__)
-#include <cheri/cheric.h>
+#include <cheriintrin.h>
 #endif
 
 #include <err.h>

@@ -37,7 +37,7 @@
 #include "libc_private.h"
 #include "csu_common.h"
 
-#include <cheri/cheric.h>
+#include <cheriintrin.h>
 
 /*
  * For -pie executables rtld will process the __cap_relocs, so we don't need
