@@ -44,8 +44,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include <cheri/cheric.h>
-
 #include "cheribsdtest.h"
 
 /*

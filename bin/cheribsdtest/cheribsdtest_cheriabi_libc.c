@@ -34,9 +34,6 @@
 #include <sys/param.h>
 #include <sys/types.h>
 
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-
 #include <string.h>
 
 #include "cheribsdtest.h"
