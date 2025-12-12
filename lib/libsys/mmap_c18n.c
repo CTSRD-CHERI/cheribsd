@@ -11,7 +11,8 @@
 
 #include <sys/mman.h>
 
-#include <cheri/cheric.h>
+#include <cheri/cherireg.h>
+#include <cheriintrin.h>
 
 #include "libc_private.h"
 

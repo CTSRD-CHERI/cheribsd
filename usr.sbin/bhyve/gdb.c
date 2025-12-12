@@ -65,8 +65,6 @@
 #include <unistd.h>
 #include <vmmapi.h>
 
-#include <cheri/cheric.h>
-
 #include "bhyverun.h"
 #include "config.h"
 #include "debug.h"
