@@ -402,8 +402,8 @@ sys_shmdt(struct thread *td, struct shmdt_args *uap)
 	 * length is checked after we find our mapping.
 	 */
 	if (shmaddr != NULL &&
-	    (!cheri_gettag(shmaddr) || cheri_getsealed(shmaddr) ||
-	    (cheri_getperm(shmaddr) & CHERI_PERM_SW_VMEM) == 0))
+	    (!cheri_tag_get(shmaddr) || cheri_is_sealed(shmaddr) ||
+	    (cheri_perms_get(shmaddr) & CHERI_PERM_SW_VMEM) == 0))
 		return (EPROT);
 #endif
 	return (kern_shmdt(td, shmaddr));
@@ -494,7 +494,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		if (CHERI_REPRESENTABLE_ALIGN_DOWN(attach_va, size) !=
 		    attach_va)
 			return (EINVAL);
-		if (cheri_gettag(shmaddr)) {
+		if (cheri_tag_get(shmaddr)) {
 			int reqperm;
 
 			/*
@@ -507,19 +507,19 @@ kern_shmat_locked(struct thread *td, int shmid,
 			reqperm = CHERI_PERM_LOAD;
 			if ((shmflg & SHM_RDONLY) == 0)
 				reqperm |= CHERI_PERM_STORE;
-			if ((cheri_getperm(shmaddr) & reqperm) != reqperm)
+			if ((cheri_perms_get(shmaddr) & reqperm) != reqperm)
 				return (EPROT);
 
 			/* XXX: require that a reservation exists. */
 			/* Handle any rounding above */
-			shmaddr = cheri_setaddress(shmaddr, attach_va);
+			shmaddr = cheri_address_set(shmaddr, attach_va);
 			if (!__CAP_CHECK(shmaddr, size))
 				return (EINVAL);
 		} else {
 			/* As with mmap, untagged implies exclusive. */
 			if ((shmflg & SHM_REMAP) != 0)
 				return (EINVAL);
-			shmaddr = cheri_setaddress(userspace_root_cap,
+			shmaddr = cheri_address_set(userspace_root_cap,
 			    attach_va);
 
 		}
@@ -547,13 +547,13 @@ kern_shmat_locked(struct thread *td, int shmid,
 			    CHERI_REPRESENTABLE_ALIGNMENT(size) < (1UL << 12) ?
 			    VMFS_OPTIMAL_SPACE :
 			    VMFS_ALIGNED_SPACE(CHERI_ALIGN_SHIFT(size));
-			shmaddr = cheri_setaddress(userspace_root_cap, attach_va);
+			shmaddr = cheri_address_set(userspace_root_cap, attach_va);
 		} else
 #endif
 			find_space = VMFS_OPTIMAL_SPACE;
 	}
 #if __has_feature(capabilities)
-	max_va = cheri_gettop(shmaddr);
+	max_va = cheri_top_get(shmaddr);
 #else
 	max_va = 0;
 #endif
@@ -565,10 +565,10 @@ kern_shmat_locked(struct thread *td, int shmid,
 		return (ENOMEM);
 	}
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(attach_va), ("Expected valid capability"));
-	KASSERT(cheri_getlen(attach_va) == size,
+	KASSERT(cheri_tag_get(attach_va), ("Expected valid capability"));
+	KASSERT(cheri_length_get(attach_va) == size,
 	    ("Inexact bounds expected %zx found %zx",
-	    (size_t)size, (size_t)cheri_getlen(attach_va)));
+	    (size_t)size, (size_t)cheri_length_get(attach_va)));
 #endif
 
 	shmmap_s->va = attach_va;
@@ -583,10 +583,10 @@ kern_shmat_locked(struct thread *td, int shmid,
 		 * and just return attach_va, as the capability will be derived from the
 		 * root map capability.
 		 */
-		shmaddr = cheri_setboundsexact(cheri_setaddress(shmaddr,
+		shmaddr = cheri_bounds_set_exact(cheri_address_set(shmaddr,
 		     attach_va), size);
 		/* Remove inappropriate permissions. */
-		shmaddr = cheri_andperm(shmaddr, ~(CHERI_PERM_EXECUTE |
+		shmaddr = cheri_perms_and(shmaddr, ~(CHERI_PERM_EXECUTE |
 		    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
 		    ((shmflg & SHM_RDONLY) != 0 ? CHERI_PERM_STORE : 0)));
 		td->td_retval[0] = (uintcap_t)__DECONST_CAP(void * __capability,
@@ -627,8 +627,8 @@ sys_shmat(struct thread *td, struct shmat_args *uap)
 	 * SW_VMEM bearing capability.
 	 */
 	if (!cheri_is_null_derived(shmaddr) &&
-	    (!cheri_gettag(shmaddr) || cheri_getsealed(shmaddr) ||
-	    (cheri_getperm(shmaddr) & CHERI_PERM_SW_VMEM) == 0))
+	    (!cheri_tag_get(shmaddr) || cheri_is_sealed(shmaddr) ||
+	    (cheri_perms_get(shmaddr) & CHERI_PERM_SW_VMEM) == 0))
 		return (EPROT);
 #endif
 	return (kern_shmat(td, uap->shmid, shmaddr, uap->shmflg));

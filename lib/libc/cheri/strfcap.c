@@ -78,10 +78,10 @@ _strfcap(char * __restrict buf, size_t maxsize, const char * __restrict format,
 	} while (0)
 
 	orig_buf = buf;
-	have_attributes = !tag || cheri_getsealed(cap);
+	have_attributes = !tag || cheri_is_sealed(cap);
 #ifdef CHERI_FLAGS_CAP_MODE
-	if ((cheri_getperm(cap) & CHERI_PERM_EXECUTE) != 0 &&
-	    cheri_getflags(cap) == CHERI_FLAGS_CAP_MODE) {
+	if ((cheri_perms_get(cap) & CHERI_PERM_EXECUTE) != 0 &&
+	    cheri_flags_get(cap) == CHERI_FLAGS_CAP_MODE) {
 		capmode = true;
 		have_attributes = true;
 	}
@@ -125,7 +125,7 @@ more_spec:
 			goto more_spec;
 
 		case 'a':
-			number = cheri_getaddress(cap);
+			number = cheri_address_get(cap);
 			break;
 
 		case 'A':
@@ -136,7 +136,7 @@ more_spec:
 					OUT("invalid");
 					comma = true;
 				}
-				switch cheri_gettype(cap) {
+				switch (cheri_type_get(cap)) {
 				case CHERI_OTYPE_UNSEALED:
 					break;
 				case CHERI_OTYPE_SENTRY:
@@ -165,7 +165,7 @@ more_spec:
 			continue;
 
 		case 'b':
-			number = cheri_getbase(cap);
+			number = cheri_base_get(cap);
 			break;
 
 		case 'B':
@@ -184,7 +184,7 @@ more_spec:
 			if (cheri_is_null_derived(cap)) {
 				alt = true;
 				number_fmt = 'x';
-				number = cheri_getaddress(cap);
+				number = cheri_address_get(cap);
 				break;
 			}
 			ret = _strfcap(buf,
@@ -196,40 +196,40 @@ more_spec:
 		}
 
 		case 'l':
-			number = cheri_getlength(cap);
+			number = cheri_length_get(cap);
 			break;
 
 		case 'o':
-			number = cheri_getoffset(cap);
+			number = cheri_offset_get(cap);
 			break;
 
 		case 'p':
-			number = cheri_getperm(cap);
+			number = cheri_perms_get(cap);
 			break;
 
 		case 'P':
-			if (cheri_getperm(cap) & CHERI_PERM_LOAD)
+			if (cheri_perms_get(cap) & CHERI_PERM_LOAD)
 				OUT("r");
-			if (cheri_getperm(cap) & CHERI_PERM_STORE)
+			if (cheri_perms_get(cap) & CHERI_PERM_STORE)
 				OUT("w");
-			if (cheri_getperm(cap) & CHERI_PERM_EXECUTE)
+			if (cheri_perms_get(cap) & CHERI_PERM_EXECUTE)
 				OUT("x");
-			if (cheri_getperm(cap) & CHERI_PERM_LOAD_CAP)
+			if (cheri_perms_get(cap) & CHERI_PERM_LOAD_CAP)
 				OUT("R");
-			if (cheri_getperm(cap) & CHERI_PERM_STORE_CAP)
+			if (cheri_perms_get(cap) & CHERI_PERM_STORE_CAP)
 				OUT("W");
 #ifdef CHERI_PERM_EXECUTIVE
-			if (cheri_getperm(cap) & CHERI_PERM_EXECUTIVE)
+			if (cheri_perms_get(cap) & CHERI_PERM_EXECUTIVE)
 				OUT("E");
 #endif
 			continue;
 
 		case 's':
-			number = cheri_gettype(cap);
+			number = cheri_type_get(cap);
 			break;
 
 		case 'S':
-			switch cheri_gettype(cap) {
+			switch (cheri_type_get(cap)) {
 			case CHERI_OTYPE_UNSEALED:
 				OUT("<unsealed>");
 				continue;
@@ -237,11 +237,11 @@ more_spec:
 				OUT("<sentry>");
 				continue;
 			}
-			number = cheri_gettype(cap);
+			number = cheri_type_get(cap);
 			break;
 
 		case 't':
-			number = cheri_gettop(cap);
+			number = cheri_top_get(cap);
 			break;
 
 		case 'T':
@@ -249,7 +249,7 @@ more_spec:
 			continue;
 
 		case 'v':
-			number = cheri_gettag(cap);
+			number = cheri_tag_get(cap);
 			break;
 
 		case 'x':
@@ -299,5 +299,5 @@ ssize_t
 strfcap(char * __restrict buf, size_t maxsize, const char * __restrict format,
     uintcap_t cap)
 {
-	return (_strfcap(buf, maxsize, format, cap, cheri_gettag(cap)));
+	return (_strfcap(buf, maxsize, format, cap, cheri_tag_get(cap)));
 }

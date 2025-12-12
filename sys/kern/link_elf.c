@@ -397,7 +397,7 @@ static caddr_t
 ef_address(elf_file_t ef, ptraddr_t offset)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
-	return (cheri_setaddress(ef->mapbase, (ptraddr_t)ef->address + offset));
+	return (cheri_address_set(ef->mapbase, (ptraddr_t)ef->address + offset));
 #else
 	return (ef->address + offset);
 #endif
@@ -503,8 +503,8 @@ link_elf_init(void* arg)
 	 * This has to have very broad bounds for the kernel so that
 	 * relocbase passed to elf_reloc works.
 	 */
-	ef->address = cheri_setaddress(kernel_root_cap, 0);
-	ef->mapbase = cheri_setbounds(ef->address + KERNBASE,
+	ef->address = cheri_address_set(kernel_root_cap, 0);
+	ef->mapbase = cheri_bounds_set(ef->address + KERNBASE,
 	    (ptraddr_t)_end - KERNBASE);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
@@ -535,7 +535,7 @@ link_elf_init(void* arg)
 			 * MODINFO_ADDR is really a virtual address,
 			 * not a pointer
 			 */
-			linker_kernel_file->address = cheri_setaddress(
+			linker_kernel_file->address = cheri_address_set(
 			    linker_kernel_file->address,
 			    *(vm_offset_t *)baseptr);
 #endif
@@ -1012,10 +1012,10 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	ef->preloaded = 1;
 	ef->modptr = modptr;
 #ifdef __CHERI_PURE_CAPABILITY__
-	ef->address = cheri_setaddress(kernel_root_cap,
+	ef->address = cheri_address_set(kernel_root_cap,
 	    *(ptraddr_t *)baseptr);
-	ef->address = cheri_setbounds(ef->address, *(size_t *)sizeptr);
-	ef->address = cheri_andperm(ef->address, CHERI_PERMS_KERNEL_CODE |
+	ef->address = cheri_bounds_set(ef->address, *(size_t *)sizeptr);
+	ef->address = cheri_perms_and(ef->address, CHERI_PERMS_KERNEL_CODE |
 	    CHERI_PERMS_KERNEL_DATA);
 	ef->mapbase = ef->address;
 #else
@@ -1755,15 +1755,15 @@ make_capability(const Elf_Sym *sym, caddr_t val)
 	switch (ELF_ST_TYPE(sym->st_info)) {
 	case STT_FUNC:
 	case STT_GNU_IFUNC:
-		val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
+		val = cheri_perms_and(val, CHERI_PERMS_KERNEL_CODE);
 #ifdef CHERI_FLAGS_CAP_MODE
-		val = cheri_setflags(val, CHERI_FLAGS_CAP_MODE);
+		val = cheri_flags_set(val, CHERI_FLAGS_CAP_MODE);
 #endif
-		val = cheri_sealentry(val);
+		val = cheri_sentry_create(val);
 		break;
 	default:
-		val = cheri_setbounds(val, sym->st_size);
-		val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
+		val = cheri_bounds_set(val, sym->st_size);
+		val = cheri_perms_and(val, CHERI_PERMS_KERNEL_DATA);
 		break;
 	}
 	return (val);
@@ -2158,14 +2158,14 @@ resolve_cap_reloc(void *arg, bool function, bool constant, ptraddr_t object,
 	}
 #endif
 	if (function) {
-		addr = cheri_andperm(addr, CHERI_PERMS_KERNEL_CODE);
+		addr = cheri_perms_and(addr, CHERI_PERMS_KERNEL_CODE);
 #ifdef CHERI_FLAGS_CAP_MODE
-		addr = cheri_setflags(addr, CHERI_FLAGS_CAP_MODE);
+		addr = cheri_flags_set(addr, CHERI_FLAGS_CAP_MODE);
 #endif
 	} else if (constant) {
-		addr = cheri_andperm(addr, CHERI_PERMS_KERNEL_RODATA);
+		addr = cheri_perms_and(addr, CHERI_PERMS_KERNEL_RODATA);
 	} else {
-		addr = cheri_andperm(addr, CHERI_PERMS_KERNEL_DATA);
+		addr = cheri_perms_and(addr, CHERI_PERMS_KERNEL_DATA);
 	}
 	*src = addr;
 }
@@ -2191,7 +2191,7 @@ link_elf_reloc_local(linker_file_t lf)
 	if (ef->caprelocs != NULL) {
 		void *data_cap;
 
-		data_cap = cheri_andperm(ef->mapbase, CHERI_PERMS_KERNEL_DATA);
+		data_cap = cheri_perms_and(ef->mapbase, CHERI_PERMS_KERNEL_DATA);
 		if (init_linker_file_cap_relocs(ef->caprelocs,
 		    (char *)ef->caprelocs + ef->caprelocssize, data_cap,
 		    (ptraddr_t)ef->address, resolve_cap_reloc, ef) != 0)
@@ -2314,8 +2314,8 @@ link_elf_ireloc(caddr_t kmdp)
 	 * It is sad that this needs to be a root capability,
 	 * as in link_elf_init().
 	 */
-	ef->address = cheri_setaddress(kernel_root_cap, 0);
-	ef->mapbase = cheri_setbounds(ef->address + KERNBASE,
+	ef->address = cheri_address_set(kernel_root_cap, 0);
+	ef->mapbase = cheri_bounds_set(ef->address + KERNBASE,
 	    (ptraddr_t)_end - KERNBASE);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif

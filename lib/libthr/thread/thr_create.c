@@ -197,9 +197,9 @@ _pthread_create(pthread_t * __restrict thread,
 	param.stack_base = new_thread->attr.stackaddr_attr;
 	param.stack_size = new_thread->attr.stacksize_attr;
 #ifdef __CHERI_PURE_CAPABILITY__
-	THR_ASSERT(cheri_gettag(param.stack_base) == 1,
+	THR_ASSERT(cheri_tag_get(param.stack_base) == 1,
 	    "stack_base must be a valid capability");
-	THR_ASSERT(cheri_getlen(param.stack_base) == param.stack_size,
+	THR_ASSERT(cheri_length_get(param.stack_base) == param.stack_size,
 	    "param.stack_base length should be param.stack_size!");
 #endif
 	param.tls_base = (char *)new_thread->tcb;

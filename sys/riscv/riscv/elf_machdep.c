@@ -596,7 +596,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		 * the lookup function instead.
 		 */
 		if (addend != 0) {
-			KASSERT(!cheri_getsealed(addr),
+			KASSERT(!cheri_is_sealed(addr),
 			    ("%s: sentry %#p with non-zero addend %#lx",
 			    __func__, (void *)addr, addend));
 

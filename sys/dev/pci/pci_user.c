@@ -981,10 +981,10 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 	flags = MAP_SHARED;
 #if __has_feature(capabilities)
 	/* Enforce the same policy as for sys_mmap() */
-	if (cheri_gettag(pbm->pbm_map_base)) {
+	if (cheri_tag_get(pbm->pbm_map_base)) {
 		if ((pbm->pbm_flags & PCIIO_BAR_MMAP_FIXED) == 0)
 			return (EPROT);
-		if ((cheri_getperm(pbm->pbm_map_base) &
+		if ((cheri_perms_get(pbm->pbm_map_base) &
 		    CHERI_PERM_SW_VMEM) == 0)
 			return (EACCES);
 	} else {

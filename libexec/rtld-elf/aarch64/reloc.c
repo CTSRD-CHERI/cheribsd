@@ -160,15 +160,15 @@ init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
 
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
 	    (uintcap_t)pcc_cap : (uintcap_t)data_cap;
-	cap = cheri_setaddress(cap, base_addr + address);
-	cap = cheri_clearperm(cap, CAP_RELOC_REMOVE_PERMS);
+	cap = cheri_address_set(cap, base_addr + address);
+	cap = cheri_perms_clear(cap, CAP_RELOC_REMOVE_PERMS);
 
 	if (perms == MORELLO_FRAG_EXECUTABLE || perms == MORELLO_FRAG_RODATA) {
-		cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
+		cap = cheri_perms_clear(cap, FUNC_PTR_REMOVE_PERMS);
 	}
 	if (perms == MORELLO_FRAG_RWDATA || perms == MORELLO_FRAG_RODATA) {
-		cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
-		cap = cheri_setbounds(cap, len);
+		cap = cheri_perms_clear(cap, DATA_PTR_REMOVE_PERMS);
+		cap = cheri_bounds_set(cap, len);
 	}
 
 	cap += addend;
@@ -178,7 +178,7 @@ init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
 		 * TODO tight bounds: lower bound and len should be set
 		 * with LSB == 0 for C64 code.
 		 */
-		cap = cheri_sealentry(cap);
+		cap = cheri_sentry_create(cap);
 	}
 
 	return (cap);
@@ -221,7 +221,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 		}
 	}
 
-	rela = cheri_setbounds(rela, relasz);
+	rela = cheri_bounds_set(rela, relasz);
 	relalim = (const Elf_Rela *)((const char *)rela + relasz);
 	pcc = __builtin_cheri_program_counter_get();
 
@@ -460,10 +460,10 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 				 * can assume it is in use.
 				 */
 				pcc = pcc_cap(obj, fragment[0]);
-				pcc = cheri_clearperm(pcc,
+				pcc = cheri_perms_clear(pcc,
 				    FUNC_PTR_REMOVE_PERMS);
 				if (fragment[1] == 0)
-					*where = cheri_sealentry(
+					*where = cheri_sentry_create(
 					    (uintptr_t)pcc);
 				else
 					*where = init_cap_from_fragment(

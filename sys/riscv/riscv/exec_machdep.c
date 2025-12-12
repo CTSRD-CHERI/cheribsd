@@ -127,7 +127,7 @@ set_regs(struct thread *td, struct reg *regs)
 
 	frame = td->td_frame;
 #if __has_feature(capabilities)
-	frame->tf_sepc = cheri_setaddress(frame->tf_sepc, regs->sepc);
+	frame->tf_sepc = cheri_address_set(frame->tf_sepc, regs->sepc);
 #else
 	frame->tf_sepc = regs->sepc;
 #endif
@@ -248,8 +248,8 @@ fill_capregs(struct thread *td, struct capreg *regs)
 	fcap = (uintcap_t *)frame;
 	rcap = (uintcap_t *)regs;
 	for (i = 0; i < NCAPREGS; i++) {
-		rcap[i] = cheri_cleartag(fcap[i]);
-		if (cheri_gettag(fcap[i]))
+		rcap[i] = cheri_tag_clear(fcap[i]);
+		if (cheri_tag_get(fcap[i]))
 			regs->tagmask |= (uint64_t)1 << i;
 	}
 	return (0);
@@ -273,16 +273,16 @@ ptrace_derive_capreg_td(struct thread *td, uintcap_t in, uintcap_t *out)
 	frame = td->td_frame;
 	fcap = (uintcap_t *)frame;
 	for (i = 0; i < NCAPREGS; i++) {
-		if (!cheri_gettag(fcap[i]))
+		if (!cheri_tag_get(fcap[i]))
 			continue;
 
-		if (cheri_equal_exact(cheri_cleartag(fcap[i]), in)) {
+		if (cheri_is_equal_exact(cheri_tag_clear(fcap[i]), in)) {
 			*out = fcap[i];
 			return (true);
 		}
 
 		/* The only sealed caps that can be derived are sentries. */
-		otype = cheri_gettype(in);
+		otype = cheri_type_get(in);
 		switch (otype) {
 		case CHERI_OTYPE_UNSEALED:
 		case CHERI_OTYPE_SENTRY:
@@ -291,8 +291,8 @@ ptrace_derive_capreg_td(struct thread *td, uintcap_t in, uintcap_t *out)
 			continue;
 		}
 
-		cap = cheri_buildcap((void * __capability)fcap[i], in);
-		if (cheri_gettag(cap)) {
+		cap = cheri_cap_build((void * __capability)fcap[i], in);
+		if (cheri_tag_get(cap)) {
 			*out = (uintcap_t)cap;
 			return (true);
 		}
@@ -323,8 +323,8 @@ set_capregs(struct thread *td, struct capreg *regs)
 		if ((regs->tagmask & ((uint64_t)1 << i)) == 0) {
 			/* Always ok to set untagged values. */
 			tempregs[i] = rcap[i];
-		} else if (cheri_gettag(fcap[i]) &&
-		    cheri_equal_exact(cheri_cleartag(fcap[i]), rcap[i])) {
+		} else if (cheri_tag_get(fcap[i]) &&
+		    cheri_is_equal_exact(cheri_tag_clear(fcap[i]), rcap[i])) {
 			/* Preserve unchanged registers. */
 			tempregs[i] = fcap[i];
 		} else {
@@ -637,9 +637,9 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	tf->tf_a[0] = sig;
 #if __has_feature(capabilities)
-	tf->tf_a[1] = (uintcap_t)cheri_setbounds(&fp->sf_si,
+	tf->tf_a[1] = (uintcap_t)cheri_bounds_set(&fp->sf_si,
 	    sizeof(fp->sf_si));
-	tf->tf_a[2] = (uintcap_t)cheri_setbounds(&fp->sf_uc,
+	tf->tf_a[2] = (uintcap_t)cheri_bounds_set(&fp->sf_uc,
 	    sizeof(fp->sf_uc));
 #else
 	tf->tf_a[1] = (register_t)&fp->sf_si;

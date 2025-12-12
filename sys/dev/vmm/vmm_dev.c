@@ -306,7 +306,7 @@ vm_get_register_set(struct vcpu *vcpu, unsigned int count, int *regnum,
 		if (error)
 			break;
 #if __has_feature(capabilities)
-		regval[i] = cheri_cleartag(regval[i]);
+		regval[i] = cheri_tag_clear(regval[i]);
 #endif
 	}
 	return (error);
@@ -551,7 +551,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		error = vm_get_register(vcpu, vmreg->regnum, &vmreg->regval);
 #if __has_feature(capabilities)
 		if (error == 0)
-			vmreg->regval = cheri_cleartag(vmreg->regval);
+			vmreg->regval = cheri_tag_clear(vmreg->regval);
 #endif
 		break;
 	}

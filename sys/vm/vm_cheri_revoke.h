@@ -66,13 +66,13 @@ static __always_inline uintcap_t
 cheri_revoke_cap(uintcap_t c)
 {
 #ifndef CHERI_CAPREVOKE_CLEARTAGS
-	if (__builtin_expect(cheri_gettype(c) == -1, 1)) {
-		return cheri_andperm(c, 0);
+	if (__builtin_expect(cheri_type_get(c) == -1, 1)) {
+		return cheri_perms_and(c, 0);
 	}
 	return cheri_revoke_sealed(c);
 #else
 	/* No need to handle sealed things specially */
-	return cheri_cleartag(c);
+	return cheri_tag_clear(c);
 
 	/* TODO: Also replace-with-NULL */
 #endif

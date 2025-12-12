@@ -135,7 +135,7 @@ flag_captured(const char *message, uint32_t key)
 	if (message == NULL)
 		strlcpy(msg_buf, "<null>", sizeof(msg_buf));
 #ifdef __CHERI_PURE_CAPABILITY__
-	else if (!cheri_gettag(message))
+	else if (!cheri_tag_get(message))
 		snprintf(msg_buf, sizeof(msg_buf), "<untagged> %#p", message);
 #endif
 	else

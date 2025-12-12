@@ -128,7 +128,7 @@ extern uintptr_t dpcpu_off[];
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	DPCPU_BIAS	0
 #define	_DPCPU_PTR(b, n)						\
-	cheri_setboundsexact((__typeof(DPCPU_NAME(n)) *)((b) +		\
+	cheri_bounds_set_exact((__typeof(DPCPU_NAME(n)) *)((b) +		\
 	    ((ptraddr_t)&DPCPU_NAME(n) - (ptraddr_t)DPCPU_START)),	\
 	    CHERI_REPRESENTABLE_LENGTH(sizeof(DPCPU_NAME(n))))
 #else /* __CHERI_PURE_CAPABILITY__ */

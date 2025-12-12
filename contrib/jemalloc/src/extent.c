@@ -201,7 +201,7 @@ extent_alloc(tsdn_t *tsdn, arena_t *arena) {
 	malloc_mutex_unlock(tsdn, &arena->extent_avail_mtx);
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Ensure we return an extent with offset zero for rtree packing */
-	extent = cheri_setboundsexact(extent, sizeof(*extent));
+	extent = cheri_bounds_set_exact(extent, sizeof(*extent));
 #endif
 	return extent;
 }
@@ -564,7 +564,7 @@ extents_alloc(tsdn_t *tsdn, arena_t *arena, extent_hooks_t **r_extent_hooks,
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Ensure we return an extent with offset zero for rtree packing */
 	if (extent != NULL)
-		extent = cheri_setboundsexact(extent, sizeof(*extent));
+		extent = cheri_bounds_set_exact(extent, sizeof(*extent));
 #endif
 	return extent;
 }
@@ -1506,7 +1506,7 @@ extent_alloc_retained(tsdn_t *tsdn, arena_t *arena,
 	}
 	malloc_mutex_assert_not_owner(tsdn, &arena->extent_grow_mtx);
 #ifdef __CHERI_PURE_CAPABILITY__
-	assert(cheri_getoffset(extent) == 0 && "extent offset must be zero for packing in rtree");
+	assert(cheri_offset_get(extent) == 0 && "extent offset must be zero for packing in rtree");
 #endif
 	return extent;
 }
@@ -1577,7 +1577,7 @@ extent_alloc_wrapper(tsdn_t *tsdn, arena_t *arena,
 
 	assert(extent == NULL || extent_dumpable_get(extent));
 #ifdef __CHERI_PURE_CAPABILITY__
-	assert(cheri_getoffset(extent) == 0 && "extent offset must be zero for packing in rtree");
+	assert(cheri_offset_get(extent) == 0 && "extent offset must be zero for packing in rtree");
 #endif
 	return extent;
 }

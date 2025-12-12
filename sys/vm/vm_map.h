@@ -196,7 +196,7 @@ vm_map_entry_system_wired_count(vm_map_entry_t entry)
  * To support optimization as to which bitmap(s) we look at, given revocation
  * runs may use different predicates on capabilities under test.
  *
- * Takes cutperm = cheri_getperm(cut) as an argument for optimization reasons.
+ * Takes cutperm = cheri_perms_get(cut) as an argument for optimization reasons.
  *
  * Returns any nonzero value to indicate revocation required.
  */

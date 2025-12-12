@@ -1474,7 +1474,7 @@ vm_cheri_revoke_cap(const struct vm_cheri_revoke_cookie *crc, uintcap_t *p)
 
 	uintcap_t v = *p;
 
-	if (!cheri_gettag(v))
+	if (!cheri_tag_get(v))
 		return;
 
 	CHERI_REVOKE_STATS_BUMP(crst, caps_found);

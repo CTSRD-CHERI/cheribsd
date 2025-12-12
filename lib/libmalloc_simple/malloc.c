@@ -155,8 +155,8 @@ bound_ptr(void *mem, size_t nbytes)
 {
 	void *ptr;
 
-	ptr = cheri_setbounds(mem, nbytes);
-	ptr = cheri_andperm(ptr,
+	ptr = cheri_bounds_set(mem, nbytes);
+	ptr = cheri_perms_and(ptr,
 	    CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_SW_VMEM);
 	return (ptr);
 }
@@ -409,7 +409,7 @@ morecore(int bucket)
 		if (__morepages(amt/pagesz) == 0)
 			return;
 
-	buf = cheri_setbounds(pagepool_start, amt);
+	buf = cheri_bounds_set(pagepool_start, amt);
 	pagepool_start += amt;
 
 	/*
@@ -417,7 +417,7 @@ morecore(int bucket)
 	 * free list for this hash bucket.
 	 */
 	for (; nblks > 0; nblks--) {
-		op = (struct overhead *)(void *)cheri_setbounds(buf, sz);
+		op = (struct overhead *)(void *)cheri_bounds_set(buf, sz);
 		SLIST_INSERT_HEAD(&nextf[bucket], op, ov_next);
 		buf += sz;
 	}
@@ -428,7 +428,7 @@ find_overhead(void * cp)
 {
 	struct overhead *op;
 
-	if (!cheri_gettag(cp))
+	if (!cheri_tag_get(cp))
 		return (NULL);
 	op = __rederive_pointer(cp);
 	if (op == NULL) {
@@ -439,7 +439,7 @@ find_overhead(void * cp)
 
 	if (op->ov_magic == MAGIC_OFFSET
 #ifdef __CHERI_PURE_CAPABILITY__
-	    && !cheri_gettag(op->ov_real_allocation)
+	    && !cheri_tag_get(op->ov_real_allocation)
 #endif
 	    )
 		op = (struct overhead *)((uintptr_t)op - op->ov_offset);
@@ -453,13 +453,13 @@ find_overhead(void * cp)
 	 *  - Be an internal allocator pointer (have the VMMAP permision).
 	 *  - Point somewhere before us and within the current pagepool.
 	 */
-	if (cheri_gettag(op->ov_real_allocation) &&
-	    (cheri_getperm(op->ov_real_allocation) & CHERI_PERM_SW_VMEM) != 0) {
+	if (cheri_tag_get(op->ov_real_allocation) &&
+	    (cheri_perms_get(op->ov_real_allocation) & CHERI_PERM_SW_VMEM) != 0) {
 		ptraddr_t base, pp_base;
 
-		pp_base = cheri_getbase(op);
-		base = cheri_getbase(op->ov_real_allocation);
-		if (base >= pp_base && base < cheri_getaddress(op)) {
+		pp_base = cheri_base_get(op);
+		base = cheri_base_get(op->ov_real_allocation);
+		if (base >= pp_base && base < cheri_address_get(op)) {
 			op = op->ov_real_allocation;
 			op--;
 		}
@@ -551,7 +551,7 @@ __simple_realloc(void *cp, size_t nbytes)
 	 */
 	memcpy(res, cp, (nbytes <= cheri_bytes_remaining(cp)) ?
 	    nbytes : cheri_bytes_remaining(cp));
-	res = cheri_andperm(res, cheri_getperm(cp));
+	res = cheri_perms_and(res, cheri_perms_get(cp));
 	__simple_free(cp);
 	return (res);
 }

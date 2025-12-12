@@ -433,7 +433,7 @@ _init_tls(void)
 #ifndef __CHERI_PURE_CAPABILITY__
 			libc_tls_init = (void *)phdr[i].p_vaddr;
 #else
-			libc_tls_init = cheri_setbounds(cheri_setaddress(phdr,
+			libc_tls_init = cheri_bounds_set(cheri_address_set(phdr,
 			    phdr[i].p_vaddr), libc_tls_init_size);
 #endif
 			break;

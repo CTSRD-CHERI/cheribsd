@@ -88,7 +88,7 @@ _start(void *auxv,
 		__builtin_trap(); /* RTLD missing? Wrong *crt1.o linked? */
 #endif
 
-	if (cheri_getdefault() != NULL)
+	if (cheri_ddc_get() != NULL)
 		__builtin_trap(); /* $ddc should be NULL */
 
 	/*

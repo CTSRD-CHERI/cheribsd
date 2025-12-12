@@ -113,9 +113,9 @@ reset_vm_el01_regs(void *vcpu)
 	memset(el2ctx->pmevtyper_el0, 0, sizeof(el2ctx->pmevtyper_el0));
 
 #if __has_feature(capabilities)
-	el2ctx->tf.tf_ddc = (uintcap_t)cheri_setaddress(vmm_gva_root_cap, 0);
-	el2ctx->ddc_el0 = (uintcap_t)cheri_setaddress(vmm_gva_root_cap, 0);
-	el2ctx->rddc_el0 = (uintcap_t)cheri_setaddress(vmm_gva_root_cap, 0);
+	el2ctx->tf.tf_ddc = (uintcap_t)cheri_address_set(vmm_gva_root_cap, 0);
+	el2ctx->ddc_el0 = (uintcap_t)cheri_address_set(vmm_gva_root_cap, 0);
+	el2ctx->rddc_el0 = (uintcap_t)cheri_address_set(vmm_gva_root_cap, 0);
 #endif
 }
 
