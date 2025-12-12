@@ -38,10 +38,6 @@
 #define	__USER_DDC	((void * __capability)curthread->td_frame->tf_ddc)
 #define	__USER_PCC	((void * __capability)curthread->td_frame->tf_sepc)
 
-/* Since ISAv9, RISC-V does not add the base in CToPtr */
-#define	__USER_DDC_OFFSET_ENABLED	0
-#define	__USER_PCC_OFFSET_ENABLED	0
-
 /*
  * CHERI-RISC-V-specific kernel utility functions.
  */
