@@ -378,7 +378,7 @@ pagecopy_cleartags(void *s, void *d)
 	dst = d;
 	src = s;
 	for (i = 0; i < PAGE_SIZE / sizeof(*dst); i++)
-		*dst++ = cheri_cleartag(*src++);
+		*dst++ = cheri_tag_clear(*src++);
 #else
 	pagecopy(s, d);
 #endif
@@ -595,7 +595,7 @@ pmap_early_alloc_tables(vm_paddr_t *freemempos, int npages)
 	pt_entry_t *pt;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	pt = cheri_setbounds(cheri_setaddress(kernel_root_cap, *freemempos),
+	pt = cheri_bounds_set(cheri_address_set(kernel_root_cap, *freemempos),
 	    npages * PAGE_SIZE);
 #else
 	pt = (pt_entry_t *)*freemempos;
@@ -643,11 +643,11 @@ pmap_bootstrap_dmap(pd_entry_t *l1, vm_paddr_t freemempos)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Initialize this now so that PHYS_TO_DMAP works below. */
-	dmap_capability = cheri_setaddress(kernel_root_cap,
+	dmap_capability = cheri_address_set(kernel_root_cap,
 	    DMAP_MIN_ADDRESS);
-	dmap_capability = cheri_setbounds(dmap_capability,
+	dmap_capability = cheri_bounds_set(dmap_capability,
 	    dmap_phys_max - dmap_phys_base);
-	dmap_capability = cheri_andperm(dmap_capability,
+	dmap_capability = cheri_perms_and(dmap_capability,
 	    CHERI_PERMS_KERNEL_DATA);
 #endif
 
@@ -954,16 +954,16 @@ pmap_bootstrap(vm_paddr_t kernstart, vm_size_t kernlen)
 	 * Therefore generate one such capability. Incrementing freeva will bump
 	 * up the cursor, but not the bounds.
 	 */
-	kmemcap = cheri_setaddress(kernel_root_cap, VM_MIN_KERNEL_ADDRESS);
-	kmemcap = cheri_setbounds(kmemcap, VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS);
-	freeva = (vm_pointer_t)cheri_setaddress(kmemcap, freeva);
+	kmemcap = cheri_address_set(kernel_root_cap, VM_MIN_KERNEL_ADDRESS);
+	kmemcap = cheri_bounds_set(kmemcap, VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS);
+	freeva = (vm_pointer_t)cheri_address_set(kmemcap, freeva);
 
 #define reserve_space(var, pa, size)					\
 	do {								\
-		var = cheri_setbounds(freeva, size);			\
+		var = cheri_bounds_set(freeva, size);			\
 		pa = freemempos;					\
-		freeva += cheri_getlen(var);				\
-		freemempos += cheri_getlen(var);			\
+		freeva += cheri_length_get(var);				\
+		freemempos += cheri_length_get(var);			\
 	} while (0)
 #else
 #define reserve_space(var, pa, size)					\

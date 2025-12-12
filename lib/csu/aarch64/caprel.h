@@ -46,15 +46,15 @@ init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
 
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
 	    (uintcap_t)text_rodata_cap : (uintcap_t)data_cap;
-	cap = cheri_setaddress(cap, base_addr + address);
-	cap = cheri_clearperm(cap, CAP_RELOC_REMOVE_PERMS);
+	cap = cheri_address_set(cap, base_addr + address);
+	cap = cheri_perms_clear(cap, CAP_RELOC_REMOVE_PERMS);
 
 	if (perms == MORELLO_FRAG_EXECUTABLE || perms == MORELLO_FRAG_RODATA) {
-		cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
+		cap = cheri_perms_clear(cap, FUNC_PTR_REMOVE_PERMS);
 	}
 	if (perms == MORELLO_FRAG_RWDATA || perms == MORELLO_FRAG_RODATA) {
-		cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
-		cap = cheri_setbounds(cap, len);
+		cap = cheri_perms_clear(cap, DATA_PTR_REMOVE_PERMS);
+		cap = cheri_bounds_set(cap, len);
 	}
 
 	cap += addend;
@@ -64,7 +64,7 @@ init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
 		 * TODO tight bounds: lower bound and len should be set
 		 * with LSB == 0 for C64 code.
 		 */
-		cap = cheri_sealentry(cap);
+		cap = cheri_sentry_create(cap);
 	}
 
 	return (cap);
@@ -83,7 +83,7 @@ elf_reloc(const Elf_Rela *rela, void * __capability data_cap,
 
 	addr = relocbase + rela->r_offset;
 #ifdef __CHERI_PURE_CAPABILITY__
-	where = cheri_setaddress(data_cap, addr);
+	where = cheri_address_set(data_cap, addr);
 #else
 	where = (Elf_Addr *)addr;
 #endif

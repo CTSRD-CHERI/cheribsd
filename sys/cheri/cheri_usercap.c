@@ -83,7 +83,7 @@ _cheri_capability_build_user_code(struct thread *td, uint32_t perms,
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 		tmpcap = cheri_capmode(tmpcap);
 
-	return (cheri_sealentry(tmpcap));
+	return (cheri_sentry_create(tmpcap));
 }
 
 /*
@@ -165,9 +165,9 @@ _cheri_capability_build_user_rwx(uint32_t perms, ptraddr_t basep, size_t length,
 	tmpcap = _cheri_capability_build_user_rwx_unchecked(perms, basep,
 	    length, off, func, line, exact);
 
-	KASSERT(!exact || cheri_getlen(tmpcap) == length,
+	KASSERT(!exact || cheri_length_get(tmpcap) == length,
 	    ("%s:%d: Constructed capability has wrong length 0x%zx != 0x%zx: "
-	     "%#lp", func, line, cheri_getlen(tmpcap), length, tmpcap));
+	     "%#lp", func, line, cheri_length_get(tmpcap), length, tmpcap));
 
 	return (tmpcap);
 }
@@ -177,8 +177,8 @@ _cheri_capability_build_user_rwx_unchecked(uint32_t perms, ptraddr_t basep,
     size_t length, off_t off, const char* func __unused, int line __unused,
     bool exact)
 {
-	return (cheri_setoffset(cheri_andperm(cheri_setbounds(
-	    cheri_setoffset(userspace_root_cap, basep), length), perms), off));
+	return (cheri_offset_set(cheri_perms_and(cheri_bounds_set(
+	    cheri_offset_set(userspace_root_cap, basep), length), perms), off));
 }
 
 /*
@@ -210,10 +210,10 @@ ptrace_derive_cap(struct proc *p, uintcap_t in, uintcap_t *out)
 
 	if (cheri_ptrace_caps >= 2) {
 		/* If forging is allowed, derive from the userspace root. */
-		cap = cheri_buildcap(userspace_root_cap, in);
-		sealcap = cheri_copytype(userspace_root_sealcap, in);
-		cap = cheri_condseal(cap, sealcap);
-		if (cheri_gettag(cap)) {
+		cap = cheri_cap_build(userspace_root_cap, in);
+		sealcap = cheri_type_copy(userspace_root_sealcap, in);
+		cap = cheri_seal_conditionally(cap, sealcap);
+		if (cheri_tag_get(cap)) {
 			atomic_add_long(&cheri_forged_ptrace_caps, 1);
 			*out = (uintcap_t)cap;
 			return (true);

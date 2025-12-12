@@ -58,12 +58,12 @@ crt1_handle_capreloc(const struct capreloc *r, void *data_cap,
 	if (r->permissions == (function_reloc_flag | indirect_reloc_flag)) {
 		where = (uintptr_t *)((uintptr_t)data_cap +
 		    (r->capability_location - (ptraddr_t)data_cap));
-		ptr = (uintptr_t)cheri_andperm(code_cap,
+		ptr = (uintptr_t)cheri_perms_and(code_cap,
 		    function_pointer_permissions_mask);
-		ptr = cheri_setaddress(ptr, r->object);
+		ptr = cheri_address_set(ptr, r->object);
 		/* TODO: tight bounds */
 		ptr += r->offset;
-		ptr = cheri_sealentry(ptr);
+		ptr = cheri_sentry_create(ptr);
 		target = ((ifunc_resolver_t)ptr)(elf_hwcap,
 		    0, 0, 0, 0, 0, 0, 0);
 		*where = target;

@@ -162,14 +162,14 @@ arm_setup_vectors(void *arg)
 		 */
 #if __has_feature(capabilities)
 #ifdef __CHERI_PURE_CAPABILITY__
-		codep = (uintcap_t)cheri_setaddress(kernel_root_cap,
+		codep = (uintcap_t)cheri_address_set(kernel_root_cap,
 		    vtophys(&vmm_hyp_code));
-		codep = cheri_andperm(codep, cheri_getperm(cheri_getpcc()));
+		codep = cheri_perms_and(codep, cheri_perms_get(cheri_pcc_get()));
 #else
-		codep = (uintcap_t)cheri_setaddress(cheri_getpcc(),
+		codep = (uintcap_t)cheri_address_set(cheri_pcc_get(),
 		    vtophys(&vmm_hyp_code));
 #endif
-		codep = (uintcap_t)cheri_setbounds(codep, hyp_code_len);
+		codep = (uintcap_t)cheri_bounds_set(codep, hyp_code_len);
 #else
 		codep = vtophys(&vmm_hyp_code);
 #endif
@@ -209,7 +209,7 @@ arm_teardown_vectors(void *arg)
 	daif = intr_disable();
 	/* TODO: Invalidate the cache */
 #ifdef __CHERI_PURE_CAPABILITY__
-	codep = (vm_pointer_t)cheri_setaddress(kernel_root_cap,
+	codep = (vm_pointer_t)cheri_address_set(kernel_root_cap,
 	    vtophys(hyp_stub_vectors));
 #else
 	codep = vtophys(hyp_stub_vectors);
@@ -276,8 +276,8 @@ el2_vmem_add(vm_offset_t base, vm_size_t size)
 	if (end - basep == 0)
 		return;
 
-	basep = (vm_pointer_t)cheri_setaddress(vmm_el2_root_cap, basep);
-	basep = (vm_pointer_t)cheri_setboundsexact(basep, size);
+	basep = (vm_pointer_t)cheri_address_set(vmm_el2_root_cap, basep);
+	basep = (vm_pointer_t)cheri_bounds_set_exact(basep, size);
 #else
 	(void)align;
 	(void)end;
@@ -378,9 +378,9 @@ vmmops_modinit(int ipinum)
 			stack[cpu] = malloc(VMM_STACK_SIZE, M_HYP, M_WAITOK | M_ZERO);
 #ifdef __CHERI_PURE_CAPABILITY__
 			stack_base =
-			    (vm_pointer_t)cheri_setaddress(vmm_el2_root_cap,
+			    (vm_pointer_t)cheri_address_set(vmm_el2_root_cap,
 				next_hyp_va);
-			stack_base = cheri_setboundsexact(stack_base,
+			stack_base = cheri_bounds_set_exact(stack_base,
 			    VMM_STACK_SIZE);
 #else
 			stack_base = next_hyp_va;
@@ -652,9 +652,9 @@ vmmops_vmspace_alloc(vm_offset_t min, vm_offset_t max)
 	vm_pointer_t minp, maxp;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	minp = (vm_pointer_t)cheri_setaddress(vmm_gpa_root_cap, min);
-	minp = (vm_pointer_t)cheri_setboundsexact(minp, max - min);
-	maxp = (vm_pointer_t)cheri_setaddress(minp, max);
+	minp = (vm_pointer_t)cheri_address_set(vmm_gpa_root_cap, min);
+	minp = (vm_pointer_t)cheri_bounds_set_exact(minp, max - min);
+	maxp = (vm_pointer_t)cheri_address_set(minp, max);
 #else
 	minp = min;
 	maxp = max;
@@ -1189,7 +1189,7 @@ vmmops_run(void *vcpui, uintcap_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 			switch (hypctx->cpacr_el1 & CPACR_CEN_MASK) {
 			case CPACR_CEN_TRAP_ALL1:
 			case CPACR_CEN_TRAP_ALL2:
-				hypctx->tf.tf_elr = cheri_setaddress(hypctx->elr_el1,
+				hypctx->tf.tf_elr = cheri_address_set(hypctx->elr_el1,
 				    hypctx->vbar_el1 + off);
 				break;
 			default:
@@ -1456,7 +1456,7 @@ vmmops_setreg(void *vcpui, int reg, uintcap_t val)
 		 * space, so we must derive a capability here.
 		 */
 		*(uintcap_t *)regp = (uintcap_t)
-		    cheri_setaddress(kernel_root_cap, val);
+		    cheri_address_set(kernel_root_cap, val);
 		break;
 #endif
 	case VM_REG_GUEST_LR:

@@ -1574,8 +1574,8 @@ _vm_gpa_hold(struct vm *vm, vm_paddr_t gpa, size_t len, int reqprot,
 			void * __capability gpap;
 
 #if __has_feature(capabilities)
-			gpap = cheri_setboundsexact(
-			    cheri_setaddress(vmm_gpa_root_cap, trunc_page(gpa)),
+			gpap = cheri_bounds_set_exact(
+			    cheri_address_set(vmm_gpa_root_cap, trunc_page(gpa)),
 			    PAGE_SIZE);
 #else
 			gpap = (void *)trunc_page(gpa);
@@ -1650,7 +1650,7 @@ vm_get_register_cheri_capability_tag(struct vcpu *vcpu, int reg, uint8_t *tagp)
 
 	error = vmmops_getreg(vcpu->cookie, reg, &val);
 	if (error == 0)
-		*tagp = cheri_gettag(val);
+		*tagp = cheri_tag_get(val);
 	return (error);
 }
 #endif
@@ -1668,11 +1668,11 @@ vm_set_register(struct vcpu *vcpu, int reg, uintcap_t val)
 
 #if __has_feature(capabilities)
 #ifdef __CHERI_PURE_CAPABILITY__
-	vcpu->nextpc = (uintcap_t)cheri_andperm(
-	    cheri_setaddress(vmm_gva_root_cap, val),
-	    cheri_getperm(cheri_getpcc()));
+	vcpu->nextpc = (uintcap_t)cheri_perms_and(
+	    cheri_address_set(vmm_gva_root_cap, val),
+	    cheri_perms_get(cheri_pcc_get()));
 #else
-	vcpu->nextpc = (uintcap_t)cheri_setaddress(cheri_getpcc(), val);
+	vcpu->nextpc = (uintcap_t)cheri_address_set(cheri_pcc_get(), val);
 #endif
 #else
 	vcpu->nextpc = val;
@@ -1725,7 +1725,7 @@ vm_get_cheri_capability_tag(struct vm *vm, struct vm_cheri_capability_tag *vt)
 	    &cookie);
 	if (cap == NULL)
 		return (EFAULT);
-	vt->tag = cheri_gettag(*cap);
+	vt->tag = cheri_tag_get(*cap);
 	vm_gpa_release(cookie);
 	return (0);
 }

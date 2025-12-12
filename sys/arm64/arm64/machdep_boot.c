@@ -93,8 +93,8 @@ fake_preload_metadata(void *dtb_ptr, size_t dtb_size)
 	size_t size;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	lastaddr = (vm_pointer_t)cheri_setaddress(
-	    cheri_andperm(kernel_root_cap,
+	lastaddr = (vm_pointer_t)cheri_address_set(
+	    cheri_perms_and(kernel_root_cap,
 		CHERI_PERMS_KERNEL_DATA_NOCAP),
 	    (vm_offset_t)&end);
 #else
@@ -225,9 +225,9 @@ freebsd_parse_boot_param(struct arm64_bootparams *abp)
 	env_addr = MD_FETCH(kmdp, MODINFOMD_ENVP, vm_offset_t);
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (env_addr != 0) {
-		env_addr = (vm_pointer_t)cheri_setaddress(kernel_root_cap,
+		env_addr = (vm_pointer_t)cheri_address_set(kernel_root_cap,
 		    env_addr);
-		env_addr = cheri_andperm(env_addr,
+		env_addr = cheri_perms_and(env_addr,
 		    CHERI_PERMS_KERNEL_DATA_NOCAP);
 	}
 #endif
@@ -238,13 +238,13 @@ freebsd_parse_boot_param(struct arm64_bootparams *abp)
 	ksym_start = MD_FETCH(kmdp, MODINFOMD_SSYM, vm_offset_t);
 	ksym_end = MD_FETCH(kmdp, MODINFOMD_ESYM, vm_offset_t);
 #ifdef __CHERI_PURE_CAPABILITY__
-	ksym_start = (vm_pointer_t)cheri_setaddress(kernel_root_cap,
+	ksym_start = (vm_pointer_t)cheri_address_set(kernel_root_cap,
 	    ksym_start);
-	ksym_start = cheri_setbounds(ksym_start,
+	ksym_start = cheri_bounds_set(ksym_start,
 	    (ptraddr_t)ksym_end - (ptraddr_t)ksym_start);
-	ksym_start = cheri_andperm(ksym_start,
+	ksym_start = cheri_perms_and(ksym_start,
 	    CHERI_PERMS_KERNEL_DATA_NOCAP);
-	ksym_end = cheri_setaddress(ksym_start, ksym_end);
+	ksym_end = cheri_address_set(ksym_start, ksym_end);
 #endif
 	db_fetch_ksymtab(ksym_start, ksym_end, 0);
 #endif

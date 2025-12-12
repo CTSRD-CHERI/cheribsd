@@ -255,8 +255,8 @@ vmem_buildcap(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
-		KASSERT(cheri_gettag(addr), ("Expected valid capability"));
-		addr = cheri_setboundsexact(addr, size);
+		KASSERT(cheri_tag_get(addr), ("Expected valid capability"));
+		addr = cheri_bounds_set_exact(addr, size);
 	}
 #endif
 	return (addr);
@@ -977,7 +977,7 @@ vmem_import(vmem_t *vm, vmem_size_t size, vmem_size_t align, int flags)
 		return (ENOMEM);
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
-		KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+		KASSERT(cheri_tag_get(addr), ("Expected valid capability"));
 		KASSERT(cheri_bytes_remaining((void *)addr) >= size,
 		    ("Insufficient bounds for size %zx in %#p",
 			(size_t)size, (void *)addr));
@@ -1496,9 +1496,9 @@ vmem_xalloc(vmem_t *vm, const vmem_size_t size0, vmem_size_t align,
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (vm->vm_flags & VMEM_CAPABILITY_ARENA)
-		KASSERT(cheri_getlen(addrp) == sizeof(void *),
+		KASSERT(cheri_length_get(addrp) == sizeof(void *),
 		    ("Invalid bounds for pointer-sized object %zx",
-		    (size_t)cheri_getlen(addrp)));
+		    (size_t)cheri_length_get(addrp)));
 #endif
 
 	if (strat == M_NEXTFIT)
@@ -1591,9 +1591,9 @@ vmem_free(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
 	MPASS(size > 0);
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
-		if (!cheri_gettag(addr))
+		if (!cheri_tag_get(addr))
 			panic("Expected valid capability");
-		if (cheri_getsealed(addr))
+		if (cheri_is_sealed(addr))
 			panic("Expect unsealed capability");
 	}
 #endif
@@ -1615,9 +1615,9 @@ vmem_xfree(vmem_t *vm, vmem_addr_t addr, vmem_size_t size __unused)
 	MPASS(size > 0);
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
-		if (!cheri_gettag(addr))
+		if (!cheri_tag_get(addr))
 			panic("Expected valid capability");
-		if (cheri_getsealed(addr))
+		if (cheri_is_sealed(addr))
 			panic("Expect unsealed capability");
 	}
 #endif
@@ -1668,11 +1668,11 @@ vmem_add(vmem_t *vm, vmem_addr_t addr, vmem_size_t size, int flags)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
-		KASSERT(cheri_gettag(addr), ("Expected valid capability"));
-		KASSERT(!cheri_getsealed(addr), ("Expect unsealed capability"));
-		KASSERT(cheri_getlen(addr) == size,
+		KASSERT(cheri_tag_get(addr), ("Expected valid capability"));
+		KASSERT(!cheri_is_sealed(addr), ("Expect unsealed capability"));
+		KASSERT(cheri_length_get(addr) == size,
 		    ("Inexact bounds expected %zx found %zx",
-		    (size_t)size, cheri_getlen(addr)));
+		    (size_t)size, cheri_length_get(addr)));
 	}
 #endif
 	flags &= VMEM_FLAGS;

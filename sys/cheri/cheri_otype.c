@@ -71,9 +71,9 @@ cheri_maketype(void * __capability root_type, register_t type)
 	void * __capability c;
 
 	c = root_type;
-	c = cheri_setoffset(c, type);	/* Set type as desired. */
-	c = cheri_setbounds(c, 1);	/* ISA implies length of 1. */
-	c = cheri_andperm(c, CHERI_PERM_GLOBAL | CHERI_PERM_SEAL); /* Perms. */
+	c = cheri_offset_set(c, type);	/* Set type as desired. */
+	c = cheri_bounds_set(c, 1);	/* ISA implies length of 1. */
+	c = cheri_perms_and(c, CHERI_PERM_GLOBAL | CHERI_PERM_SEAL); /* Perms. */
 	return (c);
 }
 
@@ -100,7 +100,7 @@ cheri_otype_free(otype_t cap)
 {
 	u_int type;
 
-	type = cheri_getbase(cap);
+	type = cheri_base_get(cap);
 	free_unr(cheri_otypes, type);
 }
 
@@ -112,7 +112,7 @@ uintcap_t
 cheri_revoke_sealed(uintcap_t c)
 {
 	c = cheri_unseal(c, kernel_root_sealcap);
-	c = cheri_andperm(c, 0);
+	c = cheri_perms_and(c, 0);
 	return c;
 }
 

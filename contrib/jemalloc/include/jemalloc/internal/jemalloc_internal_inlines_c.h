@@ -98,13 +98,13 @@ unbound_ptr(tsdn_t *tsdn, void *ptr) {
 	 * metadata is required to prevent attacks where bounds are
 	 * manipulated.
 	 */
-	if (unlikely(!cheri_gettag(ptr))) {
+	if (unlikely(!cheri_tag_get(ptr))) {
 		return NULL;
 	}
-	if (unlikely(cheri_getoffset(ptr) != 0)) {
+	if (unlikely(cheri_offset_get(ptr) != 0)) {
 		return NULL;
 	}
-	if (unlikely(cheri_getsealed(ptr))) {
+	if (unlikely(cheri_is_sealed(ptr))) {
 		return NULL;
 	}
 
@@ -112,7 +112,7 @@ unbound_ptr(tsdn_t *tsdn, void *ptr) {
 	extent = rtree_extent_read(tsdn, &extents_rtree,
 	    rtree_ctx, (uintptr_t)ptr, true);
 	assert(extent != NULL);
-	ubptr = cheri_setaddress(extent->e_addr, (ptraddr_t)ptr);
+	ubptr = cheri_address_set(extent->e_addr, (ptraddr_t)ptr);
 	/*
 	 * Compare pointer addresses to work around an issue where
 	 * LLVM's GVN pass replaces ubptr with ptr in the assert
@@ -122,8 +122,8 @@ unbound_ptr(tsdn_t *tsdn, void *ptr) {
 	 * https://github.com/CTSRD-CHERI/llvm-project/issues/619
 	 */
 	assert((ptraddr_t)ptr == (ptraddr_t)ubptr);
-	assert(cheri_getbase(ubptr) == cheri_getbase(extent->e_addr));
-	assert(cheri_getlen(ubptr) == cheri_getlen(extent->e_addr));
+	assert(cheri_base_get(ubptr) == cheri_base_get(extent->e_addr));
+	assert(cheri_length_get(ubptr) == cheri_length_get(extent->e_addr));
 #endif
 	return (ubptr);
 }

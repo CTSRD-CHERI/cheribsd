@@ -108,7 +108,7 @@ size_t
 
 	/* Scan the rest of the string using word sized operation */
 #ifdef __CHERI_PURE_CAPABILITY__
-	for (; cheri_getlen(lp) - cheri_getoffset(lp) >= sizeof(long); lp++)
+	for (; cheri_length_get(lp) - cheri_offset_get(lp) >= sizeof(long); lp++)
 #else
 	for (; ; lp++)
 #endif
@@ -132,7 +132,7 @@ size_t
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Check if we need to scan byte-by-byte at the end of the string */
-	if ((ptraddr_t)lp != cheri_gettop(lp)) {
+	if ((ptraddr_t)lp != cheri_top_get(lp)) {
 		for (p = (const char *)lp; ; p++)
 			if (*p == '\0')
 				return (p - str);

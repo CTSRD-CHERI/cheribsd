@@ -59,10 +59,10 @@ kern_cheri_cidcap_alloc(struct thread *td, uintcap_t * __capability cidp)
 	uintcap_t cidcap;
 
 	cid = vmspace_cid_alloc(td->td_proc->p_vmspace);
-	cidcap = (uintcap_t)cheri_setbounds(
-	    cheri_setaddress(userspace_root_cidcap, cid), 1);
+	cidcap = (uintcap_t)cheri_bounds_set(
+	    cheri_address_set(userspace_root_cidcap, cid), 1);
 
-	KASSERT(cheri_gettag(cidcap), ("untagged cidcap allocated"));
+	KASSERT(cheri_tag_get(cidcap), ("untagged cidcap allocated"));
 
 	return (copyoutcap(&cidcap, cidp, sizeof(cidcap)));
 }

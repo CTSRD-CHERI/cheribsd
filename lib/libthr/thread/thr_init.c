@@ -464,8 +464,8 @@ __thr_get_main_stack_base(char **base)
 	 * whole thing for the initial thread and take our values from
 	 * there.
 	 */
-	char *sp = (char *)cheri_getstack();
-	*base = cheri_setoffset(sp, cheri_getlen(sp));
+	char *sp = (char *)cheri_stack_get();
+	*base = cheri_offset_set(sp, cheri_length_get(sp));
 	return (true);
 #else
 	size_t len;
@@ -489,7 +489,7 @@ __thr_get_main_stack_lim(size_t *lim)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* See above. */
-	*lim = cheri_getlen(cheri_getstack());
+	*lim = cheri_length_get(cheri_stack_get());
 	return (true);
 #else
 	struct rlimit rlim;

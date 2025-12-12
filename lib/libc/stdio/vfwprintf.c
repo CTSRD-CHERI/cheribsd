@@ -967,7 +967,7 @@ fp_common:
 #endif
 			{
 				cap = GETARG(void * __capability);
-				ujval = cheri_getaddress(cap);
+				ujval = cheri_address_get(cap);
 			}
 			if (flags & ALT) {
 				cp = buf + BUF;

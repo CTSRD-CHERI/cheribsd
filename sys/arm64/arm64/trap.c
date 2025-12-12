@@ -294,12 +294,12 @@ external_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	 */
 	if (test_bs_fault((uintcap_t)frame->tf_elr)) {
 #if defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
-		frame->tf_elr = cheri_setaddress(frame->tf_elr,
+		frame->tf_elr = cheri_address_set(frame->tf_elr,
 		    (ptraddr_t)generic_bs_fault);
 #elif defined(__CHERI_PURE_CAPABILITY__)
 		trapframe_set_elr(frame, (uintptr_t)generic_bs_fault);
 #elif __has_feature(capabilities)
-		trapframe_set_elr(frame, cheri_setaddress(frame->tf_elr,
+		trapframe_set_elr(frame, cheri_address_set(frame->tf_elr,
 		    (ptraddr_t)generic_bs_fault));
 #else
 		frame->tf_elr = (uint64_t)generic_bs_fault;
@@ -325,12 +325,12 @@ cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		    pcb->pcb_onfault != 0) {
 			frame->tf_x[0] = EPROT;
 #if defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
-			frame->tf_elr = cheri_setaddress(frame->tf_elr,
+			frame->tf_elr = cheri_address_set(frame->tf_elr,
 			    pcb->pcb_onfault);
 #elif defined(__CHERI_PURE_CAPABILITY__)
 			trapframe_set_elr(frame, pcb->pcb_onfault);
 #else
-			trapframe_set_elr(frame, cheri_setaddress(frame->tf_elr,
+			trapframe_set_elr(frame, cheri_address_set(frame->tf_elr,
 			    pcb->pcb_onfault));
 #endif
 			return;
@@ -530,12 +530,12 @@ bad_far:
 			if (td->td_intr_nesting_level == 0 &&
 			    pcb->pcb_onfault != 0) {
 #if defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
-				frame->tf_elr = cheri_setaddress(frame->tf_elr,
+				frame->tf_elr = cheri_address_set(frame->tf_elr,
 				    pcb->pcb_onfault);
 #elif defined(__CHERI_PURE_CAPABILITY__)
 				trapframe_set_elr(frame, pcb->pcb_onfault);
 #elif __has_feature(capabilities)
-				trapframe_set_elr(frame, cheri_setaddress(
+				trapframe_set_elr(frame, cheri_address_set(
 				    frame->tf_elr, pcb->pcb_onfault));
 #else
 				frame->tf_elr = pcb->pcb_onfault;

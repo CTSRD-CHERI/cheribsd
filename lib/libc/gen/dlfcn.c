@@ -223,7 +223,7 @@ dl_init_phdr_info(void)
 			phdr_info.dlpi_phdr =
 #ifdef __CHERI_PURE_CAPABILITY__
 			    /* XXXAR: currently needs load_cap for libunwind */
-			    (const Elf_Phdr *)cheri_andperm(auxp->a_un.a_ptr,
+			    (const Elf_Phdr *)cheri_perms_and(auxp->a_un.a_ptr,
 			        CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP);
 #else
 			    (const Elf_Phdr *)auxp->a_un.a_ptr;

@@ -2370,9 +2370,9 @@ cheri_restore_tag(void * __capability *cp)
 
 	cap = (uintcap_t)*cp;
 
-	newcap = cheri_buildcap(swap_restore_cap, cap);
-	sealcap = cheri_copytype(swap_restore_cap, cap);
-	newcap = cheri_condseal(newcap, sealcap);
+	newcap = cheri_cap_build(swap_restore_cap, cap);
+	sealcap = cheri_type_copy(swap_restore_cap, cap);
+	newcap = cheri_seal_conditionally(newcap, sealcap);
 
 	*cp = newcap;
 }
