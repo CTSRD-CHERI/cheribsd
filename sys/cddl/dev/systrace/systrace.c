@@ -94,6 +94,7 @@ extern struct sysent linux32_sysent[];
  * The syscall arguments are processed into a DTrace argument array
  * using a generated function. See sys/tools/syscalls/README.md.
  */
+#include <compat/freebsd32/freebsd32.h>
 #include <compat/freebsd32/freebsd32_proto.h>
 #include <compat/freebsd32/freebsd32_util.h>
 #include <compat/freebsd32/freebsd32_syscall.h>

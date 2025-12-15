@@ -30,6 +30,7 @@
 #define _COMPAT_FREEBSD32_FREEBSD32_H_
 
 #include <sys/abi_compat.h>
+#include <sys/mount.h>
 #include <sys/procfs.h>
 #include <sys/socket.h>
 #include <sys/user.h>
@@ -529,5 +530,10 @@ struct ptrace_sc_remote32 {
 	u_int		pscr_nargs;
 	uint32_t	pscr_args;
 };
+
+#ifdef COMPAT_FREEBSD32
+typedef	__int32_t	freebsd32_intptr_t;
+typedef	__uint32_t	freebsd32_uintptr_t;
+#endif
 
 #endif /* !_COMPAT_FREEBSD32_FREEBSD32_H_ */
