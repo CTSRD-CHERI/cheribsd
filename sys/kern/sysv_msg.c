@@ -208,6 +208,7 @@ static struct syscall_helper_data msg32_syscalls[] = {
 #endif
 
 #ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_ipc.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_syscall.h>

@@ -108,6 +108,7 @@ extern const char *freebsd32_syscallnames[];
  * The syscall arguments are processed into a DTrace argument array
  * using a generated function. See sys/tools/syscalls/README.md.
  */
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_util.h>
 #include <compat/freebsd64/freebsd64_syscall.h>
