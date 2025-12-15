@@ -66,15 +66,6 @@ struct iovec {
 	__iovp->iov_len -= __amt;					\
 	__iovp->iov_base = (char *)__iovp->iov_base + __amt;		\
 } while(0)
-#endif
+#endif /* _KERNEL */
 
 #endif /* !_SYS__IOVEC_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "header",
-//   "changes": [
-//     "iovec-macros"
-//   ]
-// }
-// CHERI CHANGES END
