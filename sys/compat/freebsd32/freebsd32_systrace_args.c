@@ -528,7 +528,7 @@ systrace_args(int sysnum, void *params, uintptr_t *uarg, int *n_args)
 		struct freebsd32_fcntl_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		iarg[a++] = p->cmd; /* int */
-		uarg[a++] = (intptr_t)p->arg; /* intptr32_t */
+		uarg[a++] = (intptr_t)p->arg; /* freebsd32_intptr_t */
 		*n_args = 3;
 		break;
 	}
@@ -3365,8 +3365,8 @@ systrace_args(int sysnum, void *params, uintptr_t *uarg, int *n_args)
 		iarg[a++] = p->pid1; /* pid_t */
 		iarg[a++] = p->pid2; /* pid_t */
 		iarg[a++] = p->type; /* int */
-		uarg[a++] = (intptr_t)p->idx1; /* uintptr32_t */
-		uarg[a++] = (intptr_t)p->idx2; /* uintptr32_t */
+		uarg[a++] = (intptr_t)p->idx1; /* freebsd32_uintptr_t */
+		uarg[a++] = (intptr_t)p->idx2; /* freebsd32_uintptr_t */
 		*n_args = 5;
 		break;
 	}
@@ -4201,7 +4201,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "intptr32_t";
+			p = "freebsd32_intptr_t";
 			break;
 		default:
 			break;
@@ -9121,10 +9121,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "uintptr32_t";
+			p = "freebsd32_uintptr_t";
 			break;
 		case 4:
-			p = "uintptr32_t";
+			p = "freebsd32_uintptr_t";
 			break;
 		default:
 			break;
