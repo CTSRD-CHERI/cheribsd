@@ -7,6 +7,7 @@
 #include <sys/param.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 
 #define AS(name) (sizeof(struct name) / sizeof(syscallarg_t))

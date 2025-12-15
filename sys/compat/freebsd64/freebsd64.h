@@ -236,6 +236,9 @@ struct uexterror64 {
 	char msg[128];
 };
 
+typedef __int64_t	freebsd64_intptr_t;
+typedef __uint64_t	freebsd64_uintptr_t;
+
 #endif /* !_COMPAT_FREEBSD64_FREEBSD64_H_ */
 /*
  * CHERI CHANGES START
