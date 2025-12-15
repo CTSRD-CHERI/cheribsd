@@ -42,6 +42,7 @@
 
 #include <security/audit/audit.h>
 
+#include <compat/freebsd32/freebsd32.h>
 #include <compat/freebsd32/freebsd32_proto.h>
 
 #ifdef CAPABILITIES

@@ -39,6 +39,7 @@
 #ifdef VFP
 #include <machine/vfp.h>
 #endif
+#include <compat/freebsd32/freebsd32.h>
 #include <compat/freebsd32/freebsd32_proto.h>
 #include <compat/freebsd32/freebsd32_signal.h>
 
