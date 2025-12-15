@@ -79,6 +79,7 @@ function FreeBSDSyscall:parseSysfile()
 			incs = incs .. line .. "\n"
 		elseif line:match("%%ABI_HEADERS%%") then
 			local h = self.config.abi_headers
+			h = string.gsub(h, "\\n", "\n")
 			if h ~= nil and h ~= "" then
 				incs = incs .. h .. "\n"
 			end
