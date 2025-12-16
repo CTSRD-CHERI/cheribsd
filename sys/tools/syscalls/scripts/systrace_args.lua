@@ -43,9 +43,9 @@ function systrace_args.generate(tbl, config, fh)
 
 	gen:write(string.format([[
 static void
-systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
+systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 {
-	int64_t *iarg = (int64_t *)uarg;
+	intcap_t *iarg = (intcap_t *)uarg;
 	int a = 0;
 	switch (sysnum) {
 ]]))
@@ -149,7 +149,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 						gen:write(string.format([[
 		uarg[a++] = (%s)p->%s; /* %s */
 ]],
-						    config.ptr_intptr_t_cast,
+						    config.ptr_intcap_t_cast,
 						    arg.name, argtype))
 					elseif argtype == "union l_semun" then
 						gen:write(string.format([[

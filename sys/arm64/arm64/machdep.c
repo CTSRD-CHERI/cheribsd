@@ -210,11 +210,6 @@ pan_enable(void)
 {
 
 	/*
-	 * The LLVM integrated assembler doesn't understand the PAN
-	 * PSTATE field. Because of this we need to manually create
-	 * the instruction in an asm block. This is equivalent to:
-	 * msr pan, #1
-	 *
 	 * This sets the PAN bit, stopping the kernel from accessing
 	 * memory when userspace can also access it unless the kernel
 	 * uses the userspace load/store instructions.
@@ -222,7 +217,10 @@ pan_enable(void)
 	if (has_pan) {
 		WRITE_SPECIALREG(sctlr_el1,
 		    READ_SPECIALREG(sctlr_el1) & ~SCTLR_SPAN);
-		__asm __volatile(".inst 0xd500409f | (0x1 << 8)");
+		__asm __volatile(
+		    ".arch_extension pan	\n"
+		    "msr pan, #1		\n"
+		    ".arch_extension nopan	\n");
 	}
 }
 
@@ -465,7 +463,8 @@ arm64_get_writable_addr(void *addr, void **out)
 	 * If it is within the DMAP region and is writable use that.
 	 */
 	if (PHYS_IN_DMAP_RANGE(pa)) {
-		addr = (void *)PHYS_TO_DMAP_PAGE(pa);
+		addr = (void *)((uintptr_t)PHYS_TO_DMAP_PAGE(trunc_page(pa)) +
+		    ((vm_offset_t)addr & PAGE_MASK));
 		if (PAR_SUCCESS(arm64_address_translate_s1e1w(
 		    (vm_offset_t)addr))) {
 			*out = addr;

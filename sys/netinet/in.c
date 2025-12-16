@@ -102,13 +102,13 @@ VNET_DEFINE(bool, ip_allow_net240) = false;
 #define	V_ip_allow_net240		VNET(ip_allow_net240)
 SYSCTL_BOOL(_net_inet_ip, OID_AUTO, allow_net240,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(ip_allow_net240), 0,
-	"Allow use of Experimental addresses, aka Class E (240/4)");
+	"Allow forwarding of and ICMP response to Experimental addresses, aka Class E (240/4)");
 /* see https://datatracker.ietf.org/doc/draft-schoen-intarea-unicast-240 */
 
 VNET_DEFINE(bool, ip_allow_net0) = false;
 SYSCTL_BOOL(_net_inet_ip, OID_AUTO, allow_net0,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(ip_allow_net0), 0,
-	"Allow use of addresses in network 0/8");
+	"Allow forwarding of and ICMP response to addresses in network 0/8");
 /* see https://datatracker.ietf.org/doc/draft-schoen-intarea-unicast-0 */
 
 VNET_DEFINE(uint32_t, in_loopback_mask) = IN_LOOPBACK_MASK_DFLT;
@@ -439,6 +439,27 @@ in_control_ioctl(u_long cmd, void *data, struct ifnet *ifp,
 	NET_EPOCH_EXIT(et);
 
 	return (error);
+}
+
+int
+in_mask2len(struct in_addr *mask)
+{
+	int x, y;
+	u_char *p;
+
+	p = (u_char *)mask;
+	for (x = 0; x < sizeof(*mask); x++) {
+		if (p[x] != 0xff)
+			break;
+	}
+	y = 0;
+	if (x < sizeof(*mask)) {
+		for (y = 0; y < 8; y++) {
+			if ((p[x] & (0x80 >> y)) == 0)
+				break;
+		}
+	}
+	return (x * 8 + y);
 }
 
 int

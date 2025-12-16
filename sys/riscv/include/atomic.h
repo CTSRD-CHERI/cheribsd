@@ -140,7 +140,7 @@ ATOMIC_FCMPSET_ACQ_REL(16);
 
 #define	atomic_load_acq_16	atomic_load_acq_16
 static __inline uint16_t
-atomic_load_acq_16(volatile uint16_t *p)
+atomic_load_acq_16(const volatile uint16_t *p)
 {
 	uint16_t ret;
 
@@ -269,7 +269,7 @@ ATOMIC_CMPSET(32)
 ATOMIC_FCMPSET(32)
 
 static __inline uint32_t
-atomic_load_acq_32(volatile uint32_t *p)
+atomic_load_acq_32(const volatile uint32_t *p)
 {
 
 	return (__atomic_load_n(p, __ATOMIC_ACQUIRE));
@@ -317,20 +317,6 @@ atomic_readandclear_64(volatile uint64_t *p)
 	return (__atomic_exchange_n(p, 0, __ATOMIC_RELAXED));
 }
 
-static __inline uint32_t
-atomic_swap_32(volatile uint32_t *p, uint32_t val)
-{
-
-	return (__atomic_exchange_n(p, val, __ATOMIC_RELAXED));
-}
-
-static __inline uint64_t
-atomic_swap_64(volatile uint64_t *p, uint64_t val)
-{
-
-	return (__atomic_exchange_n(p, val, __ATOMIC_RELAXED));
-}
-
 static __inline int
 atomic_testandclear_64(volatile uint64_t *p, u_int val)
 {
@@ -359,6 +345,20 @@ atomic_testandset_acq_64(volatile uint64_t *p, u_int val)
 	mask = (1ul << (val & 63));
 	old = __atomic_fetch_or(p, mask, __ATOMIC_ACQUIRE);
 	return ((old & mask) != 0);
+}
+
+static __inline uint32_t
+atomic_swap_32(volatile uint32_t *p, uint32_t val)
+{
+
+	return (__atomic_exchange_n(p, val, __ATOMIC_RELAXED));
+}
+
+static __inline uint64_t
+atomic_swap_64(volatile uint64_t *p, uint64_t val)
+{
+
+	return (__atomic_exchange_n(p, val, __ATOMIC_RELAXED));
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__

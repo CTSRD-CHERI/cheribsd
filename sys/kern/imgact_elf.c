@@ -153,7 +153,7 @@ int __elfN(nxstack) =
 #endif
 SYSCTL_INT(ELF_NODE_OID, OID_AUTO,
     nxstack, CTLFLAG_RW, &__elfN(nxstack), 0,
-    ELF_ABI_NAME ": enable non-executable stack");
+    ELF_ABI_NAME ": support PT_GNU_STACK for non-executable stack control");
 #endif
 
 #if defined(__amd64__)
@@ -1914,7 +1914,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	oc = atomic_load_int(&vm_overcommit);
 	bsdflags |= (oc & (SWAP_RESERVE_FORCE_ON | SWAP_RESERVE_RLIMIT_ON)) !=
 	    0 ? ELF_BSDF_VMNOOVERCOMMIT : 0;
-#if defined(__ELF_CHERI) && defined(__aarch64__)
+#ifdef __ELF_CHERI
 	/*
 	 * ELF_BSDF_CHERI_C18N tells the runtime linker to enable library-based
 	 * compartmentalisation.
@@ -1932,8 +1932,6 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 			bsdflags |= ELF_BSDF_CHERI_C18N;
 	} else if (security_cheri_lib_based_c18n_default)
 		bsdflags |= ELF_BSDF_CHERI_C18N;
-	if (security_cheri_lib_based_c18n_wrap_fptr)
-		bsdflags |= ELF_BSDF_CHERI_C18N_FPTR;
 #endif
 #if defined(__ELF_CHERI) && defined(CHERI_CAPREVOKE)
 	/*

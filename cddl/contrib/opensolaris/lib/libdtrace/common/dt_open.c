@@ -1073,8 +1073,15 @@ dt_vopen(int version, int flags, int *errp,
 	if (flags & ~DTRACE_O_MASK)
 		return (set_open_errno(dtp, errp, EINVAL));
 
-	if ((flags & DTRACE_O_LP64) && (flags & DTRACE_O_ILP32))
+	switch (flags & DTRACE_O_MODEL_MASK) {
+	case 0: /* native model */
+	case DTRACE_O_ILP32:
+	case DTRACE_O_LP64:
+	case DTRACE_O_P128:
+		break;
+	default:
 		return (set_open_errno(dtp, errp, EINVAL));
+	}
 
 	if (vector == NULL && arg != NULL)
 		return (set_open_errno(dtp, errp, EINVAL));
@@ -1252,7 +1259,9 @@ alloc:
 	else if (dt_ioctl(dtp, DTRACEIOC_CONF, &dtp->dt_conf) != 0)
 		return (set_open_errno(dtp, errp, errno));
 
-	if (flags & DTRACE_O_LP64)
+	if (flags & DTRACE_O_P128)
+		dtp->dt_conf.dtc_ctfmodel = CTF_MODEL_P128;
+	else if (flags & DTRACE_O_LP64)
 		dtp->dt_conf.dtc_ctfmodel = CTF_MODEL_LP64;
 	else if (flags & DTRACE_O_ILP32)
 		dtp->dt_conf.dtc_ctfmodel = CTF_MODEL_ILP32;

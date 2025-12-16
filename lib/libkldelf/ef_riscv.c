@@ -73,6 +73,7 @@ ef_riscv_reloc(struct elf_file *ef, const void *reldata, Elf_Type reltype,
 		le64enc(where, addr);
 		break;
 	case R_RISCV_RELATIVE:	/* B + A */
+	case R_RISCV_FUNC_RELATIVE:
 		addr = relbase + addend;
 		le64enc(where, addr);
 		break;

@@ -28,6 +28,18 @@ dtrace_modevent(module_t mod __unused, int type, void *data __unused)
 
 	switch (type) {
 	case MOD_LOAD:
+		if (!dtrace_enabled) {
+			printf(
+    "DTrace is experimental on this platform and is disabled by default.\n");
+			printf(
+    "Set the debug.dtrace_enabled sysctl to 1 to allow dtrace.ko to load.\n");
+			printf(
+    "Be prepared for bugs and kernel panics if you use DTrace.\n");
+			printf(
+    "Please report bugs at https://github.com/CTSRD-CHERI/cheribsd");
+			return (ENOTSUP);
+		}
+
 		break;
 
 	case MOD_UNLOAD:

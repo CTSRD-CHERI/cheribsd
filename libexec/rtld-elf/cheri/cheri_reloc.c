@@ -42,24 +42,25 @@
 #include "rtld.h"
 
 #ifdef RTLD_HAS_CAPRELOCS
-void
-process___cap_relocs(Obj_Entry* obj)
+int
+process___cap_relocs(Obj_Entry *obj)
 {
-	if (obj->cap_relocs_processed) {
-		dbg("__cap_relocs for %s have already been processed!", obj->path);
-		/* TODO: abort() to prevent this from happening? */
-		return;
-	}
 	struct capreloc *start_relocs = (struct capreloc *)obj->cap_relocs;
 	struct capreloc *end_relocs =
 	    (struct capreloc *)(obj->cap_relocs + obj->cap_relocs_size);
-
 	char * __capability data_base = get_datasegment_cap(obj);
+	bool tight_pcc_bounds;
+
+	if (obj->cap_relocs_processed) {
+		dbg("__cap_relocs for %s have already been processed!",
+		    obj->path);
+		/* TODO: abort / return -1 to prevent this from happening? */
+		return (0);
+	}
 
 	dbg("Processing %lu __cap_relocs for %s (data base = %#lp)\n",
-	    (end_relocs - start_relocs), obj->path, data_base);
+	    end_relocs - start_relocs, obj->path, data_base);
 
-	bool tight_pcc_bounds;
 #ifdef __CHERI_PURE_CAPABILITY__
 	tight_pcc_bounds = can_use_tight_pcc_bounds(obj);
 #else
@@ -83,8 +84,15 @@ process___cap_relocs(Obj_Entry* obj)
 			continue;
 		}
 
-		if ((reloc->permissions & function_reloc_flag) ==
-		    function_reloc_flag) {
+		if (reloc->permissions ==
+		    (function_reloc_flag | indirect_reloc_flag)) {
+			obj->irelative_cap_relocs = true;
+			continue;
+		}
+
+		if (reloc->permissions == function_reloc_flag ||
+		    reloc->permissions == (function_reloc_flag |
+		    code_reloc_flag)) {
 			/* code pointer */
 			cap = (uintcap_t)pcc_cap(obj, reloc->object);
 			cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
@@ -94,30 +102,83 @@ process___cap_relocs(Obj_Entry* obj)
 			 * (unless we are in the plt ABI).
 			 */
 			can_set_bounds = tight_pcc_bounds;
-		} else if ((reloc->permissions & constant_reloc_flag) ==
-		    constant_reloc_flag) {
+		} else if (reloc->permissions == constant_reloc_flag) {
 			 /* read-only data pointer */
-			cap = (uintcap_t)pcc_cap(obj, reloc->object);
+			cap = (uintcap_t)data_base + reloc->object;
 			cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
 			cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
-		} else {
+		} else if (reloc->permissions == 0) {
 			/* read-write data */
 			cap = (uintcap_t)data_base + reloc->object;
 			cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
+		} else {
+			_rtld_error("%s: Unknown capreloc type %#zx",
+			    obj->path, reloc->permissions);
+			return (-1);
 		}
 		cap = cheri_clearperm(cap, CAP_RELOC_REMOVE_PERMS);
-		if (can_set_bounds && (reloc->size != 0)) {
+		if (can_set_bounds && reloc->size != 0)
 			cap = cheri_setbounds(cap, reloc->size);
-		}
 		cap += reloc->offset;
-		if ((reloc->permissions & function_reloc_flag) ==
-		    function_reloc_flag) {
-			/* Convert function pointers to sentries: */
+		/* Convert function pointers to sentries */
+		if (reloc->permissions == function_reloc_flag ||
+		    reloc->permissions == (function_reloc_flag |
+		    code_reloc_flag)) {
 			cap = cheri_sealentry(cap);
+#ifdef CHERI_LIB_C18N
+			if ((reloc->permissions & code_reloc_flag) == 0)
+				cap = (uintcap_t)tramp_intern(NULL,
+				    RTLD_COMPART_ID, &(struct tramp_data) {
+					.target = (void *)cap,
+					.defobj = obj
+				});
+#endif
 		}
 		*dest = cap;
 	}
 
 	obj->cap_relocs_processed = true;
+	return (0);
+}
+
+int
+process_ifunc___cap_relocs(Obj_Entry *obj)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	struct capreloc *start_relocs = (struct capreloc *)obj->cap_relocs;
+	struct capreloc *end_relocs =
+	    (struct capreloc *)(obj->cap_relocs + obj->cap_relocs_size);
+	bool tight_pcc_bounds = can_use_tight_pcc_bounds(obj);
+
+	dbg("Processing %lu __cap_relocs for %s IFUNCs\n",
+	    end_relocs - start_relocs, obj->path);
+
+	for (const struct capreloc *reloc = start_relocs; reloc < end_relocs;
+	     reloc++) {
+		uintcap_t *dest =
+		    (uintcap_t *)(obj->relocbase + reloc->capability_location);
+		uintcap_t cap;
+
+		if (reloc->permissions !=
+		    (function_reloc_flag | indirect_reloc_flag))
+			continue;
+
+		cap = (uintcap_t)pcc_cap(obj, reloc->object);
+		cap = cheri_clearperm(cap,
+		    FUNC_PTR_REMOVE_PERMS | CAP_RELOC_REMOVE_PERMS);
+		if (tight_pcc_bounds && reloc->size != 0)
+			cap = cheri_setbounds(cap, reloc->size);
+		cap += reloc->offset;
+		cap = cheri_sealentry(cap);
+		cap = call_ifunc_resolver(cap);
+		*dest = cap;
+	}
+
+	return (0);
+#else
+	_rtld_error("%s: unsupported IFUNC capreloc in hybrid",
+	    obj->path);
+	return (-1);
+#endif
 }
 #endif

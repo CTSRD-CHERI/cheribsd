@@ -88,7 +88,7 @@ KERNEL_C = \
         core/kcf_prov_tabs.c \
         $(ASM_SOURCES_C)
 
-.PATH: ${SRCTOP}/sys/contrib/openzfs/module/zfs
+.PATH: ${ZFSTOP}/module/zfs
 KERNEL_C+=	zfs_impl.c
 
 SRCS= $(ASM_SOURCES_AS) $(KERNEL_C)

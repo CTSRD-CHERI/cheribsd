@@ -432,7 +432,7 @@ nvmf_tcp_construct_pdu(struct nvmf_tcp_qpair *qp, void *hdr, size_t hlen,
 	if (qp->header_digests)
 		plen += sizeof(header_digest);
 	if (data_len != 0) {
-		pdo = roundup2(plen, qp->txpda);
+		pdo = roundup(plen, qp->txpda);
 		pad = pdo - plen;
 		plen = pdo + data_len;
 		if (qp->data_digests)
@@ -1024,8 +1024,8 @@ tcp_connect(struct nvmf_tcp_qpair *qp, struct nvmf_association *na, bool admin)
 		return (false);
 	}
 
-	qp->txpda = (params->tcp.pda + 1) * 4;
-	qp->rxpda = (ic_resp.cpda + 1) * 4;
+	qp->rxpda = (params->tcp.pda + 1) * 4;
+	qp->txpda = (ic_resp.cpda + 1) * 4;
 	qp->header_digests = ic_resp.dgst.bits.hdgst_enable != 0;
 	qp->data_digests = ic_resp.dgst.bits.ddgst_enable != 0;
 	qp->maxr2t = params->tcp.maxr2t;
@@ -1069,8 +1069,8 @@ tcp_accept(struct nvmf_tcp_qpair *qp, struct nvmf_association *na)
 		return (false);
 	}
 
-	qp->txpda = (params->tcp.pda + 1) * 4;
-	qp->rxpda = (ic_req.hpda + 1) * 4;
+	qp->rxpda = (params->tcp.pda + 1) * 4;
+	qp->txpda = (ic_req.hpda + 1) * 4;
 	qp->header_digests = ic_resp.dgst.bits.hdgst_enable != 0;
 	qp->data_digests = ic_resp.dgst.bits.ddgst_enable != 0;
 	qp->maxr2t = le32toh(ic_req.maxr2t);
@@ -1129,22 +1129,19 @@ tcp_free_qpair(struct nvmf_qpair *nq)
 	free(qp);
 }
 
-static int
-tcp_kernel_handoff_params(struct nvmf_qpair *nq,
-    struct nvmf_handoff_qpair_params *qparams)
+static void
+tcp_kernel_handoff_params(struct nvmf_qpair *nq, nvlist_t *nvl)
 {
 	struct nvmf_tcp_qpair *qp = TQP(nq);
 
-	qparams->tcp.fd = qp->s;
-	qparams->tcp.rxpda = qp->rxpda;
-	qparams->tcp.txpda = qp->txpda;
-	qparams->tcp.header_digests = qp->header_digests;
-	qparams->tcp.data_digests = qp->data_digests;
-	qparams->tcp.maxr2t = qp->maxr2t;
-	qparams->tcp.maxh2cdata = qp->maxh2cdata;
-	qparams->tcp.max_icd = qp->max_icd;
-
-	return (0);
+	nvlist_add_number(nvl, "fd", qp->s);
+	nvlist_add_number(nvl, "rxpda", qp->rxpda);
+	nvlist_add_number(nvl, "txpda", qp->txpda);
+	nvlist_add_bool(nvl, "header_digests", qp->header_digests);
+	nvlist_add_bool(nvl, "data_digests", qp->data_digests);
+	nvlist_add_number(nvl, "maxr2t", qp->maxr2t);
+	nvlist_add_number(nvl, "maxh2cdata", qp->maxh2cdata);
+	nvlist_add_number(nvl, "max_icd", qp->max_icd);
 }
 
 static struct nvmf_capsule *

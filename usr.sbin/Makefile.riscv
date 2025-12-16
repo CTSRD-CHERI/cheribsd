@@ -1,1 +1,3 @@
 SUBDIR+=	hwc
+SUBDIR+=	bhyve
+SUBDIR+=	bhyvectl

@@ -32,10 +32,46 @@
 
 #include <stdint.h>
 
+#ifdef __aarch64__
+#define	HAS_RESTRICTED_MODE
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#define	USE_RESTRICTED_MODE
+#endif
+#endif
+
 /*
  * Global symbols
  */
-extern uintptr_t sealer_pltgot, sealer_tramp;
+#ifdef __riscv
+#define	c18n_unsealentry(cap)						\
+	__builtin_cheri_high_set(cap,					\
+	    __builtin_cheri_high_get(cap) & ~(1ULL << 27))
+#else
+#define	c18n_unsealentry(cap)			cheri_unseal(cap, 0)
+#endif
+
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+#define	c18n_seal(cap, sealer)			cap
+#define	c18n_unseal(cap, sealer)		cap
+#define	c18n_seal_subset(cap, sealer)		cheri_sealentry(cap)
+#define	c18n_unseal_subset(cap, sealer, super)	(			\
+	cheri_gettag(cap) ?						\
+	cheri_buildcap(super, (uintptr_t)c18n_unsealentry(cap)) :	\
+	cap								\
+)
+#else
+#define	c18n_seal(cap, sealer)			cheri_seal(cap, sealer)
+#define	c18n_unseal(cap, sealer)		cheri_unseal(cap, sealer)
+#define	c18n_seal_subset(cap, sealer)		cheri_seal(cap, sealer)
+#define	c18n_unseal_subset(cap, sealer, super)	cheri_unseal(cap, sealer)
+#endif
+
+#ifndef HAS_RESTRICTED_MODE
+extern uintptr_t sealer_tidc;
+#endif
+#ifndef CHERI_LIB_C18N_NO_OTYPE
+extern uintptr_t sealer_pltgot;
+#endif
 extern const char *ld_compartment_utrace;
 extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;
@@ -43,6 +79,7 @@ extern const char *ld_compartment_sig;
 extern const char *ld_compartment_unwind;
 extern const char *ld_compartment_stats;
 extern const char *ld_compartment_switch_count;
+extern const char *ld_compartment_no_fast_path;
 extern struct rtld_c18n_stats *c18n_stats;
 
 /*
@@ -66,7 +103,7 @@ compart_id_t compart_id_for_address(const Obj_Entry *, Elf_Addr);
  * Stack switching
  */
 struct stk_table_stk_info {
-	size_t size;
+	_Atomic(size_t) size;
 	void *begin;
 };
 
@@ -74,10 +111,13 @@ struct stk_table_metadata {
 	size_t capacity;
 	struct tcb_wrapper *wrap;
 	/*
-	 * This field and the next array record the base and length of the
-	 * trusted stack and each compartment stack. This information is used to
-	 * unmap the stacks when the thread exits.
+	 * These fields record the base and length of the signal stack, the
+	 * trusted stack, and each compartment stack. This information is used
+	 * to unmap the stacks when the thread exits.
 	 */
+#ifndef USE_RESTRICTED_MODE
+	struct stk_table_stk_info sig_stk;
+#endif
 	struct stk_table_stk_info trusted_stk;
 	struct stk_table_stk_info compart_stk[];
 };
@@ -128,11 +168,6 @@ struct trusted_frame {
 	 * the return address
 	 */
 	struct dl_c18n_compart_state state;
-	/*
-	 * INVARIANT: This field contains the top of the caller's stack when the
-	 * caller was last entered.
-	 */
-	void *osp;
 	/*
 	 * Pointer to the previous trusted frame
 	 */
@@ -212,10 +247,15 @@ struct tramp_header {
 	 * that the tagged value is visible to the trampoline when it is run.
 	 */
 	_Atomic(void *) target;
+	/*
+	 * INVARIANT: This field must be the last tagged member of the
+	 * trampoline. Trampoline reflection relies on this to locate the
+	 * header.
+	 */
 	const Obj_Entry *defobj;
 	size_t symnum;
 	struct func_sig sig;
-	uint32_t entry[];
+	_Alignas(INST_ALIGN) uint8_t entry[];
 };
 
 /*
@@ -244,9 +284,6 @@ func_sig_legal(struct func_sig sig)
 /*
  * APIs
  */
-void *_rtld_sandbox_code(void *, struct func_sig);
-void *_rtld_safebox_code(void *, struct func_sig);
-
 void c18n_init(Obj_Entry *, Elf_Auxinfo *[]);
 void c18n_init2(Obj_Entry *);
 #endif

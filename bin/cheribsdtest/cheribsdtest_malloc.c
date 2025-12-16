@@ -45,9 +45,18 @@
 extern volatile void *eptr;
 volatile void *eptr;
 
+static const char *
+skip_malloc_revocation_disabled(const struct cheri_test *ctp __unused)
+{
+	if (malloc_revoke_enabled())
+		return (NULL);
+	return ("malloc quarantine disabled");
+}
+
 CHERIBSDTEST(malloc_double_free, "malloc aborts on double free",
     .ct_flags = CT_FLAG_SIGEXIT,
-    .ct_signum = SIGABRT)
+    .ct_signum = SIGABRT,
+    .ct_check_skip = skip_malloc_revocation_disabled)
 {
 	volatile void *ptr;
 
@@ -58,14 +67,6 @@ CHERIBSDTEST(malloc_double_free, "malloc aborts on double free",
 	free(__DEVOLATILE(void *, ptr));
 
 	cheribsdtest_failure_errx("malloc() did not abort");
-}
-
-static const char *
-skip_malloc_revocation_disabled(const struct cheri_test *ctp __unused)
-{
-	if (malloc_revoke_enabled())
-		return (NULL);
-	return ("malloc quarantine disabled");
 }
 
 CHERIBSDTEST(malloc_revoke_basic,
@@ -257,7 +258,7 @@ malloc_revocation_ctl_common(const char *progname, bool should_be_revoking)
 
 CHERIBSDTEST(malloc_revocation_ctl_baseline,
     "A base binary reports revocation is enabled",
-    .ct_check_skip = skip_need_cheri_revoke)
+    .ct_check_skip = skip_need_default_cheri_revoke)
 {
 	malloc_revocation_ctl_common("malloc_revoke_enabled", true);
 }
@@ -300,7 +301,7 @@ CHERIBSDTEST(malloc_revocation_ctl_elfnote_enable_protctl_disable,
 
 CHERIBSDTEST(malloc_revocation_ctl_suid_baseline,
     "A suid binary reports revocation is enabled",
-    .ct_check_skip = skip_need_cheri_revoke)
+    .ct_check_skip = skip_need_default_cheri_revoke)
 {
 	malloc_revocation_ctl_common("malloc_revoke_enabled_suid", true);
 }
@@ -396,7 +397,7 @@ CHERIBSDTEST(mallocx_alignment, "Check that mallocx aligns allocations")
 static void
 check_rallocx(size_t size)
 {
-	static void *data = NULL;
+	void *data = malloc(1);
 
 	data = rallocx(data, size, MALLOCX_ALIGN(size));
 	CHERIBSDTEST_VERIFY2(__builtin_is_aligned(data, size),

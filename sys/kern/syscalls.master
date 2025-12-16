@@ -3365,5 +3365,17 @@
 		    _Out_ rlim_t *res
 		);
 	}
+590	AUE_NULL	STD {
+		int fchroot(
+		    int fd
+		);
+	}
+591	AUE_SETCRED	STD|CAPENABLED {
+		int setcred(
+		    u_int flags,
+		    _In_reads_bytes_(size) _Contains_ptr_ const struct setcred *wcred,
+		    size_t size
+		);
+	}
 
 ; vim: syntax=off

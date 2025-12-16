@@ -386,12 +386,18 @@ proc_rwmem(struct proc *p, struct uio *uio)
 	/*
 	 * If we are writing, then we request vm_fault() to create a private
 	 * copy of each page.  Since these copies will not be writeable by the
-	 * process, we must explicity request that they be dirtied.
+	 * process, we must explicitly request that they be dirtied.
 	 */
 	writing = uio->uio_rw == UIO_WRITE;
 	reqprot = writing ? VM_PROT_COPY | VM_PROT_READ : VM_PROT_READ;
 	fault_flags = writing ? VM_FAULT_DIRTY : VM_FAULT_NORMAL;
 	fault_flags |= VM_FAULT_NOPMAP;
+
+	if (writing) {
+		error = priv_check_cred(p->p_ucred, PRIV_PROC_MEM_WRITE);
+		if (error)
+			return (error);
+	}
 
 	/*
 	 * Only map in one page at a time.  We don't have to, but it

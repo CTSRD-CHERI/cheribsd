@@ -47,6 +47,7 @@ FBSD_1.0 {
 	pthread_mutexattr_init;
 	pthread_mutexattr_settype;
 	pthread_once;
+	pthread_resume_all_np;
 	pthread_rwlock_destroy;
 	pthread_rwlock_init;
 	pthread_rwlock_rdlock;
@@ -59,6 +60,7 @@ FBSD_1.0 {
 	pthread_setcanceltype;
 	pthread_setspecific;
 	pthread_sigmask;
+	pthread_suspend_all_np;
 	pthread_testcancel;
 	alarm;
 	arc4random;
@@ -81,11 +83,10 @@ FBSD_1.0 {
 	dlvsym;
 	dlinfo;
 	dl_iterate_phdr;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(__aarch64__)
+#if defined(__CHERI_PURE_CAPABILITY__)
 	dl_c18n_get_trusted_stack;
 	dl_c18n_unwind_trusted_stack;
 	dl_c18n_is_trampoline;
-	dl_c18n_pop_trusted_stack;
 #endif
 	drand48;
 	erand48;
@@ -337,6 +338,9 @@ FBSD_1.1 {
 	tcsetsid;
 	__pthread_cleanup_pop_imp;
 	__pthread_cleanup_push_imp;
+#if defined(__CHERI_PURE_CAPABILITY__)
+	dl_c18n_pop_trusted_stack;
+#endif
 };
 
 FBSD_1.2 {
@@ -462,12 +466,15 @@ FBSD_1.8 {
 	aio_read2;
 	aio_write2;
 	execvpe;
+	rtld_get_var;
+	rtld_set_var;
 };
 
 FBSDprivate_1.0 {
 	/* needed by thread libraries */
 	__thr_jtable;
 
+	_dl_iterate_phdr_locked;
 	_pthread_atfork;
 	_pthread_attr_destroy;
 	_pthread_attr_getdetachstate;
@@ -587,7 +594,6 @@ FBSDprivate_1.0 {
 
 	__libc_tcdrain;
 
-	__pthread_distribute_static_tls;
 #ifndef __CHERI_PURE_CAPABILITY__
 	__pthread_map_stacks_exec;
 #endif

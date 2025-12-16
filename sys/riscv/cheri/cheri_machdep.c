@@ -88,10 +88,6 @@ cheri_init_capabilities(void * __capability kroot)
 #endif
 	kernel_root_cap = ctemp;
 #endif
-
-#if __has_feature(capabilities)
-        csr_set(senvcfg, SENVCFG_CRE);
-#endif
 }
 
 void

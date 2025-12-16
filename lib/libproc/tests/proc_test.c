@@ -139,6 +139,9 @@ verify_bkpt(struct proc_handle *phdl, GElf_Sym *sym, const char *symname,
 
 	error = proc_addr2sym(phdl, addr, name, namesz, &tsym);
 	ATF_REQUIRE_EQ_MSG(error, 0, "failed to look up symbol at 0x%lx", addr);
+#ifdef __CHERI_PURE_CAPABILITY__
+	tsym.st_value &= ~0x1ul;
+#endif
 	ATF_REQUIRE_EQ(memcmp(sym, &tsym, sizeof(*sym)), 0);
 	ATF_REQUIRE_EQ(strcmp(symname, name), 0);
 	free(name);
@@ -281,10 +284,16 @@ ATF_TC_BODY(symbol_lookup, tc)
 
 	error = proc_name2sym(phdl, target_prog_file, "main", &main_sym, NULL);
 	ATF_REQUIRE_EQ_MSG(error, 0, "failed to look up 'main'");
+#ifdef __CHERI_PURE_CAPABILITY__
+	main_sym.st_value &= ~0x1ul;
+#endif
 
 	error = proc_name2sym(phdl, ldelf_object, "r_debug_state",
 	    &r_debug_state_sym, NULL);
 	ATF_REQUIRE_EQ_MSG(error, 0, "failed to look up 'r_debug_state'");
+#ifdef __CHERI_PURE_CAPABILITY__
+	r_debug_state_sym.st_value &= ~0x1ul;
+#endif
 
 	set_bkpt(phdl, r_debug_state_sym.st_value, &saved);
 	ATF_CHECK_EQ_MSG(proc_continue(phdl), 0, "failed to resume execution");

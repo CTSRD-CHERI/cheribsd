@@ -136,6 +136,8 @@ static const int data_lengths[] = {
 	[KTR_FAULT] = sizeof(struct ktr_fault),
 	[KTR_FAULTEND] = sizeof(struct ktr_faultend),
 	[KTR_STRUCT_ARRAY] = sizeof(struct ktr_struct_array),
+	[KTR_ARGS] = 0,
+	[KTR_ENVS] = 0,
 	[KTR_SYSERRCAUSE] = 0,
 };
 
@@ -575,6 +577,21 @@ ktrsyscall(int code, int narg, syscallarg_t args[])
 		req->ktr_buffer = buf;
 	}
 	ktr_submitrequest(curthread, req);
+}
+
+void
+ktrdata(int type, const void *data, size_t len)
+{
+        struct ktr_request *req;
+        void *buf;
+
+        if ((req = ktr_getrequest(type)) == NULL)
+                return;
+        buf = malloc(len, M_KTRACE, M_WAITOK);
+        bcopy(data, buf, len);
+        req->ktr_header.ktr_len = len;
+        req->ktr_buffer = buf;
+        ktr_submitrequest(curthread, req);
 }
 
 void

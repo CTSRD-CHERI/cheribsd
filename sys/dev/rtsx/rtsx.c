@@ -3630,6 +3630,7 @@ rtsx_attach(device_t dev)
 			device_printf(dev, "If a card is detected without an SD card present,"
 				      " add dev.rtsx.0.inversion=0 in loader.conf(5)\n");
 			sc->rtsx_inversion = 1;
+			break;
 		}
 	}
 
@@ -3783,10 +3784,10 @@ rtsx_detach(device_t dev)
 	WRITE4(sc, RTSX_BIER, sc->rtsx_intr_enabled);
 
 	/* Stop device. */
-	error = device_delete_children(sc->rtsx_dev);
-	sc->rtsx_mmc_dev = NULL;
+	error = bus_generic_detach(sc->rtsx_dev);
 	if (error)
 		return (error);
+	sc->rtsx_mmc_dev = NULL;
 
 	taskqueue_drain_timeout(taskqueue_swi_giant, &sc->rtsx_card_insert_task);
 	taskqueue_drain(taskqueue_swi_giant, &sc->rtsx_card_remove_task);

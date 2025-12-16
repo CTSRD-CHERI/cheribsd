@@ -39,6 +39,8 @@
 
 #define	SIG_FRAME_SIZE			1360
 
+#define	INST_ALIGN		4
+
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 #define	TRUSTED_STACK		rddc_el0
 #define	UNTRUSTED_STACK		csp
@@ -117,6 +119,15 @@ set_trusted_stk(const struct trusted_frame *tf)
 }
 
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+static inline void *
+get_untrusted_stk(void)
+{
+	void *sp;
+
+	asm volatile ("mrs	%0, " __XSTRING(UNTRUSTED_STACK) : "=C" (sp));
+	return (sp);
+}
+
 static inline void
 set_untrusted_stk(const void *sp)
 {

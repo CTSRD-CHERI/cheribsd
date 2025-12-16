@@ -436,4 +436,6 @@ MIASM =  \
 	timerfd_gettime.o \
 	timerfd_settime.o \
 	kcmp.o \
-	getrlimitusage.o
+	getrlimitusage.o \
+	fchroot.o \
+	setcred.o

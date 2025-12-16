@@ -530,7 +530,7 @@ hdacc_attach(device_t dev)
 		device_set_ivars(child, &codec->fgs[n]);
 	}
 
-	bus_generic_attach(dev);
+	bus_attach_children(dev);
 
 	return (0);
 }
@@ -541,7 +541,7 @@ hdacc_detach(device_t dev)
 	struct hdacc_softc *codec = device_get_softc(dev);
 	int error;
 
-	if ((error = device_delete_children(dev)) != 0)
+	if ((error = bus_generic_detach(dev)) != 0)
 		return (error);
 	free(codec->fgs, M_HDACC);
 	return (0);

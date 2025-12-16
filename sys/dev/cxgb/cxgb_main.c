@@ -641,8 +641,7 @@ cxgb_controller_attach(device_t dev)
 		sc->portdev[i] = child;
 		device_set_softc(child, pi);
 	}
-	if ((error = bus_generic_attach(dev)) != 0)
-		goto out;
+	bus_attach_children(dev);
 
 	/* initialize sge private state */
 	t3_sge_init_adapter(sc);
@@ -730,7 +729,7 @@ cxgb_free(struct adapter *sc)
 	/*
 	 * Make sure all child devices are gone.
 	 */
-	bus_generic_detach(sc->dev);
+	bus_detach_children(sc->dev);
 	for (i = 0; i < (sc)->params.nports; i++) {
 		if (sc->portdev[i] &&
 		    device_delete_child(sc->dev, sc->portdev[i]) != 0)
@@ -1041,6 +1040,11 @@ cxgb_port_attach(device_t dev)
 		if_sethwassistbits(ifp, 0, CSUM_TSO);
 	}
 
+	/* Create a list of media supported by this port */
+	ifmedia_init(&p->media, IFM_IMASK, cxgb_media_change,
+	    cxgb_media_status);
+	cxgb_build_medialist(p);
+
 	ether_ifattach(ifp, p->hw_addr);
 
 	/* Attach driver debugnet methods. */
@@ -1055,11 +1059,6 @@ cxgb_port_attach(device_t dev)
 		return (err);
 	}
 
-	/* Create a list of media supported by this port */
-	ifmedia_init(&p->media, IFM_IMASK, cxgb_media_change,
-	    cxgb_media_status);
-	cxgb_build_medialist(p);
-      
 	t3_sge_init_port(p);
 
 	return (err);
@@ -1067,7 +1066,7 @@ cxgb_port_attach(device_t dev)
 
 /*
  * cxgb_port_detach() is called via the device_detach methods when
- * cxgb_free() calls the bus_generic_detach.  It is responsible for 
+ * cxgb_free() calls the bus_detach_children.  It is responsible for 
  * removing the device from the view of the kernel, i.e. from all 
  * interfaces lists etc.  This routine is only called when the driver is 
  * being unloaded, not when the link goes down.

@@ -78,6 +78,8 @@ _start(void *auxv,
 	char **argv = NULL;
 	char **env = NULL;
 	const bool has_dynamic_linker = obj != NULL && cleanup != NULL;
+	void *data_cap = NULL;
+	const void *code_cap = NULL;
 #ifndef PIC
 	const Elf_Phdr *at_phdr = NULL;
 	long at_phnum = 0;
@@ -120,11 +122,12 @@ _start(void *auxv,
 	 * not span the readonly segment or text segment.
 	 */
 	if (!has_dynamic_linker)
-		crt_init_globals(at_phdr, at_phnum, NULL, NULL, NULL);
+		crt_init_globals(at_phdr, at_phnum, &data_cap, &code_cap,
+		    NULL);
 #endif
 	/* We can access global variables/make function calls now. */
 
 	__auxargs = auxv; /* Store the global auxargs pointer */
 
-	__libc_start1(argc, argv, env, cleanup, main, NULL, NULL);
+	__libc_start1(argc, argv, env, cleanup, main, data_cap, code_cap);
 }

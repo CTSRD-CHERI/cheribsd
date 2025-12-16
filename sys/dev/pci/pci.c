@@ -407,7 +407,15 @@ static int pci_enable_ari = 1;
 SYSCTL_INT(_hw_pci, OID_AUTO, enable_ari, CTLFLAG_RDTUN, &pci_enable_ari,
     0, "Enable support for PCIe Alternative RID Interpretation");
 
+/*
+ * Some x86 firmware only enables PCIe hotplug if we claim to support aspm,
+ * however enabling it breaks some arm64 firmware as it powers off devices.
+ */
+#if defined(__i386__) || defined(__amd64__)
 int pci_enable_aspm = 1;
+#else
+int pci_enable_aspm = 0;
+#endif
 SYSCTL_INT(_hw_pci, OID_AUTO, enable_aspm, CTLFLAG_RDTUN, &pci_enable_aspm,
     0, "Enable support for PCIe Active State Power Management");
 
@@ -4495,7 +4503,8 @@ pci_attach(device_t dev)
 	domain = pcib_get_domain(dev);
 	busno = pcib_get_bus(dev);
 	pci_add_children(dev, domain, busno);
-	return (bus_generic_attach(dev));
+	bus_attach_children(dev);
+	return (0);
 }
 
 int
@@ -4509,9 +4518,7 @@ pci_detach(device_t dev)
 		return (error);
 	sc = device_get_softc(dev);
 	error = bus_release_resource(dev, PCI_RES_BUS, 0, sc->sc_bus);
-	if (error)
-		return (error);
-	return (device_delete_children(dev));
+	return (error);
 }
 
 static void

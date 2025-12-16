@@ -21,7 +21,7 @@ cpu		RISCV
 ident		GENERIC
 
 makeoptions	DEBUG=-g		# Build kernel with gdb(1) debug symbols
-makeoptions	WITH_CTF=1		# Run ctfconvert(1) for DTrace support
+#makeoptions	WITH_CTF=1		# Run ctfconvert(1) for DTrace support
 
 options 	SCHED_ULE		# ULE scheduler
 options 	PREEMPTION		# Enable kernel thread preemption
@@ -83,6 +83,7 @@ device		rcons
 # pseudo devices
 device		clk
 device		hwreset
+device		nvmem
 device		phy
 device		regulator
 device		syscon
@@ -151,10 +152,12 @@ device		axidma		# Xilinx AXI DMA Controller
 
 # GPIO
 device		gpio
+device		fdt_pinctrl
 
 # SPI
 device		spibus
 device		spigen
+device		xilinx_spi	# Xilinx AXI SPI Controller
 
 # Debugging support.  Always need this:
 options 	KDB			# Enable kernel debugger support.
@@ -199,5 +202,6 @@ device		iicoc		# OpenCores I2C controller support
 
 # Include SoC specific configuration
 include		"std.allwinner"
+include		"std.eswin"
 include		"std.sifive"
 include		"std.starfive"

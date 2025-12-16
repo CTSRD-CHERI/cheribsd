@@ -19,7 +19,7 @@ LIBTHR_SRCTOP:=	${.PARSEDIR}
 .endif
 .PATH: ${LIBTHR_SRCTOP}
 
-.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
+.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPU:Mxcheri} == ""
 SHARED_CFLAGS+=-DCHERI_LIB_C18N
 .endif
 
@@ -109,9 +109,6 @@ SYMLINKS+=lib${LIB}.a ${LIBDIR}/libpthread.a
 .endif
 .if !defined(NO_PIC)
 SYMLINKS+=lib${LIB}.so ${LIBDIR}/libpthread.so
-.endif
-.if ${MK_PROFILE} != "no"
-SYMLINKS+=lib${LIB}_p.a ${LIBDIR}/libpthread_p.a
 .endif
 
 HAS_TESTS=

@@ -607,7 +607,7 @@ activate_rxt:
 			TCPT_RANGESET_NOSLOP(to, tov,
 			    (bbr->r_ctl.rc_min_rto_ms * MS_IN_USEC),
 			    (bbr->rc_max_rto_sec * USECS_IN_SECOND));
-			bbr_log_timer_var(bbr, 2, cts, 0, srtt, 0, to);
+			bbr_log_timer_var(bbr, 2, cts, 0, bbr_get_rtt(bbr, BBR_SRTT), 0, to);
 			return (to);
 		}
 		return (0);
@@ -3843,7 +3843,7 @@ bbr_post_recovery(struct tcpcb *tp)
 		else if (bbr->r_ctl.rc_delivered == 0)
 			lr2use = 1000;
 		else {
-			lr2use = bbr->r_ctl.rc_lost * 1000;
+			lr2use = (uint64_t)bbr->r_ctl.rc_lost * (uint64_t)1000;
 			lr2use /= bbr->r_ctl.rc_delivered;
 		}
 		lr2use += bbr->r_ctl.recovery_lr;
@@ -4614,7 +4614,7 @@ need_retran:
 	 */
 	if (collapsed_win == 0) {
 		rsm = TAILQ_LAST_FAST(&bbr->r_ctl.rc_map, bbr_sendmap, r_next);
-		if (rsm && (BBR_ACKED | BBR_HAS_FIN)) {
+		if (rsm && (rsm->r_flags & (BBR_ACKED | BBR_HAS_FIN))) {
 			rsm = bbr_find_high_nonack(bbr, rsm);
 		}
 		if (rsm == NULL) {
@@ -6329,8 +6329,6 @@ tcp_bbr_xmit_timer_commit(struct tcp_bbr *bbr, struct tcpcb *tp, uint32_t cts)
 	}
 	/* Round it up */
 	rtt_ticks = USEC_2_TICKS((rtt + (USECS_IN_MSEC - 1)));
-	if (rtt_ticks == 0)
-		rtt_ticks = 1;
 	if (tp->t_srtt != 0) {
 		/*
 		 * srtt is stored as fixed point with 5 bits after the
@@ -6714,7 +6712,7 @@ bbr_update_bbr_info(struct tcp_bbr *bbr, struct bbr_sendmap *rsm, uint32_t rtt, 
 		bbr_log_rtt_shrinks(bbr, cts, 0, rtt, __LINE__, BBR_RTTS_NEWRTT, 0);
 		bbr_set_reduced_rtt(bbr, cts, __LINE__);
 	}
-	bbr_log_type_bbrrttprop(bbr, rtt, (rsm ? rsm->r_end : 0), uts, cts,
+	bbr_log_type_bbrrttprop(bbr, rtt, rsm->r_end, uts, cts,
 	    match, rsm->r_start, rsm->r_flags);
 	apply_filter_min_small(&bbr->r_ctl.rc_rttprop, rtt, cts);
 	if (old_rttprop != bbr_get_rtt(bbr, BBR_RTT_PROP)) {
@@ -7324,11 +7322,9 @@ bbr_log_ack(struct tcpcb *tp, struct tcpopt *to, struct tcphdr *th,
 	p_maxseg = min(bbr->r_ctl.rc_pace_max_segs, maxseg);
 	th_ack = th->th_ack;
 	if (SEQ_GT(th_ack, tp->snd_una)) {
-		acked = th_ack - tp->snd_una;
 		bbr_log_progress_event(bbr, tp, ticks, PROGRESS_UPDATE, __LINE__);
 		bbr->rc_tp->t_acktime = ticks;
-	} else
-		acked = 0;
+	}
 	if (SEQ_LEQ(th_ack, tp->snd_una)) {
 		/* Only sent here for sack processing */
 		goto proc_sack;
@@ -7823,7 +7819,7 @@ bbr_process_ack(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		    (int)(ticks - tp->t_badrxtwin) < 0)
 			bbr_cong_signal(tp, th, CC_RTO_ERR, NULL);
 	}
-	SOCKBUF_LOCK(&so->so_snd);
+	SOCK_SENDBUF_LOCK(so);
 	acked_amount = min(acked, (int)sbavail(&so->so_snd));
 	tp->snd_wnd -= acked_amount;
 	mfree = sbcut_locked(&so->so_snd, acked_amount);
@@ -8295,7 +8291,7 @@ bbr_process_data(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			thflags = tcp_get_flags(th) & TH_FIN;
 			KMOD_TCPSTAT_ADD(tcps_rcvpack, (int)nsegs);
 			KMOD_TCPSTAT_ADD(tcps_rcvbyte, tlen);
-			SOCKBUF_LOCK(&so->so_rcv);
+			SOCK_RECVBUF_LOCK(so);
 			if (so->so_rcv.sb_state & SBS_CANTRCVMORE)
 				m_freem(m);
 			else
@@ -8528,7 +8524,7 @@ bbr_do_fastnewdata(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	newsize = tcp_autorcvbuf(m, th, so, tp, tlen);
 
 	/* Add data to socket buffer. */
-	SOCKBUF_LOCK(&so->so_rcv);
+	SOCK_RECVBUF_LOCK(so);
 	if (so->so_rcv.sb_state & SBS_CANTRCVMORE) {
 		m_freem(m);
 	} else {
@@ -12138,7 +12134,7 @@ again:
 	len = 0;
 	rsm = NULL;
 	if (flags & TH_RST) {
-		SOCKBUF_LOCK(sb);
+		SOCK_SENDBUF_LOCK(so);
 		goto send;
 	}
 recheck_resend:
@@ -12205,7 +12201,7 @@ recheck_resend:
 			} else {
 				/* Retransmitting SYN */
 				rsm = NULL;
-				SOCKBUF_LOCK(sb);
+				SOCK_SENDBUF_LOCK(so);
 				goto send;
 			}
 		} else
@@ -12304,7 +12300,7 @@ recheck_resend:
 			kern_prefetch(end_rsm, &prefetch_rsm);
 		prefetch_rsm = 1;
 	}
-	SOCKBUF_LOCK(sb);
+	SOCK_SENDBUF_LOCK(so);
 	/*
 	 * If snd_nxt == snd_max and we have transmitted a FIN, the
 	 * sb_offset will be > 0 even if so_snd.sb_cc is 0, resulting in a
@@ -12619,7 +12615,6 @@ recheck_resend:
 	    (len > maxseg) &&
 	    (tp->t_port == 0) &&
 	    ((tp->t_flags & TF_SIGNATURE) == 0) &&
-	    tp->rcv_numsacks == 0 &&
 	    ipoptlen == 0)
 		tso = 1;
 
@@ -12722,7 +12717,7 @@ recheck_resend:
 	 * No reason to send a segment, just return.
 	 */
 just_return:
-	SOCKBUF_UNLOCK(sb);
+	SOCK_SENDBUF_UNLOCK(so);
 just_return_nolock:
 	if (tot_len)
 		slot = bbr_get_pacing_delay(bbr, bbr->r_ctl.rc_bbr_hptsi_gain, tot_len, cts, 0);
@@ -12830,7 +12825,7 @@ send:
 			len--;
 		}
 	}
-	SOCKBUF_LOCK_ASSERT(sb);
+	SOCK_SENDBUF_LOCK_ASSERT(so);
 	if (len > 0) {
 		if ((tp->snd_una == tp->snd_max) &&
 		    (bbr_calc_time(cts, bbr->r_ctl.rc_went_idle_time) >= bbr_rtt_probe_time)) {
@@ -12946,7 +12941,7 @@ send:
 	if (tp->t_port) {
 		if (V_tcp_udp_tunneling_port == 0) {
 			/* The port was removed?? */
-			SOCKBUF_UNLOCK(&so->so_snd);
+			SOCK_SENDBUF_UNLOCK(so);
 			return (EHOSTUNREACH);
 		}
 		hdrlen += sizeof(struct udphdr);
@@ -13037,7 +13032,7 @@ send:
 				 * byte of the payload can be put into the
 				 * TCP segment.
 				 */
-				SOCKBUF_UNLOCK(&so->so_snd);
+				SOCK_SENDBUF_UNLOCK(so);
 				error = EMSGSIZE;
 				sack_rxmit = 0;
 				goto out;
@@ -13107,7 +13102,7 @@ send:
 		if (m == NULL) {
 			BBR_STAT_INC(bbr_failed_mbuf_aloc);
 			bbr_log_enobuf_jmp(bbr, len, cts, __LINE__, len, 0, 0);
-			SOCKBUF_UNLOCK(sb);
+			SOCK_SENDBUF_UNLOCK(so);
 			error = ENOBUFS;
 			sack_rxmit = 0;
 			goto out;
@@ -13151,7 +13146,7 @@ send:
 					 * is the only thing to do.
 					 */
 					BBR_STAT_INC(bbr_offset_drop);
-					SOCKBUF_UNLOCK(sb);
+					SOCK_SENDBUF_UNLOCK(so);
 					(void)m_free(m);
 					return (-EFAULT); /* tcp_drop() */
 				}
@@ -13211,7 +13206,7 @@ send:
 				tso = 0;
 			}
 			if (m->m_next == NULL) {
-				SOCKBUF_UNLOCK(sb);
+				SOCK_SENDBUF_UNLOCK(so);
 				(void)m_free(m);
 				error = ENOBUFS;
 				sack_rxmit = 0;
@@ -13247,9 +13242,9 @@ send:
 		    !(flags & TH_SYN)) {
 			flags |= TH_PUSH;
 		}
-		SOCKBUF_UNLOCK(sb);
+		SOCK_SENDBUF_UNLOCK(so);
 	} else {
-		SOCKBUF_UNLOCK(sb);
+		SOCK_SENDBUF_UNLOCK(so);
 		if (tp->t_flags & TF_ACKNOW)
 			KMOD_TCPSTAT_INC(tcps_sndacks);
 		else if (flags & (TH_SYN | TH_FIN | TH_RST))
@@ -13275,7 +13270,7 @@ send:
 			m->m_data += max_linkhdr;
 		m->m_len = hdrlen;
 	}
-	SOCKBUF_UNLOCK_ASSERT(sb);
+	SOCK_SENDBUF_UNLOCK_ASSERT(so);
 	m->m_pkthdr.rcvif = (struct ifnet *)0;
 #ifdef MAC
 	mac_inpcb_create_mbuf(inp, m);
@@ -13767,7 +13762,7 @@ nomore:
 		 * Everything else will just have to retransmit with the timer
 		 * (no pacer).
 		 */
-		SOCKBUF_UNLOCK_ASSERT(sb);
+		SOCK_SENDBUF_UNLOCK_ASSERT(so);
 		BBR_STAT_INC(bbr_saw_oerr);
 		/* Clear all delay/early tracks */
 		bbr->r_ctl.rc_hptsi_agg_delay = 0;
@@ -14590,6 +14585,7 @@ bbr_get_sockopt(struct tcpcb *tp, struct sockopt *sopt)
 {
 	struct inpcb *inp = tptoinpcb(tp);
 	struct tcp_bbr *bbr;
+	uint64_t loptval;
 	int32_t error, optval;
 
 	bbr = (struct tcp_bbr *)tp->t_fb_ptr;
@@ -14650,7 +14646,7 @@ bbr_get_sockopt(struct tcpcb *tp, struct sockopt *sopt)
 		optval = bbr->rc_loss_exit;
 		break;
 	case TCP_BBR_USEDEL_RATE:
-		error = EINVAL;
+		loptval = get_filter_value(&bbr->r_ctl.rc_delrate);
 		break;
 	case TCP_BBR_MIN_RTO:
 		optval = bbr->r_ctl.rc_min_rto_ms;
@@ -14734,7 +14730,10 @@ bbr_get_sockopt(struct tcpcb *tp, struct sockopt *sopt)
 		break;
 	}
 	INP_WUNLOCK(inp);
-	error = sooptcopyout(sopt, &optval, sizeof optval);
+	if (sopt->sopt_name == TCP_BBR_USEDEL_RATE)
+		error = sooptcopyout(sopt, &loptval, sizeof loptval);
+	else
+		error = sooptcopyout(sopt, &optval, sizeof optval);
 	return (error);
 }
 

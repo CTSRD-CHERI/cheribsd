@@ -6468,7 +6468,7 @@ hdaa_sysctl_reconfig(SYSCTL_HANDLER_ARGS)
 	hdaa_unconfigure(dev);
 	hdaa_configure(dev);
 	hdaa_unlock(devinfo);
-	bus_generic_attach(dev);
+	bus_attach_children(dev);
 	HDA_BOOTHVERBOSE(
 		device_printf(dev, "Reconfiguration done\n");
 	);
@@ -6674,7 +6674,7 @@ hdaa_attach(device_t dev)
 	    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)), OID_AUTO,
 	    "init_clear", CTLFLAG_RW,
 	    &devinfo->init_clear, 1,"Clear initial pin widget configuration");
-	bus_generic_attach(dev);
+	bus_attach_children(dev);
 	return (0);
 }
 
@@ -6684,7 +6684,7 @@ hdaa_detach(device_t dev)
 	struct hdaa_devinfo *devinfo = device_get_softc(dev);
 	int error;
 
-	if ((error = device_delete_children(dev)) != 0)
+	if ((error = bus_generic_detach(dev)) != 0)
 		return (error);
 
 	hdaa_lock(devinfo);
@@ -7053,9 +7053,7 @@ hdaa_pcm_attach(device_t dev)
 	HDA_BOOTHVERBOSE(
 		device_printf(dev, "Registering PCM channels...\n");
 	);
-	if (pcm_register(dev, pdevinfo, (pdevinfo->playas >= 0)?1:0,
-	    (pdevinfo->recas >= 0)?1:0) != 0)
-		device_printf(dev, "Can't register PCM\n");
+	pcm_init(dev, pdevinfo);
 
 	pdevinfo->registered++;
 
@@ -7108,9 +7106,8 @@ hdaa_pcm_attach(device_t dev)
 
 	snprintf(status, SND_STATUSLEN, "on %s",
 	    device_get_nameunit(device_get_parent(dev)));
-	pcm_setstatus(dev, status);
 
-	return (0);
+	return (pcm_register(dev, status));
 }
 
 static int

@@ -59,6 +59,12 @@
 #define	PCI_RF_FLAGS	0
 #endif
 
+/*
+ * We allocate "ranges" specified mappings higher up in the rid space to avoid
+ * conflicts with various definitions in the wild that may have other registers
+ * attributed to the controller besides just the config space.
+ */
+#define	RANGE_RID(idx)	((idx) + 100)
 
 /* Forward prototypes */
 
@@ -67,8 +73,6 @@ static uint32_t generic_pcie_read_config(device_t dev, u_int bus, u_int slot,
 static void generic_pcie_write_config(device_t dev, u_int bus, u_int slot,
     u_int func, u_int reg, uint32_t val, int bytes);
 static int generic_pcie_maxslots(device_t dev);
-static int generic_pcie_read_ivar(device_t dev, device_t child, int index,
-    uintptr_t *result);
 static int generic_pcie_write_ivar(device_t dev, device_t child, int index,
     uintptr_t value);
 
@@ -175,7 +179,7 @@ pci_host_generic_core_attach(device_t dev)
 		phys_base = sc->ranges[tuple].phys_base;
 		pci_base = sc->ranges[tuple].pci_base;
 		size = sc->ranges[tuple].size;
-		rid = tuple + 1;
+		rid = RANGE_RID(tuple);
 		if (size == 0)
 			continue; /* empty range element */
 		switch (FLAG_TYPE(sc->ranges[tuple].flags)) {
@@ -212,6 +216,7 @@ pci_host_generic_core_attach(device_t dev)
 			    error);
 			continue;
 		}
+		sc->ranges[tuple].rid = rid;
 		sc->ranges[tuple].res = bus_alloc_resource_any(dev, type, &rid,
 		    RF_ACTIVE | RF_UNMAPPED | flags);
 		if (sc->ranges[tuple].res == NULL) {
@@ -248,7 +253,7 @@ int
 pci_host_generic_core_detach(device_t dev)
 {
 	struct generic_pcie_core_softc *sc;
-	int error, tuple, type;
+	int error, rid, tuple, type;
 
 	sc = device_get_softc(dev);
 
@@ -257,8 +262,13 @@ pci_host_generic_core_detach(device_t dev)
 		return (error);
 
 	for (tuple = 0; tuple < MAX_RANGES_TUPLES; tuple++) {
-		if (sc->ranges[tuple].size == 0)
+		rid = sc->ranges[tuple].rid;
+		if (sc->ranges[tuple].size == 0) {
+			MPASS(sc->ranges[tuple].res == NULL);
 			continue; /* empty range element */
+		}
+
+		MPASS(rid != -1);
 		switch (FLAG_TYPE(sc->ranges[tuple].flags)) {
 		case FLAG_TYPE_PMEM:
 		case FLAG_TYPE_MEM:
@@ -271,9 +281,9 @@ pci_host_generic_core_detach(device_t dev)
 			continue;
 		}
 		if (sc->ranges[tuple].res != NULL)
-			bus_release_resource(dev, type, tuple + 1,
+			bus_release_resource(dev, type, rid,
 			    sc->ranges[tuple].res);
-		bus_delete_resource(dev, type, tuple + 1);
+		bus_delete_resource(dev, type, rid);
 	}
 	rman_fini(&sc->io_rman);
 	rman_fini(&sc->mem_rman);
@@ -362,20 +372,18 @@ generic_pcie_maxslots(device_t dev)
 	return (31); /* max slots per bus acc. to standard */
 }
 
-static int
+int
 generic_pcie_read_ivar(device_t dev, device_t child, int index,
     uintptr_t *result)
 {
 	struct generic_pcie_core_softc *sc;
 
 	sc = device_get_softc(dev);
-
-	if (index == PCIB_IVAR_BUS) {
+	switch (index) {
+	case PCIB_IVAR_BUS:
 		*result = sc->bus_start;
 		return (0);
-	}
-
-	if (index == PCIB_IVAR_DOMAIN) {
+	case PCIB_IVAR_DOMAIN:
 		*result = sc->ecam;
 		return (0);
 	}

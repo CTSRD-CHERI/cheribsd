@@ -43,7 +43,8 @@ MLINKS+= c.7 c95.7
 MLINKS+= c.7 c99.7
 MLINKS+= c.7 c11.7
 MLINKS+= c.7 c17.7
-MLINKS+= c.7 c2x.7
+MLINKS+= c.7 c23.7
+MLINKS+= c.7 c2y.7
 MLINKS+= compartmentalization.7 c18n.7
 
 .if ${MK_INET} != "no"

@@ -246,7 +246,7 @@ LUA_C = \
 	lvm.c \
 	lzio.c
 
-UNICODE_C = u8_textprep.c uconv.c
+UNICODE_C = u8_textprep.c
 
 SRCS+=		${USER_C} ${KERNEL_C} ${LUA_C} ${UNICODE_C} ${ARCH_C}
 
@@ -257,7 +257,7 @@ CFLAGS+= \
 	-I${ZFSTOP}/include \
 	-I${ZFSTOP}/lib/libspl/include \
 	-I${ZFSTOP}/lib/libspl/include/os/freebsd \
-	-I${SRCTOP}/sys/contrib/openzfs/lib/libzpool/include \
+	-I${ZFSTOP}/lib/libzpool/include \
 	-I${SRCTOP}/sys \
 	-I${ZFSTOP}/include/os/freebsd/zfs \
 	-I${SRCTOP}/cddl/compat/opensolaris/include \
@@ -280,9 +280,6 @@ CFLAGS+=	-I${SRCTOP}/lib/libthr/arch/${MACHINE_CPUARCH}/include
 CFLAGS.gcc+=	-fms-extensions
 
 LIBADD=		md pthread z spl icp nvpair avl umem
-
-# atomic.S doesn't like profiling.
-MK_PROFILE=	no
 
 CSTD=	c99
 

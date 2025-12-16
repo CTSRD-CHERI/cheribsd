@@ -101,7 +101,6 @@ __DEFAULT_YES_OPTIONS = \
     FREEBSD_UPDATE \
     FTP \
     GAMES \
-    GH_BC \
     GNU_DIFF \
     GOOGLETEST \
     GPIO \
@@ -351,11 +350,6 @@ BROKEN_OPTIONS+=LIB64CB
 BROKEN_OPTIONS+=NS_CACHING
 # Not ported
 BROKEN_OPTIONS+=OFED
-.endif
-
-.if ${__C} == "cheri" || ${__C} != "zcheri093" || ${__C} == "morello" || \
-    ${__T:Maarch64*c*} || ${__T:Mriscv*c*}
-BROKEN_OPTIONS+=DTRACE
 .endif
 
 # EFI doesn't exist on powerpc (well, officially) and doesn't work on i386
