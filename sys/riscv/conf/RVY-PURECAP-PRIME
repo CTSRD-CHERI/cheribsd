@@ -12,3 +12,10 @@ options         HZ=100
 nooptions	CHERI_CAPREVOKE_NO_CLEAN
 options		CHERI_CAPREVOKE_TWOSTAGE_CLEAN
 
+options		FDT_DTB_STATIC
+makeoptions	FDT_DTS_FILE=prime-up.dts
+
+options		HWC_HOOKS
+device		hwc
+
+options		EARLY_PRINTF=sbi

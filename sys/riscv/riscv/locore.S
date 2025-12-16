@@ -117,6 +117,25 @@
  */
 	.globl _alt_start
 _alt_start:
+	li	a0, 0
+	li	a1, 0
+
+#if 1
+#ifdef __riscv_zcheripurecap
+//.option push
+//.option capmode
+//modesw.cap
+       csrr    ct0, ddc
+       li      t1, 0x10101000
+       scaddr  ct0, ct0, t1
+       li      t1, 0x61
+       sb      t1, 0(ct0)
+//modesw.int
+//.option nocapmode
+//.option pop
+#endif
+#endif
+
 	/* Set the global pointer */
 #ifdef __CHERI_PURE_CAPABILITY__
 	_CMV	PTR(gp), PTR(null)
@@ -149,7 +168,38 @@ _alt_start:
 1:
 .option pop
 #endif
+#if 1
+#ifdef __riscv_zcheripurecap
+//.option push
+//.option capmode
+//modesw.cap
+       csrr    ct0, ddc
+       li      t1, 0x10101000
+       scaddr  ct0, ct0, t1
+       li      t1, 0x61
+       sb      t1, 0(ct0)
+//modesw.int
+//.option nocapmode
+//.option pop
+#endif
+#endif
+
 	cheri_cpu_init
+#if 1
+#ifdef __riscv_zcheripurecap
+//.option push
+//.option capmode
+//modesw.cap
+       csrr    ct0, ddc
+       li      t1, 0x10101000
+       scaddr  ct0, ct0, t1
+       li      t1, 0x61
+       sb      t1, 0(ct0)
+//modesw.int
+//.option nocapmode
+//.option pop
+#endif
+#endif
 
 	/* Pick a hart to run the boot process. */
 	li	t1, 1

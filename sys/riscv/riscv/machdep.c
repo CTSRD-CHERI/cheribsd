@@ -362,6 +362,8 @@ try_load_dtb(void)
 {
 	vm_pointer_t dtbp;
 
+	dtbp = (vm_pointer_t)NULL;
+#if 0
 	dtbp = MD_FETCH(preload_kmdp, MODINFOMD_DTBP, vm_offset_t);
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (dtbp != (vm_pointer_t)NULL) {
@@ -370,14 +372,15 @@ try_load_dtb(void)
 		dtbp = cheri_bounds_set(dtbp, fdt_totalsize((void *)dtbp));
 	}
 #endif
+#endif
 
 #if defined(FDT_DTB_STATIC)
 	/*
 	 * In case the device tree blob was not retrieved (from metadata) try
 	 * to use the statically embedded one.
 	 */
-	if (dtbp == (vm_pointer_t)NULL)
-		dtbp = (vm_pointer_t)&fdt_static_dtb;
+	//if (dtbp == (vm_pointer_t)NULL)
+	dtbp = (vm_pointer_t)&fdt_static_dtb;
 #endif
 
 	if (dtbp == (vm_pointer_t)NULL) {
@@ -401,7 +404,7 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 {
 	static uint32_t fake_preload[48];
 	vm_offset_t lastaddr;
-	size_t fake_size, dtb_size;
+	size_t fake_size, dtb_size __unused;
 
 #define PRELOAD_PUSH_VALUE(type, value) do {			\
 	*(type *)((char *)fake_preload + fake_size) = (value);	\
@@ -441,6 +444,7 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	 * if we have to rederive it later.
 	 */
 
+#if 0
 #ifdef __CHERI_PURE_CAPABILITY__
 	const void *dtbp_virt = cheri_address_set(kernel_root_cap,
 	    rvbp->dtbp_phys);
@@ -448,6 +452,7 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	lastaddr = CHERI_REPRESENTABLE_ALIGN_UP(lastaddr, dtb_size);
 #else
 	dtb_size = fdt_totalsize(rvbp->dtbp_phys);
+#endif
 #endif
 
 	/*
@@ -458,6 +463,7 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_METADATA | MODINFOMD_DTBP);
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(vm_offset_t));
 	PRELOAD_PUSH_VALUE(vm_offset_t, lastaddr);
+#if 0
 #ifdef __CHERI_PURE_CAPABILITY__
 	void *dtbp = cheri_bounds_set(cheri_address_set(kernel_root_cap,
 	    lastaddr), dtb_size);
@@ -466,6 +472,7 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 #else
 	memmove((void *)lastaddr, (const void *)rvbp->dtbp_phys, dtb_size);
 	lastaddr = roundup(lastaddr + dtb_size, sizeof(int));
+#endif
 #endif
 
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_METADATA | MODINFOMD_KERNEND);
@@ -481,6 +488,7 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	PRELOAD_PUSH_VALUE(uint32_t, 0);
 	preload_metadata = (caddr_t)fake_preload;
 
+#if 0
 	/* Check if bootloader clobbered part of the kernel with the DTB. */
 	KASSERT(rvbp->dtbp_phys + dtb_size <= rvbp->kern_phys ||
 		rvbp->dtbp_phys >= rvbp->kern_phys + (lastaddr - KERNBASE),
@@ -494,6 +502,7 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 		printf("FDT phys (%lx-%lx), kernel phys (%lx-%lx)\n",
 		    rvbp->dtbp_phys, rvbp->dtbp_phys + dtb_size,
 		    rvbp->kern_phys, rvbp->kern_phys + (lastaddr - KERNBASE));
+#endif
 }
 
 /* Support for FDT configurations only. */
@@ -653,6 +662,8 @@ initriscv(struct riscv_bootparams *rvbp)
 	devmap_bootstrap();
 
 	cninit();
+
+	printf("okok\n");
 
 #if __has_feature(capabilities) && defined __riscv_xcheri
 	/*
