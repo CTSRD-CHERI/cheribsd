@@ -136,9 +136,29 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 		 * mapping of physical memory.
 		 */
 again:
-#if defined(__CHERI_PURE_CAPABILITY__) || !defined(__riscv_xcheri)
+#ifdef __riscv_y
 		__asm__ __volatile__ (
-#if !defined(__CHERI_PURE_CAPABILITY__)
+#ifdef __CHERI_HYBRID__
+			".option push\n\t"
+			".option capmode\n\t"
+			"ymodeswy\n\t"
+#endif
+			"lr.y %[cscratch], (%[cutp])\n\t"
+			"yeq %[ok], %[cscratch], %[cut]\n\t"
+			"beq x0, %[ok], 1f\n\t"
+			"sc.y %[sc_result], %[cutr], (%[cutp])\n\t"
+			"1:\n\t"
+#ifdef __CHERI_HYBRID__
+			".option pop\n\t"
+			"ymodeswi\n\t"
+#endif
+		  : [ok] "=&r" (ok), [cscratch] "=&C" (cscratch),
+		    [cutr] "+C" (cutr), [sc_result] "=r" (sc_result)
+		  : [cut] "C" (cut), [cutp] "C" (cutp)
+		  : "memory");
+#elif defined(__riscv_zcheripurecap) || (defined(__riscv_xcheri) && defined(__CHERI__))
+		__asm__ __volatile__ (
+#ifdef __CHERI_HYBRID__
 			".option push\n\t"
 			".option capmode\n\t"
 			"modesw.cap\n\t"
@@ -148,7 +168,7 @@ again:
 			"beq x0, %[ok], 1f\n\t"
 			"sc.c %[sc_result], %[cutr], (%[cutp])\n\t"
 			"1:\n\t"
-#if !defined(__CHERI_PURE_CAPABILITY__)
+#ifdef __CHERI_HYBRID__
 			".option pop\n\t"
 			"modesw.int\n\t"
 #endif
@@ -156,7 +176,7 @@ again:
 		    [cutr] "+C" (cutr), [sc_result] "=r" (sc_result)
 		  : [cut] "C" (cut), [cutp] "C" (cutp)
 		  : "memory");
-#else
+#elif defined(__riscv_xcheri) && defined(__CHERI_HYBRID)
 		__asm__ __volatile__ (
 			"lr.c.cap %[cscratch], (%[cutp])\n\t"
 			"sceq %[ok], %[cscratch], %[cut]\n\t"
