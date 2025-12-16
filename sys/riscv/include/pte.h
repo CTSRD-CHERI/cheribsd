@@ -67,37 +67,63 @@ typedef	uint64_t	pn_t;			/* page number */
 #define	Ln_ADDR_MASK	(Ln_ENTRIES - 1)
 
 #if __has_feature(capabilities)
-#ifdef __riscv_xcheri
+#if defined(__riscv_xcheri)
 /* CHERI uses reserved bits in 55:63 */
-#define	PTE_CW		(1UL << 63) /* Capability Write */
-#define	PTE_CR		(1UL << 62) /* Capability Read */
-#define	PTE_CD		(1UL << 61) /* Capability Dirty */
+#define	PTE_YW		(1UL << 63) /* Capability Write */
+#define	PTE_YR		(1UL << 62) /* Capability Read */
+#define	PTE_YD		(1UL << 61) /* Capability Dirty */
 #define	PTE_CRM		(1UL << 60) /* Cap Read Modifier */
-#define	PTE_CRG		(1UL << 59) /* Cap Read Generation */
+#define	PTE_YRG		(1UL << 59) /* Cap Read Generation */
 
 #define	PTE_CR_CLEAR	0			/* clear tags on load */
 #define	PTE_CR_TRAP	PTE_CRM			/* trap on tag load */
-#define	PTE_CR_OK	PTE_CR			/* tags load OK */
-#define	PTE_CR_GEN	(PTE_CR | PTE_CRM)	/* tags gated by generation */
+#define	PTE_CR_OK	PTE_YR			/* tags load OK */
+#define	PTE_CR_GEN	(PTE_YR | PTE_CRM)	/* tags gated by generation */
 
-#define	PTE_KERN_CHERI	(PTE_CR | PTE_CW | PTE_CD)
-#define	PTE_PROMOTE_CHERI (PTE_CR | PTE_CW | PTE_CD | PTE_CRM | PTE_CRG)
-#else /* !defined(__riscv_xcheri) */
+#define	PTE_KERN_CHERI	(PTE_YR | PTE_YW | PTE_YD)
+#define	PTE_PROMOTE_CHERI (PTE_YR | PTE_YW | PTE_YD | PTE_CRM | PTE_YRG)
+#elif defined(__riscv_zcheripurecap)
 #define	PTE_CW		(1UL << 60) /* Capability Read/Write */
 #define	PTE_CRG		(1UL << 59) /* Cap Read Generation */
 #define	PTE_CHERI_MASK	(PTE_CW | PTE_CRG)
 
+#define	PTE_YR		PTE_CW
+#define	PTE_YW		PTE_CW
+#define	PTE_YRG		PTE_CRG
 #define	PTE_CR_CLEAR	0
 #define	PTE_CR_OK	PTE_CW
 #define	PTE_CR_GEN	PTE_CW
 
 #define	PTE_KERN_CHERI	PTE_CW
 #define	PTE_PROMOTE_CHERI (PTE_CW | PTE_CRG)
-#endif  /* !defined(__riscv_xcheri) */
+#elif defined(__riscv_y)
+/* RVY 0.9.8 Svyrg */
+#define	PTE_YR		(1UL << 55) /* Capability Read */
+#define	PTE_YRG		(1UL << 56) /* Cap Read Generation */
+#define	PTE_YW		(1UL << 57) /* Capability Write */
+#define	PTE_YD		(1UL << 58) /* Capability Dirty */
+
+#define	PTE_Y		(1UL << 58) /* Capability RW when sstatus.YRGE == 0 */
+
+#define	PTE_CW		PTE_YW
+#define	PTE_CRG		PTE_YRG
+#define	PTE_CHERI_MASK	(PTE_YR | PTE_YRG | PTE_YW | PTE_YD)
+
+#define	PTE_CR_CLEAR	0
+#ifdef CHERI_CAPREVOKE
+#define	PTE_CR_OK	PTE_YR
 #else
+#define	PTE_CR_OK	PTE_Y
+#endif
+#define	PTE_CR_GEN	PTE_YR
+
+#define	PTE_KERN_CHERI	(PTE_YR | PTE_YW | PTE_YD)
+#define	PTE_PROMOTE_CHERI (PTE_YR | PTE_YRG | PTE_YW | PTE_YD)
+#endif  /* defined(__riscv_y) */
+#else /* !__has_feature(capabilities) */
 #define	PTE_KERN_CHERI	0
 #define	PTE_PROMOTE_CHERI 0
-#endif
+#endif /* !__has_feature(capabilities) */
 
 /* Bits 9:8 are reserved for software */
 #define	PTE_SW_MANAGED	(1 << 9)

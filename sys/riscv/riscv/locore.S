@@ -139,10 +139,15 @@
  * Initialize CHERI CPU state.
  */
 .macro cheri_cpu_init
-#if __has_feature(capabilities) && defined(__riscv_zcheripurecap)
+#if __has_feature(capabilities) && !defined(__riscv_xcheri)
 	/* Enable CHERI for U-mode */
 	li	t0, SENVCFG_Y
 	csrs	senvcfg, t0
+#if defined(CHERI_CAPREVOKE) && defined(__riscv_y)
+	/* Enable Sycrg for S- and U-modes */
+	li	t0, SSTATUS_YRGE
+	csrs	sstatus, t0
+#endif
 #endif
 .endmacro
 
