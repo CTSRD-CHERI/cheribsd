@@ -43,7 +43,7 @@ struct gctl_req_arg {
 	u_int				nlen;
 	union {
 #ifdef _KERNEL
-		char * __capability	user_name;
+		char *	user_name;
 #endif
 		char			*name;
 	};
@@ -54,7 +54,7 @@ struct gctl_req_arg {
 	/* kernel only fields */
 	union {
 #ifdef _KERNEL
-		void * __capability	_dummy;
+		void *	_dummy;
 #endif
 		void			*kvalue;
 	};
@@ -76,7 +76,7 @@ struct gctl_req {
 	u_int				narg;
 	union {
 #ifdef _KERNEL
-		struct gctl_req_arg* __capability user_arg;
+		struct gctl_req_arg*user_arg;
 #endif
 		struct gctl_req_arg	*arg;
 	};
@@ -88,7 +88,7 @@ struct gctl_req {
 	int				nerror;
 	union {
 #ifdef _KERNEL
-		void * __capability	_dummy;
+		void *	_dummy;
 #endif
 		struct sbuf		*serror;
 	};

@@ -133,7 +133,7 @@ struct cuse_server_dev {
 	TAILQ_ENTRY(cuse_server_dev) entry;
 	struct cuse_server *server;
 	struct cdev *kern_dev;
-	struct cuse_dev * __capability user_dev;
+	struct cuse_dev *user_dev;
 };
 
 struct cuse_server {
@@ -867,13 +867,13 @@ cuse_server_ioctl_copy_locked(struct cuse_server *pcs,
 
 	if (!isread) {
 		error = copyin(
-		    (void * __capability)pchk->local_ptr,
+		    (void *)pchk->local_ptr,
 		    pccmd->client->ioctl_buffer + offset,
 		    pchk->length);
 	} else {
 		error = copyout(
 		    pccmd->client->ioctl_buffer + offset,
-		    (void * __capability)pchk->local_ptr,
+		    (void *)pchk->local_ptr,
 		    pchk->length);
 	}
 
@@ -900,7 +900,7 @@ cuse_proc2proc_copy(struct proc *proc_s, uintcap_t data_s,
 
 	if (proc_cur == proc_d) {
 		struct iovec iov;
-		IOVEC_INIT_C(&iov, (void * __capability)data_d, len);
+		IOVEC_INIT_C(&iov, (void *)data_d, len);
 		struct uio uio = {
 			.uio_iov = &iov,
 			.uio_iovcnt = 1,
@@ -917,7 +917,7 @@ cuse_proc2proc_copy(struct proc *proc_s, uintcap_t data_s,
 
 	} else if (proc_cur == proc_s) {
 		struct iovec iov;
-		IOVEC_INIT_C(&iov, (void * __capability)data_s, len);
+		IOVEC_INIT_C(&iov, (void *)data_s, len);
 		struct uio uio = {
 			.uio_iov = &iov,
 			.uio_iovcnt = 1,
@@ -998,7 +998,7 @@ cuse_server_data_copy_optimized_locked(struct cuse_server *pcs,
 		    offset + pchk->length <= (uintptr_t)pccmd->client->write_length) {
 			cuse_server_unlock(pcs);
 			error = copyout(pccmd->client->write_buffer + offset,
-			    (void * __capability)pchk->local_ptr, pchk->length);
+			    (void *)pchk->local_ptr, pchk->length);
 			goto done;
 		}
 	} else {
@@ -1008,7 +1008,7 @@ cuse_server_data_copy_optimized_locked(struct cuse_server *pcs,
 		    pchk->length <= (unsigned long)pccmd->client->read_length &&
 		    offset + pchk->length <= (uintptr_t)pccmd->client->read_length) {
 			cuse_server_unlock(pcs);
-			error = copyin((void * __capability)pchk->local_ptr,
+			error = copyin((void *)pchk->local_ptr,
 			    pccmd->client->read_buffer + offset, pchk->length);
 			goto done;
 		}
@@ -1320,7 +1320,7 @@ cuse_server_ioctl(struct cdev *dev, unsigned long cmd,
 
 		pcsd = TAILQ_FIRST(&pcs->hdev);
 		while (pcsd != NULL) {
-			if (pcsd->user_dev == *(struct cuse_dev * __capability *)data) {
+			if (pcsd->user_dev == *(struct cuse_dev **)data) {
 				TAILQ_REMOVE(&pcs->hdev, pcsd, entry);
 				cuse_server_unlock(pcs);
 				cuse_server_free_dev(pcsd);
@@ -1481,7 +1481,7 @@ cuse_client_open(struct cdev *dev, int fflags, int devtype, struct thread *td)
 	struct cuse_server_dev *pcsd;
 	struct cuse_client *pcc;
 	struct cuse_server *pcs;
-	struct cuse_dev * __capability pcd;
+	struct cuse_dev *pcd;
 	int error;
 	int n;
 

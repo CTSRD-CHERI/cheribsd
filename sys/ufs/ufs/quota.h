@@ -229,22 +229,22 @@ int	getinoquota(struct inode *);
 int	qsync(struct mount *);
 int	qsyncvp(struct vnode *);
 int	quotaoff(struct thread *, struct mount *, int);
-int	quotaon(struct thread *, struct mount *, int, void * __capability,
+int	quotaon(struct thread *, struct mount *, int, void *,
 	    bool *);
 int	getquota32(struct thread *, struct mount *, uint64_t, int,
-	    void * __capability);
+	    void *);
 int	setquota32(struct thread *, struct mount *, uint64_t, int,
-	    void * __capability);
+	    void *);
 int	setuse32(struct thread *, struct mount *, uint64_t, int,
-	    void * __capability);
+	    void *);
 int	getquota(struct thread *, struct mount *, uint64_t, int,
-	    void * __capability);
+	    void *);
 int	setquota(struct thread *, struct mount *, uint64_t, int,
-	    void * __capability);
+	    void *);
 int	setuse(struct thread *, struct mount *, uint64_t, int,
-	    void * __capability);
+	    void *);
 int	getquotasize(struct thread *, struct mount *, uint64_t, int,
-	    void * __capability);
+	    void *);
 vfs_quotactl_t ufs_quotactl;
 
 #ifdef SOFTUPDATES

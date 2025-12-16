@@ -95,7 +95,7 @@ bool	dynamic_kenv;
 			    panic("%s: called before SI_SUB_KMEM", __func__)
 
 static int
-kenv_dump(struct thread *td, char **envp, int what, char * __capability value,
+kenv_dump(struct thread *td, char **envp, int what, char *value,
     int len)
 {
 	char *buffer, *senv;
@@ -167,8 +167,8 @@ sys_kenv(struct thread *td, struct kenv_args *uap)
 }
 
 int
-kern_kenv(struct thread *td, int what, const char * __capability namep,
-    char * __capability val, int vallen)
+kern_kenv(struct thread *td, int what, const char *namep,
+    char *val, int vallen)
 {
 	char *name, *value;
 	size_t len;

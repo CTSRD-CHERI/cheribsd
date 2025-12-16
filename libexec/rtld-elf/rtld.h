@@ -612,7 +612,7 @@ void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 	        (ptraddr_t)(uintptr_t)obj->mapbase),		\
 	    obj->mapsize)
 #define get_datasegment_cap(obj)				\
-	(char * __capability)cheri_bounds_set(			\
+	(char *)cheri_bounds_set(			\
 	    cheri_address_set(cheri_ddc_get(),		\
 	        (ptraddr_t)(uintptr_t)obj->mapbase),		\
 	    obj->mapsize)

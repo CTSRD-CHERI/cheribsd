@@ -192,7 +192,7 @@ usbd_copy_in(struct usb_page_cache *cache, usb_frlength_t offset,
 #if USB_HAVE_USER_IO
 int
 usbd_copy_in_user(struct usb_page_cache *cache, usb_frlength_t offset,
-    const void * __capability ptr, usb_frlength_t len)
+    const void *ptr, usb_frlength_t len)
 {
 	struct usb_page_search buf_res;
 	int error;
@@ -209,7 +209,7 @@ usbd_copy_in_user(struct usb_page_cache *cache, usb_frlength_t offset,
 
 		offset += buf_res.length;
 		len -= buf_res.length;
-		ptr = (const char * __capability)ptr + buf_res.length;
+		ptr = (const char *)ptr + buf_res.length;
 	}
 	return (0);			/* success */
 }
@@ -309,7 +309,7 @@ usbd_copy_out(struct usb_page_cache *cache, usb_frlength_t offset,
 #if USB_HAVE_USER_IO
 int
 usbd_copy_out_user(struct usb_page_cache *cache, usb_frlength_t offset,
-    void * __capability ptr, usb_frlength_t len)
+    void *ptr, usb_frlength_t len)
 {
 	struct usb_page_search res;
 	int error;
@@ -326,7 +326,7 @@ usbd_copy_out_user(struct usb_page_cache *cache, usb_frlength_t offset,
 
 		offset += res.length;
 		len -= res.length;
-		ptr = (char * __capability)ptr + res.length;
+		ptr = (char *)ptr + res.length;
 	}
 	return (0);			/* success */
 }

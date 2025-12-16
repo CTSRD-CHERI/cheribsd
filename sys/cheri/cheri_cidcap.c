@@ -53,7 +53,7 @@ SYSCTL_CAPABILITY(_security_cheri, OID_AUTO, cidcap, CTLFLAG_RD | CTLFLAG_PTROUT
     &userspace_root_cidcap, 0, "CHERI compartment ID root capability");
 
 int
-kern_cheri_cidcap_alloc(struct thread *td, uintcap_t * __capability cidp)
+kern_cheri_cidcap_alloc(struct thread *td, uintcap_t *cidp)
 {
 	uint64_t cid;
 	uintcap_t cidcap;

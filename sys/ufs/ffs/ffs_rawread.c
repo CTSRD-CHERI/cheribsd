@@ -55,7 +55,7 @@
 #include <vm/vnode_pager.h>
 
 static int ffs_rawread_readahead(struct vnode *vp,
-				 caddr_t __capability udata,
+				 caddr_t udata,
 				 off_t offset,
 				 size_t len,
 				 struct thread *td,
@@ -175,7 +175,7 @@ ffs_rawread_sync(struct vnode *vp)
 
 static int
 ffs_rawread_readahead(struct vnode *vp,
-		      caddr_t __capability udata,
+		      caddr_t udata,
 		      off_t offset,
 		      size_t len,
 		      struct thread *td,
@@ -255,7 +255,7 @@ ffs_rawread_main(struct vnode *vp,
 	int error, nerror;
 	struct buf *bp, *nbp, *tbp;
 	uint64_t iolen;
-	caddr_t __capability udata;
+	caddr_t udata;
 	long resid;
 	off_t offset;
 	struct thread *td;

@@ -3156,7 +3156,7 @@ kqueue_cheri_revoke_note(const struct vm_cheri_revoke_cookie *crc,
 		;
 	} else if (cheri_is_equal_exact(ud, kn->kn_kevent.udata)) {
 		CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
-		kn->kn_kevent.udata = (void * __capability)cheri_revoke_cap(ud);
+		kn->kn_kevent.udata = (void *)cheri_revoke_cap(ud);
 	} else {
 		res = 0;
 	}

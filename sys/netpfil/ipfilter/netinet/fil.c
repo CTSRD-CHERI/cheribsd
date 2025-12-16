@@ -4061,7 +4061,7 @@ ipf_sync(ipf_main_softc_t *softc, void *ifp)
 int
 copyin_indirect(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
 {
-	char * __capability ca;
+	char *ca;
 	int error;
 
 #if SOLARIS
@@ -4094,7 +4094,7 @@ copyin_indirect(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
 int
 copyout_indirect(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
 {
-	char * __capability ca;
+	char *ca;
 	int error;
 
 	bcopy(dst, (caddr_t)&ca, sizeof(ca));
@@ -7674,7 +7674,7 @@ ipf_getnextrule(ipf_main_softc_t *softc, ipftoken_t *t, void *ptr)
 	frgroup_t *fg;
 	ipfobj_t obj;
 	int predict;
-	char * __capability dst;
+	char *dst;
 	int unit;
 
 	if (t == NULL || ptr == NULL) {
@@ -7751,7 +7751,7 @@ ipf_getnextrule(ipf_main_softc_t *softc, ipftoken_t *t, void *ptr)
 		(void) ipf_derefrule(softc, &fr);
 
 	obj.ipfo_type = IPFOBJ_FRENTRY;
-	dst = (char * __capability)it.iri_rule;
+	dst = (char *)it.iri_rule;
 
 	if (next != NULL) {
 		obj.ipfo_size = next->fr_size;

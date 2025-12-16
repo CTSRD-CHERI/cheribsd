@@ -279,7 +279,7 @@ bad:
 }
 
 static int
-smb_cpdatain(struct mbchain *mbp, int len, char * __capability data)
+smb_cpdatain(struct mbchain *mbp, int len, char *data)
 {
 	int error;
 

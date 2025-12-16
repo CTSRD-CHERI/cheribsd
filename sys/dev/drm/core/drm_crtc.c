@@ -568,7 +568,7 @@ int drm_mode_setcrtc(struct drm_device *dev, void *data,
 	struct drm_framebuffer *fb = NULL;
 	struct drm_display_mode *mode = NULL;
 	struct drm_mode_set set;
-	uint32_t __user * __capability set_connectors_ptr;
+	uint32_t __user *set_connectors_ptr;
 	struct drm_modeset_acquire_ctx ctx;
 	int ret;
 	int i;
@@ -730,7 +730,7 @@ int drm_mode_setcrtc(struct drm_device *dev, void *data,
 
 		for (i = 0; i < crtc_req->count_connectors; i++) {
 			connector_set[i] = NULL;
-			set_connectors_ptr = (uint32_t __user * __capability)crtc_req->set_connectors_ptr;
+			set_connectors_ptr = (uint32_t __user *)crtc_req->set_connectors_ptr;
 			if (get_user(out_id, &set_connectors_ptr[i])) {
 				ret = -EFAULT;
 				goto out;

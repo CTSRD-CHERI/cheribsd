@@ -42,8 +42,7 @@
 #include <cheri/cheric.h>
 
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
-static void * __capability userspace_root_cap =
-    (void * __capability)(intcap_t)-1;
+static void *userspace_root_cap = (void *)(intptr_t)-1;
 
 static u_int cheri_ptrace_caps;
 SYSCTL_UINT(_security_cheri, OID_AUTO, ptrace_caps, CTLFLAG_RWTUN,
@@ -61,7 +60,7 @@ SYSCTL_ULONG(_security_cheri_stats, OID_AUTO, untagged_ptrace_caps, CTLFLAG_RD,
     "Number of capabilities injected via ptrace that failed to tag");
 
 void
-userspace_root_cap_init(void * __capability cap)
+userspace_root_cap_init(void *cap)
 {
 	userspace_root_cap = cap;
 }
@@ -73,11 +72,11 @@ userspace_root_cap_init(void * __capability cap)
  * flags, the flags for the resulting capability will be set based on what is
  * expected by userspace for the specified thread.
  */
-void * __capability
+void *
 _cheri_capability_build_user_code(struct thread *td, uint32_t perms,
     ptraddr_t basep, size_t length, ptraddr_t addr, const char* func, int line)
 {
-	void * __capability tmpcap;
+	void *tmpcap;
 
 	KASSERT((perms & ~CHERI_CAP_USER_CODE_PERMS) == 0,
 	    ("%s:%d: perms %x has permission not in CHERI_CAP_USER_CODE_PERMS %x",
@@ -98,7 +97,7 @@ _cheri_capability_build_user_code(struct thread *td, uint32_t perms,
  * The resulting capability may include read and write permissions, but
  * not execute.
  */
-void * __capability
+void *
 _cheri_capability_build_user_data(uint32_t perms, ptraddr_t basep,
     size_t length, ptraddr_t addr, const char* func, int line, bool exact)
 {
@@ -119,11 +118,11 @@ _cheri_capability_build_user_data(uint32_t perms, ptraddr_t basep,
  * This function violates W^X and its use is discouraged and the reason for
  * use should be documented in a comment when it is used.
  */
-void * __capability
+void *
 _cheri_capability_build_user_rwx(uint32_t perms, ptraddr_t basep, size_t length,
     ptraddr_t addr, const char* func __unused, int line __unused, bool exact)
 {
-	void * __capability tmpcap;
+	void *tmpcap;
 #ifdef INVARIANTS
 	vm_map_entry_t entry;
 	vm_map_t map;
@@ -179,7 +178,7 @@ _cheri_capability_build_user_rwx(uint32_t perms, ptraddr_t basep, size_t length,
 	return (tmpcap);
 }
 
-void * __capability
+void *
 _cheri_capability_build_user_rwx_unchecked(uint32_t perms, ptraddr_t basep,
     size_t length, ptraddr_t addr, const char* func __unused, int line __unused,
     bool exact)
@@ -229,8 +228,8 @@ cheri_sysvec_init(struct sysentvec *sv)
 	    CHERI_PERMS_SWALL, padded_minuser, user_length,
 	    minuser - padded_minuser);
 	KASSERT(cheri_tag_get(sv->sv_vmspace_cap),
-	    ("sv_vmspace_cap untagged %#lp",
-	     (void * __capability)sv->sv_vmspace_cap));
+	    ("sv_vmspace_cap untagged %#p",
+	     (void *)sv->sv_vmspace_cap));
 }
 
 /*
@@ -242,9 +241,9 @@ bool
 ptrace_derive_cap(struct proc *p, uintcap_t in, uintcap_t *out)
 {
 	struct thread *td;
-	void * __capability cap;
+	void *cap;
 #ifdef HAS_CHERI_PERM_SEAL
-	void * __capability sealcap;
+	void *sealcap;
 #endif
 
 	/*

@@ -588,14 +588,14 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 		return (0);
 
 	case UI_SET_PHYS: {
-		void * __capability cap;
+		void *cap;
 
 #if __has_feature(capabilities)
 		if (!SV_CURPROC_FLAG(SV_CHERI))
 			cap = USER_PTR_STR(*(uint64_t *)data);
 		else
 #endif
-			cap = *(void * __capability *)data;
+			cap = *(void **)data;
 		if (state->ucs_state == UINPUT_RUNNING)
 			return (EINVAL);
 		ret = copyinstr(cap, buf, sizeof(buf), NULL);
@@ -609,7 +609,7 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 	}
 
 	case UI_SET_BSDUNIQ: {
-		void * __capability cap;
+		void *cap;
 		if (state->ucs_state == UINPUT_RUNNING)
 			return (EINVAL);
 #if __has_feature(capabilities)
@@ -617,7 +617,7 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 			cap = USER_PTR_STR(*(uint64_t *)data);
 		else
 #endif
-			cap = *(void * __capability *)data;
+			cap = *(void **)data;
 		ret = copyinstr(cap, buf, sizeof(buf), NULL);
 		if (ret != 0)
 			return (ret);

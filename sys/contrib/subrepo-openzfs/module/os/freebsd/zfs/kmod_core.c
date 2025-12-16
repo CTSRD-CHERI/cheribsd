@@ -128,7 +128,7 @@ zfsdev_ioctl(struct cdev *dev, ulong_t zcmd, caddr_t arg, int flag,
 	zfs_cmd_legacy_t *zcl;
 #endif
 	int rc, error;
-	void * __capability uaddr;
+	void *uaddr;
 
 	len = IOCPARM_LEN(zcmd);
 	vecnum = zcmd & 0xff;
@@ -141,7 +141,7 @@ zfsdev_ioctl(struct cdev *dev, ulong_t zcmd, caddr_t arg, int flag,
 	if (len != sizeof (zfs_iocparm_t))
 		return (EINVAL);
 
-	uaddr = (void * __capability)(__uintcap_t)zp->zfs_cmd;
+	uaddr = (void *)(__uintcap_t)zp->zfs_cmd;
 	zc = vmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
 #ifdef ZFS_LEGACY_SUPPORT
 	/*

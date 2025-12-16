@@ -1534,7 +1534,7 @@ rctl_rule_to_sbuf(struct sbuf *sb, const struct rctl_rule *rule)
  * Routine used by RCTL syscalls to read in input string.
  */
 static int
-rctl_read_inbuf(char **inputstr, const char * __capability inbufp,
+rctl_read_inbuf(char **inputstr, const char *inbufp,
     size_t inbuflen)
 {
 	char *str;
@@ -1563,7 +1563,7 @@ rctl_read_inbuf(char **inputstr, const char * __capability inbufp,
  * Routine used by RCTL syscalls to write out output string.
  */
 static int
-rctl_write_outbuf(struct sbuf *outputsbuf, char * __capability outbufp,
+rctl_write_outbuf(struct sbuf *outputsbuf, char *outbufp,
     size_t outbuflen)
 {
 	int error;
@@ -1617,8 +1617,8 @@ sys_rctl_get_racct(struct thread *td, struct rctl_get_racct_args *uap)
 }
 
 int
-kern_rctl_get_racct(struct thread *td, const void * __capability inbufp,
-    size_t inbuflen, void * __capability outbufp, size_t outbuflen)
+kern_rctl_get_racct(struct thread *td, const void *inbufp,
+    size_t inbuflen, void *outbufp, size_t outbuflen)
 {
 	struct rctl_rule *filter;
 	struct sbuf *outputsbuf = NULL;
@@ -1722,8 +1722,8 @@ sys_rctl_get_rules(struct thread *td, struct rctl_get_rules_args *uap)
 }
 
 int
-kern_rctl_get_rules(struct thread *td, const void * __capability inbufp,
-    size_t inbuflen, void * __capability outbufp, size_t outbuflen)
+kern_rctl_get_rules(struct thread *td, const void *inbufp,
+    size_t inbuflen, void *outbufp, size_t outbuflen)
 {
 	struct sbuf *sb;
 	struct rctl_rule *filter;
@@ -1817,8 +1817,8 @@ sys_rctl_get_limits(struct thread *td, struct rctl_get_limits_args *uap)
 }
 
 int
-kern_rctl_get_limits(struct thread *td, const void * __capability inbufp,
-    size_t inbuflen, void * __capability outbufp, size_t outbuflen)
+kern_rctl_get_limits(struct thread *td, const void *inbufp,
+    size_t inbuflen, void *outbufp, size_t outbuflen)
 {
 	struct sbuf *sb;
 	struct rctl_rule *filter;
@@ -1909,8 +1909,8 @@ sys_rctl_add_rule(struct thread *td, struct rctl_add_rule_args *uap)
 }
 
 int
-kern_rctl_add_rule(struct thread *td, const void * __capability inbufp,
-    size_t inbuflen, void * __capability outbufp, size_t outbuflen)
+kern_rctl_add_rule(struct thread *td, const void *inbufp,
+    size_t inbuflen, void *outbufp, size_t outbuflen)
 {
 	struct rctl_rule *rule;
 	char *inputstr;
@@ -1963,8 +1963,8 @@ sys_rctl_remove_rule(struct thread *td, struct rctl_remove_rule_args *uap)
 }
 
 int
-kern_rctl_remove_rule(struct thread *td, const void * __capability inbufp,
-    size_t inbuflen, void * __capability outbufp, size_t outbuflen)
+kern_rctl_remove_rule(struct thread *td, const void *inbufp,
+    size_t inbuflen, void *outbufp, size_t outbuflen)
 {
 	struct rctl_rule *filter;
 	char *inputstr;

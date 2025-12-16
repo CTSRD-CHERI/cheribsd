@@ -112,7 +112,7 @@ stub_init(struct mac_policy_conf *conf)
 }
 
 static int
-stub_syscall(struct thread *td, int call, void * __capability arg)
+stub_syscall(struct thread *td, int call, void *arg)
 {
 
 	return (0);

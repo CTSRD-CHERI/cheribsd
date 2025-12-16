@@ -88,7 +88,7 @@ MODULE_DEPEND(smbfs, libmchain, 1, 1, 1);
 uma_zone_t smbfs_pbuf_zone;
 
 static int
-smbfs_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
+smbfs_cmount(struct mntarg *ma, void *data, uint64_t flags)
 {
 	struct smbfs_args args;
 	int error;
@@ -347,7 +347,7 @@ out:
  */
 /* ARGSUSED */
 static int
-smbfs_quotactl(struct mount *mp, int cmd, uid_t uid, void * __capability arg,
+smbfs_quotactl(struct mount *mp, int cmd, uid_t uid, void *arg,
     bool *mp_busy)
 {
 	SMBVDEBUG("return EOPNOTSUPP\n");

@@ -163,7 +163,7 @@ struct disk_zone_report {
 	uint32_t			entries_available; /* Passed Out */
 	union {
 #ifdef _KERNEL
-		struct disk_zone_rep_entry * __capability user_entries;
+		struct disk_zone_rep_entry *user_entries;
 #endif
 		struct disk_zone_rep_entry *entries;
 	};

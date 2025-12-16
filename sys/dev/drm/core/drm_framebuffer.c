@@ -701,7 +701,7 @@ out:
 int drm_mode_dirtyfb_ioctl(struct drm_device *dev,
 			   void *data, struct drm_file *file_priv)
 {
-	struct drm_clip_rect __user * __capability clips_ptr;
+	struct drm_clip_rect __user *clips_ptr;
 	struct drm_clip_rect *clips = NULL;
 	struct drm_mode_fb_dirty_cmd *r = data;
 #ifdef COMPAT_FREEBSD64
@@ -734,7 +734,7 @@ int drm_mode_dirtyfb_ioctl(struct drm_device *dev,
 		return -ENOENT;
 
 	num_clips = r->num_clips;
-	clips_ptr = (struct drm_clip_rect __user * __capability)r->clips_ptr;
+	clips_ptr = (struct drm_clip_rect __user *)r->clips_ptr;
 
 	if (!num_clips != !clips_ptr) {
 		ret = -EINVAL;

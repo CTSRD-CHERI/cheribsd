@@ -488,7 +488,7 @@ chkdquot(struct inode *ip)
  * Q_QUOTAON - set up a quota file for a particular filesystem.
  */
 int
-quotaon(struct thread *td, struct mount *mp, int type, void * __capability fname,
+quotaon(struct thread *td, struct mount *mp, int type, void *fname,
     bool *mp_busy)
 {
 	struct ufsmount *ump;
@@ -943,7 +943,7 @@ _setuse(struct thread *td, struct mount *mp, uint64_t id, int type,
 
 int
 getquota32(struct thread *td, struct mount *mp, uint64_t id, int type,
-    void * __capability addr)
+    void *addr)
 {
 	struct dqblk32 dqb32;
 	struct dqblk64 dqb64;
@@ -959,7 +959,7 @@ getquota32(struct thread *td, struct mount *mp, uint64_t id, int type,
 
 int
 setquota32(struct thread *td, struct mount *mp, uint64_t id, int type,
-    void * __capability addr)
+    void *addr)
 {
 	struct dqblk32 dqb32;
 	struct dqblk64 dqb64;
@@ -975,7 +975,7 @@ setquota32(struct thread *td, struct mount *mp, uint64_t id, int type,
 
 int
 setuse32(struct thread *td, struct mount *mp, uint64_t id, int type,
-    void * __capability addr)
+    void *addr)
 {
 	struct dqblk32 dqb32;
 	struct dqblk64 dqb64;
@@ -991,7 +991,7 @@ setuse32(struct thread *td, struct mount *mp, uint64_t id, int type,
 
 int
 getquota(struct thread *td, struct mount *mp, uint64_t id, int type,
-    void * __capability addr)
+    void *addr)
 {
 	struct dqblk64 dqb64;
 	int error;
@@ -1005,7 +1005,7 @@ getquota(struct thread *td, struct mount *mp, uint64_t id, int type,
 
 int
 setquota(struct thread *td, struct mount *mp, uint64_t id, int type,
-    void * __capability addr)
+    void *addr)
 {
 	struct dqblk64 dqb64;
 	int error;
@@ -1019,7 +1019,7 @@ setquota(struct thread *td, struct mount *mp, uint64_t id, int type,
 
 int
 setuse(struct thread *td, struct mount *mp, uint64_t id, int type,
-    void * __capability addr)
+    void *addr)
 {
 	struct dqblk64 dqb64;
 	int error;
@@ -1036,7 +1036,7 @@ setuse(struct thread *td, struct mount *mp, uint64_t id, int type,
  */
 int
 getquotasize(struct thread *td, struct mount *mp, uint64_t id, int type,
-    void * __capability sizep)
+    void *sizep)
 {
 	struct ufsmount *ump = VFSTOUFS(mp);
 	int bitsize;

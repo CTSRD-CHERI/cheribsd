@@ -304,7 +304,7 @@ sys_rtprio_thread(struct thread *td, struct rtprio_thread_args *uap)
 
 int
 kern_rtprio_thread(struct thread *td, int function, lwpid_t lwpid,
-    struct rtprio * __capability urtp)
+    struct rtprio *urtp)
 {
 	struct proc *p;
 	struct rtprio rtp;
@@ -393,7 +393,7 @@ sys_rtprio(struct thread *td, struct rtprio_args *uap)
 
 int
 kern_rtprio(struct thread *td, int function, pid_t pid,
-    struct rtprio * __capability urtp)
+    struct rtprio *urtp)
 {
 	struct proc *p;
 	struct thread *tdp;
@@ -928,7 +928,7 @@ sys_getrlimitusage(struct thread *td, struct getrlimitusage_args *uap)
 
 int
 user_getrlimitusage(struct thread *td, u_int which, int flags,
-    rlim_t * __capability resp)
+    rlim_t *resp)
 {
 	struct proc *p;
 	rlim_t res;

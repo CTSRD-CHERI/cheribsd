@@ -599,13 +599,13 @@ pci_conf_match(u_long cmd, struct pci_match_conf *matches, int num_matches,
  * pointer that cannot be dereferenced.
  */
 #define	PVE_NEXT_LEN(pve, datalen)					\
-	((struct pci_vpd_element * __capability)((char * __capability)(pve) +			\
+	((struct pci_vpd_element *)((char *)(pve) +			\
 	    sizeof(struct pci_vpd_element) + (datalen)))
 
 static int
 pci_list_vpd(device_t dev, struct pci_list_vpd_io *lvio)
 {
-	struct pci_vpd_element vpd_element, * __capability vpd_user;
+	struct pci_vpd_element vpd_element, *vpd_user;
 	struct pcicfg_vpd *vpd;
 	size_t len, datalen;
 	int error, i;
@@ -680,7 +680,7 @@ pci_list_vpd(device_t dev, struct pci_list_vpd_io *lvio)
 			return (error);
 		vpd_user = PVE_NEXT_LEN(vpd_user, vpd_element.pve_datalen);
 	}
-	KASSERT((char * __capability)vpd_user - (char * __capability)lvio->plvi_data == len,
+	KASSERT((char *)vpd_user - (char *)lvio->plvi_data == len,
 	    ("length mismatch"));
 	lvio->plvi_len = len;
 	return (0);
@@ -1349,7 +1349,7 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 
 				pci_conf_for_copyout(&dinfo->conf, &pcu, cmd);
 				error = copyout(&pcu,
-				    (char * __capability)cio->matches +
+				    (char *)cio->matches +
 				    confsz * cio->num_matches, confsz);
 				if (error)
 					break;

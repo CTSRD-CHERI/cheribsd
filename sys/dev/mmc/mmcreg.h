@@ -106,7 +106,7 @@ struct mmc_command {
 #define	MMC_ERR_MAX	6
 	union {
 #ifdef _KERNEL
-		struct mmc_data	* __capability user_data;
+		struct mmc_data	*user_data;
 #endif
 		struct mmc_data	*data;	/* Data segment with cmd */
 	};

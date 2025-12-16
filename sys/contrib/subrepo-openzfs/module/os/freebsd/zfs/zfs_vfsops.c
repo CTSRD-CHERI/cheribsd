@@ -116,10 +116,10 @@ SYSCTL_INT(_vfs_zfs_version, OID_AUTO, zpl, CTLFLAG_RD, &zfs_version_zpl, 0,
 	"ZPL_VERSION");
 
 #if __FreeBSD_version >= 1400018
-static int zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void * __capability arg,
+static int zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg,
     bool *mp_busy);
 #else
-static int zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void * __capability arg);
+static int zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg);
 #endif
 static int zfs_mount(vfs_t *vfsp);
 static int zfs_umount(vfs_t *vfsp, int fflag);
@@ -289,9 +289,9 @@ zfs_getquota(zfsvfs_t *zfsvfs, uid_t id, int isgroup, struct dqblk64 *dqp)
 
 static int
 #if __FreeBSD_version >= 1400018
-zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void * __capability arg, bool *mp_busy)
+zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg, bool *mp_busy)
 #else
-zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void * __capability arg)
+zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg)
 #endif
 {
 	zfsvfs_t *zfsvfs = vfsp->vfs_data;

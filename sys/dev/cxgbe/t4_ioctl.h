@@ -409,7 +409,7 @@ struct t4_offload_policy {
 	uint32_t nrules;
 #ifdef _KERNEL
 	union {
-		struct offload_rule * __capability user_rule;
+		struct offload_rule *user_rule;
 #endif
 		struct offload_rule *rule;
 #ifdef _KERNEL

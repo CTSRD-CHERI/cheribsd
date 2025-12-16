@@ -130,8 +130,8 @@ struct mpi3mr_ioctl_drvcmd {
         U8 opcode;
         U16 rsvd1;
         U32 rsvd2;
-        void * __capability data_in_buf;
-        void * __capability data_out_buf;
+        void *data_in_buf;
+        void *data_out_buf;
         U32 data_in_size;
         U32 data_out_size;
 };

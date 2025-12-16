@@ -88,7 +88,7 @@ cheri_revoke_epoch_clears(cheri_revoke_epoch_t now, cheri_revoke_epoch_t then)
 #if __has_feature(capabilities)
 /* Returns 1 if cap is revoked, 0 otherwise. */
 static inline int
-cheri_revoke_is_revoked(const void * __capability cap)
+cheri_revoke_is_revoked(const void *cap)
 {
 	int is_revoked;
 
@@ -145,7 +145,7 @@ cheri_revoke_is_revoked(const void * __capability cap)
  * we get there.
  */
 
-static const size_t VM_CHERI_REVOKE_GSZ_MEM_NOMAP = sizeof(void * __capability);
+static const size_t VM_CHERI_REVOKE_GSZ_MEM_NOMAP = sizeof(void *);
 static const size_t VM_CHERI_REVOKE_GSZ_OTYPE = 1;
 
 static const size_t VM_CHERI_REVOKE_BSZ_OTYPE =
@@ -333,8 +333,8 @@ int	cheri_revoke(int flags, cheri_revoke_epoch_t start_epoch,
  * This call must fail if the resulting capability would not be representable
  * due to alignment constraints.
  */
-int	cheri_revoke_get_shadow(int flags, void * __capability arena,
-    void * __capability * shadow);
+int	cheri_revoke_get_shadow(int flags, void *arena,
+    void ** shadow);
 #endif
 
 #endif /* !__SYS_CHERI_REVOKE_H__ */

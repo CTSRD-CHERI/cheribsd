@@ -501,7 +501,7 @@ EXPORT_SYMBOL(drm_invalid_op);
 /*
  * Copy and IOCTL return string to user space
  */
-static int drm_copy_field(char __user * __capability buf, size_t *buf_len, const char *value)
+static int drm_copy_field(char __user *buf, size_t *buf_len, const char *value)
 {
 	int len;
 
@@ -877,7 +877,7 @@ long drm_ioctl(struct file *filp,
 	drm_ioctl_t *func;
 	unsigned int nr = DRM_IOCTL_NR(cmd);
 	int retcode = -EINVAL;
-	char stack_kdata[128] __aligned(sizeof(void *__capability));
+	char stack_kdata[128] __aligned(sizeof(void *));
 	char *kdata = NULL;
 	unsigned int in_size, out_size, drv_size, ksize;
 	bool is_driver_ioctl;
@@ -949,7 +949,7 @@ long drm_ioctl(struct file *filp,
 		goto err_i1;
 	}
 #else
-	memcpy_c(PTR2CAP(kdata), (void * __capability)arg, in_size);
+	memcpy_c(PTR2CAP(kdata), (void *)arg, in_size);
 #endif
 
 	if (ksize > in_size)
@@ -961,7 +961,7 @@ long drm_ioctl(struct file *filp,
 	if (copy_to_user((void __user *)arg, kdata, out_size) != 0)
 		retcode = -EFAULT;
 #else
-	memcpy_c((void * __capability)arg, PTR2CAP(kdata), out_size);
+	memcpy_c((void *)arg, PTR2CAP(kdata), out_size);
 #endif
 
       err_i1:

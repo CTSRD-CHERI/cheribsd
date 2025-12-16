@@ -123,7 +123,7 @@ sys_pdfork(struct thread *td, struct pdfork_args *uap)
 }
 
 int
-kern_pdfork(struct thread *td, int * __capability fdp, int flags)
+kern_pdfork(struct thread *td, int *fdp, int flags)
 {
 	struct fork_req fr;
 	int error, fd, pid;

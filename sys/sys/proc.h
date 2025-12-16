@@ -339,10 +339,10 @@ struct thread {
 	uintcap_t	td_rb_inact;	/* (k) Current in-action mutex loc. */
 	struct syscall_args td_sa;	/* (kx) Syscall parameters. Copied on
 					   fork for child tracing. */
-	void * __capability td_sigblock_ptr; /* (k) uptr for fast sigblock. */
+	void		*td_sigblock_ptr; /* (k) uptr for fast sigblock. */
 	uint32_t	td_sigblock_val;  /* (k) fast sigblock value read at
 					     td_sigblock_ptr on kern entry */
-	void * __capability td_exterr_ptr;
+	void		*td_exterr_ptr;
 #define	td_endcopy td_pcb
 
 /*
@@ -1259,11 +1259,11 @@ int	cpu_fetch_syscall_args(struct thread *td);
 void	cpu_fork(struct thread *, struct proc *, struct thread *, int);
 void	cpu_fork_kthread_handler(struct thread *, void (*)(void *), void *);
 int	cpu_procctl(struct thread *td, int idtype, id_t id, int com,
-	    void * __capability data);
+	    void *data);
 void	cpu_set_syscall_retval(struct thread *, int);
-int	cpu_set_upcall(struct thread *, void (* __capability)(void *),
-	    void * __capability, stack_t *);
-int	cpu_set_user_tls(struct thread *, void * __capability tls_base,
+int	cpu_set_upcall(struct thread *, void (*)(void *),
+	    void *, stack_t *);
+int	cpu_set_user_tls(struct thread *, void *tls_base,
 	    int flags);
 void	cpu_thread_alloc(struct thread *);
 void	cpu_thread_clean(struct thread *);

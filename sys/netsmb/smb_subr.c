@@ -107,7 +107,7 @@ smb_strdup(const char *s)
  * duplicate string from a user space.
  */
 char *
-smb_strdupin(char * __capability s, size_t maxlen)
+smb_strdupin(char *s, size_t maxlen)
 {
 	char *p;
 	int error;
@@ -125,7 +125,7 @@ smb_strdupin(char * __capability s, size_t maxlen)
  * duplicate memory block from a user space.
  */
 void *
-smb_memdupin(void * __capability umem, size_t len)
+smb_memdupin(void *umem, size_t len)
 {
 	char *p;
 

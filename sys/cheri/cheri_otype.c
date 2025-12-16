@@ -46,7 +46,7 @@
 static struct mtx cheri_otype_lock;
 static struct unrhdr *cheri_otypes;
 /* Initialized in _start() */
-void * __capability kernel_root_sealcap;
+void *kernel_root_sealcap;
 
 static void
 cheri_otype_init(void *dummy __unused)

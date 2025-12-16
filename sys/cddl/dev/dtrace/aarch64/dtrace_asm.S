@@ -68,7 +68,7 @@ ENTRY(dtrace_interrupt_enable)
 END(dtrace_interrupt_enable)
 /*
 uint8_t
-dtrace_fuword8_nocheck(void * __capability addr)
+dtrace_fuword8_nocheck(void *addr)
 */
 ENTRY(dtrace_fuword8_nocheck)
 #if __has_feature(capabilities)
@@ -83,7 +83,7 @@ END(dtrace_fuword8_nocheck)
 
 /*
 uint16_t
-dtrace_fuword16_nocheck(void * __capability addr)
+dtrace_fuword16_nocheck(void *addr)
 */
 ENTRY(dtrace_fuword16_nocheck)
 #if __has_feature(capabilities)
@@ -98,7 +98,7 @@ END(dtrace_fuword16_nocheck)
 
 /*
 uint32_t
-dtrace_fuword32_nocheck(void * __capability addr)
+dtrace_fuword32_nocheck(void *addr)
 */
 ENTRY(dtrace_fuword32_nocheck)
 #if __has_feature(capabilities)
@@ -113,7 +113,7 @@ END(dtrace_fuword32_nocheck)
 
 /*
 uint64_t
-dtrace_fuword64_nocheck(void * __capability addr)
+dtrace_fuword64_nocheck(void *addr)
 */
 ENTRY(dtrace_fuword64_nocheck)
 #if __has_feature(capabilities)
@@ -129,7 +129,7 @@ END(dtrace_fuword64_nocheck)
 #if __has_feature(capabilities)
 /*
 uintcap_t
-dtrace_fuwordcap_nocheck(void * __capability addr)
+dtrace_fuwordcap_nocheck(void *addr)
 */
 ENTRY(dtrace_fucap_nocheck)
 	ENTER_C64

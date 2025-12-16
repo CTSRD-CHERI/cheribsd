@@ -96,7 +96,7 @@ struct in6_addr;
 
 #include <ddb/ddb.h>			/* db_expr_t */
 
-int	copyin_mac(const void * const __capability mac_p, struct mac *mac);
+int	copyin_mac(void *mac_p, struct mac *mac);
 
 /*
  * Entry points to the TrustedBSD MAC Framework from the remainder of the
@@ -193,9 +193,9 @@ mac_ifnet_create_mbuf(struct ifnet *ifp, struct mbuf *m)
 
 void	mac_ifnet_destroy(struct ifnet *);
 void	mac_ifnet_init(struct ifnet *);
-int	mac_ifnet_ioctl_get(struct ucred *cred, void * __capability ifr_data,
+int	mac_ifnet_ioctl_get(struct ucred *cred, void *ifr_data,
 	    struct ifnet *ifp);
-int	mac_ifnet_ioctl_set(struct ucred *cred, void * __capability ifr_data,
+int	mac_ifnet_ioctl_set(struct ucred *cred, void *ifr_data,
 	    struct ifnet *ifp);
 
 /* Check if the IP address is allowed for the interface. */

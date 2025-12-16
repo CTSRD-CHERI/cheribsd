@@ -137,8 +137,8 @@ struct utrace_rtld64 {
 struct utrace_rtld_cheri {
 	char sig[4];
 	int event;
-	void * __capability handle;
-	void * __capability mapbase;
+	void *handle;
+	void *mapbase;
 	size_t mapsize;
 	int refcnt;
 	char name[MAXPATHLEN];
@@ -251,9 +251,9 @@ struct utrace_malloc64 {
 };
 #else
 struct utrace_malloc_cheri {
-	void * __capability p;
+	void *p;
 	size_t s;
-	void * __capability r;
+	void *r;
 };
 #endif
 #endif

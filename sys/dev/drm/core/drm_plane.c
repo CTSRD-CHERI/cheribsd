@@ -494,7 +494,7 @@ int drm_mode_getplane_res(struct drm_device *dev, void *data,
 	struct drm_mode_get_plane_res local_plane_resp;
 #endif
 	struct drm_plane *plane;
-	uint32_t __user * __capability plane_ptr;
+	uint32_t __user *plane_ptr;
 	int count = 0;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
@@ -552,7 +552,7 @@ int drm_mode_getplane(struct drm_device *dev, void *data,
 	struct drm_mode_get_plane local_plane_resp;
 #endif
 	struct drm_plane *plane;
-	uint32_t __user * __capability format_ptr;
+	uint32_t __user *format_ptr;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;
@@ -610,7 +610,7 @@ int drm_mode_getplane(struct drm_device *dev, void *data,
 	 */
 	if (plane->format_count &&
 	    (plane_resp->count_format_types >= plane->format_count)) {
-		format_ptr = (uint32_t __user * __capability)plane_resp->format_type_ptr;
+		format_ptr = (uint32_t __user *)plane_resp->format_type_ptr;
 		if (copy_to_user(format_ptr,
 				 plane->format_types,
 				 sizeof(uint32_t) * plane->format_count)) {

@@ -45,7 +45,7 @@ extern const Elf_Rela __weak_symbol __rela_dyn_start[] __hidden;
 extern const Elf_Rela __weak_symbol __rela_dyn_end[] __hidden;
 
 static __always_inline void
-crt_init_rela(const void * __capability code_cap, void * __capability data_cap)
+crt_init_rela(const void *code_cap, void *data_cap)
 {
 	const Elf_Rela *rela, *relalim;
 
@@ -69,8 +69,8 @@ crt_init_rela(const void * __capability code_cap, void * __capability data_cap)
 static __always_inline void
 #ifdef __CHERI_PURE_CAPABILITY__
 crt_init_globals(const Elf_Phdr *phdr,
-    void * __capability *data_cap_out,
-    const void * __capability *code_cap_out)
+    void **data_cap_out,
+    const void **code_cap_out)
 #else
 crt_init_globals(void)
 #endif
@@ -78,9 +78,9 @@ crt_init_globals(void)
 	const struct capreloc *start_relocs;
 	const struct capreloc *stop_relocs;
 	bool use_code_bounds;
-	void * __capability data_cap;
-	const void * __capability code_cap;
-	const void * __capability rodata_cap;
+	void *data_cap;
+	const void *code_cap;
+	const void *rodata_cap;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/*

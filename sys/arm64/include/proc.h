@@ -76,7 +76,7 @@ struct mdthread {
 struct mdproc {
 	uint64_t md_tcr;		/* TCR_EL1 fields to update */
 #if __has_feature(capabilities)
-	void * __capability md_sigcode;
+	void *md_sigcode;
 #endif
 };
 #endif /* !LOCORE */

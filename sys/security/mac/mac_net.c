@@ -394,7 +394,7 @@ mac_ifnet_check_transmit_impl(struct ifnet *ifp, struct mbuf *m)
 }
 
 int
-mac_ifnet_ioctl_get(struct ucred *cred, void * __capability ifr_data,
+mac_ifnet_ioctl_get(struct ucred *cred, void *ifr_data,
     struct ifnet *ifp)
 {
 	char *elements, *buffer;
@@ -438,7 +438,7 @@ mac_ifnet_ioctl_get(struct ucred *cred, void * __capability ifr_data,
 }
 
 int
-mac_ifnet_ioctl_set(struct ucred *cred, void * __capability ifr_data,
+mac_ifnet_ioctl_set(struct ucred *cred, void *ifr_data,
     struct ifnet *ifp)
 {
 	struct label *intlabel;

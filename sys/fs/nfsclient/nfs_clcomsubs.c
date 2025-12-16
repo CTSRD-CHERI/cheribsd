@@ -54,7 +54,7 @@ NFSCLSTATEMUTEX;
 int
 nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 {
-	char * __capability uiocp;
+	char *uiocp;
 	struct mbuf *mp, *mp2;
 	int error, xfer, left, mlen;
 	int uiosiz, clflg, rem;
@@ -159,7 +159,7 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 struct mbuf *
 nfsm_uiombuflist(struct uio *uiop, int siz, u_int maxext)
 {
-	char * __capability uiocp;
+	char *uiocp;
 	struct mbuf *mp, *mp2, *firstmp;
 	int error, extpg, extpgsiz = 0, i, left, mlen, rem, xfer;
 	int uiosiz, clflg;

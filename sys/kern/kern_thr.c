@@ -82,7 +82,7 @@ SYSCTL_INT(_kern_threads, OID_AUTO, max_threads_hits, CTLFLAG_RD,
 #ifdef COMPAT_FREEBSD32
 
 static inline int
-suword_lwpid(void * __capability addr, lwpid_t lwpid)
+suword_lwpid(void *addr, lwpid_t lwpid)
 {
 	int error;
 
@@ -103,7 +103,7 @@ suword_lwpid(void * __capability addr, lwpid_t lwpid)
 
 struct thr_create_initthr_args {
 	ucontext_t ctx;
-	long * __capability tid;
+	long *tid;
 };
 
 static int
@@ -601,7 +601,7 @@ sys_thr_set_name(struct thread *td, struct thr_set_name_args *uap)
 
 int
 kern_thr_set_name(struct thread *td, lwpid_t id,
-    const char * __capability uname)
+    const char *uname)
 {
 	struct proc *p;
 	char name[MAXCOMLEN + 1];

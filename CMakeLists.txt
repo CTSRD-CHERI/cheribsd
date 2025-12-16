@@ -114,36 +114,36 @@ file(WRITE ${CMAKE_BINARY_DIR}/cheri_builtins.h "
 #define __has_feature(x) __fake_has_feature_##x
 #define __fake_has_feature_capabilities 1
 #define __fake_has_feature_nullability 1
-// But we don't really so define __capability to nothing
-#define __capability
+// But we don't really so defineto nothing
+#define
 // Same thing for __(u)intcap_t
 typedef unsigned long __uintcap_t;
 typedef long __intcap_t;
 // And provide the builtins for code completion
-long __builtin_cheri_length_get(const void* __capability);
-long __builtin_cheri_base_get(const void* __capability);
-long __builtin_cheri_offset_get(const void* __capability);
-long __builtin_cheri_address_get(const void* __capability);
-long __builtin_cheri_flags_get(const void* __capability);
-long __builtin_cheri_perms_get(const void* __capability);
-long __builtin_cheri_sealed_get(const void* __capability);
-long __builtin_cheri_tag_get(const void* __capability);
-long __builtin_cheri_type_get(const void* __capability));
-void* __capability __builtin_cheri_perms_and(const void* __capability, long);
-void* __capability __builtin_cheri_tag_clear(const void* __capability);
-void* __capability __builtin_cheri_offset_increment(const void* __capability, long);
-void* __capability __builtin_cheri_offset_set(const void* __capability, long);
-void* __capability __builtin_cheri_address_set(const void* __capability, long);
-void* __capability __builtin_cheri_flags_set(const void* __capability, long);
-void* __capability __builtin_cheri_seal(const void* __capability, void* __capability);
-void* __capability __builtin_cheri_unseal(const void* __capability, void* __capability);
-void __builtin_cheri_perms_check(const void* __capability, long);
-void __builtin_cheri_type_check(const void* __capability, const void* __capability);
-void* __capability __builtin_cheri_global_data_get(void);
-void* __capability __builtin_cheri_program_counter_get(void);
-void* __capability __builtin_cheri_stack_get(void);
-void* __capability __builtin_cheri_bounds_set(const void* __capability, long);
-void* __capability __builtin_cheri_bounds_set_exact(const void* __capability, long);
+long __builtin_cheri_length_get(const void*);
+long __builtin_cheri_base_get(const void*);
+long __builtin_cheri_offset_get(const void*);
+long __builtin_cheri_address_get(const void*);
+long __builtin_cheri_flags_get(const void*);
+long __builtin_cheri_perms_get(const void*);
+long __builtin_cheri_sealed_get(const void*);
+long __builtin_cheri_tag_get(const void*);
+long __builtin_cheri_type_get(const void*));
+void*__builtin_cheri_perms_and(const void*, long);
+void*__builtin_cheri_tag_clear(const void*);
+void*__builtin_cheri_offset_increment(const void*, long);
+void*__builtin_cheri_offset_set(const void*, long);
+void*__builtin_cheri_address_set(const void*, long);
+void*__builtin_cheri_flags_set(const void*, long);
+void*__builtin_cheri_seal(const void*, void*);
+void*__builtin_cheri_unseal(const void*, void*);
+void __builtin_cheri_perms_check(const void*, long);
+void __builtin_cheri_type_check(const void*, const void*);
+void*__builtin_cheri_global_data_get(void);
+void*__builtin_cheri_program_counter_get(void);
+void*__builtin_cheri_stack_get(void);
+void*__builtin_cheri_bounds_set(const void*, long);
+void*__builtin_cheri_bounds_set_exact(const void*, long);
 unsigned long __builtin_cheri_representable_alignment_mask(unsigned long);
 unsigned long __builtin_cheri_round_representable_length(unsigned long);
 // Also define some compiler defines:

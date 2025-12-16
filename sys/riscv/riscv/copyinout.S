@@ -167,7 +167,7 @@ END(copyio_fault)
 /*
  * Copies from a kernel to user address
  *
- * int copyout(const void *kaddr, void * __capability udaddr, size_t len)
+ * int copyout(const void *kaddr, void *udaddr, size_t len)
  */
 ENTRY(copyout)
 	beqz	a2, copyout_end	/* If len == 0 then skip loop */
@@ -191,7 +191,7 @@ END(copyout)
 /*
  * Copies from a user to kernel address
  *
- * int copyin(const void * __capability uaddr, void *kaddr, size_t len)
+ * int copyin(const void *uaddr, void *kaddr, size_t len)
  */
 ENTRY(copyin)
 	beqz	a2, copyin_end	/* If len == 0 then skip loop */
@@ -215,7 +215,7 @@ END(copyin)
 /*
  * Copies a string from a user to kernel address
  *
- * int copyinstr(const void * __capability udaddr, void *kaddr, size_t len,
+ * int copyinstr(const void *udaddr, void *kaddr, size_t len,
  *	size_t *done)
  */
 ENTRY(copyinstr)
@@ -350,7 +350,7 @@ END(copyinstr)
 /*
  * Copies from a kernel to user address preserving tags
  *
- * int copyoutptr(const void *kaddr, void * __capability udaddr, size_t len)
+ * int copyoutptr(const void *kaddr, void *udaddr, size_t len)
  */
 ENTRY(copyoutptr)
 	beqz	a2, copyoutptr_end	/* If len == 0 then skip loop */
@@ -374,7 +374,7 @@ END(copyoutptr)
 /*
  * Copies from a user to kernel address preserving tags
  *
- * int copyinptr(const void * __capability uaddr, void *kaddr, size_t len)
+ * int copyinptr(const void *uaddr, void *kaddr, size_t len)
  */
 ENTRY(copyinptr)
 	beqz	a2, copyinptr_end	/* If len == 0 then skip loop */

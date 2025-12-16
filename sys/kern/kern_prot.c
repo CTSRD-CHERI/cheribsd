@@ -365,7 +365,7 @@ sys_getgroups(struct thread *td, struct getgroups_args *uap)
 }
 
 int
-kern_getgroups(struct thread *td, int gidsetsize, gid_t * __capability gidset)
+kern_getgroups(struct thread *td, int gidsetsize, gid_t *gidset)
 {
 	struct ucred *cred;
 	int ngrp, error;
@@ -1265,7 +1265,7 @@ sys_setgroups(struct thread *td, struct setgroups_args *uap)
 
 int
 user_setgroups(struct thread *td, int gidsetsize,
-    const gid_t * __capability gidset)
+    const gid_t *gidset)
 {
 	gid_t smallgroups[CRED_SMALLGROUPS_NB];
 	gid_t *groups;
@@ -1667,8 +1667,8 @@ sys_getresuid(struct thread *td, struct getresuid_args *uap)
 }
 
 int
-kern_getresuid(struct thread *td, uid_t * __capability ruid,
-    uid_t * __capability euid, uid_t * __capability suid)
+kern_getresuid(struct thread *td, uid_t *ruid,
+    uid_t *euid, uid_t *suid)
 {
 	struct ucred *cred;
 	int error1 = 0, error2 = 0, error3 = 0;
@@ -1700,8 +1700,8 @@ sys_getresgid(struct thread *td, struct getresgid_args *uap)
 }
 
 int
-kern_getresgid(struct thread *td, gid_t * __capability rgid,
-    gid_t * __capability egid, gid_t * __capability sgid)
+kern_getresgid(struct thread *td, gid_t *rgid,
+    gid_t *egid, gid_t *sgid)
 {
 	struct ucred *cred;
 	int error1 = 0, error2 = 0, error3 = 0;
@@ -3087,7 +3087,7 @@ sys_getlogin(struct thread *td, struct getlogin_args *uap)
 }
 
 int
-kern_getlogin(struct thread *td, char * __capability namebuf, u_int namelen)
+kern_getlogin(struct thread *td, char *namebuf, u_int namelen)
 {
 	char login[MAXLOGNAME];
 	struct proc *p = td->td_proc;
@@ -3122,7 +3122,7 @@ sys_setlogin(struct thread *td, struct setlogin_args *uap)
 }
 
 int
-kern_setlogin(struct thread *td, const char * __capability namebuf)
+kern_setlogin(struct thread *td, const char *namebuf)
 {
 	struct proc *p = td->td_proc;
 	int error;
