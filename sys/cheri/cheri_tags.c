@@ -89,8 +89,7 @@ cheri_read_tags_page(const void *page, void *tagbuf, bool *hastagsp)
 static void
 measure_cloadtags_stride(void *dummy __unused)
 {
-	void * __capability *buf;
-	void * __capability cap;
+	void **buf;
 	uint64_t tags;
 	u_int i;
 
@@ -104,7 +103,6 @@ measure_cloadtags_stride(void *dummy __unused)
 	 */
 	buf = malloc_aligned(sizeof(*buf) * 64, sizeof(*buf) * 64,
 	    M_TEMP, M_WAITOK | M_ZERO);
-	cap = (__cheri_tocap void * __capability)&tags;
 
 #ifdef INVARIANTS
 	tags = cheri_loadtags(buf);

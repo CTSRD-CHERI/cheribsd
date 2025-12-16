@@ -517,7 +517,7 @@ sbuf_bcat(struct sbuf *s, const void *buf, size_t len)
  * Copy a byte string from userland into an sbuf.
  */
 int
-sbuf_bcopyin(struct sbuf *s, const void * __capability uaddr, size_t len)
+sbuf_bcopyin(struct sbuf *s, const void *uaddr, size_t len)
 {
 
 	assert_sbuf_integrity(s);
@@ -576,7 +576,7 @@ sbuf_cat(struct sbuf *s, const char *str)
  * Append a string from userland to an sbuf.
  */
 int
-sbuf_copyin(struct sbuf *s, const void * __capability uaddr, size_t len)
+sbuf_copyin(struct sbuf *s, const void *uaddr, size_t len)
 {
 	size_t done;
 

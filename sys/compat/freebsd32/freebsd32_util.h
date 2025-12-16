@@ -110,9 +110,9 @@ struct iovec32;
 struct rusage32;
 int	freebsd32_copyout_strings(struct image_params *imgp,
 	    uintptr_t *stack_base);
-int	freebsd32_copyiniov(const struct iovec * __capability cb_arg,
+int	freebsd32_copyiniov(const struct iovec *cb_arg,
 	    u_int iovcnt, struct iovec **iov, int error);
-int	freebsd32_copyinuio(const struct iovec * __capability cb_arg,
+int	freebsd32_copyinuio(const struct iovec *cb_arg,
 	    u_int iovcnt,
 	    struct uio **uiop);
 void	freebsd32_rusage_out(const struct rusage *s, struct rusage32 *s32);

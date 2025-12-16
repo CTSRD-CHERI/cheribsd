@@ -128,7 +128,7 @@ sys_cap_getmode(struct thread *td, struct cap_getmode_args *uap)
 }
 
 int
-kern_cap_getmode(struct thread *td, u_int * __capability modep)
+kern_cap_getmode(struct thread *td, u_int *modep)
 {
 	u_int i;
 
@@ -279,7 +279,7 @@ sys_cap_rights_limit(struct thread *td, struct cap_rights_limit_args *uap)
 
 int
 user_cap_rights_limit(struct thread *td, int fd,
-    cap_rights_t * __capability rightsp)
+    cap_rights_t *rightsp)
 {
 	cap_rights_t rights;
 	int error, version;
@@ -330,7 +330,7 @@ sys___cap_rights_get(struct thread *td, struct __cap_rights_get_args *uap)
 
 int
 kern_cap_rights_get(struct thread *td, int version, int fd,
-    cap_rights_t * __capability rightsp)
+    cap_rights_t *rightsp)
 {
 	struct filedesc *fdp;
 	cap_rights_t rights;
@@ -485,7 +485,7 @@ sys_cap_ioctls_limit(struct thread *td, struct cap_ioctls_limit_args *uap)
 
 int
 user_cap_ioctls_limit(struct thread *td, int fd,
-    const u_long * __capability ucmds, size_t ncmds)
+    const u_long *ucmds, size_t ncmds)
 {
 	u_long *cmds;
 	int error;
@@ -515,7 +515,7 @@ sys_cap_ioctls_get(struct thread *td, struct cap_ioctls_get_args *uap)
 }
 
 int
-kern_cap_ioctls_get(struct thread *td, int fd, u_long * __capability dstcmds,
+kern_cap_ioctls_get(struct thread *td, int fd, u_long *dstcmds,
     size_t maxcmds)
 {
 	struct filedesc *fdp;
@@ -648,7 +648,7 @@ sys_cap_fcntls_get(struct thread *td, struct cap_fcntls_get_args *uap)
 
 int
 kern_cap_fcntls_get(struct thread *td, int fd,
-    uint32_t * __capability fcntlrightsp)
+    uint32_t *fcntlrightsp)
 {
 	struct filedesc *fdp;
 	struct filedescent *fdep;

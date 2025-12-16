@@ -2261,8 +2261,8 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 	int ret = 0;
 	int copied = 0;
 	struct drm_mode_modeinfo u_mode;
-	struct drm_mode_modeinfo __user * __capability mode_ptr;
-	uint32_t __user * __capability encoder_ptr;
+	struct drm_mode_modeinfo __user *mode_ptr;
+	uint32_t __user *encoder_ptr;
 	LIST_HEAD(export_list);
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
@@ -2309,7 +2309,7 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 
 	if ((out_resp->count_encoders >= encoders_count) && encoders_count) {
 		copied = 0;
-		encoder_ptr = (uint32_t __user * __capability)(out_resp->encoders_ptr);
+		encoder_ptr = (uint32_t __user *)(out_resp->encoders_ptr);
 		drm_connector_for_each_possible_encoder(connector, encoder) {
 			if (put_user(encoder->base.id, encoder_ptr + copied)) {
 				ret = -EFAULT;
@@ -2354,7 +2354,7 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 	 */
 	if ((out_resp->count_modes >= mode_count) && mode_count) {
 		copied = 0;
-		mode_ptr = (struct drm_mode_modeinfo __user * __capability)out_resp->modes_ptr;
+		mode_ptr = (struct drm_mode_modeinfo __user *)out_resp->modes_ptr;
 		list_for_each_entry(mode, &export_list, export_head) {
 			drm_mode_convert_to_umode(&u_mode, mode);
 			/*
@@ -2386,8 +2386,8 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 	/* Only grab properties after probing, to make sure EDID and other
 	 * properties reflect the latest status. */
 	ret = drm_mode_object_get_properties(&connector->base, file_priv->atomic,
-			(uint32_t __user * __capability)(out_resp->props_ptr),
-			(uint64_t __user * __capability)(out_resp->prop_values_ptr),
+			(uint32_t __user *)(out_resp->props_ptr),
+			(uint64_t __user *)(out_resp->prop_values_ptr),
 			&out_resp->count_props);
 	drm_modeset_unlock(&dev->mode_config.connection_mutex);
 

@@ -36,4 +36,4 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 
-CTASSERT(sizeof(void * __capability) == CHERICAP_SIZE);
+CTASSERT(sizeof(void *) == CHERICAP_SIZE);

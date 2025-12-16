@@ -722,7 +722,7 @@ ffs_mount(struct mount *mp)
  */
 
 static int
-ffs_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
+ffs_cmount(struct mntarg *ma, void *data, uint64_t flags)
 {
 	struct ufs_args args;
 	int error;

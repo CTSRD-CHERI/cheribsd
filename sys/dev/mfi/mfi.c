@@ -3101,7 +3101,7 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 	uint32_t context = 0;
 	union mfi_sense_ptr sense_ptr;
 	uint8_t *data = NULL, *temp, skip_pre_post = 0;
-	uint8_t * __capability addr;
+	uint8_t *addr;
 	size_t len;
 	int i, res;
 	struct mfi_ioc_passthru *iop = (struct mfi_ioc_passthru *)arg;

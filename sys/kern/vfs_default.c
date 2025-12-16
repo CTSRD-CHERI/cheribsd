@@ -1356,7 +1356,7 @@ vfs_stdstatfs(struct mount *mp, struct statfs *sbp)
 }
 
 int
-vfs_stdquotactl(struct mount *mp, int cmds, uid_t uid, void * __capability arg,
+vfs_stdquotactl(struct mount *mp, int cmds, uid_t uid, void *arg,
 	bool *mp_busy)
 {
 	return (EOPNOTSUPP);

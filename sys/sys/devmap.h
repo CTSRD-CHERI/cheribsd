@@ -85,7 +85,7 @@ void devmap_print_table(void);
 /*
  * Provide a capability mapping the devmap region.
  */
-void devmap_init_capability(void * __capability _cap);
+void devmap_init_capability(void *_cap);
 #endif
 
 #endif /* !_SYS_DEVMAP_H_ */

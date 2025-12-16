@@ -474,8 +474,8 @@ int drm_mode_getproperty_ioctl(struct drm_device *dev,
 	int value_count = 0;
 	int i, copied;
 	struct drm_property_enum *prop_enum;
-	struct drm_mode_property_enum __user * __capability enum_ptr;
-	uint64_t __user * __capability values_ptr;
+	struct drm_mode_property_enum __user *enum_ptr;
+	uint64_t __user *values_ptr;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;

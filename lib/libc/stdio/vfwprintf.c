@@ -456,7 +456,7 @@ __vfwprintf(FILE *fp, locale_t locale, const wchar_t *fmt0, va_list ap)
 	wchar_t *convbuf;	/* multibyte to wide conversion result */
 	int savserr;
 #if __has_feature(capabilities)
-	void * __capability cap;
+	void *cap;
 #endif
 
 	static const char xdigs_lower[16] = "0123456789abcdef";
@@ -965,7 +965,7 @@ fp_common:
 			} else
 #endif
 			{
-				cap = GETARG(void * __capability);
+				cap = GETARG(void *);
 				ujval = cheri_address_get(cap);
 			}
 			if (flags & ALT) {

@@ -437,7 +437,7 @@ sys_nmount(struct thread *td, struct nmount_args *uap)
 }
 
 int
-kern_nmount(struct thread *td, struct iovec * __capability iovp, u_int iovcnt,
+kern_nmount(struct thread *td, struct iovec *iovp, u_int iovcnt,
     int flags32, copyinuio_t * copyinuio_f)
 {
 	struct uio *auio;
@@ -1731,7 +1731,7 @@ sys_unmount(struct thread *td, struct unmount_args *uap)
 }
 
 int
-kern_unmount(struct thread *td, const char * __capability path, int flags)
+kern_unmount(struct thread *td, const char *path, int flags)
 {
 	struct nameidata nd;
 	struct mount *mp;
@@ -2872,7 +2872,7 @@ mount_argf(struct mntarg *ma, const char *name, const char *fmt, ...)
  * Add an argument which is a userland string.
  */
 struct mntarg *
-mount_argsu(struct mntarg *ma, const char *name, const void * __capability val,
+mount_argsu(struct mntarg *ma, const char *name, const void *val,
     int len)
 {
 	struct mntaarg *maa;

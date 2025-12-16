@@ -424,7 +424,7 @@ _vm_gpa_hold(struct vm *vm, vm_paddr_t gpa, size_t len, int reqprot,
 	for (i = 0; i < VM_MAX_MEMMAPS; i++) {
 		mm = &vm_mem(vm)->mem_maps[i];
 		if (gpa >= mm->gpa && gpa < mm->gpa + mm->len) {
-			void * __capability gpap;
+			void *gpap;
 
 #if __has_feature(capabilities) && defined(__aarch64__)
 			gpap = cheri_bounds_set_exact(

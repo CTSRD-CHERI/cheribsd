@@ -130,14 +130,14 @@
 #define BUSY_SPINS		200
 
 struct umtx_copyops {
-	int	(*copyin_timeout)(const void * __capability uaddr,
+	int	(*copyin_timeout)(const void *uaddr,
 		    struct timespec *tsp);
-	int	(*copyin_umtx_time)(const void * __capability uaddr,
+	int	(*copyin_umtx_time)(const void *uaddr,
 		    size_t size, struct _umtx_time *tp);
-	int	(*copyin_robust_lists)(const void * __capability uaddr,
+	int	(*copyin_robust_lists)(const void *uaddr,
 		    size_t size,
 	    struct umtx_robust_lists_params *rbp);
-	int	(*copyout_timeout)(void * __capability uaddr, size_t size,
+	int	(*copyout_timeout)(void *uaddr, size_t size,
 	    struct timespec *tsp);
 	const size_t	timespec_sz;
 	const size_t	umtx_time_sz;
@@ -208,7 +208,7 @@ static inline void umtx_abs_timeout_init2(struct umtx_abs_timeout *timo,
 static void umtx_shm_init(void);
 static void umtxq_sysinit(void *);
 static void umtxq_hash(struct umtx_key *key);
-static int do_unlock_pp(struct thread *td, struct umutex * __capability m,
+static int do_unlock_pp(struct thread *td, struct umutex *m,
     uint32_t flags, bool rb);
 static void umtx_thread_cleanup(struct thread *td);
 SYSINIT(umtx, SI_SUB_EVENTHANDLER+1, SI_ORDER_MIDDLE, umtxq_sysinit, NULL);
@@ -891,7 +891,7 @@ umtxq_sleep(struct umtx_q *uq, const char *wmesg,
  * Convert userspace address into unique logical address.
  */
 int
-umtx_key_get(const void * __capability addr, int type, int share,
+umtx_key_get(const void *addr, int type, int share,
     struct umtx_key *key)
 {
 	struct thread *td = curthread;
@@ -958,7 +958,7 @@ umtx_key_release(struct umtx_key *key)
  * Lock a umtx object.
  */
 static int
-do_lock_umtx(struct thread *td, struct umtx * __capability umtx, u_long id,
+do_lock_umtx(struct thread *td, struct umtx *umtx, u_long id,
     const struct timespec *timeout)
 {
 	struct umtx_abs_timeout timo;
@@ -1076,7 +1076,7 @@ do_lock_umtx(struct thread *td, struct umtx * __capability umtx, u_long id,
  * Unlock a umtx object.
  */
 static int
-do_unlock_umtx(struct thread *td, struct umtx * __capability umtx, u_long id)
+do_unlock_umtx(struct thread *td, struct umtx *umtx, u_long id)
 {
 	struct umtx_key key;
 	u_long owner;
@@ -1087,7 +1087,7 @@ do_unlock_umtx(struct thread *td, struct umtx * __capability umtx, u_long id)
 	/*
 	 * Make sure we own this mtx.
 	 */
-	owner = fuword(__DEVOLATILE_CAP(u_long * __capability, &umtx->u_owner));
+	owner = fuword(__DEVOLATILE_CAP(u_long *, &umtx->u_owner));
 	if (owner == -1)
 		return (EFAULT);
 
@@ -1320,7 +1320,7 @@ do_unlock_umtx32(struct thread *td, uint32_t *m, uint32_t id)
  * Fetch and compare value, sleep on the address if value is not changed.
  */
 static int
-do_wait(struct thread *td, void * __capability addr, u_long id,
+do_wait(struct thread *td, void *addr, u_long id,
     struct _umtx_time *timeout, int compat32, int is_private)
 {
 	struct umtx_abs_timeout timo;
@@ -1374,7 +1374,7 @@ do_wait(struct thread *td, void * __capability addr, u_long id,
  * Wake up threads sleeping on the specified address.
  */
 int
-kern_umtx_wake(struct thread *td, void * __capability uaddr, int n_wake,
+kern_umtx_wake(struct thread *td, void *uaddr, int n_wake,
     int is_private)
 {
 	struct umtx_key key;
@@ -1394,7 +1394,7 @@ kern_umtx_wake(struct thread *td, void * __capability uaddr, int n_wake,
  * Lock PTHREAD_PRIO_NONE protocol POSIX mutex.
  */
 static int
-do_lock_normal(struct thread *td, struct umutex * __capability m,
+do_lock_normal(struct thread *td, struct umutex *m,
     uint32_t flags, struct _umtx_time *timeout, int mode)
 {
 	struct umtx_abs_timeout timo;
@@ -1569,7 +1569,7 @@ do_lock_normal(struct thread *td, struct umutex * __capability m,
  * Unlock PTHREAD_PRIO_NONE protocol POSIX mutex.
  */
 static int
-do_unlock_normal(struct thread *td, struct umutex * __capability m,
+do_unlock_normal(struct thread *td, struct umutex *m,
     uint32_t flags, bool rb)
 {
 	struct umtx_key key;
@@ -1645,7 +1645,7 @@ again:
  * only for simple mutex.
  */
 static int
-do_wake_umutex(struct thread *td, struct umutex * __capability m)
+do_wake_umutex(struct thread *td, struct umutex *m)
 {
 	struct umtx_key key;
 	uint32_t owner;
@@ -1711,7 +1711,7 @@ again:
  * Check if the mutex has waiters and tries to fix contention bit.
  */
 static int
-do_wake2_umutex(struct thread *td, struct umutex * __capability m,
+do_wake2_umutex(struct thread *td, struct umutex *m,
     uint32_t flags)
 {
 	struct umtx_key key;
@@ -2272,7 +2272,7 @@ umtx_pi_drop(struct thread *td, struct umtx_key *key, bool rb, int *count)
  * Lock a PI mutex.
  */
 static int
-do_lock_pi(struct thread *td, struct umutex * __capability m, uint32_t flags,
+do_lock_pi(struct thread *td, struct umutex *m, uint32_t flags,
     struct _umtx_time *timeout, int try)
 {
 	struct umtx_abs_timeout timo;
@@ -2484,7 +2484,7 @@ do_lock_pi(struct thread *td, struct umutex * __capability m, uint32_t flags,
  * Unlock a PI mutex.
  */
 static int
-do_unlock_pi(struct thread *td, struct umutex * __capability m, uint32_t flags,
+do_unlock_pi(struct thread *td, struct umutex *m, uint32_t flags,
     bool rb)
 {
 	struct umtx_key key;
@@ -2568,7 +2568,7 @@ again:
  * Lock a PP mutex.
  */
 static int
-do_lock_pp(struct thread *td, struct umutex * __capability m, uint32_t flags,
+do_lock_pp(struct thread *td, struct umutex *m, uint32_t flags,
     struct _umtx_time *timeout, int try)
 {
 	struct umtx_abs_timeout timo;
@@ -2737,7 +2737,7 @@ out:
  * Unlock a PP mutex.
  */
 static int
-do_unlock_pp(struct thread *td, struct umutex * __capability m, uint32_t flags,
+do_unlock_pp(struct thread *td, struct umutex *m, uint32_t flags,
     bool rb)
 {
 	struct umtx_key key;
@@ -2821,8 +2821,8 @@ do_unlock_pp(struct thread *td, struct umutex * __capability m, uint32_t flags,
 }
 
 static int
-do_set_ceiling(struct thread *td, struct umutex * __capability m,
-    uint32_t ceiling, uint32_t * __capability old_ceiling)
+do_set_ceiling(struct thread *td, struct umutex *m,
+    uint32_t ceiling, uint32_t *old_ceiling)
 {
 	struct umtx_q *uq;
 	uint32_t flags, id, owner, save_ceiling;
@@ -2919,7 +2919,7 @@ do_set_ceiling(struct thread *td, struct umutex * __capability m,
  * Lock a userland POSIX mutex.
  */
 static int
-do_lock_umutex(struct thread *td, struct umutex * __capability m,
+do_lock_umutex(struct thread *td, struct umutex *m,
     struct _umtx_time *timeout, int mode)
 {
 	uint32_t flags;
@@ -2957,7 +2957,7 @@ do_lock_umutex(struct thread *td, struct umutex * __capability m,
  * Unlock a userland POSIX mutex.
  */
 static int
-do_unlock_umutex(struct thread *td, struct umutex * __capability m, bool rb)
+do_unlock_umutex(struct thread *td, struct umutex *m, bool rb)
 {
 	uint32_t flags;
 	int error;
@@ -2979,8 +2979,8 @@ do_unlock_umutex(struct thread *td, struct umutex * __capability m, bool rb)
 }
 
 static int
-do_cv_wait(struct thread *td, struct ucond * __capability cv,
-    struct umutex * __capability m, struct timespec *timeout, u_long wflags)
+do_cv_wait(struct thread *td, struct ucond *cv,
+    struct umutex *m, struct timespec *timeout, u_long wflags)
 {
 	struct umtx_abs_timeout timo;
 	struct umtx_q *uq;
@@ -3079,7 +3079,7 @@ out:
  * Signal a userland condition variable.
  */
 static int
-do_cv_signal(struct thread *td, struct ucond * __capability cv)
+do_cv_signal(struct thread *td, struct ucond *cv)
 {
 	struct umtx_key key;
 	int error, cnt, nwake;
@@ -3108,7 +3108,7 @@ do_cv_signal(struct thread *td, struct ucond * __capability cv)
 }
 
 static int
-do_cv_broadcast(struct thread *td, struct ucond * __capability cv)
+do_cv_broadcast(struct thread *td, struct ucond *cv)
 {
 	struct umtx_key key;
 	int error;
@@ -3136,7 +3136,7 @@ do_cv_broadcast(struct thread *td, struct ucond * __capability cv)
 }
 
 static int
-do_rw_rdlock(struct thread *td, struct urwlock * __capability rwlock,
+do_rw_rdlock(struct thread *td, struct urwlock *rwlock,
     long fflag, struct _umtx_time *timeout)
 {
 	struct umtx_abs_timeout timo;
@@ -3324,7 +3324,7 @@ sleep:
 }
 
 static int
-do_rw_wrlock(struct thread *td, struct urwlock * __capability rwlock,
+do_rw_wrlock(struct thread *td, struct urwlock *rwlock,
     struct _umtx_time *timeout)
 {
 	struct umtx_abs_timeout timo;
@@ -3523,7 +3523,7 @@ sleep:
 }
 
 static int
-do_rw_unlock(struct thread *td, struct urwlock * __capability rwlock)
+do_rw_unlock(struct thread *td, struct urwlock *rwlock)
 {
 	struct umtx_q *uq;
 	uint32_t flags;
@@ -3622,7 +3622,7 @@ out:
 
 #if defined(COMPAT_FREEBSD9) || defined(COMPAT_FREEBSD10)
 static int
-do_sem_wait(struct thread *td, struct _usem * __capability sem, struct _umtx_time *timeout)
+do_sem_wait(struct thread *td, struct _usem *sem, struct _umtx_time *timeout)
 {
 	struct umtx_abs_timeout timo;
 	struct umtx_q *uq;
@@ -3694,7 +3694,7 @@ out:
  * Signal a userland semaphore.
  */
 static int
-do_sem_wake(struct thread *td, struct _usem * __capability sem)
+do_sem_wake(struct thread *td, struct _usem *sem)
 {
 	struct umtx_key key;
 	int error, cnt;
@@ -3731,7 +3731,7 @@ do_sem_wake(struct thread *td, struct _usem * __capability sem)
 #endif
 
 static int
-do_sem2_wait(struct thread *td, struct _usem2 * __capability sem,
+do_sem2_wait(struct thread *td, struct _usem2 *sem,
     struct _umtx_time *timeout)
 {
 	struct umtx_abs_timeout timo;
@@ -3817,7 +3817,7 @@ again:
  * Signal a userland semaphore.
  */
 static int
-do_sem2_wake(struct thread *td, struct _usem2 * __capability sem)
+do_sem2_wake(struct thread *td, struct _usem2 *sem)
 {
 	struct umtx_key key;
 	int error, cnt, rv;
@@ -3880,7 +3880,7 @@ freebsd10__umtx_unlock(struct thread *td,
 #endif
 
 inline int
-umtx_copyin_timeout(const void * __capability uaddr, struct timespec *tsp)
+umtx_copyin_timeout(const void *uaddr, struct timespec *tsp)
 {
 	int error;
 
@@ -3893,7 +3893,7 @@ umtx_copyin_timeout(const void * __capability uaddr, struct timespec *tsp)
 }
 
 static inline int
-umtx_copyin_umtx_time(const void * __capability uaddr, size_t size,
+umtx_copyin_umtx_time(const void *uaddr, size_t size,
     struct _umtx_time *tp)
 {
 	int error;
@@ -3912,7 +3912,7 @@ umtx_copyin_umtx_time(const void * __capability uaddr, size_t size,
 }
 
 static int
-umtx_copyin_robust_lists(const void * __capability uaddr, size_t size,
+umtx_copyin_robust_lists(const void *uaddr, size_t size,
     struct umtx_robust_lists_params *rb)
 {
 
@@ -3922,7 +3922,7 @@ umtx_copyin_robust_lists(const void * __capability uaddr, size_t size,
 }
 
 static int
-umtx_copyout_timeout(void * __capability uaddr, size_t sz, struct timespec *tsp)
+umtx_copyout_timeout(void *uaddr, size_t sz, struct timespec *tsp)
 {
 
 	/*
@@ -4046,22 +4046,21 @@ __umtx_op_wake(struct thread *td, struct _umtx_op_args *uap,
 	return (kern_umtx_wake(td, uap->obj, uap->val, 0));
 }
 
-#define BATCH_SIZE	(1024 / sizeof(char * __capability))
+#define BATCH_SIZE	(1024 / sizeof(char *))
 
 static int
 __umtx_op_nwake_private_native(struct thread *td, struct _umtx_op_args *uap)
 {
-	char * __capability uaddrs[BATCH_SIZE];
-	char * __capability * __capability upp;
+	char *uaddrs[BATCH_SIZE];
+	char **upp;
 	int count, error, i, pos, tocopy;
 
-	upp = (char * __capability * __capability)uap->obj;
+	upp = (char **)uap->obj;
 	error = 0;
 	for (count = uap->val, pos = 0; count > 0; count -= tocopy,
 	    pos += tocopy) {
 		tocopy = MIN(count, BATCH_SIZE);
-		error = copyinptr(upp + pos, uaddrs,
-		    tocopy * sizeof(char * __capability));
+		error = copyinptr(upp + pos, uaddrs, tocopy * sizeof(char *));
 		if (error != 0)
 			break;
 		for (i = 0; i < tocopy; ++i) {
@@ -4075,10 +4074,10 @@ __umtx_op_nwake_private_native(struct thread *td, struct _umtx_op_args *uap)
 static int
 __umtx_op_nwake_private_compat32(struct thread *td, struct _umtx_op_args *uap)
 {
-	uint32_t uaddrs[BATCH_SIZE], * __capability upp;
+	uint32_t uaddrs[BATCH_SIZE], *upp;
 	int count, error, i, pos, tocopy;
 
-	upp = (uint32_t * __capability)uap->obj;
+	upp = (uint32_t *)uap->obj;
 	error = 0;
 	for (count = uap->val, pos = 0; count > 0; count -= tocopy,
 	    pos += tocopy) {
@@ -4331,7 +4330,7 @@ __umtx_op_sem2_wait(struct thread *td, struct _umtx_op_args *uap,
 	    (timeout._flags & UMTX_ABSTIME) == 0 &&
 	    uasize >= ops->umtx_time_sz + ops->timespec_sz) {
 		error = ops->copyout_timeout(
-		    (void * __capability)((uintcap_t)uap->uaddr2 + ops->umtx_time_sz),
+		    (void *)((uintcap_t)uap->uaddr2 + ops->umtx_time_sz),
 		    uasize - ops->umtx_time_sz, &timeout._timeout);
 		if (error == 0) {
 			error = EINTR;
@@ -4613,7 +4612,7 @@ umtx_shm_create_reg(struct thread *td, const struct umtx_key *key,
 }
 
 static int
-umtx_shm_alive(struct thread *td, void * __capability addr)
+umtx_shm_alive(struct thread *td, void *addr)
 {
 	vm_map_t map;
 	vm_map_entry_t entry;
@@ -4649,7 +4648,7 @@ umtx_shm_init(void)
 }
 
 static int
-umtx_shm(struct thread *td, void * __capability addr, u_int flags)
+umtx_shm(struct thread *td, void *addr, u_int flags)
 {
 	struct umtx_key key;
 	struct umtx_shm_reg *reg;
@@ -4804,7 +4803,7 @@ struct umtx_timei386 {
 #endif
 
 static int
-umtx_copyin_robust_lists32(const void * __capability uaddr, size_t size,
+umtx_copyin_robust_lists32(const void *uaddr, size_t size,
     struct umtx_robust_lists_params *rbp)
 {
 	struct umtx_robust_lists_params_compat32 rb32;
@@ -4824,7 +4823,7 @@ umtx_copyin_robust_lists32(const void * __capability uaddr, size_t size,
 
 #ifndef __i386__
 static inline int
-umtx_copyin_timeouti386(const void * __capability uaddr, struct timespec *tsp)
+umtx_copyin_timeouti386(const void *uaddr, struct timespec *tsp)
 {
 	struct timespeci386 ts32;
 	int error;
@@ -4842,7 +4841,7 @@ umtx_copyin_timeouti386(const void * __capability uaddr, struct timespec *tsp)
 }
 
 static inline int
-umtx_copyin_umtx_timei386(const void * __capability uaddr, size_t size,
+umtx_copyin_umtx_timei386(const void *uaddr, size_t size,
     struct _umtx_time *tp)
 {
 	struct umtx_timei386 t32;
@@ -4865,7 +4864,7 @@ umtx_copyin_umtx_timei386(const void * __capability uaddr, size_t size,
 }
 
 static int
-umtx_copyout_timeouti386(void * __capability uaddr, size_t sz,
+umtx_copyout_timeouti386(void *uaddr, size_t sz,
     struct timespec *tsp)
 {
 	struct timespeci386 remain32 = {
@@ -4887,7 +4886,7 @@ umtx_copyout_timeouti386(void * __capability uaddr, size_t sz,
 
 #if defined(__i386__) || defined(__LP64__)
 static inline int
-umtx_copyin_timeoutx32(const void * __capability uaddr, struct timespec *tsp)
+umtx_copyin_timeoutx32(const void *uaddr, struct timespec *tsp)
 {
 	struct timespecx32 ts32;
 	int error;
@@ -4905,7 +4904,7 @@ umtx_copyin_timeoutx32(const void * __capability uaddr, struct timespec *tsp)
 }
 
 static inline int
-umtx_copyin_umtx_timex32(const void * __capability uaddr, size_t size,
+umtx_copyin_umtx_timex32(const void *uaddr, size_t size,
     struct _umtx_time *tp)
 {
 	struct umtx_timex32 t32;
@@ -4928,7 +4927,7 @@ umtx_copyin_umtx_timex32(const void * __capability uaddr, size_t size,
 }
 
 static int
-umtx_copyout_timeoutx32(void * __capability uaddr, size_t sz,
+umtx_copyout_timeoutx32(void *uaddr, size_t sz,
     struct timespec *tsp)
 {
 	struct timespecx32 remain32 = {
@@ -5038,8 +5037,8 @@ static const struct umtx_copyops umtx_native_opsx32 = {
 #define	UMTX_OP__FLAGS	(UMTX_OP__32BIT | UMTX_OP__I386)
 
 static int
-kern__umtx_op(struct thread *td, void * __capability obj, int op,
-    unsigned long val, void * __capability uaddr1, void * __capability uaddr2,
+kern__umtx_op(struct thread *td, void *obj, int op,
+    unsigned long val, void *uaddr1, void *uaddr2,
     const struct umtx_copyops *ops)
 {
 	struct _umtx_op_args uap = {
@@ -5217,7 +5216,7 @@ static int
 __umtx_op_nwake_private64(struct thread *td,
     struct freebsd64__umtx_op_args *uap)
 {
-	uint64_t uaddrs[BATCH_SIZE], * __capability upp;
+	uint64_t uaddrs[BATCH_SIZE], *upp;
 	int count, error, i, pos, tocopy;
 
 	upp = USER_PTR(uap->obj, uap->val * sizeof(uint64_t));
@@ -5650,19 +5649,19 @@ umtx_read_uptr(struct thread *td, uintcap_t ptr, uintcap_t *res, bool compat32)
 	int error;
 
 	if (compat32) {
-		error = fueword32((void * __capability)ptr, &res32);
+		error = fueword32((void *)ptr, &res32);
 		if (error == 0)
 			res1 = res32;
 	} else
 #ifdef COMPAT_FREEBSD64
 	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		error = fueword((void * __capability)ptr, &res64);
+		error = fueword((void *)ptr, &res64);
 		if (error == 0)
 			res1 = res64;
 	} else
 #endif
 	{
-		error = fueptr((void * __capability)ptr, &res1);
+		error = fueptr((void *)ptr, &res1);
 	}
 	if (error == 0)
 		*res = res1;
@@ -5697,17 +5696,17 @@ umtx_handle_rb(struct thread *td, uintcap_t rbp, uintcap_t *rb_list, bool inact,
 
 	KASSERT(td->td_proc == curproc, ("need current vmspace"));
 	if (compat32) {
-		error = copyin((void * __capability)rbp, &mu.m32,
+		error = copyin((void *)rbp, &mu.m32,
 		    sizeof(mu.m32));
 	} else
 #ifdef COMPAT_FREEBSD64
 	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		error = copyin((void * __capability)rbp, &mu.m64,
+		error = copyin((void *)rbp, &mu.m64,
 		    sizeof(mu.m64));
 	} else
 #endif
 
-		error = copyinptr((void * __capability)rbp, &mu.m, sizeof(mu.m));
+		error = copyinptr((void *)rbp, &mu.m, sizeof(mu.m));
 	if (error != 0)
 		return (error);
 	if (rb_list != NULL)
@@ -5717,7 +5716,7 @@ umtx_handle_rb(struct thread *td, uintcap_t rbp, uintcap_t *rb_list, bool inact,
 	if ((mu.m.m_owner & ~UMUTEX_CONTESTED) != td->td_tid)
 		/* inact is cleared after unlock, allow the inconsistency */
 		return (inact ? 0 : EINVAL);
-	return (do_unlock_umutex(td, (struct umutex * __capability)rbp, true));
+	return (do_unlock_umutex(td, (struct umutex *)rbp, true));
 }
 
 static void

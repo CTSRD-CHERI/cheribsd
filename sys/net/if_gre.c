@@ -101,7 +101,7 @@ MALLOC_DEFINE(M_GRE, grename, "Generic Routing Encapsulation");
 static struct sx gre_ioctl_sx;
 SX_SYSINIT(gre_ioctl_sx, &gre_ioctl_sx, "gre_ioctl");
 
-static int	gre_clone_create(struct if_clone *, int, void * __capability);
+static int	gre_clone_create(struct if_clone *, int, void *);
 static void	gre_clone_destroy(struct ifnet *);
 VNET_DEFINE_STATIC(struct if_clone *, gre_cloner);
 #define	V_gre_cloner	VNET(gre_cloner)
@@ -169,7 +169,7 @@ VNET_SYSUNINIT(vnet_gre_uninit, SI_SUB_PROTO_IFATTACHDOMAIN, SI_ORDER_ANY,
     vnet_gre_uninit, NULL);
 
 static int
-gre_clone_create(struct if_clone *ifc, int unit, void * __capability params)
+gre_clone_create(struct if_clone *ifc, int unit, void *params)
 {
 	struct gre_softc *sc;
 

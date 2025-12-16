@@ -61,7 +61,7 @@ fsu_fault_nopcb:
 END(fsu_fault)
 
 /*
- * int swapueword8_llsc(volatile uint8_t * __capability, uint8_t *)
+ * int swapueword8_llsc(volatile uint8_t *, uint8_t *)
  */
 ENTRY(swapueword8_llsc)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
@@ -86,7 +86,7 @@ ENTRY(swapueword8_llsc)
 END(swapueword8_llsc)
 
 /*
- * int swapueword8_lse(volatile uint8_t * __capability, uint8_t *)
+ * int swapueword8_lse(volatile uint8_t *, uint8_t *)
  */
 ENTRY(swapueword8_lse)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
@@ -111,7 +111,7 @@ ENTRY(swapueword8_lse)
 END(swapueword8_lse)
 
 /*
- * int swapueword32_llsc(volatile uint32_t * __capability, uint32_t *)
+ * int swapueword32_llsc(volatile uint32_t *, uint32_t *)
  */
 ENTRY(swapueword32_llsc)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
@@ -136,7 +136,7 @@ ENTRY(swapueword32_llsc)
 END(swapueword32_llsc)
 
 /*
- * int swapueword32_lse(volatile uint32_t * __capability, uint32_t *)
+ * int swapueword32_lse(volatile uint32_t *, uint32_t *)
  */
 ENTRY(swapueword32_lse)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
@@ -161,7 +161,7 @@ ENTRY(swapueword32_lse)
 END(swapueword32_llsc)
 
 /*
- * int casueword32_llsc(volatile uint32_t * __capability, uint32_t, uint32_t *,
+ * int casueword32_llsc(volatile uint32_t *, uint32_t, uint32_t *,
  *         uint32_t)
  */
 ENTRY(casueword32_llsc)
@@ -184,7 +184,7 @@ ENTRY(casueword32_llsc)
 END(casueword32_llsc)
 
 /*
- * int casueword32_lse(volatile u_long * __capability, u_long, u_long *, u_long)
+ * int casueword32_lse(volatile u_long *, u_long, u_long *, u_long)
  */
 ENTRY(casueword32_lse)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
@@ -206,7 +206,7 @@ ENTRY(casueword32_lse)
 END(casueword32_lse)
 
 /*
- * int casueword_llsc(volatile u_long * __capability, u_long, u_long *, u_long)
+ * int casueword_llsc(volatile u_long *, u_long, u_long *, u_long)
  */
 ENTRY(casueword_llsc)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-7), fsu_fault_nopcb
@@ -228,7 +228,7 @@ ENTRY(casueword_llsc)
 END(casueword_llsc)
 
 /*
- * int casueword_lse(volatile u_long * __capability, u_long, u_long *, u_long)
+ * int casueword_lse(volatile u_long *, u_long, u_long *, u_long)
  */
 ENTRY(casueword_lse)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
@@ -263,7 +263,7 @@ END(casueword_lse)
 .endm
 
 /*
- * int fubyte(volatile const void * __capability)
+ * int fubyte(volatile const void *)
  */
 ENTRY(fubyte)
 	check_user_access 0, (VM_MAXUSER_ADDRESS), fsu_fault_nopcb
@@ -272,7 +272,7 @@ ENTRY(fubyte)
 END(fubyte)
 
 /*
- * int fuword(volatile const void * __capability)
+ * int fuword(volatile const void *)
  */
 ENTRY(fuword16)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-1), fsu_fault_nopcb
@@ -281,7 +281,7 @@ ENTRY(fuword16)
 END(fuword16)
 
 /*
- * int32_t fueword32(volatile const void *, int32_t * __capability)
+ * int32_t fueword32(volatile const void *, int32_t *)
  */
 ENTRY(fueword32)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
@@ -292,8 +292,8 @@ ENTRY(fueword32)
 END(fueword32)
 
 /*
- * long fueword(volatile const void * __capability, int64_t *)
- * int64_t fueword64(volatile const void * __capability, int64_t *)
+ * long fueword(volatile const void *, int64_t *)
+ * int64_t fueword64(volatile const void *, int64_t *)
  */
 EENTRY(fueword64)
 ENTRY(fueword)
@@ -307,7 +307,7 @@ EEND(fueword64)
 
 #if __has_feature(capabilities)
 /*
- * int fuecap(volatile const void * __capability, intcap_t *)
+ * int fuecap(volatile const void *, intcap_t *)
  */
 ENTRY(fuecap)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-15), fsu_fault_nopcb
@@ -319,7 +319,7 @@ END(fuecap)
 #endif
 
 /*
- * int subyte(volatile void * __capability, int)
+ * int subyte(volatile void *, int)
  */
 ENTRY(subyte)
 	check_user_access 0, (VM_MAXUSER_ADDRESS), fsu_fault_nopcb
@@ -329,7 +329,7 @@ ENTRY(subyte)
 END(subyte)
 
 /*
- * int suword16(volatile void * __capability, int)
+ * int suword16(volatile void *, int)
  */
 ENTRY(suword16)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-1), fsu_fault_nopcb
@@ -339,7 +339,7 @@ ENTRY(suword16)
 END(suword16)
 
 /*
- * int suword32(volatile void * __capability, int)
+ * int suword32(volatile void *, int)
  */
 ENTRY(suword32)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
@@ -349,7 +349,7 @@ ENTRY(suword32)
 END(suword32)
 
 /*
- * int suword(volatile void * __capability, long)
+ * int suword(volatile void *, long)
  */
 EENTRY(suword64)
 ENTRY(suword)
@@ -362,7 +362,7 @@ EEND(suword64)
 
 #if __has_feature(capabilities)
 /*
- * int sucap(volatile void * __capability, intcap_t)
+ * int sucap(volatile void *, intcap_t)
  */
 ENTRY(sucap)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-15), fsu_fault_nopcb

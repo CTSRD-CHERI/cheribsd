@@ -57,12 +57,12 @@
 
 #define	MAX_USTACK_DEPTH  2048
 
-uint8_t dtrace_fuword8_nocheck(void * __capability);
-uint16_t dtrace_fuword16_nocheck(void * __capability);
-uint32_t dtrace_fuword32_nocheck(void * __capability);
-uint64_t dtrace_fuword64_nocheck(void * __capability);
+uint8_t dtrace_fuword8_nocheck(void *);
+uint16_t dtrace_fuword16_nocheck(void *);
+uint32_t dtrace_fuword32_nocheck(void *);
+uint64_t dtrace_fuword64_nocheck(void *);
 #if __has_feature(capabilities)
-uintcap_t dtrace_fucap_nocheck(void * __capability);
+uintcap_t dtrace_fucap_nocheck(void *);
 #endif
 
 void
@@ -152,22 +152,22 @@ dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t pc,
 
 #if __has_feature(capabilities)
 		if (cheri) {
-			if (!cheri_can_access((void * __capability)fp,
+			if (!cheri_can_access((void *)fp,
 			    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
 			    2 * sizeof (uintcap_t)))
 				break;
 			pc = dtrace_fucap(
-			    (void * __capability)(fp + sizeof (uintcap_t)));
-			fp = dtrace_fucap((void * __capability)fp);
+			    (void *)(fp + sizeof (uintcap_t)));
+			fp = dtrace_fucap((void *)fp);
 		} else {
-			void * __capability cfp;
+			void *cfp;
 
 			cfp = USER_PTR_UNBOUND(fp);
 			if (!cheri_can_access(cfp,
 			    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
 			    2 * sizeof (uint64_t)))
 				break;
-			pc = dtrace_fuword64((void * __capability)
+			pc = dtrace_fuword64((void *)
 			    ((uintcap_t)cfp + sizeof (uint64_t)));
 			fp = dtrace_fuword64(cfp);
 		}
@@ -408,7 +408,7 @@ dtrace_copyoutstr(uintptr_t kaddr, uintcap_t uaddr, size_t size,
 }
 
 uint8_t
-dtrace_fuword8(void * __capability uaddr)
+dtrace_fuword8(void *uaddr)
 {
 
 	if ((uintcap_t)uaddr > VM_MAXUSER_ADDRESS) {
@@ -421,7 +421,7 @@ dtrace_fuword8(void * __capability uaddr)
 }
 
 uint16_t
-dtrace_fuword16(void * __capability uaddr)
+dtrace_fuword16(void *uaddr)
 {
 
 	if ((uintcap_t)uaddr > VM_MAXUSER_ADDRESS) {
@@ -434,7 +434,7 @@ dtrace_fuword16(void * __capability uaddr)
 }
 
 uint32_t
-dtrace_fuword32(void * __capability uaddr)
+dtrace_fuword32(void *uaddr)
 {
 
 	if ((uintcap_t)uaddr > VM_MAXUSER_ADDRESS) {
@@ -447,7 +447,7 @@ dtrace_fuword32(void * __capability uaddr)
 }
 
 uint64_t
-dtrace_fuword64(void * __capability uaddr)
+dtrace_fuword64(void *uaddr)
 {
 
 	if ((uintcap_t)uaddr > VM_MAXUSER_ADDRESS) {
@@ -461,7 +461,7 @@ dtrace_fuword64(void * __capability uaddr)
 
 #if __has_feature(capabilities)
 uintcap_t
-dtrace_fucap(void * __capability uaddr)
+dtrace_fucap(void *uaddr)
 {
 
 	if ((uintcap_t)uaddr > VM_MAXUSER_ADDRESS) {

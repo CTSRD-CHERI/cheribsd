@@ -353,7 +353,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 	struct cam_periph *periph;
 	enc_softc_t *enc;
 	enc_cache_t *cache;
-	void * __capability addr;
+	void *addr;
 	int error, i;
 
 #ifdef	COMPAT_FREEBSD32
@@ -366,7 +366,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 #endif
 
 	if (arg_addr)
-		addr = *((void * __capability *) arg_addr);
+		addr = *((void **) arg_addr);
 	else
 		addr = NULL;
 
@@ -432,7 +432,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 		break;
 		
 	case ENCIOC_GETELMMAP: {
-		encioc_element_t * __capability uelm;
+		encioc_element_t *uelm;
 
 		for (uelm = addr, i = 0; i != cache->nelms; i++) {
 			encioc_element_t kelm;
@@ -479,7 +479,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 		cam_periph_unlock(periph);
 		if (error == 0 || error == ENOMEM)
 			(void)copyout(&sstr.bufsiz,
-			    &((encioc_string_t * __capability)addr)->bufsiz,
+			    &((encioc_string_t *)addr)->bufsiz,
 			    sizeof(sstr.bufsiz));
 		break;
 	}

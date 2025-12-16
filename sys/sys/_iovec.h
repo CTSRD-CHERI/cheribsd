@@ -84,18 +84,18 @@ struct iovec {
 	KASSERT(__amt <= __iovp->iov_len, ("%s: amount %zu > iov_len	\
 	    %zu", __func__, __amt, __iovp->iov_len));			\
 	__iovp->iov_len -= __amt;					\
-	__iovp->iov_base = (char * __capability)__iovp->iov_base + __amt; \
+	__iovp->iov_base = (char *)__iovp->iov_base + __amt; \
 } while(0)
 
 #ifdef _KERNEL
 struct uio;
 
-typedef int(copyiniov_t)(const struct iovec * __capability iovp, unsigned int iovcnt,
+typedef int(copyiniov_t)(const struct iovec *iovp, unsigned int iovcnt,
     struct iovec **iov, int error);
-typedef int(copyinuio_t)(const struct iovec * __capability iovp, unsigned int iovcnt,
+typedef int(copyinuio_t)(const struct iovec *iovp, unsigned int iovcnt,
     struct uio **iov);
 typedef int(updateiov_t)(const struct uio *uiop,
-    struct iovec * __capability iovp);
+    struct iovec *iovp);
 #endif
 
 #endif /* !_SYS__IOVEC_H_ */

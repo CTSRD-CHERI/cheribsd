@@ -88,7 +88,7 @@
  * should currently be sufficient for all supported platforms.
  */
 #define	SYS_IOCTL_SMALL_SIZE	128	/* bytes */
-#define	SYS_IOCTL_SMALL_ALIGN	MAX(sizeof(void * __capability), 8)	/* bytes */
+#define	SYS_IOCTL_SMALL_ALIGN	MAX(sizeof(void *), 8)	/* bytes */
 
 #if __SIZEOF_SIZE_T__ == 8
 static int iosize_max_clamp = 0;
@@ -111,7 +111,7 @@ static MALLOC_DEFINE(M_SELECT, "select", "select() buffer");
 MALLOC_DEFINE(M_IOV, "iov", "large iov's");
 
 static int	pollout(struct thread *, struct pollfd *,
-		    struct pollfd * __capability, u_int);
+		    struct pollfd *, u_int);
 static int	pollscan(struct thread *, struct pollfd *, u_int);
 static int	pollrescan(struct thread *);
 static int	selscan(struct thread *, fd_mask **, fd_mask **, int);
@@ -194,7 +194,7 @@ sys_read(struct thread *td, struct read_args *uap)
 }
 
 int
-user_read(struct thread *td, int fd, void * __capability buf, size_t nbyte)
+user_read(struct thread *td, int fd, void *buf, size_t nbyte)
 {
 	struct uio auio;
 	struct iovec aiov;
@@ -229,7 +229,7 @@ sys_pread(struct thread *td, struct pread_args *uap)
 }
 
 int
-kern_pread(struct thread *td, int fd, void * __capability buf, size_t nbyte,
+kern_pread(struct thread *td, int fd, void *buf, size_t nbyte,
     off_t offset)
 {
 	struct uio auio;
@@ -271,7 +271,7 @@ sys_readv(struct thread *td, struct readv_args *uap)
 }
 
 int
-user_readv(struct thread *td, int fd, const struct iovec * __capability iovp,
+user_readv(struct thread *td, int fd, const struct iovec *iovp,
     u_int iovcnt, copyinuio_t *copyinuio_f)
 {
 	struct uio *auio;
@@ -319,7 +319,7 @@ sys_preadv(struct thread *td, struct preadv_args *uap)
 }
 
 int
-user_preadv(struct thread *td, int fd, struct iovec * __capability iovp,
+user_preadv(struct thread *td, int fd, struct iovec *iovp,
     u_int iovcnt, off_t offset, copyinuio_t *copyinuio_f)
 {
 	struct uio *auio;
@@ -413,7 +413,7 @@ sys_write(struct thread *td, struct write_args *uap)
 }
 
 int
-kern_write(struct thread *td, int fd, const void * __capability buf,
+kern_write(struct thread *td, int fd, const void *buf,
     size_t nbyte)
 {
 	struct uio auio;
@@ -422,7 +422,7 @@ kern_write(struct thread *td, int fd, const void * __capability buf,
 
 	if (nbyte > IOSIZE_MAX)
 		return (EINVAL);
-	IOVEC_INIT_C(&aiov, __DECONST_CAP(void * __capability, buf), nbyte);
+	IOVEC_INIT_C(&aiov, __DECONST_CAP(void *, buf), nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = nbyte;
@@ -451,7 +451,7 @@ sys_pwrite(struct thread *td, struct pwrite_args *uap)
 }
 
 int
-kern_pwrite(struct thread *td, int fd, const void * __capability buf,
+kern_pwrite(struct thread *td, int fd, const void *buf,
     size_t nbyte, off_t offset)
 {
 	struct uio auio;
@@ -460,7 +460,7 @@ kern_pwrite(struct thread *td, int fd, const void * __capability buf,
 
 	if (nbyte > IOSIZE_MAX)
 		return (EINVAL);
-	IOVEC_INIT_C(&aiov, __DECONST_CAP(void * __capability, buf), nbyte);
+	IOVEC_INIT_C(&aiov, __DECONST_CAP(void *, buf), nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = nbyte;
@@ -495,7 +495,7 @@ sys_writev(struct thread *td, struct writev_args *uap)
 }
 
 int
-user_writev(struct thread *td, int fd, const struct iovec * __capability iovp,
+user_writev(struct thread *td, int fd, const struct iovec *iovp,
     u_int iovcnt, copyinuio_t *copyinuio_f)
 {
 	struct uio *auio;
@@ -543,7 +543,7 @@ sys_pwritev(struct thread *td, struct pwritev_args *uap)
 }
 
 int
-user_pwritev(struct thread *td, int fd, struct iovec * __capability iovp,
+user_pwritev(struct thread *td, int fd, struct iovec *iovp,
     u_int iovcnt, off_t offset, copyinuio_t *copyinuio_f)
 {
 	struct uio *auio;
@@ -701,7 +701,7 @@ sys_ioctl(struct thread *td, struct ioctl_args *uap)
 
 int
 user_ioctl(struct thread *td, int fd, u_long ucom,
-    void * __capability udata, void *datap, int copycaps)
+    void *udata, void *datap, int copycaps)
 {
 	u_char smalldata[SYS_IOCTL_SMALL_SIZE] __aligned(SYS_IOCTL_SMALL_ALIGN);
 	uint32_t com;
@@ -928,8 +928,8 @@ sys_fspacectl(struct thread *td, struct fspacectl_args *uap)
 
 int
 user_fspacectl(struct thread *td, int fd, int cmd,
-    const struct spacectl_range * __capability rqsrp, int flags,
-    struct spacectl_range * __capability rmsrp)
+    const struct spacectl_range *rqsrp, int flags,
+    struct spacectl_range *rmsrp)
 {
 	struct spacectl_range rqsr, rmsr;
 	int error, cerror;
@@ -998,10 +998,10 @@ out:
 }
 
 int
-kern_specialfd(struct thread *td, int type, void * __capability arg)
+kern_specialfd(struct thread *td, int type, void *arg)
 {
 	struct file *fp;
-	struct specialfd_eventfd * __capability ae;
+	struct specialfd_eventfd *ae;
 	int error, fd, fflags;
 
 	fflags = 0;
@@ -1030,7 +1030,7 @@ kern_specialfd(struct thread *td, int type, void * __capability arg)
 }
 
 int
-user_specialfd(struct thread *td, int type, const void * __capability req,
+user_specialfd(struct thread *td, int type, const void *req,
     size_t len)
 {
 	struct specialfd_eventfd ae;
@@ -1090,9 +1090,9 @@ sys_pselect(struct thread *td, struct pselect_args *uap)
 }
 
 int
-user_pselect(struct thread *td, int nd, fd_set * __capability in,
-    fd_set * __capability ou, fd_set * __capability ex,
-    const struct timespec * __capability uts, const sigset_t * __capability sm)
+user_pselect(struct thread *td, int nd, fd_set *in,
+    fd_set *ou, fd_set *ex,
+    const struct timespec *uts, const sigset_t *sm)
 {
 	struct timespec ts;
 	struct timeval tv, *tvp;
@@ -1118,8 +1118,8 @@ user_pselect(struct thread *td, int nd, fd_set * __capability in,
 }
 
 int
-kern_pselect(struct thread *td, int nd, fd_set * __capability in,
-    fd_set * __capability ou, fd_set * __capability ex,
+kern_pselect(struct thread *td, int nd, fd_set *in,
+    fd_set *ou, fd_set *ex,
     struct timeval *tvp, sigset_t *uset, int abi_nfdbits)
 {
 	int error;
@@ -1168,9 +1168,9 @@ sys_select(struct thread *td, struct select_args *uap)
 }
 
 int
-user_select(struct thread *td, int nd, fd_set * __capability in,
-    fd_set * __capability ou, fd_set * __capability ex,
-    struct timeval * __capability utv)
+user_select(struct thread *td, int nd, fd_set *in,
+    fd_set *ou, fd_set *ex,
+    struct timeval *utv)
 {
 	struct timeval tv, *tvp;
 	int error;
@@ -1196,10 +1196,10 @@ user_select(struct thread *td, int nd, fd_set * __capability in,
  * nd is fd_nfiles.
  */
 static int
-select_check_badfd(fd_set * __capability fd_in, int nd, int ndu,
+select_check_badfd(fd_set *fd_in, int nd, int ndu,
     int abi_nfdbits)
 {
-	char * __capability addr, * __capability oaddr;
+	char *addr, *oaddr;
 	int b, i, res;
 	uint8_t bits;
 
@@ -1211,9 +1211,9 @@ select_check_badfd(fd_set * __capability fd_in, int nd, int ndu,
 	for (i = nd; i < ndu; i++) {
 		b = i / NBBY;
 #if BYTE_ORDER == LITTLE_ENDIAN
-		addr = (char * __capability)fd_in + b;
+		addr = (char *)fd_in + b;
 #else
-		addr = (char * __capability)fd_in;
+		addr = (char *)fd_in;
 		if (abi_nfdbits == NFDBITS) {
 			addr += rounddown(b, sizeof(fd_mask)) +
 			    sizeof(fd_mask) - 1 - b % sizeof(fd_mask);
@@ -1236,8 +1236,8 @@ select_check_badfd(fd_set * __capability fd_in, int nd, int ndu,
 }
 
 int
-kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
-    fd_set * __capability fd_ou, fd_set * __capability fd_ex,
+kern_select(struct thread *td, int nd, fd_set *fd_in,
+    fd_set *fd_ou, fd_set *fd_ex,
     struct timeval *tvp, int abi_nfdbits)
 {
 	struct filedesc *fdp;
@@ -1581,7 +1581,7 @@ sys_poll(struct thread *td, struct poll_args *uap)
 }
 
 int
-user_poll(struct thread *td, struct pollfd * __capability fds, u_int nfds,
+user_poll(struct thread *td, struct pollfd *fds, u_int nfds,
     int timeout)
 {
 	struct timespec ts, *tsp;
@@ -1688,9 +1688,9 @@ sys_ppoll(struct thread *td, struct ppoll_args *uap)
 }
 
 int
-user_ppoll(struct thread *td, struct pollfd * __capability fds, u_int nfds,
-    const struct timespec * __capability uts,
-    const sigset_t * __capability uset)
+user_ppoll(struct thread *td, struct pollfd *fds, u_int nfds,
+    const struct timespec *uts,
+    const sigset_t *uset)
 {
 	struct timespec ts, *tsp;
 	sigset_t set, *ssp;
@@ -1717,7 +1717,7 @@ user_ppoll(struct thread *td, struct pollfd * __capability fds, u_int nfds,
  * ufds points to an array in user space.
  */
 int
-kern_poll(struct thread *td, struct pollfd * __capability ufds, u_int nfds,
+kern_poll(struct thread *td, struct pollfd *ufds, u_int nfds,
     struct timespec *tsp, sigset_t *set)
 {
 	struct pollfd *kfds;
@@ -1815,7 +1815,7 @@ pollrescan(struct thread *td)
 
 static int
 pollout(struct thread *td, struct pollfd *fds,
-    struct pollfd * __capability ufds, u_int nfd)
+    struct pollfd *ufds, u_int nfd)
 {
 	int error = 0;
 	u_int i = 0;

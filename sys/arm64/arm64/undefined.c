@@ -373,7 +373,7 @@ undef_insn(struct trapframe *frame)
 	uint32_t insn;
 	int ret;
 
-	ret = fueword32((uint32_t * __capability)frame->tf_elr, &insn);
+	ret = fueword32((uint32_t *)frame->tf_elr, &insn);
 	/* Raise a SIGILL if we are unable to read the instruction */
 	if (ret != 0)
 		return (0);

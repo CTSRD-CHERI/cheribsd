@@ -2360,7 +2360,7 @@ usb_free_symlink(struct usb_symlink *ps)
  * Else: Failure
  *------------------------------------------------------------------------*/
 int
-usb_read_symlink(uint8_t * __capability user_ptr, uint32_t startentry,
+usb_read_symlink(uint8_t *user_ptr, uint32_t startentry,
     uint32_t user_len)
 {
 	struct usb_symlink *ps;

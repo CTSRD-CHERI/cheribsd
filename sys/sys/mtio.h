@@ -281,7 +281,7 @@ struct mtsetlist {
 	int param_len;
 	union {
 #ifdef _KERNEL
-		struct mtparamset * __capability user_params;
+		struct mtparamset *user_params;
 #endif
 		struct mtparamset *params;
 	};

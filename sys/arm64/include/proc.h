@@ -74,7 +74,7 @@ struct mdthread {
 
 struct mdproc {
 #if __has_feature(capabilities)
-	void * __capability md_sigcode;
+	void *md_sigcode;
 #endif
 	long	md_dummy;
 };

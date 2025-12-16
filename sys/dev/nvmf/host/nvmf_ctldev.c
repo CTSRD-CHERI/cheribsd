@@ -99,7 +99,7 @@ out:
 }
 
 static int
-nvmf_disconnect_host(const char * __capability *namep)
+nvmf_disconnect_host(const char **namep)
 {
 	char *name;
 	int error;
@@ -120,7 +120,7 @@ nvmf_ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag,
 	case NVMF_HANDOFF_HOST:
 		return (nvmf_handoff_host((struct nvmf_ioc_nv *)arg));
 	case NVMF_DISCONNECT_HOST:
-		return (nvmf_disconnect_host((const char * __capability *)arg));
+		return (nvmf_disconnect_host((const char **)arg));
 	case NVMF_DISCONNECT_ALL:
 		return (nvmf_disconnect_by_name(NULL));
 	default:

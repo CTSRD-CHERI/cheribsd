@@ -160,12 +160,12 @@ static int mps_diag_unregister(struct mps_softc *sc,
 static int mps_diag_query(struct mps_softc *sc, mps_fw_diag_query_t *diag_query,
     uint32_t *return_code);
 static int mps_diag_read_buffer(struct mps_softc *sc,
-    mps_diag_read_buffer_t *diag_read_buffer, uint8_t * __capability ioctl_buf,
+    mps_diag_read_buffer_t *diag_read_buffer, uint8_t *ioctl_buf,
     uint32_t *return_code);
 static int mps_diag_release(struct mps_softc *sc,
     mps_fw_diag_release_t *diag_release, uint32_t *return_code);
 static int mps_do_diag_action(struct mps_softc *sc, uint32_t action,
-    uint8_t * __capability diag_action, uint32_t length, uint32_t *return_code);
+    uint8_t *diag_action, uint32_t length, uint32_t *return_code);
 static int mps_user_diag_action(struct mps_softc *sc, mps_diag_action_t *data);
 static void mps_user_event_query(struct mps_softc *sc, mps_event_query_t *data);
 static void mps_user_event_enable(struct mps_softc *sc,
@@ -1035,7 +1035,7 @@ mps_user_pass_thru(struct mps_softc *sc, mps_pass_thru_t *data)
 				    scsi_sense_data));
 				mps_unlock(sc);
 				err = copyout(cm->cm_sense,
-				    (char * __capability)data->PtrReply +
+				    (char *)data->PtrReply +
 				    sizeof(MPI2_SCSI_IO_REPLY), sense_len);
 				mps_lock(sc);
 				if (err != 0)
@@ -1661,7 +1661,7 @@ mps_diag_query(struct mps_softc *sc, mps_fw_diag_query_t *diag_query,
 
 static int
 mps_diag_read_buffer(struct mps_softc *sc,
-    mps_diag_read_buffer_t *diag_read_buffer, uint8_t * __capability ioctl_buf,
+    mps_diag_read_buffer_t *diag_read_buffer, uint8_t *ioctl_buf,
     uint32_t *return_code)
 {
 	mps_fw_diagnostic_buffer_t	*pBuffer;
@@ -1770,7 +1770,7 @@ mps_diag_release(struct mps_softc *sc, mps_fw_diag_release_t *diag_release,
 }
 
 static int
-mps_do_diag_action(struct mps_softc *sc, uint32_t action, uint8_t * __capability diag_action,
+mps_do_diag_action(struct mps_softc *sc, uint32_t action, uint8_t *diag_action,
     uint32_t length, uint32_t *return_code)
 {
 	mps_fw_diag_register_t		diag_register;

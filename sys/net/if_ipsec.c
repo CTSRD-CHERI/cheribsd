@@ -178,14 +178,14 @@ static int	ipsec_transmit(struct ifnet *, struct mbuf *);
 static int	ipsec_output(struct ifnet *, struct mbuf *,
     const struct sockaddr *, struct route *);
 static void	ipsec_qflush(struct ifnet *);
-static int	ipsec_clone_create(struct if_clone *, int, void * __capability);
+static int	ipsec_clone_create(struct if_clone *, int, void *);
 static void	ipsec_clone_destroy(struct ifnet *);
 
 VNET_DEFINE_STATIC(struct if_clone *, ipsec_cloner);
 #define	V_ipsec_cloner		VNET(ipsec_cloner)
 
 static int
-ipsec_clone_create(struct if_clone *ifc, int unit, void * __capability params)
+ipsec_clone_create(struct if_clone *ifc, int unit, void *params)
 {
 	struct ipsec_softc *sc;
 	struct ifnet *ifp;

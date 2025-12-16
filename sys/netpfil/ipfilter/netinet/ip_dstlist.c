@@ -513,7 +513,7 @@ ipf_dstlist_node_add(ipf_main_softc_t *softc, void *arg,
 		 * in (including \0) and ends up being the offset from
 		 * fd_names (0).
 		 */
-		err = COPYIN((char * __capability)op->iplo_struct + sizeof(dest),
+		err = COPYIN((char *)op->iplo_struct + sizeof(dest),
 			     node->ipfd_names, dest.fd_name);
 		if (err != 0) {
 			IPFERROR(120017);

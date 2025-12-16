@@ -788,7 +788,7 @@ static int fkey_change_ok(fkeytab_t *, fkeyarg_t *, struct thread *);
 int
 genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 {
-	void * __capability data;
+	void *data;
 	keymap_t *mapp;
 	accentmap_t *accentmapp;
 	keyarg_t *keyp;
@@ -830,7 +830,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 			data = USER_PTR_UNBOUND(*(uint64_t *)arg);
 		else
 #endif
-			data = *(void * __capability *)arg;
+			data = *(void **)arg;
 		error = copyout(kbd->kb_keymap, data, sizeof(keymap_t));
 		return (error);
 #ifdef COMPAT_FREEBSD13
@@ -872,7 +872,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 				data = USER_PTR_UNBOUND(*(uint64_t *)arg);
 			else
 #endif
-				data = *(void * __capability *)arg;
+				data = *(void **)arg;
 			error = copyin(data, mapp, sizeof *mapp);
 			if (error != 0) {
 				free(mapp, M_TEMP);
@@ -922,7 +922,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 #endif
 
 	case GIO_DEADKEYMAP:	/* get accent key translation table */
-		error = copyout(kbd->kb_accentmap, *(void * __capability *)arg,
+		error = copyout(kbd->kb_accentmap, *(void **)arg,
 		    sizeof(accentmap_t));
 		return (error);
 		break;
@@ -967,7 +967,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		} else
 #endif /* COMPAT_FREEBSD13 */
 		{
-			error = copyin(*(void * __capability *)arg, accentmapp,
+			error = copyin(*(void **)arg, accentmapp,
 			    sizeof(*accentmapp));
 			if (error != 0) {
 				free(accentmapp, M_TEMP);

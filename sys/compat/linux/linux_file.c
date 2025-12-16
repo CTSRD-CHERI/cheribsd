@@ -153,7 +153,7 @@ linux_common_openflags(int l_flags)
 }
 
 static int
-linux_common_open(struct thread *td, int dirfd, const char * __capability path,
+linux_common_open(struct thread *td, int dirfd, const char *path,
     int l_flags, int mode, enum uio_seg seg)
 {
 	struct proc *p = td->td_proc;
@@ -679,7 +679,7 @@ linux_unlink(struct thread *td, struct linux_unlink_args *args)
 
 static int
 linux_unlinkat_impl(struct thread *td, enum uio_seg pathseg,
-    const char * __capability path,
+    const char *path,
     int dfd, struct linux_unlinkat_args *args)
 {
 	struct stat st;

@@ -80,7 +80,7 @@ ufs_root(struct mount *mp, int flags, struct vnode **vpp)
  * Do operations associated with quotas
  */
 int
-ufs_quotactl(struct mount *mp, int cmds, uid_t id, void * __capability arg,
+ufs_quotactl(struct mount *mp, int cmds, uid_t id, void *arg,
     bool *mp_busy)
 {
 #ifndef QUOTA

@@ -808,7 +808,7 @@ build_arg_table(struct typetable *types, va_list ap, union arg **argtable)
 			break;
 #if __has_feature(capabilities)
 		    case TC_VOID:
-			(*argtable) [n].cvoidarg = va_arg (ap, void * __capability);
+			(*argtable) [n].cvoidarg = va_arg (ap, void *);
 			break;
 #endif
 		    case T_WINT:

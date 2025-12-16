@@ -69,7 +69,7 @@ END(copyio_c64_fault)
 /*
  * Copies from a kernel to user address
  *
- * int copyout(const void *kaddr, void * __capability udaddr, size_t len)
+ * int copyout(const void *kaddr, void *udaddr, size_t len)
  */
 ENTRY(copyout)
 	cbz	x2, 1f
@@ -89,7 +89,7 @@ END(copyout)
 /*
  * Copies from a user to kernel address
  *
- * int copyin(const void * __capability uaddr, void *kdaddr, size_t len)
+ * int copyin(const void *uaddr, void *kdaddr, size_t len)
  */
 ENTRY(copyin)
 	cbz	x2, 1f
@@ -110,7 +110,7 @@ END(copyin)
 /*
  * Copies a string from a user to kernel address
  *
- * int copyinstr(const void * __capability udaddr, void *kaddr, size_t len,
+ * int copyinstr(const void *udaddr, void *kaddr, size_t len,
  *         size_t *done)
  */
 ENTRY(copyinstr)
@@ -269,7 +269,7 @@ ending:
  * Copy specified amount of data from the user to kernel space, preserving
  * capability tags
  *
- * int copyinptr(const void * __capability uaddr, void *kdaddr, size_t len)
+ * int copyinptr(const void *uaddr, void *kdaddr, size_t len)
  */
 ENTRY(copyinptr)
 	cbz	x2, 1f
@@ -301,7 +301,7 @@ END(copyinptr)
  * Copy specified amount of data from kernel to the user space, preserving
  * capability tags
  *
- * int copyoutptr(const void *kaddr, void * __capability udaddr, size_t len)
+ * int copyoutptr(const void *kaddr, void *udaddr, size_t len)
  */
 ENTRY(copyoutptr)
 	cbz	x2, 1f

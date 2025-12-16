@@ -291,7 +291,7 @@ sys_ntp_gettime(struct thread *td, struct ntp_gettime_args *uap)
 }
 
 int
-kern_ntp_gettime(struct thread *td, struct ntptimeval * __capability ntvp)
+kern_ntp_gettime(struct thread *td, struct ntptimeval *ntvp)
 {
 	struct ntptimeval ntv;
 

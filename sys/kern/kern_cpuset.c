@@ -1838,7 +1838,7 @@ static const struct cpuset_copy_cb copy_set = {
 
 #ifndef _SYS_SYSPROTO_H_
 struct cpuset_args {
-	cpusetid_t	* __capability setid;
+	cpusetid_t	*setid;
 };
 #endif
 int
@@ -1849,7 +1849,7 @@ sys_cpuset(struct thread *td, struct cpuset_args *uap)
 }
 
 int
-kern_cpuset(struct thread *td, cpusetid_t * __capability setid)
+kern_cpuset(struct thread *td, cpusetid_t *setid)
 {
 	struct cpuset *root;
 	struct cpuset *set;
@@ -1909,7 +1909,7 @@ struct cpuset_getid_args {
 	cpulevel_t	level;
 	cpuwhich_t	which;
 	id_t		id;
-	cpusetid_t * __capability setid;
+	cpusetid_t *setid;
 };
 #endif
 int
@@ -1922,7 +1922,7 @@ sys_cpuset_getid(struct thread *td, struct cpuset_getid_args *uap)
 
 int
 kern_cpuset_getid(struct thread *td, cpulevel_t level, cpuwhich_t which,
-    id_t id, cpusetid_t * __capability setid)
+    id_t id, cpusetid_t *setid)
 {
 	struct cpuset *nset;
 	struct cpuset *set;
@@ -1977,7 +1977,7 @@ struct cpuset_getaffinity_args {
 	cpuwhich_t	which;
 	id_t		id;
 	size_t		cpusetsize;
-	cpuset_t * __capability mask;
+	cpuset_t *mask;
 };
 #endif
 int
@@ -2082,7 +2082,7 @@ kern_cpuset_getaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
 
 int
 user_cpuset_getaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
-    id_t id, size_t cpusetsize, cpuset_t * __capability maskp,
+    id_t id, size_t cpusetsize, cpuset_t *maskp,
     const struct cpuset_copy_cb *cb)
 {
 	cpuset_t *mask;
@@ -2097,11 +2097,11 @@ user_cpuset_getaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
 		if (error != 0)
 			goto out;
 		if (cpusetsize > size) {
-			char * __capability end;
-			char * __capability cp;
+			char *end;
+			char *cp;
 			int rv;
 
-			end = cp = (char * __capability)&maskp->__bits;
+			end = cp = (char *)&maskp->__bits;
 			end += cpusetsize;
 			cp += size;
 			while (cp != end) {
@@ -2125,7 +2125,7 @@ struct cpuset_setaffinity_args {
 	cpuwhich_t	which;
 	id_t		id;
 	size_t		cpusetsize;
-	const cpuset_t * __capability mask;
+	const cpuset_t *mask;
 };
 #endif
 int
@@ -2229,7 +2229,7 @@ kern_cpuset_setaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
 
 int
 user_cpuset_setaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
-    id_t id, size_t cpusetsize, const cpuset_t * __capability maskp,
+    id_t id, size_t cpusetsize, const cpuset_t *maskp,
     const struct cpuset_copy_cb *cb)
 {
 	cpuset_t *mask;
@@ -2245,9 +2245,9 @@ user_cpuset_setaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
 	 * Verify that no high bits are set.
 	 */
 	if (cpusetsize > sizeof(cpuset_t)) {
-		const char * __capability end, * __capability cp;
+		const char *end, *cp;
 		int val;
-		end = cp = (const char * __capability)&maskp->__bits;
+		end = cp = (const char *)&maskp->__bits;
 		end += cpusetsize;
 		cp += sizeof(cpuset_t);
 
@@ -2277,8 +2277,8 @@ struct cpuset_getdomain_args {
 	cpuwhich_t	which;
 	id_t		id;
 	size_t		domainsetsize;
-	domainset_t * __capability mask;
-	int * __capability policy;
+	domainset_t *mask;
+	int *policy;
 };
 #endif
 int
@@ -2291,8 +2291,8 @@ sys_cpuset_getdomain(struct thread *td, struct cpuset_getdomain_args *uap)
 
 int
 kern_cpuset_getdomain(struct thread *td, cpulevel_t level, cpuwhich_t which,
-    id_t id, size_t domainsetsize, domainset_t * __capability maskp,
-    int * __capability policyp, const struct cpuset_copy_cb *cb)
+    id_t id, size_t domainsetsize, domainset_t *maskp,
+    int *policyp, const struct cpuset_copy_cb *cb)
 {
 	struct domainset outset;
 	struct thread *ttd;
@@ -2405,7 +2405,7 @@ struct cpuset_setdomain_args {
 	cpuwhich_t	which;
 	id_t		id;
 	size_t		domainsetsize;
-	domainset_t * __capability mask;
+	domainset_t *mask;
 	int 		policy;
 };
 #endif
@@ -2419,7 +2419,7 @@ sys_cpuset_setdomain(struct thread *td, struct cpuset_setdomain_args *uap)
 
 int
 kern_cpuset_setdomain(struct thread *td, cpulevel_t level, cpuwhich_t which,
-    id_t id, size_t domainsetsize, const domainset_t * __capability maskp,
+    id_t id, size_t domainsetsize, const domainset_t *maskp,
     int policy, const struct cpuset_copy_cb *cb)
 {
 	struct cpuset *nset;

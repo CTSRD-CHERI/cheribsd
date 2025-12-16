@@ -35,14 +35,14 @@
 
 #ifdef _KERNEL
 /* Return userspace DDC and PCC of current thread. */
-#define	__USER_DDC	((void * __capability)curthread->td_frame->tf_ddc)
-#define	__USER_PCC	((void * __capability)curthread->td_frame->tf_sepc)
+#define	__USER_DDC	((void *)curthread->td_frame->tf_ddc)
+#define	__USER_PCC	((void *)curthread->td_frame->tf_sepc)
 
 /*
  * CHERI-RISC-V-specific kernel utility functions.
  */
 const char *cheri_cap_idx_string(uint8_t cap_idx);
-void	cheri_init_capabilities(void * __capability kroot);
+void	cheri_init_capabilities(void *kroot);
 int	cheri_stval_to_sicode(register_t stval);
 void	hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr);
 #endif

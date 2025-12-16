@@ -87,7 +87,7 @@ linux_kern_fstat(struct thread *td, int fd, struct stat *sbp)
 
 static int
 linux_kern_statat(struct thread *td, int flag, int fd,
-    const char * __capability path, enum uio_seg pathseg, struct stat *sbp)
+    const char *path, enum uio_seg pathseg, struct stat *sbp)
 {
 	struct nameidata nd;
 	int error;
@@ -120,7 +120,7 @@ linux_kern_statat(struct thread *td, int flag, int fd,
 
 #ifdef LINUX_LEGACY_SYSCALLS
 static int
-linux_kern_stat(struct thread *td, const char * __capability path,
+linux_kern_stat(struct thread *td, const char *path,
     enum uio_seg pathseg, struct stat *sbp)
 {
 
@@ -128,7 +128,7 @@ linux_kern_stat(struct thread *td, const char * __capability path,
 }
 
 static int
-linux_kern_lstat(struct thread *td, const char * __capability path,
+linux_kern_lstat(struct thread *td, const char *path,
     enum uio_seg pathseg, struct stat *sbp)
 {
 

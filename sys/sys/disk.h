@@ -162,7 +162,7 @@ struct diocskerneldump_arg {
 	uint32_t	 kda_encryptedkeysize;
 	union {
 #ifdef _KERNEL
-		uint8_t * __capability kda_user_encryptedkey;
+		uint8_t *kda_user_encryptedkey;
 #endif
 		uint8_t	*kda_encryptedkey;
 	};

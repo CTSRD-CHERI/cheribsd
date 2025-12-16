@@ -73,9 +73,9 @@ sys_extattrctl(struct thread *td, struct extattrctl_args *uap)
 }
 
 int
-kern_extattrctl(struct thread *td, const char * __capability path, int cmd,
-    const char * __capability filename, int attrnamespace,
-    const char * __capability uattrname)
+kern_extattrctl(struct thread *td, const char *path, int cmd,
+    const char *filename, int attrnamespace,
+    const char *uattrname)
 {
 
 	struct vnode *filename_vp;
@@ -172,7 +172,7 @@ out:
  */
 static int
 extattr_set_vp(struct vnode *vp, int attrnamespace, const char *attrname,
-    void * __capability data, size_t nbytes, struct thread *td)
+    void *data, size_t nbytes, struct thread *td)
 {
 	struct mount *mp;
 	struct uio auio;
@@ -237,7 +237,7 @@ sys_extattr_set_fd(struct thread *td, struct extattr_set_fd_args *uap)
 
 int
 user_extattr_set_fd(struct thread *td, int fd, int attrnamespace,
-    const char * __capability uattrname, void * __capability data,
+    const char *uattrname, void *data,
     size_t nbytes)
 {
 	char attrname[EXTATTR_MAXNAMELEN + 1];
@@ -252,7 +252,7 @@ user_extattr_set_fd(struct thread *td, int fd, int attrnamespace,
 
 int
 kern_extattr_set_fd(struct thread *td, int fd, int attrnamespace,
-    const char *attrname, void * __capability data, size_t nbytes)
+    const char *attrname, void *data, size_t nbytes)
 {
 	struct file *fp;
 	cap_rights_t rights;
@@ -309,9 +309,9 @@ sys_extattr_set_link(struct thread *td, struct extattr_set_link_args *uap)
 }
 
 int
-user_extattr_set_path(struct thread *td, const char * __capability path,
-    int attrnamespace, const char * __capability uattrname,
-    void * __capability data, size_t nbytes, int follow)
+user_extattr_set_path(struct thread *td, const char *path,
+    int attrnamespace, const char *uattrname,
+    void *data, size_t nbytes, int follow)
 {
 	char attrname[EXTATTR_MAXNAMELEN + 1];
 	int error;
@@ -324,8 +324,8 @@ user_extattr_set_path(struct thread *td, const char * __capability path,
 }
 
 int
-kern_extattr_set_path(struct thread *td, const char * __capability path,
-    int attrnamespace, const char *attrname, void * __capability data,
+kern_extattr_set_path(struct thread *td, const char *path,
+    int attrnamespace, const char *attrname, void *data,
     size_t nbytes, int follow, enum uio_seg pathseg)
 {
 	struct nameidata nd;
@@ -359,7 +359,7 @@ kern_extattr_set_path(struct thread *td, const char * __capability path,
  */
 static int
 extattr_get_vp(struct vnode *vp, int attrnamespace, const char *attrname,
-    void * __capability data, size_t nbytes, struct thread *td)
+    void *data, size_t nbytes, struct thread *td)
 {
 	struct uio auio, *auiop;
 	struct iovec aiov;
@@ -435,7 +435,7 @@ sys_extattr_get_fd(struct thread *td, struct extattr_get_fd_args *uap)
 
 int
 user_extattr_get_fd(struct thread *td, int fd, int attrnamespace,
-    const char * __capability uattrname, void * __capability data,
+    const char *uattrname, void *data,
     size_t nbytes)
 {
 	char attrname[EXTATTR_MAXNAMELEN + 1];
@@ -450,7 +450,7 @@ user_extattr_get_fd(struct thread *td, int fd, int attrnamespace,
 
 int
 kern_extattr_get_fd(struct thread *td, int fd, int attrnamespace,
-    const char *attrname, void * __capability data, size_t nbytes)
+    const char *attrname, void *data, size_t nbytes)
 {
 	struct file *fp;
 	cap_rights_t rights;
@@ -505,9 +505,9 @@ sys_extattr_get_link(struct thread *td, struct extattr_get_link_args *uap)
 }
 
 int
-user_extattr_get_path(struct thread *td, const char * __capability path,
-    int attrnamespace, const char * __capability uattrname,
-    void * __capability data, size_t nbytes, int follow)
+user_extattr_get_path(struct thread *td, const char *path,
+    int attrnamespace, const char *uattrname,
+    void *data, size_t nbytes, int follow)
 {
 	char attrname[EXTATTR_MAXNAMELEN + 1];
 	int error;
@@ -520,8 +520,8 @@ user_extattr_get_path(struct thread *td, const char * __capability path,
 }
 
 int
-kern_extattr_get_path(struct thread *td, const char * __capability path,
-    int attrnamespace, const char *attrname, void * __capability data,
+kern_extattr_get_path(struct thread *td, const char *path,
+    int attrnamespace, const char *attrname, void *data,
     size_t nbytes, int follow, enum uio_seg pathseg)
 {
 	struct nameidata nd;
@@ -602,7 +602,7 @@ sys_extattr_delete_fd(struct thread *td, struct extattr_delete_fd_args *uap)
 
 int
 user_extattr_delete_fd(struct thread *td, int fd, int attrnamespace,
-    const char * __capability uattrname)
+    const char *uattrname)
 {
 	char attrname[EXTATTR_MAXNAMELEN + 1];
 	int error;
@@ -667,8 +667,8 @@ sys_extattr_delete_link(struct thread *td, struct extattr_delete_link_args *uap)
 }
 
 int
-user_extattr_delete_path(struct thread *td, const char * __capability path,
-    int attrnamespace, const char * __capability uattrname, int follow)
+user_extattr_delete_path(struct thread *td, const char *path,
+    int attrnamespace, const char *uattrname, int follow)
 {
 	char attrname[EXTATTR_MAXNAMELEN + 1];
 	int error;
@@ -681,7 +681,7 @@ user_extattr_delete_path(struct thread *td, const char * __capability path,
 }
 
 int
-kern_extattr_delete_path(struct thread *td, const char * __capability path,
+kern_extattr_delete_path(struct thread *td, const char *path,
     int attrnamespace, const char *attrname, int follow, enum uio_seg pathseg)
 {
 	struct nameidata nd;
@@ -768,7 +768,7 @@ sys_extattr_list_fd(struct thread *td, struct extattr_list_fd_args *uap)
 
 int
 user_extattr_list_fd(struct thread *td, int fd, int attrnamespace,
-    void * __capability data, size_t nbytes)
+    void *data, size_t nbytes)
 {
 	struct uio auio, *auiop;
 	struct iovec aiov;
@@ -843,8 +843,8 @@ sys_extattr_list_link(struct thread *td, struct extattr_list_link_args *uap)
 }
 
 int
-user_extattr_list_path(struct thread *td, const char * __capability path,
-    int attrnamespace, void * __capability data, size_t nbytes, int follow)
+user_extattr_list_path(struct thread *td, const char *path,
+    int attrnamespace, void *data, size_t nbytes, int follow)
 {
 	struct uio auio, *auiop;
 	struct iovec aiov;
@@ -867,7 +867,7 @@ user_extattr_list_path(struct thread *td, const char * __capability path,
 }
 
 int
-kern_extattr_list_path(struct thread *td, const char * __capability path,
+kern_extattr_list_path(struct thread *td, const char *path,
     int attrnamespace, struct uio *auiop, int follow, enum uio_seg pathseg)
 {
 	struct nameidata nd;

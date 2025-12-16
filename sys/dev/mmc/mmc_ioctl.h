@@ -39,7 +39,7 @@ struct mmc_ioc_cmd {
 	u_int		__spare[4];
 	uint32_t	__pad;
 #if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
-	void * __capability data_ptr;
+	void *data_ptr;
 #else
 	uint64_t	data_ptr;
 #endif

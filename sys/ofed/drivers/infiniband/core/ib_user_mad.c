@@ -624,7 +624,7 @@ static unsigned int ib_umad_poll(struct file *filp, struct poll_table_struct *wa
 	return mask;
 }
 
-static int ib_umad_reg_agent(struct ib_umad_file *file, void __user * __capability arg,
+static int ib_umad_reg_agent(struct ib_umad_file *file, void __user *arg,
 			     int compat_method_mask)
 {
 	struct ib_user_mad_reg_req ureq;
@@ -697,7 +697,7 @@ found:
 	}
 
 	if (put_user(agent_id,
-		     (u32 __user * __capability) ((char * __capability)arg + offsetof(struct ib_user_mad_reg_req, id)))) {
+		     (u32 __user *) ((char *)arg + offsetof(struct ib_user_mad_reg_req, id)))) {
 		ret = -EFAULT;
 		goto out;
 	}
@@ -727,7 +727,7 @@ out:
 	return ret;
 }
 
-static int ib_umad_reg_agent2(struct ib_umad_file *file, void __user * __capability arg)
+static int ib_umad_reg_agent2(struct ib_umad_file *file, void __user *arg)
 {
 	struct ib_user_mad_reg_req2 ureq;
 	struct ib_mad_reg_req req;
@@ -766,7 +766,7 @@ static int ib_umad_reg_agent2(struct ib_umad_file *file, void __user * __capabil
 		ret = -EINVAL;
 
 		if (put_user(flags,
-				(u32 __user * __capability) ((char * __capability)arg + offsetof(struct
+				(u32 __user *) ((char *)arg + offsetof(struct
 				ib_user_mad_reg_req2, flags))))
 			ret = -EFAULT;
 
@@ -815,7 +815,7 @@ found:
 	}
 
 	if (put_user(agent_id,
-		     (u32 __user * __capability)((char * __capability)arg +
+		     (u32 __user *)((char *)arg +
 				offsetof(struct ib_user_mad_reg_req2, id)))) {
 		ret = -EFAULT;
 		goto out;
@@ -841,7 +841,7 @@ out:
 }
 
 
-static int ib_umad_unreg_agent(struct ib_umad_file *file, u32 __user * __capability arg)
+static int ib_umad_unreg_agent(struct ib_umad_file *file, u32 __user *arg)
 {
 	struct ib_mad_agent *agent = NULL;
 	u32 id;
@@ -891,13 +891,13 @@ static long ib_umad_ioctl(struct file *filp, unsigned int cmd,
 {
 	switch (cmd) {
 	case IB_USER_MAD_REGISTER_AGENT:
-		return ib_umad_reg_agent(filp->private_data, (void __user * __capability) arg, 0);
+		return ib_umad_reg_agent(filp->private_data, (void __user *) arg, 0);
 	case IB_USER_MAD_UNREGISTER_AGENT:
-		return ib_umad_unreg_agent(filp->private_data, (__u32 __user * __capability) arg);
+		return ib_umad_unreg_agent(filp->private_data, (__u32 __user *) arg);
 	case IB_USER_MAD_ENABLE_PKEY:
 		return ib_umad_enable_pkey(filp->private_data);
 	case IB_USER_MAD_REGISTER_AGENT2:
-		return ib_umad_reg_agent2(filp->private_data, (void __user * __capability) arg);
+		return ib_umad_reg_agent2(filp->private_data, (void __user *) arg);
 	default:
 		return -ENOIOCTLCMD;
 	}

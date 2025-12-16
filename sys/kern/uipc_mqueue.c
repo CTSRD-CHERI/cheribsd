@@ -252,32 +252,32 @@ static int	mqfs_allocv(struct mount *mp, struct vnode **vpp, struct mqfs_node *p
 static int	mqfs_prison_remove(void *obj, void *data);
 
 static int	kern_kmq_unlink(struct thread *td,
-		    const char * __capability upath);
-static int	user_kmq_open(struct thread *td, const char * __capability path,
+		    const char *upath);
+static int	user_kmq_open(struct thread *td, const char *path,
 		    int flags, mode_t mode,
-		    const struct mq_attr * __capability uattr);
+		    const struct mq_attr *uattr);
 static int	user_kmq_setattr(struct thread *td, int mqd,
-		    const struct mq_attr * __capability uattr,
-		    struct mq_attr * __capability uoattr);
+		    const struct mq_attr *uattr,
+		    struct mq_attr *uoattr);
 static int	user_kmq_timedreceive(struct thread *td, int mqd,
-		    char * __capability msg_ptr, size_t msg_len,
-		    unsigned int * __capability msg_prio,
-		    const struct timespec * __capability user_abs_timeout);
+		    char *msg_ptr, size_t msg_len,
+		    unsigned int *msg_prio,
+		    const struct timespec *user_abs_timeout);
 static int	user_kmq_timedsend(struct thread *td, int mqd,
-		    const char * __capability msg_ptr, size_t msg_len,
+		    const char *msg_ptr, size_t msg_len,
 		    unsigned int msg_prio,
-		    const struct timespec * __capability user_abs_timeout);
+		    const struct timespec *user_abs_timeout);
 
 /*
  * Message queue construction and maniplation
  */
 static struct mqueue	*mqueue_alloc(const struct mq_attr *attr);
 static void	mqueue_free(struct mqueue *mq);
-static int	mqueue_send(struct mqueue *mq, const char * __capability msg_ptr,
+static int	mqueue_send(struct mqueue *mq, const char *msg_ptr,
 			size_t msg_len, unsigned msg_prio, int waitok,
 			const struct timespec *abs_timeout);
-static int	mqueue_receive(struct mqueue *mq, char * __capability msg_ptr,
-			size_t msg_len, unsigned * __capability msg_prio,
+static int	mqueue_receive(struct mqueue *mq, char *msg_ptr,
+			size_t msg_len, unsigned *msg_prio,
 			int waitok, const struct timespec *abs_timeout);
 static int	_mqueue_send(struct mqueue *mq, struct mqueue_msg *msg,
 			int timo);
@@ -1654,7 +1654,7 @@ mqueue_free(struct mqueue *mq)
  * Load a message from user space
  */
 static struct mqueue_msg *
-mqueue_loadmsg(const char * __capability msg_ptr, size_t msg_size, int msg_prio)
+mqueue_loadmsg(const char *msg_ptr, size_t msg_size, int msg_prio)
 {
 	struct mqueue_msg *msg;
 	size_t len;
@@ -1678,8 +1678,8 @@ mqueue_loadmsg(const char * __capability msg_ptr, size_t msg_size, int msg_prio)
  * Save a message to user space
  */
 static int
-mqueue_savemsg(struct mqueue_msg *msg, char * __capability msg_ptr,
-    int * __capability msg_prio)
+mqueue_savemsg(struct mqueue_msg *msg, char *msg_ptr,
+    int *msg_prio)
 {
 	int error;
 
@@ -1705,7 +1705,7 @@ mqueue_freemsg(struct mqueue_msg *msg)
  * time will be checked.
  */
 int
-mqueue_send(struct mqueue *mq, const char * __capability msg_ptr,
+mqueue_send(struct mqueue *mq, const char *msg_ptr,
 	size_t msg_len, unsigned msg_prio, int waitok,
 	const struct timespec *abs_timeout)
 {
@@ -1860,8 +1860,8 @@ mqueue_send_notification(struct mqueue *mq)
  * time will be checked.
  */
 int
-mqueue_receive(struct mqueue *mq, char * __capability msg_ptr,
-	size_t msg_len, unsigned * __capability msg_prio, int waitok,
+mqueue_receive(struct mqueue *mq, char *msg_ptr,
+	size_t msg_len, unsigned *msg_prio, int waitok,
 	const struct timespec *abs_timeout)
 {
 	struct mqueue_msg *msg;
@@ -2023,7 +2023,7 @@ notifier_remove(struct proc *p, struct mqueue *mq, int fd)
 }
 
 int
-kern_kmq_open(struct thread *td, const char * __capability upath, int flags,
+kern_kmq_open(struct thread *td, const char *upath, int flags,
     mode_t mode, const struct mq_attr *attr)
 {
 	char *path, pathbuf[MQFS_NAMELEN + 1];
@@ -2142,8 +2142,8 @@ sys_kmq_open(struct thread *td, struct kmq_open_args *uap)
 }
 
 static int
-user_kmq_open(struct thread *td, const char * __capability path,
-    int flags, mode_t mode, const struct mq_attr * __capability uattr)
+user_kmq_open(struct thread *td, const char *path,
+    int flags, mode_t mode, const struct mq_attr *uattr)
 {
 	struct mq_attr attr;
 	int error;
@@ -2171,7 +2171,7 @@ sys_kmq_unlink(struct thread *td, struct kmq_unlink_args *uap)
 }
 
 static int
-kern_kmq_unlink(struct thread *td, const char * __capability upath)
+kern_kmq_unlink(struct thread *td, const char *upath)
 {
 	char *path, pathbuf[MQFS_NAMELEN + 1];
 	struct mqfs_node *pn;
@@ -2298,8 +2298,8 @@ sys_kmq_setattr(struct thread *td, struct kmq_setattr_args *uap)
 
 static int
 user_kmq_setattr(struct thread *td, int mqd,
-    const struct mq_attr * __capability uattr,
-    struct mq_attr * __capability uoattr)
+    const struct mq_attr *uattr,
+    struct mq_attr *uoattr)
 {
 	struct mq_attr attr, oattr;
 	int error;
@@ -2319,8 +2319,8 @@ user_kmq_setattr(struct thread *td, int mqd,
 }
 
 int
-kern_kmq_timedreceive(struct thread *td, int mqd, char * __capability msg_ptr,
-    size_t msg_len, unsigned int * __capability msg_prio,
+kern_kmq_timedreceive(struct thread *td, int mqd, char *msg_ptr,
+    size_t msg_len, unsigned int *msg_prio,
     const struct timespec *abs_timeout)
 {
 	struct mqueue *mq;
@@ -2346,9 +2346,9 @@ sys_kmq_timedreceive(struct thread *td, struct kmq_timedreceive_args *uap)
 }
 
 static int
-user_kmq_timedreceive(struct thread *td, int mqd, char * __capability msg_ptr,
-    size_t msg_len, unsigned int * __capability msg_prio,
-    const struct timespec * __capability user_abs_timeout)
+user_kmq_timedreceive(struct thread *td, int mqd, char *msg_ptr,
+    size_t msg_len, unsigned int *msg_prio,
+    const struct timespec *user_abs_timeout)
 {
 	struct timespec *abs_timeout, ets;
 	int error;
@@ -2367,7 +2367,7 @@ user_kmq_timedreceive(struct thread *td, int mqd, char * __capability msg_ptr,
 
 int
 kern_kmq_timedsend(struct thread *td, int mqd,
-    const char * __capability msg_ptr, size_t msg_len, unsigned int msg_prio,
+    const char *msg_ptr, size_t msg_len, unsigned int msg_prio,
     const struct timespec *abs_timeout)
 {
 	struct mqueue *mq;
@@ -2394,8 +2394,8 @@ sys_kmq_timedsend(struct thread *td, struct kmq_timedsend_args *uap)
 
 static int
 user_kmq_timedsend(struct thread *td, int mqd,
-    const char * __capability msg_ptr, size_t msg_len, unsigned int msg_prio,
-    const struct timespec * __capability user_abs_timeout)
+    const char *msg_ptr, size_t msg_len, unsigned int msg_prio,
+    const struct timespec *user_abs_timeout)
 {
 	struct timespec *abs_timeout, ets;
 	int error;

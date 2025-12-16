@@ -88,7 +88,7 @@ struct fiodgname_arg64 {
 #define	FIODGNAME_64	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg64)
 #endif
 
-void * __capability fiodgname_buf_get_ptr(void *fgnp, u_long com);
+void *fiodgname_buf_get_ptr(void *fgnp, u_long com);
 #endif
 
 #endif /* !_SYS_FILIO_H_ */

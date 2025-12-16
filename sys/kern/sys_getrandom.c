@@ -46,7 +46,7 @@
 CTASSERT(EWOULDBLOCK == EAGAIN);
 
 int
-kern_getrandom(struct thread *td, void * __capability user_buf, size_t buflen,
+kern_getrandom(struct thread *td, void *user_buf, size_t buflen,
     unsigned int flags)
 {
 	struct uio auio;

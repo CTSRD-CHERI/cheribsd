@@ -94,7 +94,7 @@ ffs_susp_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 	struct mount *mp;
 	struct ufsmount *ump;
 	struct buf *bp;
-	void * __capability base;
+	void *base;
 	size_t len;
 	ssize_t cnt;
 	struct fs *fs;

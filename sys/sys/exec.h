@@ -106,12 +106,12 @@ enum uio_seg;
 
 #define   CORE_BUF_SIZE   (16 * 1024)
 
-int core_write(struct coredump_params *, const void * __capability, size_t, off_t,
+int core_write(struct coredump_params *, const void *, size_t, off_t,
     enum uio_seg, size_t *);
-int core_output(char * __capability, size_t, off_t, struct coredump_params *,
+int core_output(char *, size_t, off_t, struct coredump_params *,
     void *);
 #if __has_feature(capabilities)
-int core_output_memtag_cheri(char * __capability, size_t, size_t, off_t,
+int core_output_memtag_cheri(char *, size_t, size_t, off_t,
     struct coredump_params *, void *, void *);
 #endif
 int sbuf_drain_core_output(void *, const char *, int);

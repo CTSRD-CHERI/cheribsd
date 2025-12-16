@@ -115,7 +115,7 @@ sys_sched_setparam(struct thread *td, struct sched_setparam_args *uap)
 
 int
 user_sched_setparam(struct thread *td, pid_t pid,
-    const struct sched_param * __capability param)
+    const struct sched_param *param)
 {
 	struct thread *targettd;
 	struct proc *targetp;
@@ -168,7 +168,7 @@ sys_sched_getparam(struct thread *td, struct sched_getparam_args *uap)
 
 int
 user_sched_getparam(struct thread *td, pid_t pid,
-    struct sched_param * __capability param)
+    struct sched_param *param)
 {
 	int e;
 	struct sched_param sched_param;
@@ -219,7 +219,7 @@ sys_sched_setscheduler(struct thread *td, struct sched_setscheduler_args *uap)
 
 int
 user_sched_setscheduler(struct thread *td, pid_t pid, int policy,
-    const struct sched_param * __capability param)
+    const struct sched_param *param)
 {
 	int e;
 	struct sched_param sched_param;
@@ -350,7 +350,7 @@ sys_sched_rr_get_interval(struct thread *td,
 
 int
 user_sched_rr_get_interval(struct thread *td, pid_t pid,
-    struct timespec * __capability interval)
+    struct timespec *interval)
 {
 	struct timespec timespec;
 	int error;

@@ -126,7 +126,7 @@ sys___mac_get_pid(struct thread *td, struct __mac_get_pid_args *uap)
 }
 
 int
-kern_mac_get_pid(struct thread *td, pid_t pid, void * __capability mac_p)
+kern_mac_get_pid(struct thread *td, pid_t pid, void *mac_p)
 {
 	char *buffer, * __capability u_buffer;
 	struct mac mac;
@@ -173,7 +173,7 @@ sys___mac_get_proc(struct thread *td, struct __mac_get_proc_args *uap)
 }
 
 int
-kern_mac_get_proc(struct thread *td, void * __capability mac_p)
+kern_mac_get_proc(struct thread *td, void *mac_p)
 {
 	char *buffer, * __capability u_buffer;
 	struct mac mac;
@@ -284,7 +284,7 @@ sys___mac_set_proc(struct thread *td, struct __mac_set_proc_args *uap)
 }
 
 int
-kern_mac_set_proc(struct thread *td, void * __capability mac_p)
+kern_mac_set_proc(struct thread *td, void *mac_p)
 {
 	struct ucred *newcred, *oldcred;
 	void *intlabel;
@@ -333,7 +333,7 @@ sys___mac_get_fd(struct thread *td, struct __mac_get_fd_args *uap)
 }
 
 int
-kern_mac_get_fd(struct thread *td, int fd, void * __capability mac_p)
+kern_mac_get_fd(struct thread *td, int fd, void *mac_p)
 {
 	char * __capability u_buffer, *buffer;
 	struct label *intlabel;
@@ -432,8 +432,8 @@ sys___mac_get_link(struct thread *td, struct __mac_get_link_args *uap)
 }
 
 int
-kern_mac_get_path(struct thread *td, const char * __capability path_p,
-   void * __capability mac_p, int follow)
+kern_mac_get_path(struct thread *td, const char *path_p,
+   void *mac_p, int follow)
 {
 	char * __capability u_buffer, *buffer;
 	struct nameidata nd;
@@ -480,7 +480,7 @@ sys___mac_set_fd(struct thread *td, struct __mac_set_fd_args *uap)
 }
 
 int
-kern_mac_set_fd(struct thread *td, int fd, void * __capability mac_p)
+kern_mac_set_fd(struct thread *td, int fd, void *mac_p)
 {
 	struct label *intlabel;
 	struct pipe *pipe;
@@ -586,8 +586,8 @@ sys___mac_set_link(struct thread *td, struct __mac_set_link_args *uap)
 }
 
 int
-kern_mac_set_path(struct thread *td, const char * __capability path_p,
-    void * __capability mac_p, int follow)
+kern_mac_set_path(struct thread *td, const char *path_p,
+    void *mac_p, int follow)
 {
 	struct label *intlabel;
 	struct nameidata nd;
@@ -634,8 +634,8 @@ sys_mac_syscall(struct thread *td, struct mac_syscall_args *uap)
 }
 
 int
-kern_mac_syscall(struct thread *td, const char * __capability policy, int call,
-    void * __capability arg)
+kern_mac_syscall(struct thread *td, const char *policy, int call,
+    void *arg)
 {
 	struct mac_policy_conf *mpc;
 	char target[MAC_MAX_POLICY_NAME];

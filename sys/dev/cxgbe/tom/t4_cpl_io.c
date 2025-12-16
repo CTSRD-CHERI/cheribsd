@@ -2096,7 +2096,7 @@ alloc_aiotx_mbuf(struct kaiocb *job, int len)
 	vm_page_t pgs[MBUF_PEXT_MAX_PGS];
 	struct mbuf *m, *top, *last;
 	vm_map_t map;
-	char * __capability start;
+	char *start;
 	int i, mlen, npages, pgoff;
 
 	KASSERT(job->aio_sent + len <= job->uaiocb.aio_nbytes,
@@ -2110,7 +2110,7 @@ alloc_aiotx_mbuf(struct kaiocb *job, int len)
 	 */
 	vm = job->userproc->p_vmspace;
 	map = &vm->vm_map;
-	start = __DEVOLATILE_CAP(char * __capability, job->uaiocb.aio_buf) +
+	start = __DEVOLATILE_CAP(char *, job->uaiocb.aio_buf) +
 	    job->aio_sent;
 	pgoff = (vm_offset_t)start & PAGE_MASK;
 

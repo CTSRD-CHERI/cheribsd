@@ -837,7 +837,7 @@ struct mac_veriexec_syscall_params_args32 {
  * @return 0 on success, otherwise an error code.
  */
 static int
-mac_veriexec_syscall(struct thread *td, int call, void * __capability arg)
+mac_veriexec_syscall(struct thread *td, int call, void *arg)
 {
 	struct image_params img;
 	struct nameidata nd;

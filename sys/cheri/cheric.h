@@ -171,13 +171,13 @@
 
 /* Check if the address is between cap.base and cap.top, i.e. in bounds */
 static inline bool
-cheri_is_address_inbounds(const void * __capability cap, ptraddr_t addr)
+cheri_is_address_inbounds(const void *cap, ptraddr_t addr)
 {
 	return (addr >= cheri_base_get(cap) && addr < cheri_top_get(cap));
 }
 
 static inline size_t
-cheri_bytes_remaining(const void * __capability cap)
+cheri_bytes_remaining(const void *cap)
 {
 	if (cheri_offset_get(cap) >= cheri_length_get(cap))
 		return 0;
@@ -190,8 +190,7 @@ cheri_bytes_remaining(const void * __capability cap)
  * grants access to length bytes at the current address
  */
 static inline bool
-cheri_can_access(const void * __capability cap, ptraddr_t perms,
-    size_t length)
+cheri_can_access(const void *cap, ptraddr_t perms, size_t length)
 {
 	return (cheri_tag_get(cap) && !cheri_is_sealed(cap) &&
 	    (cheri_perms_get(cap) & perms) == perms &&

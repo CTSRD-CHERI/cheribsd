@@ -5912,9 +5912,9 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 	    ("vmspace_exec recursed"));
 #if __has_feature(capabilities)
 	KASSERT(cheri_tag_get(p->p_sysent->sv_vmspace_cap),
-	    ("expected valid vmspace cap in sysvec %s, got %#lp",
+	    ("expected valid vmspace cap in sysvec %s, got %#p",
 	     p->p_sysent->sv_name,
-	     (void * __capability)p->p_sysent->sv_vmspace_cap));
+	     (void *)p->p_sysent->sv_vmspace_cap));
 	minuser_cap = cheri_address_set(p->p_sysent->sv_vmspace_cap,
 	    minuser);
 	maxuser_cap = cheri_address_set(minuser_cap, maxuser);
@@ -6532,11 +6532,11 @@ vm_map_reservation_is_unmapped(vm_map_t map, vm_offset_t reservation)
 
 #if __has_feature(capabilities)
 /* Return a capability for the reservation that includes va. */
-void * __capability
+void *
 vm_map_reservation_cap(vm_map_t map, vm_offset_t va)
 {
 	vm_map_entry_t entry;
-	void * __capability cap;
+	void *cap;
 	vm_offset_t end, reservation;
 	vm_prot_t max_prot;
 
@@ -6574,8 +6574,8 @@ vm_map_reservation_cap(vm_map_t map, vm_offset_t va)
 		max_prot = entry->max_protection;
 	}
 
-	cap = (void * __capability)vm_map_buildcap(map, reservation,
-	    end - reservation, max_prot);
+	cap = (void *)vm_map_buildcap(map, reservation, end - reservation,
+	    max_prot);
 out:
 	vm_map_unlock_read(map);
 	return (cap);

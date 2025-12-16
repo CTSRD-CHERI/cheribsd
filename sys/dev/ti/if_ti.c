@@ -212,9 +212,9 @@ static void ti_mem_read(struct ti_softc *, uint32_t, uint32_t, void *);
 static void ti_mem_write(struct ti_softc *, uint32_t, uint32_t, void *);
 static void ti_mem_zero(struct ti_softc *, uint32_t, uint32_t);
 static int ti_copy_mem(struct ti_softc *, uint32_t, uint32_t,
-    char * __capability, int, int);
+    char *, int, int);
 static int ti_copy_scratch(struct ti_softc *, uint32_t, uint32_t,
-    char * __capability, int, int, int);
+    char *, int, int, int);
 static int ti_bcopy_swap(const void *, void *, size_t, ti_swap_type);
 static void ti_loadfw(struct ti_softc *);
 static void ti_cmd(struct ti_softc *, struct ti_cmd_desc *);
@@ -497,10 +497,10 @@ ti_mem_zero(struct ti_softc *sc, uint32_t addr, uint32_t len)
 
 static int
 ti_copy_mem(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
-    char * __capability buf, int useraddr, int readdata)
+    char *buf, int useraddr, int readdata)
 {
 	int segptr, segsize, cnt;
-	char * __capability ptr;
+	char *ptr;
 	uint32_t origwin;
 	int error, resid, segresid;
 	int first_pass;
@@ -694,12 +694,12 @@ ti_copy_mem(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
 
 static int
 ti_copy_scratch(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
-    char * __capability buf, int useraddr, int readdata, int cpu)
+    char *buf, int useraddr, int readdata, int cpu)
 {
 	uint32_t segptr;
 	int cnt, error;
 	uint32_t tmpval, tmpval2;
-	char * __capability ptr;
+	char *ptr;
 
 	TI_LOCK_ASSERT(sc);
 
@@ -3747,7 +3747,7 @@ ti_ioctl2(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 		       trace_buf->buf_len);
 #endif
 		error = ti_copy_mem(sc, trace_start, min(trace_len,
-		    trace_buf->buf_len), (char * __capability)trace_buf->buf, 1, 1);
+		    trace_buf->buf_len), (char *)trace_buf->buf, 1, 1);
 		if (error == 0) {
 			trace_buf->fill_len = min(trace_len,
 			    trace_buf->buf_len);

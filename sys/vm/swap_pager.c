@@ -198,7 +198,7 @@ int swap_pager_avail;
 static struct sx swdev_syscall_lock;	/* serialize swap(on|off) */
 
 #if __has_feature(capabilities)
-void * __capability swap_restore_cap;
+void *swap_restore_cap;
 #endif
 
 static __exclusive_cache_line u_long swap_reserved;
@@ -531,7 +531,7 @@ static daddr_t	swp_pager_getswapspace(int *npages);
 static daddr_t swp_pager_meta_build(struct pctrie_iter *, vm_object_t object,
 	vm_pindex_t, daddr_t, bool);
 #if __has_feature(capabilities)
-static void cheri_restore_tag(void * __capability *);
+static void cheri_restore_tag(void **);
 static void swp_pager_meta_cheri_get_tags(vm_page_t);
 static void swp_pager_meta_cheri_put_tags(vm_page_t);
 #endif
@@ -2322,12 +2322,12 @@ allocated:
  *	Restore a single tag.
  */
 static void
-cheri_restore_tag(void * __capability *cp)
+cheri_restore_tag(void **cp)
 {
 	uintcap_t cap;
-	void * __capability newcap;
+	void *newcap;
 #ifdef HAS_CHERI_PERM_SEAL
-	void * __capability sealcap;
+	void *sealcap;
 #endif
 
 	cap = (uintcap_t)*cp;
@@ -2352,7 +2352,7 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 {
 	size_t i, j;
 	tag_word_t t;
-	void * __capability *scan;
+	void **scan;
 	struct swblk *sb;
 	vm_pindex_t modpi;
 	bool mark_capdirty = false;
@@ -2387,7 +2387,7 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 static void
 swp_pager_meta_cheri_put_tags(vm_page_t page)
 {
-	void * __capability *scan;
+	void **scan;
 	struct swblk *sb;
 	vm_pindex_t modpi;
 
@@ -2798,7 +2798,7 @@ sys_swapon(struct thread *td, struct swapon_args *uap)
 }
 
 int
-kern_swapon(struct thread *td, const char * __capability name)
+kern_swapon(struct thread *td, const char *name)
 {
 	struct vattr attr;
 	struct vnode *vp;
@@ -2937,7 +2937,7 @@ swaponsomething(struct vnode *vp, void *id, u_long nblks,
  * only to make this work.
  */
 int
-kern_swapoff(struct thread *td, const char * __capability name,
+kern_swapoff(struct thread *td, const char *name,
     enum uio_seg name_seg, u_int flags)
 {
 	struct vnode *vp;

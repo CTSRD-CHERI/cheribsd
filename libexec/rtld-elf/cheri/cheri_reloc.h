@@ -79,7 +79,7 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 	} else if ((flags & SYMLOOK_IFUNC) != 0)
 		return (0);
 
-	const void * __capability symval = NULL;
+	const void *symval = NULL;
 	bool is_undef_weak = false;
 	if (def->st_shndx == SHN_UNDEF) {
 		/* Verify that we are resolving a weak symbol */
@@ -168,6 +168,6 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		    obj->path, symname(obj, r_symndx), symval);
 		return -1;
 	}
-	*((const void * __capability *)where) = symval;
+	*((const void **)where) = symval;
 	return 0;
 }

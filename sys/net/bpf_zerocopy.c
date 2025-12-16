@@ -91,7 +91,7 @@
  * knows that the space is not available.
  */
 struct zbuf {
-	void * __capability zb_uaddr;	/* User address at time of setup. */
+	void *zb_uaddr;	/* User address at time of setup. */
 	size_t		 zb_size;	/* Size of buffer, incl. header. */
 	u_int		 zb_numpages;	/* Number of pages. */
 	int		 zb_flags;	/* Flags on zbuf. */
@@ -153,7 +153,7 @@ zbuf_free(struct zbuf *zb)
  * deadlock and use SFB_NOWAIT.
  */
 static struct sf_buf *
-zbuf_sfbuf_get(struct vm_map *map, void * __capability uaddr)
+zbuf_sfbuf_get(struct vm_map *map, void *uaddr)
 {
 	struct sf_buf *sf;
 	vm_page_t pp;
@@ -174,7 +174,7 @@ zbuf_sfbuf_get(struct vm_map *map, void * __capability uaddr)
  * page alignment, size requirements, etc.
  */
 static int
-zbuf_setup(struct thread *td, void * __capability uaddr, size_t len,
+zbuf_setup(struct thread *td, void *uaddr, size_t len,
     struct zbuf **zbp)
 {
 	struct zbuf *zb;
@@ -214,7 +214,7 @@ zbuf_setup(struct thread *td, void * __capability uaddr, size_t len,
 	map = &td->td_proc->p_vmspace->vm_map;
 	for (i = 0; i < zb->zb_numpages; i++) {
 		zb->zb_pages[i] = zbuf_sfbuf_get(map,
-		    (char * __capability)uaddr + (i * PAGE_SIZE));
+		    (char *)uaddr + (i * PAGE_SIZE));
 		if (zb->zb_pages[i] == NULL) {
 			error = EFAULT;
 			goto error;

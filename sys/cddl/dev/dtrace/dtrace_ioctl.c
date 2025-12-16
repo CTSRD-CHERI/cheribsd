@@ -108,7 +108,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 	switch (cmd) {
 	case DTRACEIOC_AGGDESC: {
-		void * __capability paggdesc = *(dtrace_aggdesc_t * __capability *)addr;
+		void *paggdesc = *(dtrace_aggdesc_t **)addr;
 		dtrace_aggdesc_t aggdesc;
 		dtrace_action_t *act;
 		dtrace_aggregation_t *agg;
@@ -213,7 +213,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 	}
 	case DTRACEIOC_AGGSNAP:
 	case DTRACEIOC_BUFSNAP: {
-		void *__capability pdesc = *(dtrace_bufdesc_t * __capability *)addr;
+		void *pdesc = *(dtrace_bufdesc_t **)addr;
 		dtrace_bufdesc_t desc;
 		caddr_t cached;
 		dtrace_buffer_t *buf;
@@ -371,7 +371,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		return (0);
 	}
 	case DTRACEIOC_DOFGET: {
-		dof_hdr_t * __capability pdof = *(dof_hdr_t * __capability *)addr;
+		dof_hdr_t *pdof = *(dof_hdr_t **)addr;
 		dof_hdr_t hdr, *dof;
 		int rval;
 		uint64_t len;
@@ -454,7 +454,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		return (err);
 	}
 	case DTRACEIOC_EPROBE: {
-		void * __capability pepdesc = *(dtrace_eprobedesc_t * __capability *)addr;
+		void *pepdesc = *(dtrace_eprobedesc_t **)addr;
 		dtrace_eprobedesc_t epdesc;
 		dtrace_ecb_t *ecb;
 		dtrace_action_t *act;
