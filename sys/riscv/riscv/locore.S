@@ -143,6 +143,11 @@
 	/* Enable CHERI for U-mode */
 	li	t0, SENVCFG_Y
 	csrs	senvcfg, t0
+#ifndef CHERI_RISCV_STD_093
+	/* Enable Svucrg for S- and U-modes */
+	li	t0, SSTATUS_YRGE
+	csrs	sstatus, t0
+#endif
 #endif
 .endmacro
 
