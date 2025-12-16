@@ -120,7 +120,7 @@ _alt_start:
 	li	a0, 0
 	li	a1, 0
 
-#if 1
+#if 0
 #ifdef __riscv_zcheripurecap
 //.option push
 //.option capmode
@@ -168,7 +168,7 @@ _alt_start:
 1:
 .option pop
 #endif
-#if 1
+#if 0
 #ifdef __riscv_zcheripurecap
 //.option push
 //.option capmode
@@ -185,7 +185,7 @@ _alt_start:
 #endif
 
 	cheri_cpu_init
-#if 1
+#if 0
 #ifdef __riscv_zcheripurecap
 //.option push
 //.option capmode

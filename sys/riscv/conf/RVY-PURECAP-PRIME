@@ -18,4 +18,5 @@ makeoptions	FDT_DTS_FILE=prime-up.dts
 options		HWC_HOOKS
 device		hwc
 
-options		EARLY_PRINTF=sbi
+#options	EARLY_PRINTF=sbi
+device		xlnx_pcib
