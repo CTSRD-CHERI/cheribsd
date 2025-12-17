@@ -4070,7 +4070,7 @@ loop:
 		 * Buffer is in-core.  If the buffer is not busy nor managed,
 		 * it must be on a queue.
 		 */
-		lockflags = LK_EXCLUSIVE | LK_INTERLOCK |
+		lockflags = LK_EXCLUSIVE | LK_INTERLOCK | LK_CANRECURSE |
 		    ((flags & GB_LOCK_NOWAIT) != 0 ? LK_NOWAIT : LK_SLEEPFAIL);
 #ifdef WITNESS
 		lockflags |= (flags & GB_NOWITNESS) != 0 ? LK_NOWITNESS : 0;
