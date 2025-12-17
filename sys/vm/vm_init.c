@@ -92,7 +92,7 @@
 #include <vm/vm_pager.h>
 #include <vm/vm_extern.h>
 
-extern void	uma_startup1(vm_offset_t);
+extern void	uma_startup1(vm_pointer_t);
 
 long physmem;
 
