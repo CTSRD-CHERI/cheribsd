@@ -549,7 +549,7 @@ _getenv_static_from(char *chkenv, const char *name)
 		len = ep - cp;
 		ep++;
 		if (!strncmp(name, cp, len) && name[len] == 0)
-			return (cheri_kern_setbounds(ep, strlen(ep) + 1));
+			return (cheri_kern_bounds_set(ep, strlen(ep) + 1));
 	}
 	return (NULL);
 }

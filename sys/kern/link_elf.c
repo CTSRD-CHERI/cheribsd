@@ -547,14 +547,14 @@ link_elf_init(void* arg)
 		ctors_sizep = (Elf_Size *)preload_search_info(modptr,
 			MODINFO_METADATA | MODINFOMD_CTORS_SIZE);
 		if (ctors_addrp != NULL && ctors_sizep != NULL) {
-			linker_kernel_file->ctors_addr = cheri_kern_setbounds(
+			linker_kernel_file->ctors_addr = cheri_kern_bounds_set(
 			    ef->address + *ctors_addrp, *ctors_sizep);
 			linker_kernel_file->ctors_size = *ctors_sizep;
 		}
 	}
 
 	/* Set the bounds on load address */
-	linker_kernel_file->address = cheri_kern_setbounds(
+	linker_kernel_file->address = cheri_kern_bounds_set(
 	    linker_kernel_file->address, linker_kernel_file->size);
 #ifdef __CHERI_PURE_CAPABILITY__
 	ef->mapbase = linker_kernel_file->address;
@@ -603,13 +603,13 @@ link_elf_preload_parse_symbols(elf_file_t ef)
 		return (0);
 	esym = *(vm_offset_t *)pointer;
 
-	base = cheri_kern_setbounds(cheri_kern_setaddress(ef->address, ssym),
+	base = cheri_kern_bounds_set(cheri_kern_address_set(ef->address, ssym),
 	    esym - ssym);
 
 	symcnt = *(long *)base;
 	base += sizeof(long);
 	size = roundup(symcnt, sizeof(long));
-	symtab = (Elf_Sym *)cheri_kern_setbounds(base, size);
+	symtab = (Elf_Sym *)cheri_kern_bounds_set(base, size);
 	base += size;
 
 	if ((ptraddr_t)base > esym || (ptraddr_t)base < ssym) {
@@ -620,7 +620,7 @@ link_elf_preload_parse_symbols(elf_file_t ef)
 	strcnt = *(long *)base;
 	base += sizeof(long);
 	size = roundup(strcnt, sizeof(long));
-	strtab = cheri_kern_setbounds(base, size);
+	strtab = cheri_kern_bounds_set(base, size);
 	base += size;
 
 	if ((ptraddr_t)base > esym || (ptraddr_t)base < ssym) {
@@ -651,9 +651,9 @@ parse_dynamic(elf_file_t ef)
 			    ef_address(ef, dp->d_un.d_ptr);
 			ef->nbuckets = hashtab[0];
 			ef->nchains = hashtab[1];
-			ef->buckets = cheri_kern_setbounds(hashtab + 2,
+			ef->buckets = cheri_kern_bounds_set(hashtab + 2,
 			    ef->nbuckets * sizeof(Elf_Hashelt));
-			ef->chains = cheri_kern_setbounds(hashtab + 2 + ef->nbuckets,
+			ef->chains = cheri_kern_bounds_set(hashtab + 2 + ef->nbuckets,
 			    ef->nchains * sizeof(Elf_Hashelt));
 			break;
 		}
@@ -728,19 +728,19 @@ parse_dynamic(elf_file_t ef)
 	 * If we are not a cheri kernel these are no-ops.
 	 */
 	if (ef->strtab != NULL)
-		ef->strtab = cheri_kern_setbounds(ef->strtab, ef->strsz);
+		ef->strtab = cheri_kern_bounds_set(ef->strtab, ef->strsz);
 	if (ef->rel != NULL)
-		ef->rel = cheri_kern_setbounds(ef->rel, ef->relsize);
+		ef->rel = cheri_kern_bounds_set(ef->rel, ef->relsize);
 	if (ef->pltrel != NULL)
-		ef->pltrel = cheri_kern_setbounds(ef->pltrel, ef->pltrelsize);
+		ef->pltrel = cheri_kern_bounds_set(ef->pltrel, ef->pltrelsize);
 	if (ef->rela != NULL)
-		ef->rela = cheri_kern_setbounds(ef->rela, ef->relasize);
+		ef->rela = cheri_kern_bounds_set(ef->rela, ef->relasize);
 	if (ef->symtab != NULL)
-		ef->symtab = cheri_kern_setbounds(ef->symtab,
+		ef->symtab = cheri_kern_bounds_set(ef->symtab,
 		    ef->nchains * sizeof(Elf_Sym));
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
 	if (ef->caprelocs != NULL)
-		ef->caprelocs = cheri_kern_setbounds(ef->caprelocs,
+		ef->caprelocs = cheri_kern_bounds_set(ef->caprelocs,
 		    ef->caprelocssize);
 #endif
 
@@ -1036,7 +1036,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	if (ctors_addrp != NULL && ctors_sizep != NULL) {
 		lf->ctors_addr = ef_address(ef, *ctors_addrp);
 		lf->ctors_size = *ctors_sizep;
-		lf->ctors_addr = cheri_kern_setbounds(lf->ctors_addr,
+		lf->ctors_addr = cheri_kern_bounds_set(lf->ctors_addr,
 		    lf->ctors_size);
 	}
 
@@ -1431,7 +1431,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 			/* Record relocated address and size of .ctors. */
 			lf->ctors_addr = mapbase + shdr[i].sh_addr - base_vaddr;
 			lf->ctors_size = shdr[i].sh_size;
-			lf->ctors_addr = cheri_kern_setbounds(lf->ctors_addr,
+			lf->ctors_addr = cheri_kern_bounds_set(lf->ctors_addr,
 			    lf->ctors_size);
 		}
 	}

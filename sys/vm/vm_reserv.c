@@ -504,7 +504,7 @@ vm_reserv_from_page(vm_page_t m)
 	seg = &vm_phys_segs[m->segind];
 	rv = seg->first_reserv + ((VM_PAGE_TO_PHYS(m) >> VM_LEVEL_0_SHIFT) -
 	    (seg->start >> VM_LEVEL_0_SHIFT));
-	return (cheri_kern_setboundsexact(rv, sizeof(*rv)));
+	return (cheri_kern_bounds_set_exact(rv, sizeof(*rv)));
 #else
 	return (&vm_reserv_array[VM_PAGE_TO_PHYS(m) >> VM_LEVEL_0_SHIFT]);
 #endif
@@ -1077,7 +1077,7 @@ vm_reserv_init(void)
 #else
 		rv_slice = vm_reserv_array + (seg->start >> VM_LEVEL_0_SHIFT);
 #endif
-		seg->first_reserv = cheri_kern_setbounds(rv_slice,
+		seg->first_reserv = cheri_kern_bounds_set(rv_slice,
 		    nreserv * sizeof(*rv_slice));
 		paddr = roundup2(seg->start, VM_LEVEL_0_SIZE);
 		rv = seg->first_reserv + (paddr >> VM_LEVEL_0_SHIFT) -

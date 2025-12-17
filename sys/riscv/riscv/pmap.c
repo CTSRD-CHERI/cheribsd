@@ -1003,7 +1003,7 @@ pmap_bootstrap(vm_paddr_t kernstart, vm_size_t kernlen)
 
 	/* Mark the bounds of our available virtual address space */
 	kernel_vm_end = virtual_avail = freeva;
-	virtual_end = cheri_kern_setaddress(virtual_avail, DEVMAP_MIN_VADDR);
+	virtual_end = cheri_kern_address_set(virtual_avail, DEVMAP_MIN_VADDR);
 
 	/* Exclude the reserved physical memory from allocations. */
 	physmem_exclude_region(kernstart, freemempos - kernstart,
@@ -1375,8 +1375,8 @@ pmap_map(vm_pointer_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 	vm_pointer_t p;
 
 	p = PHYS_TO_DMAP(start);
-	p = cheri_kern_setbounds(p, end - start);
-	p = cheri_kern_andperm(p, vm_map_prot2perms(prot) |
+	p = cheri_kern_bounds_set(p, end - start);
+	p = cheri_kern_perms_and(p, vm_map_prot2perms(prot) |
 	    ~CHERI_PROT2PERM_MASK);
 
 	return (p);
@@ -5513,7 +5513,7 @@ void *
 pmap_mapbios(vm_paddr_t pa, vm_size_t size)
 {
 
-        return (cheri_kern_setbounds((void *)PHYS_TO_DMAP(pa), size));
+        return (cheri_kern_bounds_set((void *)PHYS_TO_DMAP(pa), size));
 }
 
 void

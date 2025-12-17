@@ -214,19 +214,19 @@ cheri_bytes_remaining(const void * __capability cap)
 
 #ifdef _KERNEL
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	cheri_kern_gettag(x)		cheri_tag_get(x)
-#define	cheri_kern_setbounds(x, y)	cheri_bounds_set(x, y)
-#define	cheri_kern_setboundsexact(x, y)	cheri_bounds_set_exact(x, y)
-#define	cheri_kern_setaddress(x, y)	cheri_address_set(x, y)
-#define	cheri_kern_getaddress(x)	cheri_address_get(x)
-#define	cheri_kern_andperm(x, y)	cheri_perms_and(x, y)
+#define	cheri_kern_tag_get(x)		cheri_tag_get(x)
+#define	cheri_kern_bounds_set(x, y)	cheri_bounds_set(x, y)
+#define	cheri_kern_bounds_set_exact(x, y)	cheri_bounds_set_exact(x, y)
+#define	cheri_kern_address_set(x, y)	cheri_address_set(x, y)
+#define	cheri_kern_address_get(x)	cheri_address_get(x)
+#define	cheri_kern_perms_and(x, y)	cheri_perms_and(x, y)
 #else
-#define	cheri_kern_gettag(x)		1
-#define	cheri_kern_setbounds(x, y)	(x)
-#define	cheri_kern_setboundsexact(x, y)	(x)
-#define	cheri_kern_setaddress(x, y)	((__typeof__(x))(y))
-#define	cheri_kern_getaddress(x)	((uintptr_t)(x))
-#define	cheri_kern_andperm(x, y)	(x)
+#define	cheri_kern_tag_get(x)		1
+#define	cheri_kern_bounds_set(x, y)	(x)
+#define	cheri_kern_bounds_set_exact(x, y)	(x)
+#define	cheri_kern_address_set(x, y)	((__typeof__(x))(y))
+#define	cheri_kern_address_get(x)	((uintptr_t)(x))
+#define	cheri_kern_perms_and(x, y)	(x)
 #endif	/* __CHERI_PURE_CAPABILITY__ */
 #endif	/* _KERNEL */
 
