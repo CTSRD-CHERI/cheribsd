@@ -80,7 +80,7 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 			if (VIRT_IN_DMAP(v)) {
 #ifdef __CHERI_PURE_CAPABILITY__
 				error = uiomove(cheri_bounds_set_exact(
-				    cheri_address_set(dmap_base_cap, v), cnt),
+				    cheri_address_set(dmap_capability, v), cnt),
 				    cnt, uio);
 #else
 				error = uiomove((void *)v, cnt, uio);

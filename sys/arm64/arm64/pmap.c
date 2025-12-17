@@ -354,7 +354,7 @@ vm_paddr_t dmap_phys_base;	/* The start of the dmap region */
 vm_paddr_t dmap_phys_max;	/* The limit of the dmap region */
 vm_offset_t dmap_max_addr;	/* The virtual address limit of the dmap */
 #ifdef __CHERI_PURE_CAPABILITY__
-void *dmap_base_cap;		/* Capability for the direct map region */
+void *dmap_capability;		/* Capability for the direct map region */
 #endif
 
 extern pt_entry_t pagetable_l0_ttbr1[];
@@ -1400,10 +1400,10 @@ pmap_bootstrap_dmap(void)
 	}
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	dmap_base_cap = cheri_address_set(kernel_root_cap, DMAP_MIN_ADDRESS);
-	dmap_base_cap = cheri_bounds_set(dmap_base_cap,
+	dmap_capability = cheri_address_set(kernel_root_cap, DMAP_MIN_ADDRESS);
+	dmap_capability = cheri_bounds_set(dmap_capability,
 	    dmap_phys_max - dmap_phys_base);
-	dmap_base_cap = cheri_perms_and(dmap_base_cap,
+	dmap_capability = cheri_perms_and(dmap_capability,
 	    CHERI_PERMS_KERNEL_DATA);
 #endif
 
