@@ -88,6 +88,7 @@ struct fileattr;
 #endif
 #define	kfree_link NULL // XXX
 #define	ATTR_SIZE	0x01
+#define	brelse lkpi_brelse
 
 struct super_block {
 	void                    *s_fs_info;     /* Filesystem private info */
@@ -593,7 +594,7 @@ struct dentry	*mount_bdev(struct file_system_type *fs_type, int flags,
 	    const char *dev_name, void *data,
 	    int (*fill_super)(struct super_block *, void *, int));
 int	register_filesystem(struct file_system_type *fst);
-void	brelse(struct buffer_head *bh);
+void	lkpi_brelse(struct buffer_head *bh);
 size_t	bdev_nr_sectors(struct block_device *);
 
 #endif /* _LINUXKPI_LINUX_FS_H_ */
