@@ -1923,7 +1923,7 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	/* Allocate KVA and indirectly advance bootmem. */
 	mem = (void *)pmap_map(&bootmem, m->phys_addr,
 	    m->phys_addr + (pages * PAGE_SIZE), VM_PROT_READ | VM_PROT_WRITE);
-	return (cheri_kern_setboundsexact(mem, bytes));
+	return (cheri_kern_bounds_set_exact(mem, bytes));
 }
 
 static void
@@ -2095,7 +2095,7 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_tag_get(retkva), ("Expected valid capability"));
 #endif
-	return (cheri_kern_setboundsexact((void *)retkva, bytes));
+	return (cheri_kern_bounds_set_exact((void *)retkva, bytes));
 }
 
 /*

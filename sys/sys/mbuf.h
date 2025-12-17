@@ -925,7 +925,7 @@ m_extaddref(struct mbuf *m, char *buf, u_int size, u_int *ref_cnt,
 
 	atomic_add_int(ref_cnt, 1);
 	m->m_flags |= M_EXT;
-	m->m_ext.ext_buf = cheri_kern_setbounds(buf, size);
+	m->m_ext.ext_buf = cheri_kern_bounds_set(buf, size);
 	m->m_ext.ext_cnt = ref_cnt;
 	m->m_data = m->m_ext.ext_buf;
 	m->m_ext.ext_size = size;
@@ -975,7 +975,7 @@ m_init(struct mbuf *m, int how, short type, int flags)
 
 	m->m_next = NULL;
 	m->m_nextpkt = NULL;
-	m->m_data = cheri_kern_setbounds(m->m_dat, MLEN);
+	m->m_data = cheri_kern_bounds_set(m->m_dat, MLEN);
 	m->m_len = 0;
 	m->m_flags = flags;
 	m->m_type = type;
@@ -1081,7 +1081,7 @@ m_cljset(struct mbuf *m, void *cl, int type)
 		break;
 	}
 
-	m->m_data = m->m_ext.ext_buf = cheri_kern_setbounds(cl, size);
+	m->m_data = m->m_ext.ext_buf = cheri_kern_bounds_set(cl, size);
 	m->m_ext.ext_free = m->m_ext.ext_arg1 = m->m_ext.ext_arg2 = NULL;
 	m->m_ext.ext_size = size;
 	m->m_ext.ext_type = type;

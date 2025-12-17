@@ -1526,7 +1526,7 @@ pmap_bootstrap(vm_size_t kernlen)
 
 	virtual_avail = preinit_map_va + PMAP_PREINIT_MAPPING_SIZE;
 	virtual_avail = roundup2(virtual_avail, L1_SIZE);
-	virtual_end = cheri_kern_setaddress(virtual_avail,
+	virtual_end = cheri_kern_address_set(virtual_avail,
 	    VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE);
 	kernel_vm_end = virtual_avail;
 
@@ -1760,7 +1760,7 @@ pmap_init_pv_table(void)
 		seg = &vm_phys_segs[i];
 		used_pvd = pmap_l2_pindex(roundup2(seg->end, L2_SIZE)) -
 		    pmap_l2_pindex(seg->start);
-		seg->md_first = cheri_kern_setbounds(pvd,
+		seg->md_first = cheri_kern_bounds_set(pvd,
 		    used_pvd * sizeof(*pvd));
 		pvd += used_pvd;
 
@@ -9769,7 +9769,7 @@ pmap_sync_icache(pmap_t pmap, vm_offset_t va, vm_size_t sz)
 			/* Extract the physical address & find it in the DMAP */
 			pa = pmap_extract(pmap, va);
 			if (pa != 0)
-				cpu_icache_sync_range((void *)cheri_kern_setbounds(
+				cpu_icache_sync_range((void *)cheri_kern_bounds_set(
 				    PHYS_TO_DMAP(pa), len), len);
 
 			/* Move to the next page */

@@ -1038,7 +1038,7 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 		MPASS(maxaddr == 0 || start + size - 1 <= maxaddr);
 		MPASS((vmem_offset_t)bt->bt_start <= start);
 		MPASS((vmem_offset_t)BT_END(bt) - start >= size - 1);
-		*addrp = cheri_kern_setaddress(bt->bt_start, start);
+		*addrp = cheri_kern_address_set(bt->bt_start, start);
 
 		return (0);
 	}

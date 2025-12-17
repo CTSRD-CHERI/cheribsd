@@ -456,7 +456,7 @@ ktls_buffer_import(void *arg, void **store, int count, int domain, int flags)
 		if (m == NULL)
 			break;
 		store[i] = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-		store[i] = cheri_kern_setbounds(store[i], ktls_maxlen);
+		store[i] = cheri_kern_bounds_set(store[i], ktls_maxlen);
 	}
 	return (i);
 }
@@ -483,7 +483,7 @@ ktls_free_mext_contig(struct mbuf *m)
 
 	M_ASSERTEXTPG(m);
 	epg = (void *)PHYS_TO_DMAP(m->m_epg_pa[0]);
-	uma_zfree(ktls_buffer_zone, cheri_kern_setbounds(epg, ktls_maxlen));
+	uma_zfree(ktls_buffer_zone, cheri_kern_bounds_set(epg, ktls_maxlen));
 }
 
 static int

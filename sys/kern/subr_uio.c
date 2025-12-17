@@ -483,7 +483,7 @@ allocuio(u_int iovcnt)
 		uio->uio_iov = uio->uio_ext_iov;
 		uio->uio_flags |= UIO_EXT_IOVEC;
 	} else {
-		uio->uio_iov = cheri_kern_setboundsexact(uio->uio_iov,
+		uio->uio_iov = cheri_kern_bounds_set_exact(uio->uio_iov,
 		    iovcnt * sizeof(struct iovec));
 	}
 	uio->uio_iovcnt = iovcnt;

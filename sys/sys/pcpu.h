@@ -272,7 +272,7 @@ extern struct pcpu *cpuid_to_pcpu[];
 /* Accessor to elements allocated via UMA_ZONE_PCPU zone. */
 #define	_zpcpu_get_obj(base, offset, size) ({				\
 	__typeof(base) _ptr = (void *)((char *)(base) + offset);	\
-	cheri_kern_setbounds(_ptr, size);				\
+	cheri_kern_bounds_set(_ptr, size);				\
 })
 
 #define	zpcpu_get(base)							\

@@ -5687,12 +5687,12 @@ retry:
 	stack_reservation = vm_map_buildcap(map, gap_entry->start,
 	    stack_entry->end - gap_entry->start, prot);
 
-	grow_start = (vm_pointer_t)cheri_kern_setaddress(stack_reservation,
+	grow_start = (vm_pointer_t)cheri_kern_address_set(stack_reservation,
 	    gap_entry->end - grow_amount);
 	if (gap_entry->start + grow_amount == gap_entry->end) {
-		gap_start = (vm_pointer_t)cheri_kern_setaddress(
+		gap_start = (vm_pointer_t)cheri_kern_address_set(
 		    stack_reservation, gap_entry->start);
-		gap_end = (vm_pointer_t)cheri_kern_setaddress(
+		gap_end = (vm_pointer_t)cheri_kern_address_set(
 		    stack_reservation, gap_entry->end);
 		vm_map_entry_delete(map, gap_entry);
 		gap_deleted = true;

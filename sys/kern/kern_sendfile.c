@@ -1082,7 +1082,7 @@ retry_space:
 			}
 
 			m0 = m_get(M_WAITOK, MT_DATA);
-			m0->m_ext.ext_buf = (char *)cheri_kern_setbounds(
+			m0->m_ext.ext_buf = (char *)cheri_kern_bounds_set(
 			    sf_buf_kva(sf), PAGE_SIZE);
 			m0->m_ext.ext_size = PAGE_SIZE;
 			m0->m_ext.ext_arg1 = sf;
