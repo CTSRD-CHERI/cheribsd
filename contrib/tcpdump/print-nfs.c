@@ -987,7 +987,11 @@ xid_map_enter(netdissect_options *ndo,
 		UNALIGNED_MEMCPY(&xmep->server, ip6->ip6_dst,
 				 sizeof(ip6->ip6_dst));
 	}
+	if (!ND_TTEST(rp->rm_call.cb_proc))
+		return (0);
 	xmep->proc = GET_BE_U_4(&rp->rm_call.cb_proc);
+	if (!ND_TTEST(rp->rm_call.cb_vers))
+		return (0);
 	xmep->vers = GET_BE_U_4(&rp->rm_call.cb_vers);
 	return (1);
 }
