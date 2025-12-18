@@ -142,7 +142,13 @@ CHERIBSDTEST(colocation_coexec_child,
 static void
 coaccept_slow_cf(void)
 {
-	pid_t caller_pid, my_pid, parent_pid, recvd_pid;
+	pid_t caller_pid, parent_pid;
+	/*
+	 * We use intcapt_t instead of pid_t because the cocall API requires
+	 * that their sizes and addresses are 16-byte aligned.
+	 */
+	intcap_t my_pid;
+	intcap_t recvd_pid;
 	int error;
 
 	if (!is_colocated_with_parent())
@@ -159,13 +165,13 @@ coaccept_slow_cf(void)
 	if (error != 0)
 		err(EX_OSERR, "coregister");
 
-	error = coaccept_slow(NULL, NULL, 0, &recvd_pid, sizeof(recvd_pid));
-	if (error != 0)
+	error = coaccept_slow(NULL, &my_pid, sizeof(my_pid), &recvd_pid, sizeof(recvd_pid));
+	if (error < 0)
 		err(EX_OSERR, "coaccept");
 
 	if (parent_pid != recvd_pid)
 		errx(EX_SOFTWARE, "parent_pid %d != recvd_pid %d", parent_pid,
-		    recvd_pid);
+		    (pid_t) recvd_pid);
 
 	error = cogetpid(&caller_pid);
 	if (error != 0)
@@ -178,7 +184,9 @@ coaccept_slow_cf(void)
 	 * Return from cocall.  Should never return as there won't be
 	 * another cocall.
 	 */
-	(void) coaccept_slow(NULL, &my_pid, sizeof(my_pid), NULL, 0);
+	error = coaccept_slow(NULL, &my_pid, sizeof(my_pid), &recvd_pid, sizeof(recvd_pid));
+	if (error < 0)
+		err(EX_OSERR, "coaccept");
 	err(EX_SOFTWARE, "Second coaccept returned.");
 }
 
@@ -186,7 +194,13 @@ CHERIBSDTEST(colocation_coaccept_slow,
     "Configure the child to coaccept and handle one cocall",
     .ct_child_func = coaccept_slow_cf)
 {
-	pid_t fork_pid, my_pid, recvd_pid;
+	pid_t fork_pid;
+	/*
+	 * We use intcapt_t instead of pid_t because the cocall API requires
+	 * that their sizes and addresses are 16-byte aligned.
+	 */
+	intcap_t my_pid;
+	intcap_t recvd_pid;
 	int pfd;
 
 	if (is_colocated_with_parent())
@@ -231,14 +245,14 @@ CHERIBSDTEST(colocation_coaccept_slow,
 		 * XXX: set a timeout?
 		 */
 		while ((error = cocall_slow(target, &my_pid, sizeof(my_pid),
-		    &recvd_pid, sizeof(recvd_pid))) != 0 && errno == EAGAIN)
+		    &recvd_pid, sizeof(recvd_pid))) < 0 && errno == EAGAIN)
 			;
-		if (error != 0)
+		if (error < 0)
 			cheribsdtest_failure_err("cocall");
 
 		if (recvd_pid != fork_pid) {
 			cheribsdtest_failure_errx("recvd_pid %d != fork_pid %d",
-			    recvd_pid, fork_pid);
+			    (pid_t) recvd_pid, fork_pid);
 		}
 
 		/*
