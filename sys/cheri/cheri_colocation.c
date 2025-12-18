@@ -563,14 +563,14 @@ switcher_code_cap(struct thread *td, ptraddr_t base, size_t length)
 	 */
 	codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
 	    base, length, 0);
-#ifndef __aarch64__
+
 	/*
 	 * XXX: Somehow makes every attempt at ldr/str in the switcher
 	 *      fail with capability fault.
 	 */
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 		codecap = cheri_capmode(codecap);
-#endif
+
 	return (codecap);
 }
 

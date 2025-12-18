@@ -34,6 +34,7 @@
 
 #include <sys/elf_common.h>
 #include <sys/syscall.h>
+
 #include <machine/asm.h>
 #include <machine/cherireg.h>
 #include <machine/switcher.h>
@@ -145,8 +146,8 @@ SIGCODE(switcher_coaccept)
 	 */
 	ldr	x9, SCB_BORROWER_TD(c8)
 	cbnz	x9, 4f
-	ldr	x11, SCB_TD(c8)
-	str	x11, SCB_BORROWER_TD(c29)
+	ldr	c11, SCB_TD(c8)
+	str	c11, SCB_BORROWER_TD(c29)
 	b	5f
 4:
 	str	xzr, SCB_BORROWER_TD(c8)
@@ -223,9 +224,9 @@ use_cocall_output_buffer_len:
 	mov	x14, x13
 
 copy_loop:
-	add	x13, x13, #-8
-	ldr	x11, [c3, x13]
-	str	x11, [c12, x13]
+	add	x13, x13, #-16
+	ldr	c11, [c3, x13]
+	str	c11, [c12, x13]
 	cbnz	x13, copy_loop
 
 	/*
@@ -270,11 +271,11 @@ copy_loop:
 END(switcher_coaccept)
 
 eswitcher_coaccept:
-
 	.data
 	.align	3
 	.globl szswitcher_coaccept
 	.type szswitcher_coaccept,@object
+
 szswitcher_coaccept:
 	.long eswitcher_coaccept - switcher_coaccept
 	.size szswitcher_coaccept, . - szswitcher_coaccept
