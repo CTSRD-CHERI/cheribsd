@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)filedesc.h	8.1 (Berkeley) 6/2/93
  */
 
 #ifndef _SYS_FILEDESC_H_
@@ -336,6 +334,8 @@ fd_modified(struct filedesc *fdp, int fd, seqc_t seqc)
 	return (!seqc_consistent(fd_seqc(fdp->fd_files, fd), seqc));
 }
 #endif
+
+int	proc_nfiles(struct proc *p);
 
 /* cdir/rdir/jdir manipulation functions. */
 struct pwddesc *pdcopy(struct pwddesc *pdp);

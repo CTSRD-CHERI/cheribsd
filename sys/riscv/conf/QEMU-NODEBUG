@@ -1,6 +1,6 @@
 #NO_UNIVERSE
 
 include "QEMU"
-include "../../conf/std.nodebug"
+include "std.nodebug"
 
 ident QEMU-NODEBUG

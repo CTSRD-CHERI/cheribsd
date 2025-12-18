@@ -32,8 +32,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)kern_exit.c	8.7 (Berkeley) 2/12/94
  */
 
 #include <sys/cdefs.h>
@@ -822,14 +820,14 @@ kern_abort2(struct thread *td, const char * __capability why, int nargs,
 		if (error < 0)
 			goto out;
 	} else {
-		sbuf_printf(sb, "(null)");
+		sbuf_cat(sb, "(null)");
 	}
 	if (nargs > 0) {
-		sbuf_printf(sb, "(");
+		sbuf_putc(sb, '(');
 		for (i = 0;i < nargs; i++)
 			sbuf_printf(sb, "%s%p", i == 0 ? "" : ", ",
 			    (__cheri_fromcap void *)uargs[i]);
-		sbuf_printf(sb, ")");
+		sbuf_putc(sb, ')');
 	}
 	/*
 	 * Final stage: arguments were proper, string has been
@@ -840,14 +838,15 @@ kern_abort2(struct thread *td, const char * __capability why, int nargs,
 out:
 	if (sig == SIGKILL) {
 		sbuf_trim(sb);
-		sbuf_printf(sb, " (Reason text inaccessible)");
+		sbuf_cat(sb, " (Reason text inaccessible)");
 	}
 	sbuf_cat(sb, "\n");
 	sbuf_finish(sb);
 	log(LOG_INFO, "%s", sbuf_data(sb));
 	sbuf_delete(sb);
-	exit1(td, 0, sig);
-	return (0);
+	PROC_LOCK(p);
+	sigexit(td, sig);
+	/* NOTREACHED */
 }
 
 #ifdef COMPAT_43
@@ -1385,11 +1384,12 @@ loop_locked:
 		 * When running in capsicum(4) mode, make wait(2) ignore
 		 * processes created with pdfork(2).  This is because one can
 		 * disown them - by passing their process descriptor to another
-		 * process - which needs to prevent it from touching them
-		 * afterwards.
+		 * process - which means it needs to be prevented from touching
+		 * them afterwards.
 		 */
 		if (IN_CAPABILITY_MODE(td) && p->p_procdesc != NULL) {
 			printf("%s: pid %d (%s) has procdesc\n", __func__, p->p_pid, p->p_comm);
+			PROC_UNLOCK(p);
 			continue;
 		}
 

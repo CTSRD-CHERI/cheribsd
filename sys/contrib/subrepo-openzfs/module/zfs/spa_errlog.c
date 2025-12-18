@@ -180,7 +180,7 @@ static int get_head_ds(spa_t *spa, uint64_t dsobj, uint64_t *head_ds)
  * during spa_errlog_sync().
  */
 void
-spa_log_error(spa_t *spa, const zbookmark_phys_t *zb, const uint64_t *birth)
+spa_log_error(spa_t *spa, const zbookmark_phys_t *zb, const uint64_t birth)
 {
 	spa_error_entry_t search;
 	spa_error_entry_t *new;
@@ -223,13 +223,7 @@ spa_log_error(spa_t *spa, const zbookmark_phys_t *zb, const uint64_t *birth)
 		new->se_zep.zb_object = zb->zb_object;
 		new->se_zep.zb_level = zb->zb_level;
 		new->se_zep.zb_blkid = zb->zb_blkid;
-
-		/*
-		 * birth may end up being NULL, e.g. in zio_done(). We
-		 * will handle this in process_error_block().
-		 */
-		if (birth != NULL)
-			new->se_zep.zb_birth = *birth;
+		new->se_zep.zb_birth = birth;
 	}
 
 	avl_insert(tree, new, where);
@@ -258,7 +252,7 @@ find_birth_txg(dsl_dataset_t *ds, zbookmark_err_phys_t *zep,
 	if (error == 0 && BP_IS_HOLE(&bp))
 		error = SET_ERROR(ENOENT);
 
-	*birth_txg = bp.blk_birth;
+	*birth_txg = BP_GET_LOGICAL_BIRTH(&bp);
 	rw_exit(&dn->dn_struct_rwlock);
 	dnode_rele(dn, FTAG);
 	return (error);
@@ -425,15 +419,17 @@ check_filesystem(spa_t *spa, uint64_t head_ds, zbookmark_err_phys_t *zep,
 		dsl_dataset_rele_flags(ds, DS_HOLD_FLAG_DECRYPT, FTAG);
 	}
 
-	if (zap_clone == 0 || aff_snap_count == 0)
-		return (0);
+	if (zap_clone == 0 || aff_snap_count == 0) {
+		error = 0;
+		goto out;
+	}
 
 	/* Check clones. */
 	zap_cursor_t *zc;
 	zap_attribute_t *za;
 
 	zc = kmem_zalloc(sizeof (zap_cursor_t), KM_SLEEP);
-	za = kmem_zalloc(sizeof (zap_attribute_t), KM_SLEEP);
+	za = zap_attribute_alloc();
 
 	for (zap_cursor_init(zc, spa->spa_meta_objset, zap_clone);
 	    zap_cursor_retrieve(zc, za) == 0;
@@ -467,7 +463,7 @@ check_filesystem(spa_t *spa, uint64_t head_ds, zbookmark_err_phys_t *zep,
 	}
 
 	zap_cursor_fini(zc);
-	kmem_free(za, sizeof (*za));
+	zap_attribute_free(za);
 	kmem_free(zc, sizeof (*zc));
 
 out:
@@ -533,7 +529,7 @@ process_error_block(spa_t *spa, uint64_t head_ds, zbookmark_err_phys_t *zep,
 		 */
 		zbookmark_phys_t zb;
 		zep_to_zb(head_ds, zep, &zb);
-		spa_remove_error(spa, &zb, &zep->zb_birth);
+		spa_remove_error(spa, &zb, zep->zb_birth);
 	}
 
 	return (error);
@@ -561,7 +557,7 @@ spa_get_last_errlog_size(spa_t *spa)
  */
 static void
 spa_add_healed_error(spa_t *spa, uint64_t obj, zbookmark_phys_t *healed_zb,
-    const uint64_t *birth)
+    const uint64_t birth)
 {
 	char name[NAME_MAX_LEN];
 
@@ -616,19 +612,15 @@ spa_add_healed_error(spa_t *spa, uint64_t obj, zbookmark_phys_t *healed_zb,
 	healed_zep.zb_object = healed_zb->zb_object;
 	healed_zep.zb_level = healed_zb->zb_level;
 	healed_zep.zb_blkid = healed_zb->zb_blkid;
-
-	if (birth != NULL)
-		healed_zep.zb_birth = *birth;
-	else
-		healed_zep.zb_birth = 0;
+	healed_zep.zb_birth = birth;
 
 	errphys_to_name(&healed_zep, name, sizeof (name));
 
 	zap_cursor_t zc;
-	zap_attribute_t za;
+	zap_attribute_t *za = zap_attribute_alloc();
 	for (zap_cursor_init(&zc, spa->spa_meta_objset, spa->spa_errlog_last);
-	    zap_cursor_retrieve(&zc, &za) == 0; zap_cursor_advance(&zc)) {
-		if (zap_contains(spa->spa_meta_objset, za.za_first_integer,
+	    zap_cursor_retrieve(&zc, za) == 0; zap_cursor_advance(&zc)) {
+		if (zap_contains(spa->spa_meta_objset, za->za_first_integer,
 		    name) == 0) {
 			if (!MUTEX_HELD(&spa->spa_errlog_lock)) {
 				mutex_enter(&spa->spa_errlog_lock);
@@ -665,6 +657,7 @@ spa_add_healed_error(spa_t *spa, uint64_t obj, zbookmark_phys_t *healed_zb,
 		}
 	}
 	zap_cursor_fini(&zc);
+	zap_attribute_free(za);
 }
 
 /*
@@ -712,24 +705,25 @@ spa_remove_healed_errors(spa_t *spa, avl_tree_t *s, avl_tree_t *l, dmu_tx_t *tx)
 		} else {
 			errphys_to_name(&se->se_zep, name, sizeof (name));
 			zap_cursor_t zc;
-			zap_attribute_t za;
+			zap_attribute_t *za = zap_attribute_alloc();
 			for (zap_cursor_init(&zc, spa->spa_meta_objset,
 			    spa->spa_errlog_last);
-			    zap_cursor_retrieve(&zc, &za) == 0;
+			    zap_cursor_retrieve(&zc, za) == 0;
 			    zap_cursor_advance(&zc)) {
 				zap_remove(spa->spa_meta_objset,
-				    za.za_first_integer, name, tx);
+				    za->za_first_integer, name, tx);
 			}
 			zap_cursor_fini(&zc);
 
 			for (zap_cursor_init(&zc, spa->spa_meta_objset,
 			    spa->spa_errlog_scrub);
-			    zap_cursor_retrieve(&zc, &za) == 0;
+			    zap_cursor_retrieve(&zc, za) == 0;
 			    zap_cursor_advance(&zc)) {
 				zap_remove(spa->spa_meta_objset,
-				    za.za_first_integer, name, tx);
+				    za->za_first_integer, name, tx);
 			}
 			zap_cursor_fini(&zc);
+			zap_attribute_free(za);
 		}
 		kmem_free(se, sizeof (spa_error_entry_t));
 	}
@@ -740,7 +734,7 @@ spa_remove_healed_errors(spa_t *spa, avl_tree_t *s, avl_tree_t *l, dmu_tx_t *tx)
  * later in spa_remove_healed_errors().
  */
 void
-spa_remove_error(spa_t *spa, zbookmark_phys_t *zb, const uint64_t *birth)
+spa_remove_error(spa_t *spa, zbookmark_phys_t *zb, uint64_t birth)
 {
 	spa_add_healed_error(spa, spa->spa_errlog_last, zb, birth);
 	spa_add_healed_error(spa, spa->spa_errlog_scrub, zb, birth);
@@ -754,15 +748,16 @@ approx_errlog_size_impl(spa_t *spa, uint64_t spa_err_obj)
 	uint64_t total = 0;
 
 	zap_cursor_t zc;
-	zap_attribute_t za;
+	zap_attribute_t *za = zap_attribute_alloc();
 	for (zap_cursor_init(&zc, spa->spa_meta_objset, spa_err_obj);
-	    zap_cursor_retrieve(&zc, &za) == 0; zap_cursor_advance(&zc)) {
+	    zap_cursor_retrieve(&zc, za) == 0; zap_cursor_advance(&zc)) {
 		uint64_t count;
-		if (zap_count(spa->spa_meta_objset, za.za_first_integer,
+		if (zap_count(spa->spa_meta_objset, za->za_first_integer,
 		    &count) == 0)
 			total += count;
 	}
 	zap_cursor_fini(&zc);
+	zap_attribute_free(za);
 	return (total);
 }
 
@@ -814,7 +809,7 @@ sync_upgrade_errlog(spa_t *spa, uint64_t spa_err_obj, uint64_t *newobj,
     dmu_tx_t *tx)
 {
 	zap_cursor_t zc;
-	zap_attribute_t za;
+	zap_attribute_t *za;
 	zbookmark_phys_t zb;
 	uint64_t count;
 
@@ -830,14 +825,15 @@ sync_upgrade_errlog(spa_t *spa, uint64_t spa_err_obj, uint64_t *newobj,
 		return;
 	}
 
+	za = zap_attribute_alloc();
 	for (zap_cursor_init(&zc, spa->spa_meta_objset, spa_err_obj);
-	    zap_cursor_retrieve(&zc, &za) == 0;
+	    zap_cursor_retrieve(&zc, za) == 0;
 	    zap_cursor_advance(&zc)) {
 		if (spa_upgrade_errlog_limit != 0 &&
 		    zc.zc_cd == spa_upgrade_errlog_limit)
 			break;
 
-		name_to_bookmark(za.za_name, &zb);
+		name_to_bookmark(za->za_name, &zb);
 
 		zbookmark_err_phys_t zep;
 		zep.zb_object = zb.zb_object;
@@ -888,7 +884,7 @@ sync_upgrade_errlog(spa_t *spa, uint64_t spa_err_obj, uint64_t *newobj,
 		if (error == EACCES)
 			error = 0;
 		else if (!error)
-			zep.zb_birth = bp.blk_birth;
+			zep.zb_birth = BP_GET_LOGICAL_BIRTH(&bp);
 
 		rw_exit(&dn->dn_struct_rwlock);
 		dnode_rele(dn, FTAG);
@@ -917,6 +913,7 @@ sync_upgrade_errlog(spa_t *spa, uint64_t spa_err_obj, uint64_t *newobj,
 		    buf, 1, strlen(name) + 1, name, tx);
 	}
 	zap_cursor_fini(&zc);
+	zap_attribute_free(za);
 
 	VERIFY0(dmu_object_free(spa->spa_meta_objset, spa_err_obj, tx));
 }
@@ -930,12 +927,21 @@ spa_upgrade_errlog(spa_t *spa, dmu_tx_t *tx)
 	if (spa->spa_errlog_last != 0) {
 		sync_upgrade_errlog(spa, spa->spa_errlog_last, &newobj, tx);
 		spa->spa_errlog_last = newobj;
+
+		(void) zap_update(spa->spa_meta_objset,
+		    DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_ERRLOG_LAST,
+		    sizeof (uint64_t), 1, &spa->spa_errlog_last, tx);
 	}
 
 	if (spa->spa_errlog_scrub != 0) {
 		sync_upgrade_errlog(spa, spa->spa_errlog_scrub, &newobj, tx);
 		spa->spa_errlog_scrub = newobj;
+
+		(void) zap_update(spa->spa_meta_objset,
+		    DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_ERRLOG_SCRUB,
+		    sizeof (uint64_t), 1, &spa->spa_errlog_scrub, tx);
 	}
+
 	mutex_exit(&spa->spa_errlog_lock);
 }
 
@@ -953,7 +959,7 @@ process_error_log(spa_t *spa, uint64_t obj, void * __capability uaddr, uint64_t 
 	zap_attribute_t *za;
 
 	zc = kmem_zalloc(sizeof (zap_cursor_t), KM_SLEEP);
-	za = kmem_zalloc(sizeof (zap_attribute_t), KM_SLEEP);
+	za = zap_attribute_alloc();
 
 	if (!spa_feature_is_enabled(spa, SPA_FEATURE_HEAD_ERRLOG)) {
 		for (zap_cursor_init(zc, spa->spa_meta_objset, obj);
@@ -962,7 +968,7 @@ process_error_log(spa_t *spa, uint64_t obj, void * __capability uaddr, uint64_t 
 			if (*count == 0) {
 				zap_cursor_fini(zc);
 				kmem_free(zc, sizeof (*zc));
-				kmem_free(za, sizeof (*za));
+				zap_attribute_free(za);
 				return (SET_ERROR(ENOMEM));
 			}
 
@@ -973,13 +979,13 @@ process_error_log(spa_t *spa, uint64_t obj, void * __capability uaddr, uint64_t 
 			if (error != 0) {
 				zap_cursor_fini(zc);
 				kmem_free(zc, sizeof (*zc));
-				kmem_free(za, sizeof (*za));
+				zap_attribute_free(za);
 				return (error);
 			}
 		}
 		zap_cursor_fini(zc);
 		kmem_free(zc, sizeof (*zc));
-		kmem_free(za, sizeof (*za));
+		zap_attribute_free(za);
 		return (0);
 	}
 
@@ -991,7 +997,7 @@ process_error_log(spa_t *spa, uint64_t obj, void * __capability uaddr, uint64_t 
 		zap_attribute_t *head_ds_attr;
 
 		head_ds_cursor = kmem_zalloc(sizeof (zap_cursor_t), KM_SLEEP);
-		head_ds_attr = kmem_zalloc(sizeof (zap_attribute_t), KM_SLEEP);
+		head_ds_attr = zap_attribute_alloc();
 
 		uint64_t head_ds_err_obj = za->za_first_integer;
 		uint64_t head_ds;
@@ -1009,20 +1015,20 @@ process_error_log(spa_t *spa, uint64_t obj, void * __capability uaddr, uint64_t 
 				zap_cursor_fini(head_ds_cursor);
 				kmem_free(head_ds_cursor,
 				    sizeof (*head_ds_cursor));
-				kmem_free(head_ds_attr, sizeof (*head_ds_attr));
+				zap_attribute_free(head_ds_attr);
 
 				zap_cursor_fini(zc);
-				kmem_free(za, sizeof (*za));
+				zap_attribute_free(za);
 				kmem_free(zc, sizeof (*zc));
 				return (error);
 			}
 		}
 		zap_cursor_fini(head_ds_cursor);
 		kmem_free(head_ds_cursor, sizeof (*head_ds_cursor));
-		kmem_free(head_ds_attr, sizeof (*head_ds_attr));
+		zap_attribute_free(head_ds_attr);
 	}
 	zap_cursor_fini(zc);
-	kmem_free(za, sizeof (*za));
+	zap_attribute_free(za);
 	kmem_free(zc, sizeof (*zc));
 	return (0);
 }
@@ -1229,14 +1235,15 @@ delete_errlog(spa_t *spa, uint64_t spa_err_obj, dmu_tx_t *tx)
 {
 	if (spa_feature_is_enabled(spa, SPA_FEATURE_HEAD_ERRLOG)) {
 		zap_cursor_t zc;
-		zap_attribute_t za;
+		zap_attribute_t *za = zap_attribute_alloc();
 		for (zap_cursor_init(&zc, spa->spa_meta_objset, spa_err_obj);
-		    zap_cursor_retrieve(&zc, &za) == 0;
+		    zap_cursor_retrieve(&zc, za) == 0;
 		    zap_cursor_advance(&zc)) {
 			VERIFY0(dmu_object_free(spa->spa_meta_objset,
-			    za.za_first_integer, tx));
+			    za->za_first_integer, tx));
 		}
 		zap_cursor_fini(&zc);
+		zap_attribute_free(za);
 	}
 	VERIFY0(dmu_object_free(spa->spa_meta_objset, spa_err_obj, tx));
 }
@@ -1338,20 +1345,21 @@ delete_dataset_errlog(spa_t *spa, uint64_t spa_err_obj, uint64_t ds,
 		return;
 
 	zap_cursor_t zc;
-	zap_attribute_t za;
+	zap_attribute_t *za = zap_attribute_alloc();
 	for (zap_cursor_init(&zc, spa->spa_meta_objset, spa_err_obj);
-	    zap_cursor_retrieve(&zc, &za) == 0; zap_cursor_advance(&zc)) {
+	    zap_cursor_retrieve(&zc, za) == 0; zap_cursor_advance(&zc)) {
 		uint64_t head_ds;
-		name_to_object(za.za_name, &head_ds);
+		name_to_object(za->za_name, &head_ds);
 		if (head_ds == ds) {
 			(void) zap_remove(spa->spa_meta_objset, spa_err_obj,
-			    za.za_name, tx);
+			    za->za_name, tx);
 			VERIFY0(dmu_object_free(spa->spa_meta_objset,
-			    za.za_first_integer, tx));
+			    za->za_first_integer, tx));
 			break;
 		}
 	}
 	zap_cursor_fini(&zc);
+	zap_attribute_free(za);
 }
 
 void
@@ -1434,22 +1442,23 @@ swap_errlog(spa_t *spa, uint64_t spa_err_obj, uint64_t new_head, uint64_t
 	}
 
 	zap_cursor_t zc;
-	zap_attribute_t za;
+	zap_attribute_t *za = zap_attribute_alloc();
 	zbookmark_err_phys_t err_block;
 	for (zap_cursor_init(&zc, spa->spa_meta_objset, old_head_errlog);
-	    zap_cursor_retrieve(&zc, &za) == 0; zap_cursor_advance(&zc)) {
+	    zap_cursor_retrieve(&zc, za) == 0; zap_cursor_advance(&zc)) {
 
 		const char *name = "";
-		name_to_errphys(za.za_name, &err_block);
+		name_to_errphys(za->za_name, &err_block);
 		if (err_block.zb_birth < txg) {
 			(void) zap_update(spa->spa_meta_objset, new_head_errlog,
-			    za.za_name, 1, strlen(name) + 1, name, tx);
+			    za->za_name, 1, strlen(name) + 1, name, tx);
 
 			(void) zap_remove(spa->spa_meta_objset, old_head_errlog,
-			    za.za_name, tx);
+			    za->za_name, tx);
 		}
 	}
 	zap_cursor_fini(&zc);
+	zap_attribute_free(za);
 }
 
 void

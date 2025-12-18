@@ -42,9 +42,9 @@
 #include <machine/bus.h>
 #include <machine/resource.h>
 
-#include <dev/extres/clk/clk.h>
-#include <dev/extres/hwreset/hwreset.h>
-#include <dev/extres/phy/phy.h>
+#include <dev/clk/clk.h>
+#include <dev/hwreset/hwreset.h>
+#include <dev/phy/phy.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 #include <dev/usb/usb.h>
@@ -259,7 +259,7 @@ tegra_ehci_attach(device_t dev)
 	}
 
 	/* Add USB bus device. */
-	esc->sc_bus.bdev = device_add_child(dev, "usbus", -1);
+	esc->sc_bus.bdev = device_add_child(dev, "usbus", DEVICE_UNIT_ANY);
 	if (esc->sc_bus.bdev == NULL) {
 		device_printf(dev, "Could not add USB device\n");
 		goto out;

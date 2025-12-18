@@ -102,6 +102,8 @@ void *bootpcpu;
 
 extern u_int mptramp_la57;
 extern u_int mptramp_nx;
+smp_targeted_tlb_shootdown_t smp_targeted_tlb_shootdown =
+    &smp_targeted_tlb_shootdown_native;
 
 /*
  * Local data and functions.
@@ -300,11 +302,12 @@ amd64_mp_alloc_pcpu(void)
 		m = NULL;
 		if (vm_ndomains > 1) {
 			m = vm_page_alloc_noobj_domain(
-			    acpi_pxm_get_cpu_locality(cpu_apic_ids[cpu]), 0);
+			    acpi_pxm_get_cpu_locality(cpu_apic_ids[cpu]),
+			    VM_ALLOC_ZERO);
 		}
 		if (m == NULL)
 #endif
-			m = vm_page_alloc_noobj(0);
+			m = vm_page_alloc_noobj(VM_ALLOC_ZERO);
 		if (m == NULL)
 			panic("cannot alloc pcpu page for cpu %d", cpu);
 		pmap_qenter((vm_offset_t)&__pcpu[cpu], &m, 1);
@@ -497,24 +500,6 @@ start_ap(int apic_id, vm_paddr_t boot_address)
  */
 
 /*
- * Invalidation request.  PCPU pc_smp_tlb_op uses u_int instead of the
- * enum to avoid both namespace and ABI issues (with enums).
- */
-enum invl_op_codes {
-      INVL_OP_TLB		= 1,
-      INVL_OP_TLB_INVPCID	= 2,
-      INVL_OP_TLB_INVPCID_PTI	= 3,
-      INVL_OP_TLB_PCID		= 4,
-      INVL_OP_PGRNG		= 5,
-      INVL_OP_PGRNG_INVPCID	= 6,
-      INVL_OP_PGRNG_PCID	= 7,
-      INVL_OP_PG		= 8,
-      INVL_OP_PG_INVPCID	= 9,
-      INVL_OP_PG_PCID		= 10,
-      INVL_OP_CACHE		= 11,
-};
-
-/*
  * These variables are initialized at startup to reflect how each of
  * the different kinds of invalidations should be performed on the
  * current machine and environment.
@@ -599,9 +584,9 @@ invl_scoreboard_slot(u_int cpu)
  * Function must be called with the thread pinned, and it unpins on
  * completion.
  */
-static void
-smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
-    smp_invl_cb_t curcpu_cb, enum invl_op_codes op)
+void
+smp_targeted_tlb_shootdown_native(pmap_t pmap, vm_offset_t addr1,
+    vm_offset_t addr2, smp_invl_cb_t curcpu_cb, enum invl_op_codes op)
 {
 	cpuset_t mask;
 	uint32_t generation, *p_cpudone;
@@ -693,6 +678,20 @@ local_cb:
 void
 smp_masked_invltlb(pmap_t pmap, smp_invl_cb_t curcpu_cb)
 {
+	if (invlpgb_works && pmap == kernel_pmap) {
+		invlpgb(INVLPGB_GLOB, 0, 0);
+
+		/*
+		 * TLBSYNC syncs only against INVLPGB executed on the
+		 * same CPU.  Since current thread is pinned by
+		 * caller, we do not need to enter critical section to
+		 * prevent migration.
+		 */
+		tlbsync();
+		sched_unpin();
+		return;
+	}
+
 	smp_targeted_tlb_shootdown(pmap, 0, 0, curcpu_cb, invl_op_tlb);
 #ifdef COUNT_XINVLTLB_HITS
 	ipi_global++;
@@ -702,6 +701,13 @@ smp_masked_invltlb(pmap_t pmap, smp_invl_cb_t curcpu_cb)
 void
 smp_masked_invlpg(vm_offset_t addr, pmap_t pmap, smp_invl_cb_t curcpu_cb)
 {
+	if (invlpgb_works && pmap == kernel_pmap) {
+		invlpgb(INVLPGB_GLOB | INVLPGB_VA | trunc_page(addr), 0, 0);
+		tlbsync();
+		sched_unpin();
+		return;
+	}
+
 	smp_targeted_tlb_shootdown(pmap, addr, 0, curcpu_cb, invl_op_pg);
 #ifdef COUNT_XINVLTLB_HITS
 	ipi_page++;
@@ -712,6 +718,39 @@ void
 smp_masked_invlpg_range(vm_offset_t addr1, vm_offset_t addr2, pmap_t pmap,
     smp_invl_cb_t curcpu_cb)
 {
+	if (invlpgb_works && pmap == kernel_pmap) {
+		vm_offset_t va;
+		uint64_t cnt, total;
+
+		addr1 = trunc_page(addr1);
+		addr2 = round_page(addr2);
+		total = atop(addr2 - addr1);
+		for (va = addr1; total > 0;) {
+			if ((va & PDRMASK) != 0 || total < NPDEPG) {
+				cnt = atop(NBPDR - (va & PDRMASK));
+				if (cnt > total)
+					cnt = total;
+				if (cnt > invlpgb_maxcnt + 1)
+					cnt = invlpgb_maxcnt + 1;
+				invlpgb(INVLPGB_GLOB | INVLPGB_VA | va, 0,
+				    cnt - 1);
+				va += ptoa(cnt);
+				total -= cnt;
+			} else {
+				cnt = total / NPTEPG;
+				if (cnt > invlpgb_maxcnt + 1)
+					cnt = invlpgb_maxcnt + 1;
+				invlpgb(INVLPGB_GLOB | INVLPGB_VA | va, 0,
+				    INVLPGB_2M_CNT | (cnt - 1));
+				va += cnt << PDRSHIFT;
+				total -= cnt * NPTEPG;
+			}
+		}
+		tlbsync();
+		sched_unpin();
+		return;
+	}
+
 	smp_targeted_tlb_shootdown(pmap, addr1, addr2, curcpu_cb,
 	    invl_op_pgrng);
 #ifdef COUNT_XINVLTLB_HITS

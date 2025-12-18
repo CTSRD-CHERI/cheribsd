@@ -31,7 +31,6 @@
  * from specs given in a .conf file.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 
@@ -657,7 +656,7 @@ fillin_program(prog_t *p)
 	}
 
 	/* Unless the option to make object files was specified the
-	* the objects will be built in the source directory unless
+	* objects will be built in the source directory unless
 	* an object directory already exists.
 	*/
 	if (!makeobj && !p->objdir && p->srcdir) {
@@ -925,17 +924,23 @@ gen_output_cfile(void)
 		    "extern crunched_stub_t _crunched_%s_stub;\n",
 		    p->ident);
 
+	int n = 2; /* 2 because main and --list are added manually. */
 	fprintf(outcf, "\nstruct stub entry_points[] = {\n");
 	for (p = progs; p != NULL; p = p->next) {
+		n++;
 		fprintf(outcf, "\t{ \"%s\", _crunched_%s_stub },\n",
 		    p->name, p->ident);
-		for (s = p->links; s != NULL; s = s->next)
+		for (s = p->links; s != NULL; s = s->next) {
+			n++;
 			fprintf(outcf, "\t{ \"%s\", _crunched_%s_stub },\n",
 			    s->str, p->ident);
+		}
 	}
 
 	fprintf(outcf, "\t{ EXECNAME, crunched_main },\n");
-	fprintf(outcf, "\t{ NULL, NULL }\n};\n");
+	fprintf(outcf, "\t{ \"--list\", crunched_list }\n");
+	fprintf(outcf, "};\n\n");
+	fprintf(outcf, "int num_entry_points = %d;\n", n);
 	fclose(outcf);
 }
 
@@ -1115,8 +1120,8 @@ prog_makefile_rules(FILE *outmk, prog_t *p)
 	    "int _crunched_%s_stub(int argc, char **argv, char **envp)"
 	    "{return main(argc,argv,envp);}\" >%s_stub.c\n",
 	    p->ident, p->ident, p->name);
-	fprintf(outmk, "%s.lo: %s_stub.o $(%s_OBJPATHS)",
-	    p->name, p->name, p->ident);
+	fprintf(outmk, "%s.lo: %s_stub.o $(%s_OBJPATHS) %s",
+	    p->name, p->name, p->ident, outmkname);
 	if (p->libs)
 		fprintf(outmk, " $(%s_LIBS)", p->ident);
 
@@ -1128,7 +1133,7 @@ prog_makefile_rules(FILE *outmk, prog_t *p)
 	fprintf(outmk, "\n");
 	fprintf(outmk, "\tcrunchide -k _crunched_%s_stub ", p->ident);
 	for (lst = p->keeplist; lst != NULL; lst = lst->next)
-		fprintf(outmk, "-k _%s ", lst->str);
+		fprintf(outmk, "-k %s ", lst->str);
 	fprintf(outmk, "%s.lo\n", p->name);
 }
 

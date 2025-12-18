@@ -220,8 +220,10 @@ backtrace_symbols_fmt(void *const *trace, size_t len, const char *fmt)
 	}
 
 	/* Change offsets to pointers */
-	for (size_t j = 0; j < len; j++)
-		((char **)(void *)ptr)[j] += (intptr_t)ptr;
+	for (size_t j = 0; j < len; j++) {
+		ptrdiff_t ptr_offs = (intptr_t)((char **)(void *)ptr)[j];
+		((char **)(void *)ptr)[j] = ptr + ptr_offs;
+	}
 
 out:
 	symtab_destroy(st);

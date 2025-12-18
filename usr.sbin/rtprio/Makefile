@@ -1,5 +1,3 @@
-#	from: @(#)Makefile	5.5 (Berkeley) 5/11/90
-
 PROG=	rtprio
 LINKS=  ${BINDIR}/rtprio ${BINDIR}/idprio
 MLINKS= rtprio.1 idprio.1

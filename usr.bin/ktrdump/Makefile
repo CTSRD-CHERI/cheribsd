@@ -1,4 +1,3 @@
-
 PROG?=	ktrdump
 SRCS=	ktrdump.c
 LIBADD=	kvm

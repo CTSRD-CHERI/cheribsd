@@ -60,7 +60,8 @@
 #define	PTRDIFFT	0x800		/* ptrdiff_t */
 #define	INTMAXT		0x1000		/* intmax_t */
 #define	CHARINT		0x2000		/* print char using int format */
-#define	INTPTRT		0x4000		/* intptr_t */
+#define	FASTINT		0x4000		/* int_fastN_t */
+#define	INTPTRT		0x8000		/* intptr_t */
 
 /*
  * Macros for converting digits to letters and vice versa

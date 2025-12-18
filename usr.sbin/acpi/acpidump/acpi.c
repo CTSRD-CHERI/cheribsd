@@ -4,7 +4,11 @@
  * Copyright (c) 1998 Doug Rabson
  * Copyright (c) 2000 Mitsuru IWASAKI <iwasaki@FreeBSD.org>
  * Copyright (c) 2020 Alexander Motin <mav@FreeBSD.org>
+ * Copyright (c) 2024 The FreeBSD Foundation
  * All rights reserved.
+ *
+ * Portions of this software were developed by Konstantin Belousov
+ * under sponsorship from the FreeBSD Foundation.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,6 +40,7 @@
 #include <err.h>
 #include <fcntl.h>
 #include <paths.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -82,7 +87,7 @@ static void	acpi_print_facs(ACPI_TABLE_FACS *facs);
 static void	acpi_print_dsdt(ACPI_TABLE_HEADER *dsdp);
 static ACPI_TABLE_HEADER *acpi_map_sdt(vm_offset_t pa);
 static void	acpi_print_rsd_ptr(ACPI_TABLE_RSDP *rp);
-static void	acpi_handle_rsdt(ACPI_TABLE_HEADER *rsdp);
+static void	acpi_handle_rsdt(ACPI_TABLE_HEADER *rsdp, const char *elm);
 static void	acpi_walk_subtables(ACPI_TABLE_HEADER *table, void *first,
 		    void (*action)(ACPI_SUBTABLE_HEADER *));
 static void	acpi_walk_nfit(ACPI_TABLE_HEADER *table, void *first,
@@ -157,6 +162,18 @@ printflag(uint64_t var, uint64_t mask, const char *name)
 }
 
 static void
+printfield(uint64_t var, int lbit, int hbit, const char *name)
+{
+	uint64_t mask;
+	int len;
+
+	len = hbit - lbit + 1;
+	mask = ((1 << (len + 1)) - 1) << lbit;
+	printf("%c%s=%#jx", pf_sep, name, (uintmax_t)((var & mask) >> lbit));
+	pf_sep = ',';
+}
+
+static void
 acpi_print_string(char *s, size_t length)
 {
 	int	c;
@@ -209,7 +226,7 @@ acpi_print_gas(ACPI_GENERIC_ADDRESS *gas)
 
 /* The FADT revision indicates whether we use the DSDT or X_DSDT addresses. */
 static int
-acpi_get_fadt_revision(ACPI_TABLE_FADT *fadt)
+acpi_get_fadt_revision(ACPI_TABLE_FADT *fadt __unused)
 {
 	int fadt_revision;
 
@@ -258,7 +275,7 @@ acpi_handle_fadt(ACPI_TABLE_HEADER *sdp)
 	if (addr != 0) {
 		facs = (ACPI_TABLE_FACS *)acpi_map_sdt(addr);
 
-		if (memcmp(facs->Signature, ACPI_SIG_FACS, 4) != 0 ||
+		if (memcmp(facs->Signature, ACPI_SIG_FACS, ACPI_NAMESEG_SIZE) != 0 ||
 		    facs->Length < 64)
 			errx(1, "FACS is corrupt");
 		acpi_print_facs(facs);
@@ -1240,6 +1257,7 @@ acpi_handle_tcpa(ACPI_TABLE_HEADER *sdp)
 
 	printf(END_COMMENT);
 }
+
 static void acpi_handle_tpm2(ACPI_TABLE_HEADER *sdp)
 {
 	ACPI_TABLE_TPM2 *tpm2;
@@ -1251,21 +1269,161 @@ static void acpi_handle_tpm2(ACPI_TABLE_HEADER *sdp)
 	printf ("\t\tStartMethod=%x\n", tpm2->StartMethod);	
 	printf (END_COMMENT);
 }
-	
+
+static int spcr_xlate_baud(uint8_t r)
+{
+	static int rates[] = { 9600, 19200, -1, 57600, 115200 };
+	_Static_assert(nitems(rates) == 7 - 3 + 1, "rates array size incorrect");
+
+	if (r == 0)
+		return (0);
+
+	if (r < 3 || r > 7)
+		return (-1);
+
+	return (rates[r - 3]);
+}
+
+static const char *spcr_interface_type(int ift)
+{
+	static const char *if_names[] = {
+		[0x00] = "Fully 16550-compatible",
+		[0x01] = "16550 subset compatible with DBGP Revision 1",
+		[0x02] = "MAX311xE SPI UART",
+		[0x03] = "Arm PL011 UART",
+		[0x04] = "MSM8x60 (e.g. 8960)",
+		[0x05] = "Nvidia 16550",
+		[0x06] = "TI OMAP",
+		[0x07] = "Reserved (Do Not Use)",
+		[0x08] = "APM88xxxx",
+		[0x09] = "MSM8974",
+		[0x0a] = "SAM5250",
+		[0x0b] = "Intel USIF",
+		[0x0c] = "i.MX 6",
+		[0x0d] = "(deprecated) Arm SBSA (2.x only) Generic UART supporting only 32-bit accesses",
+		[0x0e] = "Arm SBSA Generic UART",
+		[0x0f] = "Arm DCC",
+		[0x10] = "BCM2835",
+		[0x11] = "SDM845 with clock rate of 1.8432 MHz",
+		[0x12] = "16550-compatible with parameters defined in Generic Address Structure",
+		[0x13] = "SDM845 with clock rate of 7.372 MHz",
+		[0x14] = "Intel LPSS",
+		[0x15] = "RISC-V SBI console (any supported SBI mechanism)",
+	};
+
+	if (ift >= (int)nitems(if_names) || if_names[ift] == NULL)
+		return ("Reserved");
+	return (if_names[ift]);
+}
+
+static const char *spcr_interrupt_type(int ift)
+{
+	static char buf[100];
+
+#define APPEND(b,s) \
+	if ((ift & (b)) != 0) { \
+		if (strlen(buf) > 0) \
+			strlcat(buf, ",", sizeof(buf)); \
+		strlcat(buf, s, sizeof(buf)); \
+	}
+
+	*buf = '\0';
+	APPEND(0x01, "PC/AT IRQ");
+	APPEND(0x02, "I/O APIC");
+	APPEND(0x04, "I/O SAPIC");
+	APPEND(0x08, "ARMH GIC");
+	APPEND(0x10, "RISC-V PLIC/APLIC");
+
+#undef APPEND
+
+	return (buf);
+}
+
+static const char *spcr_terminal_type(int type)
+{
+	static const char *term_names[] = {
+		[0] = "VT100",
+		[1] = "Extended VT100",
+		[2] = "VT-UTF8",
+		[3] = "ANSI",
+	};
+
+	if (type >= (int)nitems(term_names) || term_names[type] == NULL)
+		return ("Reserved");
+	return (term_names[type]);
+}
+
+static void acpi_handle_spcr(ACPI_TABLE_HEADER *sdp)
+{
+	ACPI_TABLE_SPCR *spcr;
+
+	printf (BEGIN_COMMENT);
+	acpi_print_sdt(sdp);
+
+	/* Rev 1 and 2 are the same size */
+	spcr = (ACPI_TABLE_SPCR *) sdp;
+	printf ("\tInterfaceType=%d (%s)\n", spcr->InterfaceType,
+	    spcr_interface_type(spcr->InterfaceType));
+	printf ("\tSerialPort=");
+	acpi_print_gas(&spcr->SerialPort);
+	printf ("\n\tInterruptType=%#x (%s)\n", spcr->InterruptType,
+	    spcr_interrupt_type(spcr->InterruptType));
+	printf ("\tPcInterrupt=%d (%s)\n", spcr->PcInterrupt,
+	    (spcr->InterruptType & 0x1) ? "Valid" : "Invalid");
+	printf ("\tInterrupt=%d\n", spcr->Interrupt);
+	printf ("\tBaudRate=%d (%d)\n", spcr_xlate_baud(spcr->BaudRate), spcr->BaudRate);
+	printf ("\tParity=%d\n", spcr->Parity);
+	printf ("\tStopBits=%d\n", spcr->StopBits);
+	printf ("\tFlowControl=%d\n", spcr->FlowControl);
+	printf ("\tTerminalType=%d (%s)\n", spcr->TerminalType,
+	    spcr_terminal_type(spcr->TerminalType));
+	printf ("\tPciDeviceId=%#04x\n", spcr->PciDeviceId);
+	printf ("\tPciVendorId=%#04x\n", spcr->PciVendorId);
+	printf ("\tPciBus=%d\n", spcr->PciBus);
+	printf ("\tPciDevice=%d\n", spcr->PciDevice);
+	printf ("\tPciFunction=%d\n", spcr->PciFunction);
+	printf ("\tPciFlags=%d\n", spcr->PciFlags);
+	printf ("\tPciSegment=%d\n", spcr->PciSegment);
+
+	/* Rev 3 added UartClkFrequency */
+	if (sdp->Revision >= 3) {
+		printf("\tLanguage=%d\n", spcr->Language);
+		printf("\tUartClkFreq=%jd",
+		    (uintmax_t)spcr->UartClkFreq);
+	}
+
+	/* Rev 4 added PreciseBaudrate and NameSpace* */
+	if (sdp->Revision >= 4) {
+		printf("\tPreciseBaudrate=%jd",
+		    (uintmax_t)spcr->PreciseBaudrate);
+		if (spcr->NameSpaceStringLength > 0 &&
+		    spcr->NameSpaceStringOffset >= sizeof(*spcr) &&
+		    sdp->Length >= spcr->NameSpaceStringOffset +
+		        spcr->NameSpaceStringLength) {
+			printf ("\tNameSpaceString='%s'\n",
+			    (char *)sdp + spcr->NameSpaceStringOffset);
+		}
+	}
+
+	printf (END_COMMENT);
+}
+
 static const char *
 devscope_type2str(int type)
 {
 	static char typebuf[16];
 
 	switch (type) {
-	case 1:
+	case ACPI_DMAR_SCOPE_TYPE_ENDPOINT:
 		return ("PCI Endpoint Device");
-	case 2:
+	case ACPI_DMAR_SCOPE_TYPE_BRIDGE:
 		return ("PCI Sub-Hierarchy");
-	case 3:
+	case ACPI_DMAR_SCOPE_TYPE_IOAPIC:
 		return ("IOAPIC");
-	case 4:
+	case ACPI_DMAR_SCOPE_TYPE_HPET:
 		return ("HPET");
+	case ACPI_DMAR_SCOPE_TYPE_NAMESPACE:
+		return ("ACPI NS DEV");
 	default:
 		snprintf(typebuf, sizeof(typebuf), "%d", type);
 		return (typebuf);
@@ -1485,6 +1643,375 @@ acpi_handle_dmar(ACPI_TABLE_HEADER *sdp)
 }
 
 static void
+acpi_handle_ivrs_ivhd_header(ACPI_IVRS_HEADER *addr)
+{
+	printf("\n\tIVHD Type=%#x IOMMU DeviceId=%#06x\n\tFlags=",
+	    addr->Type, addr->DeviceId);
+#define PRINTFLAG(flag, name) printflag(addr->Flags, flag, #name)
+	PRINTFLAG(ACPI_IVHD_TT_ENABLE, HtTunEn);
+	PRINTFLAG(ACPI_IVHD_ISOC, PassPW);
+	PRINTFLAG(ACPI_IVHD_RES_PASS_PW, ResPassPW);
+	PRINTFLAG(ACPI_IVHD_ISOC, Isoc);
+	PRINTFLAG(ACPI_IVHD_TT_ENABLE, IotlbSup);
+	PRINTFLAG((1 << 5), Coherent);
+	PRINTFLAG((1 << 6), PreFSup);
+	PRINTFLAG((1 << 7), PPRSup);
+#undef PRINTFLAG
+	PRINTFLAG_END();
+}
+
+static void
+acpi_handle_ivrs_ivhd_dte(UINT8 dte)
+{
+	if (dte == 0) {
+		printf("\n");
+		return;
+	}
+	printf(" DTE=");
+#define PRINTFLAG(flag, name) printflag(dte, flag, #name)
+	PRINTFLAG(ACPI_IVHD_INIT_PASS, INITPass);
+	PRINTFLAG(ACPI_IVHD_EINT_PASS, EIntPass);
+	PRINTFLAG(ACPI_IVHD_NMI_PASS, NMIPass);
+	PRINTFLAG(ACPI_IVHD_SYSTEM_MGMT, SysMgtPass);
+	PRINTFLAG(ACPI_IVHD_LINT0_PASS, Lint0Pass);
+	PRINTFLAG(ACPI_IVHD_LINT1_PASS, Lint1Pass);
+#undef PRINTFLAG
+	PRINTFLAG_END();
+}
+
+static void
+acpi_handle_ivrs_ivhd_edte(UINT32 edte)
+{
+	if (edte == 0)
+		return;
+	printf("\t\t ExtDTE=");
+#define PRINTFLAG(flag, name) printflag(edte, flag, #name)
+	PRINTFLAG(ACPI_IVHD_ATS_DISABLED, AtsDisabled);
+#undef PRINTFLAG
+	PRINTFLAG_END();
+}
+
+static const char *
+acpi_handle_ivrs_ivhd_variety(UINT8 v)
+{
+	switch (v) {
+	case ACPI_IVHD_IOAPIC:
+		return ("IOAPIC");
+	case ACPI_IVHD_HPET:
+		return ("HPET");
+	default:
+		return ("UNKNOWN");
+	}
+}
+
+static void
+acpi_handle_ivrs_ivhd_devs(ACPI_IVRS_DE_HEADER *d, char *de)
+{
+	char *db;
+	ACPI_IVRS_DEVICE4 *d4;
+	ACPI_IVRS_DEVICE8A *d8a;
+	ACPI_IVRS_DEVICE8B *d8b;
+	ACPI_IVRS_DEVICE8C *d8c;
+	ACPI_IVRS_DEVICE_HID *dh;
+	size_t len;
+	UINT32 x32;
+
+	for (; (char *)d < de; d = (ACPI_IVRS_DE_HEADER *)(db + len)) {
+		db = (char *)d;
+		if (d->Type == ACPI_IVRS_TYPE_PAD4) {
+			len = sizeof(*d4);
+		} else if (d->Type == ACPI_IVRS_TYPE_ALL) {
+			d4 = (ACPI_IVRS_DEVICE4 *)db;
+			len = sizeof(*d4);
+			printf("\t\tDev Type=%#x Id=ALL", d4->Header.Type);
+			acpi_handle_ivrs_ivhd_dte(d4->Header.DataSetting);
+		} else if (d->Type == ACPI_IVRS_TYPE_SELECT) {
+			d4 = (ACPI_IVRS_DEVICE4 *)db;
+			len = sizeof(*d4);
+			printf("\t\tDev Type=%#x Id=%#06x", d4->Header.Type,
+			    d4->Header.Id);
+			acpi_handle_ivrs_ivhd_dte(d4->Header.DataSetting);
+		} else if (d->Type == ACPI_IVRS_TYPE_START) {
+			d4 = (ACPI_IVRS_DEVICE4 *)db;
+			len = 2 * sizeof(*d4);
+			printf("\t\tDev Type=%#x Id=%#06x-%#06x",
+			    d4->Header.Type,
+			    d4->Header.Id, (d4 + 1)->Header.Id);
+			acpi_handle_ivrs_ivhd_dte(d4->Header.DataSetting);
+		} else if (d->Type == ACPI_IVRS_TYPE_END) {
+			d4 = (ACPI_IVRS_DEVICE4 *)db;
+			len = 2 * sizeof(*d4);
+			printf("\t\tDev Type=%#x Id=%#06x BIOS BUG\n",
+			    d4->Header.Type, d4->Header.Id);
+		} else if (d->Type == ACPI_IVRS_TYPE_PAD8) {
+			len = sizeof(*d8a);
+		} else if (d->Type == ACPI_IVRS_TYPE_ALIAS_SELECT) {
+			d8a = (ACPI_IVRS_DEVICE8A *)db;
+			len = sizeof(*d8a);
+			printf("\t\tDev Type=%#x Id=%#06x AliasId=%#06x",
+			    d8a->Header.Type, d8a->Header.Id, d8a->UsedId);
+			acpi_handle_ivrs_ivhd_dte(d8a->Header.DataSetting);
+		} else if (d->Type == ACPI_IVRS_TYPE_ALIAS_START) {
+			d8a = (ACPI_IVRS_DEVICE8A *)db;
+			d4 = (ACPI_IVRS_DEVICE4 *)(db + sizeof(*d8a));
+			len = sizeof(*d8a) + sizeof(*d4);
+			printf("\t\tDev Type=%#x Id=%#06x-%#06x AliasId=%#06x",
+			    d8a->Header.Type, d8a->Header.Id, d4->Header.Id,
+			    d8a->UsedId);
+			acpi_handle_ivrs_ivhd_dte(d8a->Header.DataSetting);
+		} else if (d->Type == ACPI_IVRS_TYPE_EXT_SELECT) {
+			d8b = (ACPI_IVRS_DEVICE8B *)db;
+			len = sizeof(*d8b);
+			printf("\t\tDev Type=%#x Id=%#06x",
+			    d8a->Header.Type, d8a->Header.Id);
+			acpi_handle_ivrs_ivhd_dte(d8b->Header.DataSetting);
+			printf("\t\t");
+			acpi_handle_ivrs_ivhd_edte(d8b->ExtendedData);
+		} else if (d->Type == ACPI_IVRS_TYPE_EXT_START) {
+			d8b = (ACPI_IVRS_DEVICE8B *)db;
+			len = sizeof(*d8b);
+			d4 = (ACPI_IVRS_DEVICE4 *)(db + sizeof(*d8b));
+			len = sizeof(*d8b) + sizeof(*d4);
+			printf("\t\tDev Type=%#x Id=%#06x-%#06x",
+			    d8a->Header.Type, d8a->Header.Id, d4->Header.Id);
+			acpi_handle_ivrs_ivhd_dte(d8b->Header.DataSetting);
+			acpi_handle_ivrs_ivhd_edte(d8b->ExtendedData);
+		} else if (d->Type == ACPI_IVRS_TYPE_SPECIAL) {
+			d8c = (ACPI_IVRS_DEVICE8C *)db;
+			len = sizeof(*d8c);
+			printf("\t\tDev Type=%#x Id=%#06x Handle=%#x "
+			    "Variety=%d(%s)",
+			    d8c->Header.Type, d8c->UsedId, d8c->Handle,
+			    d8c->Variety,
+			    acpi_handle_ivrs_ivhd_variety(d8c->Variety));
+			acpi_handle_ivrs_ivhd_dte(d8c->Header.DataSetting);
+		} else if (d->Type == ACPI_IVRS_TYPE_HID) {
+			dh = (ACPI_IVRS_DEVICE_HID *)db;
+			len = sizeof(*dh) + dh->UidLength;
+			printf("\t\tDev Type=%#x Id=%#06x HID=",
+			    dh->Header.Type, dh->Header.Id);
+			acpi_print_string((char *)&dh->AcpiHid,
+			    sizeof(dh->AcpiHid));
+			printf(" CID=");
+			acpi_print_string((char *)&dh->AcpiCid,
+			    sizeof(dh->AcpiCid));
+			printf(" UID=");
+			switch (dh->UidType) {
+			case ACPI_IVRS_UID_NOT_PRESENT:
+			default:
+				printf("none");
+				break;
+			case ACPI_IVRS_UID_IS_INTEGER:
+				memcpy(&x32, dh + 1, sizeof(x32));
+				printf("%#x", x32);
+				break;
+			case ACPI_IVRS_UID_IS_STRING:
+				acpi_print_string((char *)(dh + 1),
+				    dh->UidLength);
+				break;
+			}
+			acpi_handle_ivrs_ivhd_dte(dh->Header.DataSetting);
+		} else {
+			printf("\t\tDev Type=%#x Unknown\n", d->Type);
+			if (d->Type <= 63)
+				len = sizeof(*d4);
+			else if (d->Type <= 127)
+				len = sizeof(*d8a);
+			else {
+				printf("Abort, cannot advance iterator.\n");
+				return;
+			}
+		}
+	}
+}
+
+static void
+acpi_handle_ivrs_ivhd_10(ACPI_IVRS_HARDWARE1 *addr, bool efrsup)
+{
+	acpi_handle_ivrs_ivhd_header(&addr->Header);
+	printf("\tCapOffset=%#x Base=%#jx PCISeg=%#x Unit=%#x MSIlog=%d\n",
+	    addr->CapabilityOffset, (uintmax_t)addr->BaseAddress,
+	    addr->PciSegmentGroup, (addr->Info & ACPI_IVHD_UNIT_ID_MASK) >> 8,
+	    addr->Info & ACPI_IVHD_MSI_NUMBER_MASK);
+	if (efrsup) {
+#define PRINTFLAG(flag, name) printflag(addr->FeatureReporting, flag, #name)
+#define PRINTFIELD(lbit, hbit, name) \
+    printfield(addr->FeatureReporting, lbit, hbit, #name)
+		PRINTFIELD(30, 31, HATS);
+		PRINTFIELD(28, 29, GATS);
+		PRINTFIELD(23, 27, MsiNumPPR);
+		PRINTFIELD(17, 22, PNBanks);
+		PRINTFIELD(13, 16, PNCounters);
+		PRINTFIELD(8, 12, PASmax);
+		PRINTFLAG(1 << 7, HESup);
+		PRINTFLAG(1 << 6, GASup);
+		PRINTFLAG(1 << 5, UASup);
+		PRINTFIELD(3, 2, GLXSup);
+		PRINTFLAG(1 << 1, NXSup);
+		PRINTFLAG(1 << 0, XTSup);
+#undef PRINTFLAG
+#undef PRINTFIELD
+		PRINTFLAG_END();
+	}
+	acpi_handle_ivrs_ivhd_devs((ACPI_IVRS_DE_HEADER *)(addr + 1),
+	    (char *)addr + addr->Header.Length);
+}
+
+static void
+acpi_handle_ivrs_ivhd_info_11(ACPI_IVRS_HARDWARE2 *addr)
+{
+	acpi_handle_ivrs_ivhd_header(&addr->Header);
+	printf("\tCapOffset=%#x Base=%#jx PCISeg=%#x Unit=%#x MSIlog=%d\n",
+	    addr->CapabilityOffset, (uintmax_t)addr->BaseAddress,
+	    addr->PciSegmentGroup, (addr->Info >> 8) & 0x1f,
+	    addr->Info & 0x5);
+	printf("\tAttr=");
+#define PRINTFIELD(lbit, hbit, name) \
+    printfield(addr->Attributes, lbit, hbit, #name)
+	PRINTFIELD(23, 27, MsiNumPPR);
+	PRINTFIELD(17, 22, PNBanks);
+	PRINTFIELD(13, 16, PNCounters);
+#undef PRINTFIELD
+	PRINTFLAG_END();
+}
+
+static void
+acpi_handle_ivrs_ivhd_11(ACPI_IVRS_HARDWARE2 *addr)
+{
+	acpi_handle_ivrs_ivhd_info_11(addr);
+	printf("\tEFRreg=%#018jx\n", (uintmax_t)addr->EfrRegisterImage);
+	acpi_handle_ivrs_ivhd_devs((ACPI_IVRS_DE_HEADER *)(addr + 1),
+	    (char *)addr + addr->Header.Length);
+}
+
+static void
+acpi_handle_ivrs_ivhd_40(ACPI_IVRS_HARDWARE2 *addr)
+{
+	acpi_handle_ivrs_ivhd_info_11(addr);
+	printf("\tEFRreg=%#018jx EFR2reg=%#018jx\n",
+	    (uintmax_t)addr->EfrRegisterImage, (uintmax_t)addr->Reserved);
+	acpi_handle_ivrs_ivhd_devs((ACPI_IVRS_DE_HEADER *)(addr + 1),
+	    (char *)addr + addr->Header.Length);
+}
+
+static const char *
+acpi_handle_ivrs_ivmd_type(ACPI_IVRS_MEMORY *addr)
+{
+	switch (addr->Header.Type) {
+	case ACPI_IVRS_TYPE_MEMORY1:
+		return ("ALL");
+	case ACPI_IVRS_TYPE_MEMORY2:
+		return ("specified");
+	case ACPI_IVRS_TYPE_MEMORY3:
+		return ("range");
+	default:
+		return ("unknown");
+	}
+}
+
+static void
+acpi_handle_ivrs_ivmd(ACPI_IVRS_MEMORY *addr)
+{
+	printf("\tMem Type=%#x(%s) ",
+	    addr->Header.Type, acpi_handle_ivrs_ivmd_type(addr));
+	switch (addr->Header.Type) {
+	case ACPI_IVRS_TYPE_MEMORY2:
+		printf("Id=%#06x PCISeg=%#x ", addr->Header.DeviceId,
+		    *(UINT16 *)&addr->Reserved);
+		break;
+	case ACPI_IVRS_TYPE_MEMORY3:
+		printf("Id=%#06x-%#06x PCISeg=%#x", addr->Header.DeviceId,
+		    addr->AuxData, *(UINT16 *)&addr->Reserved);
+		break;
+	}
+	printf("Start=%#18jx Length=%#jx Flags=",
+	    (uintmax_t)addr->StartAddress, (uintmax_t)addr->MemoryLength);
+#define PRINTFLAG(flag, name) printflag(addr->Header.Flags, flag, #name)
+	PRINTFLAG(ACPI_IVMD_EXCLUSION_RANGE, ExclusionRange);
+	PRINTFLAG(ACPI_IVMD_WRITE, IW);
+	PRINTFLAG(ACPI_IVMD_READ, IR);
+	PRINTFLAG(ACPI_IVMD_UNITY, Unity);
+#undef PRINTFLAG
+	PRINTFLAG_END();
+}
+
+static int
+acpi_handle_ivrs_blocks(void *addr, int remaining, bool efrsup)
+{
+	ACPI_IVRS_HEADER *hdr = addr;
+
+	if (remaining < (int)sizeof(ACPI_IVRS_HEADER))
+		return (-1);
+
+	if (remaining < hdr->Length)
+		return (-1);
+
+	switch (hdr->Type) {
+	case ACPI_IVRS_TYPE_HARDWARE1:
+		acpi_handle_ivrs_ivhd_10(addr, efrsup);
+		break;
+	case ACPI_IVRS_TYPE_HARDWARE2:
+		if (!efrsup)
+			printf("\t!! Found IVHD block 0x11 but !EFRsup\n");
+		acpi_handle_ivrs_ivhd_11(addr);
+		break;
+	case ACPI_IVRS_TYPE_HARDWARE3:
+		if (!efrsup)
+			printf("\t!! Found IVHD block 0x40 but !EFRsup\n");
+		acpi_handle_ivrs_ivhd_40(addr);
+		break;
+	case ACPI_IVRS_TYPE_MEMORY1:
+	case ACPI_IVRS_TYPE_MEMORY2:
+	case ACPI_IVRS_TYPE_MEMORY3:
+		acpi_handle_ivrs_ivmd(addr);
+		break;
+	default:
+		printf("\n");
+		printf("\tType=%d\n", hdr->Type);
+		printf("\tLength=%d\n", hdr->Length);
+		break;
+	}
+	return (hdr->Length);
+}
+
+#define	ACPI_IVRS_DMAREMAP	0x00000002
+#define	ACPI_IVRS_EFRSUP	0x00000001
+#define	ACPI_IVRS_GVA_SIZE	0x000000e0
+
+static void
+acpi_handle_ivrs(ACPI_TABLE_HEADER *sdp)
+{
+	ACPI_TABLE_IVRS *ivrs;
+	char *cp;
+	int remaining, consumed;
+	bool efrsup;
+
+	printf(BEGIN_COMMENT);
+	acpi_print_sdt(sdp);
+	ivrs = (ACPI_TABLE_IVRS *)sdp;
+	efrsup = (ivrs->Info & ACPI_IVRS_EFRSUP) != 0;
+	printf("\tVAsize=%d PAsize=%d GVAsize=%d\n",
+	    (ivrs->Info & ACPI_IVRS_VIRTUAL_SIZE) >> 15,
+	    (ivrs->Info & ACPI_IVRS_PHYSICAL_SIZE) >> 8,
+	    (ivrs->Info & ACPI_IVRS_GVA_SIZE) >> 5);
+	printf("\tATS_resp_res=%d DMA_preboot_remap=%d EFRsup=%d\n",
+	    (ivrs->Info & ACPI_IVRS_ATS_RESERVED) != 0,
+	    (ivrs->Info & ACPI_IVRS_DMAREMAP) != 0, efrsup);
+
+	remaining = sdp->Length - sizeof(ACPI_TABLE_IVRS);
+	while (remaining > 0) {
+		cp = (char *)sdp + sdp->Length - remaining;
+		consumed = acpi_handle_ivrs_blocks(cp, remaining, efrsup);
+		if (consumed <= 0)
+			break;
+		else
+			remaining -= consumed;
+	}
+
+	printf(END_COMMENT);
+}
+
+static void
 acpi_print_srat_memory(ACPI_SRAT_MEM_AFFINITY *mp)
 {
 
@@ -1596,7 +2123,7 @@ acpi_print_nfit(ACPI_NFIT_HEADER *nfit)
 		printf("\tRangeIndex=%u\n", (u_int)sysaddr->RangeIndex);
 		printf("\tProximityDomain=%u\n",
 		    (u_int)sysaddr->ProximityDomain);
-		uuid_to_string((uuid_t *)(sysaddr->RangeGuid),
+		uuid_to_string((uuid_t *)(uintptr_t)(sysaddr->RangeGuid),
 		    &uuidstr, &status);
 		if (status != uuid_s_ok)
 			errx(1, "uuid_to_string: status=%u", status);
@@ -2020,8 +2547,52 @@ acpi_print_rsd_ptr(ACPI_TABLE_RSDP *rp)
 	printf(END_COMMENT);
 }
 
+static const struct {
+	const char *sig;
+	void (*fnp)(ACPI_TABLE_HEADER *);
+} known[] = {
+	{ ACPI_SIG_BERT, 	acpi_handle_bert },
+	{ ACPI_SIG_DMAR,	acpi_handle_dmar },
+	{ ACPI_SIG_ECDT,	acpi_handle_ecdt },
+	{ ACPI_SIG_EINJ,	acpi_handle_einj },
+	{ ACPI_SIG_ERST,	acpi_handle_erst },
+	{ ACPI_SIG_FADT,	acpi_handle_fadt },
+	{ ACPI_SIG_HEST,	acpi_handle_hest },
+	{ ACPI_SIG_HPET,	acpi_handle_hpet },
+	{ ACPI_SIG_IVRS,	acpi_handle_ivrs },
+	{ ACPI_SIG_LPIT,	acpi_handle_lpit },
+	{ ACPI_SIG_MADT,	acpi_handle_madt },
+	{ ACPI_SIG_MCFG,	acpi_handle_mcfg },
+	{ ACPI_SIG_NFIT,	acpi_handle_nfit },
+	{ ACPI_SIG_SLIT,	acpi_handle_slit },
+	{ ACPI_SIG_SPCR,	acpi_handle_spcr },
+	{ ACPI_SIG_SRAT,	acpi_handle_srat },
+	{ ACPI_SIG_TCPA,	acpi_handle_tcpa },
+	{ ACPI_SIG_TPM2,	acpi_handle_tpm2 },
+	{ ACPI_SIG_WDDT,	acpi_handle_wddt },
+};
+
 static void
-acpi_handle_rsdt(ACPI_TABLE_HEADER *rsdp)
+acpi_report_sdp(ACPI_TABLE_HEADER *sdp)
+{
+	for (u_int i = 0; i < nitems(known); i++) {
+		if (memcmp(sdp->Signature, known[i].sig, ACPI_NAMESEG_SIZE)
+		    == 0) {
+			known[i].fnp(sdp);
+			return;
+		}
+	}
+
+	/*
+	 * Otherwise, do a generic thing.
+	 */
+	printf(BEGIN_COMMENT);
+	acpi_print_sdt(sdp);
+	printf(END_COMMENT);
+}
+
+static void
+acpi_handle_rsdt(ACPI_TABLE_HEADER *rsdp, const char *tbl)
 {
 	ACPI_TABLE_HEADER *sdp;
 	ACPI_TABLE_RSDT *rsdt;
@@ -2029,7 +2600,14 @@ acpi_handle_rsdt(ACPI_TABLE_HEADER *rsdp)
 	vm_offset_t addr;
 	int entries, i;
 
-	acpi_print_rsdt(rsdp);
+	if (tbl == NULL) {
+		acpi_print_rsdt(rsdp);
+	} else {
+		if (memcmp(tbl, rsdp->Signature, ACPI_NAMESEG_SIZE) == 0) {
+			acpi_print_rsdt(rsdp);
+			return;
+		}
+	}
 	rsdt = (ACPI_TABLE_RSDT *)rsdp;
 	xsdt = (ACPI_TABLE_XSDT *)rsdp;
 	entries = (rsdp->Length - sizeof(ACPI_TABLE_HEADER)) / addr_size;
@@ -2046,45 +2624,9 @@ acpi_handle_rsdt(ACPI_TABLE_HEADER *rsdp)
 			    sdp->Signature);
 			continue;
 		}
-		if (!memcmp(sdp->Signature, ACPI_SIG_BERT, 4))
-			acpi_handle_bert(sdp);
-		else if (!memcmp(sdp->Signature, ACPI_SIG_EINJ, 4))
-			acpi_handle_einj(sdp);
-		else if (!memcmp(sdp->Signature, ACPI_SIG_ERST, 4))
-			acpi_handle_erst(sdp);
-		else if (!memcmp(sdp->Signature, ACPI_SIG_FADT, 4))
-			acpi_handle_fadt(sdp);
-		else if (!memcmp(sdp->Signature, ACPI_SIG_MADT, 4))
-			acpi_handle_madt(sdp);
-		else if (!memcmp(sdp->Signature, ACPI_SIG_HEST, 4))
-			acpi_handle_hest(sdp);
-		else if (!memcmp(sdp->Signature, ACPI_SIG_HPET, 4))
-			acpi_handle_hpet(sdp);
-		else if (!memcmp(sdp->Signature, ACPI_SIG_ECDT, 4))
-			acpi_handle_ecdt(sdp);
-		else if (!memcmp(sdp->Signature, ACPI_SIG_MCFG, 4))
-			acpi_handle_mcfg(sdp);
-		else if (!memcmp(sdp->Signature, ACPI_SIG_SLIT, 4))
-			acpi_handle_slit(sdp);
-		else if (!memcmp(sdp->Signature, ACPI_SIG_SRAT, 4))
-			acpi_handle_srat(sdp);
-		else if (!memcmp(sdp->Signature, ACPI_SIG_TCPA, 4))
-			acpi_handle_tcpa(sdp);
-		else if (!memcmp(sdp->Signature, ACPI_SIG_DMAR, 4))
-			acpi_handle_dmar(sdp);
-		else if (!memcmp(sdp->Signature, ACPI_SIG_NFIT, 4))
-			acpi_handle_nfit(sdp);
-		else if (!memcmp(sdp->Signature, ACPI_SIG_WDDT, 4))
-			acpi_handle_wddt(sdp);
-		else if (!memcmp(sdp->Signature, ACPI_SIG_LPIT, 4))
-			acpi_handle_lpit(sdp);
-		else if (!memcmp(sdp->Signature, ACPI_SIG_TPM2, 4))
-			acpi_handle_tpm2(sdp);
-		else {
-			printf(BEGIN_COMMENT);
-			acpi_print_sdt(sdp);
-			printf(END_COMMENT);
-		}
+		if (tbl != NULL && memcmp(sdp->Signature, tbl, ACPI_NAMESEG_SIZE) != 0)
+			continue;
+		acpi_report_sdp(sdp);
 	}
 }
 
@@ -2102,13 +2644,13 @@ sdt_load_devmem(void)
 		acpi_print_rsd_ptr(rp);
 	if (rp->Revision < 2) {
 		rsdp = (ACPI_TABLE_HEADER *)acpi_map_sdt(rp->RsdtPhysicalAddress);
-		if (memcmp(rsdp->Signature, "RSDT", 4) != 0 ||
+		if (memcmp(rsdp->Signature, "RSDT", ACPI_NAMESEG_SIZE) != 0 ||
 		    acpi_checksum(rsdp, rsdp->Length) != 0)
 			errx(1, "RSDT is corrupted");
 		addr_size = sizeof(uint32_t);
 	} else {
 		rsdp = (ACPI_TABLE_HEADER *)acpi_map_sdt(rp->XsdtPhysicalAddress);
-		if (memcmp(rsdp->Signature, "XSDT", 4) != 0 ||
+		if (memcmp(rsdp->Signature, "XSDT", ACPI_NAMESEG_SIZE) != 0 ||
 		    acpi_checksum(rsdp, rsdp->Length) != 0)
 			errx(1, "XSDT is corrupted");
 		addr_size = sizeof(uint64_t);
@@ -2231,7 +2773,7 @@ aml_disassemble(ACPI_TABLE_HEADER *rsdt, ACPI_TABLE_HEADER *dsdp)
 		goto out;
 	}
 	if (status != 0) {
-		fprintf(stderr, "iast exit status = %d\n", status);
+		fprintf(stderr, "iasl exit status = %d\n", status);
 	}
 
 	/* Dump iasl's output to stdout */
@@ -2256,9 +2798,25 @@ aml_disassemble(ACPI_TABLE_HEADER *rsdt, ACPI_TABLE_HEADER *dsdp)
 }
 
 void
-sdt_print_all(ACPI_TABLE_HEADER *rsdp)
+aml_disassemble_separate(ACPI_TABLE_HEADER *rsdt, ACPI_TABLE_HEADER *dsdp)
 {
-	acpi_handle_rsdt(rsdp);
+	ACPI_TABLE_HEADER *ssdt = NULL;
+
+	aml_disassemble(NULL, dsdp);
+	if (rsdt != NULL) {
+		for (;;) {
+			ssdt = sdt_from_rsdt(rsdt, "SSDT", ssdt);
+			if (ssdt == NULL)
+				break;
+			aml_disassemble(NULL, ssdt);
+		}
+	}
+}
+
+void
+sdt_print_all(ACPI_TABLE_HEADER *rsdp, const char *tbl)
+{
+	acpi_handle_rsdt(rsdp, tbl);
 }
 
 /* Fetch a table matching the given signature via the RSDT. */

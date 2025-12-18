@@ -35,8 +35,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)procfs_status.c	8.4 (Berkeley) 6/15/94
  */
 
 /*
@@ -58,6 +56,9 @@
 
 #include <fs/pseudofs/pseudofs.h>
 #include <fs/procfs/procfs.h>
+
+_Static_assert(nitems(rlimit_ident) == RLIM_NLIMITS,
+    "resource.h RLIMIT_IDENT needs update");
 
 int
 procfs_doprocrlimit(PFS_FILL_ARGS)

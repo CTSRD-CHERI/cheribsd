@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)sysexits.h	8.1 (Berkeley) 6/2/93
  */
 
 #ifndef	_SYSEXITS_H_
@@ -37,9 +35,10 @@
 /*
  *  SYSEXITS.H -- Exit status codes for system programs.
  *
- *	This include file attempts to categorize possible error
- *	exit statuses for system programs, notably delivermail
- *	and the Berkeley network.
+ *	This include file attempts to categorize error exit statuses
+ *	for system programs, notably sendmail. These values exist only
+ *	for interface compatibility, and are deprecated for FreeBSD
+ *	base software.
  *
  *	Error numbers begin at EX__BASE to reduce the possibility of
  *	clashing with other exit statuses that random programs may

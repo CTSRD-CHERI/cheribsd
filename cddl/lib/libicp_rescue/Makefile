@@ -1,4 +1,3 @@
-
 .PATH: ${ZFSTOP}/module/icp
 
 PACKAGE=	utilities
@@ -20,7 +19,7 @@ ASM_SOURCES_AS = \
         asm-x86_64/blake3/blake3_sse41.S
 
 CFLAGS+= -D__amd64 -D_SYS_STACK_H
-.elif ${MACHINE_ARCH} == "armv7"
+.elif ${MACHINE_CPUARCH} == "arm"
 ASM_SOURCES_C =
 ASM_SOURCES_AS = \
         asm-arm/sha2/sha256-armv7.S \
@@ -68,13 +67,10 @@ KERNEL_C = \
         algs/blake3/blake3_impl.c \
         algs/edonr/edonr.c \
         algs/modes/modes.c \
-        algs/modes/cbc.c \
         algs/modes/gcm_generic.c \
         algs/modes/gcm_pclmulqdq.c \
         algs/modes/gcm.c \
-        algs/modes/ctr.c \
         algs/modes/ccm.c \
-        algs/modes/ecb.c \
         algs/sha2/sha2_generic.c \
         algs/sha2/sha256_impl.c \
         algs/sha2/sha512_impl.c \
@@ -82,7 +78,6 @@ KERNEL_C = \
         illumos-crypto.c \
         io/aes.c \
         io/sha2_mod.c \
-        io/skein_mod.c \
         core/kcf_sched.c \
         core/kcf_prov_lib.c \
         core/kcf_callprov.c \
@@ -105,6 +100,7 @@ CFLAGS+= -I${ZFSTOP}/lib/libspl/include/os/freebsd
 CFLAGS+= -I${SRCTOP}/sys
 CFLAGS+= -I${SRCTOP}/cddl/compat/opensolaris/include
 CFLAGS+= -I${ZFSTOP}/module/icp/include
+CFLAGS+= -I${ZFSTOP}/lib/libzpool/include
 CFLAGS+= -include ${ZFSTOP}/include/os/freebsd/spl/sys/ccompile.h
 CFLAGS+= -DHAVE_ISSETUGID -UHAVE_AVX -DRESCUE
 CFLAGS+= -include ${SRCTOP}/sys/modules/zfs/zfs_config.h

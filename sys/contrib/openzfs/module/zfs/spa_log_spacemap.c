@@ -783,7 +783,7 @@ spa_flush_metaslabs(spa_t *spa, dmu_tx_t *tx)
 	 * request of flushing everything before we attempt to return
 	 * immediately.
 	 */
-	if (spa->spa_uberblock.ub_rootbp.blk_birth < txg &&
+	if (BP_GET_LOGICAL_BIRTH(&spa->spa_uberblock.ub_rootbp) < txg &&
 	    !dmu_objset_is_dirty(spa_meta_objset(spa), txg) &&
 	    !spa_flush_all_logs_requested(spa))
 		return;
@@ -1020,16 +1020,17 @@ spa_ld_log_sm_metadata(spa_t *spa)
 	}
 
 	zap_cursor_t zc;
-	zap_attribute_t za;
+	zap_attribute_t *za = zap_attribute_alloc();
 	for (zap_cursor_init(&zc, spa_meta_objset(spa), spacemap_zap);
-	    (error = zap_cursor_retrieve(&zc, &za)) == 0;
+	    (error = zap_cursor_retrieve(&zc, za)) == 0;
 	    zap_cursor_advance(&zc)) {
-		uint64_t log_txg = zfs_strtonum(za.za_name, NULL);
+		uint64_t log_txg = zfs_strtonum(za->za_name, NULL);
 		spa_log_sm_t *sls =
-		    spa_log_sm_alloc(za.za_first_integer, log_txg);
+		    spa_log_sm_alloc(za->za_first_integer, log_txg);
 		avl_add(&spa->spa_sm_logs_by_txg, sls);
 	}
 	zap_cursor_fini(&zc);
+	zap_attribute_free(za);
 	if (error != ENOENT) {
 		spa_load_failed(spa, "spa_ld_log_sm_metadata(): failed at "
 		    "zap_cursor_retrieve(spacemap_zap) [error %d]",
@@ -1147,12 +1148,13 @@ spa_ld_log_sm_data(spa_t *spa)
 	/* Prefetch log spacemaps dnodes. */
 	for (sls = avl_first(&spa->spa_sm_logs_by_txg); sls;
 	    sls = AVL_NEXT(&spa->spa_sm_logs_by_txg, sls)) {
-		dmu_prefetch(spa_meta_objset(spa), sls->sls_sm_obj,
-		    0, 0, 0, ZIO_PRIORITY_SYNC_READ);
+		dmu_prefetch_dnode(spa_meta_objset(spa), sls->sls_sm_obj,
+		    ZIO_PRIORITY_SYNC_READ);
 	}
 
 	uint_t pn = 0;
 	uint64_t ps = 0;
+	uint64_t nsm = 0;
 	psls = sls = avl_first(&spa->spa_sm_logs_by_txg);
 	while (sls != NULL) {
 		/* Prefetch log spacemaps up to 16 TXGs or MBs ahead. */
@@ -1185,6 +1187,10 @@ spa_ld_log_sm_data(spa_t *spa)
 		summary_add_data(spa, sls->sls_txg,
 		    sls->sls_mscount, 0, sls->sls_nblocks);
 
+		spa_import_progress_set_notes_nolog(spa,
+		    "Read %llu of %lu log space maps", (u_longlong_t)nsm,
+		    avl_numnodes(&spa->spa_sm_logs_by_txg));
+
 		struct spa_ld_log_sm_arg vla = {
 			.slls_spa = spa,
 			.slls_txg = sls->sls_txg
@@ -1200,6 +1206,7 @@ spa_ld_log_sm_data(spa_t *spa)
 
 		pn--;
 		ps -= space_map_length(sls->sls_sm);
+		nsm++;
 		space_map_close(sls->sls_sm);
 		sls->sls_sm = NULL;
 		sls = AVL_NEXT(&spa->spa_sm_logs_by_txg, sls);
@@ -1210,11 +1217,11 @@ spa_ld_log_sm_data(spa_t *spa)
 
 	hrtime_t read_logs_endtime = gethrtime();
 	spa_load_note(spa,
-	    "read %llu log space maps (%llu total blocks - blksz = %llu bytes) "
-	    "in %lld ms", (u_longlong_t)avl_numnodes(&spa->spa_sm_logs_by_txg),
+	    "Read %lu log space maps (%llu total blocks - blksz = %llu bytes) "
+	    "in %lld ms", avl_numnodes(&spa->spa_sm_logs_by_txg),
 	    (u_longlong_t)spa_log_sm_nblocks(spa),
 	    (u_longlong_t)zfs_log_sm_blksz,
-	    (longlong_t)((read_logs_endtime - read_logs_starttime) / 1000000));
+	    (longlong_t)NSEC2MSEC(read_logs_endtime - read_logs_starttime));
 
 out:
 	if (error != 0) {

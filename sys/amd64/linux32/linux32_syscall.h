@@ -7,7 +7,7 @@
 #define	LINUX32_SYS_linux_exit	1
 #define	LINUX32_SYS_linux_fork	2
 #define	LINUX32_SYS_read	3
-#define	LINUX32_SYS_write	4
+#define	LINUX32_SYS_linux_write	4
 #define	LINUX32_SYS_linux_open	5
 #define	LINUX32_SYS_close	6
 #define	LINUX32_SYS_linux_waitpid	7
@@ -403,4 +403,14 @@
 #define	LINUX32_SYS_linux_process_madvise	440
 #define	LINUX32_SYS_linux_epoll_pwait2_64	441
 #define	LINUX32_SYS_linux_mount_setattr	442
-#define	LINUX32_SYS_MAXSYSCALL	444
+#define	LINUX32_SYS_linux_quotactl_fd	443
+#define	LINUX32_SYS_linux_landlock_create_ruleset	444
+#define	LINUX32_SYS_linux_landlock_add_rule	445
+#define	LINUX32_SYS_linux_landlock_restrict_self	446
+#define	LINUX32_SYS_linux_memfd_secret	447
+#define	LINUX32_SYS_linux_process_mrelease	448
+#define	LINUX32_SYS_linux_futex_waitv	449
+#define	LINUX32_SYS_linux_set_mempolicy_home_node	450
+#define	LINUX32_SYS_linux_cachestat	451
+#define	LINUX32_SYS_linux_fchmodat2	452
+#define	LINUX32_SYS_MAXSYSCALL	453

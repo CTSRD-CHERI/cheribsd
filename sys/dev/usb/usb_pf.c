@@ -195,12 +195,6 @@ usbpf_clone_create(struct if_clone *ifc, char *name, size_t len,
 		return (error);
 	}
 	ifp = ubus->ifp = if_alloc(IFT_USB);
-	if (ifp == NULL) {
-		ifc_free_unit(ifc, unit);
-		device_printf(ubus->parent, "usbpf: Could not allocate "
-		    "instance\n");
-		return (ENOSPC);
-	}
 	if_setsoftc(ifp, ubus);
 	if_initname(ifp, usbusname, unit);
 	if_setname(ifp, name);
@@ -408,9 +402,7 @@ usbpf_xfertap(struct usb_xfer *xfer, int type)
 	bus = xfer->xroot->bus;
 
 	/* sanity checks */
-	if (bus->ifp == NULL || if_getbpf(bus->ifp) == NULL)
-		return;
-	if (!bpf_peers_present(if_getbpf(bus->ifp)))
+	if (bus->ifp == NULL || !bpf_peers_present_if(bus->ifp))
 		return;
 
 	totlen = usbpf_xfer_precompute_size(xfer, type);

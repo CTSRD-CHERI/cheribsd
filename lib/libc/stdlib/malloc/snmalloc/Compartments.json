@@ -1,0 +1,9 @@
+{
+    "compartments": {
+	"snmalloc": {
+	    "files": [
+		"malloc.*o"
+	    ]
+	}
+    }
+}

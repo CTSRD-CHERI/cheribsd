@@ -1,4 +1,4 @@
-# $NetBSD: varmod-sysv.mk,v 1.15 2023/06/01 20:56:35 rillig Exp $
+# $NetBSD: varmod-sysv.mk,v 1.19 2024/07/04 17:47:54 rillig Exp $
 #
 # Tests for the variable modifier ':from=to', which replaces the suffix
 # "from" with "to".  It can also use '%' as a wildcard.
@@ -49,7 +49,7 @@
 .  error
 .endif
 
-# In the modifier ':from=to', both parts can contain variable expressions.
+# In the modifier ':from=to', both parts can contain expressions.
 .if ${one two:L:${:Uone}=${:U1}} != "1 two"
 .  error
 .endif
@@ -69,7 +69,7 @@
 .endif
 
 # The replacement string can contain spaces, thereby changing the number
-# of words in the variable expression.
+# of words in the expression.
 .if ${In:L:%=% ${:Uthe Sun}} != "In the Sun"
 .  error
 .endif
@@ -206,13 +206,14 @@
 .  error
 .endif
 
-# This is not a SysV modifier since the nested variable expression expands
+# This is not a SysV modifier since the nested expression expands
 # to an empty string.  The '=' in it should be irrelevant during parsing.
-# XXX: As of 2020-12-05, this expression generates an "Unfinished modifier"
+# XXX: As of 2024-06-30, this expression generates an "Unfinished modifier"
 # error, while the correct error message would be "Unknown modifier" since
 # there is no modifier named "fromto".
-# expect+1: Malformed conditional (${word214:L:from${:D=}to})
-.if ${word214:L:from${:D=}to}
+# expect+2: while evaluating variable "word216" with value "word216": Unfinished modifier ('=' missing)
+# expect+1: Malformed conditional (${word216:L:from${:D=}to})
+.if ${word216:L:from${:D=}to}
 .  error
 .endif
 
@@ -221,7 +222,7 @@
 # "fromto}...".  The next modifier is a SysV modifier.  ApplyModifier_SysV
 # parses the modifier as "from${:D=}to", ending at the '}'.  Next, the two
 # parts of the modifier are parsed using ParseModifierPart, which scans
-# differently, properly handling nested variable expressions.  The two parts
+# differently, properly handling nested expressions.  The two parts
 # are now "fromto}..." and "replaced".
 .if "${:Ufromto\}...:from${:D=}to}...=replaced}" != "replaced"
 .  error
@@ -251,5 +252,14 @@ INDIRECT=	1:${VALUE} 2:$${VALUE} 4:$$$${VALUE}
 .    endfor
 .  endfor
 .endfor
+
+
+# The error case of an unfinished ':from=to' modifier after the '=' requires
+# an expression that is missing the closing '}'.
+# expect+2: while evaluating variable "error" with value "error": Unfinished modifier ('}' missing)
+# expect+1: Malformed conditional (${error:L:from=$(}))
+.if ${error:L:from=$(})
+.endif
+
 
 all:

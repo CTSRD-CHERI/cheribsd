@@ -29,7 +29,6 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <sys/socket.h>
@@ -42,9 +41,5 @@ ssize_t
 sendto(int s, const void *msg, size_t len, int flags,
     const struct sockaddr *to, socklen_t tolen)
 {
-
-	return (((ssize_t (*)(int, const void *, size_t, int,
-	    const struct sockaddr *, socklen_t))
-	    __libc_interposing[INTERPOS_sendto])(s, msg, len, flags,
-	    to, tolen));
+	return (INTERPOS_SYS(sendto, s, msg, len, flags, to, tolen));
 }

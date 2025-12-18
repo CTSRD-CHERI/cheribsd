@@ -24,7 +24,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd February 4, 2022
+.Dd October 5, 2023
 .Dt ELFCTL 1
 .Os
 .Sh NAME
@@ -87,14 +87,16 @@ elfctl -e +noaslr file
 .Ed
 .Pp
 Features may be specified as numerical values:
-.Bd -literal -offset -indent
+.Bd -literal -offset indent
 elfctl -e =0x0001,0x0004 file
 .Ed
 .Pp
 Features may also be specified as a single combined value:
-.Bd -literal -offset -indent
+.Bd -literal -offset indent
 elfctl -e =0x5 file
 .Ed
+.Sh SEE ALSO
+.Xr mitigations 7
 .Sh HISTORY
 .Nm
 first appeared in

@@ -27,6 +27,7 @@
  */
 
 #include "assym.inc"
+#include <sys/elf_common.h>
 #include <sys/syscall.h>
 #include <machine/asm.h>
 
@@ -45,7 +46,7 @@
 SIGCODE(sigcode)
 #if __has_feature(capabilities)
 #ifndef __CHERI_PURE_CAPABILITY__
-	.arch_extension c64
+	.code	c64
 #endif
 	blrr	c8
 	add	c0, csp, #SF_UC
@@ -66,8 +67,7 @@ SIGCODE(sigcode)
 	b	1b
 #if __has_feature(capabilities)
 #ifndef __CHERI_PURE_CAPABILITY__
-	.arch_extension noc64
-	.arch_extension a64c
+	.code	a64
 #endif
 #endif
 	/* This may be copied to the stack, keep it 16-byte aligned */
@@ -82,3 +82,5 @@ esigcode:
 	.size	szsigcode, 8
 szsigcode:
 	.quad	esigcode - sigcode
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

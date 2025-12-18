@@ -308,7 +308,7 @@ utimensat(int fd, const char *path, const struct timespec times[2], int flag)
 }
 
 int
-__sys_openat(int fd, const char *path, int flags, int mode)
+__sys_openat(int fd, const char *path, int flags, mode_t mode)
 {
 
 	return (do_fd_and_path(SYS_openat, fd, (uintcap_t)path, flags, mode, 0));

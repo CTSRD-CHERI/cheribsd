@@ -31,7 +31,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -1678,7 +1677,8 @@ pfkey_align(struct sadb_msg *msg, caddr_t *mhp)
 
 		/* duplicate check */
 		/* XXX Are there duplication either KEY_AUTH or KEY_ENCRYPT ?*/
-		if (mhp[ext->sadb_ext_type] != NULL) {
+		if (mhp[ext->sadb_ext_type] != NULL &&
+		    ext->sadb_ext_type != SADB_X_EXT_IF_HW_OFFL /* XXXKIB */) {
 			__ipsec_errcode = EIPSEC_INVAL_EXTTYPE;
 			return -1;
 		}
@@ -1714,6 +1714,9 @@ pfkey_align(struct sadb_msg *msg, caddr_t *mhp)
 		case SADB_X_EXT_SA_REPLAY:
 		case SADB_X_EXT_NEW_ADDRESS_SRC:
 		case SADB_X_EXT_NEW_ADDRESS_DST:
+		case SADB_X_EXT_LFT_CUR_SW_OFFL:
+		case SADB_X_EXT_LFT_CUR_HW_OFFL:
+		case SADB_X_EXT_IF_HW_OFFL:
 			mhp[ext->sadb_ext_type] = (caddr_t)ext;
 			break;
 		default:

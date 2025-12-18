@@ -29,7 +29,6 @@
  * Myson fast ethernet PCI NIC driver, available at: http://www.myson.com.tw/
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -874,11 +873,6 @@ my_attach(device_t dev)
 	bzero(sc->my_ldata, sizeof(struct my_list_data));
 
 	ifp = sc->my_ifp = if_alloc(IFT_ETHER);
-	if (ifp == NULL) {
-		device_printf(dev, "can not if_alloc()\n");
-		error = ENOSPC;
-		goto free_ldata;
-	}
 	if_setsoftc(ifp, sc);
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	if_setflags(ifp, IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
@@ -962,7 +956,6 @@ detach_if:
 	ether_ifdetach(ifp);
 free_if:
 	if_free(ifp);
-free_ldata:
 	free(sc->my_ldata_ptr, M_DEVBUF);
 release_irq:
 	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->my_irq);
@@ -1152,7 +1145,7 @@ my_rxeof(struct my_softc * sc)
 		 * broadcast packet, multicast packet, matches our ethernet
 		 * address or the interface is in promiscuous mode.
 		 */
-		if (bpf_peers_present(if_getbpf(ifp))) {
+		if (bpf_peers_present_if(ifp)) {
 			bpf_mtap_if(ifp, m);
 			if (if_getflags(ifp) & IFF_PROMISC &&
 			    (bcmp(eh->ether_dhost, if_getlladdr(sc->my_ifp),

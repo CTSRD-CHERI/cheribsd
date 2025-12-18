@@ -272,7 +272,7 @@ static void
 zio_checksum_gang_verifier(zio_cksum_t *zcp, const blkptr_t *bp)
 {
 	const dva_t *dva = BP_IDENTITY(bp);
-	uint64_t txg = BP_PHYSICAL_BIRTH(bp);
+	uint64_t txg = BP_GET_BIRTH(bp);
 
 	ASSERT(BP_IS_GANG(bp));
 
@@ -363,11 +363,14 @@ zio_checksum_compute(zio_t *zio, enum zio_checksum checksum,
 			zil_chain_t zilc;
 			abd_copy_to_buf(&zilc, abd, sizeof (zil_chain_t));
 
-			size = P2ROUNDUP_TYPED(zilc.zc_nused, ZIL_MIN_BLKSZ,
-			    uint64_t);
+			uint64_t nused = P2ROUNDUP_TYPED(zilc.zc_nused,
+			    ZIL_MIN_BLKSZ, uint64_t);
+			ASSERT3U(size, >=, nused);
+			size = nused;
 			eck = zilc.zc_eck;
 			eck_offset = offsetof(zil_chain_t, zc_eck);
 		} else {
+			ASSERT3U(size, >=, sizeof (zio_eck_t));
 			eck_offset = size - sizeof (zio_eck_t);
 			abd_copy_to_buf_off(&eck, abd, eck_offset,
 			    sizeof (zio_eck_t));
@@ -448,12 +451,13 @@ zio_checksum_error_impl(spa_t *spa, const blkptr_t *bp,
 				return (SET_ERROR(ECKSUM));
 			}
 
-			if (nused > size) {
+			nused = P2ROUNDUP_TYPED(nused, ZIL_MIN_BLKSZ, uint64_t);
+			if (size < nused)
 				return (SET_ERROR(ECKSUM));
-			}
-
-			size = P2ROUNDUP_TYPED(nused, ZIL_MIN_BLKSZ, uint64_t);
+			size = nused;
 		} else {
+			if (size < sizeof (zio_eck_t))
+				return (SET_ERROR(ECKSUM));
 			eck_offset = size - sizeof (zio_eck_t);
 			abd_copy_to_buf_off(&eck, abd, eck_offset,
 			    sizeof (zio_eck_t));
@@ -515,8 +519,6 @@ zio_checksum_error_impl(spa_t *spa, const blkptr_t *bp,
 	}
 
 	if (info != NULL) {
-		info->zbc_expected = expected_cksum;
-		info->zbc_actual = actual_cksum;
 		info->zbc_checksum_name = ci->ci_name;
 		info->zbc_byteswapped = byteswap;
 		info->zbc_injected = 0;

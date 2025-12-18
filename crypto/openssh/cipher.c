@@ -1,4 +1,4 @@
-/* $OpenBSD: cipher.c,v 1.119 2021/04/03 06:18:40 djm Exp $ */
+/* $OpenBSD: cipher.c,v 1.123 2024/08/23 04:51:00 deraadt Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -143,8 +143,8 @@ const char *
 compression_alg_list(int compression)
 {
 #ifdef WITH_ZLIB
-	return compression ? "zlib@openssh.com,zlib,none" :
-	    "none,zlib@openssh.com,zlib";
+	return compression ? "zlib@openssh.com,none" :
+	    "none,zlib@openssh.com";
 #else
 	return "none";
 #endif
@@ -255,7 +255,7 @@ cipher_init(struct sshcipher_ctx **ccp, const struct sshcipher *cipher,
 #endif
 
 	*ccp = NULL;
-	if ((cc = calloc(sizeof(*cc), 1)) == NULL)
+	if ((cc = calloc(1, sizeof(*cc))) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 
 	cc->plaintext = (cipher->flags & CFLAG_NONE) != 0;
@@ -372,7 +372,7 @@ cipher_crypt(struct sshcipher_ctx *cc, u_int seqnr, u_char *dest,
 		if (!EVP_CIPHER_CTX_ctrl(cc->evp, EVP_CTRL_GCM_IV_GEN,
 		    1, lastiv))
 			return SSH_ERR_LIBCRYPTO_ERROR;
-		/* set tag on decyption */
+		/* set tag on decryption */
 		if (!cc->encrypt &&
 		    !EVP_CIPHER_CTX_ctrl(cc->evp, EVP_CTRL_GCM_SET_TAG,
 		    authlen, (u_char *)src + aadlen + len))
@@ -432,27 +432,6 @@ cipher_free(struct sshcipher_ctx *cc)
 	cc->evp = NULL;
 #endif
 	freezero(cc, sizeof(*cc));
-}
-
-/*
- * Exports an IV from the sshcipher_ctx required to export the key
- * state back from the unprivileged child to the privileged parent
- * process.
- */
-int
-cipher_get_keyiv_len(const struct sshcipher_ctx *cc)
-{
-	const struct sshcipher *c = cc->cipher;
-
-	if ((c->flags & CFLAG_CHACHAPOLY) != 0)
-		return 0;
-	else if ((c->flags & CFLAG_AESCTR) != 0)
-		return sizeof(cc->ac_ctx.ctr);
-#ifdef WITH_OPENSSL
-	return EVP_CIPHER_CTX_iv_length(cc->evp);
-#else
-	return 0;
-#endif
 }
 
 int

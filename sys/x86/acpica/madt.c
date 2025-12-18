@@ -25,7 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -160,7 +159,8 @@ madt_x2apic_disable_reason(void)
 	}
 
 	if (vm_guest == VM_GUEST_VMWARE) {
-		vmware_hvcall(VMW_HVCMD_GETVCPU_INFO, p);
+		vmware_hvcall(0, VMW_HVCMD_GETVCPU_INFO,
+		    VMW_HVCMD_DEFAULT_PARAM, p);
 		if ((p[0] & VMW_VCPUINFO_VCPU_RESERVED) != 0 ||
 		    (p[0] & VMW_VCPUINFO_LEGACY_X2APIC) == 0)
 			return ("inside VMWare without intr redirection");
@@ -221,7 +221,7 @@ madt_setup_local(void)
 		else if (bootverbose)
 			printf("x2APIC available but disabled %s\n", reason);
 		user_x2apic = x2apic_mode;
-		TUNABLE_INT_FETCH("hw.x2apic_enable", &user_x2apic);
+		TUNABLE_INT_FETCH("hw.apic.x2apic_mode", &user_x2apic);
 		if (user_x2apic != x2apic_mode) {
 			if (bios_x2apic && !user_x2apic)
 				printf("x2APIC disabled by tunable and "
@@ -368,8 +368,8 @@ madt_add_cpu(u_int acpi_id, u_int apic_id, u_int flags)
 	 * MP code figure out which CPU is the BSP on its own.
 	 */
 	if (bootverbose)
-		printf("MADT: Found CPU APIC ID %u ACPI ID %u: %s\n",
-		    apic_id, acpi_id, flags & ACPI_MADT_ENABLED ?
+		printf("MADT: Found CPU APIC ID %d ACPI ID %u: %s\n",
+		    (int)apic_id, acpi_id, flags & ACPI_MADT_ENABLED ?
 		    "enabled" : "disabled");
 	if (!(flags & ACPI_MADT_ENABLED))
 		return;

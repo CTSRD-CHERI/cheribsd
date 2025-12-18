@@ -1,5 +1,4 @@
 
-/* @(#)e_rem_pio2.c 1.4 95/01/18 */
 /*
  * ====================================================
  * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -13,7 +12,6 @@
  * Optimized by Bruce D. Evans.
  */
 
-#include <sys/cdefs.h>
 /* __ieee754_rem_pio2(x,y)
  * 
  * return the remainder of x rem pi/2 in y[0]+y[1] 
@@ -47,7 +45,7 @@ pio2_3  =  2.02226624871116645580e-21, /* 0x3BA3198A, 0x2E000000 */
 pio2_3t =  8.47842766036889956997e-32; /* 0x397B839A, 0x252049C1 */
 
 #ifdef INLINE_REM_PIO2
-static __inline __always_inline
+static __always_inline
 #endif
 int
 __ieee754_rem_pio2(double x, double *y)
@@ -164,7 +162,7 @@ medium:
     /* set z = scalbn(|x|,ilogb(x)-23) */
 	GET_LOW_WORD(low,x);
 	e0 	= (ix>>20)-1046;	/* e0 = ilogb(z)-23; */
-	INSERT_WORDS(z, ix - ((int32_t)(e0<<20)), low);
+	INSERT_WORDS(z, ix - ((int32_t)((u_int32_t)e0<<20)), low);
 	for(i=0;i<2;i++) {
 		tx[i] = (double)((int32_t)(z));
 		z     = (z-tx[i])*two24;

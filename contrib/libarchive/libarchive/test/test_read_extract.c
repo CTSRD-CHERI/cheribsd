@@ -24,7 +24,6 @@
  */
 #include "test.h"
 #include "test_utils.h"
-__FBSDID("$FreeBSD$");
 
 #define BUFF_SIZE 1000000
 #define FILE_BUFF_SIZE 100000

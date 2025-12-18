@@ -37,8 +37,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
  */
 /*-
@@ -213,18 +211,6 @@ cpu_exit(struct thread *td)
  * fixed-size KVA.
  */
 
-void
-cpu_thread_swapin(struct thread *td)
-{
-
-}
-
-void
-cpu_thread_swapout(struct thread *td)
-{
-
-}
-
 bool
 cpu_exec_vmspace_reuse(struct proc *p __unused, vm_map_t map __unused)
 {
@@ -238,4 +224,14 @@ cpu_procctl(struct thread *td __unused, int idtype __unused, id_t id __unused,
 {
 
 	return (EINVAL);
+}
+
+void
+cpu_sync_core(void)
+{
+	/*
+	 * Linux performs "rfi" there.  Our rendezvous IPI handler on
+	 * the target cpu does "rfi" before and lwsync/sync after the
+	 * action, which is stronger than required.
+	 */
 }

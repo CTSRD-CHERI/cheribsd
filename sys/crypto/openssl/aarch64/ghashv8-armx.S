@@ -2,12 +2,14 @@
 #include "arm_arch.h"
 
 #if __ARM_MAX_ARCH__>=7
+.arch_extension	crypto
 .text
 .globl	gcm_init_v8
 .type	gcm_init_v8,%function
 .align	4
 gcm_init_v8:
-	ld1	{v17.2d},[x1]		//load input H
+	AARCH64_VALID_CALL_TARGET
+	ld1	{v17.2d},[PTR(1)]		//load input H
 	movi	v19.16b,#0xe1
 	shl	v19.2d,v19.2d,#57		//0xc2.0
 	ext	v3.16b,v17.16b,v17.16b,#8
@@ -22,7 +24,7 @@ gcm_init_v8:
 	and	v16.16b,v16.16b,v17.16b
 	orr	v3.16b,v3.16b,v18.16b		//H<<<=1
 	eor	v20.16b,v3.16b,v16.16b		//twisted H
-	st1	{v20.2d},[x0],#16		//store Htable[0]
+	st1	{v20.2d},[PTR(0)],#16	//store Htable[0]
 
 	//calculate H^2
 	ext	v16.16b,v20.16b,v20.16b,#8		//Karatsuba pre-processing
@@ -49,7 +51,7 @@ gcm_init_v8:
 	ext	v17.16b,v22.16b,v22.16b,#8		//Karatsuba pre-processing
 	eor	v17.16b,v17.16b,v22.16b
 	ext	v21.16b,v16.16b,v17.16b,#8		//pack Karatsuba pre-processed
-	st1	{v21.2d,v22.2d},[x0],#32	//store Htable[1..2]
+	st1	{v21.2d,v22.2d},[PTR(0)],#32	//store Htable[1..2]
 	//calculate H^3 and H^4
 	pmull	v0.1q,v20.1d, v22.1d
 	pmull	v5.1q,v22.1d,v22.1d
@@ -90,18 +92,19 @@ gcm_init_v8:
 	eor	v16.16b,v16.16b,v20.16b
 	eor	v17.16b,v17.16b,v22.16b
 	ext	v21.16b,v16.16b,v17.16b,#8		//pack Karatsuba pre-processed
-	st1	{v20.2d,v21.2d,v22.2d},[x0]		//store Htable[3..5]
+	st1	{v20.2d,v21.2d,v22.2d},[PTR(0)]	//store Htable[3..5]
 	ret
 .size	gcm_init_v8,.-gcm_init_v8
 .globl	gcm_gmult_v8
 .type	gcm_gmult_v8,%function
 .align	4
 gcm_gmult_v8:
-	ld1	{v17.2d},[x0]		//load Xi
+	AARCH64_VALID_CALL_TARGET
+	ld1	{v17.2d},[PTR(0)]		//load Xi
 	movi	v19.16b,#0xe1
-	ld1	{v20.2d,v21.2d},[x1]	//load twisted H, ...
+	ld1	{v20.2d,v21.2d},[PTR(1)]	//load twisted H, ...
 	shl	v19.2d,v19.2d,#57
-#ifndef __ARMEB__
+#ifndef __AARCH64EB__
 	rev64	v17.16b,v17.16b
 #endif
 	ext	v3.16b,v17.16b,v17.16b,#8
@@ -126,11 +129,11 @@ gcm_gmult_v8:
 	eor	v18.16b,v18.16b,v2.16b
 	eor	v0.16b,v0.16b,v18.16b
 
-#ifndef __ARMEB__
+#ifndef __AARCH64EB__
 	rev64	v0.16b,v0.16b
 #endif
 	ext	v0.16b,v0.16b,v0.16b,#8
-	st1	{v0.2d},[x0]		//write out Xi
+	st1	{v0.2d},[PTR(0)]		//write out Xi
 
 	ret
 .size	gcm_gmult_v8,.-gcm_gmult_v8
@@ -138,9 +141,10 @@ gcm_gmult_v8:
 .type	gcm_ghash_v8,%function
 .align	4
 gcm_ghash_v8:
+	AARCH64_VALID_CALL_TARGET
 	cmp	x3,#64
 	b.hs	.Lgcm_ghash_v8_4x
-	ld1	{v0.2d},[x0]		//load [rotated] Xi
+	ld1	{v0.2d},[PTR(0)]		//load [rotated] Xi
 						//"[rotated]" means that
 						//loaded value would have
 						//to be rotated in order to
@@ -156,21 +160,21 @@ gcm_ghash_v8:
 						//last block[s] are actually
 						//loaded twice, but last
 						//copy is not processed
-	ld1	{v20.2d,v21.2d},[x1],#32	//load twisted H, ..., H^2
+	ld1	{v20.2d,v21.2d},[PTR(1)],#32	//load twisted H, ..., H^2
 	movi	v19.16b,#0xe1
-	ld1	{v22.2d},[x1]
+	ld1	{v22.2d},[PTR(1)]
 	csel	x12,xzr,x12,eq			//is it time to zero x12?
 	ext	v0.16b,v0.16b,v0.16b,#8		//rotate Xi
-	ld1	{v16.2d},[x2],#16	//load [rotated] I[0]
+	ld1	{v16.2d},[PTR(2)],#16	//load [rotated] I[0]
 	shl	v19.2d,v19.2d,#57		//compose 0xc2.0 constant
-#ifndef __ARMEB__
+#ifndef __AARCH64EB__
 	rev64	v16.16b,v16.16b
 	rev64	v0.16b,v0.16b
 #endif
 	ext	v3.16b,v16.16b,v16.16b,#8		//rotate I[0]
 	b.lo	.Lodd_tail_v8		//x3 was less than 32
-	ld1	{v17.2d},[x2],x12	//load [rotated] I[1]
-#ifndef __ARMEB__
+	ld1	{v17.2d},[PTR(2)],x12	//load [rotated] I[1]
+#ifndef __AARCH64EB__
 	rev64	v17.16b,v17.16b
 #endif
 	ext	v7.16b,v17.16b,v17.16b,#8
@@ -192,7 +196,7 @@ gcm_ghash_v8:
 	pmull2	v2.1q,v22.2d,v3.2d		//H^2.hi·Xi.hi
 	eor	v0.16b,v0.16b,v4.16b		//accumulate
 	pmull2	v1.1q,v21.2d,v18.2d		//(H^2.lo+H^2.hi)·(Xi.lo+Xi.hi)
-	ld1	{v16.2d},[x2],x12	//load [rotated] I[i+2]
+	ld1	{v16.2d},[PTR(2)],x12	//load [rotated] I[i+2]
 
 	eor	v2.16b,v2.16b,v6.16b
 	csel	x12,xzr,x12,eq			//is it time to zero x12?
@@ -201,14 +205,14 @@ gcm_ghash_v8:
 	ext	v17.16b,v0.16b,v2.16b,#8		//Karatsuba post-processing
 	eor	v18.16b,v0.16b,v2.16b
 	eor	v1.16b,v1.16b,v17.16b
-	ld1	{v17.2d},[x2],x12	//load [rotated] I[i+3]
-#ifndef __ARMEB__
+	ld1	{v17.2d},[PTR(2)],x12	//load [rotated] I[i+3]
+#ifndef __AARCH64EB__
 	rev64	v16.16b,v16.16b
 #endif
 	eor	v1.16b,v1.16b,v18.16b
 	pmull	v18.1q,v0.1d,v19.1d		//1st phase of reduction
 
-#ifndef __ARMEB__
+#ifndef __AARCH64EB__
 	rev64	v17.16b,v17.16b
 #endif
 	ins	v2.d[0],v1.d[1]
@@ -258,11 +262,11 @@ gcm_ghash_v8:
 	eor	v0.16b,v0.16b,v18.16b
 
 .Ldone_v8:
-#ifndef __ARMEB__
+#ifndef __AARCH64EB__
 	rev64	v0.16b,v0.16b
 #endif
 	ext	v0.16b,v0.16b,v0.16b,#8
-	st1	{v0.2d},[x0]		//write out Xi
+	st1	{v0.2d},[PTR(0)]		//write out Xi
 
 	ret
 .size	gcm_ghash_v8,.-gcm_ghash_v8
@@ -270,14 +274,14 @@ gcm_ghash_v8:
 .align	4
 gcm_ghash_v8_4x:
 .Lgcm_ghash_v8_4x:
-	ld1	{v0.2d},[x0]		//load [rotated] Xi
-	ld1	{v20.2d,v21.2d,v22.2d},[x1],#48	//load twisted H, ..., H^2
+	ld1	{v0.2d},[PTR(0)]		//load [rotated] Xi
+	ld1	{v20.2d,v21.2d,v22.2d},[PTR(1)],#48	//load twisted H, ..., H^2
 	movi	v19.16b,#0xe1
-	ld1	{v26.2d,v27.2d,v28.2d},[x1]	//load twisted H^3, ..., H^4
+	ld1	{v26.2d,v27.2d,v28.2d},[PTR(1)]	//load twisted H^3, ..., H^4
 	shl	v19.2d,v19.2d,#57		//compose 0xc2.0 constant
 
-	ld1	{v4.2d,v5.2d,v6.2d,v7.2d},[x2],#64
-#ifndef __ARMEB__
+	ld1	{v4.2d,v5.2d,v6.2d,v7.2d},[PTR(2)],#64
+#ifndef __AARCH64EB__
 	rev64	v0.16b,v0.16b
 	rev64	v5.16b,v5.16b
 	rev64	v6.16b,v6.16b
@@ -319,9 +323,9 @@ gcm_ghash_v8_4x:
 .align	4
 .Loop4x:
 	eor	v16.16b,v4.16b,v0.16b
-	ld1	{v4.2d,v5.2d,v6.2d,v7.2d},[x2],#64
+	ld1	{v4.2d,v5.2d,v6.2d,v7.2d},[PTR(2)],#64
 	ext	v3.16b,v16.16b,v16.16b,#8
-#ifndef __ARMEB__
+#ifndef __AARCH64EB__
 	rev64	v5.16b,v5.16b
 	rev64	v6.16b,v6.16b
 	rev64	v7.16b,v7.16b
@@ -402,9 +406,9 @@ gcm_ghash_v8_4x:
 	ext	v17.16b,v0.16b,v2.16b,#8		//Karatsuba post-processing
 	eor	v18.16b,v0.16b,v2.16b
 	eor	v1.16b,v1.16b,v17.16b
-	ld1	{v4.2d,v5.2d,v6.2d},[x2]
+	ld1	{v4.2d,v5.2d,v6.2d},[PTR(2)]
 	eor	v1.16b,v1.16b,v18.16b
-#ifndef	__ARMEB__
+#ifndef	__AARCH64EB__
 	rev64	v5.16b,v5.16b
 	rev64	v6.16b,v6.16b
 	rev64	v4.16b,v4.16b
@@ -454,9 +458,9 @@ gcm_ghash_v8_4x:
 	ext	v17.16b,v0.16b,v2.16b,#8		//Karatsuba post-processing
 	eor	v18.16b,v0.16b,v2.16b
 	eor	v1.16b,v1.16b,v17.16b
-	ld1	{v4.2d,v5.2d},[x2]
+	ld1	{v4.2d,v5.2d},[PTR(2)]
 	eor	v1.16b,v1.16b,v18.16b
-#ifndef	__ARMEB__
+#ifndef	__AARCH64EB__
 	rev64	v5.16b,v5.16b
 	rev64	v4.16b,v4.16b
 #endif
@@ -497,9 +501,9 @@ gcm_ghash_v8_4x:
 	ext	v17.16b,v0.16b,v2.16b,#8		//Karatsuba post-processing
 	eor	v18.16b,v0.16b,v2.16b
 	eor	v1.16b,v1.16b,v17.16b
-	ld1	{v4.2d},[x2]
+	ld1	{v4.2d},[PTR(2)]
 	eor	v1.16b,v1.16b,v18.16b
-#ifndef	__ARMEB__
+#ifndef	__AARCH64EB__
 	rev64	v4.16b,v4.16b
 #endif
 
@@ -539,10 +543,10 @@ gcm_ghash_v8_4x:
 	eor	v0.16b,v0.16b,v18.16b
 	ext	v0.16b,v0.16b,v0.16b,#8
 
-#ifndef __ARMEB__
+#ifndef __AARCH64EB__
 	rev64	v0.16b,v0.16b
 #endif
-	st1	{v0.2d},[x0]		//write out Xi
+	st1	{v0.2d},[PTR(0)]		//write out Xi
 
 	ret
 .size	gcm_ghash_v8_4x,.-gcm_ghash_v8_4x

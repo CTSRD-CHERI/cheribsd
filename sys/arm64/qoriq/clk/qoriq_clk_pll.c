@@ -26,14 +26,13 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/malloc.h>
 
-#include <dev/extres/clk/clk.h>
-#include <dev/extres/clk/clk_fixed.h>
+#include <dev/clk/clk.h>
+#include <dev/clk/clk_fixed.h>
 
 #include <arm64/qoriq/clk/qoriq_clkgen.h>
 

@@ -29,10 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-/*static char *sccsid = "from: @(#)malloc.c	5.11 (Berkeley) 2/23/91";*/
-static char *rcsid = "$FreeBSD$";
-#endif /* LIBC_SCCS and not lint */
 
 /*
  * malloc.c (Caltech) 2/21/82
@@ -75,8 +71,8 @@ static caddr_t		pagepool_start, pagepool_end;
 union	overhead {
 	union	overhead *ov_next;	/* when free */
 	struct {
-		u_char	ovu_magic;	/* magic number */
-		u_char	ovu_index;	/* bucket # */
+		uint16_t ovu_index;	/* bucket # */
+		uint8_t ovu_magic;	/* magic number */
 	} ovu;
 #define	ov_magic	ovu.ovu_magic
 #define	ov_index	ovu.ovu_index
@@ -86,13 +82,15 @@ static void morecore(int bucket);
 static int morepages(int n);
 
 #define	MAGIC		0xef		/* magic # on accounting info */
+#define	AMAGIC		0xdf		/* magic # for aligned alloc */
 
 /*
  * nextf[i] is the pointer to the next free block of size
  * (FIRST_BUCKET_SIZE << i).  The overhead information precedes the data
  * area returned to the user.
  */
-#define	FIRST_BUCKET_SIZE	8
+#define	LOW_BITS		3
+#define	FIRST_BUCKET_SIZE	(1U << LOW_BITS)
 #define	NBUCKETS 30
 static	union overhead *nextf[NBUCKETS];
 
@@ -106,10 +104,10 @@ static	int pagesz;			/* page size */
  * increasing order.
  */
 
-static union overhead *
+static void *
 cp2op(void *cp)
 {
-	return ((union overhead *)((caddr_t)cp - sizeof(union overhead)));
+	return (((caddr_t)cp - sizeof(union overhead)));
 }
 
 void *
@@ -150,21 +148,6 @@ __crt_malloc(size_t nbytes)
 	}
 	/* remove from linked list */
   	nextf[bucket] = op->ov_next;
-	/*
-	 * XXXQEMU: Set an ov_next capability to a NULL capability, clearing any
-	 * permissions.
-	 *
-	 * Based on a tag and permissions of ov_next, find_overhead() determines
-	 * if an allocation is aligned. The QEMU user mode for CheriABI doesn't
-	 * implement tagged memory and find_overhead() might incorrectly assume
-	 * the allocation is aligned because of a non-cleared tag. Having the
-	 * permissions cleared, find_overhead() behaves as expected under the
-	 * user mode.
-	 *
-	 * This is a workaround and should be reverted once the user mode
-	 * implements tagged memory.
-	 */
-	op->ov_next = NULL;
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
   	return ((char *)(op + 1));
@@ -184,6 +167,28 @@ __crt_calloc(size_t num, size_t size)
 		memset(ret, 0, num * size);
 
 	return (ret);
+}
+
+void *
+__crt_aligned_alloc_offset(size_t align, size_t size, size_t offset)
+{
+	void *mem, *ov;
+	union overhead ov1;
+	uintptr_t x;
+
+	if (align < FIRST_BUCKET_SIZE)
+		align = FIRST_BUCKET_SIZE;
+	offset &= align - 1;
+	mem = __crt_malloc(size + align + offset + sizeof(union overhead));
+	if (mem == NULL)
+		return (NULL);
+	x = roundup2((uintptr_t)mem + sizeof(union overhead), align);
+	x += offset;
+	ov = cp2op((void *)x);
+	ov1.ov_magic = AMAGIC;
+	ov1.ov_index = x - (uintptr_t)mem + sizeof(union overhead);
+	memcpy(ov, &ov1, sizeof(ov1));
+	return ((void *)x);
 }
 
 /*
@@ -227,12 +232,16 @@ morecore(int bucket)
 void
 __crt_free(void *cp)
 {
+	union overhead *op, op1;
+	void *opx;
 	int size;
-	union overhead *op;
 
   	if (cp == NULL)
   		return;
-	op = cp2op(cp);
+	opx = cp2op(cp);
+	memcpy(&op1, opx, sizeof(op1));
+	op = op1.ov_magic == AMAGIC ? (void *)((caddr_t)cp - op1.ov_index) :
+	    opx;
 	if (op->ov_magic != MAGIC)
 		return;				/* sanity */
   	size = op->ov_index;

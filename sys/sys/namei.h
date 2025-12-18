@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)namei.h	8.5 (Berkeley) 1/9/95
  */
 
 #ifndef _SYS_NAMEI_H_
@@ -39,6 +37,8 @@
 #include <sys/queue.h>
 #include <sys/_seqc.h>
 #include <sys/_uio.h>
+
+#include <vm/uma.h>
 
 enum nameiop { LOOKUP, CREATE, DELETE, RENAME };
 
@@ -158,7 +158,7 @@ int	cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
  */
 #define	RDONLY		0x00000200 /* lookup with read-only semantics */
 #define	ISRESTARTED	0x00000400 /* restarted namei */
-/* UNUSED		0x00000800 */
+#define	IGNOREWHITEOUT	0x00000800 /* ignore whiteouts, e.g. when checking if a dir is empty */
 #define	ISWHITEOUT	0x00001000 /* found whiteout */
 #define	DOWHITEOUT	0x00002000 /* do whiteouts */
 #define	WILLBEDIR	0x00004000 /* new files will be dirs; allow trailing / */
@@ -197,8 +197,12 @@ int	cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
 /*
  * Flags in ni_lcf, valid for the duration of the namei call.
  */
-#define	NI_LCF_STRICTRELATIVE	0x0001	/* relative lookup only */
+#define	NI_LCF_STRICTREL	0x0001	/* relative lookup only */
 #define	NI_LCF_CAP_DOTDOT	0x0002	/* ".." in strictrelative case */
+/* Track capability restrictions seperately for violation ktracing. */
+#define	NI_LCF_STRICTREL_KTR	0x0004	/* trace relative lookups */
+#define	NI_LCF_CAP_DOTDOT_KTR	0x0008	/* ".." in strictrelative case */
+#define	NI_LCF_KTR_FLAGS	(NI_LCF_STRICTREL_KTR | NI_LCF_CAP_DOTDOT_KTR)
 
 /*
  * Initialization of a nameidata structure.

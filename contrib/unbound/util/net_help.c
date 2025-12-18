@@ -47,6 +47,7 @@
 #ifdef HAVE_NETIOAPI_H
 #include <netioapi.h>
 #endif
+#include <ctype.h>
 #include "util/net_help.h"
 #include "util/log.h"
 #include "util/data/dname.h"
@@ -77,6 +78,8 @@
 
 /** max length of an IP address (the address portion) that we allow */
 #define MAX_ADDR_STRLEN 128 /* characters */
+/** max length of a hostname (with port and tls name) that we allow */
+#define MAX_HOST_STRLEN (LDNS_MAX_DOMAINLEN * 3) /* characters */
 /** default value for EDNS ADVERTISED size */
 uint16_t EDNS_ADVERTISED_SIZE = 4096;
 
@@ -486,28 +489,38 @@ uint8_t* authextstrtodname(char* str, int* port, char** auth_name)
 	*port = UNBOUND_DNS_PORT;
 	*auth_name = NULL;
 	if((s=strchr(str, '@'))) {
+		char buf[MAX_HOST_STRLEN];
+		size_t len = (size_t)(s-str);
 		char* hash = strchr(s+1, '#');
 		if(hash) {
 			*auth_name = hash+1;
 		} else {
 			*auth_name = NULL;
 		}
+		if(len >= MAX_HOST_STRLEN) {
+			return NULL;
+		}
+		(void)strlcpy(buf, str, sizeof(buf));
+		buf[len] = 0;
 		*port = atoi(s+1);
 		if(*port == 0) {
 			if(!hash && strcmp(s+1,"0")!=0)
-				return 0;
+				return NULL;
 			if(hash && strncmp(s+1,"0#",2)!=0)
-				return 0;
+				return NULL;
 		}
-		*s = 0;
-		dname = sldns_str2wire_dname(str, &dname_len);
-		*s = '@';
+		dname = sldns_str2wire_dname(buf, &dname_len);
 	} else if((s=strchr(str, '#'))) {
+		char buf[MAX_HOST_STRLEN];
+		size_t len = (size_t)(s-str);
+		if(len >= MAX_HOST_STRLEN) {
+			return NULL;
+		}
+		(void)strlcpy(buf, str, sizeof(buf));
+		buf[len] = 0;
 		*port = UNBOUND_DNS_OVER_TLS_PORT;
 		*auth_name = s+1;
-		*s = 0;
-		dname = sldns_str2wire_dname(str, &dname_len);
-		*s = '#';
+		dname = sldns_str2wire_dname(buf, &dname_len);
 	} else {
 		dname = sldns_str2wire_dname(str, &dname_len);
 	}
@@ -779,8 +792,8 @@ addr_in_common(struct sockaddr_storage* addr1, int net1,
 	return match;
 }
 
-void 
-addr_to_str(struct sockaddr_storage* addr, socklen_t addrlen, 
+void
+addr_to_str(struct sockaddr_storage* addr, socklen_t addrlen,
 	char* buf, size_t len)
 {
 	int af = (int)((struct sockaddr_in*)addr)->sin_family;
@@ -792,7 +805,51 @@ addr_to_str(struct sockaddr_storage* addr, socklen_t addrlen,
 	}
 }
 
-int 
+int
+prefixnet_is_nat64(int prefixnet)
+{
+	return (prefixnet == 32 || prefixnet == 40 ||
+		prefixnet == 48 || prefixnet == 56 ||
+		prefixnet == 64 || prefixnet == 96);
+}
+
+void
+addr_to_nat64(const struct sockaddr_storage* addr,
+	const struct sockaddr_storage* nat64_prefix,
+	socklen_t nat64_prefixlen, int nat64_prefixnet,
+	struct sockaddr_storage* nat64_addr, socklen_t* nat64_addrlen)
+{
+	struct sockaddr_in *sin = (struct sockaddr_in *)addr;
+	struct sockaddr_in6 *sin6;
+	uint8_t *v4_byte;
+	int i;
+
+	/* This needs to be checked by the caller */
+	log_assert(addr->ss_family == AF_INET);
+	/* Current usage is only from config values; prefix lengths enforced
+	 * during config validation */
+	log_assert(prefixnet_is_nat64(nat64_prefixnet));
+
+	*nat64_addr = *nat64_prefix;
+	*nat64_addrlen = nat64_prefixlen;
+
+	sin6 = (struct sockaddr_in6 *)nat64_addr;
+	sin6->sin6_flowinfo = 0;
+	sin6->sin6_port = sin->sin_port;
+
+	nat64_prefixnet = nat64_prefixnet / 8;
+
+	v4_byte = (uint8_t *)&sin->sin_addr.s_addr;
+	for(i = 0; i < 4; i++) {
+		if(nat64_prefixnet == 8) {
+			/* bits 64...71 are MBZ */
+			sin6->sin6_addr.s6_addr[nat64_prefixnet++] = 0;
+		}
+		sin6->sin6_addr.s6_addr[nat64_prefixnet++] = *v4_byte++;
+	}
+}
+
+int
 addr_is_ip4mapped(struct sockaddr_storage* addr, socklen_t addrlen)
 {
 	/* prefix for ipv4 into ipv6 mapping is ::ffff:x.x.x.x */
@@ -804,6 +861,20 @@ addr_is_ip4mapped(struct sockaddr_storage* addr, socklen_t addrlen)
 	/* s is 16 octet ipv6 address string */
 	s = (uint8_t*)&((struct sockaddr_in6*)addr)->sin6_addr;
 	return (memcmp(s, map_prefix, 12) == 0);
+}
+
+int addr_is_ip6linklocal(struct sockaddr_storage* addr, socklen_t addrlen)
+{
+	const uint8_t prefix[2] = {0xfe, 0x80};
+	int af = (int)((struct sockaddr_in6*)addr)->sin6_family;
+	void* sin6addr = &((struct sockaddr_in6*)addr)->sin6_addr;
+	uint8_t start[2];
+	if(af != AF_INET6 || addrlen<(socklen_t)sizeof(struct sockaddr_in6))
+		return 0;
+	/* Put the first 10 bits of sin6addr in start, match fe80::/10. */
+	memmove(start, sin6addr, 2);
+	start[1] &= 0xc0;
+	return memcmp(start, prefix, 2) == 0;
 }
 
 int addr_is_broadcast(struct sockaddr_storage* addr, socklen_t addrlen)
@@ -909,6 +980,111 @@ void log_crypto_err_code(const char* str, unsigned long err)
 }
 
 #ifdef HAVE_SSL
+/** Print crypt erro with SSL_get_error want code and err_get_error code */
+static void log_crypto_err_io_code_arg(const char* str, int r,
+	unsigned long err, int err_present)
+{
+	int print_errno = 0, print_crypto_err = 0;
+	const char* inf = NULL;
+
+	switch(r) {
+	case SSL_ERROR_NONE:
+		inf = "no error";
+		break;
+	case SSL_ERROR_ZERO_RETURN:
+		inf = "channel closed";
+		break;
+	case SSL_ERROR_WANT_READ:
+		inf = "want read";
+		break;
+	case SSL_ERROR_WANT_WRITE:
+		inf = "want write";
+		break;
+	case SSL_ERROR_WANT_CONNECT:
+		inf = "want connect";
+		break;
+	case SSL_ERROR_WANT_ACCEPT:
+		inf = "want accept";
+		break;
+	case SSL_ERROR_WANT_X509_LOOKUP:
+		inf = "want X509 lookup";
+		break;
+#ifdef SSL_ERROR_WANT_ASYNC
+	case SSL_ERROR_WANT_ASYNC:
+		inf = "want async";
+		break;
+#endif
+#ifdef SSL_ERROR_WANT_ASYNC_JOB
+	case SSL_ERROR_WANT_ASYNC_JOB:
+		inf = "want async job";
+		break;
+#endif
+#ifdef SSL_ERROR_WANT_CLIENT_HELLO_CB
+	case SSL_ERROR_WANT_CLIENT_HELLO_CB:
+		inf = "want client hello cb";
+		break;
+#endif
+	case SSL_ERROR_SYSCALL:
+		print_errno = 1;
+		inf = "syscall";
+		break;
+	case SSL_ERROR_SSL:
+		print_crypto_err = 1;
+		inf = "SSL, usually protocol, error";
+		break;
+	default:
+		inf = "unknown SSL_get_error result code";
+		print_errno = 1;
+		print_crypto_err = 1;
+	}
+	if(print_crypto_err) {
+		if(print_errno) {
+			char buf[1024];
+			snprintf(buf, sizeof(buf), "%s with errno %s",
+				str, strerror(errno));
+			if(err_present)
+				log_crypto_err_code(buf, err);
+			else	log_crypto_err(buf);
+		} else {
+			if(err_present)
+				log_crypto_err_code(str, err);
+			else	log_crypto_err(str);
+		}
+	} else {
+		if(print_errno) {
+			if(errno == 0)
+				log_err("%s: syscall error with errno %s",
+					str, strerror(errno));
+			else log_err("%s: %s", str, strerror(errno));
+		} else {
+			log_err("%s: %s", str, inf);
+		}
+	}
+}
+#endif /* HAVE_SSL */
+
+void log_crypto_err_io(const char* str, int r)
+{
+#ifdef HAVE_SSL
+	log_crypto_err_io_code_arg(str, r, 0, 0);
+#else
+	(void)str;
+	(void)r;
+#endif /* HAVE_SSL */
+}
+
+void log_crypto_err_io_code(const char* str, int r, unsigned long err)
+{
+#ifdef HAVE_SSL
+	log_crypto_err_io_code_arg(str, r, err, 1);
+#else
+	(void)str;
+	(void)r;
+	(void)err;
+#endif /* HAVE_SSL */
+}
+
+#ifdef HAVE_SSL
 /** log certificate details */
 void
 log_cert(unsigned level, const char* str, void* cert)
@@ -1005,6 +1181,16 @@ listen_sslctx_setup(void* ctxt)
 			log_crypto_err("could not set cipher list with SSL_CTX_set_cipher_list");
 	}
 #endif
+#if defined(SSL_OP_IGNORE_UNEXPECTED_EOF)
+	/* ignore errors when peers do not send the mandatory close_notify
+	 * alert on shutdown.
+	 * Relevant for openssl >= 3 */
+	if((SSL_CTX_set_options(ctx, SSL_OP_IGNORE_UNEXPECTED_EOF) &
+		SSL_OP_IGNORE_UNEXPECTED_EOF) != SSL_OP_IGNORE_UNEXPECTED_EOF) {
+		log_crypto_err("could not set SSL_OP_IGNORE_UNEXPECTED_EOF");
+		return 0;
+	}
+#endif
 
 	if((SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE) &
 		SSL_OP_CIPHER_SERVER_PREFERENCE) !=
@@ -1035,7 +1221,7 @@ listen_sslctx_setup_2(void* ctxt)
 	if(!SSL_CTX_set_ecdh_auto(ctx,1)) {
 		log_crypto_err("Error in SSL_CTX_ecdh_auto, not enabling ECDHE");
 	}
-#elif defined(USE_ECDSA)
+#elif defined(USE_ECDSA) && defined(HAVE_SSL_CTX_SET_TMP_ECDH)
 	if(1) {
 		EC_KEY *ecdh = EC_KEY_new_by_curve_name (NID_X9_62_prime256v1);
 		if (!ecdh) {
@@ -1230,6 +1416,17 @@ void* connect_sslctx_create(char* key, char* pem, char* verifypem, int wincert)
 	if((SSL_CTX_set_options(ctx, SSL_OP_NO_RENEGOTIATION) &
 		SSL_OP_NO_RENEGOTIATION) != SSL_OP_NO_RENEGOTIATION) {
 		log_crypto_err("could not set SSL_OP_NO_RENEGOTIATION");
+		SSL_CTX_free(ctx);
+		return 0;
+	}
+#endif
+#if defined(SSL_OP_IGNORE_UNEXPECTED_EOF)
+	/* ignore errors when peers do not send the mandatory close_notify
+	 * alert on shutdown.
+	 * Relevant for openssl >= 3 */
+	if((SSL_CTX_set_options(ctx, SSL_OP_IGNORE_UNEXPECTED_EOF) &
+		SSL_OP_IGNORE_UNEXPECTED_EOF) != SSL_OP_IGNORE_UNEXPECTED_EOF) {
+		log_crypto_err("could not set SSL_OP_IGNORE_UNEXPECTED_EOF");
 		SSL_CTX_free(ctx);
 		return 0;
 	}
@@ -1675,3 +1872,42 @@ sock_close(int socket)
 	closesocket(socket);
 }
 #  endif /* USE_WINSOCK */
+
+ssize_t
+hex_ntop(uint8_t const *src, size_t srclength, char *target, size_t targsize)
+{
+	static char hexdigits[] = {
+		'0', '1', '2', '3', '4', '5', '6', '7',
+		'8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
+	};
+	size_t i;
+
+	if (targsize < srclength * 2 + 1) {
+		return -1;
+	}
+
+	for (i = 0; i < srclength; ++i) {
+		*target++ = hexdigits[src[i] >> 4U];
+		*target++ = hexdigits[src[i] & 0xfU];
+	}
+	*target = '\0';
+	return 2 * srclength;
+}
+
+ssize_t
+hex_pton(const char* src, uint8_t* target, size_t targsize)
+{
+	uint8_t *t = target;
+	if(strlen(src) % 2 != 0 || strlen(src)/2 > targsize) {
+		return -1;
+	}
+	while(*src) {
+		if(!isxdigit((unsigned char)src[0]) ||
+			!isxdigit((unsigned char)src[1]))
+			return -1;
+		*t++ = sldns_hexdigit_to_int(src[0]) * 16 +
+			sldns_hexdigit_to_int(src[1]) ;
+		src += 2;
+	}
+	return t-target;
+}

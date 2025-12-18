@@ -29,7 +29,6 @@
 
 #include "opt_ktrace.h"
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/systm.h>
@@ -292,11 +291,7 @@ abort_handler(struct trapframe *tf, int prefetch)
 	td = curthread;
 
 	fsr = (prefetch) ? cp15_ifsr_get(): cp15_dfsr_get();
-#if __ARM_ARCH >= 7
 	far = (prefetch) ? cp15_ifar_get() : cp15_dfar_get();
-#else
-	far = (prefetch) ? TRAPF_PC(tf) : cp15_dfar_get();
-#endif
 
 	idx = FSR_TO_FAULT(fsr);
 	usermode = TRAPF_USERMODE(tf);	/* Abort came from user mode? */
@@ -409,8 +404,6 @@ abort_handler(struct trapframe *tf, int prefetch)
 	if (td->td_md.md_spinlock_count == 0) {
 		if (__predict_true(tf->tf_spsr & PSR_I) == 0)
 			enable_interrupts(PSR_I);
-		if (__predict_true(tf->tf_spsr & PSR_F) == 0)
-			enable_interrupts(PSR_F);
 	}
 
 	p = td->td_proc;
@@ -566,7 +559,7 @@ abort_fatal(struct trapframe *tf, u_int idx, u_int fsr, u_int far,
 
 	mode = usermode ? "user" : "kernel";
 	rw_mode  = fsr & FSR_WNR ? "write" : "read";
-	disable_interrupts(PSR_I|PSR_F);
+	disable_interrupts(PSR_I);
 
 	if (td != NULL) {
 		printf("Fatal %s mode data abort: '%s' on %s\n", mode,

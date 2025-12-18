@@ -1,4 +1,3 @@
-
 SHLIBDIR?=	/lib
 
 .include <src.opts.mk>
@@ -58,10 +57,11 @@ CFLAGS+= -I${ZFSTOP}/include/os/freebsd
 CFLAGS+= -I${ZFSTOP}/lib/libspl/include
 CFLAGS+= -I${ZFSTOP}/lib/libspl/include/os/freebsd
 CFLAGS+= -I${ZFSTOP}/lib/libzfs
+CFLAGS+= -I${ZFSTOP}/lib/libzpool/include
 CFLAGS+= -I${SRCTOP}/sys
 CFLAGS+= -I${SRCTOP}/cddl/compat/opensolaris/include
 CFLAGS+= -include ${ZFSTOP}/include/os/freebsd/spl/sys/ccompile.h
-CFLAGS+= -DHAVE_ISSETUGID
+CFLAGS+= -DHAVE_ISSETUGID -DHAVE_STRLCAT -DHAVE_STRLCPY
 CFLAGS.be.c=		-Wno-cast-qual
 CFLAGS.be_access.c=	-Wno-cast-qual
 CFLAGS.be_error.c=	-Wno-cast-qual

@@ -32,8 +32,6 @@
 #include <sys/cdefs.h>
 #ifndef lint
 __RCSID("$NetBSD: dir.c,v 1.20 2006/06/05 16:51:18 christos Exp $");
-static const char rcsid[] =
-  "$FreeBSD$";
 #endif /* not lint */
 
 #include <assert.h>
@@ -997,7 +995,7 @@ readDosDirSection(struct fat_descriptor *fat, struct dosDirEntry *dir)
 				n->next = pendingDirectories;
 				n->dir = d;
 				pendingDirectories = n;
-			} else {
+			} else if (!(mod & FSERROR)) {
 				mod |= k = checksize(fat, p, &dirent);
 				if (k & FSDIRMOD)
 					mod |= THISMOD;

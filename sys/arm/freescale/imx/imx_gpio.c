@@ -59,7 +59,7 @@
 #endif
 
 #ifdef IMX_ENABLE_CLOCKS
-#include <dev/extres/clk/clk.h>
+#include <dev/clk/clk.h>
 #endif
 
 #include "gpio_if.h"
@@ -134,6 +134,7 @@ static struct ofw_compat_data compat_data[] = {
 	{"fsl,imx6q-gpio",	1},
 	{"fsl,imx53-gpio",	1},
 	{"fsl,imx51-gpio",	1},
+	{"fsl,imx35-gpio",	1},
 	{NULL,			0}
 };
 

@@ -42,7 +42,6 @@
  * must handle retries in a way that makes sense for the slave being addressed.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -76,7 +75,7 @@
 #endif
 
 #ifdef IMX_ENABLE_CLOCKS
-#include <dev/extres/clk/clk.h>
+#include <dev/clk/clk.h>
 #endif
 
 #define I2C_ADDR_REG		0x00 /* I2C slave address register */
@@ -414,7 +413,7 @@ i2c_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	sc->iicbus = device_add_child(dev, "iicbus", -1);
+	sc->iicbus = device_add_child(dev, "iicbus", DEVICE_UNIT_ANY);
 	if (sc->iicbus == NULL) {
 		device_printf(dev, "could not add iicbus child");
 		return (ENXIO);

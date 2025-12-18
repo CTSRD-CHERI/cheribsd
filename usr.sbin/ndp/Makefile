@@ -30,9 +30,6 @@ CFLAGS+=	-DDRAFT_IETF_6MAN_IPV6ONLY_FLAG
 
 .if ${MK_NETLINK_SUPPORT} != "no"
 SRCS+=	ndp_netlink.c
-
-# ld.lld: error: could not determine size of cap reloc against local object nla_p_donemsg
-LD_FATAL_WARNINGS=no
 .else
 CFLAGS+=-DWITHOUT_NETLINK
 .endif

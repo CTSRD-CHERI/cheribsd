@@ -53,8 +53,6 @@
  * SUCH DAMAGE.
  *
  * from: Utah Hdr: vn.c 1.13 94/04/02
- *
- *	from: @(#)vn.c	8.6 (Berkeley) 4/1/94
  * From: src/sys/dev/vn/vn.c,v 1.122 2000/12/16 16:06:03
  */
 
@@ -897,23 +895,6 @@ mdstart_vnode(struct md_s *sc, struct bio *bp)
 	int ma_offs, npages;
 	bool mapped;
 
-	switch (bp->bio_cmd) {
-	case BIO_READ:
-		auio.uio_rw = UIO_READ;
-		break;
-	case BIO_WRITE:
-		auio.uio_rw = UIO_WRITE;
-		break;
-	case BIO_FLUSH:
-		break;
-	case BIO_DELETE:
-		if (sc->candelete)
-			break;
-		/* FALLTHROUGH */
-	default:
-		return (EOPNOTSUPP);
-	}
-
 	td = curthread;
 	vp = sc->vnode;
 	piov = NULL;
@@ -930,7 +911,14 @@ mdstart_vnode(struct md_s *sc, struct bio *bp)
 	 * still valid.
 	 */
 
-	if (bp->bio_cmd == BIO_FLUSH) {
+	switch (bp->bio_cmd) {
+	case BIO_READ:
+		auio.uio_rw = UIO_READ;
+		break;
+	case BIO_WRITE:
+		auio.uio_rw = UIO_WRITE;
+		break;
+	case BIO_FLUSH:
 		do {
 			(void)vn_start_write(vp, &mp, V_WAIT);
 			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
@@ -939,11 +927,17 @@ mdstart_vnode(struct md_s *sc, struct bio *bp)
 			vn_finished_write(mp);
 		} while (error == ERELOOKUP);
 		return (error);
-	} else if (bp->bio_cmd == BIO_DELETE) {
-		error = vn_deallocate(vp, &off, &len, 0,
-		    sc->flags & MD_ASYNC ? 0 : IO_SYNC, sc->cred, NOCRED);
-		bp->bio_resid = len;
-		return (error);
+	case BIO_DELETE:
+		if (sc->candelete) {
+			error = vn_deallocate(vp, &off, &len, 0,
+			    sc->flags & MD_ASYNC ? 0 : IO_SYNC, sc->cred,
+			    NOCRED);
+			bp->bio_resid = len;
+			return (error);
+		}
+		/* FALLTHROUGH */
+	default:
+		return (EOPNOTSUPP);
 	}
 
 	auio.uio_offset = (vm_ooffset_t)bp->bio_offset;
@@ -973,7 +967,7 @@ unmapped_step:
 		    PAGE_MASK))));
 		iolen = min(ptoa(npages) - (ma_offs & PAGE_MASK), len);
 		KASSERT(iolen > 0, ("zero iolen"));
-		KASSERT(npages <= atop(MAXPHYS + PAGE_SIZE),
+		KASSERT(npages <= atop(maxphys + PAGE_SIZE),
 		    ("npages %d too large", npages));
 		pmap_qenter(sc->kva, &bp->bio_ma[atop(ma_offs)], npages);
 		IOVEC_INIT(&aiov,
@@ -989,7 +983,7 @@ unmapped_step:
 		auio.uio_iovcnt = 1;
 	}
 	iostart = auio.uio_offset;
-	if (auio.uio_rw == UIO_READ) {
+	if (bp->bio_cmd == BIO_READ) {
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		error = VOP_READ(vp, &auio, 0, sc->cred);
 		VOP_UNLOCK(vp);
@@ -1309,6 +1303,7 @@ mdinit(struct md_s *sc)
 {
 	struct g_geom *gp;
 	struct g_provider *pp;
+	unsigned remn;
 
 	g_topology_lock();
 	gp = g_new_geomf(&g_md_class, "md%d", sc->unit);
@@ -1317,6 +1312,13 @@ mdinit(struct md_s *sc)
 	devstat_remove_entry(pp->stat);
 	pp->stat = NULL;
 	pp->flags |= G_PF_DIRECT_SEND | G_PF_DIRECT_RECEIVE;
+	/* Prune off any residual fractional sector. */
+	remn = sc->mediasize % sc->sectorsize;
+	if (remn != 0) {
+		printf("md%d: truncating fractional last sector by %u bytes\n",
+		    sc->unit, remn);
+		sc->mediasize -= remn;
+	}
 	pp->mediasize = sc->mediasize;
 	pp->sectorsize = sc->sectorsize;
 	switch (sc->type) {
@@ -1357,7 +1359,7 @@ mdcreate_malloc(struct md_s *sc, struct md_req *mdr)
 		sc->fwsectors = mdr->md_fwsectors;
 	if (mdr->md_fwheads != 0)
 		sc->fwheads = mdr->md_fwheads;
-	sc->flags = mdr->md_options & (MD_COMPRESS | MD_FORCE);
+	sc->flags = mdr->md_options & (MD_COMPRESS | MD_FORCE | MD_RESERVE);
 	sc->indir = dimension(sc->mediasize / sc->sectorsize);
 	sc->uma = uma_zcreate(sc->name, sc->sectorsize, NULL, NULL, NULL, NULL,
 	    0x1ff, 0);
@@ -1482,7 +1484,7 @@ mdcreate_vnode(struct md_s *sc, struct md_req *mdr, struct thread *td)
 	snprintf(sc->ident, sizeof(sc->ident), "MD-DEV%ju-INO%ju",
 	    (uintmax_t)vattr.va_fsid, (uintmax_t)vattr.va_fileid);
 	sc->flags = mdr->md_options & (MD_ASYNC | MD_CACHE | MD_FORCE |
-	    MD_VERIFY);
+	    MD_VERIFY | MD_MUSTDEALLOC);
 	if (!(flags & FWRITE))
 		sc->flags |= MD_READONLY;
 	sc->vnode = nd.ni_vp;
@@ -1495,7 +1497,7 @@ mdcreate_vnode(struct md_s *sc, struct md_req *mdr, struct thread *td)
 		goto bad;
 	}
 
-	sc->kva = kva_alloc(MAXPHYS + PAGE_SIZE);
+	sc->kva = kva_alloc(maxphys + PAGE_SIZE);
 	return (0);
 bad:
 	VOP_UNLOCK(nd.ni_vp);
@@ -1555,7 +1557,7 @@ mddestroy(struct md_s *sc, struct thread *td)
 	if (sc->uma)
 		uma_zdestroy(sc->uma);
 	if (sc->kva)
-		kva_free(sc->kva, MAXPHYS + PAGE_SIZE);
+		kva_free(sc->kva, maxphys + PAGE_SIZE);
 
 	LIST_REMOVE(sc, list);
 	free_unr(md_uh, sc->unit);
@@ -1686,7 +1688,7 @@ kern_mdattach_locked(struct thread *td, struct md_req *mdr)
 {
 	struct md_s *sc;
 	unsigned sectsize;
-	int error, i;
+	int error;
 
 	sx_assert(&md_sx, SA_XLOCKED);
 
@@ -1757,10 +1759,6 @@ err_after_new:
 		mddestroy(sc, td);
 		return (error);
 	}
-
-	/* Prune off any residual fractional sector */
-	i = sc->mediasize % sc->sectorsize;
-	sc->mediasize -= i;
 
 	mdinit(sc);
 	return (0);

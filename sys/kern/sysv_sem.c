@@ -44,7 +44,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include "opt_sysvipc.h"
 
 #include <sys/param.h>
@@ -268,7 +267,7 @@ static struct syscall_helper_data sem64_syscalls[] = {
 	FREEBSD64_SYSCALL_INIT_HELPER_COMPAT(semget),
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_semop),
 #if defined(COMPAT_FREEBSD7)
-	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_semsys),
+	FREEBSD64_SYSCALL_INIT_HELPER_COMPAT(semsys),
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd7_freebsd64___semctl),
 #endif
 	SYSCALL_INIT_LAST
@@ -1621,6 +1620,39 @@ sysctl_sema(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
+int
+kern_get_sema(struct thread *td, struct semid_kernel **res, size_t *sz)
+{
+	struct prison *pr, *rpr;
+	struct semid_kernel *psemak;
+	int i, mi;
+
+	*sz = mi = seminfo.semmni;
+	if (res == NULL)
+		return (0);
+
+	pr = td->td_ucred->cr_prison;
+	rpr = sem_find_prison(td->td_ucred);
+	*res = malloc(sizeof(struct semid_kernel) * mi, M_TEMP, M_WAITOK);
+	for (i = 0; i < mi; i++) {
+		psemak = &(*res)[i];
+		mtx_lock(&sema_mtx[i]);
+		if ((sema[i].u.sem_perm.mode & SEM_ALLOC) == 0 ||
+		    rpr == NULL || sem_prison_cansee(rpr, &sema[i]) != 0)
+			bzero(psemak, sizeof(*psemak));
+		else {
+			*psemak = sema[i];
+			if (psemak->cred->cr_prison != pr)
+				psemak->u.sem_perm.key = IPC_PRIVATE;
+		}
+		mtx_unlock(&sema_mtx[i]);
+		psemak->u.__sem_base = NULL;
+		psemak->label = NULL;
+		psemak->cred = NULL;
+	}
+	return (0);
+}
+
 static int
 sem_prison_check(void *obj, void *data)
 {
@@ -2072,25 +2104,6 @@ freebsd32___semctl(struct thread *td, struct freebsd32___semctl_args *uap)
 #endif /* COMPAT_FREEBSD32 */
 
 #ifdef COMPAT_FREEBSD64
-
-int
-freebsd64_semsys(struct thread *td, struct freebsd64_semsys_args *uap)
-{
-
-#ifdef COMPAT_FREEBSD7
-	AUDIT_ARG_SVIPC_WHICH(uap->which);
-	switch (uap->which) {
-	case 0:
-		return (freebsd7_freebsd64___semctl(td,
-		    (struct freebsd7_freebsd64___semctl_args *)&uap->a2));
-	default:
-		return (sys_semsys(td, (struct semsys_args *)uap));
-	}
-#else
-	return (nosys(td, (struct nosys_args *)uap));
-#endif
-}
-
 #if defined(COMPAT_FREEBSD7)
 int
 freebsd7_freebsd64___semctl(struct thread *td,
@@ -2244,7 +2257,6 @@ freebsd64___semctl(struct thread *td, struct freebsd64___semctl_args *uap)
 int
 freebsd64_semop(struct thread *td, struct freebsd64_semop_args *uap)
 {
-
 	return (kern_semop(td, uap->semid,
 	    __USER_CAP_ARRAY(uap->sops, uap->nsops), uap->nsops, NULL));
 }

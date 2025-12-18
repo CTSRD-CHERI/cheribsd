@@ -43,6 +43,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include <vmmapi.h>
 
@@ -85,6 +86,21 @@ fail:
 }
 
 static int
+vmexit_reg_emul(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
+    struct vm_run *vmrun)
+{
+	struct vm_exit *vme;
+	struct vre *vre;
+
+	vme = vmrun->vm_exit;
+	vre = &vme->u.reg_emul.vre;
+
+	EPRINTLN("Unhandled register access: pc %#lx syndrome %#x reg %d\n",
+	    (uint64_t)vme->pc, vre->inst_syndrome, vre->reg);
+	return (VMEXIT_ABORT);
+}
+
+static int
 vmexit_suspend(struct vmctx *ctx, struct vcpu *vcpu, struct vm_run *vmrun)
 {
 	struct vm_exit *vme;
@@ -117,6 +133,11 @@ vmexit_debug(struct vmctx *ctx __unused, struct vcpu *vcpu,
     struct vm_run *vmrun __unused)
 {
 	gdb_cpu_suspend(vcpu);
+	/*
+	 * XXX-MJ sleep for a short period to avoid chewing up the CPU in the
+	 * window between activation of the vCPU thread and the STARTUP IPI.
+	 */
+	usleep(1000);
 	return (VMEXIT_CONTINUE);
 }
 
@@ -228,7 +249,8 @@ vmexit_smccc(struct vmctx *ctx, struct vcpu *vcpu, struct vm_run *vmrun)
 			how = VM_SUSPEND_POWEROFF;
 		else
 			how = VM_SUSPEND_RESET;
-		vm_suspend(ctx, how);
+		error = vm_suspend(ctx, how);
+		assert(error == 0 || errno == EALREADY);
 		break;
 	default:
 		break;
@@ -241,15 +263,15 @@ vmexit_smccc(struct vmctx *ctx, struct vcpu *vcpu, struct vm_run *vmrun)
 }
 
 static int
-vmexit_hyp(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
-    struct vm_run *vmrun)
+vmexit_hyp(struct vmctx *ctx __unused, struct vcpu *vcpu, struct vm_run *vmrun)
 {
-	struct vm_exit *vme;
+	/* Raise an unknown reason exception */
+	if (vm_inject_exception(vcpu,
+	    (EXCP_UNKNOWN << ESR_ELx_EC_SHIFT) | ESR_ELx_IL,
+	    vmrun->vm_exit->u.hyp.far_el2) != 0)
+		return (VMEXIT_ABORT);
 
-	vme = vmrun->vm_exit;
-	printf("unhandled exception: esr %#lx, far %#lx\n",
-	    vme->u.hyp.esr_el2, vme->u.hyp.far_el2);
-	return (VMEXIT_ABORT);
+	return (VMEXIT_CONTINUE);
 }
 
 static int
@@ -259,12 +281,21 @@ vmexit_brk(struct vmctx *ctx __unused, struct vcpu *vcpu, struct vm_run *vmrun)
 	return (VMEXIT_CONTINUE);
 }
 
+static int
+vmexit_ss(struct vmctx *ctx __unused, struct vcpu *vcpu, struct vm_run *vmrun)
+{
+	gdb_cpu_debug(vcpu, vmrun->vm_exit);
+	return (VMEXIT_CONTINUE);
+}
+
 const vmexit_handler_t vmexit_handlers[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_BOGUS]  = vmexit_bogus,
 	[VM_EXITCODE_INST_EMUL] = vmexit_inst_emul,
+	[VM_EXITCODE_REG_EMUL] = vmexit_reg_emul,
 	[VM_EXITCODE_SUSPENDED] = vmexit_suspend,
 	[VM_EXITCODE_DEBUG] = vmexit_debug,
 	[VM_EXITCODE_SMCCC] = vmexit_smccc,
 	[VM_EXITCODE_HYP] = vmexit_hyp,
 	[VM_EXITCODE_BRK] = vmexit_brk,
+	[VM_EXITCODE_SS] = vmexit_ss,
 };

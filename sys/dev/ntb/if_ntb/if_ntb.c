@@ -37,7 +37,6 @@
  * be picked up and redistributed in Linux with a dual GPL/BSD license.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -137,10 +136,6 @@ ntb_net_attach(device_t dev)
 	int i;
 
 	ifp = sc->ifp = if_gethandle(IFT_ETHER);
-	if (ifp == NULL) {
-		printf("ntb: Cannot allocate ifnet structure\n");
-		return (ENOMEM);
-	}
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	if_setdev(ifp, dev);
 
@@ -326,7 +321,7 @@ ntb_transmit_locked(struct ntb_net_queue *q)
 	CTR0(KTR_NTB, "TX: ntb_transmit_locked");
 	while ((m = drbr_peek(ifp, q->br)) != NULL) {
 		CTR1(KTR_NTB, "TX: start mbuf %p", m);
-		if_etherbpfmtap(ifp, m);
+		ether_bpf_mtap_if(ifp, m);
 		len = m->m_pkthdr.len;
 		mflags = m->m_flags;
 		rc = ntb_transport_tx_enqueue(q->qp, m, m, len);

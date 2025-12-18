@@ -44,13 +44,6 @@
  * CHERI CHANGES END
  */
 
-#if 0
-#ifndef lint
-static char sccsid[] = "@(#)sprint.c	8.3 (Berkeley) 4/28/95";
-#endif
-#endif
-
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/socket.h>

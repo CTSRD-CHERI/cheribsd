@@ -26,7 +26,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/bio.h>
 #include <sys/diskmbr.h>
@@ -103,7 +102,8 @@ struct g_part_gpt_entry {
 
 static void g_gpt_printf_utf16(struct sbuf *, uint16_t *, size_t);
 static void g_gpt_utf8_to_utf16(const uint8_t *, uint16_t *, size_t);
-static void g_gpt_set_defaults(struct g_part_table *, struct g_provider *);
+static void g_gpt_set_defaults(struct g_part_table *, struct g_provider *,
+    struct g_part_parms *);
 
 static int g_part_gpt_add(struct g_part_table *, struct g_part_entry *,
     struct g_part_parms *);
@@ -154,7 +154,8 @@ static struct g_part_scheme g_part_gpt_scheme = {
 	g_part_gpt_methods,
 	sizeof(struct g_part_gpt_table),
 	.gps_entrysz = sizeof(struct g_part_gpt_entry),
-	.gps_minent = 128,
+	.gps_minent = 1,
+	.gps_defent = 128,
 	.gps_maxent = 4096,
 	.gps_bootcodesz = MBRSIZE,
 };
@@ -223,6 +224,7 @@ static struct uuid gpt_uuid_solaris_var = GPT_ENT_TYPE_SOLARIS_VAR;
 static struct uuid gpt_uuid_solaris_home = GPT_ENT_TYPE_SOLARIS_HOME;
 static struct uuid gpt_uuid_solaris_altsec = GPT_ENT_TYPE_SOLARIS_ALTSEC;
 static struct uuid gpt_uuid_solaris_reserved = GPT_ENT_TYPE_SOLARIS_RESERVED;
+static struct uuid gpt_uuid_u_boot_env = GPT_ENT_TYPE_U_BOOT_ENV;
 static struct uuid gpt_uuid_unused = GPT_ENT_TYPE_UNUSED;
 static struct uuid gpt_uuid_vmfs = GPT_ENT_TYPE_VMFS;
 static struct uuid gpt_uuid_vmkdiag = GPT_ENT_TYPE_VMKDIAG;
@@ -295,6 +297,7 @@ static struct g_part_uuid_alias {
 	{ &gpt_uuid_solaris_home,	G_PART_ALIAS_SOLARIS_HOME,	 0 },
 	{ &gpt_uuid_solaris_altsec,	G_PART_ALIAS_SOLARIS_ALTSEC,	 0 },
 	{ &gpt_uuid_solaris_reserved,	G_PART_ALIAS_SOLARIS_RESERVED,	 0 },
+	{ &gpt_uuid_u_boot_env,		G_PART_ALIAS_U_BOOT_ENV,	 0 },
 	{ &gpt_uuid_vmfs,		G_PART_ALIAS_VMFS,		 0 },
 	{ &gpt_uuid_vmkdiag,		G_PART_ALIAS_VMKDIAG,		 0 },
 	{ &gpt_uuid_vmreserved,		G_PART_ALIAS_VMRESERVED,	 0 },
@@ -717,7 +720,7 @@ g_part_gpt_create(struct g_part_table *basetable, struct g_part_parms *gpp)
 	table->hdr->hdr_entries = basetable->gpt_entries;
 	table->hdr->hdr_entsz = sizeof(struct gpt_ent);
 
-	g_gpt_set_defaults(basetable, pp);
+	g_gpt_set_defaults(basetable, pp, gpp);
 	return (0);
 }
 
@@ -1042,6 +1045,20 @@ g_part_gpt_read(struct g_part_table *basetable, struct g_consumer *cp)
 		g_free(sectbl);
 	}
 
+	/*
+	 * The reserved area preceeds the valid area for partitions. Warn when
+	 * the lba_start doesn't meet the standard's minimum size for the gpt
+	 * entry array. UEFI 2.10 section 5.3 specifies that the LBA must be 32
+	 * (for 512 byte sectors) or 6 (4k sectors) or larger. This is different
+	 * than the number of valid entries in the GPT entry array, which can be
+	 * smaller.
+	 */
+	if (table->hdr->hdr_lba_start < GPT_MIN_RESERVED / pp->sectorsize + 2) {
+		printf("GEOM: warning: %s lba_start %llu < required min %d\n",
+		    pp->name, (unsigned long long)table->hdr->hdr_lba_start,
+		    GPT_MIN_RESERVED / pp->sectorsize + 2);
+	}
+
 	basetable->gpt_first = table->hdr->hdr_lba_start;
 	basetable->gpt_last = table->hdr->hdr_lba_end;
 	basetable->gpt_entries = table->hdr->hdr_entries;
@@ -1083,7 +1100,7 @@ g_part_gpt_recover(struct g_part_table *basetable)
 	table = (struct g_part_gpt_table *)basetable;
 	pp = LIST_FIRST(&basetable->gpt_gp->consumer)->provider;
 	gpt_create_pmbr(table, pp);
-	g_gpt_set_defaults(basetable, pp);
+	g_gpt_set_defaults(basetable, pp, NULL);
 	basetable->gpt_corrupt = 0;
 	return (0);
 }
@@ -1300,7 +1317,8 @@ g_part_gpt_write(struct g_part_table *basetable, struct g_consumer *cp)
 }
 
 static void
-g_gpt_set_defaults(struct g_part_table *basetable, struct g_provider *pp)
+g_gpt_set_defaults(struct g_part_table *basetable, struct g_provider *pp,
+	struct g_part_parms *gpp)
 {
 	struct g_part_entry *baseentry;
 	struct g_part_gpt_entry *entry;
@@ -1334,14 +1352,29 @@ g_gpt_set_defaults(struct g_part_table *basetable, struct g_provider *pp)
 		if (entry->ent.ent_lba_end > max)
 			max = entry->ent.ent_lba_end;
 	}
-	spb = 4096 / pp->sectorsize;
-	if (spb > 1) {
-		lba = start + ((start % spb) ? spb - start % spb : 0);
-		if (lba <= min)
-			start = lba;
-		lba = end - (end + 1) % spb;
-		if (max <= lba)
-			end = lba;
+	/*
+	 * Don't force alignment of any kind whatsoever on resize, restore or
+	 * recover. resize doesn't go through this path, recover has a NULL gpp
+	 * and restore has flags == restore (maybe with an appended 'C' to
+	 * commit the operation). For these operations, we have to trust the
+	 * user knows what they are doing.
+	 *
+	 * Otherwise it some flavor of creation of a new partition, so we align
+	 * to a 4k offset on the drive, to make 512e/4kn drives more performant
+	 * by default.
+	 */
+	if (gpp == NULL ||
+	    (gpp->gpp_parms & G_PART_PARM_FLAGS) == 0 ||
+	    strstr(gpp->gpp_flags, "restore") == NULL) {
+		spb = 4096 / pp->sectorsize;
+		if (spb > 1) {
+			lba = start + ((start % spb) ? spb - start % spb : 0);
+			if (lba <= min)
+				start = lba;
+			lba = end - (end + 1) % spb;
+			if (max <= lba)
+				end = lba;
+		}
 	}
 	table->hdr->hdr_lba_start = start;
 	table->hdr->hdr_lba_end = end;

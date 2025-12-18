@@ -1193,7 +1193,7 @@ int
 freebsd64_getfhat(struct thread *td, struct freebsd64_getfhat_args *uap)
 {
 	return (kern_getfhat(td, uap->flags, uap->fd,
-	    __USER_CAP_STR(uap->path), UIO_SYSSPACE,
+	    __USER_CAP_STR(uap->path), UIO_USERSPACE,
 	    __USER_CAP_OBJ(uap->fhp), UIO_USERSPACE));
 }
 

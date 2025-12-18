@@ -1,4 +1,3 @@
-/* @(#)rls.c	2.2 88/08/12 4.0 RPCSRC */
 /*
  * rls.c: Remote directory listing client
  */
@@ -72,7 +71,7 @@ main(argc, argv)
 	}
 
 	/*
-	 * Successfuly got a directory listing.
+	 * Successfully got a directory listing.
 	 * Print it out.
 	 */
 	for (nl = result->readdir_res_u.list; nl != NULL; nl = nl->next) {

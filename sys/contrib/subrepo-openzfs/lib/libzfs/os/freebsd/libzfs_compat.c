@@ -38,7 +38,8 @@
 #define	ZFS_KMOD	"openzfs"
 #endif
 
-
+#ifndef HAVE_EXECVPE
+/* FreeBSD prior to 15 lacks execvpe */
 static int
 execvPe(const char *name, const char *path, char * const *argv,
     char * const *envp)
@@ -192,6 +193,7 @@ execvpe(const char *name, char * const argv[], char * const envp[])
 
 	return (execvPe(name, path, argv, envp));
 }
+#endif /* !HAVE_EXECVPE */
 
 static __thread char errbuf[ERRBUFLEN];
 
@@ -210,7 +212,7 @@ libzfs_error_init(int error)
 		msglen -= len;
 	}
 
-	(void) snprintf(msg, msglen, "%s", strerror(error));
+	(void) snprintf(msg, msglen, "%s", zfs_strerror(error));
 
 	return (errbuf);
 }

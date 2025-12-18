@@ -6,6 +6,9 @@
  */
 
 #include <linux/of.h>
+#if defined(__FreeBSD__)
+#include <linux/delay.h>
+#endif
 #include "mt7615.h"
 #include "eeprom.h"
 
@@ -47,6 +50,9 @@ static int mt7615_efuse_init(struct mt7615_dev *dev, u32 base)
 	void *buf;
 	u32 val;
 
+	if (is_mt7663(&dev->mt76))
+		len = MT7663_EEPROM_SIZE;
+
 	val = mt76_rr(dev, base + MT_EFUSE_BASE_CTRL);
 	if (val & MT_EFUSE_BASE_CTRL_EMPTY)
 		return 0;
@@ -60,7 +66,11 @@ static int mt7615_efuse_init(struct mt7615_dev *dev, u32 base)
 	for (i = 0; i + 16 <= len; i += 16) {
 		int ret;
 
+#if defined(__linux__)
 		ret = mt7615_efuse_read(dev, base, i, buf + i);
+#elif defined(__FreeBSD__)
+		ret = mt7615_efuse_read(dev, base, i, (u8 *)buf + i);
+#endif
 		if (ret)
 			return ret;
 	}
@@ -71,6 +81,8 @@ static int mt7615_efuse_init(struct mt7615_dev *dev, u32 base)
 static int mt7615_eeprom_load(struct mt7615_dev *dev, u32 addr)
 {
 	int ret;
+
+	BUILD_BUG_ON(MT7615_EEPROM_FULL_SIZE < MT7663_EEPROM_SIZE);
 
 	ret = mt76_eeprom_init(&dev->mt76, MT7615_EEPROM_FULL_SIZE);
 	if (ret < 0)
@@ -123,12 +135,12 @@ mt7615_eeprom_parse_hw_band_cap(struct mt7615_dev *dev)
 	case MT_EE_5GHZ:
 		dev->mphy.cap.has_5ghz = true;
 		break;
-	case MT_EE_2GHZ:
-		dev->mphy.cap.has_2ghz = true;
-		break;
 	case MT_EE_DBDC:
 		dev->dbdc_support = true;
 		fallthrough;
+	case MT_EE_2GHZ:
+		dev->mphy.cap.has_2ghz = true;
+		break;
 	default:
 		dev->mphy.cap.has_2ghz = true;
 		dev->mphy.cap.has_5ghz = true;
@@ -251,6 +263,7 @@ int mt7615_eeprom_get_power_delta_index(struct mt7615_dev *dev,
 		return MT_EE_5G_RATE_POWER;
 }
 
+#if defined(__linux__)
 static void mt7615_apply_cal_free_data(struct mt7615_dev *dev)
 {
 	static const u16 ical[] = {
@@ -306,9 +319,11 @@ static void mt7622_apply_cal_free_data(struct mt7615_dev *dev)
 		eeprom[ical[i]] = otp[ical[i]];
 	}
 }
+#endif
 
 static void mt7615_cal_free_data(struct mt7615_dev *dev)
 {
+#if defined(__linux__)
 	struct device_node *np = dev->mt76.dev->of_node;
 
 	if (!np || !of_property_read_bool(np, "mediatek,eeprom-merge-otp"))
@@ -323,6 +338,7 @@ static void mt7615_cal_free_data(struct mt7615_dev *dev)
 		mt7615_apply_cal_free_data(dev);
 		break;
 	}
+#endif
 }
 
 int mt7615_eeprom_init(struct mt7615_dev *dev, u32 addr)
@@ -336,14 +352,18 @@ int mt7615_eeprom_init(struct mt7615_dev *dev, u32 addr)
 	ret = mt7615_check_eeprom(&dev->mt76);
 	if (ret && dev->mt76.otp.data) {
 		memcpy(dev->mt76.eeprom.data, dev->mt76.otp.data,
-		       MT7615_EEPROM_SIZE);
+		       dev->mt76.otp.size);
 	} else {
 		dev->flash_eeprom = true;
 		mt7615_cal_free_data(dev);
 	}
 
 	mt7615_eeprom_parse_hw_cap(dev);
+#if defined(__linux__)
 	memcpy(dev->mphy.macaddr, dev->mt76.eeprom.data + MT_EE_MAC_ADDR,
+#elif defined(__FreeBSD__)
+	memcpy(dev->mphy.macaddr, (u8 *)dev->mt76.eeprom.data + MT_EE_MAC_ADDR,
+#endif
 	       ETH_ALEN);
 
 	mt76_eeprom_override(&dev->mphy);

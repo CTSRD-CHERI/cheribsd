@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, 2019 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2024 by Delphix. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
  * Copyright 2013 Saso Kiselkov. All rights reserved.
@@ -38,6 +38,7 @@
 #include <sys/vdev.h>
 #include <sys/vdev_rebuild.h>
 #include <sys/vdev_removal.h>
+#include <sys/vdev_raidz.h>
 #include <sys/metaslab.h>
 #include <sys/dmu.h>
 #include <sys/dsl_pool.h>
@@ -61,6 +62,12 @@ typedef struct spa_alloc {
 	kmutex_t	spaa_lock;
 	avl_tree_t	spaa_tree;
 } ____cacheline_aligned spa_alloc_t;
+
+typedef struct spa_allocs_use {
+	kmutex_t	sau_lock;
+	uint_t		sau_rotor;
+	boolean_t	sau_inuse[];
+} spa_allocs_use_t;
 
 typedef struct spa_error_entry {
 	zbookmark_phys_t	se_bookmark;
@@ -139,6 +146,7 @@ struct spa_aux_vdev {
 	vdev_t		**sav_vdevs;		/* devices */
 	int		sav_count;		/* number devices */
 	boolean_t	sav_sync;		/* sync the device list */
+	boolean_t	sav_label_sync;		/* sync aux labels */
 	nvlist_t	**sav_pending;		/* pending device additions */
 	uint_t		sav_npending;		/* # pending devices */
 };
@@ -188,6 +196,12 @@ typedef struct spa_taskqs {
 	taskq_t **stqs_taskq;
 } spa_taskqs_t;
 
+/* one for each thread in the spa sync taskq */
+typedef struct spa_syncthread_info {
+	kthread_t	*sti_thread;
+	uint_t		sti_allocator;
+} spa_syncthread_info_t;
+
 typedef enum spa_all_vdev_zap_action {
 	AVZ_ACTION_NONE = 0,
 	AVZ_ACTION_DESTROY,	/* Destroy all per-vdev ZAPs and the AVZ. */
@@ -230,6 +244,8 @@ struct spa {
 	dsl_pool_t	*spa_dsl_pool;
 	boolean_t	spa_is_initializing;	/* true while opening pool */
 	boolean_t	spa_is_exporting;	/* true while exporting pool */
+	kthread_t	*spa_export_thread;	/* valid during pool export */
+	kthread_t	*spa_load_thread;	/* loading, no namespace lock */
 	metaslab_class_t *spa_normal_class;	/* normal data class */
 	metaslab_class_t *spa_log_class;	/* intent log data class */
 	metaslab_class_t *spa_embedded_log_class; /* log on normal vdevs */
@@ -250,6 +266,7 @@ struct spa {
 	uint64_t	spa_min_ashift;		/* of vdevs in normal class */
 	uint64_t	spa_max_ashift;		/* of vdevs in normal class */
 	uint64_t	spa_min_alloc;		/* of vdevs in normal class */
+	uint64_t	spa_gcd_alloc;		/* of vdevs in normal class */
 	uint64_t	spa_config_guid;	/* config pool guid */
 	uint64_t	spa_load_guid;		/* spa_load initialized guid */
 	uint64_t	spa_last_synced_guid;	/* last synced guid */
@@ -261,10 +278,17 @@ struct spa {
 	 * allocation performance in write-heavy workloads.
 	 */
 	spa_alloc_t	*spa_allocs;
+	spa_allocs_use_t *spa_allocs_use;
 	int		spa_alloc_count;
+	int		spa_active_allocator;	/* selectable allocator */
+
+	/* per-allocator sync thread taskqs */
+	taskq_t		*spa_sync_tq;
+	spa_syncthread_info_t *spa_syncthreads;
 
 	spa_aux_vdev_t	spa_spares;		/* hot spares */
 	spa_aux_vdev_t	spa_l2cache;		/* L2ARC cache devices */
+	boolean_t	spa_aux_sync_uber;	/* need to sync aux uber */
 	nvlist_t	*spa_label_features;	/* Features for reading MOS */
 	uint64_t	spa_config_object;	/* MOS object for pool config */
 	uint64_t	spa_config_generation;	/* config generation number */
@@ -320,6 +344,9 @@ struct spa {
 	spa_condensing_indirect_phys_t	spa_condensing_indirect_phys;
 	spa_condensing_indirect_t	*spa_condensing_indirect;
 	zthr_t		*spa_condense_zthr;	/* zthr doing condense. */
+
+	vdev_raidz_expand_t	*spa_raidz_expand;
+	zthr_t		*spa_raidz_expand_zthr;
 
 	uint64_t	spa_checkpoint_txg;	/* the txg of the checkpoint */
 	spa_checkpoint_info_t spa_checkpoint_info; /* checkpoint accounting */
@@ -385,6 +412,7 @@ struct spa {
 	uint64_t	spa_dedup_dspace;	/* Cache get_dedup_dspace() */
 	uint64_t	spa_dedup_checksum;	/* default dedup checksum */
 	uint64_t	spa_dspace;		/* dspace in normal class */
+	boolean_t	spa_active_ddt_prune;	/* ddt prune process active */
 	struct brt	*spa_brt;		/* in-core BRT */
 	kmutex_t	spa_vdev_top_lock;	/* dueling offline/remove */
 	kmutex_t	spa_proc_lock;		/* protects spa_proc* */
@@ -422,7 +450,9 @@ struct spa {
 
 	hrtime_t	spa_ccw_fail_time;	/* Conf cache write fail time */
 	taskq_t		*spa_zvol_taskq;	/* Taskq for minor management */
+	taskq_t		*spa_metaslab_taskq;	/* Taskq for metaslab preload */
 	taskq_t		*spa_prefetch_taskq;	/* Taskq for prefetch threads */
+	taskq_t		*spa_upgrade_taskq;	/* Taskq for upgrade jobs */
 	uint64_t	spa_multihost;		/* multihost aware (mmp) */
 	mmp_thread_t	spa_mmp;		/* multihost mmp thread */
 	list_t		spa_leaf_list;		/* list of leaf vdevs */
@@ -437,6 +467,9 @@ struct spa {
 	boolean_t	spa_waiters_cancel;	/* waiters should return */
 
 	char		*spa_compatibility;	/* compatibility file(s) */
+	uint64_t	spa_dedup_table_quota;	/* property DDT maximum size */
+	uint64_t	spa_dedup_dsize;	/* cached on-disk size of DDT */
+	uint64_t	spa_dedup_class_full_txg; /* txg dedup class was full */
 
 	/*
 	 * spa_refcount & spa_config_lock must be the last elements
@@ -446,17 +479,13 @@ struct spa {
 	 */
 	spa_config_lock_t spa_config_lock[SCL_LOCKS]; /* config changes */
 	zfs_refcount_t	spa_refcount;		/* number of opens */
-
-	taskq_t		*spa_upgrade_taskq;	/* taskq for upgrade jobs */
 };
 
 extern char *spa_config_path;
 extern const char *zfs_deadman_failmode;
 extern uint_t spa_slop_shift;
-extern void spa_taskq_dispatch_ent(spa_t *spa, zio_type_t t, zio_taskq_type_t q,
-    task_func_t *func, void *arg, uint_t flags, taskq_ent_t *ent);
-extern void spa_taskq_dispatch_sync(spa_t *, zio_type_t t, zio_taskq_type_t q,
-    task_func_t *func, void *arg, uint_t flags);
+extern void spa_taskq_dispatch(spa_t *spa, zio_type_t t, zio_taskq_type_t q,
+    task_func_t *func, zio_t *zio, boolean_t cutinline);
 extern void spa_load_spares(spa_t *spa);
 extern void spa_load_l2cache(spa_t *spa);
 extern sysevent_t *spa_event_create(spa_t *spa, vdev_t *vd, nvlist_t *hist_nvl,
@@ -466,6 +495,8 @@ extern int param_set_deadman_failmode_common(const char *val);
 extern void spa_set_deadman_synctime(hrtime_t ns);
 extern void spa_set_deadman_ziotime(hrtime_t ns);
 extern const char *spa_history_zone(void);
+extern const char *zfs_active_allocator;
+extern int param_set_active_allocator_common(const char *val);
 
 #ifdef	__cplusplus
 }

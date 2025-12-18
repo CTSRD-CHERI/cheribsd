@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: ZFS on Linux specific mailing list <zfs-discuss@list.zfsonlinux.org>
 Build-Depends: debhelper-compat (= 12),
                dh-python,
-               dkms (>> 2.1.1.2-5),
+               dh-sequence-dkms | dkms (>> 2.1.1.2-5),
                libaio-dev,
                libblkid-dev,
                libcurl4-openssl-dev,
@@ -78,9 +78,9 @@ Architecture: linux-any
 Depends: libssl-dev | libssl1.0-dev,
          openzfs-libnvpair3 (= ${binary:Version}),
          openzfs-libuutil3 (= ${binary:Version}),
-         openzfs-libzfs4 (= ${binary:Version}),
+         openzfs-libzfs6 (= ${binary:Version}),
          openzfs-libzfsbootenv1 (= ${binary:Version}),
-         openzfs-libzpool5 (= ${binary:Version}),
+         openzfs-libzpool6 (= ${binary:Version}),
          ${misc:Depends}
 Replaces: libzfslinux-dev
 Conflicts: libzfslinux-dev
@@ -90,18 +90,18 @@ Description: OpenZFS filesystem development files for Linux
  libraries of OpenZFS filesystem.
  .
  This package includes the development files of libnvpair3, libuutil3,
- libzpool5 and libzfs4.
+ libzpool6 and libzfs6.
 
-Package: openzfs-libzfs4
+Package: openzfs-libzfs6
 Section: contrib/libs
 Architecture: linux-any
 Depends: ${misc:Depends}, ${shlibs:Depends}
 # The libcurl4 is loaded through dlopen("libcurl.so.4").
 # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=988521
 Recommends: libcurl4
-Breaks: libzfs2, libzfs4
-Replaces: libzfs2, libzfs4, libzfs4linux
-Conflicts: libzfs4linux
+Breaks: libzfs2, libzfs4, libzfs4linux, libzfs6linux
+Replaces: libzfs2, libzfs4, libzfs4linux, libzfs6linux
+Conflicts: libzfs6linux
 Description: OpenZFS filesystem library for Linux - general support
  OpenZFS is a storage platform that encompasses the functionality of
  traditional filesystems and volume managers. It supports data checksums,
@@ -123,13 +123,13 @@ Description: OpenZFS filesystem library for Linux - label info support
  .
  The zfsbootenv library provides support for modifying ZFS label information.
 
-Package: openzfs-libzpool5
+Package: openzfs-libzpool6
 Section: contrib/libs
 Architecture: linux-any
 Depends: ${misc:Depends}, ${shlibs:Depends}
-Breaks: libzpool2, libzpool5
-Replaces: libzpool2, libzpool5, libzpool5linux
-Conflicts: libzpool5linux
+Breaks: libzpool2, libzpool5, libzpool5linux, libzpool6linux
+Replaces: libzpool2, libzpool5, libzpool5linux, libzpool6linux
+Conflicts: libzpool6linux
 Description: OpenZFS pool library for Linux
  OpenZFS is a storage platform that encompasses the functionality of
  traditional filesystems and volume managers. It supports data checksums,
@@ -189,7 +189,7 @@ Depends: dkms (>> 2.1.1.2-5),
          file,
          libc6-dev | libc-dev,
          lsb-release,
-         python3-distutils | libpython3-stdlib (<< 3.6.4),
+         python3 (>> 3.12) | python3-distutils | libpython3-stdlib (<< 3.6.4),
          ${misc:Depends},
          ${perl:Depends}
 Recommends: openzfs-zfs-zed, openzfs-zfsutils (>= ${source:Version}), ${linux:Recommends}
@@ -197,7 +197,6 @@ Recommends: openzfs-zfs-zed, openzfs-zfsutils (>= ${source:Version}), ${linux:Re
 Suggests: debhelper
 Breaks: spl-dkms (<< 0.8.0~rc1)
 Replaces: spl-dkms, zfs-dkms
-Conflicts: zfs-dkms
 Provides: openzfs-zfs-modules
 Description: OpenZFS filesystem kernel modules for Linux
  OpenZFS is a storage platform that encompasses the functionality of
@@ -247,8 +246,8 @@ Architecture: linux-any
 Pre-Depends: ${misc:Pre-Depends}
 Depends: openzfs-libnvpair3 (= ${binary:Version}),
          openzfs-libuutil3 (= ${binary:Version}),
-         openzfs-libzfs4 (= ${binary:Version}),
-         openzfs-libzpool5 (= ${binary:Version}),
+         openzfs-libzfs6 (= ${binary:Version}),
+         openzfs-libzpool6 (= ${binary:Version}),
          python3,
          ${misc:Depends},
          ${shlibs:Depends}

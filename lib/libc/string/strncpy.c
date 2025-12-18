@@ -32,11 +32,9 @@
  * SUCH DAMAGE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)strncpy.c	8.1 (Berkeley) 6/4/93";
-#endif /* LIBC_SCCS and not lint */
-#include <sys/cdefs.h>
 #include <string.h>
+
+#undef strncpy	/* FORTIFY_SOURCE */
 
 /*
  * Copy src to dst, truncating or null-padding to always copy n bytes.

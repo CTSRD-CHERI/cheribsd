@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)ufs_extern.h	8.10 (Berkeley) 5/14/95
  */
 
 #ifndef _UFS_UFS_EXTERN_H_
@@ -61,7 +59,7 @@ int	 ufs_bmap_seekdata(struct vnode *, off_t *);
 int	 ufs_checkpath(ino_t, ino_t, struct inode *, struct ucred *, ino_t *);
 void	 ufs_dirbad(struct inode *, doff_t, char *);
 int	 ufs_dirbadentry(struct vnode *, struct direct *, int);
-int	 ufs_dirempty(struct inode *, ino_t, struct ucred *);
+int	 ufs_dirempty(struct inode *, ino_t, struct ucred *, int);
 int	 ufs_extread(struct vop_read_args *);
 int	 ufs_extwrite(struct vop_write_args *);
 void	 ufs_makedirentry(struct inode *, struct componentname *,

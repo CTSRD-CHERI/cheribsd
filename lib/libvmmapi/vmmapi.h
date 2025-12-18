@@ -29,7 +29,6 @@
 #ifndef _VMMAPI_H_
 #define	_VMMAPI_H_
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/cpuset.h>
 #include <machine/vmm.h>
@@ -153,10 +152,18 @@ int	vm_get_seg_desc(struct vcpu *vcpu, int reg, struct seg_desc *seg_desc);
 #endif
 int	vm_set_register(struct vcpu *vcpu, int reg, uintcap_t val);
 int	vm_get_register(struct vcpu *vcpu, int reg, uintcap_t *retval);
+#if __has_feature(capabilities)
+int	vm_get_register_cheri_capability_tag(struct vcpu *vcpu, int reg,
+    uint8_t *tagp);
+#endif
 int	vm_set_register_set(struct vcpu *vcpu, unsigned int count,
     const int *regnums, uintcap_t *regvals);
 int	vm_get_register_set(struct vcpu *vcpu, unsigned int count,
     const int *regnums, uintcap_t *regvals);
+#if __has_feature(capabilities)
+int	vm_get_register_cheri_capability_tag_set(struct vcpu *vcpu,
+    unsigned int count, const int *regnums, uint8_t *tags);
+#endif
 int	vm_run(struct vcpu *vcpu, struct vm_run *vmrun);
 int	vm_suspend(struct vmctx *ctx, enum vm_suspend_how how);
 int	vm_reinit(struct vmctx *ctx);
@@ -284,6 +291,14 @@ void	vm_setup_freebsd_gdt(uint64_t *gdtr);
  */
 int	vm_snapshot_req(struct vmctx *ctx, struct vm_snapshot_meta *meta);
 int	vm_restore_time(struct vmctx *ctx);
+
+#if __has_feature(capabilities)
+/*
+ * CHERI interfaces
+ */
+int	vm_get_cheri_capability_tag(struct vmctx *ctx, vm_paddr_t gpa,
+	    uint8_t *tag);
+#endif
 
 /*
  * Deprecated interfaces, do not use them in new code.

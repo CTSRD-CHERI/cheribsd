@@ -33,7 +33,6 @@
  * from OpenSSL.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -58,7 +57,7 @@ ossl_identify(driver_t *driver, device_t parent)
 {
 
 	if (device_find_child(parent, "ossl", -1) == NULL)
-		BUS_ADD_CHILD(parent, 10, "ossl", -1);
+		BUS_ADD_CHILD(parent, 10, "ossl", DEVICE_UNIT_ANY);
 }
 
 static int

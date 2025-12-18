@@ -23,7 +23,6 @@
  * ChaCha based random number generator for OpenBSD.
  */
 
-#include <sys/cdefs.h>
 #include "namespace.h"
 #if defined(__FreeBSD__)
 #include <assert.h>
@@ -36,6 +35,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <ssp/ssp.h>
 #include <sys/types.h>
 #include <sys/time.h>
  
@@ -244,7 +244,7 @@ arc4random(void)
 }
 
 void
-arc4random_buf(void *buf, size_t n)
+__ssp_real(arc4random_buf)(void *buf, size_t n)
 {
 	_ARC4_LOCK();
 	_rs_random_buf(buf, n);

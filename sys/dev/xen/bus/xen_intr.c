@@ -57,8 +57,6 @@
 #include <xen/xen_intr.h>
 #include <xen/evtchn/evtchnvar.h>
 
-#include <dev/xen/xenpci/xenpcivar.h>
-#include <dev/pci/pcivar.h>
 #include <machine/xen/arch-intr.h>
 
 #ifdef DDB
@@ -86,7 +84,7 @@ struct xen_intr_pcpu_data {
 	 * A bitmap of ports that can be serviced from this CPU.
 	 * A set bit means interrupt handling is enabled.
 	 */
-	u_long	evtchn_enabled[sizeof(u_long) * 8];
+	xen_ulong_t	evtchn_enabled[sizeof(xen_ulong_t) * 8];
 };
 
 /*
@@ -168,6 +166,7 @@ evtchn_cpu_mask_port(u_int cpu, evtchn_port_t port)
 	struct xen_intr_pcpu_data *pcpu;
 
 	pcpu = DPCPU_ID_PTR(cpu, xen_intr_pcpu);
+	KASSERT(is_valid_evtchn(port), ("Invalid event channel port"));
 	xen_clear_bit(port, pcpu->evtchn_enabled);
 }
 
@@ -190,6 +189,7 @@ evtchn_cpu_unmask_port(u_int cpu, evtchn_port_t port)
 	struct xen_intr_pcpu_data *pcpu;
 
 	pcpu = DPCPU_ID_PTR(cpu, xen_intr_pcpu);
+	KASSERT(is_valid_evtchn(port), ("Invalid event channel port"));
 	xen_set_bit(port, pcpu->evtchn_enabled);
 }
 
@@ -341,7 +341,7 @@ xen_intr_active_ports(const struct xen_intr_pcpu_data *const pcpu,
 /**
  * Interrupt handler for processing all Xen event channel events.
  * 
- * \param trap_frame  The trap frame context for the current interrupt.
+ * \param unused
  */
 int
 xen_intr_handle_upcall(void *unused __unused)
@@ -353,6 +353,15 @@ xen_intr_handle_upcall(void *unused __unused)
 	vcpu_info_t *v;
 	struct xen_intr_pcpu_data *pc;
 	u_long l1, l2;
+
+	/*
+	 * The upcall handler is an interrupt handler itself (that calls other
+	 * interrupt handlers), hence the caller has the responsibility to
+	 * increase td_intr_nesting_level ahead of dispatching the upcall
+	 * handler.
+	 */
+	KASSERT(curthread->td_intr_nesting_level > 0,
+	        ("Unexpected thread context"));
 
 	/* We must remain on the same vCPU during this function */
 	CRITICAL_ASSERT(curthread);
@@ -371,7 +380,7 @@ xen_intr_handle_upcall(void *unused __unused)
 	/* Clear master flag /before/ clearing selector flag. */
 	wmb();
 #endif
-	l1 = atomic_readandclear_long(&v->evtchn_pending_sel);
+	l1 = atomic_readandclear_xen_ulong(&v->evtchn_pending_sel);
 
 	l1i = pc->last_processed_l1i;
 	l2i = pc->last_processed_l2i;
@@ -417,7 +426,17 @@ xen_intr_handle_upcall(void *unused __unused)
 				("Received unexpected event on vCPU#%u, event bound to vCPU#%u",
 				PCPU_GET(cpuid), isrc->xi_cpu));
 
+			/*
+			 * Reduce interrupt nesting level ahead of calling the
+			 * per-arch interrupt dispatch helper.  This is
+			 * required because the per-arch dispatcher will also
+			 * increase td_intr_nesting_level, and then handlers
+			 * would wrongly see td_intr_nesting_level = 2 when
+			 * there's no nesting at all.
+			 */
+			curthread->td_intr_nesting_level--;
 			xen_arch_intr_execute_handlers(isrc, trap_frame);
+			curthread->td_intr_nesting_level++;
 
 			/*
 			 * If this is the final port processed,
@@ -477,7 +496,7 @@ xen_intr_init(void *dummy __unused)
 	}
 
 	for (i = 0; i < nitems(s->evtchn_mask); i++)
-		atomic_store_rel_long(&s->evtchn_mask[i], ~0);
+		atomic_store_rel_xen_ulong(&s->evtchn_mask[i], ~0);
 
 	xen_arch_intr_init();
 
@@ -584,7 +603,7 @@ xen_intr_resume(void)
 
 	/* Mask all event channels. */
 	for (i = 0; i < nitems(s->evtchn_mask); i++)
-		atomic_store_rel_long(&s->evtchn_mask[i], ~0);
+		atomic_store_rel_xen_ulong(&s->evtchn_mask[i], ~0);
 
 	/* Clear existing port mappings */
 	for (isrc_idx = 0; isrc_idx < NR_EVENT_CHANNELS; ++isrc_idx)
@@ -621,7 +640,8 @@ void
 xen_intr_disable_intr(struct xenisrc *isrc)
 {
 
-	evtchn_mask_port(isrc->xi_port);
+	if (__predict_true(is_valid_evtchn(isrc->xi_port)))
+		evtchn_mask_port(isrc->xi_port);
 }
 
 /**
@@ -708,7 +728,8 @@ xen_intr_disable_source(struct xenisrc *isrc)
 	 * unmasked by the generic interrupt code. The event channel
 	 * device will unmask them when needed.
 	 */
-	isrc->xi_masked = !!evtchn_test_and_set_mask(isrc->xi_port);
+	if (__predict_true(is_valid_evtchn(isrc->xi_port)))
+		isrc->xi_masked = !!evtchn_test_and_set_mask(isrc->xi_port);
 }
 
 /*
@@ -866,7 +887,7 @@ xen_intr_bind_virq(device_t dev, u_int virq, u_int cpu,
 	if (error != 0) {
 		evtchn_close_t close = { .port = bind_virq.port };
 
-		xen_intr_unbind(*port_handlep);
+		xen_intr_unbind(port_handlep);
 		if (HYPERVISOR_event_channel_op(EVTCHNOP_close, &close))
 			panic("EVTCHNOP_close failed");
 		return (error);
@@ -923,7 +944,7 @@ xen_intr_alloc_and_bind_ipi(u_int cpu, driver_filter_t filter,
 	if (error != 0) {
 		evtchn_close_t close = { .port = bind_ipi.port };
 
-		xen_intr_unbind(*port_handlep);
+		xen_intr_unbind(port_handlep);
 		if (HYPERVISOR_event_channel_op(EVTCHNOP_close, &close))
 			panic("EVTCHNOP_close failed");
 		return (error);

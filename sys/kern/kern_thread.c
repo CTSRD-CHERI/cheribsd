@@ -31,9 +31,8 @@
 #include "opt_witness.h"
 #include "opt_hwpmc_hooks.h"
 
-#include <sys/cdefs.h>
-#include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/asan.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/msan.h>
@@ -107,9 +106,9 @@ _Static_assert(offsetof(struct thread, td_flags) == 0x9c,
     "struct thread KBI td_flags");
 _Static_assert(offsetof(struct thread, td_pflags) == 0xa8,
     "struct thread KBI td_pflags");
-_Static_assert(offsetof(struct thread, td_frame) == 0x314,
+_Static_assert(offsetof(struct thread, td_frame) == 0x318,
     "struct thread KBI td_frame");
-_Static_assert(offsetof(struct thread, td_emuldata) == 0x358,
+_Static_assert(offsetof(struct thread, td_emuldata) == 0x35c,
     "struct thread KBI td_emuldata");
 _Static_assert(offsetof(struct proc, p_flag) == 0x6c,
     "struct proc KBI p_flag");
@@ -119,7 +118,7 @@ _Static_assert(offsetof(struct proc, p_filemon) == 0x270,
     "struct proc KBI p_filemon");
 _Static_assert(offsetof(struct proc, p_comm) == 0x284,
     "struct proc KBI p_comm");
-_Static_assert(offsetof(struct proc, p_emuldata) == 0x318,
+_Static_assert(offsetof(struct proc, p_emuldata) == 0x31c,
     "struct proc KBI p_emuldata");
 #endif
 
@@ -146,7 +145,7 @@ static void thread_reap(void);
 static void thread_reap_all(void);
 static void thread_reap_task_cb(void *, int);
 static void thread_reap_callout_cb(void *);
-static int thread_unsuspend_one(struct thread *td, struct proc *p,
+static void thread_unsuspend_one(struct thread *td, struct proc *p,
     bool boundary);
 static void thread_free_batched(struct thread *td);
 
@@ -461,7 +460,6 @@ thread_init(void *mem, int size, int flags)
 	td->td_allocdomain = vm_phys_domain(vtophys(td));
 	td->td_sleepqueue = sleepq_alloc();
 	td->td_turnstile = turnstile_alloc();
-	td->td_rlqe = NULL;
 	EVENTHANDLER_DIRECT_INVOKE(thread_init, td);
 	umtx_thread_init(td);
 	td->td_kstack = 0;
@@ -479,7 +477,6 @@ thread_fini(void *mem, int size)
 
 	td = (struct thread *)mem;
 	EVENTHANDLER_DIRECT_INVOKE(thread_fini, td);
-	rlqentry_free(td->td_rlqe);
 	turnstile_free(td->td_turnstile);
 	sleepq_free(td->td_sleepqueue);
 	umtx_thread_fini(td);
@@ -568,9 +565,15 @@ threadinit(void)
 	if (tid0 != THREAD0_TID)
 		panic("tid0 %d != %d\n", tid0, THREAD0_TID);
 
+	/*
+	 * Thread structures are specially aligned so that (at least) the
+	 * 5 lower bits of a pointer to 'struct thead' must be 0.  These bits
+	 * are used by synchronization primitives to store flags in pointers to
+	 * such structures.
+	 */
 	thread_zone = uma_zcreate("THREAD", sched_sizeof_thread(),
 	    thread_ctor, thread_dtor, thread_init, thread_fini,
-	    MAX(32 - 1, UMA_ALIGN_PTR), UMA_ZONE_NOFREE);
+	    UMA_ALIGN_CACHE_AND_MASK(32 - 1), UMA_ZONE_NOFREE);
 	tidhashtbl = hashinit(maxproc / 2, M_TIDHASH, &tidhash);
 	tidhashlock = (tidhash + 1) / 64;
 	if (tidhashlock > 0)
@@ -793,6 +796,7 @@ thread_alloc(int pages)
 	}
 	td->td_tid = tid;
 	bzero(&td->td_sa.args, sizeof(td->td_sa.args));
+	kasan_thread_alloc(td);
 	kmsan_thread_alloc(td);
 	cpu_thread_alloc(td);
 	EVENTHANDLER_DIRECT_INVOKE(thread_ctor, td);
@@ -800,15 +804,18 @@ thread_alloc(int pages)
 }
 
 int
-thread_alloc_stack(struct thread *td, int pages)
+thread_recycle(struct thread *td, int pages)
 {
-
-	KASSERT(td->td_kstack == 0,
-	    ("thread_alloc_stack called on a thread with kstack"));
-	if (!vm_thread_new(td, pages))
-		return (0);
-	cpu_thread_alloc(td);
-	return (1);
+	if (td->td_kstack == 0 || td->td_kstack_pages != pages) {
+		if (td->td_kstack != 0)
+			vm_thread_dispose(td);
+		if (!vm_thread_new(td, pages))
+			return (ENOMEM);
+		cpu_thread_alloc(td);
+	}
+	kasan_thread_alloc(td);
+	kmsan_thread_alloc(td);
+	return (0);
 }
 
 /*
@@ -926,7 +933,6 @@ thread_exit(void)
 	struct thread *td;
 	struct thread *td2;
 	struct proc *p;
-	int wakeup_swapper;
 
 	td = curthread;
 	p = td->td_proc;
@@ -972,10 +978,8 @@ thread_exit(void)
 			if (P_SHOULDSTOP(p) == P_STOPPED_SINGLE) {
 				if (p->p_numthreads == p->p_suspcount) {
 					thread_lock(p->p_singlethread);
-					wakeup_swapper = thread_unsuspend_one(
-						p->p_singlethread, p, false);
-					if (wakeup_swapper)
-						kick_proc0();
+					thread_unsuspend_one(p->p_singlethread,
+					    p, false);
 				}
 			}
 
@@ -1128,16 +1132,12 @@ remain_for_mode(int mode)
 	return (mode == SINGLE_ALLPROC ? 0 : 1);
 }
 
-static int
+static void
 weed_inhib(int mode, struct thread *td2, struct proc *p)
 {
-	int wakeup_swapper;
-
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	PROC_SLOCK_ASSERT(p, MA_OWNED);
 	THREAD_LOCK_ASSERT(td2, MA_OWNED);
-
-	wakeup_swapper = 0;
 
 	/*
 	 * Since the thread lock is dropped by the scheduler we have
@@ -1147,26 +1147,26 @@ restart:
 	switch (mode) {
 	case SINGLE_EXIT:
 		if (TD_IS_SUSPENDED(td2)) {
-			wakeup_swapper |= thread_unsuspend_one(td2, p, true);
+			thread_unsuspend_one(td2, p, true);
 			thread_lock(td2);
 			goto restart;
 		}
 		if (TD_CAN_ABORT(td2)) {
-			wakeup_swapper |= sleepq_abort(td2, EINTR);
-			return (wakeup_swapper);
+			sleepq_abort(td2, EINTR);
+			return;
 		}
 		break;
 	case SINGLE_BOUNDARY:
 	case SINGLE_NO_EXIT:
 		if (TD_IS_SUSPENDED(td2) &&
 		    (td2->td_flags & TDF_BOUNDARY) == 0) {
-			wakeup_swapper |= thread_unsuspend_one(td2, p, false);
+			thread_unsuspend_one(td2, p, false);
 			thread_lock(td2);
 			goto restart;
 		}
 		if (TD_CAN_ABORT(td2)) {
-			wakeup_swapper |= sleepq_abort(td2, ERESTART);
-			return (wakeup_swapper);
+			sleepq_abort(td2, ERESTART);
+			return;
 		}
 		break;
 	case SINGLE_ALLPROC:
@@ -1180,21 +1180,20 @@ restart:
 		 */
 		if (TD_IS_SUSPENDED(td2) &&
 		    (td2->td_flags & TDF_ALLPROCSUSP) == 0) {
-			wakeup_swapper |= thread_unsuspend_one(td2, p, false);
+			thread_unsuspend_one(td2, p, false);
 			thread_lock(td2);
 			goto restart;
 		}
 		if (TD_CAN_ABORT(td2)) {
 			td2->td_flags |= TDF_ALLPROCSUSP;
-			wakeup_swapper |= sleepq_abort(td2, ERESTART);
-			return (wakeup_swapper);
+			sleepq_abort(td2, ERESTART);
+			return;
 		}
 		break;
 	default:
 		break;
 	}
 	thread_unlock(td2);
-	return (wakeup_swapper);
 }
 
 /*
@@ -1215,7 +1214,7 @@ thread_single(struct proc *p, int mode)
 {
 	struct thread *td;
 	struct thread *td2;
-	int remaining, wakeup_swapper;
+	int remaining;
 
 	td = curthread;
 	KASSERT(mode == SINGLE_EXIT || mode == SINGLE_BOUNDARY ||
@@ -1243,6 +1242,9 @@ thread_single(struct proc *p, int mode)
 				return (1);
 			msleep(&p->p_flag, &p->p_mtx, PCATCH, "thrsgl", 0);
 		}
+		if ((p->p_flag & (P_STOPPED_SIG | P_TRACED)) != 0 ||
+		    (p->p_flag2 & P2_WEXIT) != 0)
+			return (1);
 	} else if ((p->p_flag & P_HADTHREADS) == 0)
 		return (0);
 	if (p->p_singlethread != NULL && p->p_singlethread != td)
@@ -1267,14 +1269,13 @@ thread_single(struct proc *p, int mode)
 	while (remaining != remain_for_mode(mode)) {
 		if (P_SHOULDSTOP(p) != P_STOPPED_SINGLE)
 			goto stopme;
-		wakeup_swapper = 0;
 		FOREACH_THREAD_IN_PROC(p, td2) {
 			if (td2 == td)
 				continue;
 			thread_lock(td2);
 			ast_sched_locked(td2, TDA_SUSPEND);
 			if (TD_IS_INHIBITED(td2)) {
-				wakeup_swapper |= weed_inhib(mode, td2, p);
+				weed_inhib(mode, td2, p);
 #ifdef SMP
 			} else if (TD_IS_RUNNING(td2)) {
 				forward_signal(td2);
@@ -1283,8 +1284,6 @@ thread_single(struct proc *p, int mode)
 			} else
 				thread_unlock(td2);
 		}
-		if (wakeup_swapper)
-			kick_proc0();
 		remaining = calc_remaining(p, mode);
 
 		/*
@@ -1400,7 +1399,6 @@ thread_suspend_check(int return_instead)
 {
 	struct thread *td;
 	struct proc *p;
-	int wakeup_swapper;
 
 	td = curthread;
 	p = td->td_proc;
@@ -1463,10 +1461,8 @@ thread_suspend_check(int return_instead)
 		if (P_SHOULDSTOP(p) == P_STOPPED_SINGLE) {
 			if (p->p_numthreads == p->p_suspcount + 1) {
 				thread_lock(p->p_singlethread);
-				wakeup_swapper = thread_unsuspend_one(
-				    p->p_singlethread, p, false);
-				if (wakeup_swapper)
-					kick_proc0();
+				thread_unsuspend_one(p->p_singlethread, p,
+				    false);
 			}
 		}
 		PROC_UNLOCK(p);
@@ -1573,7 +1569,7 @@ thread_suspend_one(struct thread *td)
 	sched_sleep(td, 0);
 }
 
-static int
+static void
 thread_unsuspend_one(struct thread *td, struct proc *p, bool boundary)
 {
 
@@ -1589,7 +1585,7 @@ thread_unsuspend_one(struct thread *td, struct proc *p, bool boundary)
 			p->p_boundary_count--;
 		}
 	}
-	return (setrunnable(td, 0));
+	setrunnable(td, 0);
 }
 
 void
@@ -1613,8 +1609,7 @@ thread_run_flash(struct thread *td)
 	MPASS(p->p_suspcount > 0);
 	p->p_suspcount--;
 	PROC_SUNLOCK(p);
-	if (setrunnable(td, 0))
-		kick_proc0();
+	setrunnable(td, 0);
 }
 
 /*
@@ -1624,17 +1619,14 @@ void
 thread_unsuspend(struct proc *p)
 {
 	struct thread *td;
-	int wakeup_swapper;
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	PROC_SLOCK_ASSERT(p, MA_OWNED);
-	wakeup_swapper = 0;
 	if (!P_SHOULDSTOP(p)) {
                 FOREACH_THREAD_IN_PROC(p, td) {
 			thread_lock(td);
 			if (TD_IS_SUSPENDED(td))
-				wakeup_swapper |= thread_unsuspend_one(td, p,
-				    true);
+				thread_unsuspend_one(td, p, true);
 			else
 				thread_unlock(td);
 		}
@@ -1647,12 +1639,9 @@ thread_unsuspend(struct proc *p)
 		 */
 		if (p->p_singlethread->td_proc == p) {
 			thread_lock(p->p_singlethread);
-			wakeup_swapper = thread_unsuspend_one(
-			    p->p_singlethread, p, false);
+			thread_unsuspend_one(p->p_singlethread, p, false);
 		}
 	}
-	if (wakeup_swapper)
-		kick_proc0();
 }
 
 /*
@@ -1662,7 +1651,6 @@ void
 thread_single_end(struct proc *p, int mode)
 {
 	struct thread *td;
-	int wakeup_swapper;
 
 	KASSERT(mode == SINGLE_EXIT || mode == SINGLE_BOUNDARY ||
 	    mode == SINGLE_ALLPROC || mode == SINGLE_NO_EXIT,
@@ -1681,7 +1669,7 @@ thread_single_end(struct proc *p, int mode)
 	    P_TOTAL_STOP);
 	PROC_SLOCK(p);
 	p->p_singlethread = NULL;
-	wakeup_swapper = 0;
+
 	/*
 	 * If there are other threads they may now run,
 	 * unless of course there is a blanket 'stop order'
@@ -1691,18 +1679,15 @@ thread_single_end(struct proc *p, int mode)
 	if (p->p_numthreads != remain_for_mode(mode) && !P_SHOULDSTOP(p)) {
                 FOREACH_THREAD_IN_PROC(p, td) {
 			thread_lock(td);
-			if (TD_IS_SUSPENDED(td)) {
-				wakeup_swapper |= thread_unsuspend_one(td, p,
-				    true);
-			} else
+			if (TD_IS_SUSPENDED(td))
+				thread_unsuspend_one(td, p, true);
+			else
 				thread_unlock(td);
 		}
 	}
 	KASSERT(mode != SINGLE_BOUNDARY || p->p_boundary_count == 0,
 	    ("inconsistent boundary count %d", p->p_boundary_count));
 	PROC_SUNLOCK(p);
-	if (wakeup_swapper)
-		kick_proc0();
 	wakeup(&p->p_flag);
 }
 

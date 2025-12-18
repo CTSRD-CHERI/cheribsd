@@ -12,6 +12,8 @@
  * MTE compatible.
  */
 
+#include <sys/elf_common.h>
+
 #include <machine/asm.h>
 
 #define L(l) .L ## l
@@ -99,7 +101,7 @@ L(end):
 	   perform a signed 32-bit subtraction.  */
 	lsr	data1, data1, 56
 	sub	result, data1, data2, lsr 56
-	ret
+	RETURN
 
 	.p2align 4
 
@@ -183,7 +185,8 @@ L(tail):
 
 L(done):
 	sub	result, data1, data2
-	ret
+	RETURN
 
 END (strcmp)
 
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

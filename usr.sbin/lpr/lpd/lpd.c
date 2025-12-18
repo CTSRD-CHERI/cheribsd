@@ -30,18 +30,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char copyright[] =
-"@(#) Copyright (c) 1983, 1993, 1994\n\
-	The Regents of the University of California.  All rights reserved.\n";
-#endif /* not lint */
-
-#if 0
-#ifndef lint
-static char sccsid[] = "@(#)lpd.c	8.7 (Berkeley) 5/10/95";
-#endif /* not lint */
-#endif
-
 #include "lp.cdefs.h"		/* A cross-platform version of <sys/cdefs.h> */
 /*
  * lpd -- line printer daemon.
@@ -326,7 +314,7 @@ main(int argc, char **argv)
 	sigaddset(&nmask, SIGTERM);
 	sigprocmask(SIG_BLOCK, &nmask, &omask);
 
-	(void) umask(07);
+	(void) umask(077);
 	signal(SIGHUP, mcleanup);
 	signal(SIGINT, mcleanup);
 	signal(SIGQUIT, mcleanup);

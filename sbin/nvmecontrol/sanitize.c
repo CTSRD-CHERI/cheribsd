@@ -25,7 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/ioccom.h>
 
@@ -131,8 +130,11 @@ sanitize(const struct cmd *f, int argc, char *argv[])
 			sanact = 3;
 		else if (strcmp(opt.sanact, "crypto") == 0)
 			sanact = 4;
+		else if ((sanact = (int)strtol(opt.sanact, NULL, 10) != 0)
+		    && (sanact >= 1 && sanact <= 4))
+			; /* compat with nvme sanitize -a number */
 		else {
-			fprintf(stderr, "Incorrect Sanitize Action value\n");
+			fprintf(stderr, "Incorrect Sanitize Action value: %s\n", opt.sanact);
 			arg_help(argc, argv, f);
 		}
 	}
@@ -155,14 +157,11 @@ sanitize(const struct cmd *f, int argc, char *argv[])
 	/* Check that controller can execute this command. */
 	if (read_controller_data(fd, &cd))
 		errx(EX_IOERR, "Identify request failed");
-	if (((cd.sanicap >> NVME_CTRLR_DATA_SANICAP_BES_SHIFT) &
-	     NVME_CTRLR_DATA_SANICAP_BES_MASK) == 0 && sanact == 2)
+	if (NVMEV(NVME_CTRLR_DATA_SANICAP_BES, cd.sanicap) == 0 && sanact == 2)
 		errx(EX_UNAVAILABLE, "controller does not support Block Erase");
-	if (((cd.sanicap >> NVME_CTRLR_DATA_SANICAP_OWS_SHIFT) &
-	     NVME_CTRLR_DATA_SANICAP_OWS_MASK) == 0 && sanact == 3)
+	if (NVMEV(NVME_CTRLR_DATA_SANICAP_OWS, cd.sanicap) == 0 && sanact == 3)
 		errx(EX_UNAVAILABLE, "controller does not support Overwrite");
-	if (((cd.sanicap >> NVME_CTRLR_DATA_SANICAP_CES_SHIFT) &
-	     NVME_CTRLR_DATA_SANICAP_CES_MASK) == 0 && sanact == 4)
+	if (NVMEV(NVME_CTRLR_DATA_SANICAP_CES, cd.sanicap) == 0 && sanact == 4)
 		errx(EX_UNAVAILABLE, "controller does not support Crypto Erase");
 
 	/*
@@ -186,9 +185,9 @@ sanitize(const struct cmd *f, int argc, char *argv[])
 
 wait:
 	read_logpage(fd, NVME_LOG_SANITIZE_STATUS,
-	    NVME_GLOBAL_NAMESPACE_TAG, 0, 0, 0, &ss, sizeof(ss));
-	switch ((ss.sstat >> NVME_SS_PAGE_SSTAT_STATUS_SHIFT) &
-	    NVME_SS_PAGE_SSTAT_STATUS_MASK) {
+	    NVME_GLOBAL_NAMESPACE_TAG, 0, 0, 0,
+	    0, 0, 0, 0, &ss, sizeof(ss));
+	switch (NVMEV(NVME_SS_PAGE_SSTAT_STATUS, ss.sstat)) {
 	case NVME_SS_PAGE_SSTAT_STATUS_NEVER:
 		printf("Never sanitized");
 		break;

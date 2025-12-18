@@ -6,7 +6,7 @@ AC_DEFUN([ZFS_AC_KERNEL_SRC_SYMLINK], [
 	ZFS_LINUX_TEST_SRC([symlink_mnt_idmap], [
 		#include <linux/fs.h>
 		#include <linux/sched.h>
-		int tmp_symlink(struct mnt_idmap *idmap,
+		static int tmp_symlink(struct mnt_idmap *idmap,
 		    struct inode *inode ,struct dentry *dentry,
 		    const char *path) { return 0; }
 
@@ -23,7 +23,7 @@ AC_DEFUN([ZFS_AC_KERNEL_SRC_SYMLINK], [
 		#include <linux/fs.h>
 		#include <linux/sched.h>
 
-		int tmp_symlink(struct user_namespace *userns,
+		static int tmp_symlink(struct user_namespace *userns,
 		    struct inode *inode ,struct dentry *dentry,
 		    const char *path) { return 0; }
 
@@ -41,6 +41,8 @@ AC_DEFUN([ZFS_AC_KERNEL_SYMLINK], [
 		AC_DEFINE(HAVE_IOPS_SYMLINK_IDMAP, 1,
 		    [iops->symlink() takes struct mnt_idmap*])
 	],[
+		AC_MSG_RESULT(no)
+
 		AC_MSG_CHECKING([whether iops->symlink() takes struct user_namespace*])
 		ZFS_LINUX_TEST_RESULT([symlink_userns], [
 			AC_MSG_RESULT(yes)

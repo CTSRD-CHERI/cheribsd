@@ -1,10 +1,10 @@
-
 .include <src.opts.mk>
 
 PROG_CXX=	llvm-symbolizer
 MAN=		llvm-symbolizer.1 llvm-addr2line.1
 
 SRCDIR=		llvm/tools/llvm-symbolizer
+SRCS+=		llvm-symbolizer-driver.cpp
 SRCS+=		llvm-symbolizer.cpp
 
 .include "${SRCTOP}/lib/clang/llvm.pre.mk"

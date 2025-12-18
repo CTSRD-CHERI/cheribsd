@@ -276,6 +276,7 @@ struct country {
 	char		*tlc;
 	int		nzones;
 	struct continent *override;	/* continent override */
+	struct continent *alternate;	/* extra continent */
 	TAILQ_HEAD(, zone) zones;
 	dialogMenuItem	*submenu;
 };
@@ -375,6 +376,18 @@ find_country(int lineno, const char *tlc)
 }
 
 static void
+add_cont_to_country(struct country *cp, struct continent *cont)
+{
+	struct zone	*zp;
+
+	TAILQ_FOREACH(zp, &cp->zones, link) {
+		if (zp->continent == cont)
+			return;
+	}
+	cp->alternate = cont;
+}
+
+static void
 add_zone_to_country(int lineno, struct country *cp, const char *descr,
     const char *file, struct continent *cont)
 {
@@ -441,13 +454,13 @@ read_zones(void)
 	struct country	*cp;
 	size_t		len;
 	char		*line, *country_list, *tlc, *file, *descr;
+	char		*p, *q;
 	int		lineno;
-	bool		pass1;
+	int		pass = 1;
 
 	fp = fopen(path_zonetab, "r");
 	if (!fp)
 		err(1, "%s", path_zonetab);
-	pass1 = true;
 
 again:
 	lineno = 0;
@@ -457,7 +470,9 @@ again:
 			errx(1, "%s:%d: invalid format", path_zonetab, lineno);
 		line[len - 1] = '\0';
 
-		if (pass1) {
+		switch (pass)
+		{
+		case 1:
 			/*
 			 * First pass: collect overrides, only looking for
 			 * single continent ones for the moment.
@@ -481,7 +496,8 @@ again:
 				cp = find_country(lineno, tlc);
 				cp->override = cont;
 			}
-		} else {
+			break;
+		case 2:
 			/* Second pass: parse actual data */
 			if (line[0] == '#')
 				continue;
@@ -498,11 +514,34 @@ again:
 				add_zone_to_country(lineno, cp, descr, file,
 				    cont);
 			}
+			break;
+		case 3:
+			/* Third pass: collect multi-continent overrides */
+			if (strncmp(line, "#@", strlen("#@")) != 0)
+				continue;
+			line += 2;
+			country_list = strsep(&line, "\t");
+			/* Skip single-continent overrides */
+			if (strchr(line, ',') == NULL)
+				continue;
+			while (line != NULL) {
+				cont = find_continent(lineno, line);
+				p = q = strdup(country_list);
+				if (p == NULL)
+					errx(1, "malloc failed");
+				while (q != NULL) {
+					tlc = strsep(&q, ",");
+					cp = find_country(lineno, tlc);
+					add_cont_to_country(cp, cont);
+				}
+				free(p);
+				strsep(&line, ",");
+			}
+			break;
 		}
 	}
 
-	if (pass1) {
-		pass1 = false;
+	if (pass++ < 3) {
 		errno = 0;
 		rewind(fp);
 		if (errno != 0)
@@ -554,6 +593,12 @@ make_menus(void)
 				;
 			if (zp2 == zp)
 				zp->continent->nitems++;
+		}
+
+		for (i = 0; i < NCONTINENTS; i++) {
+			if (cp->alternate == continent_names[i].continent) {
+				continent_names[i].continent->nitems++;
+			}
 		}
 	}
 
@@ -611,6 +656,16 @@ make_menus(void)
 			dmi->fire = set_zone_menu;
 			dmi->data = cp;
 		}
+
+		if (cp->alternate != NULL) {
+			cont = cp->alternate;
+			dmi = &cont->menu[cont->nitems];
+			memset(dmi, 0, sizeof(*dmi));
+			asprintf(&dmi->prompt, "%d", ++cont->nitems);
+			dmi->title = cp->name;
+			dmi->fire = set_zone_menu;
+			dmi->data = cp;
+		}
 	}
 }
 
@@ -654,7 +709,7 @@ confirm_zone(const char *filename)
 	tm = localtime(&t);
 
 	snprintf(prompt, sizeof(prompt),
-	    "Does the abbreviation `%s' look reasonable?", tm->tm_zone);
+	    "Does the timezone abbreviation `%s' look reasonable?", tm->tm_zone);
 	conf.title = "Confirmation";
 	rv = (bsddialog_yesno(&conf, prompt, 5, 72) == BSDDIALOG_YES);
 	return (rv);
@@ -689,109 +744,42 @@ static void message_zoneinfo_file(const char *title, char *prompt)
 static int
 install_zoneinfo_file(const char *zoneinfo_file)
 {
-	char		buf[1024];
 	char		prompt[SILLY_BUFFER_SIZE];
-	struct stat	sb;
-	ssize_t		len;
-	int		fd1, fd2, copymode;
-
-	if (lstat(path_localtime, &sb) < 0) {
-		/* Nothing there yet... */
-		copymode = 1;
-	} else if (S_ISLNK(sb.st_mode))
-		copymode = 0;
-	else
-		copymode = 1;
 
 #ifdef VERBOSE
-	if (copymode)
-		snprintf(prompt, sizeof(prompt),
-		    "Copying %s to %s", zoneinfo_file, path_localtime);
-	else
-		snprintf(prompt, sizeof(prompt),
-		    "Creating symbolic link %s to %s",
-		    path_localtime, zoneinfo_file);
+	snprintf(prompt, sizeof(prompt), "Creating symbolic link %s to %s",
+	    path_localtime, zoneinfo_file);
 	message_zoneinfo_file("Info", prompt);
 #endif
 
 	if (reallydoit) {
-		if (copymode) {
-			fd1 = open(zoneinfo_file, O_RDONLY, 0);
-			if (fd1 < 0) {
-				snprintf(prompt, sizeof(prompt),
-				    "Could not open %s: %s", zoneinfo_file,
-				    strerror(errno));
-				message_zoneinfo_file("Error", prompt);
-				return (DITEM_FAILURE | DITEM_RECREATE);
-			}
-
-			if (unlink(path_localtime) < 0 && errno != ENOENT) {
-				snprintf(prompt, sizeof(prompt),
-				    "Could not delete %s: %s",
-				    path_localtime, strerror(errno));
-				message_zoneinfo_file("Error", prompt);
-				return (DITEM_FAILURE | DITEM_RECREATE);
-			}
-
-			fd2 = open(path_localtime, O_CREAT | O_EXCL | O_WRONLY,
-			    S_IRUSR | S_IRGRP | S_IROTH);
-			if (fd2 < 0) {
-				snprintf(prompt, sizeof(prompt),
-				    "Could not open %s: %s",
-				    path_localtime, strerror(errno));
-				message_zoneinfo_file("Error", prompt);
-				return (DITEM_FAILURE | DITEM_RECREATE);
-			}
-
-			while ((len = read(fd1, buf, sizeof(buf))) > 0)
-				if ((len = write(fd2, buf, len)) < 0)
-					break;
-
-			if (len == -1) {
-				snprintf(prompt, sizeof(prompt),
-				    "Error copying %s to %s %s", zoneinfo_file,
-				    path_localtime, strerror(errno));
-				message_zoneinfo_file("Error", prompt);
-				/* Better to leave none than a corrupt one. */
-				unlink(path_localtime);
-				return (DITEM_FAILURE | DITEM_RECREATE);
-			}
-			close(fd1);
-			close(fd2);
-		} else {
-			if (access(zoneinfo_file, R_OK) != 0) {
-				snprintf(prompt, sizeof(prompt),
-				    "Cannot access %s: %s", zoneinfo_file,
-				    strerror(errno));
-				message_zoneinfo_file("Error", prompt);
-				return (DITEM_FAILURE | DITEM_RECREATE);
-			}
-			if (unlink(path_localtime) < 0 && errno != ENOENT) {
-				snprintf(prompt, sizeof(prompt),
-				    "Could not delete %s: %s",
-				    path_localtime, strerror(errno));
-				message_zoneinfo_file("Error", prompt);
-				return (DITEM_FAILURE | DITEM_RECREATE);
-			}
-			if (symlink(zoneinfo_file, path_localtime) < 0) {
-				snprintf(prompt, sizeof(prompt),
-				    "Cannot create symbolic link %s to %s: %s",
-				    path_localtime, zoneinfo_file,
-				    strerror(errno));
-				message_zoneinfo_file("Error", prompt);
-				return (DITEM_FAILURE | DITEM_RECREATE);
-			}
+		if (access(zoneinfo_file, R_OK) != 0) {
+			snprintf(prompt, sizeof(prompt),
+			    "Cannot access %s: %s", zoneinfo_file,
+			    strerror(errno));
+			message_zoneinfo_file("Error", prompt);
+			return (DITEM_FAILURE | DITEM_RECREATE);
+		}
+		if (unlink(path_localtime) < 0 && errno != ENOENT) {
+			snprintf(prompt, sizeof(prompt),
+			    "Could not delete %s: %s",
+			    path_localtime, strerror(errno));
+			message_zoneinfo_file("Error", prompt);
+			return (DITEM_FAILURE | DITEM_RECREATE);
+		}
+		if (symlink(zoneinfo_file, path_localtime) < 0) {
+			snprintf(prompt, sizeof(prompt),
+			    "Cannot create symbolic link %s to %s: %s",
+			    path_localtime, zoneinfo_file,
+			    strerror(errno));
+			message_zoneinfo_file("Error", prompt);
+			return (DITEM_FAILURE | DITEM_RECREATE);
 		}
 
 #ifdef VERBOSE
-		if (copymode)
-			snprintf(prompt, sizeof(prompt),
-			    "Copied timezone file from %s to %s",
-			    zoneinfo_file, path_localtime);
-		else
-			snprintf(prompt, sizeof(prompt),
-			    "Created symbolic link from %s to %s",
-			    zoneinfo_file, path_localtime);
+		snprintf(prompt, sizeof(prompt),
+		    "Created symbolic link from %s to %s", zoneinfo_file,
+		    path_localtime);
 		message_zoneinfo_file("Done", prompt);
 #endif
 	} /* reallydoit */
@@ -889,19 +877,19 @@ main(int argc, char **argv)
 		else
 			strlcpy(path_zonetab, dztpath, sizeof(path_zonetab));
 		strcpy(path_iso3166, _PATH_ISO3166);
-		strcpy(path_zoneinfo, _PATH_ZONEINFO);
 		strcpy(path_localtime, _PATH_LOCALTIME);
 		strcpy(path_db, _PATH_DB);
 		strcpy(path_wall_cmos_clock, _PATH_WALL_CMOS_CLOCK);
 	} else {
 		sprintf(path_zonetab, "%s/%s", chrootenv, _PATH_ZONETAB);
 		sprintf(path_iso3166, "%s/%s", chrootenv, _PATH_ISO3166);
-		sprintf(path_zoneinfo, "%s/%s", chrootenv, _PATH_ZONEINFO);
 		sprintf(path_localtime, "%s/%s", chrootenv, _PATH_LOCALTIME);
 		sprintf(path_db, "%s/%s", chrootenv, _PATH_DB);
 		sprintf(path_wall_cmos_clock, "%s/%s", chrootenv,
 		    _PATH_WALL_CMOS_CLOCK);
 	}
+	/* Symlink target is the same regardless of chroot */
+	strcpy(path_zoneinfo, _PATH_ZONEINFO);
 
 	/* Override the user-supplied umask. */
 	(void)umask(S_IWGRP | S_IWOTH);
@@ -969,7 +957,7 @@ main(int argc, char **argv)
 		    "If it is set to local time,\n"
 		    "or you don't know, please choose NO here!");
 
-		conf.title = "Select local or UTC (Greenwich Mean Time) clock";
+		conf.title = "Select local or UTC (Coordinated Universal Time) clock";
 		if (bsddialog_yesno(&conf, prompt, 7, 73) == BSDDIALOG_YES) {
 			if (reallydoit)
 				unlink(path_wall_cmos_clock);

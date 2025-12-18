@@ -29,7 +29,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -583,16 +582,17 @@ again:
 	if (sigalrm || sigint)
 		goto signal;
 	if (f == NULL) {
-		warnx("%s: %s", URL, fetchLastErrString);
-		if (i_flag && (strcmp(url->scheme, SCHEME_HTTP) == 0 ||
-		    strcmp(url->scheme, SCHEME_HTTPS) == 0) &&
-		    fetchLastErrCode == FETCH_OK &&
+		if (i_flag && *is_http && fetchLastErrCode == FETCH_OK &&
 		    strcmp(fetchLastErrString, "Not Modified") == 0) {
 			/* HTTP Not Modified Response, return OK. */
+			if (v_level > 0)
+				warnx("%s: %s", URL, fetchLastErrString);
 			r = 0;
 			goto done;
-		} else
+		} else {
+			warnx("%s: %s", URL, fetchLastErrString);
 			goto failure;
+		}
 	}
 	if (sigint)
 		goto signal;
@@ -1059,7 +1059,7 @@ main(int argc, char *argv[])
 			setenv("SSL_CLIENT_KEY_FILE", optarg, 1);
 			break;
 		case OPTION_SSL_CRL_FILE:
-			setenv("SSL_CLIENT_CRL_FILE", optarg, 1);
+			setenv("SSL_CRL_FILE", optarg, 1);
 			break;
 		case OPTION_SSL_NO_SSL3:
 			setenv("SSL_NO_SSL3", "", 1);

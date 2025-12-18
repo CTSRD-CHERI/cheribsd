@@ -81,6 +81,7 @@
 
 #if defined(__FreeBSD__)
 #include <sys/selinfo.h>
+#include <vm/vm.h>
 
 #define likely(x)	__builtin_expect((long)!!(x), 1L)
 #define unlikely(x)	__builtin_expect((long)!!(x), 0L)
@@ -102,6 +103,7 @@
 #define MBUF_TXQ(m)	((m)->m_pkthdr.flowid)
 #define MBUF_TRANSMIT(na, ifp, m)	((na)->if_transmit(ifp, m))
 #define	GEN_TX_MBUF_IFP(m)	((m)->m_pkthdr.rcvif)
+#define	GEN_TX_MBUF_NA(m)	((struct netmap_adapter *)(m)->m_ext.ext_arg1)
 
 #define NM_ATOMIC_T	volatile int /* required by atomic/bitops.h */
 /* atomic operations */
@@ -1726,10 +1728,30 @@ extern int netmap_generic_txqdisc;
 #define NM_IS_NATIVE(ifp)	(NM_NA_VALID(ifp) && NA(ifp)->nm_dtor == netmap_hw_dtor)
 
 #if defined(__FreeBSD__)
+extern int netmap_port_numa_affinity;
 
-/* Assigns the device IOMMU domain to an allocator.
- * Returns -ENOMEM in case the domain is different */
-#define nm_iommu_group_id(dev) (-1)
+static inline int
+nm_iommu_group_id(struct netmap_adapter *na)
+{
+	return (-1);
+}
+
+static inline int
+nm_numa_domain(struct netmap_adapter *na)
+{
+	int domain;
+
+	/*
+	 * If the system has only one NUMA domain, don't bother distinguishing
+	 * between IF_NODOM and domain 0.
+	 */
+	if (vm_ndomains == 1 || netmap_port_numa_affinity == 0)
+		return (-1);
+	domain = if_getnumadomain(na->ifp);
+	if (domain == IF_NODOM)
+		domain = -1;
+	return (domain);
+}
 
 /* Callback invoked by the dma machinery after a successful dmamap_load */
 static void netmap_dmamap_cb(__unused void *arg,
@@ -2395,9 +2417,10 @@ nm_generic_mbuf_dtor(struct mbuf *m)
 	uma_zfree(zone_clust, m->m_ext.ext_buf);
 }
 
-#define SET_MBUF_DESTRUCTOR(m, fn)	do {		\
+#define SET_MBUF_DESTRUCTOR(m, fn, na)	do {		\
 	(m)->m_ext.ext_free = (fn != NULL) ?		\
 	    (void *)fn : (void *)nm_generic_mbuf_dtor;	\
+	(m)->m_ext.ext_arg1 = na;			\
 } while (0)
 
 static inline struct mbuf *
@@ -2450,8 +2473,19 @@ void netmap_uninit_bridges(void);
 #define CSB_READ(csb, field, r) (get_user(r, &csb->field))
 #define CSB_WRITE(csb, field, v) (put_user(v, &csb->field))
 #else  /* ! linux */
-#define CSB_READ(csb, field, r) (r = fuword32(&csb->field))
-#define CSB_WRITE(csb, field, v) (suword32(&csb->field, v))
+#define CSB_READ(csb, field, r) do {				\
+	int32_t v __diagused;					\
+								\
+	v = fuword32(&csb->field);				\
+	KASSERT(v != -1, ("%s: fuword32 failed", __func__));	\
+	r = v;							\
+} while (0)
+#define CSB_WRITE(csb, field, v) do {				\
+	int error __diagused;					\
+								\
+	error = suword32(&csb->field, v);			\
+	KASSERT(error == 0, ("%s: suword32 failed", __func__));	\
+} while (0)
 #endif /* ! linux */
 
 /* some macros that may not be defined */

@@ -31,7 +31,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include "opt_capsicum.h"
 
 #include <sys/param.h>
@@ -106,7 +105,8 @@
 
 static int __elfN(check_header)(const Elf_Ehdr *hdr);
 static Elf_Brandinfo *__elfN(get_brandinfo)(struct image_params *imgp,
-    const char *interp, int32_t *osrel, uint32_t *fctl0);
+    const Elf_Ehdr *hdr, const Elf_Phdr *phdr, const char *interp,
+    int32_t *osrel, uint32_t *fctl0);
 static int __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
     u_long *end_addr, u_long *entry, struct proc *cop);
 static int __elfN(load_section)(const struct image_params *imgp,
@@ -116,9 +116,9 @@ static int __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp);
 static bool __elfN(freebsd_trans_osrel)(const Elf_Note *note,
     int32_t *osrel);
 static bool kfreebsd_trans_osrel(const Elf_Note *note, int32_t *osrel);
-static bool __elfN(check_note)(struct image_params *imgp,
-    Elf_Brandnote *checknote, int32_t *osrel, bool *has_fctl0,
-    uint32_t *fctl0);
+static bool __elfN(check_note)(struct image_params *imgp, const Elf_Ehdr *hdr,
+    const Elf_Phdr *phdr, Elf_Brandnote *checknote, int32_t *osrel,
+    bool *has_fctl0, uint32_t *fctl0);
 static vm_prot_t __elfN(trans_prot)(Elf_Word);
 static Elf_Word __elfN(untrans_prot)(vm_prot_t);
 #if __has_feature(capabilities)
@@ -147,7 +147,7 @@ SYSCTL_INT(_debug, OID_AUTO, __elfN(legacy_coredump), CTLFLAG_RW,
 #ifndef __ELF_CHERI
 int __elfN(nxstack) =
 #if defined(__amd64__) || defined(__powerpc64__) /* both 64 and 32 bit */ || \
-    (defined(__arm__) && __ARM_ARCH >= 7) || defined(__aarch64__) || \
+    defined(__arm__) || defined(__aarch64__) || \
     defined(__riscv)
 	1;
 #else
@@ -228,7 +228,7 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, honor_sbrk, CTLFLAG_RW,
     &__elfN(aslr_honor_sbrk), 0,
     ELF_ABI_NAME ": assume sbrk is used");
 
-static int __elfN(aslr_stack) = 1;
+static int __elfN(aslr_stack) = __ELF_WORD_SIZE == 64;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, stack, CTLFLAG_RWTUN,
     &__elfN(aslr_stack), 0,
     ELF_ABI_NAME
@@ -240,11 +240,7 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, shared_page, CTLFLAG_RWTUN,
     __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE))
     ": enable shared page address randomization");
 
-#ifdef __ELF_CHERI
-static int __elfN(sigfastblock) = 0;
-#else
 static int __elfN(sigfastblock) = 1;
-#endif
 SYSCTL_INT(ELF_NODE_OID, OID_AUTO, sigfastblock,
     CTLFLAG_RWTUN, &__elfN(sigfastblock), 0,
     "enable sigfastblock for new processes");
@@ -253,6 +249,11 @@ static bool __elfN(allow_wx) = true;
 SYSCTL_BOOL(ELF_NODE_OID, OID_AUTO, allow_wx, CTLFLAG_RWTUN,
     &__elfN(allow_wx), 0,
     "Allow pages to be mapped simultaneously writable and executable");
+
+static unsigned long __elfN(max_phdr_len) = 4 * PAGE_SIZE;
+SYSCTL_ULONG(ELF_NODE_OID, OID_AUTO, max_phdr_len, CTLFLAG_RWTUN,
+    &__elfN(max_phdr_len), 0,
+    "Maximum length of program headers");
 
 static Elf_Brandinfo *elf_brand_list[MAX_BRANDS];
 
@@ -279,7 +280,6 @@ __elfN(freebsd_trans_osrel)(const Elf_Note *note, int32_t *osrel)
 	return (true);
 }
 
-static const char GNU_ABI_VENDOR[] = "GNU";
 static int GNU_KFREEBSD_ABI_DESC = 3;
 
 Elf_Brandnote __elfN(kfreebsd_brandnote) = {
@@ -367,10 +367,9 @@ __elfN(brand_inuse)(Elf_Brandinfo *entry)
 }
 
 static Elf_Brandinfo *
-__elfN(get_brandinfo)(struct image_params *imgp, const char *interp,
-    int32_t *osrel, uint32_t *fctl0)
+__elfN(get_brandinfo)(struct image_params *imgp, const Elf_Ehdr *hdr,
+    const Elf_Phdr *phdr, const char *interp, int32_t *osrel, uint32_t *fctl0)
 {
-	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
 	Elf_Brandinfo *bi, *bi_m;
 	bool ret, has_fctl0;
 	int i;
@@ -398,12 +397,12 @@ __elfN(get_brandinfo)(struct image_params *imgp, const char *interp,
 			has_fctl0 = false;
 			*fctl0 = 0;
 			*osrel = 0;
-			ret = __elfN(check_note)(imgp, bi->brand_note, osrel,
-			    &has_fctl0, fctl0);
+			ret = __elfN(check_note)(imgp, hdr, phdr,
+			    bi->brand_note, osrel, &has_fctl0, fctl0);
 			/* Give brand a chance to veto check_note's guess */
 			if (ret && bi->header_supported) {
-				ret = bi->header_supported(imgp, osrel,
-				    has_fctl0 ? fctl0 : NULL);
+				ret = bi->header_supported(imgp, hdr, phdr,
+				    osrel, has_fctl0 ? fctl0 : NULL);
 			}
 			/*
 			 * If note checker claimed the binary, but the
@@ -443,7 +442,7 @@ __elfN(get_brandinfo)(struct image_params *imgp, const char *interp,
 		    bi->compat_3_brand) == 0))) {
 			/* Looks good, but give brand a chance to veto */
 			if (bi->header_supported == NULL ||
-			    bi->header_supported(imgp, NULL, NULL)) {
+			    bi->header_supported(imgp, hdr, phdr, NULL, NULL)) {
 				/*
 				 * Again, prefer strictly matching
 				 * interpreter path.
@@ -471,7 +470,7 @@ __elfN(get_brandinfo)(struct image_params *imgp, const char *interp,
 		    bi->header_supported == NULL)
 			continue;
 		if (hdr->e_machine == bi->machine) {
-			ret = bi->header_supported(imgp, NULL, NULL);
+			ret = bi->header_supported(imgp, hdr, phdr, NULL, NULL);
 			if (ret)
 				return (bi);
 		}
@@ -491,7 +490,7 @@ __elfN(get_brandinfo)(struct image_params *imgp, const char *interp,
 			    strlen(bi->interp_path) + 1 == interp_name_len &&
 			    strncmp(interp, bi->interp_path, interp_name_len)
 			    == 0 && (bi->header_supported == NULL ||
-			    bi->header_supported(imgp, NULL, NULL)))
+			    bi->header_supported(imgp, hdr, phdr, NULL, NULL)))
 				return (bi);
 		}
 	}
@@ -505,7 +504,7 @@ __elfN(get_brandinfo)(struct image_params *imgp, const char *interp,
 		if (hdr->e_machine == bi->machine &&
 		    __elfN(fallback_brand) == bi->brand &&
 		    (bi->header_supported == NULL ||
-		    bi->header_supported(imgp, NULL, NULL)))
+		    bi->header_supported(imgp, hdr, phdr, NULL, NULL)))
 			return (bi);
 	}
 	return (NULL);
@@ -516,6 +515,56 @@ __elfN(phdr_in_zero_page)(const Elf_Ehdr *hdr)
 {
 	return (hdr->e_phoff <= PAGE_SIZE &&
 	    (u_int)hdr->e_phentsize * hdr->e_phnum <= PAGE_SIZE - hdr->e_phoff);
+}
+
+static const Elf_Phdr *
+__elfN(map_phdr)(struct image_params *imgp, const Elf_Ehdr *hdr, bool complain)
+{
+	struct thread *td;
+	void *buf;
+	size_t len;
+	int error;
+
+	if (__elfN(phdr_in_zero_page)(hdr))
+		return ((const Elf_Phdr *)(imgp->image_header + hdr->e_phoff));
+
+	len = hdr->e_phnum * hdr->e_phentsize;
+	if (len > __elfN(max_phdr_len)) {
+		if (complain)
+			uprintf("Program headers (%zu) too large\n", len);
+		return (NULL);
+	}
+
+	/* See comment in __elfN(get_interp). */
+	ASSERT_VOP_LOCKED(imgp->vp, __func__);
+	buf = malloc(len, M_TEMP, M_NOWAIT);
+	if (buf == NULL) {
+		VOP_UNLOCK(imgp->vp);
+		buf = malloc(len, M_TEMP, M_WAITOK);
+		vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
+	}
+
+	td = curthread;
+	error = vn_rdwr(UIO_READ, imgp->vp, PTR2CAP(buf), len, hdr->e_phoff,
+	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED, NULL, td);
+	if (error != 0) {
+		free(buf, M_TEMP);
+		if (complain)
+			uprintf("i/o error reading program headers %d\n",
+			    error);
+		return (NULL);
+	}
+
+	return (buf);
+}
+
+static void
+__elfN(unmap_phdr)(const Elf_Ehdr *hdr, const Elf_Phdr *phdr)
+{
+	if (__elfN(phdr_in_zero_page)(hdr))
+		return;
+
+	free(__DECONST(Elf_Phdr *, phdr), M_TEMP);
 }
 
 static int
@@ -1031,13 +1080,12 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 		goto fail;
 	}
 
-	/* Only support headers that fit within first page for now      */
-	if (!__elfN(phdr_in_zero_page)(hdr)) {
+	phdr = __elfN(map_phdr)(imgp, hdr, false);
+	if (phdr == NULL) {
 		error = ENOEXEC;
 		goto fail;
 	}
 
-	phdr = (const Elf_Phdr *)(imgp->image_header + hdr->e_phoff);
 	if (!aligned(phdr, Elf_Addr)) {
 		error = ENOEXEC;
 		goto fail;
@@ -1054,11 +1102,17 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	if (error != 0)
 		goto fail;
 
+	if (p->p_sysent->sv_protect != NULL)
+		p->p_sysent->sv_protect(imgp, SVP_INTERP);
+
 	*addr = base_addr;
 	*end_addr = max_addr;
 	*entry = (unsigned long)hdr->e_entry + rbase;
 
 fail:
+	if (phdr != NULL)
+		__elfN(unmap_phdr(hdr, phdr));
+
 	if (imgp->firstpage)
 		exec_unmap_first_page(imgp);
 
@@ -1345,14 +1399,18 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 * detected an ELF file.
 	 */
 
-	if (!__elfN(phdr_in_zero_page)(hdr)) {
-		uprintf("Program headers not in the first page\n");
+	phdr = __elfN(map_phdr)(imgp, hdr, true);
+	if (phdr == NULL) {
 		return (ENOEXEC);
 	}
-	phdr = (const Elf_Phdr *)(imgp->image_header + hdr->e_phoff); 
+
+	interp = NULL;
+	free_interp = false;
+
 	if (!aligned(phdr, Elf_Addr)) {
 		uprintf("Unaligned program headers\n");
-		return (ENOEXEC);
+		error = ENOEXEC;
+		goto ret;
 	}
 
 	n = error = 0;
@@ -1360,8 +1418,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	osrel = 0;
 	fctl0 = 0;
 	entry = proghdr = 0;
-	interp = NULL;
-	free_interp = false;
 	td = curthread;
 
 	/*
@@ -1373,8 +1429,10 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	maxalign = PAGE_SIZE;
 	maxsalign = PAGE_SIZE * 1024;
 	for (i = MAXPAGESIZES - 1; i > 0; i--) {
-		if (pagesizes[i] > maxsalign)
+		if (pagesizes[i] > maxsalign) {
 			maxsalign = pagesizes[i];
+			break;
+		}
 	}
 
 	mapsz = 0;
@@ -1457,7 +1515,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		}
 	}
 
-	brand_info = __elfN(get_brandinfo)(imgp, interp, &osrel, &fctl0);
+	brand_info = __elfN(get_brandinfo)(imgp, hdr, phdr, interp, &osrel,
+	    &fctl0);
 	if (brand_info == NULL) {
 		uprintf("ELF binary type \"%u\" not known.\n",
 		    hdr->e_ident[EI_OSABI]);
@@ -1647,8 +1706,12 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	if ((map->flags & MAP_ASLR) != 0) {
 		maxv1 = maxv / 2 + addr / 2;
 		error = __CONCAT(rnd_, __elfN(base))(map, addr, maxv1,
-		    (MAXPAGESIZES > 1 && pagesizes[1] != 0) ?
-		    pagesizes[1] : pagesizes[0], &anon_loc);
+#if VM_NRESERVLEVEL > 0
+		    pagesizes[VM_NRESERVLEVEL] != 0 ?
+		    /* Align anon_loc to the largest superpage size. */
+		    pagesizes[VM_NRESERVLEVEL] :
+#endif
+		    pagesizes[0], &anon_loc);
 		if (error != 0)
 			goto ret;
 		map->anon_loc = anon_loc;
@@ -1661,6 +1724,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	/* If needed, these will be set to valid values inside load_interp(). */
 	imgp->interp_start = 0;
 	imgp->interp_end = 0;
+
+	if (sv->sv_protect != NULL)
+		sv->sv_protect(imgp, SVP_IMAGE);
 
 	if (interp != NULL) {
 		VOP_UNLOCK(imgp->vp);
@@ -1713,6 +1779,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 
 ret:
 	ASSERT_VOP_LOCKED(imgp->vp, "skipped relock");
+	if (phdr != NULL)
+		__elfN(unmap_phdr)(hdr, phdr);
+
 	if (free_interp)
 		free(interp, M_TEMP);
 	return (error);
@@ -1912,6 +1981,27 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	oc = atomic_load_int(&vm_overcommit);
 	bsdflags |= (oc & (SWAP_RESERVE_FORCE_ON | SWAP_RESERVE_RLIMIT_ON)) !=
 	    0 ? ELF_BSDF_VMNOOVERCOMMIT : 0;
+#if defined(__ELF_CHERI) && defined(__aarch64__)
+	/*
+	 * ELF_BSDF_CHERI_C18N tells the runtime linker to enable library-based
+	 * compartmentalisation.
+	 *
+	 * Precedence: procctl, ELF note, system default.
+	 * In case of conflicting flags, disable wins.
+	 */
+	if ((imgp->proc->p_flag2 & P2_CHERI_C18N_MASK) != 0) {
+		if ((imgp->proc->p_flag2 & P2_CHERI_C18N_DISABLE) == 0)
+			bsdflags |= ELF_BSDF_CHERI_C18N;
+	} else if ((imgp->proc->p_fctl0 &
+	    NT_FREEBSD_FCTL_CHERI_C18N_MASK) != 0) {
+		if ((imgp->proc->p_fctl0 &
+		    NT_FREEBSD_FCTL_CHERI_C18N_DISABLE) == 0)
+			bsdflags |= ELF_BSDF_CHERI_C18N;
+	} else if (security_cheri_lib_based_c18n_default)
+		bsdflags |= ELF_BSDF_CHERI_C18N;
+	if (security_cheri_lib_based_c18n_wrap_fptr)
+		bsdflags |= ELF_BSDF_CHERI_C18N_FPTR;
+#endif
 #if defined(__ELF_CHERI) && defined(CHERI_CAPREVOKE)
 	/*
 	 * ELF_BSDF_CHERI_REVOKE tells the runtime it should enable
@@ -1939,6 +2029,8 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	 */
 	if (security_cheri_runtime_revocation_every_free_default != 0)
 		bsdflags |= ELF_BSDF_CHERI_REVOKE_EVERY_FREE;
+	if (security_cheri_runtime_revocation_async != 0)
+		bsdflags |= ELF_BSDF_CHERI_REVOKE_ASYNC;
 #endif
 	AUXARGS_ENTRY(pos, AT_BSDFLAGS, bsdflags);
 	AUXARGS_ENTRY(pos, AT_ARGC, imgp->args->argc);
@@ -1960,6 +2052,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	    round_page(imgp->proc->p_vm_stacktop));
 	stacksz = imgp->proc->p_limit->pl_rlimit[RLIMIT_STACK].rlim_cur;
 	AUXARGS_ENTRY(pos, AT_USRSTACKLIM, stacksz);
+	AUXARGS_ENTRY_PTR(pos, AT_CHERI_C18N, imgp->c18n_info);
 	if (imgp->capv != NULL) {
 		AUXARGS_ENTRY(pos, AT_CAPC, imgp->args->capc);
 		AUXARGS_ENTRY_PTR(pos, AT_CAPV, imgp->capv);
@@ -3307,9 +3400,10 @@ __elfN(note_procstat_auxv)(void *arg, struct sbuf *sb, size_t *sizep)
 	}
 }
 
+#define	MAX_NOTES_LOOP	4096
 bool
-__elfN(parse_notes)(const struct image_params *imgp,
-    Elf_Note *checknote, const char *note_vendor, const Elf_Phdr *pnote,
+__elfN(parse_notes)(const struct image_params *imgp, const Elf_Note *checknote,
+    const char *note_vendor, const Elf_Phdr *pnote,
     bool (*cb)(const Elf_Note *, void *, bool *), void *cb_arg)
 {
 	const Elf_Note *note, *note0, *note_end;
@@ -3346,9 +3440,15 @@ __elfN(parse_notes)(const struct image_params *imgp,
 		    pnote->p_offset + pnote->p_filesz);
 		buf = NULL;
 	}
-	for (i = 0; i < 100 && note >= note0 && note < note_end; i++) {
-		if (!aligned(note, Elf32_Addr) || (const char *)note_end -
-		    (const char *)note < sizeof(Elf_Note)) {
+	for (i = 0; i < MAX_NOTES_LOOP && note >= note0 && note < note_end;
+	    i++) {
+		if (!aligned(note, Elf32_Addr)) {
+			uprintf("Unaligned ELF note\n");
+			goto retf;
+		}
+		if ((const char *)note_end - (const char *)note <
+		    sizeof(Elf_Note)) {
+			uprintf("ELF note to short\n");
 			goto retf;
 		}
 		if (note->n_namesz != checknote->n_namesz ||
@@ -3368,6 +3468,8 @@ nextnote:
 		    roundup2(note->n_namesz, ELF_NOTE_ROUNDSIZE) +
 		    roundup2(note->n_descsz, ELF_NOTE_ROUNDSIZE));
 	}
+	if (i >= MAX_NOTES_LOOP)
+		uprintf("ELF note parser reached %d notes\n", i);
 retf:
 	res = false;
 ret:
@@ -3433,17 +3535,14 @@ note_fctl_cb(const Elf_Note *note, void *arg0, bool *res)
  * as for headers.
  */
 static bool
-__elfN(check_note)(struct image_params *imgp, Elf_Brandnote *brandnote,
-    int32_t *osrel, bool *has_fctl0, uint32_t *fctl0)
+__elfN(check_note)(struct image_params *imgp, const Elf_Ehdr *hdr,
+    const Elf_Phdr *phdr, Elf_Brandnote *brandnote, int32_t *osrel,
+    bool *has_fctl0, uint32_t *fctl0)
 {
-	const Elf_Phdr *phdr;
-	const Elf_Ehdr *hdr;
 	struct brandnote_cb_arg b_arg;
 	struct fctl_cb_arg f_arg;
 	int i, j;
 
-	hdr = (const Elf_Ehdr *)imgp->image_header;
-	phdr = (const Elf_Phdr *)(imgp->image_header + hdr->e_phoff);
 	b_arg.brandnote = brandnote;
 	b_arg.osrel = osrel;
 	f_arg.has_fctl0 = has_fctl0;

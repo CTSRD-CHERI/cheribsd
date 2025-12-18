@@ -19,7 +19,7 @@
 .\" OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 .\" THE SOFTWARE.
 .\"
-.Dd April 29, 2022
+.Dd August 14, 2024
 .Dt MIXER 8
 .Os
 .Sh NAME
@@ -28,12 +28,11 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl f Ar device
-.Op Fl d Ar unit
+.Op Fl d Ar pcmN | N Op Fl V Ar voss_device:mode
 .Op Fl os
 .Op Ar dev Ns Op Cm \&. Ns Ar control Ns Op Cm \&= Ns Ar value
 .Ar ...
 .Nm
-.Op Fl d Ar unit
 .Op Fl os
 .Fl a
 .Nm
@@ -44,16 +43,41 @@ The
 utility is used to set and display soundcard mixer device controls.
 .Pp
 The options are as follows:
-.Bl -tag -width "-f device"
+.Bl -tag -width "-V voss_device:mode"
 .It Fl a
 Print the values for all mixer devices available in the system
 .Pq see Sx FILES .
-.It Fl d Ar unit
+.It Fl d Ar pcmN | N
 Change the default audio card to
-.Ar unit .
-The unit has to be an integer value.
-To see what unit values are available, look at the number each mixer device has by running
-.Nm .
+.Ar pcmN ,
+where N is the unit number (e.g for pcm0, the unit number is 0).
+See
+.Sx EXAMPLES
+on how to list all available audio devices in the system.
+.Pp
+There is also the possibility of hot-swapping to the new default device if
+.Xr virtual_oss 8
+exists in the system and is running, in which case the
+.Fl V
+option needs to be specified as well.
+.Pp
+Hot-swapping generally cannot happen with plain
+.Xr sound 4 ,
+so the user has to restart the track in order to get sound coming out of the
+new default device.
+This is because applications usually open a device at the start of the track
+and do not check for default device changes, in order to open the new device
+mid-track.
+.Xr virtual_oss 8 ,
+on the other hand, can do hot-swapping, because it creates a virtual device for
+applications to open, and then does all the necessary routing and conversions
+to the appropriate device(s).
+.Pp
+Note that hot-swapping will work only for applications that are using
+.Xr virtual_oss 8
+devices, and not plain
+.Xr sound 4
+ones.
 .It Fl f Ar device
 Open
 .Ar device
@@ -66,6 +90,33 @@ Print mixer values in a format suitable for use inside scripts.
 The mixer's header (name, audio card name, ...) will not be printed.
 .It Fl s
 Print only the recording source(s) of the mixer device.
+.It Fl V Ar voss_device:mode
+Specify a
+.Xr virtual_oss 8
+control device, as well as a mode (see below), in order to hot-swap devices.
+This option is meant to only be used in combination with the
+.Fl d
+option.
+.Pp
+The available modes are as follows:
+.Bl -column play
+.It Sy Mode Ta Sy Action
+.It all Ta Playback and recording
+.It play Ta Playback
+.It rec Ta Recording
+.El
+.Pp
+The
+.Pa mode
+part is needed, so that
+.Nm
+will not accidentally hot-swap both the recording and playback device in
+.Xr virtual_oss 8 ,
+if only one direction is to be hot-swapped.
+.Pp
+See
+.Sx EXAMPLES
+on how to use this option.
 .El
 .Pp
 The list of mixer devices that may be modified are:
@@ -114,7 +165,9 @@ with one of the available devices):
 .Oo Cm \&: Oo Cm \&+ | Cm \&- Oc Ar rvol Oo % Oc Oc
 .Xc
 .It Ar dev Cm .mute Ta Cm 0 | 1 | ^
+.It Ar dev Cm .mute Ta Cm off | on | toggle
 .It Ar dev Cm .recsrc Ta Cm ^ | + | - | =
+.It Ar dev Cm .recsrc Ta Cm toggle | add | remove | set
 .El
 .Sm on
 .Pp
@@ -150,14 +203,14 @@ The
 .Ar dev Ns Cm .mute
 control (un)mutes a device.
 The following values are available:
-.Bl -tag -width = -offset indent
-.It Cm 0
+.Bl -tag -width "xxxxxxxxxx" -offset indent
+.It Cm 0 | off
 unmutes
 .Ar dev
-.It Cm 1
+.It Cm 1 | on
 mutes
 .Ar dev
-.It Cm ^
+.It Cm ^ | toggle
 toggles the mute of
 .Ar dev
 .El
@@ -174,22 +227,23 @@ To modify the recording source you can use one of the following modifiers
 on a
 .Sy rec
 device:
-.Bl -tag -width = -offset indent
-.It Cm ^
+.Bl -tag -width "xxxxxxxxxx" -offset indent
+.It Cm ^ | toggle
 toggles
 .Ar dev
 of possible recording devices
-.It Cm +
+.It Cm + | add
 adds
 .Ar dev
 to possible recording devices
-.It Cm -
+.It Cm - | remove
 removes
 .Ar dev
 from possible recording devices
-.It Cm =
-sets the recording device to
+.It Cm = | set
+makes
 .Ar dev
+the only recording device.
 .El
 .Sh FILES
 .Bl -tag -width /dev/mixerN -compact
@@ -218,6 +272,18 @@ opens when the
 option has not been specified.
 .El
 .Sh EXAMPLES
+List all available audio devices in the system:
+.Bd -literal -offset indent
+$ mixer -a | grep ^pcm
+.Ed
+.Pp
+Increase the
+.Cm vol
+device's volume by 5%:
+.Bd -literal -offset indent
+$ mixer vol=+5%
+.Ed
+.Pp
 Change the volume for the
 .Cm vol
 device of the
@@ -238,16 +304,16 @@ $ mixer mic.volume=+0.10:-0.05
 Toggle the mute for
 .Cm vol :
 .Bd -literal -offset indent
-$ mixer vol.mute=^
+$ mixer vol.mute=toggle
 .Ed
 .Pp
-Set
+Add
 .Cm mic
-and toggle
+and remove
 .Cm line
-recording sources:
+from the recording devices:
 .Bd -literal -offset indent
-$ mixer mic.recsrc=+ line.recsrc=^
+$ mixer mic.recsrc=add line.recsrc=remove
 .Ed
 .Pp
 Dump
@@ -258,10 +324,26 @@ $ mixer -f /dev/mixer0 -o > info
 \&...
 $ mixer -f /dev/mixer0 `cat info`
 .Ed
+.Pp
+Suppose
+.Xr virtual_oss 8
+is running with
+.Pa /dev/vdsp.ctl
+as its control device, and
+.Pa pcm0
+as the playback device.
+Change the default device to
+.Pa pcm1 ,
+and hot-swap to it for both recording and playback in
+.Xr virtual_oss 8 :
+.Bd -literal -offset indent
+$ mixer -d pcm1 -V /dev/vdsp.ctl:all
+.Ed
 .Sh SEE ALSO
 .Xr mixer 3 ,
 .Xr sound 4 ,
-.Xr sysctl 8
+.Xr sysctl 8 ,
+.Xr virtual_oss 8
 .Sh HISTORY
 The
 .Nm

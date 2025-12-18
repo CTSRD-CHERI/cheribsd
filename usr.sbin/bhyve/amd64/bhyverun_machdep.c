@@ -37,7 +37,9 @@
 #include "acpi.h"
 #include "atkbdc.h"
 #include "bhyverun.h"
+#include "bootrom.h"
 #include "config.h"
+#include "debug.h"
 #include "e820.h"
 #include "fwctl.h"
 #include "ioapic.h"
@@ -72,11 +74,10 @@ bhyve_usage(int code)
 	progname = getprogname();
 
 	fprintf(stderr,
-	    "Usage: %s [-AaCDeHhPSuWwxY]\n"
+	    "Usage: %s [-aCDeHhPSuWwxY]\n"
 	    "       %*s [-c [[cpus=]numcpus][,sockets=n][,cores=n][,threads=n]]\n"
 	    "       %*s [-G port] [-k config_file] [-l lpc] [-m mem] [-o var=value]\n"
 	    "       %*s [-p vcpu:hostcpu] [-r file] [-s pci] [-U uuid] vmname\n"
-	    "       -A: create ACPI tables\n"
 	    "       -a: local apic is in xAPIC mode (deprecated)\n"
 	    "       -C: include guest memory in core file\n"
 	    "       -c: number of CPUs and/or topology specification\n"
@@ -237,6 +238,18 @@ bhyve_optparse(int argc, char **argv)
 			bhyve_usage(1);
 		}
 	}
+
+	/* Handle backwards compatibility aliases in config options. */
+	if (get_config_value("lpc.bootrom") != NULL &&
+	    get_config_value("bootrom") == NULL) {
+		warnx("lpc.bootrom is deprecated, use '-o bootrom' instead");
+		set_config_value("bootrom", get_config_value("lpc.bootrom"));
+	}
+	if (get_config_value("lpc.bootvars") != NULL &&
+	    get_config_value("bootvars") == NULL) {
+		warnx("lpc.bootvars is deprecated, use '-o bootvars' instead");
+		set_config_value("bootvars", get_config_value("lpc.bootvars"));
+	}
 }
 
 void
@@ -247,7 +260,7 @@ bhyve_init_vcpu(struct vcpu *vcpu)
 	if (get_config_bool_default("x86.vmexit_on_hlt", false)) {
 		err = vm_get_capability(vcpu, VM_CAP_HALT_EXIT, &tmp);
 		if (err < 0) {
-			fprintf(stderr, "VM exit on HLT not supported\n");
+			EPRINTLN("VM exit on HLT not supported");
 			exit(4);
 		}
 		vm_set_capability(vcpu, VM_CAP_HALT_EXIT, 1);
@@ -259,8 +272,7 @@ bhyve_init_vcpu(struct vcpu *vcpu)
 		 */
 		err = vm_get_capability(vcpu, VM_CAP_PAUSE_EXIT, &tmp);
 		if (err < 0) {
-			fprintf(stderr,
-			    "SMP mux requested, no pause support\n");
+			EPRINTLN("SMP mux requested, no pause support");
 			exit(4);
 		}
 		vm_set_capability(vcpu, VM_CAP_PAUSE_EXIT, 1);
@@ -272,7 +284,7 @@ bhyve_init_vcpu(struct vcpu *vcpu)
 		err = vm_set_x2apic_state(vcpu, X2APIC_DISABLED);
 
 	if (err) {
-		fprintf(stderr, "Unable to set x2apic state (%d)\n", err);
+		EPRINTLN("Unable to set x2apic state (%d)", err);
 		exit(4);
 	}
 
@@ -288,7 +300,7 @@ bhyve_start_vcpu(struct vcpu *vcpu, bool bsp)
 	int error;
 
 	if (bsp) {
-		if (lpc_bootrom()) {
+		if (bootrom_boot()) {
 			error = vm_set_capability(vcpu,
 			    VM_CAP_UNRESTRICTED_GUEST, 1);
 			if (error != 0) {
@@ -331,6 +343,9 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp __unused)
 	error = e820_init(ctx);
 	if (error != 0)
 		return (error);
+	error = bootrom_loadrom(ctx);
+	if (error != 0)
+		return (error);
 
 	return (0);
 }
@@ -352,7 +367,7 @@ bhyve_init_platform_late(struct vmctx *ctx, struct vcpu *bsp __unused)
 	if (error != 0)
 		return (error);
 
-	if (lpc_bootrom() && strcmp(lpc_fwcfg(), "bhyve") == 0)
+	if (bootrom_boot() && strcmp(lpc_fwcfg(), "bhyve") == 0)
 		fwctl_init();
 
 	if (get_config_bool("acpi_tables")) {

@@ -43,17 +43,23 @@
 .option push
 #ifndef __CHERI_PURE_CAPABILITY__
 .option capmode
+	/*
+	 * If coming from userspace, load_registers 0 leaves 'csp' as a
+	 * capability, which is then stored in 'sscratchc' whilst in
+	 * userspace, and similarly for fork_trampoline, so no derivation is
+	 * needed on re-entering the kernel.
+	 */
 .if \mode == 1
 	/*
 	 * Build a capability for 'csp' using 'sp' as an address
 	 * in the kernel DDC.  We haven't saved any registers yet,
-	 * so store 'ct0' in 'scratchc' temporarily.
+	 * so store 'ct0' in 'sscratchc' temporarily.
 	 *
-	 * XXX: Bounds?  Maybe could use TF_SIZE + 16 as length?
+	 * XXX: Bounds?  Maybe could use TF_SIZE + KF_SIZE as length?
 	 * A purecap kernel would have proper bounds on csp already.
 	 */
 	cspecialw sscratchc, ct0
-	cspecialr ct0, stdc
+	cspecialr ct0, ddc
 	csetaddr ct0, ct0, sp
 	cmove	csp, ct0
 	cspecialr ct0, sscratchc
@@ -75,9 +81,9 @@
 .if \mode == 0	/* We came from userspace. */
 	/* Load our pcpu */
 #if __has_feature(capabilities)
-	clc	ctp, (TF_SIZE)(csp)
+	clc	ctp, (TF_SIZE + KF_TP)(csp)
 #else
-	ld	tp, (TF_SIZE)(sp)
+	ld	tp, (TF_SIZE + KF_TP)(sp)
 #endif
 .endif
 
@@ -129,12 +135,15 @@
 	cspecialr ct0, ddc
 	csc	ct0, (TF_DDC)(csp)
 
+.if \mode == 0
+	/* Load our DDC */
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	ct0, cnull
 #else
-	cspecialr ct0, stdc
+	clc	ct0, (TF_SIZE + KF_DDC)(csp)
 #endif
 	cspecialw ddc, ct0
+.endif
 
 #ifndef __CHERI_PURE_CAPABILITY__
 	/* Switch to non-capmode PCC. */
@@ -213,8 +222,8 @@
 
 .if \mode == 0
 #ifdef __CHERI_PURE_CAPABILITY__
-	cspecialr ct0, stdc
-	cmove	cgp, ct0
+	/* CHERI-RISC-V purecap doesn't currently use cgp. */
+	cmove	cgp, cnull
 #else
 .option push
 .option norelax
@@ -266,12 +275,20 @@
 	 * Build a capability for 'csp' using 'sp' as an address
 	 * in the kernel DDC.
 	 *
-	 * XXX: Bounds?  Maybe could use TF_SIZE + 16 as length?
+	 * XXX: Bounds?  Maybe could use TF_SIZE + KF_SIZE as length?
 	 * A purecap kernel would have proper bounds on csp already.
 	 */
 	cspecialr ct0, ddc
 	csetaddr ct0, ct0, sp
 	cmove	csp, ct0
+#endif
+
+#ifndef __CHERI_PURE_CAPABILITY__
+.if \mode == 0
+	/* Store our DDC */
+	cspecialr ct0, ddc
+	csc	ct0, (TF_SIZE + KF_DDC)(csp)
+.endif
 #endif
 
 	/*
@@ -289,7 +306,7 @@
 	cspecialw sscratchc, ct0
 
 	/* Store our pcpu */
-	csc	ctp, (TF_SIZE)(csp)
+	csc	ctp, (TF_SIZE + KF_TP)(csp)
 	clc	ctp, (TF_TP)(csp)
 
 	/* And restore the user's global pointer */
@@ -339,7 +356,7 @@
 	csrw	sscratch, t0
 
 	/* Store our pcpu */
-	sd	tp, (TF_SIZE)(sp)
+	sd	tp, (TF_SIZE + KF_TP)(sp)
 	ld	tp, (TF_TP)(sp)
 
 	/* And restore the user's global pointer */

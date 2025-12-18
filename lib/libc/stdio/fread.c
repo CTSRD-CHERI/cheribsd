@@ -32,15 +32,12 @@
  * SUCH DAMAGE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)fread.c	8.2 (Berkeley) 12/11/93";
-#endif /* LIBC_SCCS and not lint */
-#include <sys/cdefs.h>
 #include "namespace.h"
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <ssp/ssp.h>
 #include "un-namespace.h"
 #include "local.h"
 #include "libc_private.h"
@@ -50,7 +47,8 @@ static char sccsid[] = "@(#)fread.c	8.2 (Berkeley) 12/11/93";
  */
 
 size_t
-fread(void * __restrict buf, size_t size, size_t count, FILE * __restrict fp)
+__ssp_real(fread)(void * __restrict buf, size_t size, size_t count,
+    FILE * __restrict fp)
 {
 	size_t ret;
 

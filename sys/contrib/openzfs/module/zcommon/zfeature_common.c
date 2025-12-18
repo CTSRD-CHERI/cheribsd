@@ -25,7 +25,7 @@
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright (c) 2014, Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2017, Intel Corporation.
- * Copyright (c) 2019, Klara Inc.
+ * Copyright (c) 2019, 2024, Klara, Inc.
  * Copyright (c) 2019, Allan Jude
  */
 
@@ -736,6 +736,54 @@ zpool_feature_init(void)
 	    "Support for root vdev ZAP.",
 	    ZFEATURE_FLAG_MOS, ZFEATURE_TYPE_BOOLEAN, NULL,
 	    sfeatures);
+
+	{
+		static const spa_feature_t redact_list_spill_deps[] = {
+			SPA_FEATURE_REDACTION_BOOKMARKS,
+			SPA_FEATURE_NONE
+		};
+		zfeature_register(SPA_FEATURE_REDACTION_LIST_SPILL,
+		    "com.delphix:redaction_list_spill", "redaction_list_spill",
+		    "Support for increased number of redaction_snapshot "
+		    "arguments in zfs redact.", 0, ZFEATURE_TYPE_BOOLEAN,
+		    redact_list_spill_deps, sfeatures);
+	}
+
+	zfeature_register(SPA_FEATURE_RAIDZ_EXPANSION,
+	    "org.openzfs:raidz_expansion", "raidz_expansion",
+	    "Support for raidz expansion",
+	    ZFEATURE_FLAG_MOS, ZFEATURE_TYPE_BOOLEAN, NULL, sfeatures);
+
+	zfeature_register(SPA_FEATURE_FAST_DEDUP,
+	    "com.klarasystems:fast_dedup", "fast_dedup",
+	    "Support for advanced deduplication",
+	    ZFEATURE_FLAG_READONLY_COMPAT, ZFEATURE_TYPE_BOOLEAN, NULL,
+	    sfeatures);
+
+	{
+		static const spa_feature_t longname_deps[] = {
+			SPA_FEATURE_EXTENSIBLE_DATASET,
+			SPA_FEATURE_NONE
+		};
+		zfeature_register(SPA_FEATURE_LONGNAME,
+		    "org.zfsonlinux:longname", "longname",
+		    "support filename up to 1024 bytes",
+		    ZFEATURE_FLAG_PER_DATASET, ZFEATURE_TYPE_BOOLEAN,
+		    longname_deps, sfeatures);
+	}
+
+	{
+		static const spa_feature_t large_microzap_deps[] = {
+			SPA_FEATURE_EXTENSIBLE_DATASET,
+			SPA_FEATURE_LARGE_BLOCKS,
+			SPA_FEATURE_NONE
+		};
+		zfeature_register(SPA_FEATURE_LARGE_MICROZAP,
+		    "com.klarasystems:large_microzap", "large_microzap",
+		    "Support for microzaps larger than 128KB.",
+		    ZFEATURE_FLAG_PER_DATASET | ZFEATURE_FLAG_READONLY_COMPAT,
+		    ZFEATURE_TYPE_BOOLEAN, large_microzap_deps, sfeatures);
+	}
 
 	zfs_mod_list_supported_free(sfeatures);
 }

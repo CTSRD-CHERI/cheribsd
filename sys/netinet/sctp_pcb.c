@@ -192,21 +192,17 @@ sctp_find_ifn(void *ifn, uint32_t ifn_index)
 	struct sctp_ifn *sctp_ifnp;
 	struct sctp_ifnlist *hash_ifn_head;
 
-	/*
-	 * We assume the lock is held for the addresses if that's wrong
-	 * problems could occur :-)
-	 */
 	SCTP_IPI_ADDR_LOCK_ASSERT();
 	hash_ifn_head = &SCTP_BASE_INFO(vrf_ifn_hash)[(ifn_index & SCTP_BASE_INFO(vrf_ifn_hashmark))];
 	LIST_FOREACH(sctp_ifnp, hash_ifn_head, next_bucket) {
 		if (sctp_ifnp->ifn_index == ifn_index) {
-			return (sctp_ifnp);
+			break;
 		}
-		if (sctp_ifnp->ifn_p && ifn && (sctp_ifnp->ifn_p == ifn)) {
-			return (sctp_ifnp);
+		if (ifn != NULL && sctp_ifnp->ifn_p == ifn) {
+			break;
 		}
 	}
-	return (NULL);
+	return (sctp_ifnp);
 }
 
 struct sctp_vrf *
@@ -239,7 +235,7 @@ sctp_free_vrf(struct sctp_vrf *vrf)
 	}
 }
 
-void
+static void
 sctp_free_ifn(struct sctp_ifn *sctp_ifnp)
 {
 	if (SCTP_DECREMENT_AND_CHECK_REFCOUNT(&sctp_ifnp->refcount)) {
@@ -249,17 +245,6 @@ sctp_free_ifn(struct sctp_ifn *sctp_ifnp)
 		}
 		SCTP_FREE(sctp_ifnp, SCTP_M_IFN);
 		atomic_subtract_int(&SCTP_BASE_INFO(ipi_count_ifns), 1);
-	}
-}
-
-void
-sctp_update_ifn_mtu(uint32_t ifn_index, uint32_t mtu)
-{
-	struct sctp_ifn *sctp_ifnp;
-
-	sctp_ifnp = sctp_find_ifn((void *)NULL, ifn_index);
-	if (sctp_ifnp != NULL) {
-		sctp_ifnp->ifn_mtu = mtu;
 	}
 }
 
@@ -277,25 +262,16 @@ sctp_free_ifa(struct sctp_ifa *sctp_ifap)
 }
 
 static void
-sctp_delete_ifn(struct sctp_ifn *sctp_ifnp, int hold_addr_lock)
+sctp_delete_ifn(struct sctp_ifn *sctp_ifnp)
 {
-	struct sctp_ifn *found;
 
-	found = sctp_find_ifn(sctp_ifnp->ifn_p, sctp_ifnp->ifn_index);
-	if (found == NULL) {
+	SCTP_IPI_ADDR_WLOCK_ASSERT();
+	if (sctp_find_ifn(sctp_ifnp->ifn_p, sctp_ifnp->ifn_index) == NULL) {
 		/* Not in the list.. sorry */
 		return;
 	}
-	if (hold_addr_lock == 0) {
-		SCTP_IPI_ADDR_WLOCK();
-	} else {
-		SCTP_IPI_ADDR_WLOCK_ASSERT();
-	}
 	LIST_REMOVE(sctp_ifnp, next_bucket);
 	LIST_REMOVE(sctp_ifnp, next_ifn);
-	if (hold_addr_lock == 0) {
-		SCTP_IPI_ADDR_WUNLOCK();
-	}
 	/* Take away the reference, and possibly free it */
 	sctp_free_ifn(sctp_ifnp);
 }
@@ -387,13 +363,13 @@ out:
 /*-
  * Add an ifa to an ifn.
  * Register the interface as necessary.
- * NOTE: ADDR write lock MUST be held.
  */
 static void
 sctp_add_ifa_to_ifn(struct sctp_ifn *sctp_ifnp, struct sctp_ifa *sctp_ifap)
 {
 	int ifa_af;
 
+	SCTP_IPI_ADDR_WLOCK_ASSERT();
 	LIST_INSERT_HEAD(&sctp_ifnp->ifalist, sctp_ifap, next_ifa);
 	sctp_ifap->ifn_p = sctp_ifnp;
 	atomic_add_int(&sctp_ifap->ifn_p->refcount, 1);
@@ -424,11 +400,11 @@ sctp_add_ifa_to_ifn(struct sctp_ifn *sctp_ifnp, struct sctp_ifa *sctp_ifap)
  * Remove an ifa from its ifn.
  * If no more addresses exist, remove the ifn too. Otherwise, re-register
  * the interface based on the remaining address families left.
- * NOTE: ADDR write lock MUST be held.
  */
 static void
 sctp_remove_ifa_from_ifn(struct sctp_ifa *sctp_ifap)
 {
+	SCTP_IPI_ADDR_WLOCK_ASSERT();
 	LIST_REMOVE(sctp_ifap, next_ifa);
 	if (sctp_ifap->ifn_p) {
 		/* update address counts */
@@ -450,7 +426,7 @@ sctp_remove_ifa_from_ifn(struct sctp_ifa *sctp_ifap)
 
 		if (LIST_EMPTY(&sctp_ifap->ifn_p->ifalist)) {
 			/* remove the ifn, possibly freeing it */
-			sctp_delete_ifn(sctp_ifap->ifn_p, SCTP_ADDR_LOCKED);
+			sctp_delete_ifn(sctp_ifap->ifn_p);
 		} else {
 			/* re-register address family type, if needed */
 			if ((sctp_ifap->ifn_p->num_v6 == 0) &&
@@ -479,7 +455,6 @@ sctp_add_addr_to_vrf(uint32_t vrf_id, void *ifn, uint32_t ifn_index,
 	struct sctp_ifalist *hash_addr_head;
 	struct sctp_ifnlist *hash_ifn_head;
 	uint32_t hash_of_addr;
-	int new_ifn_af = 0;
 
 #ifdef SCTP_DEBUG
 	SCTPDBG(SCTP_DEBUG_PCB4, "vrf_id 0x%x: adding address: ", vrf_id);
@@ -543,59 +518,63 @@ sctp_add_addr_to_vrf(uint32_t vrf_id, void *ifn, uint32_t ifn_index,
 		LIST_INSERT_HEAD(hash_ifn_head, sctp_ifnp, next_bucket);
 		LIST_INSERT_HEAD(&vrf->ifnlist, sctp_ifnp, next_ifn);
 		atomic_add_int(&SCTP_BASE_INFO(ipi_count_ifns), 1);
-		new_ifn_af = 1;
 	}
 	sctp_ifap = sctp_find_ifa_by_addr(addr, vrf->vrf_id, SCTP_ADDR_LOCKED);
-	if (sctp_ifap) {
-		/* Hmm, it already exists? */
-		if ((sctp_ifap->ifn_p) &&
-		    (sctp_ifap->ifn_p->ifn_index == ifn_index)) {
-			SCTPDBG(SCTP_DEBUG_PCB4, "Using existing ifn %s (0x%x) for ifa %p\n",
-			    sctp_ifap->ifn_p->ifn_name, ifn_index,
-			    (void *)sctp_ifap);
-			if (new_ifn_af) {
-				/* Remove the created one that we don't want */
-				sctp_delete_ifn(sctp_ifnp, SCTP_ADDR_LOCKED);
-			}
-			if (sctp_ifap->localifa_flags & SCTP_BEING_DELETED) {
-				/* easy to solve, just switch back to active */
-				SCTPDBG(SCTP_DEBUG_PCB4, "Clearing deleted ifa flag\n");
-				sctp_ifap->localifa_flags = SCTP_ADDR_VALID;
-				sctp_ifap->ifn_p = sctp_ifnp;
-				atomic_add_int(&sctp_ifap->ifn_p->refcount, 1);
-			}
-	exit_stage_left:
-			SCTP_IPI_ADDR_WUNLOCK();
-			if (new_sctp_ifnp != NULL) {
-				SCTP_FREE(new_sctp_ifnp, SCTP_M_IFN);
-			}
-			SCTP_FREE(new_sctp_ifap, SCTP_M_IFA);
-			return (sctp_ifap);
-		} else {
-			if (sctp_ifap->ifn_p) {
+	if (sctp_ifap != NULL) {
+		/* The address being added is already or still known. */
+		if (sctp_ifap->ifn_p != NULL) {
+			if (sctp_ifap->ifn_p->ifn_index == ifn_index) {
+				SCTPDBG(SCTP_DEBUG_PCB4,
+				    "Using existing ifn %s (0x%x) for ifa %p\n",
+				    sctp_ifap->ifn_p->ifn_name, ifn_index,
+				    (void *)sctp_ifap);
+				if (new_sctp_ifnp == NULL) {
+					/* Remove the created one not used. */
+					sctp_delete_ifn(sctp_ifnp);
+				}
+				if (sctp_ifap->localifa_flags & SCTP_BEING_DELETED) {
+					/* Switch back to active. */
+					SCTPDBG(SCTP_DEBUG_PCB4,
+					    "Clearing deleted ifa flag\n");
+					sctp_ifap->localifa_flags = SCTP_ADDR_VALID;
+					sctp_ifap->ifn_p = sctp_ifnp;
+					atomic_add_int(&sctp_ifap->ifn_p->refcount, 1);
+				}
+			} else {
 				/*
 				 * The last IFN gets the address, remove the
 				 * old one
 				 */
-				SCTPDBG(SCTP_DEBUG_PCB4, "Moving ifa %p from %s (0x%x) to %s (0x%x)\n",
-				    (void *)sctp_ifap, sctp_ifap->ifn_p->ifn_name,
+				SCTPDBG(SCTP_DEBUG_PCB4,
+				    "Moving ifa %p from %s (0x%x) to %s (0x%x)\n",
+				    (void *)sctp_ifap,
+				    sctp_ifap->ifn_p->ifn_name,
 				    sctp_ifap->ifn_p->ifn_index, if_name,
 				    ifn_index);
 				/* remove the address from the old ifn */
 				sctp_remove_ifa_from_ifn(sctp_ifap);
 				/* move the address over to the new ifn */
 				sctp_add_ifa_to_ifn(sctp_ifnp, sctp_ifap);
-				goto exit_stage_left;
-			} else {
-				/* repair ifnp which was NULL ? */
-				sctp_ifap->localifa_flags = SCTP_ADDR_VALID;
-				SCTPDBG(SCTP_DEBUG_PCB4, "Repairing ifn %p for ifa %p\n",
-				    (void *)sctp_ifnp, (void *)sctp_ifap);
-				sctp_add_ifa_to_ifn(sctp_ifnp, sctp_ifap);
 			}
-			goto exit_stage_left;
+		} else {
+			/* Repair ifn_p, which was NULL... */
+			sctp_ifap->localifa_flags = SCTP_ADDR_VALID;
+			SCTPDBG(SCTP_DEBUG_PCB4,
+			    "Repairing ifn %p for ifa %p\n",
+			    (void *)sctp_ifnp, (void *)sctp_ifap);
+			sctp_add_ifa_to_ifn(sctp_ifnp, sctp_ifap);
 		}
+		SCTP_IPI_ADDR_WUNLOCK();
+		if (new_sctp_ifnp != NULL) {
+			SCTP_FREE(new_sctp_ifnp, SCTP_M_IFN);
+		}
+		SCTP_FREE(new_sctp_ifap, SCTP_M_IFA);
+		return (sctp_ifap);
 	}
+	KASSERT(sctp_ifnp != NULL,
+	    ("sctp_add_addr_to_vrf: sctp_ifnp == NULL"));
+	KASSERT(sctp_ifap == NULL,
+	    ("sctp_add_addr_to_vrf: sctp_ifap (%p) != NULL", sctp_ifap));
 	sctp_ifap = new_sctp_ifap;
 	memset(sctp_ifap, 0, sizeof(struct sctp_ifa));
 	sctp_ifap->ifn_p = sctp_ifnp;
@@ -621,8 +600,8 @@ sctp_add_addr_to_vrf(uint32_t vrf_id, void *ifn, uint32_t ifn_index,
 				sctp_ifap->src_is_priv = 1;
 			}
 			sctp_ifnp->num_v4++;
-			if (new_ifn_af)
-				new_ifn_af = AF_INET;
+			if (new_sctp_ifnp == NULL)
+				sctp_ifnp->registered_af = AF_INET;
 			break;
 		}
 #endif
@@ -641,13 +620,12 @@ sctp_add_addr_to_vrf(uint32_t vrf_id, void *ifn, uint32_t ifn_index,
 				sctp_ifap->src_is_priv = 1;
 			}
 			sctp_ifnp->num_v6++;
-			if (new_ifn_af)
-				new_ifn_af = AF_INET6;
+			if (new_sctp_ifnp == NULL)
+				sctp_ifnp->registered_af = AF_INET6;
 			break;
 		}
 #endif
 	default:
-		new_ifn_af = 0;
 		break;
 	}
 	hash_of_addr = sctp_get_ifa_hash_val(&sctp_ifap->address.sa);
@@ -663,9 +641,6 @@ sctp_add_addr_to_vrf(uint32_t vrf_id, void *ifn, uint32_t ifn_index,
 	sctp_ifnp->ifa_count++;
 	vrf->total_ifa_count++;
 	atomic_add_int(&SCTP_BASE_INFO(ipi_count_ifas), 1);
-	if (new_ifn_af) {
-		sctp_ifnp->registered_af = new_ifn_af;
-	}
 	SCTP_IPI_ADDR_WUNLOCK();
 	if (new_sctp_ifnp != NULL) {
 		SCTP_FREE(new_sctp_ifnp, SCTP_M_IFN);
@@ -778,7 +753,7 @@ sctp_del_addr_from_vrf(uint32_t vrf_id, struct sockaddr *addr,
 	else {
 		SCTPDBG(SCTP_DEBUG_PCB4, "Del Addr-ifn:%d Could not find address:",
 		    ifn_index);
-		SCTPDBG_ADDR(SCTP_DEBUG_PCB1, addr);
+		SCTPDBG_ADDR(SCTP_DEBUG_PCB4, addr);
 	}
 #endif
 
@@ -2570,7 +2545,7 @@ sctp_inpcb_alloc(struct socket *so, uint32_t vrf_id)
 
 	/* Setup the initial secret */
 	(void)SCTP_GETTIME_TIMEVAL(&time);
-	m->time_of_secret_change = (unsigned int)time.tv_sec;
+	m->time_of_secret_change = time.tv_sec;
 
 	for (i = 0; i < SCTP_NUMBER_OF_SECRETS; i++) {
 		m->secret_key[0][i] = sctp_select_initial_TSN(m);
@@ -3405,7 +3380,6 @@ sctp_inpcb_free(struct sctp_inpcb *inp, int immediate, int from)
 				continue;
 			}
 			if ((stcb->asoc.size_on_reasm_queue > 0) ||
-			    (stcb->asoc.control_pdapi) ||
 			    (stcb->asoc.size_on_all_streams > 0) ||
 			    ((so != NULL) && (SCTP_SBAVAIL(&so->so_rcv) > 0))) {
 				/* Left with Data unread */
@@ -4542,7 +4516,7 @@ sctp_del_remote_addr(struct sctp_tcb *stcb, struct sockaddr *remaddr)
 }
 
 static bool
-sctp_is_in_timewait(uint32_t tag, uint16_t lport, uint16_t rport, uint32_t now)
+sctp_is_in_timewait(uint32_t tag, uint16_t lport, uint16_t rport, time_t now)
 {
 	struct sctpvtaghead *chain;
 	struct sctp_tagblock *twait_block;
@@ -4564,7 +4538,7 @@ sctp_is_in_timewait(uint32_t tag, uint16_t lport, uint16_t rport, uint32_t now)
 }
 
 static void
-sctp_set_vtag_block(struct sctp_timewait *vtag_block, uint32_t time,
+sctp_set_vtag_block(struct sctp_timewait *vtag_block, time_t time,
     uint32_t tag, uint16_t lport, uint16_t rport)
 {
 	vtag_block->tv_sec_at_expire = time;
@@ -4579,13 +4553,13 @@ sctp_add_vtag_to_timewait(uint32_t tag, uint16_t lport, uint16_t rport)
 	struct sctpvtaghead *chain;
 	struct sctp_tagblock *twait_block;
 	struct timeval now;
-	uint32_t time;
+	time_t time;
 	int i;
 	bool set;
 
 	SCTP_INP_INFO_WLOCK_ASSERT();
 	(void)SCTP_GETTIME_TIMEVAL(&now);
-	time = (uint32_t)now.tv_sec + SCTP_BASE_SYSCTL(sctp_vtag_time_wait);
+	time = now.tv_sec + SCTP_BASE_SYSCTL(sctp_vtag_time_wait);
 	chain = &SCTP_BASE_INFO(vtag_timewait)[(tag % SCTP_STACK_VTAG_HASH_SIZE)];
 	set = false;
 	LIST_FOREACH(twait_block, chain, sctp_nxt_tagblock) {
@@ -4597,7 +4571,7 @@ sctp_add_vtag_to_timewait(uint32_t tag, uint16_t lport, uint16_t rport)
 				continue;
 			}
 			if ((twait_block->vtag_block[i].v_tag != 0) &&
-			    (twait_block->vtag_block[i].tv_sec_at_expire < (uint32_t)now.tv_sec)) {
+			    (twait_block->vtag_block[i].tv_sec_at_expire < now.tv_sec)) {
 				if (set) {
 					/* Audit expires this guy */
 					sctp_set_vtag_block(twait_block->vtag_block + i, 0, 0, 0, 0);
@@ -4762,18 +4736,10 @@ sctp_free_assoc(struct sctp_inpcb *inp, struct sctp_tcb *stcb, int from_inpcbfre
 				 * now.
 				 */
 				if (sq->end_added == 0) {
-					/* Held for PD-API clear that. */
+					/* Held for PD-API, clear that. */
 					sq->pdapi_aborted = 1;
 					sq->held_length = 0;
 					if (sctp_stcb_is_feature_on(inp, stcb, SCTP_PCB_FLAGS_PDAPIEVNT) && (so != NULL)) {
-						/*
-						 * Need to add a PD-API
-						 * aborted indication.
-						 * Setting the control_pdapi
-						 * assures that it will be
-						 * added right after this
-						 * msg.
-						 */
 						sctp_ulp_notify(SCTP_NOTIFY_PARTIAL_DELVIERY_INDICATION,
 						    stcb,
 						    SCTP_PARTIAL_DELIVERY_ABORTED,
@@ -4860,7 +4826,6 @@ sctp_free_assoc(struct sctp_inpcb *inp, struct sctp_tcb *stcb, int from_inpcbfre
 				SOCKBUF_LOCK(&so->so_rcv);
 				so->so_state &= ~(SS_ISCONNECTING |
 				    SS_ISDISCONNECTING |
-				    SS_ISCONFIRMING |
 				    SS_ISCONNECTED);
 				so->so_state |= SS_ISDISCONNECTED;
 				socantrcvmore_locked(so);
@@ -5685,6 +5650,11 @@ sctp_startup_mcore_threads(void)
 }
 #endif
 
+#define VALIDATE_LOADER_TUNABLE(var_name, prefix)		\
+	if (SCTP_BASE_SYSCTL(var_name) < prefix##_MIN ||	\
+	    SCTP_BASE_SYSCTL(var_name) > prefix##_MAX)		\
+		SCTP_BASE_SYSCTL(var_name) = prefix##_DEFAULT
+
 void
 sctp_pcb_init(void)
 {
@@ -5726,6 +5696,9 @@ sctp_pcb_init(void)
 	TUNABLE_INT_FETCH("net.inet.sctp.tcbhashsize", &SCTP_BASE_SYSCTL(sctp_hashtblsize));
 	TUNABLE_INT_FETCH("net.inet.sctp.pcbhashsize", &SCTP_BASE_SYSCTL(sctp_pcbtblsize));
 	TUNABLE_INT_FETCH("net.inet.sctp.chunkscale", &SCTP_BASE_SYSCTL(sctp_chunkscale));
+	VALIDATE_LOADER_TUNABLE(sctp_hashtblsize, SCTPCTL_TCBHASHSIZE);
+	VALIDATE_LOADER_TUNABLE(sctp_pcbtblsize, SCTPCTL_PCBHASHSIZE);
+	VALIDATE_LOADER_TUNABLE(sctp_chunkscale, SCTPCTL_CHUNKSCALE);
 	SCTP_BASE_INFO(sctp_asochash) = SCTP_HASH_INIT((SCTP_BASE_SYSCTL(sctp_hashtblsize) * 31),
 	    &SCTP_BASE_INFO(hashasocmark));
 	SCTP_BASE_INFO(sctp_ephash) = SCTP_HASH_INIT(SCTP_BASE_SYSCTL(sctp_hashtblsize),
@@ -6747,7 +6720,7 @@ sctp_is_vtag_good(uint32_t tag, uint16_t lport, uint16_t rport, struct timeval *
 			return (false);
 		}
 	}
-	return (!sctp_is_in_timewait(tag, lport, rport, (uint32_t)now->tv_sec));
+	return (!sctp_is_in_timewait(tag, lport, rport, now->tv_sec));
 }
 
 static void

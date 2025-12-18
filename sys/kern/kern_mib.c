@@ -33,8 +33,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)kern_sysctl.c	8.4 (Berkeley) 4/14/94
  */
 
 #include <sys/cdefs.h>
@@ -59,6 +57,8 @@
 #include <sys/sysctl.h>
 #include <sys/systm.h>
 #include <sys/unistd.h>
+
+#include <vm/vm_param.h>
 
 SYSCTL_ROOT_NODE(0, sysctl, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Sysctl internal magic");
@@ -94,20 +94,20 @@ SYSCTL_ROOT_NODE(OID_AUTO, regression, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Regression test MIB");
 #endif
 
-SYSCTL_STRING(_kern, OID_AUTO, ident, CTLFLAG_RD|CTLFLAG_MPSAFE,
-    kern_ident, 0, "Kernel identifier");
+SYSCTL_CONST_STRING(_kern, OID_AUTO, ident, CTLFLAG_RD,
+    kern_ident, "Kernel identifier");
 
-SYSCTL_INT(_kern, KERN_OSREV, osrevision, CTLFLAG_RD|CTLFLAG_CAPRD,
+SYSCTL_INT(_kern, KERN_OSREV, osrevision, CTLFLAG_RD | CTLFLAG_CAPRD,
     SYSCTL_NULL_INT_PTR, BSD, "Operating system revision");
 
-SYSCTL_STRING(_kern, KERN_VERSION, version, CTLFLAG_RD|CTLFLAG_MPSAFE,
-    version, 0, "Kernel version");
+SYSCTL_CONST_STRING(_kern, KERN_VERSION, version, CTLFLAG_RD,
+    version, "Kernel version");
 
-SYSCTL_STRING(_kern, OID_AUTO, compiler_version, CTLFLAG_RD|CTLFLAG_MPSAFE,
-    compiler_version, 0, "Version of compiler used to compile kernel");
+SYSCTL_CONST_STRING(_kern, OID_AUTO, compiler_version, CTLFLAG_RD,
+    compiler_version, "Version of compiler used to compile kernel");
 
-SYSCTL_STRING(_kern, KERN_OSTYPE, ostype, CTLFLAG_RD|CTLFLAG_MPSAFE|
-    CTLFLAG_CAPRD, ostype, 0, "Operating system type");
+SYSCTL_CONST_STRING(_kern, KERN_OSTYPE, ostype, CTLFLAG_RD | CTLFLAG_CAPRD,
+    ostype, "Operating system type");
 
 SYSCTL_INT(_kern, KERN_MAXPROC, maxproc, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
     &maxproc, 0, "Maximum number of processes");
@@ -141,7 +141,7 @@ SYSCTL_INT(_kern, KERN_SAVED_IDS, saved_ids, CTLFLAG_RD|CTLFLAG_CAPRD,
 
 char kernelname[MAXPATHLEN] = PATH_KERNEL;	/* XXX bloat */
 
-SYSCTL_STRING(_kern, KERN_BOOTFILE, bootfile, CTLFLAG_RW | CTLFLAG_MPSAFE,
+SYSCTL_STRING(_kern, KERN_BOOTFILE, bootfile, CTLFLAG_RW,
     kernelname, sizeof kernelname, "Name of kernel file booted");
 
 #ifdef COMPAT_FREEBSD12
@@ -182,10 +182,14 @@ sysctl_kern_arnd(SYSCTL_HANDLER_ARGS)
 {
 	char buf[256];
 	size_t len;
+	int error;
 
 	len = MIN(req->oldlen, sizeof(buf));
 	read_random(buf, len);
-	return (SYSCTL_OUT(req, buf, len));
+
+	error = SYSCTL_OUT(req, buf, len);
+	explicit_bzero(buf, len);
+	return (error);
 }
 
 SYSCTL_PROC(_kern, KERN_ARND, arandom,
@@ -244,7 +248,11 @@ SYSCTL_PROC(_hw, HW_USERMEM, usermem,
 SYSCTL_LONG(_hw, OID_AUTO, availpages, CTLFLAG_RD, &physmem, 0,
     "Amount of physical memory (in pages)");
 
-u_long pagesizes[MAXPAGESIZES] = { PAGE_SIZE };
+#if VM_NRESERVLEVEL > 0
+_Static_assert(MAXPAGESIZES > VM_NRESERVLEVEL, "MAXPAGESIZES is too small");
+#endif
+
+u_long __read_mostly pagesizes[MAXPAGESIZES] = { PAGE_SIZE };
 
 static int
 sysctl_hw_pagesizes(SYSCTL_HANDLER_ARGS)
@@ -325,9 +333,7 @@ SYSCTL_PROC(_hw, HW_MACHINE_ARCH, machine_arch, CTLTYPE_STRING | CTLFLAG_RD |
     "System architecture");
 
 #ifndef MACHINE_ARCHES
-#if defined(COMPAT_FREEBSD32)
-#define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH32
-#elif defined(MACHINE_ARCH64CB) && defined(COMPAT_FREEBSD64)
+#if defined(MACHINE_ARCH64CB) && defined(COMPAT_FREEBSD64)
 #define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH64CB " " MACHINE_ARCH64
 #elif defined(MACHINE_ARCH64CB)
 #define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH64CB
@@ -338,8 +344,25 @@ SYSCTL_PROC(_hw, HW_MACHINE_ARCH, machine_arch, CTLTYPE_STRING | CTLFLAG_RD |
 #endif
 #endif
 
-SYSCTL_STRING(_kern, OID_AUTO, supported_archs, CTLFLAG_RD | CTLFLAG_MPSAFE,
-    MACHINE_ARCHES, 0, "Supported architectures for binaries");
+#ifdef COMPAT_FREEBSD32
+#include <compat/freebsd32/freebsd32_util.h>
+#endif
+
+static int
+sysctl_kern_supported_archs(SYSCTL_HANDLER_ARGS)
+{
+	const char *supported_archs;
+
+	supported_archs =
+#ifdef COMPAT_FREEBSD32
+	    compat_freebsd_32bit ? MACHINE_ARCHES " " MACHINE_ARCH32 :
+#endif
+	    MACHINE_ARCHES;
+	return (SYSCTL_OUT(req, supported_archs, strlen(supported_archs) + 1));
+}
+SYSCTL_PROC(_kern, OID_AUTO, supported_archs, CTLFLAG_RD | CTLFLAG_MPSAFE |
+    CTLFLAG_CAPRD | CTLTYPE_STRING, NULL, 0, sysctl_kern_supported_archs, "A",
+    "Supported architectures for binaries");
 
 static int
 sysctl_hostname(SYSCTL_HANDLER_ARGS)
@@ -461,10 +484,10 @@ SYSCTL_PROC(_kern, KERN_SECURELVL, securelevel,
 
 #ifdef INCLUDE_CONFIG_FILE
 /* Actual kernel configuration options. */
-extern char kernconfstring[];
+extern const char kernconfstring[];
 
-SYSCTL_STRING(_kern, OID_AUTO, conftxt, CTLFLAG_RD | CTLFLAG_MPSAFE,
-    kernconfstring, 0, "Kernel configuration file");
+SYSCTL_CONST_STRING(_kern, OID_AUTO, conftxt, CTLFLAG_RD,
+    kernconfstring, "Kernel configuration file");
 #endif
 
 static int
@@ -644,6 +667,34 @@ FEATURE(compat_freebsd6, "Compatible with FreeBSD 6");
 FEATURE(compat_freebsd7, "Compatible with FreeBSD 7");
 #endif
 
+#ifdef COMPAT_FREEBSD8
+FEATURE(compat_freebsd8, "Compatible with FreeBSD 8");
+#endif
+
+#ifdef COMPAT_FREEBSD9
+FEATURE(compat_freebsd9, "Compatible with FreeBSD 9");
+#endif
+
+#ifdef COMPAT_FREEBSD10
+FEATURE(compat_freebsd10, "Compatible with FreeBSD 10");
+#endif
+
+#ifdef COMPAT_FREEBSD11
+FEATURE(compat_freebsd11, "Compatible with FreeBSD 11");
+#endif
+
+#ifdef COMPAT_FREEBSD12
+FEATURE(compat_freebsd12, "Compatible with FreeBSD 12");
+#endif
+
+#ifdef COMPAT_FREEBSD13
+FEATURE(compat_freebsd13, "Compatible with FreeBSD 13");
+#endif
+
+#ifdef COMPAT_FREEBSD14
+FEATURE(compat_freebsd14, "Compatible with FreeBSD 14");
+#endif
+
 /*
  * This is really cheating.  These actually live in the libc, something
  * which I'm not quite sure is a good idea anyway, but in order for
@@ -732,6 +783,10 @@ sysctl_kern_pid_max(SYSCTL_HANDLER_ARGS)
 SYSCTL_PROC(_kern, OID_AUTO, pid_max, CTLTYPE_INT |
     CTLFLAG_RWTUN | CTLFLAG_NOFETCH | CTLFLAG_MPSAFE,
     0, 0, sysctl_kern_pid_max, "I", "Maximum allowed pid");
+
+SYSCTL_INT(_kern, OID_AUTO, pid_max_limit, CTLFLAG_RD,
+    SYSCTL_NULL_INT_PTR, PID_MAX,
+    "Maximum allowed pid (kern.pid_max) top limit");
 
 #include <sys/bio.h>
 #include <sys/buf.h>

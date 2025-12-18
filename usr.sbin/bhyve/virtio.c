@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/uio.h>
 
@@ -115,10 +114,8 @@ vi_reset_dev(struct virtio_softc *vs)
 	vs->vs_negotiated_caps = 0;
 	vs->vs_curq = 0;
 	/* vs->vs_status = 0; -- redundant */
-#ifdef __amd64__
 	if (vs->vs_isr)
 		pci_lintr_deassert(vs->vs_pi);
-#endif
 	vs->vs_isr = 0;
 	vs->vs_msix_cfg_idx = VIRTIO_MSI_NO_VECTOR;
 }
@@ -165,11 +162,8 @@ vi_intr_init(struct virtio_softc *vs, int barnum, int use_msix)
 	/* Only 1 MSI vector for bhyve */
 	pci_emul_add_msicap(vs->vs_pi, 1);
 
-	/* XXX-MJ missing an implementation for arm64 */
-#ifdef __amd64__
 	/* Legacy interrupts are mandatory for virtio devices */
 	pci_lintr_request(vs->vs_pi);
-#endif
 
 	return (0);
 }
@@ -222,10 +216,15 @@ static inline void
 _vq_record(int i, struct vring_desc *vd, struct vmctx *ctx, struct iovec *iov,
     int n_iov, struct vi_req *reqp)
 {
+	uint32_t len;
+	uint64_t addr;
+
 	if (i >= n_iov)
 		return;
-	iov[i].iov_base = paddr_guest2host(ctx, vd->addr, vd->len);
-	iov[i].iov_len = vd->len;
+	len = atomic_load_32(&vd->len);
+	addr = atomic_load_64(&vd->addr);
+	iov[i].iov_len = len;
+	iov[i].iov_base = paddr_guest2host(ctx, addr, len);
 	if ((vd->flags & VRING_DESC_F_WRITE) == 0)
 		reqp->readable++;
 	else
@@ -657,10 +656,8 @@ bad:
 	case VIRTIO_PCI_ISR:
 		value = vs->vs_isr;
 		vs->vs_isr = 0;		/* a read clears this flag */
-#ifdef __amd64__
 		if (value)
 			pci_lintr_deassert(pi);
-#endif
 		break;
 	case VIRTIO_MSI_CONFIG_VECTOR:
 		value = vs->vs_msix_cfg_idx;

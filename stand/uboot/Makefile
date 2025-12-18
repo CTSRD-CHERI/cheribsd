@@ -1,4 +1,3 @@
-
 LOADER_UFS_SUPPORT?=	yes
 LOADER_CD9660_SUPPORT?=	no
 LOADER_MSDOS_SUPPORT?=	no
@@ -9,6 +8,8 @@ LOADER_TFTP_SUPPORT?=	no
 LOADER_GZIP_SUPPORT?=	no
 LOADER_BZIP2_SUPPORT?=	no
 LOADER_DISK_SUPPORT?=	yes
+
+BINDIR= 	/boot/uboot
 
 .include <bsd.init.mk>
 
@@ -22,7 +23,6 @@ PROG=		ubldr
 .endif
 
 NEWVERSWHAT=	"U-Boot loader" ${MACHINE_ARCH}
-BINDIR= 	/boot/uboot
 INSTALLFLAGS=	-b
 WARNS?=		1
 
@@ -40,16 +40,15 @@ HELP_FILENAME=	loader.help.uboot
 # Always add MI sources
 .include	"${BOOTSRC}/loader.mk"
 
-LDSCRIPT=	${.CURDIR}/arch/${MACHINE_CPUARCH}/ldscript.${MACHINE_CPUARCH}
+LDSCRIPT=	${.CURDIR}/arch/${MACHINE_CPUARCH}/${MACHINE_CPUARCH}.ldscript
 LDFLAGS=	-nostdlib -static -T ${LDSCRIPT}
 LDFLAGS+=	-Wl,-znotext
 
 SRCS+=		main.c vers.c
 SRCS+=		copy.c devicename.c elf_freebsd.c glue.c
-SRCS+=		net.c reboot.c time.c gfx_fb_stub.c
+SRCS+=		net.c reboot.c time.c
 SRCS+=		uboot_console.c uboot_disk.c uboot_fdt.c uboot_module.c
 
-CFLAGS.gfx_fb_stub.c += -I${SRCTOP}/contrib/pnglite -I${SRCTOP}/sys/teken
 CFLAGS.glue.c+=	-DHAVE_MEMCPY -I${SRCTOP}/sys/contrib/zlib
 
 CFLAGS+=	-I${BOOTSRC}/common

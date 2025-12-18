@@ -1,8 +1,10 @@
-
 .include <src.opts.mk>
 
-SUBDIR+=	libpythagoras target
+SUBDIR+=	libpythagoras libdeep libval libval2 target
+TESTS_SUBDIRS+=	rtld_deepbind
 
+SUBDIR_DEPEND_libdeep=	libval2
+SUBDIR_DEPEND_rtld_deepbind=	libval
 SUBDIR_DEPEND_target=	libpythagoras
 
 ATF_TESTS_C=	ld_library_pathfds
@@ -12,10 +14,12 @@ ATF_TESTS_C+=	ld_preload_fds
 SRCS.$t=	$t.c common.c
 .endfor
 
+ATF_TESTS_C+=	dlopen_test
+
 WARNS?=		3
 
 .if ${MACHINE_ABI:Mpurecap}
-SUBDIR+=	cheri
+TESTS_SUBDIRS+=	cheri
 .endif
 
 .include <bsd.test.mk>

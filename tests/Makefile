@@ -1,4 +1,3 @@
-
 .include <src.opts.mk>
 
 PACKAGE= tests
@@ -12,6 +11,7 @@ KYUAFILE= yes
 SUBDIR.${MK_LIB64C}+=	cheri
 SUBDIR+= etc
 SUBDIR+= examples
+SUBDIR+= include
 SUBDIR+= sys
 SUBDIR+= atf_python
 

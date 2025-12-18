@@ -85,7 +85,7 @@ struct sysentvec elf64_freebsd_sysvec_v1 = {
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP | SV_ASLR |
-			    SV_TIMEKEEP | SV_RNG_SEED_VER,
+			    SV_TIMEKEEP | SV_RNG_SEED_VER | SV_SIGSYS,
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = syscallnames,
@@ -126,7 +126,7 @@ struct sysentvec elf64_freebsd_sysvec_v2 = {
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP |
-			    SV_TIMEKEEP | SV_RNG_SEED_VER,
+			    SV_TIMEKEEP | SV_RNG_SEED_VER | SV_SIGSYS,
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = syscallnames,
@@ -144,8 +144,10 @@ struct sysentvec elf64_freebsd_sysvec_v2 = {
 };
 
 static bool ppc64_elfv1_header_match(const struct image_params *params,
+    const Elf64_Ehdr *, const Elf64_Phdr *,
     const int32_t *, const uint32_t *);
 static bool ppc64_elfv2_header_match(const struct image_params *params,
+    const Elf64_Ehdr *, const Elf64_Phdr *,
     const int32_t *, const uint32_t *);
 
 static Elf64_Brandinfo freebsd_brand_info_elfv1 = {
@@ -219,20 +221,20 @@ ppc64_init_sysvecs(void *arg)
 SYSINIT(elf64_sysvec, SI_SUB_EXEC, SI_ORDER_ANY, ppc64_init_sysvecs, NULL);
 
 static bool
-ppc64_elfv1_header_match(const struct image_params *params,
+ppc64_elfv1_header_match(const struct image_params *params __unused,
+    const Elf64_Ehdr *hdr, const Elf64_Phdr *phdr __unused,
     const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
 {
-	const Elf64_Ehdr *hdr = (const Elf64_Ehdr *)params->image_header;
 	int abi = (hdr->e_flags & 3);
 
 	return (abi == 0 || abi == 1);
 }
 
 static bool
-ppc64_elfv2_header_match(const struct image_params *params,
+ppc64_elfv2_header_match(const struct image_params *params __unused,
+    const Elf64_Ehdr *hdr, const Elf64_Phdr *phdr __unused,
     const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
 {
-	const Elf64_Ehdr *hdr = (const Elf64_Ehdr *)params->image_header;
 	int abi = (hdr->e_flags & 3);
 
 	return (abi == 2);
@@ -323,7 +325,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
     int type, int local, elf_lookup_fn lookup)
 {
 	Elf_Addr *where;
-	Elf_Addr addr;
+	uintptr_t addr;
 	Elf_Addr addend, val;
 	Elf_Word rtype, symidx;
 	const Elf_Rela *rela;

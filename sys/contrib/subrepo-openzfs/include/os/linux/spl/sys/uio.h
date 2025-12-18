@@ -33,6 +33,12 @@
 #include <linux/bio.h>
 #include <asm/uaccess.h>
 #include <sys/types.h>
+#include <sys/string.h>
+
+/*
+ * uio_extflg: extended flags
+ */
+#define	UIO_DIRECT	0x0001 /* Direct I/O request */
 
 #if defined(HAVE_VFS_IOV_ITER) && defined(HAVE_FAULT_IN_IOV_ITER_READABLE)
 #define	iov_iter_fault_in_readable(a, b)	fault_in_iov_iter_readable(a, b)
@@ -54,6 +60,14 @@ typedef enum zfs_uio_seg {
 #endif
 } zfs_uio_seg_t;
 
+/*
+ * This structures is used when doing Direct I/O.
+ */
+typedef struct {
+	struct page	**pages;	/* Mapped pages */
+	long 		npages;		/* Number of mapped pages */
+} zfs_uio_dio_t;
+
 typedef struct zfs_uio {
 	union {
 		const struct iovec	*uio_iov;
@@ -62,24 +76,18 @@ typedef struct zfs_uio {
 		struct iov_iter		*uio_iter;
 #endif
 	};
-	int		uio_iovcnt;
-	offset_t	uio_loffset;
-	zfs_uio_seg_t	uio_segflg;
+	int		uio_iovcnt;	/* Number of iovecs */
+	offset_t	uio_soffset;	/* Starting logical offset */
+	offset_t	uio_loffset;	/* Current logical offset */
+	zfs_uio_seg_t	uio_segflg;	/* Segment type */
 	boolean_t	uio_fault_disable;
-	uint16_t	uio_fmode;
-	uint16_t	uio_extflg;
-	ssize_t		uio_resid;
-
-	size_t		uio_skip;
+	uint16_t	uio_fmode;	/* Access mode (unused) */
+	uint16_t	uio_extflg;	/* Extra flags (UIO_DIRECT) */
+	ssize_t		uio_resid;	/* Residual unprocessed bytes */
+	size_t		uio_skip;	/* Skipped bytes in current iovec */
+	zfs_uio_dio_t	uio_dio;	/* Direct I/O user pages */
 
 	struct request	*rq;
-
-	/*
-	 * Used for saving rq_for_each_segment() state between calls
-	 * to zfs_uiomove_bvec_rq().
-	 */
-	struct req_iterator iter;
-	struct bio_vec bv;
 } zfs_uio_t;
 
 
@@ -90,6 +98,7 @@ typedef struct zfs_uio {
 #define	zfs_uio_iovlen(u, idx)		(u)->uio_iov[(idx)].iov_len
 #define	zfs_uio_iovbase(u, idx)		(u)->uio_iov[(idx)].iov_base
 #define	zfs_uio_fault_disable(u, set)	(u)->uio_fault_disable = set
+#define	zfs_uio_soffset(u)		(u)->uio_soffset
 #define	zfs_uio_rlimit_fsize(z, u)	(0)
 #define	zfs_uio_fault_move(p, n, rw, u)	zfs_uiomove((p), (n), (rw), (u))
 
@@ -102,7 +111,14 @@ zfs_uio_setoffset(zfs_uio_t *uio, offset_t off)
 }
 
 static inline void
-zfs_uio_advance(zfs_uio_t *uio, size_t size)
+zfs_uio_setsoffset(zfs_uio_t *uio, offset_t off)
+{
+	ASSERT3U(zfs_uio_offset(uio), ==, off);
+	zfs_uio_soffset(uio) = off;
+}
+
+static inline void
+zfs_uio_advance(zfs_uio_t *uio, ssize_t size)
 {
 	uio->uio_resid -= size;
 	uio->uio_loffset += size;
@@ -124,6 +140,8 @@ zfs_uio_iovec_init(zfs_uio_t *uio, const struct iovec *iov,
 	uio->uio_extflg = 0;
 	uio->uio_resid = resid;
 	uio->uio_skip = skip;
+	uio->uio_soffset = uio->uio_loffset;
+	memset(&uio->uio_dio, 0, sizeof (zfs_uio_dio_t));
 }
 
 static inline void
@@ -138,7 +156,6 @@ zfs_uio_bvec_init(zfs_uio_t *uio, struct bio *bio, struct request *rq)
 	} else {
 		uio->uio_bvec = NULL;
 		uio->uio_iovcnt = 0;
-		memset(&uio->iter, 0, sizeof (uio->iter));
 	}
 
 	uio->uio_loffset = io_offset(bio, rq);
@@ -154,6 +171,8 @@ zfs_uio_bvec_init(zfs_uio_t *uio, struct bio *bio, struct request *rq)
 	}
 
 	uio->rq = rq;
+	uio->uio_soffset = uio->uio_loffset;
+	memset(&uio->uio_dio, 0, sizeof (zfs_uio_dio_t));
 }
 
 #if defined(HAVE_VFS_IOV_ITER)
@@ -170,7 +189,21 @@ zfs_uio_iov_iter_init(zfs_uio_t *uio, struct iov_iter *iter, offset_t offset,
 	uio->uio_extflg = 0;
 	uio->uio_resid = resid;
 	uio->uio_skip = skip;
+	uio->uio_soffset = uio->uio_loffset;
+	memset(&uio->uio_dio, 0, sizeof (zfs_uio_dio_t));
 }
+#endif /* HAVE_VFS_IOV_ITER */
+
+#if defined(HAVE_ITER_IOV)
+#define	zfs_uio_iter_iov(iter)	iter_iov((iter))
+#else
+#define	zfs_uio_iter_iov(iter)	(iter)->iov
+#endif
+
+#if defined(HAVE_IOV_ITER_TYPE)
+#define	zfs_uio_iov_iter_type(iter)	iov_iter_type((iter))
+#else
+#define	zfs_uio_iov_iter_type(iter)	(iter)->type
 #endif
 
 #endif /* SPL_UIO_H */

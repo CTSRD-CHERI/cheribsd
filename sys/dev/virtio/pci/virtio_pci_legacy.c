@@ -28,7 +28,6 @@
 
 /* Driver for the legacy VirtIO PCI interface. */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -86,8 +85,8 @@ static int	vtpci_legacy_register_vq_msix(device_t, int idx,
 		    struct vtpci_interrupt *);
 
 static uint64_t	vtpci_legacy_negotiate_features(device_t, uint64_t);
-static int	vtpci_legacy_with_feature(device_t, uint64_t);
-static int	vtpci_legacy_alloc_virtqueues(device_t, int, int,
+static bool	vtpci_legacy_with_feature(device_t, uint64_t);
+static int	vtpci_legacy_alloc_virtqueues(device_t, int,
 		    struct vq_alloc_info *);
 static int	vtpci_legacy_setup_interrupts(device_t, enum intr_type);
 static void	vtpci_legacy_stop(device_t);
@@ -191,7 +190,6 @@ DRIVER_MODULE(virtio_pci_legacy, pci, vtpci_legacy_driver, 0, 0);
 static int
 vtpci_legacy_probe(device_t dev)
 {
-	char desc[64];
 	const char *name;
 
 	if (pci_get_vendor(dev) != VIRTIO_PCI_VENDORID)
@@ -208,8 +206,7 @@ vtpci_legacy_probe(device_t dev)
 	if (name == NULL)
 		name = "Unknown";
 
-	snprintf(desc, sizeof(desc), "VirtIO PCI (legacy) %s adapter", name);
-	device_set_desc_copy(dev, desc);
+	device_set_descf(dev, "VirtIO PCI (legacy) %s adapter", name);
 
 	/* Prefer transitional modern VirtIO PCI. */
 	return (BUS_PROBE_LOW_PRIORITY);
@@ -379,7 +376,7 @@ vtpci_legacy_negotiate_features(device_t dev, uint64_t child_features)
 	return (features);
 }
 
-static int
+static bool
 vtpci_legacy_with_feature(device_t dev, uint64_t feature)
 {
 	struct vtpci_legacy_softc *sc;
@@ -390,7 +387,7 @@ vtpci_legacy_with_feature(device_t dev, uint64_t feature)
 }
 
 static int
-vtpci_legacy_alloc_virtqueues(device_t dev, int flags, int nvqs,
+vtpci_legacy_alloc_virtqueues(device_t dev, int nvqs,
     struct vq_alloc_info *vq_info)
 {
 	struct vtpci_legacy_softc *sc;
@@ -399,7 +396,7 @@ vtpci_legacy_alloc_virtqueues(device_t dev, int flags, int nvqs,
 	sc = device_get_softc(dev);
 	cn = &sc->vtpci_common;
 
-	return (vtpci_alloc_virtqueues(cn, flags, nvqs, vq_info));
+	return (vtpci_alloc_virtqueues(cn, nvqs, vq_info));
 }
 
 static int

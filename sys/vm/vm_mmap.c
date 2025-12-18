@@ -39,8 +39,6 @@
  * SUCH DAMAGE.
  *
  * from: Utah $Hdr: vm_mmap.c 1.6 91/10/21$
- *
- *	@(#)vm_mmap.c	8.4 (Berkeley) 1/12/94
  */
 
 /*
@@ -155,13 +153,10 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 	register_t perms, cap_prot;
 
 	/*
-	 * Return the original capability when MAP_CHERI_NOSETBOUNDS is set.
-	 *
-	 * NB: This means no permission changes.
-	 * The assumption is that the larger capability has the correct
-	 * permissions and we're only interested in adjusting page mappings.
+	 * If we're updating the backing store within an existing
+	 * reservation, just return the capability we were passed.
 	 */
-	if (mrp->mr_flags & MAP_CHERI_NOSETBOUNDS)
+	if ((mrp->mr_kern_flags & MAP_RESERVATION_CREATE) == 0)
 		return ((uintcap_t)mrp->mr_source_cap);
 
 	/*
@@ -220,32 +215,6 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 }
 #endif
 
-#ifndef _SYS_SYSPROTO_H_
-struct sbrk_args {
-	int incr;
-};
-#endif
-
-int
-sys_sbrk(struct thread *td, struct sbrk_args *uap)
-{
-	/* Not yet implemented */
-	return (EOPNOTSUPP);
-}
-
-#ifndef _SYS_SYSPROTO_H_
-struct sstk_args {
-	int incr;
-};
-#endif
-
-int
-sys_sstk(struct thread *td, struct sstk_args *uap)
-{
-	/* Not yet implemented */
-	return (EOPNOTSUPP);
-}
-
 #if defined(COMPAT_43)
 int
 ogetpagesize(struct thread *td, struct ogetpagesize_args *uap)
@@ -262,6 +231,35 @@ vm_wxcheck(struct proc *p, char *call)
 	if (log_wxrequests)
 		log(LOG_NOTICE, "%s(%d): W^X requested from %s\n",
 		    p->p_comm, p->p_pid, call);
+	return (0);
+}
+
+static inline int
+vm_prot2vmprot(vm_prot_t *prot, const char *func, const char *protname)
+{
+	vm_prot_t vm_prot;
+
+	KASSERT((*prot & ~_PROT_ALL) == 0, ("invalid bits in %s", protname));
+
+	if ((*prot & PROT_CAP) != 0 &&
+	    (*prot & (PROT_READ | PROT_WRITE)) == 0) {
+		SYSERRCAUSE(
+		    "%s: PROT_CAP in %s without PROT_READ or PROT_WRITE",
+		    func, protname);
+		return (ENOTSUP);
+	}
+
+	vm_prot = (*prot & ~_PROT_CAP);
+	if ((*prot & PROT_CAP) != 0) {
+		if ((*prot & PROT_READ) != 0)
+			vm_prot |= VM_PROT_READ_CAP;
+		if ((*prot & PROT_WRITE) != 0)
+			vm_prot |= VM_PROT_WRITE_CAP;
+	}
+	if ((*prot & PROT_NO_CAP) != 0)
+		vm_prot |= VM_PROT_NO_IMPLY_CAP;
+
+	*prot = vm_prot;
 	return (0);
 }
 
@@ -337,6 +335,8 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	if (cheri_gettag(uap->addr)) {
 		if ((flags & MAP_FIXED) == 0)
 			return (EPROT);
+		else if ((flags & MAP_STACK) != 0)
+			return (ENOMEM);
 		else if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM))
 			source_cap = uap->addr;
 		else {
@@ -355,12 +355,6 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 
 		if (flags & MAP_FIXED)
 			flags |= MAP_EXCL;
-
-		if (flags & MAP_CHERI_NOSETBOUNDS) {
-			SYSERRCAUSE("MAP_CHERI_NOSETBOUNDS without a valid "
-			    "addr capability");
-			return (EINVAL);
-		}
 
 		source_cap = userspace_root_cap;
 	}
@@ -398,33 +392,6 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		return (EPROT);
 	}
 
-	if ((flags & MAP_ALIGNMENT_MASK) == MAP_ALIGNED_SUPER) {
-#if VM_NRESERVLEVEL > 0
-		/*
-		 * pmap_align_superpage() is a no-op for allocations
-		 * less than a super page so request data alignment
-		 * in that case.
-		 *
-		 * In practice this is a no-op as super-pages are
-		 * precisely representable.
-		 */
-		if (uap->len < (1UL << (VM_LEVEL_0_ORDER + PAGE_SHIFT)) &&
-		    CHERI_REPRESENTABLE_ALIGNMENT(uap->len) > (1UL << PAGE_SHIFT)) {
-			flags &= ~MAP_ALIGNMENT_MASK;
-			flags |= MAP_ALIGNED_CHERI;
-		}
-#endif
-	}
-	else if ((flags & MAP_ALIGNMENT_MASK) != MAP_ALIGNED(0) &&
-		 (flags & MAP_ALIGNMENT_MASK) != MAP_ALIGNED_CHERI &&
-		 (flags & MAP_ALIGNMENT_MASK) != MAP_ALIGNED_CHERI_SEAL) {
-		/* Reject nonsensical sub-page alignment requests */
-		if ((flags >> MAP_ALIGNMENT_SHIFT) < PAGE_SHIFT) {
-			SYSERRCAUSE("subpage alignment request");
-			return (EINVAL);
-		}
-	}
-
 	/*
 	 * NOTE: If this architecture requires an alignment constraint, it is
 	 * set at this point.  A simple assert is not easy to contruct...
@@ -454,11 +421,11 @@ kern_mmap_maxprot(struct proc *p, int prot)
 #endif
 	if ((p->p_flag2 & P2_PROTMAX_DISABLE) != 0 ||
 	    (p->p_fctl0 & NT_FREEBSD_FCTL_PROTMAX_DISABLE) != 0)
-		return (_PROT_ALL);
+		return (PROT_READ | PROT_WRITE | PROT_EXEC);
 	if (((p->p_flag2 & P2_PROTMAX_ENABLE) != 0 || imply_prot_max) &&
 	    prot != PROT_NONE)
 		 return (prot);
-	return (_PROT_ALL);
+	return (PROT_READ | PROT_WRITE | PROT_EXEC);
 }
 
 int
@@ -472,16 +439,14 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	vm_pointer_t addr, orig_addr;
 	vm_offset_t max_addr;
 	vm_size_t len, pageoff, size;
-	vm_prot_t cap_maxprot;
-	int align, error, fd, flags, max_prot, prot;
+	vm_prot_t cap_maxprot, cap_prot, max_prot, prot;
+	int align, error, fd, flags;
 	cap_rights_t rights;
 	mmap_check_fp_fn check_fp_fn;
-	int cap_prot;
 
 	orig_addr = addr = mrp->mr_hint;
 	max_addr = mrp->mr_max_addr;
 	len = mrp->mr_len;
-	prot = mrp->mr_prot;
 	flags = mrp->mr_flags;
 	fd = mrp->mr_fd;
 	pos = mrp->mr_pos;
@@ -489,24 +454,38 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 
 	p = td->td_proc;
 
-	if ((prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))) != 0) {
+	if ((mrp->mr_prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))) != 0) {
 		SYSERRCAUSE(
 		    "%s: invalid bits in prot %x", __func__,
-		    (prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))));
+		    (mrp->mr_prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))));
 		return (EINVAL);
 	}
-	max_prot = PROT_MAX_EXTRACT(prot);
-	prot = PROT_EXTRACT(prot);
-	if (max_prot != 0 && (max_prot & prot) != prot) {
-		SYSERRCAUSE(
-		    "%s: requested page permissions exceed requested maximum",
-		    __func__);
-		return (ENOTSUP);
+	max_prot = PROT_MAX_EXTRACT(mrp->mr_prot);
+	prot = PROT_EXTRACT(mrp->mr_prot);
+	/* Ensure max_prot is a superset of prot if non-zero */
+	if (max_prot != 0) {
+		/*
+		 * If prot contains explicit capability permissions then
+		 * max_prot must as well.  Add PROT_NO_CAP to both to allow
+		 * a simple check that max_prot is a superset of prot.
+		 * Adding to max_prot allows max_prot to contain PROT_CAP
+		 * while prot contains only PROT_NO_CAP.  Adding to prot
+		 # ensures that prot doesn't later gain implied permissions
+		 * while max_prot has PROT_NO_CAP and not PROT_CAP.
+		 */
+		if ((prot & _PROT_CAP) != 0 || (max_prot & _PROT_CAP) != 0) {
+			prot |= PROT_NO_CAP;
+			max_prot |= PROT_NO_CAP;
+		}
+		if ((max_prot & prot) != prot) {
+			SYSERRCAUSE("%s: requested page permissions exceed "
+			    "requested maximum", __func__);
+			return (ENOTSUP);
+		}
 	}
 	if ((prot & (PROT_WRITE | PROT_EXEC)) == (PROT_WRITE | PROT_EXEC) &&
 	    (error = vm_wxcheck(p, "mmap")))
 		return (error);
-
 	/*
 	 * Always honor PROT_MAX if set.  If not, default to all
 	 * permissions unless we're implying maximum permissions.
@@ -524,8 +503,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	/*
 	 * Ignore old flags that used to be defined but did not do anything.
 	 */
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		flags &= ~(MAP_RESERVED0020 | MAP_RESERVED0040);
+	flags &= ~(MAP_RESERVED0020 | MAP_RESERVED0040);
 
 	/*
 	 * Enforce the constraints.
@@ -568,8 +546,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	unsigned int extra_flags =
 	    (flags & ~(MAP_SHARED | MAP_PRIVATE | MAP_FIXED | MAP_HASSEMAPHORE |
 	    MAP_STACK | MAP_NOSYNC | MAP_ANON | MAP_EXCL | MAP_NOCORE |
-	    MAP_PREFAULT_READ | MAP_GUARD | MAP_32BIT | MAP_CHERI_NOSETBOUNDS |
-	    MAP_ALIGNMENT_MASK));
+	    MAP_PREFAULT_READ | MAP_GUARD | MAP_32BIT | MAP_ALIGNMENT_MASK));
 	if (extra_flags != 0) {
 		SYSERRCAUSE("%s: Unhandled flag(s) 0x%x", __func__,
 		    extra_flags);
@@ -584,19 +561,31 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		SYSERRCAUSE("%s: both MAP_SHARED and MAP_PRIVATE", __func__);
 		return (EINVAL);
 	}
-	if (prot != PROT_NONE &&
-	    (prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC)) != 0) {
+	if (prot != PROT_NONE && (prot & ~_PROT_ALL) != 0) {
 		SYSERRCAUSE("%s: Unexpected protections 0x%x", __func__,
-		    (prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC)));
+		    (prot & ~_PROT_ALL));
 		return (EINVAL);
 	}
-	if ((flags & MAP_GUARD) != 0 && (prot != PROT_NONE || fd != -1 ||
+	if ((flags & MAP_GUARD) != 0 &&
+	    ((prot != PROT_NONE && prot != PROT_NO_CAP) || fd != -1 ||
 	    pos != 0 || (flags & ~(MAP_FIXED | MAP_GUARD | MAP_EXCL |
-	    MAP_CHERI_NOSETBOUNDS | MAP_RESERVATION_CREATE |
+	    MAP_RESERVATION_CREATE |
 	    MAP_32BIT | MAP_ALIGNMENT_MASK)) != 0)) {
 		SYSERRCAUSE("%s: Invalid arguments with MAP_GUARD", __func__);
 		return (EINVAL);
 	}
+	error = vm_prot2vmprot(&prot, "mmap", "prot");
+	if (error)
+		return (error);
+	error = vm_prot2vmprot(&max_prot, "mmap", "max prot");
+	if (error)
+		return (error);
+	error = vm_prot2vmprot(&cap_prot, "mmap", "cap_prot");
+	if (error)
+		return (error);
+	/*
+	 * NB: Beyond this point, all prot flags are normalized to VM_PROT_*.
+	 */
 
 	/*
 	 * Align the file position to a page boundary,
@@ -612,54 +601,8 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	if (len > size)
 		return (ENOMEM);
 
-	align = flags & MAP_ALIGNMENT_MASK;
-#if !__has_feature(capabilities)
-	/* In the non-CHERI case, remove the alignment request. */
-	if (align == MAP_ALIGNED_CHERI || align == MAP_ALIGNED_CHERI_SEAL) {
-		flags &= ~MAP_ALIGNMENT_MASK;
-		align = 0;
-	}
-#else /* __has_feature(capabilities) */
-	/*
-	 * Convert MAP_ALIGNED_CHERI(_SEAL) into explicit alignment
-	 * requests and pad lengths.  The combination of alignment (via
-	 * the updated, explicit alignment flags) and padding is required
-	 * for any request that would otherwise be unrepresentable due
-	 * to compressed capability bounds.
-	 *
-	 * XXX: With CHERI Concentrate, there is no difference in
-	 * precision between sealed and unsealed capabilities.  We
-	 * retain the duplicate code paths in case other otype tradeoffs
-	 * are made at a later date.
-	 */
-	if (align == MAP_ALIGNED_CHERI) {
-		flags &= ~MAP_ALIGNMENT_MASK;
-		if (CHERI_REPRESENTABLE_ALIGNMENT(size) > PAGE_SIZE) {
-			flags |= MAP_ALIGNED(CHERI_ALIGN_SHIFT(size));
-
-			if (size != CHERI_REPRESENTABLE_LENGTH(size))
-				size = CHERI_REPRESENTABLE_LENGTH(size);
-
-			if (CHERI_ALIGN_MASK(size) != 0)
-				addr_mask = CHERI_ALIGN_MASK(size);
-		}
-		align = flags & MAP_ALIGNMENT_MASK;
-	} else if (align == MAP_ALIGNED_CHERI_SEAL) {
-		flags &= ~MAP_ALIGNMENT_MASK;
-		if (CHERI_SEALABLE_ALIGNMENT(size) > (1UL << PAGE_SHIFT)) {
-			flags |= MAP_ALIGNED(CHERI_SEAL_ALIGN_SHIFT(size));
-
-			if (size != CHERI_SEALABLE_LENGTH(size))
-				size = CHERI_SEALABLE_LENGTH(size);
-
-			if (CHERI_SEAL_ALIGN_MASK(size) != 0)
-				addr_mask = CHERI_SEAL_ALIGN_MASK(size);
-		}
-		align = flags & MAP_ALIGNMENT_MASK;
-	}
-#endif
-
 	/* Ensure alignment is at least a page and fits in a pointer. */
+	align = flags & MAP_ALIGNMENT_MASK;
 	if (align != 0 && align != MAP_ALIGNED_SUPER &&
 	    (align >> MAP_ALIGNMENT_SHIFT >= sizeof(void *) * NBBY ||
 	    align >> MAP_ALIGNMENT_SHIFT < PAGE_SHIFT)) {
@@ -754,8 +697,6 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	} else if ((flags & MAP_ANON) != 0) {
 		/*
 		 * Mapping blank space is trivial.
-		 *
-		 * This relies on VM_PROT_* matching PROT_*.
 		 */
 		error = vm_mmap_object(&vms->vm_map, &addr, max_addr, size,
 		    VM_PROT_ADD_CAP(prot), VM_PROT_ADD_CAP(max_prot), flags,
@@ -768,13 +709,13 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		 * with maxprot later.
 		 */
 		cap_rights_init_one(&rights, CAP_MMAP);
-		if (cap_prot & PROT_READ)
+		if (cap_prot & VM_PROT_READ)
 			cap_rights_set_one(&rights, CAP_MMAP_R);
 		if ((flags & MAP_SHARED) != 0) {
-			if (cap_prot & PROT_WRITE)
+			if (cap_prot & VM_PROT_WRITE)
 				cap_rights_set_one(&rights, CAP_MMAP_W);
 		}
-		if (cap_prot & PROT_EXEC)
+		if (cap_prot & VM_PROT_EXECUTE)
 			cap_rights_set_one(&rights, CAP_MMAP_X);
 		error = fget_mmap(td, fd, &rights, &cap_maxprot, &fp);
 		if (error != 0)
@@ -784,6 +725,8 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 			error = EINVAL;
 			goto done;
 		}
+		if ((cap_prot & (VM_PROT_READ_CAP | VM_PROT_WRITE_CAP)) != 0)
+			cap_maxprot = VM_PROT_ADD_CAP(cap_maxprot);
 		if ((cap_prot & cap_maxprot) != cap_prot) {
 			SYSERRCAUSE("%s: unable to map file with "
 			    "requested permissions", __func__);
@@ -798,7 +741,6 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		}
 		if (fp->f_ops == &shm_ops && shm_largepage(fp->f_data))
 			addr = orig_addr;
-		/* This relies on VM_PROT_* matching PROT_*. */
 		error = fo_mmap(fp, &vms->vm_map, &addr, max_addr, size,
 		    prot, max_prot, flags, pos, td);
 	}
@@ -1083,18 +1025,19 @@ sys_mprotect(struct thread *td, struct mprotect_args *uap)
 }
 
 int
-kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot,
+kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int userprot,
     int flags)
 {
 	vm_offset_t addr;
 	vm_size_t pageoff;
-	int vm_error, max_prot;
+	vm_prot_t max_prot, prot;
+	int error, vm_error;
 
 	addr = addr0;
-	if ((prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))) != 0)
+	if ((userprot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))) != 0)
 		return (EINVAL);
-	max_prot = PROT_MAX_EXTRACT(prot);
-	prot = PROT_EXTRACT(prot);
+	max_prot = PROT_MAX_EXTRACT(userprot);
+	prot = PROT_EXTRACT(userprot);
 	pageoff = (addr & PAGE_MASK);
 	addr -= pageoff;
 	size += pageoff;
@@ -1114,10 +1057,22 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot,
 
 	flags |= VM_MAP_PROTECT_SET_PROT | VM_MAP_PROTECT_KEEP_CAP;
 	if (max_prot != 0) {
+		/* see comment in kern_mmap() */
+		if ((prot & _PROT_CAP) != 0 || (max_prot & _PROT_CAP) != 0) {
+			prot |= PROT_NO_CAP;
+			max_prot |= PROT_NO_CAP;
+		}
 		if ((max_prot & prot) != prot)
 			return (ENOTSUP);
 		flags |= VM_MAP_PROTECT_SET_MAXPROT;
 	}
+	error = vm_prot2vmprot(&prot, "mprotect", "prot");
+	if (error)
+		return (error);
+	error = vm_prot2vmprot(&max_prot, "mprotect", "max prot");
+	if (error)
+		return (error);
+
 	vm_error = vm_map_protect(&td->td_proc->p_vmspace->vm_map,
 	    addr, addr + size, prot, max_prot, flags);
 
@@ -1913,7 +1868,7 @@ vm_mmap_cdev(struct thread *td, vm_size_t objsize, vm_prot_t *protp,
 	if (dsw->d_flags & D_MMAP_ANON) {
 		*objp = NULL;
 		*foff = 0;
-		*maxprotp = VM_PROT_ALL;
+		*maxprotp = VM_PROT_ADD_CAP(VM_PROT_ALL);
 		*protp = VM_PROT_ADD_CAP(*protp);
 		*flagsp |= MAP_ANON;
 		return (0);
@@ -1951,6 +1906,9 @@ vm_mmap_cdev(struct thread *td, vm_size_t objsize, vm_prot_t *protp,
 	    td->td_ucred);
 	if (obj == NULL)
 		return (EINVAL);
+	VM_OBJECT_WLOCK(obj);
+	vm_object_set_flag(obj, OBJ_CDEVH);
+	VM_OBJECT_WUNLOCK(obj);
 	*objp = obj;
 	*flagsp = flags;
 	return (0);

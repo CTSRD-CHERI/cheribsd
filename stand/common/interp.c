@@ -24,7 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 /*
  * Simple commandline interpreter, toplevel and misc.
  *
@@ -34,6 +33,10 @@
 #include <stand.h>
 #include <string.h>
 #include "bootstrap.h"
+
+#ifdef LOADER_VERIEXEC
+#include <verify_file.h>
+#endif
 
 #define	MAXARGS	20			/* maximum number of arguments allowed */
 
@@ -57,6 +60,7 @@ interact(void)
 	 * we need to switch interpreters.
 	 */
 	interp_identifier = bootprog_interp;
+	interp_preinit();
 	interp_init();
 
 	printf("\n");
@@ -79,6 +83,10 @@ interact(void)
 		input[0] = '\0';
 		interp_emit_prompt();
 		ngets(input, sizeof(input));
+#ifdef LOADER_VERIEXEC
+		/* some settings should be restritcted */
+		ve_status_set(-1, VE_UNVERIFIED_OK);
+#endif
 		interp_run(input);
 	}
 }
@@ -182,7 +190,9 @@ interp_builtin_cmd(int argc, char *argv[])
 
 	cmd = interp_lookup_cmd(argv[0]);
 	if (cmd != NULL && cmd->c_fn) {
+		TSENTER2(argv[0]);
 		result = cmd->c_fn(argc, argv);
+		TSEXIT();
 	} else {
 		command_errmsg = "unknown command";
 	}

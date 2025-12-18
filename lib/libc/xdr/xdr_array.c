@@ -45,11 +45,6 @@
  * CHERI CHANGES END
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char *sccsid2 = "@(#)xdr_array.c 1.10 87/08/11 Copyr 1984 Sun Micro";
-static char *sccsid = "@(#)xdr_array.c	2.1 88/07/29 4.0 RPCSRC";
-#endif
-#include <sys/cdefs.h>
 /*
  * xdr_array.c, Generic XDR routines implementation.
  *

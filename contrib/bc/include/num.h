@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018-2023 Gavin D. Howard and contributors.
+ * Copyright (c) 2018-2024 Gavin D. Howard and contributors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -211,9 +211,9 @@ struct BcRNG;
 #define BC_NUM_KARATSUBA_ALLOCS (6)
 
 /**
- * Rounds @a s (scale) up to the next power of BC_BASE_DIGS. This also check for
- * overflow and gives a fatal error if that happens because we just can't go
- * over the limits we have imposed.
+ * Rounds @a s (scale) up to the next power of BC_BASE_DIGS. This will also
+ * check for overflow and gives a fatal error if that happens because we just
+ * can't go over the limits we have imposed.
  * @param s  The scale to round up.
  * @return   @a s rounded up to the next power of BC_BASE_DIGS.
  */

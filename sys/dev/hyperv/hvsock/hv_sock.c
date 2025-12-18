@@ -26,7 +26,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/domain.h>
@@ -479,7 +478,7 @@ hvs_trans_listen(struct socket *so, int backlog, struct thread *td)
 }
 
 int
-hvs_trans_accept(struct socket *so, struct sockaddr **nam)
+hvs_trans_accept(struct socket *so, struct sockaddr *sa)
 {
 	struct hvs_pcb *pcb = so2hvspcb(so);
 
@@ -489,10 +488,9 @@ hvs_trans_accept(struct socket *so, struct sockaddr **nam)
 	if (pcb == NULL)
 		return (EINVAL);
 
-	*nam = sodupsockaddr((struct sockaddr *) &pcb->remote_addr,
-	    M_NOWAIT);
+	memcpy(sa, &pcb->remote_addr, pcb->remote_addr.sa_len);
 
-	return ((*nam == NULL) ? ENOMEM : 0);
+	return (0);
 }
 
 int
@@ -762,7 +760,7 @@ out:
 	SOCKBUF_UNLOCK(sb);
 	SOCK_IO_RECV_UNLOCK(so);
 
-	/* We recieved a FIN in this call */
+	/* We received a FIN in this call */
 	if (so->so_error == ESHUTDOWN) {
 		if (so->so_snd.sb_state & SBS_CANTSENDMORE) {
 			/* Send has already closed */
@@ -878,7 +876,7 @@ out:
 }
 
 int
-hvs_trans_peeraddr(struct socket *so, struct sockaddr **nam)
+hvs_trans_peeraddr(struct socket *so, struct sockaddr *sa)
 {
 	struct hvs_pcb *pcb = so2hvspcb(so);
 
@@ -888,13 +886,13 @@ hvs_trans_peeraddr(struct socket *so, struct sockaddr **nam)
 	if (pcb == NULL)
 		return (EINVAL);
 
-	*nam = sodupsockaddr((struct sockaddr *) &pcb->remote_addr, M_NOWAIT);
+	memcpy(sa, &pcb->remote_addr, pcb->remote_addr.sa_len);
 
-	return ((*nam == NULL)? ENOMEM : 0);
+	return (0);
 }
 
 int
-hvs_trans_sockaddr(struct socket *so, struct sockaddr **nam)
+hvs_trans_sockaddr(struct socket *so, struct sockaddr *sa)
 {
 	struct hvs_pcb *pcb = so2hvspcb(so);
 
@@ -904,9 +902,9 @@ hvs_trans_sockaddr(struct socket *so, struct sockaddr **nam)
 	if (pcb == NULL)
 		return (EINVAL);
 
-	*nam = sodupsockaddr((struct sockaddr *) &pcb->local_addr, M_NOWAIT);
+	memcpy(sa, &pcb->local_addr, pcb->local_addr.sa_len);
 
-	return ((*nam == NULL)? ENOMEM : 0);
+	return (0);
 }
 
 void
@@ -980,43 +978,43 @@ hvs_trans_abort(struct socket *so)
 }
 
 int
-hvs_trans_shutdown(struct socket *so)
+hvs_trans_shutdown(struct socket *so, enum shutdown_how how)
 {
 	struct hvs_pcb *pcb = so2hvspcb(so);
-	struct sockbuf *sb;
 
 	HVSOCK_DBG(HVSOCK_DBG_VERBOSE,
 	    "%s: HyperV Socket hvs_trans_shutdown called\n", __func__);
 
+	SOCK_LOCK(so);
+	if ((so->so_state &
+	    (SS_ISCONNECTED | SS_ISCONNECTING | SS_ISDISCONNECTING)) == 0) {
+		SOCK_UNLOCK(so);
+		return (ENOTCONN);
+	}
+	SOCK_UNLOCK(so);
+
 	if (pcb == NULL)
 		return (EINVAL);
 
-	/*
-	 * Only get called with the shutdown method is SHUT_WR or
-	 * SHUT_RDWR.
-	 * When the method is SHUT_RD or SHUT_RDWR, the caller
-	 * already set the SBS_CANTRCVMORE on receive side socket
-	 * buffer.
-	 */
-	if ((so->so_rcv.sb_state & SBS_CANTRCVMORE) == 0) {
-		/*
-		 * SHUT_WR only case.
-		 * Receive side is still open. Just close
-		 * the send side.
-		 */
-		socantsendmore(so);
-	} else {
-		/* SHUT_RDWR case */
+	switch (how) {
+	case SHUT_RD:
+		socantrcvmore(so);
+		break;
+	case SHUT_RDWR:
+		socantrcvmore(so);
 		if (so->so_state & SS_ISCONNECTED) {
 			/* Send a FIN to peer */
-			sb = &so->so_snd;
-			SOCKBUF_LOCK(sb);
-			(void) hvsock_send_data(pcb->chan, NULL, 0, sb);
-			SOCKBUF_UNLOCK(sb);
-
+			SOCK_SENDBUF_LOCK(so);
+			(void) hvsock_send_data(pcb->chan, NULL, 0,
+			    &so->so_snd);
+			SOCK_SENDBUF_UNLOCK(so);
 			soisdisconnecting(so);
 		}
+		/* FALLTHROUGH */
+	case SHUT_WR:
+		socantsendmore(so);
 	}
+	wakeup(&so->so_timeo);
 
 	return (0);
 }

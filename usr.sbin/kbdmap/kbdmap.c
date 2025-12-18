@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/sysctl.h>
@@ -399,8 +398,7 @@ show_dialog(struct keymap **km_sorted, int num_keymaps)
 	case BSDDIALOG_OK:
 		for (i = 0; i < num_keymaps; i++) {
 			if (listitems[i].on) {
-				printf("ici\n");
-				if (!strcmp(program, "kdbmap"))
+				if (!strcmp(program, "kbdmap"))
 					do_kbdcontrol(km_sorted[i]);
 				else
 					do_vidfont(km_sorted[i]);
@@ -409,7 +407,6 @@ show_dialog(struct keymap **km_sorted, int num_keymaps)
 		}
 		break;
 	default:
-		printf("la\n");
 		if (font != NULL && strcmp(font, font_current))
 			/* Cancelled, restore old font */
 			vidcontrol(font_current);

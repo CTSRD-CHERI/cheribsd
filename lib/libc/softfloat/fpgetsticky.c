@@ -31,7 +31,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include "namespace.h"
 
 #include <ieeefp.h>
@@ -41,13 +40,8 @@
 #include "milieu.h"
 #include "softfloat.h"
 
-#ifdef __weak_alias
-__weak_alias(fpgetsticky,_fpgetsticky)
-#endif
-
 fp_except
 fpgetsticky(void)
 {
-
 	return float_exception_flags;
 }

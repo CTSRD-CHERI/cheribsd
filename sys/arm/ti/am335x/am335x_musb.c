@@ -66,8 +66,8 @@
 
 #include <arm/ti/am335x/am335x_scm.h>
 #include <arm/ti/ti_sysc.h>
-#include <dev/extres/clk/clk.h>
-#include <dev/extres/syscon/syscon.h>
+#include <dev/clk/clk.h>
+#include <dev/syscon/syscon.h>
 #include "syscon_if.h"
 
 #define USBCTRL_REV		0x00
@@ -327,7 +327,7 @@ musbotg_attach(device_t dev)
 	sc->sc_otg.sc_io_size =
 	    rman_get_size(sc->sc_otg.sc_io_res);
 
-	sc->sc_otg.sc_bus.bdev = device_add_child(dev, "usbus", -1);
+	sc->sc_otg.sc_bus.bdev = device_add_child(dev, "usbus", DEVICE_UNIT_ANY);
 	if (!(sc->sc_otg.sc_bus.bdev)) {
 		device_printf(dev, "No busdev for musb\n");
 		goto error;

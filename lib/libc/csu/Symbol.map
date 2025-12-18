@@ -1,4 +1,6 @@
 FBSD_1.7 {
 	__libc_start1;
+#ifndef __CHERI_PURE_CAPABILITY__
 	__libc_start1_gcrt;
+#endif
 };

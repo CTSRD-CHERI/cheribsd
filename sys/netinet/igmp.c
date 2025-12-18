@@ -32,8 +32,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)igmp.c	8.1 (Berkeley) 7/19/93
  */
 
 /*
@@ -168,7 +166,6 @@ static const struct netisr_handler igmp_nh = {
  *    Any may be taken independently; if any are held at the same
  *    time, the above lock order must be followed.
  *  * All output is delegated to the netisr.
- *    Now that Giant has been eliminated, the netisr may be inlined.
  *  * IN_MULTI_LIST_LOCK covers in_multi.
  *  * IGMP_LOCK covers igmp_ifsoftc and any global variables in this file,
  *    including the output queue.
@@ -1674,7 +1671,6 @@ igmp_fasttimo(void *arg __unused)
 
 /*
  * Fast timeout handler (per-vnet).
- * Sends are shuffled off to a netisr to deal with Giant.
  *
  * VIMAGE: Assume caller has set up our curvnet.
  */
@@ -2124,7 +2120,8 @@ igmp_v1v2_process_querier_timers(struct igmp_ifsoftc *igi)
 		 *
 		 * Revert to IGMPv3.
 		 */
-		if (igi->igi_version != IGMP_VERSION_3) {
+		if (V_igmp_default_version == IGMP_VERSION_3 &&
+		    igi->igi_version != IGMP_VERSION_3) {
 			CTR5(KTR_IGMPV3,
 			    "%s: transition from v%d -> v%d on %p(%s)",
 			    __func__, igi->igi_version, IGMP_VERSION_3,
@@ -2139,7 +2136,8 @@ igmp_v1v2_process_querier_timers(struct igmp_ifsoftc *igi)
 		 * revert to IGMPv3.
 		 * If IGMPv2 is enabled, revert to IGMPv2.
 		 */
-		if (!V_igmp_v2enable) {
+		if (V_igmp_default_version == IGMP_VERSION_3 &&
+		    !V_igmp_v2enable) {
 			CTR5(KTR_IGMPV3,
 			    "%s: transition from v%d -> v%d on %p(%s)",
 			    __func__, igi->igi_version, IGMP_VERSION_3,
@@ -2148,7 +2146,8 @@ igmp_v1v2_process_querier_timers(struct igmp_ifsoftc *igi)
 			igi->igi_version = IGMP_VERSION_3;
 		} else {
 			--igi->igi_v2_timer;
-			if (igi->igi_version != IGMP_VERSION_2) {
+			if (V_igmp_default_version == IGMP_VERSION_2 &&
+			    igi->igi_version != IGMP_VERSION_2) {
 				CTR5(KTR_IGMPV3,
 				    "%s: transition from v%d -> v%d on %p(%s)",
 				    __func__, igi->igi_version, IGMP_VERSION_2,
@@ -2166,7 +2165,8 @@ igmp_v1v2_process_querier_timers(struct igmp_ifsoftc *igi)
 		 * revert to IGMPv3.
 		 * If IGMPv1 is enabled, reset IGMPv2 timer if running.
 		 */
-		if (!V_igmp_v1enable) {
+		if (V_igmp_default_version == IGMP_VERSION_3 &&
+		    !V_igmp_v1enable) {
 			CTR5(KTR_IGMPV3,
 			    "%s: transition from v%d -> v%d on %p(%s)",
 			    __func__, igi->igi_version, IGMP_VERSION_3,
@@ -3381,7 +3381,7 @@ igmp_v3_dispatch_general_query(struct igmp_ifsoftc *igi)
 	 * many packets, we should finish sending them before starting of
 	 * queuing the new reply.
 	 */
-	if (mbufq_len(&igi->igi_gq) != 0)
+	if (!mbufq_empty(&igi->igi_gq))
 		goto send;
 
 	ifp = igi->igi_ifp;

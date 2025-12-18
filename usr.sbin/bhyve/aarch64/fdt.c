@@ -57,6 +57,7 @@
 
 static void *fdtroot;
 static uint32_t gic_phandle = 0;
+static uint32_t apb_pclk_phandle;
 
 static uint32_t
 assign_phandle(void *fdt)
@@ -155,6 +156,14 @@ fdt_init(struct vmctx *ctx, int ncpu, vm_paddr_t fdtaddr, vm_size_t fdtsize)
 	fdt_property_string(fdt, "method", "hvc");
 	fdt_end_node(fdt);
 
+	fdt_begin_node(fdt, "apb-pclk");
+	fdt_property_string(fdt, "compatible", "fixed-clock");
+	fdt_property_string(fdt, "clock-output-names", "clk24mhz");
+	fdt_property_u32(fdt, "#clock-cells", 0);
+	fdt_property_u32(fdt, "clock-frequency", 24000000);
+	apb_pclk_phandle = assign_phandle(fdt);
+	fdt_end_node(fdt);
+
 	/* Finalized by fdt_finalized(). */
 	fdtroot = fdt;
 
@@ -177,6 +186,7 @@ fdt_add_gic(uint64_t dist_base, uint64_t dist_size,
 	gic_phandle = assign_phandle(fdt);
 	fdt_property_string(fdt, "compatible", "arm,gic-v3");
 	fdt_property(fdt, "interrupt-controller", NULL, 0);
+	fdt_property(fdt, "msi-controller", NULL, 0);
 	/* XXX: Needed given the root #address-cells? */
 	fdt_property_u32(fdt, "#address-cells", 2);
 	fdt_property_u32(fdt, "#interrupt-cells", 3);
@@ -192,7 +202,6 @@ fdt_add_gic(uint64_t dist_base, uint64_t dist_size,
 	    &prop);
 	SET_PROP_U32(prop, 0, 256);
 	SET_PROP_U32(prop, 1, 64);
-	fdt_property(fdt, "msi-controller", NULL, 0);
 
 	fdt_end_node(fdt);
 
@@ -204,20 +213,12 @@ fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr)
 {
 	void *fdt, *interrupts, *prop;
 	char node_name[32];
-	uint32_t clk_phandle;
 
 	assert(gic_phandle != 0);
+	assert(apb_pclk_phandle != 0);
 	assert(intr >= GIC_FIRST_SPI);
 
 	fdt = fdtroot;
-
-	fdt_begin_node(fdt, "uart-clock");
-	fdt_property_string(fdt, "compatible", "fixed-clock");
-	fdt_property_string(fdt, "clock-output-names", "clk24mhz");
-	fdt_property_u32(fdt, "#clock-cells", 0);
-	fdt_property_u32(fdt, "clock-frequency", 24000000);
-	clk_phandle = assign_phandle(fdt);
-	fdt_end_node(fdt);
 
 	snprintf(node_name, sizeof(node_name), "serial@%lx", uart_base);
 	fdt_begin_node(fdt, node_name);
@@ -232,8 +233,8 @@ fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr)
 	SET_PROP_U32(interrupts, 1, intr - GIC_FIRST_SPI);
 	SET_PROP_U32(interrupts, 2, IRQ_TYPE_LEVEL_HIGH);
 	fdt_property_placeholder(fdt, "clocks", 2 * sizeof(uint32_t), &prop);
-	SET_PROP_U32(prop, 0, clk_phandle);
-	SET_PROP_U32(prop, 1, clk_phandle);
+	SET_PROP_U32(prop, 0, apb_pclk_phandle);
+	SET_PROP_U32(prop, 1, apb_pclk_phandle);
 #define	UART_CLK_NAMES	"uartclk\0apb_pclk"
 	fdt_property(fdt, "clock-names", UART_CLK_NAMES,
 	    sizeof(UART_CLK_NAMES));
@@ -244,6 +245,37 @@ fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr)
 	snprintf(node_name, sizeof(node_name), "/serial@%lx", uart_base);
 	fdt_begin_node(fdt, "aliases");
 	fdt_property_string(fdt, "serial0", node_name);
+	fdt_end_node(fdt);
+}
+
+void
+fdt_add_rtc(uint64_t rtc_base, uint64_t rtc_size, int intr)
+{
+	void *fdt, *interrupts, *prop;
+	char node_name[32];
+
+	assert(gic_phandle != 0);
+	assert(apb_pclk_phandle != 0);
+	assert(intr >= GIC_FIRST_SPI);
+
+	fdt = fdtroot;
+
+	snprintf(node_name, sizeof(node_name), "rtc@%lx", rtc_base);
+	fdt_begin_node(fdt, node_name);
+#define	RTC_COMPAT	"arm,pl031\0arm,primecell"
+	fdt_property(fdt, "compatible", RTC_COMPAT, sizeof(RTC_COMPAT));
+#undef RTC_COMPAT
+	set_single_reg(fdt, rtc_base, rtc_size);
+	fdt_property_u32(fdt, "interrupt-parent", gic_phandle);
+	fdt_property_placeholder(fdt, "interrupts", 3 * sizeof(uint32_t),
+	    &interrupts);
+	SET_PROP_U32(interrupts, 0, GIC_SPI);
+	SET_PROP_U32(interrupts, 1, intr - GIC_FIRST_SPI);
+	SET_PROP_U32(interrupts, 2, IRQ_TYPE_LEVEL_HIGH);
+	fdt_property_placeholder(fdt, "clocks", sizeof(uint32_t), &prop);
+	SET_PROP_U32(prop, 0, apb_pclk_phandle);
+	fdt_property_string(fdt, "clock-names", "apb_pclk");
+
 	fdt_end_node(fdt);
 }
 
@@ -271,12 +303,12 @@ fdt_add_timer(void)
 }
 
 void
-fdt_add_pcie(int intr)
+fdt_add_pcie(int intrs[static 4])
 {
 	void *fdt, *prop;
+	int slot, pin, intr, i;
 
 	assert(gic_phandle != 0);
-	assert(intr >= GIC_FIRST_SPI);
 
 	fdt = fdtroot;
 
@@ -320,24 +352,35 @@ fdt_add_pcie(int intr)
 
 	fdt_property_u32(fdt, "#interrupt-cells", 1);
 	fdt_property_u32(fdt, "interrupt-parent", gic_phandle);
+
+	/*
+	 * Describe standard swizzled interrupts routing (pins rotated by one
+	 * for each consecutive slot). Must match pci_irq_route().
+	 */
 	fdt_property_placeholder(fdt, "interrupt-map-mask",
 	    4 * sizeof(uint32_t), &prop);
-	SET_PROP_U32(prop, 0, 0);
+	SET_PROP_U32(prop, 0, 3 << 11);
 	SET_PROP_U32(prop, 1, 0);
 	SET_PROP_U32(prop, 2, 0);
 	SET_PROP_U32(prop, 3, 7);
 	fdt_property_placeholder(fdt, "interrupt-map",
-	    10 * sizeof(uint32_t), &prop);
-	SET_PROP_U32(prop, 0, 0);
-	SET_PROP_U32(prop, 1, 0);
-	SET_PROP_U32(prop, 2, 0);
-	SET_PROP_U32(prop, 3, 1);
-	SET_PROP_U32(prop, 4, gic_phandle);
-	SET_PROP_U32(prop, 5, 0);
-	SET_PROP_U32(prop, 6, 0);
-	SET_PROP_U32(prop, 7, GIC_SPI);
-	SET_PROP_U32(prop, 8, intr - GIC_FIRST_SPI);
-	SET_PROP_U32(prop, 9, IRQ_TYPE_LEVEL_HIGH);
+	    160 * sizeof(uint32_t), &prop);
+	for (i = 0; i < 16; ++i) {
+		pin = i % 4;
+		slot = i / 4;
+		intr = intrs[(pin + slot) % 4];
+		assert(intr >= GIC_FIRST_SPI);
+		SET_PROP_U32(prop, 10 * i + 0, slot << 11);
+		SET_PROP_U32(prop, 10 * i + 1, 0);
+		SET_PROP_U32(prop, 10 * i + 2, 0);
+		SET_PROP_U32(prop, 10 * i + 3, pin + 1);
+		SET_PROP_U32(prop, 10 * i + 4, gic_phandle);
+		SET_PROP_U32(prop, 10 * i + 5, 0);
+		SET_PROP_U32(prop, 10 * i + 6, 0);
+		SET_PROP_U32(prop, 10 * i + 7, GIC_SPI);
+		SET_PROP_U32(prop, 10 * i + 8, intr - GIC_FIRST_SPI);
+		SET_PROP_U32(prop, 10 * i + 9, IRQ_TYPE_LEVEL_HIGH);
+	}
 
 	fdt_end_node(fdt);
 }

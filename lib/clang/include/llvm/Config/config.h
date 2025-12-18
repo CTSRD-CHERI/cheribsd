@@ -196,9 +196,6 @@
 /* Define to 1 if you have the <signal.h> header file. */
 #define HAVE_SIGNAL_H 1
 
-/* Define to 1 if you have the `strerror' function. */
-#define HAVE_STRERROR 1
-
 /* Define to 1 if you have the `strerror_r' function. */
 #define HAVE_STRERROR_R 1
 
@@ -235,15 +232,6 @@
 
 /* Define to 1 if you have the <sys/types.h> header file. */
 #define HAVE_SYS_TYPES_H 1
-
-/* Define if the setupterm() function is supported this platform. */
-#if defined(__FreeBSD__)
-/*
- * This is only needed for terminalHasColors(). When disabled LLVM falls back
- * to checking a list of TERM prefixes which is sufficient for a bootstrap tool.
- */
-#define LLVM_ENABLE_TERMINFO TRUE
-#endif
 
 /* Define to 1 if you have the <termios.h> header file. */
 #define HAVE_TERMIOS_H 1
@@ -323,6 +311,9 @@
 /* Whether tools show host and target info when invoked with --version */
 #define LLVM_VERSION_PRINTER_SHOW_HOST_TARGET_INFO 1
 
+/* Whether tools show optional build config flags when invoked with --version */
+#define LLVM_VERSION_PRINTER_SHOW_BUILD_CONFIG 1
+
 /* Define if libxml2 is supported on this platform. */
 /* #undef LLVM_ENABLE_LIBXML2 */
 
@@ -347,10 +338,10 @@
 #define PACKAGE_NAME "LLVM"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "LLVM 16.0.6"
+#define PACKAGE_STRING "LLVM 19.1.2"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "16.0.6"
+#define PACKAGE_VERSION "19.1.2"
 
 /* Define to the vendor of this package. */
 /* #undef PACKAGE_VENDOR */
@@ -375,5 +366,7 @@
 #endif
 
 /* #undef HAVE_PROC_PID_RUSAGE */
+
+#define HAVE_BUILTIN_THREAD_POINTER 1
 
 #endif

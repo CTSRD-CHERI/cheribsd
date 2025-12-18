@@ -29,19 +29,16 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <sys/socket.h>
+#include <ssp/ssp.h>
 #include "libc_private.h"
 
 __weak_reference(__sys_recvmsg, __recvmsg);
 
-#pragma weak recvmsg
-ssize_t
-recvmsg(int s, struct msghdr *msg, int flags)
+ssize_t __weak_symbol
+__ssp_real(recvmsg)(int s, struct msghdr *msg, int flags)
 {
-
-	return (((int (*)(int, struct msghdr *, int))
-	    __libc_interposing[INTERPOS_recvmsg])(s, msg, flags));
+	return (INTERPOS_SYS(recvmsg, s, msg, flags));
 }

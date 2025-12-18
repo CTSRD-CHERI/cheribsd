@@ -31,11 +31,9 @@
  * SUCH DAMAGE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)strcpy.c	8.1 (Berkeley) 6/4/93";
-#endif /* LIBC_SCCS and not lint */
-#include <sys/cdefs.h>
 #include <string.h>
+
+#undef stpcpy	/* _FORTIFY_SOURCE */
 
 char *
 stpcpy(char * __restrict to, const char * __restrict from)

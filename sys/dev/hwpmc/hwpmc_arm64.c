@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/pmc.h>
@@ -35,6 +34,7 @@
 
 #include <machine/pmc_mdep.h>
 #include <machine/cpu.h>
+#include <machine/machdep.h>
 
 #include "opt_acpi.h"
 
@@ -164,7 +164,7 @@ static int
 arm64_allocate_pmc(int cpu, int ri, struct pmc *pm,
   const struct pmc_op_pmcallocate *a)
 {
-	uint32_t config;
+	uint64_t config;
 	enum pmc_event pe;
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
@@ -177,9 +177,9 @@ arm64_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	}
 	pe = a->pm_ev;
 
-	/* Adjust the config value if needed. */
-	config = a->pm_md.pm_md_config;
-	if ((a->pm_md.pm_md_flags & PM_MD_RAW_EVENT) == 0) {
+	if ((a->pm_flags & PMC_F_EV_PMU) != 0) {
+		config = a->pm_md.pm_md_config;
+	} else {
 		config = (uint32_t)pe - PMC_EV_ARMV8_FIRST;
 		if (config > (PMC_EV_ARMV8_LAST - PMC_EV_ARMV8_FIRST))
 			return (EINVAL);
@@ -187,10 +187,18 @@ arm64_allocate_pmc(int cpu, int ri, struct pmc *pm,
 
 	switch (a->pm_caps & (PMC_CAP_SYSTEM | PMC_CAP_USER)) {
 	case PMC_CAP_SYSTEM:
+		/* Exclude EL0 */
 		config |= PMEVTYPER_U;
+		if (in_vhe()) {
+			/* If in VHE we need to include EL2 and exclude EL1 */
+			config |= PMEVTYPER_NSH | PMEVTYPER_P;
+		}
 		break;
 	case PMC_CAP_USER:
+		/* Exclude EL1 */
 		config |= PMEVTYPER_P;
+		/* Exclude EL2 */
+		config &= ~PMEVTYPER_NSH;
 		break;
 	default:
 		/*
@@ -198,11 +206,16 @@ arm64_allocate_pmc(int cpu, int ri, struct pmc *pm,
 		 * (default setting) or if both flags are specified
 		 * (user explicitly requested both qualifiers).
 		 */
+		if (in_vhe()) {
+			/* If in VHE we need to include EL2 */
+			config |= PMEVTYPER_NSH;
+		}
 		break;
 	}
 
 	pm->pm_md.pm_arm64.pm_arm64_evsel = config;
-	PMCDBG2(MDP, ALL, 2, "arm64-allocate ri=%d -> config=0x%x", ri, config);
+	PMCDBG2(MDP, ALL, 2, "arm64-allocate ri=%d -> config=0x%lx", ri,
+	    config);
 
 	return (0);
 }
@@ -300,7 +313,7 @@ arm64_config_pmc(int cpu, int ri, struct pmc *pm)
 static int
 arm64_start_pmc(int cpu, int ri, struct pmc *pm)
 {
-	uint32_t config;
+	uint64_t config;
 
 	config = pm->pm_md.pm_arm64.pm_arm64_evsel;
 
@@ -620,6 +633,10 @@ void
 pmc_arm64_finalize(struct pmc_mdep *md)
 {
 	PMCDBG0(MDP, INI, 1, "arm64-finalize");
+
+	for (int i = 0; i < pmc_cpu_max(); i++)
+		KASSERT(arm64_pcpu[i] == NULL,
+		    ("[arm64,%d] non-null pcpu cpu %d", __LINE__, i));
 
 	free(arm64_pcpu, M_PMC);
 }

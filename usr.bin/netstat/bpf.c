@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
@@ -40,7 +39,6 @@
 #include <net/bpfdesc.h>
 #include <arpa/inet.h>
 
-#include <err.h>
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>

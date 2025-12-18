@@ -32,8 +32,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)buf.h	8.9 (Berkeley) 3/30/95
  */
 
 #ifndef _SYS_BUF_H_
@@ -343,6 +341,13 @@ struct buf {
  */
 #define	BUF_ISLOCKED(bp)						\
 	lockstatus(&(bp)->b_lock)
+
+/*
+ * Check if a buffer lock is currently held by LK_KERNPROC.
+ */
+#define	BUF_DISOWNED(bp)						\
+	lockmgr_disowned(&(bp)->b_lock)
+
 /*
  * Free a buffer lock.
  */
@@ -598,7 +603,7 @@ void	vfs_unbusy_pages(struct buf *);
 int	vmapbuf(struct buf *, void * __capability, size_t, int);
 void	vunmapbuf(struct buf *);
 void	brelvp(struct buf *);
-void	bgetvp(struct vnode *, struct buf *);
+int	bgetvp(struct vnode *, struct buf *) __result_use_check;
 void	pbgetbo(struct bufobj *bo, struct buf *bp);
 void	pbgetvp(struct vnode *, struct buf *);
 void	pbrelbo(struct buf *);

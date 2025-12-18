@@ -29,8 +29,6 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"	from: @(#)sh.1	8.6 (Berkeley) 5/4/95
-.\"
 .Dd December 14, 2022
 .Dt SH 1
 .Os
@@ -1076,13 +1074,13 @@ command.
 Commands may be grouped by writing either
 .Pp
 .Sm off
-.Bd -literal -offset -ident
+.Bd -literal -offset indent
 .Po Ar list Pc
 .Ed
 .Sm on
 .Pp
 or
-.Bd -literal -offset -ident
+.Bd -literal -offset indent
 .No { Ar list ; }
 .Ed
 .Pp
@@ -1427,6 +1425,16 @@ unless you are the superuser, in which case it defaults to
 may include any of the following formatting sequences,
 which are replaced by the given information:
 .Bl -tag -width indent
+.It Li \eD{format}
+The current time in
+.Xr strftime 3
+.Ar format .
+The braces are required.
+Empty
+.Ar format
+is equivalent to
+\&%X,
+national representation of the time.
 .It Li \eH
 This system's fully-qualified hostname (FQDN).
 .It Li \eh

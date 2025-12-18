@@ -81,7 +81,7 @@ typedef struct arc_prune arc_prune_t;
 typedef void arc_read_done_func_t(zio_t *zio, const zbookmark_phys_t *zb,
     const blkptr_t *bp, arc_buf_t *buf, void *priv);
 typedef void arc_write_done_func_t(zio_t *zio, arc_buf_t *buf, void *priv);
-typedef void arc_prune_func_t(int64_t bytes, void *priv);
+typedef void arc_prune_func_t(uint64_t bytes, void *priv);
 
 /* Shared module parameters */
 extern uint_t zfs_arc_average_blocksize;
@@ -120,7 +120,7 @@ typedef enum arc_flags
 
 	/*
 	 * Private ARC flags.  These flags are private ARC only flags that
-	 * will show up in b_flags in the arc_hdr_buf_t. These flags should
+	 * will show up in b_flags in the arc_buf_hdr_t. These flags should
 	 * only be set by ARC code.
 	 */
 	ARC_FLAG_IN_HASH_TABLE		= 1 << 7,	/* buffer is hashed */
@@ -179,7 +179,6 @@ typedef enum arc_flags
 	ARC_FLAG_COMPRESS_4		= 1 << 28,
 	ARC_FLAG_COMPRESS_5		= 1 << 29,
 	ARC_FLAG_COMPRESS_6		= 1 << 30
-
 } arc_flags_t;
 
 typedef enum arc_buf_flags {
@@ -250,6 +249,16 @@ typedef struct arc_buf_info {
 	enum zio_compress	abi_l2arc_compress;
 } arc_buf_info_t;
 
+/*
+ * Flags returned by arc_cached; describes which part of the arc
+ * the block is cached in.
+ */
+#define	ARC_CACHED_EMBEDDED	(1U << 0)
+#define	ARC_CACHED_IN_L1	(1U << 1)
+#define	ARC_CACHED_IN_MRU	(1U << 2)
+#define	ARC_CACHED_IN_MFU	(1U << 3)
+#define	ARC_CACHED_IN_L2	(1U << 4)
+
 void arc_space_consume(uint64_t space, arc_space_type_t type);
 void arc_space_return(uint64_t space, arc_space_type_t type);
 boolean_t arc_is_metadata(arc_buf_t *buf);
@@ -310,6 +319,7 @@ zio_t *arc_write(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 arc_prune_t *arc_add_prune_callback(arc_prune_func_t *func, void *priv);
 void arc_remove_prune_callback(arc_prune_t *p);
 void arc_freed(spa_t *spa, const blkptr_t *bp);
+int arc_cached(spa_t *spa, const blkptr_t *bp);
 
 void arc_flush(spa_t *spa, boolean_t retry);
 void arc_tempreserve_clear(uint64_t reserve);

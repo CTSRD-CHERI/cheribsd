@@ -79,32 +79,26 @@ drmcompat_add_to_sleepqueue(void *wchan, struct thread *task,
 void
 drmcompat_wake_up_task_locked(struct thread *task)
 {
-	int wakeup_swapper;
-
-	wakeup_swapper = sleepq_signal(task, SLEEPQ_SLEEP, 0, 0);
+	sleepq_signal(task, SLEEPQ_SLEEP, 0, 0);
 	sleepq_release(task);
-	if (wakeup_swapper)
-		kick_proc0();
 }
 
 static int
 wake_up_task_by_wq(wait_queue_entry_t *wq, unsigned int state)
 {
-	int ret, wakeup_swapper;
+	int ret;
 	struct thread *task;
 
 	task = wq->private;
 
-	ret = wakeup_swapper = 0;
+	ret = 0;
 	sleepq_lock(task);
 	if ((atomic_load_int(&wq->state) & state) != 0) {
 		atomic_store_int(&wq->state, TASK_WAKING);
-		wakeup_swapper = sleepq_signal(task, SLEEPQ_SLEEP, 0, 0);
+		sleepq_signal(task, SLEEPQ_SLEEP, 0, 0);
 		ret = 1;
 	}
 	sleepq_release(task);
-	if (wakeup_swapper)
-		kick_proc0();
 	return (ret);
 }
 

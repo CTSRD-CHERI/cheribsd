@@ -28,9 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
  * POSSIBILITY OF SUCH DAMAGE.
- *
- *	from: @(#)svc.h 1.35 88/12/17 SMI
- *	from: @(#)svc.h      1.27    94/04/25 SMI
  */
 
 /*
@@ -188,6 +185,7 @@ typedef struct __rpc_svcxprt {
 	int		xp_ngrps;	/* Cred. from TLS cert. */
 	uid_t		xp_uid;
 	gid_t		*xp_gidp;
+	int		xp_doneddp;
 #else
 	int		xp_fd;
 	u_short		xp_port;	 /* associated port number */

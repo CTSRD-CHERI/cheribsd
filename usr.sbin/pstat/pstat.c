@@ -36,18 +36,6 @@
  * SUCH DAMAGE.
  */
 
-#if 0
-#ifndef lint
-static const char copyright[] =
-"@(#) Copyright (c) 1980, 1991, 1993, 1994\n\
-	The Regents of the University of California.  All rights reserved.\n";
-#endif /* not lint */
-
-#ifndef lint
-static char sccsid[] = "@(#)pstat.c	8.16 (Berkeley) 5/9/95";
-#endif /* not lint */
-#endif
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/file.h>
@@ -400,7 +388,7 @@ filemode(void)
 	printf(sizeof(uintptr_t) == 4 ? fhdr32 : fhdr64);
 	wid = (int)sizeof(uintptr_t) * 2;
 	for (fp = (struct xfile *)buf, i = 0; i < openf; ++fp, ++i) {
-		if ((size_t)fp->xf_type >= sizeof(dtypes) / sizeof(dtypes[0]))
+		if ((size_t)fp->xf_type >= nitems(dtypes))
 			continue;
 		(void)printf("%*jx", wid, (uintmax_t)(uintptr_t)fp->xf_file);
 		(void)printf(" %-6.6s", dtypes[fp->xf_type]);

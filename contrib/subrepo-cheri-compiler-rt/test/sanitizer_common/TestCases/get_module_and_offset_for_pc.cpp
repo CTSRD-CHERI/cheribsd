@@ -21,7 +21,7 @@ int foo() { return 1; }
 
 void Test(void *pc, const char *name) {
   char module_name[1024];
-  size_t offset;
+  size_t offset = 0;
   int ok = __sanitizer_get_module_and_offset_for_pc(
       (uintptr_t)pc, module_name, sizeof(module_name), &offset);
   if (!ok) {

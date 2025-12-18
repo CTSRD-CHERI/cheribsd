@@ -1,4 +1,3 @@
-
 .include <src.opts.mk>
 .include "${SRCTOP}/secure/ssh.mk"
 
@@ -29,10 +28,6 @@ LIBADD+=	gssapi
 .endif
 
 LIBADD+=	crypto
-
-.if defined(LOCALBASE)
-CFLAGS+= -DXAUTH_PATH=\"${LOCALBASE}/bin/xauth\"
-.endif
 
 .include <bsd.prog.mk>
 

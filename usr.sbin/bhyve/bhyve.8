@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd November 20, 2023
+.Dd August 21, 2024
 .Dt BHYVE 8
 .Os
 .Sh NAME
@@ -30,7 +30,7 @@
 .Nd "run a guest operating system inside a virtual machine"
 .Sh SYNOPSIS
 .Nm
-.Op Fl AaCDeHhPSuWwxY
+.Op Fl aCDeHhPSuWwxY
 .Oo
 .Sm off
 .Fl c\~
@@ -93,32 +93,38 @@
 .Nm
 is a hypervisor that runs guest operating systems inside a
 virtual machine.
+It can run guests on amd64 and arm64 platforms with suitable hardware support.
 .Pp
 Parameters such as the number of virtual CPUs, amount of guest memory, and
 I/O connectivity can be specified with command-line parameters.
 .Pp
+.Nm
+is typically used with a boot ROM that can load the guest operating system.
+On arm64 platforms, this is currently required.
 If not using a boot ROM, the guest operating system must be loaded with
 .Xr bhyveload 8
 or a similar boot loader before running
 .Nm ,
-otherwise, it is enough to run
-.Nm
-with a boot ROM of choice.
+otherwise.
+On amd64, the
+.Pa edk2-bhyve
+package provides a UEFI firmware that can be used to boot the guest;
+on arm64 the
+.Pa u-boot-bhyve-arm64
+package provides a U-Boot image that can be used to boot the guest.
 .Pp
 .Nm
 runs until the guest operating system reboots or an unhandled hypervisor
 exit is detected.
 .Sh OPTIONS
 .Bl -tag -width 10n
-.It Fl A
-Generate ACPI tables.
-bhyve always generates ACPI tables so this option is obsolete.
 .It Fl a
 The guest's local APIC is configured in xAPIC mode.
-The xAPIC mode is the default setting so this option is redundant.
+This option only applies to the amd64 platform.
+xAPIC mode is the default setting so this option is redundant.
 It will be deprecated in a future version.
 .It Fl C
-Include guest memory in core file.
+Include guest memory in core files.
 .It Fl c Op Ar setting ...
 Number of guest virtual CPUs
 and/or the CPU topology.
@@ -129,7 +135,6 @@ The default value for each of
 and
 .Ar threads
 is 1.
-The current maximum number of guest virtual CPUs is 16.
 If
 .Ar numcpus
 is not specified then it will be calculated from the other arguments.
@@ -143,13 +148,22 @@ and
 If a
 .Ar setting
 is specified more than once the last one has precedence.
+.Pp
+The maximum number of virtual CPUs defaults to the number of active
+physical CPUs in the system available via the
+.Va hw.vmm.maxcpu
+.Xr sysctl 8
+variable.
+The limit can be adjusted via the
+.Va hw.vmm.maxcpu
+loader tunable.
 .It Fl D
 Destroy the VM on guest initiated power-off.
 .It Fl e
 Force
 .Nm
 to exit when a guest issues an access to an I/O port that is not emulated.
-This is intended for debug purposes.
+This is intended for debug purposes and only applies to the amd64 platform.
 .It Fl f Ar name Ns Cm \&, Ns Oo Cm string Ns No | Ns Cm file Ns Oc Ns Cm \&= Ns Ar data
 Add a fw_cfg file
 .Ar name
@@ -182,19 +196,13 @@ will pause execution at the first instruction waiting for a debugger to attach.
 .It Fl H
 Yield the virtual CPU thread when a HLT instruction is detected.
 If this option is not specified, virtual CPUs will use 100% of a host CPU.
+This option applies only to the amd64 platform.
 .It Fl h
 Print help message and exit.
 .It Fl k Ar config_file
 Set configuration variables from a simple, key-value config file.
 Each line of the config file is expected to consist of a config variable
 name, an equals sign
-.It Fl K Ar layout
-Specify the keyboard layout.
-The value that can be specified sets the file name in
-.Ar /usr/share/bhyve/kbdlayout .
-This specification only works when loaded with UEFI mode for VNC.
-When using a VNC client that supports QEMU Extended Key Event Message (e.g. TigerVNC), this option isn't needed.
-When using a VNC client that doesn't support QEMU Extended Key Event Message (e.g. tightVNC), the layout defaults to the US keyboard unless specified otherwise.
 .Pq Sq = ,
 and a value.
 No spaces are permitted between the variable name, equals sign, or
@@ -205,6 +213,16 @@ are ignored.
 See
 .Xr bhyve_config 5
 for more details.
+.It Fl K Ar layout
+Specify the keyboard layout.
+The value that can be specified sets the file name in
+.Ar /usr/share/bhyve/kbdlayout .
+This specification only works when loaded with UEFI mode for VNC.
+When using a VNC client that supports QEMU Extended Key Event Message (e.g.
+TigerVNC), this option isn't needed.
+When using a VNC client that doesn't support QEMU Extended Key Event Message
+(e.g. tightVNC), the layout defaults to the US keyboard unless specified
+otherwise.
 .It Fl l Cm help
 Print a list of supported LPC devices.
 .It Fl l Ar lpcdev Ns Op Cm \&, Ns Ar conf
@@ -227,6 +245,12 @@ The possible values for the
 argument are listed in the
 .Fl s
 flag description.
+.Pp
+This option applies only to the amd64 platform.
+On arm64, the console and boot ROM devices are configured using the
+more generic
+.Fl o
+option.
 .It Xo
 .Fl m Ar memsize Ns Oo
 .Sm off
@@ -234,7 +258,7 @@ flag description.
 .Sm on
 .Oc
 .Xc
-Set the guest physical memory size
+Set the guest physical memory size.
 This must be the same size that was given to
 .Xr bhyveload 8 .
 .Pp
@@ -252,13 +276,25 @@ Set the configuration variable
 .Ar var
 to
 .Ar value .
+See
+.Xr bhyve_config 5
+for configuration options.
 .It Fl P
 Force the guest virtual CPU to exit when a PAUSE instruction is detected.
+This option applies only to the amd64 platform.
 .It Fl p Ar vcpu Ns Cm \& : Ns Ar hostcpu
 Pin guest's virtual CPU
 .Em vcpu
 to
 .Em hostcpu .
+Host CPUs and guest virtual CPUs are numbered starting from 0.
+A
+.Fl p
+option is required for every guest vCPU to be pinned.
+To map a 4 vCPU guest to host CPUs 12-15:
+.Bd -literal
+-p 0:12 -p 1:13 -p 2:14 -p 3:15
+.Ed
 .It Fl r Ar file
 Resume a guest from a snapshot.
 The guest memory contents are restored from
@@ -266,9 +302,9 @@ The guest memory contents are restored from
 and the guest device and vCPU state are restored from the file
 .Dq Ar file Ns .kern .
 .Pp
-Note that the current snapshot file format requires that the configuration of
-devices in the new VM match the VM from which the snapshot was taken by specifying the
-same
+Note that the current snapshot file format requires that the
+configuration of devices in the new VM match the VM from which the
+snapshot was taken by specifying the same
 .Fl s
 and
 .Fl l
@@ -320,10 +356,45 @@ If not specified, the
 .Ar bus
 value defaults to 0.
 .Pp
-The
+See
+.Sx "PCI EMULATION"
+for available options for the
 .Ar emulation
-argument
-can be one of the following:
+argument.
+.It Fl U Ar uuid
+Set the universally unique identifier
+.Pq UUID
+in the guest's System Management BIOS System Information structure.
+By default a UUID is generated from the host's hostname and
+.Ar vmname .
+.It Fl u
+RTC keeps UTC time.
+.It Fl W
+Force virtio PCI device emulations to use MSI interrupts instead of MSI-X
+interrupts.
+.It Fl w
+Ignore accesses to unimplemented Model Specific Registers (MSRs).
+This is intended for debug purposes.
+.It Fl x
+The guest's local APIC is configured in x2APIC mode.
+This option applies only to the amd64 platform.
+.It Fl Y
+Disable MPtable generation.
+This option applies only to the amd64 platform.
+.It Ar vmname
+Alphanumeric name of the guest.
+This should be the same as that created by
+.Xr bhyveload 8 .
+.El
+.Sh PCI EMULATION
+.Nm
+provides emulation for various PCI devices.
+They are specified by the
+.Fl s
+.Ar slot,emulation,conf
+configuration's
+.Ar emulation
+argument, which can be one of the following:
 .Bl -tag -width "amd_hostbridge"
 .It Cm hostbridge
 A simple host bridge.
@@ -364,7 +435,7 @@ PCI 16550 serial device.
 .It Cm lpc
 LPC PCI-ISA bridge with COM1, COM2, COM3, and COM4 16550 serial ports,
 a boot ROM, and,
-optionally, a fwcfg type and the debug/test device.
+optionally, a TPM module, a fwcfg type, and the debug/test device.
 The LPC bridge emulation can only be configured on bus 0.
 .It Cm fbuf
 Raw framebuffer device attached to VNC server.
@@ -383,8 +454,7 @@ If
 .Ar conf
 is not specified, the device emulation has no backend and can be
 considered unconnected.
-.Pp
-Network device backends:
+.Ss Network device backends
 .Sm off
 .Bl -bullet
 .It
@@ -416,7 +486,7 @@ Network device backends:
 .Pp
 If
 .Cm mac
-is not specified, the MAC address is derived from a fixed OUI and the
+is not specified, the MAC address is derived from a fixed OUI, and the
 remaining bytes from an MD5 hash of the slot and function numbers and
 the device name.
 .Pp
@@ -467,16 +537,15 @@ forwarded to the guest.
 Multiple rules can be specified, separated by semicolons.
 Note that semicolons must be escaped or quoted to prevent the shell from
 interpreting them.
-.Pp
-Block storage device backends:
-.Sm off
+.Ss Block storage device backends:
 .Bl -bullet
+.Sm off
 .It
 .Ar /filename Op Cm \&, Ar block-device-options
 .It
 .Ar /dev/xxx Op Cm \&, Ar block-device-options
-.El
 .Sm on
+.El
 .Pp
 The
 .Ar block-device-options
@@ -505,14 +574,13 @@ A fwcfg file is used to specify the bootorder.
 The guest firmware may ignore or doesn't support this fwcfg file.
 In that case, this feature doesn't work as expected.
 .El
-.Pp
-SCSI device backends:
-.Sm off
+.Ss SCSI device backends
 .Bl -bullet
+.Sm off
 .It
 .Pa /dev/cam/ctl Oo Ar pp Cm \&. Ar vp Oc Oo Cm \&, Ar scsi-device-options Oc
-.El
 .Sm on
+.El
 .Pp
 The
 .Ar scsi-device-options
@@ -528,14 +596,13 @@ A fwcfg file is used to specify the bootorder.
 The guest firmware may ignore or doesn't support this fwcfg file.
 In that case, this feature doesn't work as expected.
 .El
-.Pp
-9P device backends:
-.Sm off
+.Ss 9P device backends
 .Bl -bullet
+.Sm off
 .It
 .Ar sharename Cm = Ar /path/to/share Op Cm \&, Ar 9p-device-options
-.El
 .Sm on
+.El
 .Pp
 The
 .Ar 9p-device-options
@@ -544,8 +611,7 @@ are:
 .It Cm ro
 Expose the share in read-only mode.
 .El
-.Pp
-TTY device backends:
+.Ss TTY device backends
 .Bl -tag -width 10n
 .It Cm stdio
 Connect the serial port to the standard input and output of
@@ -554,12 +620,41 @@ the
 process.
 .It Ar /dev/xxx
 Use the host TTY device for serial port I/O.
+.It Ar tcp=ip:port
+Use the TCP server for serial port I/O.
+Configuring this option will start a TCP server that waits for connections.
+Only one connection is allowed at any time. Other connection try to connect
+to TCP server will be disconnected immediately. Note that this feature
+allows unprivileged users to access the guest console, so ensure that
+access is appropriately restricted.
+.El
+.Ss TPM device backends
+.Bl -bullet
+.Sm off
+.It
+.Ar type Ns \&, Ns Ar path Ns Op Cm \&, Ns Ar tpm-device-options
+.Sm on
 .El
 .Pp
-TPM device backends:
-.Bl -tag -width 10n
-.It Ar type Ns \&, Ns Ar path Ns Op Cm \&, Ns Ar tpm-device-options
 Emulate a TPM device.
+Supported options for
+.Ar type :
+.Bl -tag -width 10n
+.It Cm passthru
+Use a physical TPM device.
+The argument
+.Ar path
+needs to point to a valid TPM device path, i.e.
+.Pa /dev/tpm0 .
+.It Cm swtpm
+Connect to a running
+.Cm swtpm
+instance.
+The argument
+.Ar path
+needs to point to a UNIX domain socket that a
+.Cm swtpm
+process is listening on.
 .El
 .Pp
 The
@@ -569,27 +664,32 @@ are:
 .It Cm version= Ns Ar version
 Version of the TPM device according to the TCG specification.
 Defaults to
-.Cm 2.0
+.Cm 2.0 ,
+which is the only version currently supported.
 .El
+.Ss Boot ROM device backends
+.Sm off
+.Bl -bullet
+.It
+.Ar romfile Ns Op Cm \&, Ns Ar varfile
 .El
+.Sm on
 .Pp
-Boot ROM device backends:
-.Bl -tag -width 10n
-.It Ar romfile Ns Op Cm \&, Ns Ar varfile
 Map
 .Ar romfile
 in the guest address space reserved for boot firmware.
+.Pp
 If
 .Ar varfile
 is provided, that file is also mapped in the boot firmware guest
 address space, and any modifications the guest makes will be saved
 to that file.
-.El
 .Pp
 Fwcfg types:
 .Bl -tag -width 10n
 .It Ar fwcfg
-The fwcfg interface is used to pass information such as the CPU count or ACPI tables to the guest firmware.
+The fwcfg interface is used to pass information such as the CPU count
+or ACPI tables to the guest firmware.
 Supported values are
 .Ql bhyve
 and
@@ -604,12 +704,14 @@ It currently reports only the CPU count to the guest firmware.
 The
 .Ql qemu
 option uses QEMU's fwcfg interface.
-This interface is widely used and allows user-defined information to be passed to the guest.
-It is used for passing the CPU count, ACPI tables, a boot order and many other things to the guest.
-Some operating systems such as Fedora CoreOS can be configured by qemu's fwcfg interface as well.
+This interface is widely used and allows user-defined information to
+be passed to the guest.
+It is used for passing the CPU count, ACPI tables, a boot order and
+many other things to the guest.
+Some operating systems such as Fedora CoreOS can be configured by
+qemu's fwcfg interface as well.
 .El
-.Pp
-Pass-through device backends:
+.Ss Pass-through device backends
 .Sm off
 .Bl -bullet
 .It
@@ -640,7 +742,8 @@ are:
 Add
 .Ar romfile
 as option ROM to the PCI device.
-The ROM will be loaded by firmware and should be capable of initializing the device.
+The ROM will be loaded by firmware and should be capable of
+initializing the device.
 .It Li bootindex= Ns Ar index
 Add the device to the bootorder at
 .Ar index .
@@ -657,28 +760,7 @@ The host device must have been reserved at boot-time using the
 .Va pptdevs
 loader variable as described in
 .Xr vmm 4 .
-.Pp
-TPM devices:
-.Bl -tag -width 10n
-.It Ns Ar type
-Specifies the type of the TPM device.
-.Pp
-Supported types:
-.Bl -tag -width 10n
-.It Cm passthru
-.El
-.It Cm version= Ns Ar version
-The
-.Ar version
-of the emulated TPM device according to the TCG specification.
-.Pp
-Supported versions:
-.Bl -tag -width 10n
-.It Cm 2.0
-.El
-.El
-.Pp
-Virtio console device backends:
+.Ss Virtio console device backends
 .Bl -bullet
 .Sm off
 .It
@@ -695,7 +777,7 @@ accepts at most one connection per port at a time.
 Limitations:
 .Bl -bullet
 .It
-Due to lack of destructors in
+Due to the lack of destructors in
 .Nm ,
 sockets on the filesystem must be cleaned up manually after
 .Nm
@@ -708,16 +790,18 @@ resize at present.
 .It
 Emergency write is advertised, but no-op at present.
 .El
+.Ss Virtio input device backends:
+.Bl -bullet
+.Sm off
+.It
+.Ar /dev/input/eventX
+.Sm on
+.El
 .Pp
-Virtio input device backends:
-.Bl -tag -width 10n
-.It Ar /dev/input/eventX
 Send input events of
 .Ar /dev/input/eventX
 to guest by VirtIO Input Interface.
-.El
-.Pp
-Framebuffer devices backends:
+.Ss Framebuffer device backends
 .Bl -bullet
 .Sm off
 .It
@@ -755,13 +839,13 @@ optional zone identifier.
 A display resolution, width and height, respectively.
 If not specified, a default resolution of 1024x768 pixels will be used.
 Minimal supported resolution is 640x480 pixels,
-and maximum is 1920x1200 pixels.
+and maximum is 3840x2160 pixels.
 .It Cm vga= Ns Ar vgaconf
 Possible values for this option are
 .Cm io
 (default),
-.Cm on
-, and
+.Cm on ,
+and
 .Cm off .
 PCI graphics cards have a dual personality in that they are
 standard PCI devices with BAR addressing, but may also
@@ -806,15 +890,17 @@ intended for use on untrusted networks.
 Many implementations will want to use stronger security, such as running
 the session over an encrypted channel provided by IPsec or SSH.
 .El
-.Pp
-xHCI USB device backends:
-.Bl -tag -width 10n
-.It Cm tablet
-A USB tablet device which provides precise cursor synchronization
-when using VNC.
+.Ss xHCI USB device backends
+.Bl -bullet
+.Sm off
+.It
+.Ar tablet
+.Sm on
 .El
 .Pp
-NVMe device backends:
+A USB tablet device that provides precise cursor synchronization
+when using VNC.
+.Ss NVMe device backends
 .Bl -bullet
 .Sm off
 .It
@@ -857,8 +943,7 @@ Supported values are:
 and
 .Cm disable .
 .El
-.Pp
-AHCI device backends:
+.Ss AHCI device backends
 .Bl -bullet
 .It
 .Sm off
@@ -883,8 +968,7 @@ Revision Number with maximum 8 characters.
 .It Cm model
 Model Number with maximum 40 characters.
 .El
-.Pp
-HD Audio device backends:
+.Ss HD Audio device backends
 .Bl -bullet
 .It
 .Sm off
@@ -901,29 +985,6 @@ Playback device, typically
 .It Cm rec
 Recording device, typically
 .Ar /dev/dsp0 .
-.El
-.It Fl U Ar uuid
-Set the universally unique identifier
-.Pq UUID
-in the guest's System Management BIOS System Information structure.
-By default a UUID is generated from the host's hostname and
-.Ar vmname .
-.It Fl u
-RTC keeps UTC time.
-.It Fl W
-Force virtio PCI device emulations to use MSI interrupts instead of MSI-X
-interrupts.
-.It Fl w
-Ignore accesses to unimplemented Model Specific Registers (MSRs).
-This is intended for debug purposes.
-.It Fl x
-The guest's local APIC is configured in x2APIC mode.
-.It Fl Y
-Disable MPtable generation.
-.It Ar vmname
-Alphanumeric name of the guest.
-This should be the same as that created by
-.Xr bhyveload 8 .
 .El
 .Sh CONFIGURATION VARIABLES
 .Nm
@@ -951,6 +1012,31 @@ and global settings.
 .Pp
 More details on configuration variables can be found in
 .Xr bhyve_config 5 .
+.Sh CONFIGURATION FILE CREATION
+The
+.Fl k
+flag allows one to provide a path to a configuration file holding all
+settings, which otherwise would need to be defined by providing a long
+list of program arguments to
+.Nm .
+.Pp
+There is a very simple way to translate a complex set of program
+arguments to an equivalent configuration file in
+.Xr bhyve_config 5
+format.
+.Pp
+Use
+.Fl o
+.Ar config.dump=1
+to make
+.Nm
+dump a configuration file representing the used flags and arguments to
+stdout. You can pipe the output into a file to persist the generated settings.
+.Pp
+Make sure to remove the
+.Ar config.dump
+line from the resulting configuration file before using it to start
+.Nm .
 .Sh DEBUG SERVER
 The current debug server provides limited support for debuggers.
 .Ss Registers
@@ -959,9 +1045,10 @@ Each virtual CPU is exposed to the debugger as a thread.
 General purpose registers can be queried for each virtual CPU, but other
 registers such as floating-point and system registers cannot be queried.
 .Ss Memory
-Memory (including memory mapped I/O regions) can be read and written by the debugger.
-Memory operations use virtual addresses that are resolved to physical addresses
-via the current virtual CPU's active address translation.
+Memory (including memory mapped I/O regions) can be read and written
+by the debugger.
+Memory operations use virtual addresses that are resolved to physical
+addresses via the current virtual CPU's active address translation.
 .Ss Control
 The running guest can be interrupted by the debugger at any time
 .Pq for example, by pressing Ctrl-C in the debugger .
@@ -1009,8 +1096,14 @@ block device backed by the
 filesystem image, and a serial port for the console:
 .Bd -literal -offset indent
 bhyve -c 2 -s 0,hostbridge -s 1,lpc -s 2,virtio-blk,/my/image \\
-  -l com1,stdio -A -H -P -m 1G vm1
+  -l com1,stdio -H -P -m 1G vm1
 .Ed
+.Pp
+To do the same on arm64:
+.Bd -literal -offset indent
+.Ed
+bhyve -c 2 -s 0,hostbridge -s 1,virtio-blk,/my/image -o console=stdio \\
+  -o bootrom=/usr/local/share/u-boot/u-boot-bhyve-arm64/u-boot.bin -m 1G vm1
 .Pp
 Run a 24GB single-CPU virtual machine with three network ports, one of which
 has a MAC address specified:
@@ -1019,7 +1112,7 @@ bhyve -s 0,hostbridge -s 1,lpc -s 2:0,virtio-net,tap0 \\
   -s 2:1,virtio-net,tap1 \\
   -s 2:2,virtio-net,tap2,mac=00:be:fa:76:45:00 \\
   -s 3,virtio-blk,/my/image -l com1,stdio \\
-  -A -H -P -m 24G bigvm
+  -H -P -m 24G bigvm
 .Ed
 .Pp
 Run an 8GB quad-CPU virtual machine with 8 AHCI SATA disks, an AHCI ATAPI
@@ -1037,11 +1130,12 @@ hd:/images/disk.7,hd:/images/disk.8,\\
 cd:/images/install.iso \\
   -s 3,virtio-net,tap0 \\
   -l com1,/dev/nmdm0A \\
-  -A -H -P -m 8G
+  -H -P -m 8G
 .Ed
 .Pp
 Run a UEFI virtual machine with a display resolution of 800 by 600 pixels
-that can be accessed via VNC at: 0.0.0.0:5900.
+that can be accessed via VNC at: 0.0.0.0:5900 or via serial console over
+TCP at: 127.0.0.1:1234 (unsafe if you expose serial console without protection).
 .Bd -literal -offset indent
 bhyve -c 2 -m 4G -w -H \\
   -s 0,hostbridge \\
@@ -1050,13 +1144,14 @@ bhyve -c 2 -m 4G -w -H \\
   -s 5,virtio-net,tap0 \\
   -s 29,fbuf,tcp=0.0.0.0:5900,w=800,h=600,wait \\
   -s 30,xhci,tablet \\
-  -s 31,lpc -l com1,stdio \\
+  -s 31,lpc -l com1,tcp=127.0.0.1:1234 \\
   -l bootrom,/usr/local/share/uefi-firmware/BHYVE_UEFI.fd \\
    uefivm
 .Ed
 .Pp
 Run a UEFI virtual machine with a VNC display that is bound to all IPv6
-addresses on port 5900.
+addresses on port 5900 and a serial I/O port bound to TCP port 1234 of
+loopback address (unsafe if you expose serial console without protection).
 .Bd -literal -offset indent
 bhyve -c 2 -m 4G -w -H \\
   -s 0,hostbridge \\
@@ -1064,7 +1159,7 @@ bhyve -c 2 -m 4G -w -H \\
   -s 5,virtio-net,tap0 \\
   -s 29,fbuf,tcp=[::]:5900,w=800,h=600 \\
   -s 30,xhci,tablet \\
-  -s 31,lpc -l com1,stdio \\
+  -s 31,lpc -l com1,tcp=[::1]:1234 \\
   -l bootrom,/usr/local/share/uefi-firmware/BHYVE_UEFI.fd \\
    uefivm
 .Ed
@@ -1081,6 +1176,31 @@ bhyve -c 2 -m 4g -w -H \\
   -s 31,lpc -l com1,stdio \\
   -l bootrom,/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd,BHYVE_UEFI_VARS.fd
    uefivm
+.Ed
+.Pp
+To create a configuration file
+.Pa configfile
+for a virtual machine, use
+.Fl o
+.Ar config.dump=1 :
+.Bd -literal -offset indent
+/usr/sbin/bhyve -c 2 -m 256 -H -P \\
+  -s 0:0,hostbridge -s 1:0,virtio-net,tap0 \\
+  -s 2:0,ahci-hd,./vm0.img \\
+  -s 31,lpc -l com1,stdio \\
+  -o config.dump=1 vm0 > configfile
+.Ed
+.Pp
+Then use an editor of your choice to remove the line "config.dump=1"
+from the newly generated
+.Pa configfile .
+.Pp
+To start
+.Nm
+using this configuration file, use flag
+.Fl k :
+.Bd -literal -offset indent
+/usr/sbin/bhyve -k configfile vm0
 .Ed
 .Sh SEE ALSO
 .Xr bhyve 4 ,

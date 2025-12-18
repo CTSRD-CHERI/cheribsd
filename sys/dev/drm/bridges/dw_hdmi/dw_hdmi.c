@@ -41,9 +41,9 @@
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
-#include <dev/extres/clk/clk.h>
-#include <dev/extres/syscon/syscon.h>
-#include <dev/extres/hwreset/hwreset.h>
+#include <dev/clk/clk.h>
+#include <dev/syscon/syscon.h>
+#include <dev/hwreset/hwreset.h>
 
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_bridge.h>

@@ -28,7 +28,6 @@
 
 #include "opt_ddb.h"
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/kdb.h>
@@ -47,6 +46,13 @@
 #define	FRAME_IRQ	2
 #define	FRAME_SERROR	3
 #define	FRAME_UNHANDLED	4
+
+void
+db_md_list_breakpoints(void)
+{
+
+	dbg_show_breakpoint();
+}
 
 void
 db_md_list_watchpoints(void)
@@ -101,7 +107,7 @@ db_stack_trace_cmd(struct thread *td, struct unwind_state *frame)
 				break;
 			}
 #endif
-			if (!__is_aligned(tf, _Alignof(*tf)) ||
+			if (!__is_aligned(tf, _Alignof(struct trapframe)) ||
 			    !kstack_contains(td, (vm_offset_t)tf,
 			    sizeof(*tf))) {
 				db_printf("--- invalid trapframe %p\n", tf);

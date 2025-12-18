@@ -75,6 +75,7 @@ struct pfr_buffer;	/* forward definition */
 
 struct pfctl {
 	int dev;
+	struct pfctl_handle *h;
 	int opts;
 	int optimize;
 	int loadopt;
@@ -135,6 +136,8 @@ struct node_host {
 	struct node_host	*next;
 	struct node_host	*tail;
 };
+
+void	freehostlist(struct node_host *);
 
 struct node_mac {
 	u_int8_t	 mac[ETHER_ADDR_LEN];
@@ -284,13 +287,13 @@ int	pfctl_add_pool(struct pfctl *, struct pfctl_pool *, sa_family_t);
 void	pfctl_move_pool(struct pfctl_pool *, struct pfctl_pool *);
 void	pfctl_clear_pool(struct pfctl_pool *);
 
-int	pfctl_set_timeout(struct pfctl *, const char *, int, int);
+int	pfctl_apply_timeout(struct pfctl *, const char *, int, int);
 int	pfctl_set_reassembly(struct pfctl *, int, int);
 int	pfctl_set_optimization(struct pfctl *, const char *);
-int	pfctl_set_limit(struct pfctl *, const char *, unsigned int);
+int	pfctl_apply_limit(struct pfctl *, const char *, unsigned int);
 int	pfctl_set_logif(struct pfctl *, char *);
 int	pfctl_set_hostid(struct pfctl *, u_int32_t);
-int	pfctl_set_debug(struct pfctl *, char *);
+int	pfctl_do_set_debug(struct pfctl *, char *);
 int	pfctl_set_interface_flags(struct pfctl *, char *, int, int);
 int	pfctl_cfg_syncookies(struct pfctl *, uint8_t, struct pfctl_watermarks *);
 
@@ -299,7 +302,7 @@ int	parse_flags(char *);
 int	pfctl_load_anchors(int, struct pfctl *, struct pfr_buffer *);
 
 void	print_pool(struct pfctl_pool *, u_int16_t, u_int16_t, sa_family_t, int);
-void	print_src_node(struct pf_src_node *, int);
+void	print_src_node(struct pfctl_src_node *, int);
 void	print_eth_rule(struct pfctl_eth_rule *, const char *, int);
 void	print_rule(struct pfctl_rule *, const char *, int, int);
 void	print_tabledef(const char *, int, int, struct node_tinithead *);
@@ -360,6 +363,7 @@ extern const struct pf_timeout pf_timeouts[];
 void			 set_ipmask(struct node_host *, u_int8_t);
 int			 check_netmask(struct node_host *, sa_family_t);
 int			 unmask(struct pf_addr *, sa_family_t);
+struct node_host	*gen_dynnode(struct node_host *, sa_family_t);
 void			 ifa_load(void);
 int			 get_query_socket(void);
 struct node_host	*ifa_exists(char *);

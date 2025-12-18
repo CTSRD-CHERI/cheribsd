@@ -40,7 +40,7 @@
 
 #include <machine/bus.h>
 
-#include <dev/extres/clk/clk.h>
+#include <dev/clk/clk.h>
 
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_gem.h>
@@ -59,7 +59,8 @@ drm_gem_cma_destruct(struct drm_gem_cma_object *bo)
 
 	if (bo->vbase != 0) {
 		pmap_qremove(bo->vbase, bo->npages);
-		vmem_free(kmem_arena, bo->vbase, round_page(bo->gem_obj.size));
+		vmem_free(kernel_arena, bo->vbase,
+		    round_page(bo->gem_obj.size));
 	}
 
 	for (i = 0; i < bo->npages; i++) {
@@ -104,8 +105,6 @@ retry:
 	}
 
 	for (i = 0; i < npages; i++, m++) {
-		if ((m->flags & PG_ZERO) == 0)
-			pmap_zero_page(m);
 		m->valid = VM_PAGE_BITS_ALL;
 		(*ret_page)[i] = m;
 	}
@@ -156,9 +155,8 @@ drm_gem_cma_alloc(struct drm_device *drm, struct drm_gem_cma_object *bo)
 }
 
 static int
-drm_gem_cma_fault(struct vm_area_struct *dummy, struct vm_fault *vmf)
+drm_gem_cma_fault(struct vm_fault *vmf)
 {
-	struct vm_area_struct *vma;
 	struct drm_gem_object *gem_obj;
 	struct drm_gem_cma_object *bo;
 	vm_object_t obj;
@@ -166,37 +164,38 @@ drm_gem_cma_fault(struct vm_area_struct *dummy, struct vm_fault *vmf)
 	struct page *page;
 	int i;
 
-	vma = vmf->vma;
-	gem_obj = vma->vm_private_data;
+	obj = vmf->object;
+	gem_obj = obj->handle;
 	bo = container_of(gem_obj, struct drm_gem_cma_object, gem_obj);
-	obj = vma->vm_obj;
 
 	if (!bo->m)
 		return (VM_FAULT_SIGBUS);
 
-	pidx = OFF_TO_IDX(vmf->address - vma->vm_start);
+	pidx = vmf->pindex;
 	if (pidx >= bo->npages)
 		return (VM_FAULT_SIGBUS);
 
 	VM_OBJECT_WLOCK(obj);
 	for (i = 0; i < bo->npages; i++) {
 		page = bo->m[i];
-		if (vm_page_busied(page))
+		if (!vm_page_tryxbusy(page))
 			goto fail_unlock;
-		if (vm_page_insert(page, obj, i))
+		if (vm_page_insert(page, obj, i)) {
+			vm_page_xunbusy(page);
 			goto fail_unlock;
-		vm_page_tryxbusy(page);
+		}
 		page->valid = VM_PAGE_BITS_ALL;
 	}
 	VM_OBJECT_WUNLOCK(obj);
 
-	vma->vm_pfn_first = 0;
-	vma->vm_pfn_count =  bo->npages;
-	DRM_DEBUG("%s: pidx: %llu, start: 0x%08X, addr: 0x%08lX\n", __func__, pidx, vma->vm_start, vmf->address);
+	vmf->pindex = 0;
+	vmf->count = bo->npages;
 
 	return (VM_FAULT_NOPAGE);
 
 fail_unlock:
+	for (i--; i >= 0; i--)
+		vm_page_xunbusy(bo->m[i]);
 	VM_OBJECT_WUNLOCK(obj);
 	DRM_ERROR("%s: insert failed\n", __func__);
 	return (VM_FAULT_SIGBUS);
@@ -206,6 +205,7 @@ const struct vm_operations_struct drm_gem_cma_vm_ops = {
 	.fault = drm_gem_cma_fault,
 	.open = drm_gem_vm_open,
 	.close = drm_gem_vm_close,
+	.objtype = OBJT_MGTDEVICE,
 };
 
 static int

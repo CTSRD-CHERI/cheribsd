@@ -27,7 +27,6 @@
  *
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/eventhandler.h>
@@ -1317,10 +1316,12 @@ smu_shutdown(void *xdev, int howto)
 	struct smu_cmd cmd;
 
 	cmd.cmd = SMU_POWER;
-	if (howto & RB_HALT)
+	if ((howto & RB_POWEROFF) != 0)
 		strcpy(cmd.data, "SHUTDOWN");
-	else
+	else if ((howto & RB_HALT) == 0)
 		strcpy(cmd.data, "RESTART");
+	else
+		return;
 
 	cmd.len = strlen(cmd.data);
 
@@ -1434,7 +1435,7 @@ smu_attach_i2c(device_t smu, phandle_t i2croot)
 			continue;
 		}
 
-		cdev = device_add_child(smu, NULL, -1);
+		cdev = device_add_child(smu, NULL, DEVICE_UNIT_ANY);
 		if (cdev == NULL) {
 			device_printf(smu, "<%s>: device_add_child failed\n",
 			    dinfo->obd_name);
@@ -1475,7 +1476,7 @@ smuiic_attach(device_t dev)
 	    sizeof(sc->sc_busno));
 
 	/* Add the IIC bus layer */
-	device_add_child(dev, "iicbus", -1);
+	device_add_child(dev, "iicbus", DEVICE_UNIT_ANY);
 
 	return (bus_generic_attach(dev));
 }

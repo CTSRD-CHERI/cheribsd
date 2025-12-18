@@ -29,12 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#if 0
-#ifndef lint
-static char sccsid[] = "@(#)tree.c	8.3 (Berkeley) 4/2/94";
-#endif
-#endif
-
 #include <sys/cdefs.h>
 #include <err.h>
 #include <limits.h>
@@ -106,7 +100,7 @@ add_node(NODE *node, NODE *cur_node)
 		if (!cur_node->been_warned)
 			if (!wflag)
 				fprintf(stderr, "Duplicate entry in files %s and %s: %s (Warning only)\n", node->file, cur_node->file, node->entry);
-		cur_node->been_warned = YES;
+		cur_node->been_warned = true;
 	}
 	else if (dif < 0)
 		if (cur_node->left)

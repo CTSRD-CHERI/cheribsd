@@ -35,7 +35,7 @@
 /*
  * Efficient memory file system supporting functions.
  */
-#include <sys/cdefs.h>
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/dirent.h>
@@ -64,6 +64,7 @@
 #include <vm/vm_pager.h>
 #include <vm/vm_extern.h>
 #include <vm/swap_pager.h>
+#include <vm/uma.h>
 
 #include <fs/tmpfs/tmpfs.h>
 #include <fs/tmpfs/tmpfs_fifoops.h>
@@ -73,6 +74,9 @@ SYSCTL_NODE(_vfs, OID_AUTO, tmpfs, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "tmpfs file system");
 
 static long tmpfs_pages_reserved = TMPFS_PAGES_MINRESERVED;
+static long tmpfs_pages_avail_init;
+static int tmpfs_mem_percent = TMPFS_MEM_PERCENT;
+static void tmpfs_set_reserve_from_percent(void);
 
 MALLOC_DEFINE(M_TMPFSDIR, "tmpfs dir", "tmpfs dirent structure");
 static uma_zone_t tmpfs_node_pool;
@@ -116,7 +120,7 @@ tmpfs_pager_writecount_recalc(vm_object_t object, vm_offset_t old,
 	/*
 	 * Forced unmount?
 	 */
-	if (vp == NULL) {
+	if (vp == NULL || vp->v_object == NULL) {
 		KASSERT((object->flags & OBJ_TMPFS_VREF) == 0,
 		    ("object %p with OBJ_TMPFS_VREF but without vnode",
 		    object));
@@ -179,6 +183,9 @@ tmpfs_pager_release_writecount(vm_object_t object, vm_offset_t start,
 	KASSERT((object->flags & OBJ_ANON) == 0,
 	    ("%s: object %p with OBJ_ANON", __func__, object));
 	old = object->un_pager.swp.writemappings;
+	KASSERT(old >= (vm_ooffset_t)end - start,
+	    ("tmpfs obj %p writecount %jx dec %jx", object, (uintmax_t)old,
+	    (uintmax_t)((vm_ooffset_t)end - start)));
 	object->un_pager.swp.writemappings -= (vm_ooffset_t)end - start;
 	new = object->un_pager.swp.writemappings;
 	tmpfs_pager_writecount_recalc(object, old, new);
@@ -290,6 +297,8 @@ tmpfs_can_alloc_page(vm_object_t obj, vm_pindex_t pindex)
 	if (tm == NULL || vm_pager_has_page(obj, pindex, NULL, NULL) ||
 	    tm->tm_pages_max == 0)
 		return (true);
+	if (tm->tm_pages_max == ULONG_MAX)
+		return (tmpfs_mem_avail() >= 1);
 	return (tm->tm_pages_max > atomic_load_long(&tm->tm_pages_used));
 }
 
@@ -340,7 +349,7 @@ tmpfs_node_init(void *mem, int size, int flags)
 
 	node = mem;
 	node->tn_id = 0;
-	mtx_init(&node->tn_interlock, "tmpfsni", NULL, MTX_DEF);
+	mtx_init(&node->tn_interlock, "tmpfsni", NULL, MTX_DEF | MTX_NEW);
 	node->tn_gen = arc4random();
 	return (0);
 }
@@ -365,6 +374,9 @@ tmpfs_subr_init(void)
 	    sizeof(struct tmpfs_node), tmpfs_node_ctor, tmpfs_node_dtor,
 	    tmpfs_node_init, tmpfs_node_fini, UMA_ALIGN_PTR, 0);
 	VFS_SMR_ZONE_SET(tmpfs_node_pool);
+
+	tmpfs_pages_avail_init = tmpfs_mem_avail();
+	tmpfs_set_reserve_from_percent();
 	return (0);
 }
 
@@ -399,9 +411,41 @@ sysctl_mem_reserved(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_vfs_tmpfs, OID_AUTO, memory_reserved,
-    CTLTYPE_LONG|CTLFLAG_MPSAFE|CTLFLAG_RW, &tmpfs_pages_reserved, 0,
+    CTLTYPE_LONG | CTLFLAG_MPSAFE | CTLFLAG_RW, &tmpfs_pages_reserved, 0,
     sysctl_mem_reserved, "L",
     "Amount of available memory and swap below which tmpfs growth stops");
+
+static int
+sysctl_mem_percent(SYSCTL_HANDLER_ARGS)
+{
+	int error, percent;
+
+	percent = *(int *)arg1;
+	error = sysctl_handle_int(oidp, &percent, 0, req);
+	if (error || !req->newptr)
+		return (error);
+
+	if ((unsigned) percent > 100)
+		return (EINVAL);
+
+	*(int *)arg1 = percent;
+	tmpfs_set_reserve_from_percent();
+	return (0);
+}
+
+static void
+tmpfs_set_reserve_from_percent(void)
+{
+	size_t reserved;
+
+	reserved = tmpfs_pages_avail_init * (100 - tmpfs_mem_percent) / 100;
+	tmpfs_pages_reserved = max(reserved, TMPFS_PAGES_MINRESERVED);
+}
+
+SYSCTL_PROC(_vfs_tmpfs, OID_AUTO, memory_percent,
+    CTLTYPE_INT | CTLFLAG_MPSAFE | CTLFLAG_RW, &tmpfs_mem_percent, 0,
+    sysctl_mem_percent, "I",
+    "Percent of available memory that can be used if no size limit");
 
 static __inline int tmpfs_dirtree_cmp(struct tmpfs_dirent *a,
     struct tmpfs_dirent *b);
@@ -602,6 +646,7 @@ tmpfs_alloc_node(struct mount *mp, struct tmpfs_mount *tmp, __enum_uint8(vtype) 
 		nnode->tn_dir.tn_parent = (parent == NULL) ? nnode : parent;
 		nnode->tn_dir.tn_readdir_lastn = 0;
 		nnode->tn_dir.tn_readdir_lastp = NULL;
+		nnode->tn_dir.tn_wht_size = 0;
 		nnode->tn_links++;
 		TMPFS_NODE_LOCK(nnode->tn_dir.tn_parent);
 		nnode->tn_dir.tn_parent->tn_links++;
@@ -913,6 +958,8 @@ tmpfs_destroy_vobject(struct vnode *vp, vm_object_t obj)
 
 	VM_OBJECT_WLOCK(obj);
 	VI_LOCK(vp);
+	vp->v_object = NULL;
+
 	/*
 	 * May be going through forced unmount.
 	 */
@@ -1053,15 +1100,19 @@ loop:
 		KASSERT((object->flags & OBJ_TMPFS_VREF) == 0,
 		    ("%s: object %p with OBJ_TMPFS_VREF but without vnode",
 		    __func__, object));
-		KASSERT(object->un_pager.swp.writemappings == 0,
-		    ("%s: object %p has writemappings",
-		    __func__, object));
 		VI_LOCK(vp);
 		KASSERT(vp->v_object == NULL, ("Not NULL v_object in tmpfs"));
 		vp->v_object = object;
 		vn_irflag_set_locked(vp, (tm->tm_pgread ? VIRF_PGREAD : 0) |
 		    VIRF_TEXT_REF);
 		VI_UNLOCK(vp);
+		VNASSERT((object->flags & OBJ_TMPFS_VREF) == 0, vp,
+		    ("leaked OBJ_TMPFS_VREF"));
+		if (object->un_pager.swp.writemappings > 0) {
+			vrefact(vp);
+			vlazy(vp);
+			vm_object_set_flag(object, OBJ_TMPFS_VREF);
+		}
 		VM_OBJECT_WUNLOCK(object);
 		break;
 	case VDIR:
@@ -1781,13 +1832,16 @@ int
 tmpfs_dir_whiteout_add(struct vnode *dvp, struct componentname *cnp)
 {
 	struct tmpfs_dirent *de;
+	struct tmpfs_node *dnode;
 	int error;
 
 	error = tmpfs_alloc_dirent(VFS_TO_TMPFS(dvp->v_mount), NULL,
 	    cnp->cn_nameptr, cnp->cn_namelen, &de);
 	if (error != 0)
 		return (error);
+	dnode = VP_TO_TMPFS_DIR(dvp);
 	tmpfs_dir_attach(dvp, de);
+	dnode->tn_dir.tn_wht_size += sizeof(*de);
 	return (0);
 }
 
@@ -1795,11 +1849,41 @@ void
 tmpfs_dir_whiteout_remove(struct vnode *dvp, struct componentname *cnp)
 {
 	struct tmpfs_dirent *de;
+	struct tmpfs_node *dnode;
 
-	de = tmpfs_dir_lookup(VP_TO_TMPFS_DIR(dvp), NULL, cnp);
+	dnode = VP_TO_TMPFS_DIR(dvp);
+	de = tmpfs_dir_lookup(dnode, NULL, cnp);
 	MPASS(de != NULL && de->td_node == NULL);
+	MPASS(dnode->tn_dir.tn_wht_size >= sizeof(*de));
+	dnode->tn_dir.tn_wht_size -= sizeof(*de);
 	tmpfs_dir_detach(dvp, de);
 	tmpfs_free_dirent(VFS_TO_TMPFS(dvp->v_mount), de);
+}
+
+/*
+ * Frees any dirents still associated with the directory represented
+ * by dvp in preparation for the removal of the directory.  This is
+ * required when removing a directory which contains only whiteout
+ * entries.
+ */
+void
+tmpfs_dir_clear_whiteouts(struct vnode *dvp)
+{
+	struct tmpfs_dir_cursor dc;
+	struct tmpfs_dirent *de;
+	struct tmpfs_node *dnode;
+
+	dnode = VP_TO_TMPFS_DIR(dvp);
+
+	while ((de = tmpfs_dir_first(dnode, &dc)) != NULL) {
+		KASSERT(de->td_node == NULL, ("%s: non-whiteout dirent %p",
+		    __func__, de));
+		dnode->tn_dir.tn_wht_size -= sizeof(*de);
+		tmpfs_dir_detach(dvp, de);
+		tmpfs_free_dirent(VFS_TO_TMPFS(dvp->v_mount), de);
+	}
+	MPASS(dnode->tn_size == 0);
+	MPASS(dnode->tn_dir.tn_wht_size == 0);
 }
 
 /*

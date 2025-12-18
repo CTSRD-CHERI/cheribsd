@@ -38,6 +38,7 @@
 #include <sys/elf.h>
 #endif
 #include <sys/caprights.h>
+#include <cheri/c18n.h>
 
 /*
  * Vnode types.
@@ -154,7 +155,6 @@ struct shmstat {
 	uint16_t	mode;
 };
 struct sockstat {
-	uint64_t	inp_ppcb;
 	uint64_t	so_addr;
 	uint64_t	so_pcb;
 	uint64_t	unp_conn;
@@ -212,9 +212,15 @@ void	procstat_freefiles(struct procstat *procstat,
     struct filestat_list *head);
 void	procstat_freeptlwpinfo(struct procstat *procstat,
     struct ptrace_lwpinfo *pl);
+void	procstat_freerlimitusage(struct procstat *procstat, rlim_t *resusage);
 void	procstat_freevmmap(struct procstat *procstat,
     struct kinfo_vmentry *vmmap);
 struct advlock_list	*procstat_getadvlock(struct procstat *procstat);
+int	procstat_getc18n(struct procstat *procstat, struct kinfo_proc *kp,
+    struct rtld_c18n_stats *stats);
+int	procstat_getcompartments(struct procstat *procstat,
+    struct kinfo_proc *kp, struct kinfo_cheri_c18n_compart **comparts,
+    size_t *ncomparts);
 struct filestat_list	*procstat_getfiles(struct procstat *procstat,
     struct kinfo_proc *kp, int mmapped);
 struct kinfo_proc	*procstat_getprocs(struct procstat *procstat,
@@ -257,6 +263,8 @@ int	procstat_getquarantining(struct procstat *procstat,
     struct kinfo_proc *kp, int *quarantining);
 int	procstat_getrlimit(struct procstat *procstat, struct kinfo_proc *kp,
     int which, struct rlimit* rlimit);
+rlim_t	*procstat_getrlimitusage(struct procstat *procstat,
+    struct kinfo_proc *kp, unsigned int *cntp);
 int	procstat_getumask(struct procstat *procstat, struct kinfo_proc *kp,
     unsigned short* umask);
 struct kinfo_vmentry	*procstat_getvmmap(struct procstat *procstat,

@@ -1,6 +1,3 @@
-#	@(#)Makefile	8.4 (Berkeley) 6/22/95
-#
-
 PACKAGE=runtime
 PROG=	umount
 SRCS=	umount.c vfslist.c mounttab.c

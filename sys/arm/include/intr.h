@@ -47,21 +47,6 @@
 #define	NIRQ		1024	/* XXX - It should be an option. */
 #endif
 
-#include <sys/intr.h>
-
-#ifdef SMP
-typedef void intr_ipi_send_t(void *, cpuset_t, u_int);
-typedef void intr_ipi_handler_t(void *);
-
-void intr_ipi_dispatch(u_int);
-void intr_ipi_send(cpuset_t, u_int);
-
-void intr_ipi_setup(u_int, const char *, intr_ipi_handler_t *, void *,
-    intr_ipi_send_t *, void *);
-
-int intr_pic_ipi_setup(u_int, const char *, intr_ipi_handler_t *, void *);
-#endif
-
 void arm_irq_memory_barrier(uintptr_t);
 
 #endif	/* _MACHINE_INTR_H */

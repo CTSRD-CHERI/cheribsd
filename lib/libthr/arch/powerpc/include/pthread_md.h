@@ -49,6 +49,9 @@ _get_curthread(void)
 	return (NULL);
 }
 
-#define	HAS__UMTX_OP_ERR	1
+static __inline void
+_thr_resolve_machdep(void)
+{
+}
 
 #endif /* _PTHREAD_MD_H_ */

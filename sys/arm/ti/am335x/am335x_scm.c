@@ -24,7 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -38,7 +37,7 @@
 #include <arm/ti/ti_cpuid.h>
 #include <arm/ti/ti_scm.h>
 
-#include <dev/extres/syscon/syscon.h>
+#include <dev/syscon/syscon.h>
 #include "syscon_if.h"
 
 #define	TZ_ZEROC	2731
@@ -90,7 +89,7 @@ am335x_scm_identify(driver_t *driver, device_t parent)
 	if (device_find_child(parent, "am335x_scm", -1) != NULL)
 		return;
 
-	child = device_add_child(parent, "am335x_scm", -1);
+	child = device_add_child(parent, "am335x_scm", DEVICE_UNIT_ANY);
 	if (child == NULL)
 		device_printf(parent, "cannot add ti_scm child\n");
 }

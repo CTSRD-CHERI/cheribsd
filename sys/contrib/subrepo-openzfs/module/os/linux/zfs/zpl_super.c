@@ -29,6 +29,7 @@
 #include <sys/zfs_vnops.h>
 #include <sys/zfs_ctldir.h>
 #include <sys/zpl.h>
+#include <linux/iversion.h>
 
 
 static struct inode *
@@ -54,7 +55,6 @@ zpl_inode_destroy(struct inode *ip)
  * inode has changed.  We use it to ensure the znode system attributes
  * are always strictly update to date with respect to the inode.
  */
-#ifdef HAVE_DIRTY_INODE_WITH_FLAGS
 static void
 zpl_dirty_inode(struct inode *ip, int flags)
 {
@@ -64,17 +64,6 @@ zpl_dirty_inode(struct inode *ip, int flags)
 	zfs_dirty_inode(ip, flags);
 	spl_fstrans_unmark(cookie);
 }
-#else
-static void
-zpl_dirty_inode(struct inode *ip)
-{
-	fstrans_cookie_t cookie;
-
-	cookie = spl_fstrans_mark();
-	zfs_dirty_inode(ip, 0);
-	spl_fstrans_unmark(cookie);
-}
-#endif /* HAVE_DIRTY_INODE_WITH_FLAGS */
 
 /*
  * When ->drop_inode() is called its return value indicates if the
@@ -277,8 +266,6 @@ zpl_test_super(struct super_block *s, void *data)
 {
 	zfsvfs_t *zfsvfs = s->s_fs_info;
 	objset_t *os = data;
-	int match;
-
 	/*
 	 * If the os doesn't match the z_os in the super_block, assume it is
 	 * not a match. Matching would imply a multimount of a dataset. It is
@@ -286,19 +273,7 @@ zpl_test_super(struct super_block *s, void *data)
 	 * that changes the z_os, e.g., rollback, where the match will be
 	 * missed, but in that case the user will get an EBUSY.
 	 */
-	if (zfsvfs == NULL || os != zfsvfs->z_os)
-		return (0);
-
-	/*
-	 * If they do match, recheck with the lock held to prevent mounting the
-	 * wrong dataset since z_os can be stale when the teardown lock is held.
-	 */
-	if (zpl_enter(zfsvfs, FTAG) != 0)
-		return (0);
-	match = (os == zfsvfs->z_os);
-	zpl_exit(zfsvfs, FTAG);
-
-	return (match);
+	return (zfsvfs != NULL && os == zfsvfs->z_os);
 }
 
 static struct super_block *
@@ -306,6 +281,7 @@ zpl_mount_impl(struct file_system_type *fs_type, int flags, zfs_mnt_t *zm)
 {
 	struct super_block *s;
 	objset_t *os;
+	boolean_t issnap = B_FALSE;
 	int err;
 
 	err = dmu_objset_hold(zm->mnt_osname, FTAG, &os);
@@ -324,11 +300,35 @@ zpl_mount_impl(struct file_system_type *fs_type, int flags, zfs_mnt_t *zm)
 
 	s = sget(fs_type, zpl_test_super, set_anon_super, flags, os);
 
+	/*
+	 * Recheck with the lock held to prevent mounting the wrong dataset
+	 * since z_os can be stale when the teardown lock is held.
+	 *
+	 * We can't do this in zpl_test_super in since it's under spinlock and
+	 * also s_umount lock is not held there so it would race with
+	 * zfs_umount and zfsvfs can be freed.
+	 */
+	if (!IS_ERR(s) && s->s_fs_info != NULL) {
+		zfsvfs_t *zfsvfs = s->s_fs_info;
+		if (zpl_enter(zfsvfs, FTAG) == 0) {
+			if (os != zfsvfs->z_os)
+				err = -SET_ERROR(EBUSY);
+			issnap = zfsvfs->z_issnap;
+			zpl_exit(zfsvfs, FTAG);
+		} else {
+			err = -SET_ERROR(EBUSY);
+		}
+	}
 	dsl_dataset_long_rele(dmu_objset_ds(os), FTAG);
 	dsl_dataset_rele(dmu_objset_ds(os), FTAG);
 
 	if (IS_ERR(s))
 		return (ERR_CAST(s));
+
+	if (err) {
+		deactivate_locked_super(s);
+		return (ERR_PTR(err));
+	}
 
 	if (s->s_root == NULL) {
 		err = zpl_fill_super(s, zm, flags & SB_SILENT ? 1 : 0);
@@ -337,7 +337,11 @@ zpl_mount_impl(struct file_system_type *fs_type, int flags, zfs_mnt_t *zm)
 			return (ERR_PTR(err));
 		}
 		s->s_flags |= SB_ACTIVE;
-	} else if ((flags ^ s->s_flags) & SB_RDONLY) {
+	} else if (!issnap && ((flags ^ s->s_flags) & SB_RDONLY)) {
+		/*
+		 * Skip ro check for snap since snap is always ro regardless
+		 * ro flag is passed by mount or not.
+		 */
 		deactivate_locked_super(s);
 		return (ERR_PTR(-EBUSY));
 	}
@@ -366,7 +370,7 @@ zpl_kill_sb(struct super_block *sb)
 }
 
 void
-zpl_prune_sb(int64_t nr_to_scan, void *arg)
+zpl_prune_sb(uint64_t nr_to_scan, void *arg)
 {
 	struct super_block *sb = (struct super_block *)arg;
 	int objects = 0;

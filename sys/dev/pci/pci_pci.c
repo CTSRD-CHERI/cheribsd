@@ -58,8 +58,18 @@
 #include "pcib_if.h"
 
 static int		pcib_probe(device_t dev);
-static int		pcib_suspend(device_t dev);
 static int		pcib_resume(device_t dev);
+
+static bus_child_present_t	pcib_child_present;
+static bus_alloc_resource_t	pcib_alloc_resource;
+static bus_adjust_resource_t	pcib_adjust_resource;
+static bus_release_resource_t	pcib_release_resource;
+static bus_activate_resource_t	pcib_activate_resource;
+static bus_deactivate_resource_t pcib_deactivate_resource;
+static bus_map_resource_t	pcib_map_resource;
+static bus_unmap_resource_t	pcib_unmap_resource;
+static int		pcib_reset_child(device_t dev, device_t child, int flags);
+
 static int		pcib_power_for_sleep(device_t pcib, device_t dev,
 			    int *pstate);
 static int		pcib_ari_get_id(device_t pcib, device_t dev,
@@ -81,7 +91,6 @@ static void		pcib_pcie_dll_timeout(void *arg, int pending);
 #endif
 static int		pcib_request_feature_default(device_t pcib, device_t dev,
 			    enum pci_feature feature);
-static int		pcib_reset_child(device_t dev, device_t child, int flags);
 
 static device_method_t pcib_methods[] = {
     /* Device interface */
@@ -89,7 +98,7 @@ static device_method_t pcib_methods[] = {
     DEVMETHOD(device_attach,		pcib_attach),
     DEVMETHOD(device_detach,		pcib_detach),
     DEVMETHOD(device_shutdown,		bus_generic_shutdown),
-    DEVMETHOD(device_suspend,		pcib_suspend),
+    DEVMETHOD(device_suspend,		bus_generic_suspend),
     DEVMETHOD(device_resume,		pcib_resume),
 
     /* Bus interface */
@@ -97,15 +106,12 @@ static device_method_t pcib_methods[] = {
     DEVMETHOD(bus_read_ivar,		pcib_read_ivar),
     DEVMETHOD(bus_write_ivar,		pcib_write_ivar),
     DEVMETHOD(bus_alloc_resource,	pcib_alloc_resource),
-#ifdef NEW_PCIB
     DEVMETHOD(bus_adjust_resource,	pcib_adjust_resource),
     DEVMETHOD(bus_release_resource,	pcib_release_resource),
-#else
-    DEVMETHOD(bus_adjust_resource,	bus_generic_adjust_resource),
-    DEVMETHOD(bus_release_resource,	bus_generic_release_resource),
-#endif
-    DEVMETHOD(bus_activate_resource,	bus_generic_activate_resource),
-    DEVMETHOD(bus_deactivate_resource,	bus_generic_deactivate_resource),
+    DEVMETHOD(bus_activate_resource,	pcib_activate_resource),
+    DEVMETHOD(bus_deactivate_resource,	pcib_deactivate_resource),
+    DEVMETHOD(bus_map_resource,		pcib_map_resource),
+    DEVMETHOD(bus_unmap_resource,	pcib_unmap_resource),
     DEVMETHOD(bus_setup_intr,		bus_generic_setup_intr),
     DEVMETHOD(bus_teardown_intr,	bus_generic_teardown_intr),
     DEVMETHOD(bus_reset_child,		pcib_reset_child),
@@ -134,11 +140,8 @@ static device_method_t pcib_methods[] = {
 DEFINE_CLASS_0(pcib, pcib_driver, pcib_methods, sizeof(struct pcib_softc));
 EARLY_DRIVER_MODULE(pcib, pci, pcib_driver, NULL, NULL, BUS_PASS_BUS);
 
-#if defined(NEW_PCIB) || defined(PCI_HP)
 SYSCTL_DECL(_hw_pci);
-#endif
 
-#ifdef NEW_PCIB
 static int pci_clear_pcib;
 SYSCTL_INT(_hw_pci, OID_AUTO, clear_pcib, CTLFLAG_RDTUN, &pci_clear_pcib, 0,
     "Clear firmware-assigned resources for PCI-PCI bridge I/O windows.");
@@ -148,9 +151,9 @@ SYSCTL_INT(_hw_pci, OID_AUTO, clear_pcib, CTLFLAG_RDTUN, &pci_clear_pcib, 0,
  * sub-allocated from one of our window resource managers.
  */
 static struct pcib_window *
-pcib_get_resource_window(struct pcib_softc *sc, int type, struct resource *r)
+pcib_get_resource_window(struct pcib_softc *sc, struct resource *r)
 {
-	switch (type) {
+	switch (rman_get_type(r)) {
 	case SYS_RES_IOPORT:
 		if (rman_is_region_manager(r, &sc->io.rman))
 			return (&sc->io);
@@ -172,14 +175,12 @@ pcib_get_resource_window(struct pcib_softc *sc, int type, struct resource *r)
  * resource managers?
  */
 static int
-pcib_is_resource_managed(struct pcib_softc *sc, int type, struct resource *r)
+pcib_is_resource_managed(struct pcib_softc *sc, struct resource *r)
 {
 
-#ifdef PCI_RES_BUS
-	if (type == PCI_RES_BUS)
+	if (rman_get_type(r) == PCI_RES_BUS)
 		return (rman_is_region_manager(r, &sc->bus.rman));
-#endif
-	return (pcib_get_resource_window(sc, type, r) != NULL);
+	return (pcib_get_resource_window(sc, r) != NULL);
 }
 
 static int
@@ -373,7 +374,7 @@ alloc_ranges(rman_res_t start, rman_res_t end, void *arg)
 		device_printf(as->sc->dev,
 		    "allocating non-ISA range %#jx-%#jx\n", start, end);
 	as->res[as->count] = bus_alloc_resource(as->sc->dev, SYS_RES_IOPORT,
-	    &rid, start, end, end - start + 1, 0);
+	    &rid, start, end, end - start + 1, RF_ACTIVE | RF_UNMAPPED);
 	if (as->res[as->count] == NULL)
 		as->error = ENXIO;
 	else
@@ -446,7 +447,7 @@ pcib_alloc_window(struct pcib_softc *sc, struct pcib_window *w, int type,
 	else {
 		rid = w->reg;
 		res = bus_alloc_resource(sc->dev, type, &rid, w->base, w->limit,
-		    w->limit - w->base + 1, flags);
+		    w->limit - w->base + 1, flags | RF_ACTIVE | RF_UNMAPPED);
 		if (res != NULL)
 			pcib_add_window_resources(w, &res, 1);
 	}
@@ -602,7 +603,6 @@ pcib_free_windows(struct pcib_softc *sc)
 	pcib_release_window(sc, &sc->io, SYS_RES_IOPORT);
 }
 
-#ifdef PCI_RES_BUS
 /*
  * Allocate a suitable secondary bus for this bridge if needed and
  * initialize the resource manager for the secondary bus range.  Note
@@ -646,14 +646,14 @@ pcib_setup_secbus(device_t dev, struct pcib_secbus *bus, int min_count)
 	 */
 	rid = 0;
 	bus->res = bus_alloc_resource_anywhere(dev, PCI_RES_BUS, &rid,
-	    min_count, 0);
+	    min_count, RF_ACTIVE);
 	if (bus->res == NULL) {
 		/*
 		 * Fall back to just allocating a range of a single bus
 		 * number.
 		 */
 		bus->res = bus_alloc_resource_anywhere(dev, PCI_RES_BUS, &rid,
-		    1, 0);
+		    1, RF_ACTIVE);
 	} else if (rman_get_size(bus->res) < min_count)
 		/*
 		 * Attempt to grow the existing range to satisfy the
@@ -711,6 +711,7 @@ pcib_suballoc_bus(struct pcib_secbus *bus, device_t child, int *rid,
 		    rman_get_start(res), rman_get_end(res), *rid,
 		    pcib_child_name(child));
 	rman_set_rid(res, *rid);
+	rman_set_type(res, PCI_RES_BUS);
 	return (res);
 }
 
@@ -789,141 +790,6 @@ pcib_alloc_subbus(struct pcib_secbus *bus, device_t child, int *rid,
 		    flags));
 	return (NULL);
 }
-#endif
-
-#else
-
-/*
- * Is the prefetch window open (eg, can we allocate memory in it?)
- */
-static int
-pcib_is_prefetch_open(struct pcib_softc *sc)
-{
-	return (sc->pmembase > 0 && sc->pmembase < sc->pmemlimit);
-}
-
-/*
- * Is the nonprefetch window open (eg, can we allocate memory in it?)
- */
-static int
-pcib_is_nonprefetch_open(struct pcib_softc *sc)
-{
-	return (sc->membase > 0 && sc->membase < sc->memlimit);
-}
-
-/*
- * Is the io window open (eg, can we allocate ports in it?)
- */
-static int
-pcib_is_io_open(struct pcib_softc *sc)
-{
-	return (sc->iobase > 0 && sc->iobase < sc->iolimit);
-}
-
-/*
- * Get current I/O decode.
- */
-static void
-pcib_get_io_decode(struct pcib_softc *sc)
-{
-	device_t	dev;
-	uint32_t	iolow;
-
-	dev = sc->dev;
-
-	iolow = pci_read_config(dev, PCIR_IOBASEL_1, 1);
-	if ((iolow & PCIM_BRIO_MASK) == PCIM_BRIO_32)
-		sc->iobase = PCI_PPBIOBASE(
-		    pci_read_config(dev, PCIR_IOBASEH_1, 2), iolow);
-	else
-		sc->iobase = PCI_PPBIOBASE(0, iolow);
-
-	iolow = pci_read_config(dev, PCIR_IOLIMITL_1, 1);
-	if ((iolow & PCIM_BRIO_MASK) == PCIM_BRIO_32)
-		sc->iolimit = PCI_PPBIOLIMIT(
-		    pci_read_config(dev, PCIR_IOLIMITH_1, 2), iolow);
-	else
-		sc->iolimit = PCI_PPBIOLIMIT(0, iolow);
-}
-
-/*
- * Get current memory decode.
- */
-static void
-pcib_get_mem_decode(struct pcib_softc *sc)
-{
-	device_t	dev;
-	pci_addr_t	pmemlow;
-
-	dev = sc->dev;
-
-	sc->membase = PCI_PPBMEMBASE(0,
-	    pci_read_config(dev, PCIR_MEMBASE_1, 2));
-	sc->memlimit = PCI_PPBMEMLIMIT(0,
-	    pci_read_config(dev, PCIR_MEMLIMIT_1, 2));
-
-	pmemlow = pci_read_config(dev, PCIR_PMBASEL_1, 2);
-	if ((pmemlow & PCIM_BRPM_MASK) == PCIM_BRPM_64)
-		sc->pmembase = PCI_PPBMEMBASE(
-		    pci_read_config(dev, PCIR_PMBASEH_1, 4), pmemlow);
-	else
-		sc->pmembase = PCI_PPBMEMBASE(0, pmemlow);
-
-	pmemlow = pci_read_config(dev, PCIR_PMLIMITL_1, 2);
-	if ((pmemlow & PCIM_BRPM_MASK) == PCIM_BRPM_64)
-		sc->pmemlimit = PCI_PPBMEMLIMIT(
-		    pci_read_config(dev, PCIR_PMLIMITH_1, 4), pmemlow);
-	else
-		sc->pmemlimit = PCI_PPBMEMLIMIT(0, pmemlow);
-}
-
-/*
- * Restore previous I/O decode.
- */
-static void
-pcib_set_io_decode(struct pcib_softc *sc)
-{
-	device_t	dev;
-	uint32_t	iohi;
-
-	dev = sc->dev;
-
-	iohi = sc->iobase >> 16;
-	if (iohi > 0)
-		pci_write_config(dev, PCIR_IOBASEH_1, iohi, 2);
-	pci_write_config(dev, PCIR_IOBASEL_1, sc->iobase >> 8, 1);
-
-	iohi = sc->iolimit >> 16;
-	if (iohi > 0)
-		pci_write_config(dev, PCIR_IOLIMITH_1, iohi, 2);
-	pci_write_config(dev, PCIR_IOLIMITL_1, sc->iolimit >> 8, 1);
-}
-
-/*
- * Restore previous memory decode.
- */
-static void
-pcib_set_mem_decode(struct pcib_softc *sc)
-{
-	device_t	dev;
-	pci_addr_t	pmemhi;
-
-	dev = sc->dev;
-
-	pci_write_config(dev, PCIR_MEMBASE_1, sc->membase >> 16, 2);
-	pci_write_config(dev, PCIR_MEMLIMIT_1, sc->memlimit >> 16, 2);
-
-	pmemhi = sc->pmembase >> 32;
-	if (pmemhi > 0)
-		pci_write_config(dev, PCIR_PMBASEH_1, pmemhi, 4);
-	pci_write_config(dev, PCIR_PMBASEL_1, sc->pmembase >> 16, 2);
-
-	pmemhi = sc->pmemlimit >> 32;
-	if (pmemhi > 0)
-		pci_write_config(dev, PCIR_PMLIMITH_1, pmemhi, 4);
-	pci_write_config(dev, PCIR_PMLIMITL_1, sc->pmemlimit >> 16, 2);
-}
-#endif
 
 #ifdef PCI_HP
 /*
@@ -1247,7 +1113,7 @@ pcib_pcie_hotplug_task(void *context, int pending)
 	dev = sc->dev;
 	if (pcib_hotplug_present(sc) != 0) {
 		if (sc->child == NULL) {
-			sc->child = device_add_child(dev, "pci", -1);
+			sc->child = device_add_child(dev, "pci", DEVICE_UNIT_ANY);
 			bus_generic_attach(dev);
 		}
 	} else {
@@ -1493,44 +1359,12 @@ pcib_detach_hotplug(struct pcib_softc *sc)
 #endif
 
 /*
- * Get current bridge configuration.
- */
-static void
-pcib_cfg_save(struct pcib_softc *sc)
-{
-#ifndef NEW_PCIB
-	device_t	dev;
-	uint16_t command;
-
-	dev = sc->dev;
-
-	command = pci_read_config(dev, PCIR_COMMAND, 2);
-	if (command & PCIM_CMD_PORTEN)
-		pcib_get_io_decode(sc);
-	if (command & PCIM_CMD_MEMEN)
-		pcib_get_mem_decode(sc);
-#endif
-}
-
-/*
  * Restore previous bridge configuration.
  */
 static void
 pcib_cfg_restore(struct pcib_softc *sc)
 {
-#ifndef NEW_PCIB
-	uint16_t command;
-#endif
-
-#ifdef NEW_PCIB
 	pcib_write_windows(sc, WIN_IO | WIN_MEM | WIN_PMEM);
-#else
-	command = pci_read_config(sc->dev, PCIR_COMMAND, 2);
-	if (command & PCIM_CMD_PORTEN)
-		pcib_set_io_decode(sc);
-	if (command & PCIM_CMD_MEMEN)
-		pcib_set_mem_decode(sc);
-#endif
 }
 
 /*
@@ -1562,12 +1396,7 @@ pcib_attach_common(device_t dev)
      * Get current bridge configuration.
      */
     sc->domain = pci_get_domain(dev);
-#if !(defined(NEW_PCIB) && defined(PCI_RES_BUS))
-    sc->bus.sec = pci_read_config(dev, PCIR_SECBUS_1, 1);
-    sc->bus.sub = pci_read_config(dev, PCIR_SUBBUS_1, 1);
-#endif
     sc->bridgectl = pci_read_config(dev, PCIR_BRIDGECTL_1, 2);
-    pcib_cfg_save(sc);
 
     /*
      * The primary bus register should always be the bus of the
@@ -1594,20 +1423,6 @@ pcib_attach_common(device_t dev)
      * Quirk handling.
      */
     switch (pci_get_devid(dev)) {
-#if !(defined(NEW_PCIB) && defined(PCI_RES_BUS))
-    case 0x12258086:		/* Intel 82454KX/GX (Orion) */
-	{
-	    uint8_t	supbus;
-
-	    supbus = pci_read_config(dev, 0x41, 1);
-	    if (supbus != 0xff) {
-		sc->bus.sec = supbus + 1;
-		sc->bus.sub = supbus + 1;
-	    }
-	    break;
-	}
-#endif
-
     /*
      * The i82380FB mobile docking controller is a PCI-PCI bridge,
      * and it is a subtractive bridge.  However, the ProgIf is wrong
@@ -1620,34 +1435,6 @@ pcib_attach_common(device_t dev)
     case 0x060513d7:		/* Toshiba ???? */
 	sc->flags |= PCIB_SUBTRACTIVE;
 	break;
-
-#if !(defined(NEW_PCIB) && defined(PCI_RES_BUS))
-    /* Compaq R3000 BIOS sets wrong subordinate bus number. */
-    case 0x00dd10de:
-	{
-	    char *cp;
-
-	    if ((cp = kern_getenv("smbios.planar.maker")) == NULL)
-		break;
-	    if (strncmp(cp, "Compal", 6) != 0) {
-		freeenv(cp);
-		break;
-	    }
-	    freeenv(cp);
-	    if ((cp = kern_getenv("smbios.planar.product")) == NULL)
-		break;
-	    if (strncmp(cp, "08A0", 4) != 0) {
-		freeenv(cp);
-		break;
-	    }
-	    freeenv(cp);
-	    if (sc->bus.sub < 0xa) {
-		pci_write_config(dev, PCIR_SUBBUS_1, 0xa, 1);
-		sc->bus.sub = pci_read_config(dev, PCIR_SUBBUS_1, 1);
-	    }
-	    break;
-	}
-#endif
     }
 
     if (pci_msi_device_blacklisted(dev))
@@ -1671,12 +1458,8 @@ pcib_attach_common(device_t dev)
 #ifdef PCI_HP
     pcib_probe_hotplug(sc);
 #endif
-#ifdef NEW_PCIB
-#ifdef PCI_RES_BUS
     pcib_setup_secbus(dev, &sc->bus, 1);
-#endif
     pcib_probe_windows(sc);
-#endif
 #ifdef PCI_HP
     if (sc->flags & PCIB_HOTPLUG)
 	    pcib_setup_hotplug(sc);
@@ -1685,7 +1468,6 @@ pcib_attach_common(device_t dev)
 	device_printf(dev, "  domain            %d\n", sc->domain);
 	device_printf(dev, "  secondary bus     %d\n", sc->bus.sec);
 	device_printf(dev, "  subordinate bus   %d\n", sc->bus.sub);
-#ifdef NEW_PCIB
 	if (pcib_is_window_open(&sc->io))
 	    device_printf(dev, "  I/O decode        0x%jx-0x%jx\n",
 	      (uintmax_t)sc->io.base, (uintmax_t)sc->io.limit);
@@ -1695,17 +1477,6 @@ pcib_attach_common(device_t dev)
 	if (pcib_is_window_open(&sc->pmem))
 	    device_printf(dev, "  prefetched decode 0x%jx-0x%jx\n",
 	      (uintmax_t)sc->pmem.base, (uintmax_t)sc->pmem.limit);
-#else
-	if (pcib_is_io_open(sc))
-	    device_printf(dev, "  I/O decode        0x%x-0x%x\n",
-	      sc->iobase, sc->iolimit);
-	if (pcib_is_nonprefetch_open(sc))
-	    device_printf(dev, "  memory decode     0x%jx-0x%jx\n",
-	      (uintmax_t)sc->membase, (uintmax_t)sc->memlimit);
-	if (pcib_is_prefetch_open(sc))
-	    device_printf(dev, "  prefetched decode 0x%jx-0x%jx\n",
-	      (uintmax_t)sc->pmembase, (uintmax_t)sc->pmemlimit);
-#endif
 	if (sc->bridgectl & (PCIB_BCR_ISA_ENABLE | PCIB_BCR_VGA_ENABLE) ||
 	    sc->flags & PCIB_SUBTRACTIVE) {
 		device_printf(dev, "  special decode    ");
@@ -1761,7 +1532,7 @@ pcib_attach_child(device_t dev)
 	}
 #endif
 
-	sc->child = device_add_child(dev, "pci", -1);
+	sc->child = device_add_child(dev, "pci", DEVICE_UNIT_ANY);
 	return (bus_generic_attach(dev));
 }
 
@@ -1776,14 +1547,10 @@ pcib_attach(device_t dev)
 int
 pcib_detach(device_t dev)
 {
-#if defined(PCI_HP) || defined(NEW_PCIB)
 	struct pcib_softc *sc;
-#endif
 	int error;
 
-#if defined(PCI_HP) || defined(NEW_PCIB)
 	sc = device_get_softc(dev);
-#endif
 	error = bus_generic_detach(dev);
 	if (error)
 		return (error);
@@ -1797,21 +1564,9 @@ pcib_detach(device_t dev)
 	error = device_delete_children(dev);
 	if (error)
 		return (error);
-#ifdef NEW_PCIB
 	pcib_free_windows(sc);
-#ifdef PCI_RES_BUS
 	pcib_free_secbus(dev, &sc->bus);
-#endif
-#endif
 	return (0);
-}
-
-int
-pcib_suspend(device_t dev)
-{
-
-	pcib_cfg_save(device_get_softc(dev));
-	return (bus_generic_suspend(dev));
 }
 
 int
@@ -1888,7 +1643,6 @@ pcib_write_ivar(device_t dev, device_t child, int which, uintptr_t value)
     return(ENOENT);
 }
 
-#ifdef NEW_PCIB
 /*
  * Attempt to allocate a resource from the existing resources assigned
  * to a window.
@@ -1914,12 +1668,8 @@ pcib_suballoc_resource(struct pcib_softc *sc, struct pcib_window *w,
 		    w->name, rman_get_start(res), rman_get_end(res), *rid,
 		    pcib_child_name(child));
 	rman_set_rid(res, *rid);
+	rman_set_type(res, type);
 
-	/*
-	 * If the resource should be active, pass that request up the
-	 * tree.  This assumes the parent drivers can handle
-	 * activating sub-allocated resources.
-	 */
 	if (flags & RF_ACTIVE) {
 		if (bus_activate_resource(child, type, *rid, res) != 0) {
 			rman_release_resource(res);
@@ -1993,7 +1743,7 @@ pcib_alloc_new_window(struct pcib_softc *sc, struct pcib_window *w, int type,
 	count = roundup2(count, (rman_res_t)1 << w->step);
 	rid = w->reg;
 	res = bus_alloc_resource(sc->dev, type, &rid, start, end, count,
-	    flags & ~RF_ACTIVE);
+	    flags | RF_ACTIVE | RF_UNMAPPED);
 	if (res == NULL)
 		return (ENOSPC);
 	pcib_add_window_resources(w, &res, 1);
@@ -2269,7 +2019,7 @@ updatewin:
  * We have to trap resource allocation requests and ensure that the bridge
  * is set up to, or capable of handling them.
  */
-struct resource *
+static struct resource *
 pcib_alloc_resource(device_t dev, device_t child, int type, int *rid,
     rman_res_t start, rman_res_t end, rman_res_t count, u_int flags)
 {
@@ -2293,11 +2043,9 @@ pcib_alloc_resource(device_t dev, device_t child, int type, int *rid,
 	}
 
 	switch (type) {
-#ifdef PCI_RES_BUS
 	case PCI_RES_BUS:
 		return (pcib_alloc_subbus(&sc->bus, child, rid, start, end,
 		    count, flags));
-#endif
 	case SYS_RES_IOPORT:
 		if (pcib_is_isa_range(sc, start, end, count))
 			return (NULL);
@@ -2358,26 +2106,25 @@ pcib_alloc_resource(device_t dev, device_t child, int type, int *rid,
 	return (r);
 }
 
-int
-pcib_adjust_resource(device_t bus, device_t child, int type, struct resource *r,
+static int
+pcib_adjust_resource(device_t bus, device_t child, struct resource *r,
     rman_res_t start, rman_res_t end)
 {
 	struct pcib_softc *sc;
 	struct pcib_window *w;
 	rman_res_t wmask;
-	int error;
+	int error, type;
 
 	sc = device_get_softc(bus);
+	type = rman_get_type(r);
 
 	/*
 	 * If the resource wasn't sub-allocated from one of our region
 	 * managers then just pass the request up.
 	 */
-	if (!pcib_is_resource_managed(sc, type, r))
-		return (bus_generic_adjust_resource(bus, child, type, r,
-		    start, end));
+	if (!pcib_is_resource_managed(sc, r))
+		return (bus_generic_adjust_resource(bus, child, r, start, end));
 
-#ifdef PCI_RES_BUS
 	if (type == PCI_RES_BUS) {
 		/*
 		 * If our bus range isn't big enough to grow the sub-allocation
@@ -2391,14 +2138,12 @@ pcib_adjust_resource(device_t bus, device_t child, int type, struct resource *r,
 			if (error != 0)
 				return (error);
 		}
-	} else
-#endif
-	{
+	} else {
 		/*
 		 * Resource is managed and not a secondary bus number, must
 		 * be from one of our windows.
 		 */
-		w = pcib_get_resource_window(sc, type, r);
+		w = pcib_get_resource_window(sc, r);
 		KASSERT(w != NULL,
 		    ("%s: no window for resource (%#jx-%#jx) type %d",
 		    __func__, rman_get_start(r), rman_get_end(r), type));
@@ -2426,181 +2171,136 @@ pcib_adjust_resource(device_t bus, device_t child, int type, struct resource *r,
 	return (rman_adjust_resource(r, start, end));
 }
 
-int
-pcib_release_resource(device_t dev, device_t child, int type, int rid,
-    struct resource *r)
+static int
+pcib_release_resource(device_t dev, device_t child, struct resource *r)
 {
 	struct pcib_softc *sc;
 	int error;
 
 	sc = device_get_softc(dev);
-	if (pcib_is_resource_managed(sc, type, r)) {
+	if (pcib_is_resource_managed(sc, r)) {
 		if (rman_get_flags(r) & RF_ACTIVE) {
-			error = bus_deactivate_resource(child, type, rid, r);
+			error = bus_deactivate_resource(child, r);
 			if (error)
 				return (error);
 		}
 		return (rman_release_resource(r));
 	}
-	return (bus_generic_release_resource(dev, child, type, rid, r));
+	return (bus_generic_release_resource(dev, child, r));
 }
-#else
-/*
- * We have to trap resource allocation requests and ensure that the bridge
- * is set up to, or capable of handling them.
- */
-struct resource *
-pcib_alloc_resource(device_t dev, device_t child, int type, int *rid,
-    rman_res_t start, rman_res_t end, rman_res_t count, u_int flags)
+
+static int
+pcib_activate_resource(device_t dev, device_t child, struct resource *r)
 {
-	struct pcib_softc	*sc = device_get_softc(dev);
-	const char *name, *suffix;
-	int ok;
+	struct pcib_softc *sc = device_get_softc(dev);
+	struct resource_map map;
+	int error, type;
 
-	/*
-	 * Fail the allocation for this range if it's not supported.
-	 */
-	name = device_get_nameunit(child);
-	if (name == NULL) {
-		name = "";
-		suffix = "";
-	} else
-		suffix = " ";
-	switch (type) {
-	case SYS_RES_IOPORT:
-		ok = 0;
-		if (!pcib_is_io_open(sc))
-			break;
-		ok = (start >= sc->iobase && end <= sc->iolimit);
+	if (!pcib_is_resource_managed(sc, r))
+		return (bus_generic_activate_resource(dev, child, r));
 
-		/*
-		 * Make sure we allow access to VGA I/O addresses when the
-		 * bridge has the "VGA Enable" bit set.
-		 */
-		if (!ok && pci_is_vga_ioport_range(start, end))
-			ok = (sc->bridgectl & PCIB_BCR_VGA_ENABLE) ? 1 : 0;
+	error = rman_activate_resource(r);
+	if (error != 0)
+		return (error);
 
-		if ((sc->flags & PCIB_SUBTRACTIVE) == 0) {
-			if (!ok) {
-				if (start < sc->iobase)
-					start = sc->iobase;
-				if (end > sc->iolimit)
-					end = sc->iolimit;
-				if (start < end)
-					ok = 1;
-			}
-		} else {
-			ok = 1;
-#if 0
-			/*
-			 * If we overlap with the subtractive range, then
-			 * pick the upper range to use.
-			 */
-			if (start < sc->iolimit && end > sc->iobase)
-				start = sc->iolimit + 1;
-#endif
+	type = rman_get_type(r);
+	if ((rman_get_flags(r) & RF_UNMAPPED) == 0 &&
+	    (type == SYS_RES_MEMORY || type == SYS_RES_IOPORT)) {
+		error = BUS_MAP_RESOURCE(dev, child, r, NULL, &map);
+		if (error != 0) {
+			rman_deactivate_resource(r);
+			return (error);
 		}
-		if (end < start) {
-			device_printf(dev, "ioport: end (%jx) < start (%jx)\n",
-			    end, start);
-			start = 0;
-			end = 0;
-			ok = 0;
-		}
-		if (!ok) {
-			device_printf(dev, "%s%srequested unsupported I/O "
-			    "range 0x%jx-0x%jx (decoding 0x%x-0x%x)\n",
-			    name, suffix, start, end, sc->iobase, sc->iolimit);
-			return (NULL);
-		}
-		if (bootverbose)
-			device_printf(dev,
-			    "%s%srequested I/O range 0x%jx-0x%jx: in range\n",
-			    name, suffix, start, end);
-		break;
 
-	case SYS_RES_MEMORY:
-		ok = 0;
-		if (pcib_is_nonprefetch_open(sc))
-			ok = ok || (start >= sc->membase && end <= sc->memlimit);
-		if (pcib_is_prefetch_open(sc))
-			ok = ok || (start >= sc->pmembase && end <= sc->pmemlimit);
-
-		/*
-		 * Make sure we allow access to VGA memory addresses when the
-		 * bridge has the "VGA Enable" bit set.
-		 */
-		if (!ok && pci_is_vga_memory_range(start, end))
-			ok = (sc->bridgectl & PCIB_BCR_VGA_ENABLE) ? 1 : 0;
-
-		if ((sc->flags & PCIB_SUBTRACTIVE) == 0) {
-			if (!ok) {
-				ok = 1;
-				if (flags & RF_PREFETCHABLE) {
-					if (pcib_is_prefetch_open(sc)) {
-						if (start < sc->pmembase)
-							start = sc->pmembase;
-						if (end > sc->pmemlimit)
-							end = sc->pmemlimit;
-					} else {
-						ok = 0;
-					}
-				} else {	/* non-prefetchable */
-					if (pcib_is_nonprefetch_open(sc)) {
-						if (start < sc->membase)
-							start = sc->membase;
-						if (end > sc->memlimit)
-							end = sc->memlimit;
-					} else {
-						ok = 0;
-					}
-				}
-			}
-		} else if (!ok) {
-			ok = 1;	/* subtractive bridge: always ok */
-#if 0
-			if (pcib_is_nonprefetch_open(sc)) {
-				if (start < sc->memlimit && end > sc->membase)
-					start = sc->memlimit + 1;
-			}
-			if (pcib_is_prefetch_open(sc)) {
-				if (start < sc->pmemlimit && end > sc->pmembase)
-					start = sc->pmemlimit + 1;
-			}
-#endif
-		}
-		if (end < start) {
-			device_printf(dev, "memory: end (%jx) < start (%jx)\n",
-			    end, start);
-			start = 0;
-			end = 0;
-			ok = 0;
-		}
-		if (!ok && bootverbose)
-			device_printf(dev,
-			    "%s%srequested unsupported memory range %#jx-%#jx "
-			    "(decoding %#jx-%#jx, %#jx-%#jx)\n",
-			    name, suffix, start, end,
-			    (uintmax_t)sc->membase, (uintmax_t)sc->memlimit,
-			    (uintmax_t)sc->pmembase, (uintmax_t)sc->pmemlimit);
-		if (!ok)
-			return (NULL);
-		if (bootverbose)
-			device_printf(dev,"%s%srequested memory range "
-			    "0x%jx-0x%jx: good\n",
-			    name, suffix, start, end);
-		break;
-
-	default:
-		break;
+		rman_set_mapping(r, &map);
 	}
-	/*
-	 * Bridge is OK decoding this resource, so pass it up.
-	 */
-	return (bus_generic_alloc_resource(dev, child, type, rid, start, end,
-	    count, flags));
+	return (0);
 }
-#endif
+
+static int
+pcib_deactivate_resource(device_t dev, device_t child, struct resource *r)
+{
+	struct pcib_softc *sc = device_get_softc(dev);
+	struct resource_map map;
+	int error, type;
+
+	if (!pcib_is_resource_managed(sc, r))
+		return (bus_generic_deactivate_resource(dev, child, r));
+
+	error = rman_deactivate_resource(r);
+	if (error != 0)
+		return (error);
+
+	type = rman_get_type(r);
+	if ((rman_get_flags(r) & RF_UNMAPPED) == 0 &&
+	    (type == SYS_RES_MEMORY || type == SYS_RES_IOPORT)) {
+		rman_get_mapping(r, &map);
+		BUS_UNMAP_RESOURCE(dev, child, r, &map);
+	}
+	return (0);
+}
+
+static struct resource *
+pcib_find_parent_resource(struct pcib_window *w, struct resource *r)
+{
+	for (int i = 0; i < w->count; i++) {
+		if (rman_get_start(w->res[i]) <= rman_get_start(r) &&
+		    rman_get_end(w->res[i]) >= rman_get_end(r))
+			return (w->res[i]);
+	}
+	return (NULL);
+}
+
+static int
+pcib_map_resource(device_t dev, device_t child, struct resource *r,
+    struct resource_map_request *argsp, struct resource_map *map)
+{
+	struct pcib_softc *sc = device_get_softc(dev);
+	struct resource_map_request args;
+	struct pcib_window *w;
+	struct resource *pres;
+	rman_res_t length, start;
+	int error;
+
+	w = pcib_get_resource_window(sc, r);
+	if (w == NULL)
+		return (bus_generic_map_resource(dev, child, r, argsp, map));
+
+	/* Resources must be active to be mapped. */
+	if (!(rman_get_flags(r) & RF_ACTIVE))
+		return (ENXIO);
+
+	resource_init_map_request(&args);
+	error = resource_validate_map_request(r, argsp, &args, &start, &length);
+	if (error)
+		return (error);
+
+	pres = pcib_find_parent_resource(w, r);
+	if (pres == NULL)
+		return (ENOENT);
+
+	args.offset = start - rman_get_start(pres);
+	args.length = length;
+	return (bus_map_resource(dev, pres, &args, map));
+}
+
+static int
+pcib_unmap_resource(device_t dev, device_t child, struct resource *r,
+    struct resource_map *map)
+{
+	struct pcib_softc *sc = device_get_softc(dev);
+	struct pcib_window *w;
+	struct resource *pres;
+
+	w = pcib_get_resource_window(sc, r);
+	if (w == NULL)
+		return (bus_generic_unmap_resource(dev, child, r, map));
+
+	pres = pcib_find_parent_resource(w, r);
+	if (pres == NULL)
+		return (ENOENT);
+	return (bus_unmap_resource(dev, pres, map));
+}
 
 /*
  * If ARI is enabled on this downstream port, translate the function number

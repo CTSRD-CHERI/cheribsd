@@ -1,0 +1,16 @@
+MIASM:=	${MIASM:Nfreebsd[467]_*}
+
+SRCS+=	__vdso_gettc.c \
+	sched_getcpu_gen.c
+
+MDASM=	cerror.S
+
+.if ${MACHINE_ABI:Mpurecap}
+SYM_MAPS+= ${LIBSYS_SRCTOP}/aarch64/Symbol.map
+
+SRCS+=	_coaccept.S _cocall.S
+.endif
+
+.ifndef CHERI_LIB_C18N
+MDASM+=	vfork.S
+.endif

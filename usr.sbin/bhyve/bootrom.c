@@ -192,7 +192,7 @@ bootrom_alloc(struct vmctx *ctx, size_t len, int prot, int flags,
 }
 
 int
-bootrom_loadrom(struct vmctx *ctx, const nvlist_t *nvl)
+bootrom_loadrom(struct vmctx *ctx)
 {
 	struct stat sbuf;
 	ssize_t rlen;
@@ -204,9 +204,9 @@ bootrom_loadrom(struct vmctx *ctx, const nvlist_t *nvl)
 	rv = -1;
 	varfd = -1;
 
-	bootrom = get_config_value_node(nvl, "bootrom");
+	bootrom = get_config_value("bootrom");
 	if (bootrom == NULL) {
-		return (-1);
+		return (0);
 	}
 
 	/*
@@ -235,19 +235,19 @@ bootrom_loadrom(struct vmctx *ctx, const nvlist_t *nvl)
 
 	rom_size = sbuf.st_size;
 
-	varfile = get_config_value_node(nvl, "bootvars");
+	varfile = get_config_value("bootvars");
 	var_size = 0;
 	if (varfile != NULL) {
 		varfd = open(varfile, O_RDWR);
 		if (varfd < 0) {
-			fprintf(stderr, "Error opening bootrom variable file "
-			    "\"%s\": %s\n", varfile, strerror(errno));
+			EPRINTLN("Error opening bootrom variable file "
+			    "\"%s\": %s", varfile, strerror(errno));
 			goto done;
 		}
 
 		if (fstat(varfd, &sbuf) < 0) {
-			fprintf(stderr,
-			    "Could not fstat bootrom variable file \"%s\": %s\n",
+			EPRINTLN(
+			    "Could not fstat bootrom variable file \"%s\": %s",
 			    varfile, strerror(errno));
 			goto done;
 		}
@@ -257,7 +257,7 @@ bootrom_loadrom(struct vmctx *ctx, const nvlist_t *nvl)
 
 	if (var_size > BOOTROM_SIZE ||
 	    (var_size != 0 && var_size < PAGE_SIZE)) {
-		fprintf(stderr, "Invalid bootrom variable size %ld\n",
+		EPRINTLN("Invalid bootrom variable size %ld",
 		    var_size);
 		goto done;
 	}
@@ -265,8 +265,8 @@ bootrom_loadrom(struct vmctx *ctx, const nvlist_t *nvl)
 	total_size = rom_size + var_size;
 
 	if (total_size > BOOTROM_SIZE) {
-		fprintf(stderr, "Invalid bootrom and variable aggregate size "
-		    "%ld\n", total_size);
+		EPRINTLN("Invalid bootrom and variable aggregate size %ld",
+		    total_size);
 		goto done;
 	}
 
@@ -313,4 +313,13 @@ done:
 		close(fd);
 	free(romfile);
 	return (rv);
+}
+
+/*
+ * Are we relying on a bootrom to initialize the guest's CPU context?
+ */
+bool
+bootrom_boot(void)
+{
+	return (get_config_value("bootrom") != NULL);
 }

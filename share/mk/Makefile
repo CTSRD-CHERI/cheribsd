@@ -1,5 +1,3 @@
-#	@(#)Makefile	8.1 (Berkeley) 6/8/93
-
 # Only parse this if executing make in this directory, not in other places
 # in src that lack a Makefile, such as sys/dev/*.  Otherwise the MAKESYSPATH
 # will read this Makefile since it auto includes it into -I.
@@ -52,6 +50,7 @@ FILES=	\
 	bsd.progs.mk \
 	bsd.snmpmod.mk \
 	bsd.subdir.mk \
+	bsd.suffixes-extra.mk \
 	bsd.suffixes-posix.mk \
 	bsd.suffixes.mk \
 	bsd.symver.mk \
@@ -60,16 +59,22 @@ FILES=	\
 	bsd.test.mk \
 	dirdeps.mk \
 	dirdeps-options.mk \
+	dirdeps-targets.mk \
 	gendirdeps.mk \
+	host-target.mk \
 	install-new.mk \
+	jobs.mk \
 	meta.autodep.mk \
 	meta.stage.mk \
 	meta.subdir.mk \
 	meta.sys.mk \
+	meta2deps.py \
+	meta2deps.sh \
 	${SRCTOP}/contrib/bmake/mk/posix.mk \
 	stage-install.sh \
 	sys.mk \
 	sys.dependfile.mk \
+	sys.dirdeps.mk \
 	version_gen.awk
 
 FILESDIR=	${BINDIR}/mk

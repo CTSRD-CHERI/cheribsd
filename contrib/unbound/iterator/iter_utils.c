@@ -71,6 +71,11 @@
 /** time when nameserver glue is said to be 'recent' */
 #define SUSPICION_RECENT_EXPIRY 86400
 
+/** if NAT64 is enabled and no NAT64 prefix is configured, first fall back to
+ * DNS64 prefix.  If that is not configured, fall back to this default value.
+ */
+static const char DEFAULT_NAT64_PREFIX[] = "64:ff9b::/96";
+
 /** fillup fetch policy array */
 static void
 fetch_fill(struct iter_env* ie, const char* str)
@@ -142,6 +147,7 @@ caps_white_apply_cfg(rbtree_type* ntree, struct config_file* cfg)
 int
 iter_apply_cfg(struct iter_env* iter_env, struct config_file* cfg)
 {
+	const char *nat64_prefix;
 	int i;
 	/* target fetch policy */
 	if(!read_fetch_policy(iter_env, cfg->target_fetch_policy))
@@ -172,8 +178,32 @@ iter_apply_cfg(struct iter_env* iter_env, struct config_file* cfg)
 		}
 
 	}
+
+	nat64_prefix = cfg->nat64_prefix;
+	if(!nat64_prefix)
+		nat64_prefix = cfg->dns64_prefix;
+	if(!nat64_prefix)
+		nat64_prefix = DEFAULT_NAT64_PREFIX;
+	if(!netblockstrtoaddr(nat64_prefix, 0, &iter_env->nat64_prefix_addr,
+		&iter_env->nat64_prefix_addrlen,
+		&iter_env->nat64_prefix_net)) {
+		log_err("cannot parse nat64-prefix netblock: %s", nat64_prefix);
+		return 0;
+	}
+	if(!addr_is_ip6(&iter_env->nat64_prefix_addr,
+		iter_env->nat64_prefix_addrlen)) {
+		log_err("nat64-prefix is not IPv6: %s", cfg->nat64_prefix);
+		return 0;
+	}
+	if(!prefixnet_is_nat64(iter_env->nat64_prefix_net)) {
+		log_err("nat64-prefix length it not 32, 40, 48, 56, 64 or 96: %s",
+			nat64_prefix);
+		return 0;
+	}
+
 	iter_env->supports_ipv6 = cfg->do_ip6;
 	iter_env->supports_ipv4 = cfg->do_ip4;
+	iter_env->use_nat64 = cfg->do_nat64;
 	iter_env->outbound_msg_retry = cfg->outbound_msg_retry;
 	iter_env->max_sent_count = cfg->max_sent_count;
 	iter_env->max_query_restarts = cfg->max_query_restarts;
@@ -240,7 +270,8 @@ iter_filter_unsuitable(struct iter_env* iter_env, struct module_env* env,
 	if(!iter_env->supports_ipv6 && addr_is_ip6(&a->addr, a->addrlen)) {
 		return -1; /* there is no ip6 available */
 	}
-	if(!iter_env->supports_ipv4 && !addr_is_ip6(&a->addr, a->addrlen)) {
+	if(!iter_env->supports_ipv4 && !iter_env->use_nat64 &&
+	   !addr_is_ip6(&a->addr, a->addrlen)) {
 		return -1; /* there is no ip4 available */
 	}
 	/* check lameness - need zone , class info */
@@ -248,9 +279,10 @@ iter_filter_unsuitable(struct iter_env* iter_env, struct module_env* env,
 		name, namelen, qtype, &lame, &dnsseclame, &reclame,
 		&rtt, now)) {
 		log_addr(VERB_ALGO, "servselect", &a->addr, a->addrlen);
-		verbose(VERB_ALGO, "   rtt=%d%s%s%s%s", rtt,
+		verbose(VERB_ALGO, "   rtt=%d%s%s%s%s%s", rtt,
 			lame?" LAME":"",
 			dnsseclame?" DNSSEC_LAME":"",
+			a->dnsseclame?" ADDR_DNSSEC_LAME":"",
 			reclame?" REC_LAME":"",
 			a->lame?" ADDR_LAME":"");
 		if(lame)
@@ -747,10 +779,15 @@ iter_mark_pside_cycle_targets(struct module_qstate* qstate, struct delegpt* dp)
 
 int
 iter_dp_is_useless(struct query_info* qinfo, uint16_t qflags,
-	struct delegpt* dp, int supports_ipv4, int supports_ipv6)
+	struct delegpt* dp, int supports_ipv4, int supports_ipv6,
+	int use_nat64)
 {
 	struct delegpt_ns* ns;
 	struct delegpt_addr* a;
+
+	if(supports_ipv6 && use_nat64)
+		supports_ipv4 = 1;
+
 	/* check:
 	 *      o RD qflag is on.
 	 *      o no addresses are provided.
@@ -1248,8 +1285,17 @@ iter_get_next_root(struct iter_hints* hints, struct iter_forwards* fwd,
 	uint16_t* c)
 {
 	uint16_t c1 = *c, c2 = *c;
-	int r1 = hints_next_root(hints, &c1);
-	int r2 = forwards_next_root(fwd, &c2);
+	int r1, r2;
+	int nolock = 1;
+
+	/* prelock both forwards and hints for atomic read. */
+	lock_rw_rdlock(&fwd->lock);
+	lock_rw_rdlock(&hints->lock);
+	r1 = hints_next_root(hints, &c1, nolock);
+	r2 = forwards_next_root(fwd, &c2, nolock);
+	lock_rw_unlock(&fwd->lock);
+	lock_rw_unlock(&hints->lock);
+
 	if(!r1 && !r2) /* got none, end of list */
 		return 0;
 	else if(!r1) /* got one, return that */
@@ -1310,8 +1356,7 @@ void iter_dec_attempts(struct delegpt* dp, int d, int outbound_msg_retry)
 	for(a=dp->target_list; a; a = a->next_target) {
 		if(a->attempts >= outbound_msg_retry) {
 			/* add back to result list */
-			a->next_result = dp->result_list;
-			dp->result_list = a;
+			delegpt_add_to_result_list(dp, a);
 		}
 		if(a->attempts > d)
 			a->attempts -= d;
@@ -1415,15 +1460,21 @@ int iter_dp_cangodown(struct query_info* qinfo, struct delegpt* dp)
 
 int
 iter_stub_fwd_no_cache(struct module_qstate *qstate, struct query_info *qinf,
-	uint8_t** retdpname, size_t* retdpnamelen)
+	uint8_t** retdpname, size_t* retdpnamelen, uint8_t* dpname_storage,
+	size_t dpname_storage_len)
 {
 	struct iter_hints_stub *stub;
 	struct delegpt *dp;
+	int nolock = 1;
 
 	/* Check for stub. */
+	/* Lock both forwards and hints for atomic read. */
+	lock_rw_rdlock(&qstate->env->fwds->lock);
+	lock_rw_rdlock(&qstate->env->hints->lock);
 	stub = hints_lookup_stub(qstate->env->hints, qinf->qname,
-	    qinf->qclass, NULL);
-	dp = forwards_lookup(qstate->env->fwds, qinf->qname, qinf->qclass);
+	    qinf->qclass, NULL, nolock);
+	dp = forwards_lookup(qstate->env->fwds, qinf->qname, qinf->qclass,
+		nolock);
 
 	/* see if forward or stub is more pertinent */
 	if(stub && stub->dp && dp) {
@@ -1437,7 +1488,9 @@ iter_stub_fwd_no_cache(struct module_qstate *qstate, struct query_info *qinf,
 
 	/* check stub */
 	if (stub != NULL && stub->dp != NULL) {
-		if(stub->dp->no_cache) {
+		int stub_no_cache = stub->dp->no_cache;
+		lock_rw_unlock(&qstate->env->fwds->lock);
+		if(stub_no_cache) {
 			char qname[255+1];
 			char dpname[255+1];
 			dname_str(qinf->qname, qname);
@@ -1445,15 +1498,27 @@ iter_stub_fwd_no_cache(struct module_qstate *qstate, struct query_info *qinf,
 			verbose(VERB_ALGO, "stub for %s %s has no_cache", qname, dpname);
 		}
 		if(retdpname) {
-			*retdpname = stub->dp->name;
+			if(stub->dp->namelen > dpname_storage_len) {
+				verbose(VERB_ALGO, "no cache stub dpname too long");
+				lock_rw_unlock(&qstate->env->hints->lock);
+				*retdpname = NULL;
+				*retdpnamelen = 0;
+				return stub_no_cache;
+			}
+			memmove(dpname_storage, stub->dp->name,
+				stub->dp->namelen);
+			*retdpname = dpname_storage;
 			*retdpnamelen = stub->dp->namelen;
 		}
-		return (stub->dp->no_cache);
+		lock_rw_unlock(&qstate->env->hints->lock);
+		return stub_no_cache;
 	}
 
 	/* Check for forward. */
 	if (dp) {
-		if(dp->no_cache) {
+		int dp_no_cache = dp->no_cache;
+		lock_rw_unlock(&qstate->env->hints->lock);
+		if(dp_no_cache) {
 			char qname[255+1];
 			char dpname[255+1];
 			dname_str(qinf->qname, qname);
@@ -1461,11 +1526,22 @@ iter_stub_fwd_no_cache(struct module_qstate *qstate, struct query_info *qinf,
 			verbose(VERB_ALGO, "forward for %s %s has no_cache", qname, dpname);
 		}
 		if(retdpname) {
-			*retdpname = dp->name;
+			if(dp->namelen > dpname_storage_len) {
+				verbose(VERB_ALGO, "no cache dpname too long");
+				lock_rw_unlock(&qstate->env->fwds->lock);
+				*retdpname = NULL;
+				*retdpnamelen = 0;
+				return dp_no_cache;
+			}
+			memmove(dpname_storage, dp->name, dp->namelen);
+			*retdpname = dpname_storage;
 			*retdpnamelen = dp->namelen;
 		}
-		return (dp->no_cache);
+		lock_rw_unlock(&qstate->env->fwds->lock);
+		return dp_no_cache;
 	}
+	lock_rw_unlock(&qstate->env->fwds->lock);
+	lock_rw_unlock(&qstate->env->hints->lock);
 	if(retdpname) {
 		*retdpname = NULL;
 		*retdpnamelen = 0;
@@ -1487,4 +1563,46 @@ void iterator_set_ip46_support(struct module_stack* mods,
 		ie->supports_ipv4 = 0;
 	if(outnet->num_ip6 == 0)
 		ie->supports_ipv6 = 0;
+}
+
+void
+limit_nsec_ttl(struct dns_msg* msg)
+{
+	/* Limit NSEC and NSEC3 TTL in response, RFC9077 */
+	size_t i;
+	int found = 0;
+	time_t soa_ttl = 0;
+	/* Limit the NSEC and NSEC3 TTL values to the SOA TTL and SOA minimum
+	 * TTL. That has already been applied to the SOA record ttl. */
+	for(i=0; i<msg->rep->rrset_count; i++) {
+		struct ub_packed_rrset_key* s = msg->rep->rrsets[i];
+		if(ntohs(s->rk.type) == LDNS_RR_TYPE_SOA) {
+			struct packed_rrset_data* soadata = (struct packed_rrset_data*)s->entry.data;
+			found = 1;
+			soa_ttl = soadata->ttl;
+			break;
+		}
+	}
+	if(!found)
+		return;
+	for(i=0; i<msg->rep->rrset_count; i++) {
+		struct ub_packed_rrset_key* s = msg->rep->rrsets[i];
+		if(ntohs(s->rk.type) == LDNS_RR_TYPE_NSEC ||
+			ntohs(s->rk.type) == LDNS_RR_TYPE_NSEC3) {
+			struct packed_rrset_data* data = (struct packed_rrset_data*)s->entry.data;
+			/* Limit the negative TTL. */
+			if(data->ttl > soa_ttl) {
+				if(verbosity >= VERB_ALGO) {
+					char buf[256];
+					snprintf(buf, sizeof(buf),
+						"limiting TTL %d of %s record to the SOA TTL of %d for",
+						(int)data->ttl, ((ntohs(s->rk.type) == LDNS_RR_TYPE_NSEC)?"NSEC":"NSEC3"), (int)soa_ttl);
+					log_nametypeclass(VERB_ALGO, buf,
+						s->rk.dname, ntohs(s->rk.type),
+						ntohs(s->rk.rrset_class));
+				}
+				data->ttl = soa_ttl;
+			}
+		}
+	}
 }

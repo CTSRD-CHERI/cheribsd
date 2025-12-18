@@ -29,19 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char copyright[] =
-"@(#) Copyright (c) 1980, 1987, 1991, 1993\n\
-	The Regents of the University of California.  All rights reserved.\n";
-#endif /* not lint */
-
-#if 0
-#ifndef lint
-static char sccsid[] = "@(#)wc.c	8.1 (Berkeley) 6/6/93";
-#endif /* not lint */
-#endif
-
-#include <sys/cdefs.h>
 #include <sys/capsicum.h>
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -63,6 +50,8 @@ static char sccsid[] = "@(#)wc.c	8.1 (Berkeley) 6/6/93";
 
 #include <libcasper.h>
 #include <casper/cap_fileargs.h>
+
+#define WC_XO_VERSION "1"
 
 static const char *stdin_filename = "stdin";
 
@@ -130,8 +119,6 @@ main(int argc, char *argv[])
 	argv += optind;
 	argc -= optind;
 
-	(void)signal(SIGINFO, siginfo_handler);
-
 	fa = fileargs_init(argc, argv, O_RDONLY, 0,
 	    cap_rights_init(&rights, CAP_READ, CAP_FSTAT), FA_OPEN);
 	if (fa == NULL)
@@ -147,9 +134,12 @@ main(int argc, char *argv[])
 		doline = doword = dochar = true;
 
 	stderr_handle = xo_create_to_file(stderr, XO_STYLE_TEXT, 0);
+
+	xo_set_version(WC_XO_VERSION);
 	xo_open_container("wc");
 	xo_open_list("file");
 
+	(void)signal(SIGINFO, siginfo_handler);
 	errors = 0;
 	total = 0;
 	if (argc == 0) {
@@ -243,7 +233,8 @@ cnt(const char *file)
 			(void)close(fd);
 			return (1);
 		}
-		if (S_ISREG(sb.st_mode)) {
+		/* pseudo-filesystems advertize a zero size */
+		if (S_ISREG(sb.st_mode) && sb.st_size > 0) {
 			reset_siginfo();
 			charct = sb.st_size;
 			show_cnt(file, linect, wordct, charct, llct);

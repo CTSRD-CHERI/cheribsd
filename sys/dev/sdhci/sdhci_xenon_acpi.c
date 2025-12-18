@@ -24,8 +24,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -42,7 +40,7 @@
 #include <contrib/dev/acpica/include/accommon.h>
 #include <dev/acpica/acpivar.h>
 
-#include <dev/extres/regulator/regulator.h>
+#include <dev/regulator/regulator.h>
 
 #include <dev/sdhci/sdhci.h>
 #include <dev/sdhci/sdhci_xenon.h>
@@ -88,8 +86,6 @@ sdhci_xenon_acpi_attach(device_t dev)
 	memset(&mmc_helper, 0, sizeof(mmc_helper));
 
 	slot = malloc(sizeof(*slot), M_DEVBUF, M_ZERO | M_WAITOK);
-	if (!slot)
-		return (ENOMEM);
 
 	/*
 	 * Don't use regularators.

@@ -1,4 +1,3 @@
-
 SUBDIR = \
 	ads111x \
 	controllers \
@@ -28,7 +27,9 @@ SUBDIR = \
 	smbus \
 
 .if !empty(OPT_FDT)
-SUBDIR += rx8803 \
+SUBDIR += hym8563 \
+	  rv3032 \
+	  rx8803 \
 	  tca64xx \
 	  tmp461
 .endif

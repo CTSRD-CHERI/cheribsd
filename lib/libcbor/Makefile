@@ -1,4 +1,3 @@
-
 PACKAGE=ssh
 LIB=	cbor
 PRIVATELIB=
@@ -30,6 +29,7 @@ SRCS+=	cbor/internal/unicode.c
 CFLAGS+= -I${DIST}/src -I${.CURDIR}
 
 WARNS?=	2
+IGNORE_PRAGMA=
 MAN=
 
 .include <bsd.lib.mk>

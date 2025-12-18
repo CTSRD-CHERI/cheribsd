@@ -32,18 +32,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char copyright[] =
-"@(#) Copyright (c) 1989, 1993, 1994\n\
-	The Regents of the University of California.  All rights reserved.\n";
-#endif /* not lint */
-
-#if 0
-#ifndef lint
-static char sccsid[] = "@(#)ls.c	8.5 (Berkeley) 4/2/94";
-#endif /* not lint */
-#endif
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
@@ -325,14 +313,21 @@ main(int argc, char *argv[])
 		case 'A':
 			f_listdot = 1;
 			break;
-		/* The -t and -S options override each other. */
+		/* The -S, -t and -v options override each other. */
 		case 'S':
 			f_sizesort = 1;
 			f_timesort = 0;
+			f_verssort = 0;
 			break;
 		case 't':
 			f_timesort = 1;
 			f_sizesort = 0;
+			f_verssort = 0;
+			break;
+		case 'v':
+			f_verssort = 1;
+			f_sizesort = 0;
+			f_timesort = 0;
 			break;
 		/* Other flags.  Please keep alphabetic. */
 		case ',':
@@ -445,9 +440,6 @@ main(int argc, char *argv[])
 			break;
 		case 's':
 			f_size = 1;
-			break;
-		case 'v':
-			f_verssort = 1;
 			break;
 		case 'w':
 			f_nonprint = 0;
@@ -574,6 +566,7 @@ main(int argc, char *argv[])
 			blocksize /= 512;
 		}
 	}
+
 	/* Select a sort function. */
 	if (f_reversesort) {
 		if (f_sizesort)
@@ -976,7 +969,8 @@ label_out:
 	d.maxlen = maxlen;
 	if (needstats) {
 		d.btotal = btotal;
-		d.s_block = snprintf(NULL, 0, "%lu", howmany(maxblock, blocksize));
+		d.s_block = snprintf(NULL, 0, f_thousands ? "%'ld" : "%ld",
+		    howmany(maxblock, blocksize));
 		d.s_flags = maxflags;
 		d.s_label = maxlabelstr;
 		d.s_group = maxgroup;

@@ -31,11 +31,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)kern_subr.c	8.3 (Berkeley) 1/21/94
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -66,14 +63,21 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 	int save = 0;
 	bool mapped;
 
-	KASSERT(uio->uio_rw == UIO_READ || uio->uio_rw == UIO_WRITE,
+	KASSERT(uio->uio_rw == UIO_READ || uio->uio_rw == UIO_WRITE ||
+	    uio->uio_rw == UIO_READ_CAP || uio->uio_rw == UIO_WRITE_CAP,
 	    ("uiomove_fromphys: mode"));
 	KASSERT(uio->uio_segflg != UIO_USERSPACE || uio->uio_td == curthread,
 	    ("uiomove_fromphys proc"));
+	KASSERT(uio->uio_resid >= 0,
+	    ("%s: uio %p resid underflow", __func__, uio));
+
 	save = td->td_pflags & TDP_DEADLKTREAT;
 	td->td_pflags |= TDP_DEADLKTREAT;
 	mapped = false;
 	while (n > 0 && uio->uio_resid) {
+		KASSERT(uio->uio_iovcnt > 0,
+		    ("%s: uio %p iovcnt underflow", __func__, uio));
+
 		iov = uio->uio_iov;
 		cnt = iov->iov_len;
 		if (cnt == 0) {
@@ -93,18 +97,42 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 		switch (uio->uio_segflg) {
 		case UIO_USERSPACE:
 			maybe_yield();
-			if (uio->uio_rw == UIO_READ)
+			switch (uio->uio_rw) {
+#if __has_feature(capabilities)
+			case UIO_READ_CAP:
+				error = copyoutcap(cp, iov->iov_base, cnt);
+				break;
+			case UIO_WRITE_CAP:
+				error = copyincap(iov->iov_base, cp, cnt);
+				break;
+#endif
+			case UIO_READ:
 				error = copyout(cp, iov->iov_base, cnt);
-			else
+				break;
+			case UIO_WRITE:
 				error = copyin(iov->iov_base, cp, cnt);
+				break;
+			}
 			if (error)
 				goto out;
 			break;
 		case UIO_SYSSPACE:
-			if (uio->uio_rw == UIO_READ)
+			switch (uio->uio_rw) {
+#if __has_feature(capabilities)
+			case UIO_READ_CAP:
+				bcopy_c(PTR2CAP(cp), iov->iov_base, cnt);
+				break;
+			case UIO_WRITE_CAP:
+				bcopy_c(iov->iov_base, PTR2CAP(cp), cnt);
+				break;
+#endif
+			case UIO_READ:
 				bcopynocap_c(PTR2CAP(cp), iov->iov_base, cnt);
-			else
+				break;
+			case UIO_WRITE:
 				bcopynocap_c(iov->iov_base, PTR2CAP(cp), cnt);
+				break;
+			}
 			break;
 		case UIO_NOCOPY:
 			break;

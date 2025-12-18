@@ -31,8 +31,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	from: @(#)vm_map.c	8.3 (Berkeley) 1/12/94
- *
  *
  * Copyright (c) 1987, 1990 Carnegie-Mellon University.
  * All rights reserved.
@@ -64,7 +62,6 @@
  *	Virtual memory mapping module.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/elf.h>
@@ -235,7 +232,7 @@ RB_GENERATE_STATIC(vm_map_quarantine, vm_map_entry, quarantine, quarantine_cmp)
  */
 #define	vm_map_log(prefix, entry)
 
-#ifndef UMA_MD_SMALL_ALLOC
+#ifndef UMA_USE_DMAP
 
 /*
  * Allocate a new slab for kernel map entries.  The kernel map may be locked or
@@ -339,7 +336,7 @@ vm_map_startup(void)
 	kmapentzone = uma_zcreate("KMAP ENTRY", sizeof(struct vm_map_entry),
 	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR,
 	    UMA_ZONE_VM | UMA_ZONE_NOBUCKET);
-#ifndef UMA_MD_SMALL_ALLOC
+#ifndef UMA_USE_DMAP
 	/* Reserve an extra map entry for use when replenishing the reserve. */
 	uma_zone_reserve(kmapentzone, KMAPENT_RESERVE + 1);
 	uma_prealloc(kmapentzone, KMAPENT_RESERVE + 1);
@@ -615,7 +612,7 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 
 	KASSERT(entry->protection == PROT_NONE,
 	    ("%s: protection %d\n", __func__, entry->protection));
-	KASSERT(entry->max_protection == PROT_NONE,
+	KASSERT(entry->max_protection == VM_PROT_NO_IMPLY_CAP,
 	    ("%s: max_protection %d\n", __func__, entry->max_protection));
 	KASSERT(entry->inheritance == VM_INHERIT_DEFAULT,
 	    ("%s: inheritance %d\n", __func__, entry->inheritance));
@@ -952,7 +949,7 @@ _vm_map_unlock(vm_map_t map, const char *file, int line)
 
 	VM_MAP_UNLOCK_CONSISTENT(map);
 	if (map->system_map) {
-#ifndef UMA_MD_SMALL_ALLOC
+#ifndef UMA_USE_DMAP
 		if (map == kernel_map && (map->flags & MAP_REPLENISH) != 0) {
 			uma_prealloc(kmapentzone, 1);
 			map->flags &= ~MAP_REPLENISH;
@@ -1213,6 +1210,7 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 
 #ifdef CHERI_CAPREVOKE
 	map->vm_cheri_revoke_st = CHERI_REVOKE_ST_NONE; /* and epoch 0 */
+	map->vm_cheri_async_revoke_st = CHERI_REVOKE_ST_NONE; /* and epoch 0 */
 	map->vm_cheri_revoke_quarantining = false;
 	RB_INIT(&map->quarantine);
 #endif
@@ -1250,7 +1248,7 @@ vm_map_entry_create(vm_map_t map)
 {
 	vm_map_entry_t new_entry;
 
-#ifndef UMA_MD_SMALL_ALLOC
+#ifndef UMA_USE_DMAP
 	if (map == kernel_map) {
 		VM_MAP_ASSERT_LOCKED(map);
 
@@ -1851,7 +1849,7 @@ vm_map_entry_start_revocation(vm_map_t map, vm_map_entry_t *entry)
 	   ("an entry %p is already being revoked", map->rev_entry));
 	VM_MAP_ASSERT_LOCKED(map);
 	if (RB_EMPTY(&map->quarantine))
-		return (FALSE);
+		return (false);
 	rev_entry = RB_MAX(vm_map_quarantine, &map->quarantine);
 
 	/*
@@ -1895,7 +1893,7 @@ vm_map_entry_start_revocation(vm_map_t map, vm_map_entry_t *entry)
 	if (entry != NULL)
 		*entry = map->rev_entry;
 	/* XXX stats */
-	return (TRUE);
+	return (true);
 }
 
 void
@@ -2351,7 +2349,7 @@ charged:
 
 	new_entry->inheritance = inheritance;
 	new_entry->protection = prot;
-	new_entry->max_protection = max;
+	new_entry->max_protection = max | VM_PROT_NO_IMPLY_CAP;
 	new_entry->wired_count = 0;
 	new_entry->wiring_thread = NULL;
 	new_entry->read_ahead = VM_FAULT_READ_AHEAD_INIT;
@@ -2640,8 +2638,15 @@ err:
 	return (result);
 }
 
+#if VM_NRESERVLEVEL <= 1
 static const int aslr_pages_rnd_64[2] = {0x1000, 0x10};
 static const int aslr_pages_rnd_32[2] = {0x100, 0x4};
+#elif VM_NRESERVLEVEL == 2
+static const int aslr_pages_rnd_64[3] = {0x1000, 0x1000, 0x10};
+static const int aslr_pages_rnd_32[3] = {0x100, 0x100, 0x4};
+#else
+#error "Unsupported VM_NRESERVLEVEL"
+#endif
 
 static int cluster_anon = 1;
 SYSCTL_INT(_vm, OID_AUTO, cluster_anon, CTLFLAG_RW,
@@ -2766,9 +2771,24 @@ vm_map_find_aligned(vm_map_t map, vm_offset_t *addr, vm_size_t length,
  */
 int
 vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-	    vm_pointer_t *addr,	/* IN/OUT */
-	    vm_size_t length, vm_offset_t max_addr, int find_space,
-	    vm_prot_t prot, vm_prot_t max, int cow)
+    vm_pointer_t *addr,	/* IN/OUT */
+    vm_size_t length, vm_offset_t max_addr, int find_space,
+    vm_prot_t prot, vm_prot_t max, int cow)
+{
+	int rv;
+
+	vm_map_lock(map);
+	rv = vm_map_find_locked(map, object, offset, addr, length, max_addr,
+	    find_space, prot, max, cow);
+	vm_map_unlock(map);
+	return (rv);
+}
+
+int
+vm_map_find_locked(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
+    vm_pointer_t *addr,	/* IN/OUT */
+    vm_size_t length, vm_offset_t max_addr, int find_space,
+    vm_prot_t prot, vm_prot_t max, int cow)
 {
 	vm_offset_t alignment, curr_min_addr, min_addr, vaddr;
 	int gap, pidx, rv, try;
@@ -2778,7 +2798,7 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 
 	KASSERT((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0 ||
 	    object == NULL,
-	    ("vm_map_find: non-NULL backing object for stack"));
+	    ("non-NULL backing object for stack"));
 	MPASS((cow & MAP_REMAP) == 0 || (find_space == VMFS_NO_SPACE &&
 	    (cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0));
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -2816,7 +2836,6 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    (map->flags & MAP_ASLR_IGNSTART) != 0)
 		curr_min_addr = min_addr = vm_map_min(map);
 	try = 0;
-	vm_map_lock(map);
 	if (cluster) {
 		curr_min_addr = map->anon_loc;
 		if (curr_min_addr == 0)
@@ -2863,9 +2882,23 @@ again:
 			 * Find space for allocation, including
 			 * gap needed for later randomization.
 			 */
-			pidx = MAXPAGESIZES > 1 && pagesizes[1] != 0 &&
-			    (find_space == VMFS_SUPER_SPACE || find_space ==
-			    VMFS_OPTIMAL_SPACE) ? 1 : 0;
+			pidx = 0;
+#if VM_NRESERVLEVEL > 0
+			if ((find_space == VMFS_SUPER_SPACE ||
+			    find_space == VMFS_OPTIMAL_SPACE) &&
+			    pagesizes[VM_NRESERVLEVEL] != 0) {
+				/*
+				 * Do not pointlessly increase the space that
+				 * is requested from vm_map_findspace().
+				 * pmap_align_superpage() will only change a
+				 * mapping's alignment if that mapping is at
+				 * least a superpage in size.
+				 */
+				pidx = VM_NRESERVLEVEL;
+				while (pidx > 0 && length < pagesizes[pidx])
+					pidx--;
+			}
+#endif
 			gap = vm_map_max(map) > MAP_32BIT_MAX_ADDR &&
 			    (max_addr == 0 || max_addr > MAP_32BIT_MAX_ADDR) ?
 			    aslr_pages_rnd_64[pidx] : aslr_pages_rnd_32[pidx];
@@ -2887,8 +2920,7 @@ again:
 					MPASS(try == 1);
 					goto again;
 				}
-				rv = KERN_NO_SPACE;
-				goto done;
+				return (KERN_NO_SPACE);
 			}
 		}
 		/*
@@ -2905,23 +2937,21 @@ again:
 				try = 0;
 				goto again;
 			}
-			goto done;
+			return (rv);
 		}
 	} else if ((cow & MAP_REMAP) != 0) {
-		if (!vm_map_range_valid(map, vaddr, vaddr + length)) {
-			rv = KERN_INVALID_ADDRESS;
-			goto done;
-		}
+		if (!vm_map_range_valid(map, vaddr, vaddr + length))
+			return (KERN_INVALID_ADDRESS);
 		rv = vm_map_delete(map, vaddr, vaddr + length, true);
 		if (rv != KERN_SUCCESS)
-			goto done;
+			return (rv);
 	}
 
 	reservation = vaddr;
 	rv = vm_map_reservation_create_locked(map, &reservation,
 	    length, max);
 	if (rv != KERN_SUCCESS)
-		goto done;
+		return (rv);
 
 	/*
 	 * The guard mapping must have PROT_NONE maxprot but the capability we
@@ -2940,19 +2970,22 @@ again:
 	}
 	if (rv != KERN_SUCCESS) {
 		vm_map_reservation_delete_locked(map, reservation);
-		goto done;
+		return (rv);
 	}
-	if (rv == KERN_SUCCESS && update_anon)
-		map->anon_loc = reservation + length;
-done:
-	vm_map_unlock(map);
-	if (rv == KERN_SUCCESS) {
+
+	/*
+	 * Update the starting address for clustered anonymous memory mappings
+	 * if a starting address was not previously defined or an ASLR restart
+	 * placed an anonymous memory mapping at a lower address.
+	 */
+	if (update_anon && rv == KERN_SUCCESS && (map->anon_loc == 0 ||
+	    reservation < map->anon_loc))
+		map->anon_loc = reservation;
+
 #ifdef __CHERI_PURE_CAPABILITY__
-		KASSERT(cheri_gettag(reservation),
-		    ("Expected valid capability"));
+	KASSERT(cheri_gettag(reservation), ("Expected valid capability"));
 #endif
-		*addr = reservation;
-	}
+	*addr = reservation;
 	return (rv);
 }
 
@@ -3388,6 +3421,7 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 	vm_offset_t start;
 	vm_page_t p, p_start;
 	vm_pindex_t mask, psize, threshold, tmpidx;
+	int psind;
 
 #ifdef CHERI_CAPREVOKE
 	/*
@@ -3463,13 +3497,17 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 				p_start = p;
 			}
 			/* Jump ahead if a superpage mapping is possible. */
-			if (p->psind > 0 && ((addr + ptoa(tmpidx)) &
-			    (pagesizes[p->psind] - 1)) == 0) {
-				mask = atop(pagesizes[p->psind]) - 1;
-				if (tmpidx + mask < psize &&
-				    vm_page_ps_test(p, PS_ALL_VALID, NULL)) {
-					p += mask;
-					threshold += mask;
+			for (psind = p->psind; psind > 0; psind--) {
+				if (((addr + ptoa(tmpidx)) &
+				    (pagesizes[psind] - 1)) == 0) {
+					mask = atop(pagesizes[psind]) - 1;
+					if (tmpidx + mask < psize &&
+					    vm_page_ps_test(p, psind,
+					    PS_ALL_VALID, NULL)) {
+						p += mask;
+						threshold += mask;
+						break;
+					}
 				}
 			}
 		} else if (p_start != NULL) {
@@ -3594,27 +3632,6 @@ again:
 	 */
 	vm_map_wait_busy(map);
 
-#ifdef CHERI_CAPREVOKE
-	if (cheri_revoke_st_get_state(map->vm_cheri_revoke_st) !=
-	    CHERI_REVOKE_ST_NONE) {
-		if (map == &curthread->td_proc->p_vmspace->vm_map) {
-			/* Push our revocation along */
-			vm_map_unlock(map);
-
-			// XXX!
-
-			goto again;
-		} else {
-			/* It's hard to push on another thread; wait */
-			rv = cv_wait_sig(&map->vm_cheri_revoke_cv, &map->lock);
-			if (rv != 0) {
-				return rv;
-			}
-			goto again;
-		}
-	}
-#endif
-
 	VM_MAP_RANGE_CHECK(map, start, end);
 
 	rv = vm_map_check_owner(map, start, end);
@@ -3648,6 +3665,9 @@ again:
 	 * Make a first pass to check for protection violations.
 	 */
 restart_checks:
+	KASSERT((flags & VM_MAP_PROTECT_KEEP_CAP) == 0 ||
+	    (flags & (VM_MAP_PROTECT_SET_PROT | VM_MAP_PROTECT_SET_MAXPROT)) !=
+	       0, ("VM_MAP_PROTECT_KEEP_CAP, but not setting any protections"));
 	check_prot = 0;
 	if ((flags & VM_MAP_PROTECT_SET_PROT) != 0)
 		check_prot |= new_prot;
@@ -3668,10 +3688,10 @@ restart_checks:
 
 		/*
 		 * When VM_MAP_PROTECT_KEEP_CAP is used (for mprotect()),
-		 * upgrade* new_prot to include the associated VM_PROT_CAP
+		 * upgrade new_prot to include the associated VM_PROT_CAP
 		 * bits and retry the the scan.  This means that the
 		 * mprotect will fail if it spans map entries with and
-		 * without VM_PROT_CAP set.
+		 * without VM_PROT_CAP set set in max_protection.
 		 *
 		 * Alternatively, VM_MAP_PROTECT_KEEP_CAP could be applied to
 		 * individual map entries.  The current approach gives
@@ -3679,10 +3699,10 @@ restart_checks:
 		 * potential compatibility breakage.  The alternative
 		 * would maximize compatibility.
 		 */
-		if (flags & VM_MAP_PROTECT_KEEP_CAP &&
-		    (((flags & VM_MAP_PROTECT_SET_MAXPROT) != 0 && (entry->max_protection & VM_PROT_CAP) != 0) ||
-		    ((flags & VM_MAP_PROTECT_SET_MAXPROT) == 0 && (entry->protection & VM_PROT_CAP) != 0))) {
+		if ((flags & VM_MAP_PROTECT_KEEP_CAP) != 0 &&
+		    (entry->max_protection & VM_PROT_CAP) != 0) {
 			new_prot = VM_PROT_ADD_CAP(new_prot);
+			new_maxprot = VM_PROT_ADD_CAP(new_maxprot);
 			flags &= ~VM_MAP_PROTECT_KEEP_CAP;
 			goto restart_checks;
 		}
@@ -3802,7 +3822,8 @@ restart_checks:
 		old_prot = entry->protection;
 
 		if ((flags & VM_MAP_PROTECT_SET_MAXPROT) != 0) {
-			entry->max_protection = new_maxprot;
+			entry->max_protection = new_maxprot |
+			    VM_PROT_NO_IMPLY_CAP;
 			entry->protection = new_maxprot & old_prot;
 		}
 		if ((flags & VM_MAP_PROTECT_SET_PROT) != 0)
@@ -5057,9 +5078,6 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 		    entry->object.vm_object != NULL)
 			pmap_map_delete(map->pmap, entry->start, entry->end);
 
-		if (entry->end == map->anon_loc)
-			map->anon_loc = entry->start;
-
 		/*
 		 * If using reservations, allocate a new reservation
 		 * entry to use in place of the entry being removed.
@@ -5234,6 +5252,7 @@ vm_map_clear(vm_map_t map)
 	 * no capabilities).  Clear revocation state.
 	 */
 	map->vm_cheri_revoke_st = CHERI_REVOKE_ST_NONE;
+	map->vm_cheri_async_revoke_st = CHERI_REVOKE_ST_NONE;
 	/* quarantine is drained below. */
 	map->rev_entry = NULL;
 #ifdef CHERI_CAPREVOKE_STATS
@@ -5523,16 +5542,7 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 	KASSERT(locked, ("vmspace_fork: lock failed"));
 
 #ifdef CHERI_CAPREVOKE
-	/*
-	 * Revocation holds the map busy, so if we're here, there isn't a state
-	 * transition in progress (but an epoch might be open).
-	 *
-	 * XXX NWF We should probably go around again to force the epoch closed.
-	 */
-	vm2->vm_map.vm_cheri_revoke_st = vm1->vm_map.vm_cheri_revoke_st;
-	vm2->vm_map.vm_cheri_revoke_test = vm1->vm_map.vm_cheri_revoke_test;
-	vm2->vm_map.vm_cheri_revoke_quarantining =
-	    vm1->vm_map.vm_cheri_revoke_quarantining;
+	cheri_revoke_vmspace_fork(vm2, vm1);
 #endif
 
 	error = pmap_vmspace_copy(new_map->pmap, old_map->pmap);
@@ -5754,7 +5764,7 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 			}
 		}
 	}
-#if defined(CHERI_CAPREVOKE) && defined(DIAGNOSTIC)
+#if defined(CHERI_CAPREVOKE)
 	vm_cheri_assert_consistent_clg(new_map);
 #endif
 	/*
@@ -5816,6 +5826,7 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 	vm_pointer_t bot, gap_bot, gap_top, top;
 	vm_size_t init_ssize, sgp;
 	int orient, rv;
+	vm_offset_t reservation;
 
 	/*
 	 * The stack orientation is piggybacked with the cow argument.
@@ -5841,13 +5852,18 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 		init_ssize = max_ssize - sgp;
 
 	if (map->flags & MAP_RESERVATIONS) {
-		/* Check reservation exists */
+		/*
+		 * If this map enables reservations, a reservation must have
+		 * already been created for us.
+		 */
 		if (vm_map_lookup_entry(map, addrbos, &prev_entry) == 0 ||
 		    (prev_entry->eflags & MAP_ENTRY_UNMAPPED) == 0)
 			return (KERN_PROTECTION_FAILURE);
 		/* If reservation can't accommodate max_ssize, no go. */
 		if (prev_entry->end - (vm_offset_t)addrbos < max_ssize)
 			return (KERN_NO_SPACE);
+
+		reservation = prev_entry->reservation;
 	} else {
 		/* If addr is already mapped, no go */
 		if (vm_map_lookup_entry(map, addrbos, &prev_entry))
@@ -5857,6 +5873,8 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 		 */
 		if (vm_map_entry_succ(prev_entry)->start < addrbos + max_ssize)
 			return (KERN_NO_SPACE);
+
+		reservation = addrbos;
 	}
 
 	/*
@@ -5880,7 +5898,7 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 		gap_bot = top;
 		gap_top = addrbos + max_ssize;
 	}
-	rv = vm_map_insert1(map, NULL, 0, bot, top, prot, max, cow, addrbos,
+	rv = vm_map_insert1(map, NULL, 0, bot, top, prot, max, cow, reservation,
 	    &new_entry);
 	if (rv != KERN_SUCCESS)
 		return (rv);
@@ -5896,7 +5914,7 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 		return (KERN_SUCCESS);
 	rv = vm_map_insert1(map, NULL, 0, gap_bot, gap_top, VM_PROT_NONE,
 	    VM_PROT_NONE, MAP_CREATE_GUARD | (orient == MAP_STACK_GROWS_DOWN ?
-	    MAP_CREATE_STACK_GAP_DN : MAP_CREATE_STACK_GAP_UP), addrbos,
+	    MAP_CREATE_STACK_GAP_DN : MAP_CREATE_STACK_GAP_UP), reservation,
 	    &gap_entry);
 	if (rv == KERN_SUCCESS) {
 		KASSERT((gap_entry->eflags & MAP_ENTRY_GUARD) != 0,
@@ -6667,10 +6685,23 @@ vm_map_prot2perms(vm_prot_t prot)
 {
 	int perms = 0;
 
-	if (prot & (VM_PROT_READ | VM_PROT_COPY))
-		perms |= CHERI_PROT2PERM_READ_PERMS;
-	if (prot & VM_PROT_WRITE)
-		perms |= CHERI_PROT2PERM_WRITE_PERMS;
+	if (prot & (VM_PROT_CAP | VM_PROT_NO_IMPLY_CAP)) {
+		if (prot & (VM_PROT_READ | VM_PROT_COPY))
+			perms |= CHERI_PROT2PERM_READ_PERMS;
+		if (prot & VM_PROT_READ_CAP)
+			perms |= CHERI_PROT2PERM_READ_CAP_PERMS;
+		if (prot & VM_PROT_WRITE)
+			perms |= CHERI_PROT2PERM_WRITE_PERMS;
+		if (prot & VM_PROT_WRITE_CAP)
+			perms |= CHERI_PROT2PERM_WRITE_CAP_PERMS;
+	} else {
+		if (prot & (VM_PROT_READ | VM_PROT_COPY))
+			perms |= CHERI_PROT2PERM_READ_PERMS |
+			    CHERI_PROT2PERM_READ_CAP_PERMS;
+		if (prot & VM_PROT_WRITE)
+			perms |= CHERI_PROT2PERM_WRITE_PERMS |
+			    CHERI_PROT2PERM_WRITE_CAP_PERMS;
+	}
 	if (prot & VM_PROT_EXECUTE)
 		perms |= CHERI_PROT2PERM_EXEC_PERMS;
 
@@ -6715,8 +6746,8 @@ vm_map_reservation_insert(vm_map_t map, vm_offset_t addr, vm_size_t length,
 	new_entry->end = addr + length;
 	new_entry->reservation = reservation;
 	new_entry->next_read = addr;
-	new_entry->max_protection = max;
 	new_entry->owner = curproc->p_pid;
+	new_entry->max_protection = max | VM_PROT_NO_IMPLY_CAP;
 	vm_map_entry_link(map, new_entry);
 	vm_map_log("reserve", new_entry);
 

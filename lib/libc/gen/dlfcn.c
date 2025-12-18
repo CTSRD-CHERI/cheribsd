@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #if !defined(IN_LIBDL) || defined(PIC)
 
 /*
@@ -58,11 +57,6 @@ static const char sorry[] = "Service unavailable";
 void _rtld_thread_init(void *);
 void _rtld_atfork_pre(int *);
 void _rtld_atfork_post(int *);
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-void _rtld_thread_start_init(void (*)(struct pthread *));
-void _rtld_sighandler_init(void (*)(int, siginfo_t *, void *));
-#endif
 
 /*
  * For ELF, the dynamic linker directly resolves references to its
@@ -196,20 +190,6 @@ _rtld_thread_init(void *li __unused)
 	/* Do nothing when linked statically. */
 }
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-#pragma weak _rtld_thread_start_init
-void
-_rtld_thread_start_init(void (*p)(struct pthread *) __unused)
-{
-}
-
-#pragma weak _rtld_sighandler_init
-void
-_rtld_sighandler_init(void (*p)(int, siginfo_t *, void *) __unused)
-{
-}
-#endif
-
 #ifndef IN_LIBDL
 static pthread_once_t dl_phdr_info_once = PTHREAD_ONCE_INIT;
 static struct dl_phdr_info phdr_info;
@@ -285,7 +265,7 @@ dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *) __unused,
 		return (1);
 	_once(&dl_phdr_info_once, dl_init_phdr_info);
 	ti.ti_module = 1;
-	ti.ti_offset = 0;
+	ti.ti_offset = -TLS_DTV_OFFSET;
 	mutex_lock(&dl_phdr_info_lock);
 	phdr_info.dlpi_tls_data = __tls_get_addr(&ti);
 	ret = callback(&phdr_info, sizeof(phdr_info), data);
@@ -396,5 +376,31 @@ _rtld_is_dlopened(void *arg __unused)
 
 	return (0);
 }
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(__aarch64__)
+#pragma weak dl_c18n_get_trusted_stack
+void *
+dl_c18n_get_trusted_stack(uintptr_t pc __unused) {
+	return (NULL);
+}
+
+#pragma weak dl_c18n_unwind_trusted_stack
+void
+dl_c18n_unwind_trusted_stack(void *sp __unused, void *target __unused) {
+}
+
+#pragma weak dl_c18n_is_trampoline
+int
+dl_c18n_is_trampoline(uintptr_t pc __unused, void *tfs __unused) {
+	return (0);
+}
+
+#pragma weak dl_c18n_pop_trusted_stack
+void *
+dl_c18n_pop_trusted_stack(struct dl_c18n_compart_state *state __unused,
+    void *tfs __unused) {
+	return (NULL);
+}
+#endif
 
 #endif /* !defined(IN_LIBDL) || defined(PIC) */

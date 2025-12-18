@@ -97,6 +97,7 @@
 #include <security/mac/mac_framework.h>
 
 #if __has_feature(capabilities)
+#include <cheri/c18n.h>
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #include <cheri/cherireg.h>
@@ -650,6 +651,8 @@ do_execve(struct thread *td, struct image_args *args,
 interpret:
 	if (args->fname != NULL) {
 #ifdef CAPABILITY_MODE
+		if (CAP_TRACING(td))
+			ktrcapfail(CAPFAIL_NAMEI, args->fname);
 		/*
 		 * While capability mode can't reach this point via direct
 		 * path arguments to execve(), we also don't allow
@@ -1022,7 +1025,8 @@ interpret:
 		p->p_flag2 &= ~P2_NOTRACE;
 	if ((p->p_flag2 & P2_STKGAP_DISABLE_EXEC) == 0)
 		p->p_flag2 &= ~P2_STKGAP_DISABLE;
-	p->p_flag2 &= ~P2_NOCOLOCATE;
+	p->p_flag2 &= ~(P2_NOCOLOCATE | P2_MEMBAR_PRIVE |
+	    P2_MEMBAR_PRIVE_SYNCORE | P2_MEMBAR_GLOBE);
 	if (p->p_flag & P_PPWAIT) {
 		p->p_flag &= ~(P_PPWAIT | P_PPTRACE);
 		cv_broadcast(&p->p_pwait);
@@ -2269,6 +2273,18 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	ustringp = destp;
 #endif
 
+#if __has_feature(capabilities)
+	/*
+	 * Allocate the compartment statistics header.
+	 */
+	destp -= sizeof(*imgp->c18n_info);
+	destp = rounddown2(destp, sizeof(void * __capability));
+	imgp->c18n_info = (struct cheri_c18n_info * __kerncap)
+	    cheri_setboundsexact(destp, sizeof(*imgp->c18n_info));
+	p->p_c18n_info =
+	    (__cheri_fromcap struct cheri_c18n_info *)imgp->c18n_info;
+#endif
+
 	if (imgp->auxargs) {
 		/*
 		 * Allocate room on the stack for the ELF auxargs
@@ -2527,6 +2543,7 @@ compress_chunk(struct coredump_params *cp, char * __capability base, char *buf,
 	size_t chunk_len;
 	int error;
 
+	error = 0;
 	while (len > 0) {
 		chunk_len = MIN(len, CORE_BUF_SIZE);
 
@@ -2573,6 +2590,7 @@ core_output(char * __capability base, size_t len, off_t offset,
 	if (cp->comp != NULL)
 		return (compress_chunk(cp, base, tmpbuf, len));
 
+	error = 0;
 	map = &cp->td->td_proc->p_vmspace->vm_map;
 	for (; len > 0; base += runlen, offset += runlen, len -= runlen) {
 		/*

@@ -1,0 +1,16 @@
+{
+    "compartments": {
+	"csu": {
+	    "files": [
+		"crt1.o",
+		"crtbegin.o",
+		"crtbeginS.o",
+		"crtbeginT.o",
+		"crtend.o",
+		"crtendS.o",
+		"crti.o",
+		"crtn.o"
+	    ]
+	}
+    }
+}

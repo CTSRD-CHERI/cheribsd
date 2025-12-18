@@ -89,8 +89,8 @@
  * functions.
  *
  * As an additional feature, linear and scatter ABD's can be stitched together
- * by using the gang ABD type (abd_alloc_gang_abd()). This allows for
- * multiple ABDs to be viewed as a singular ABD.
+ * by using the gang ABD type (abd_alloc_gang()). This allows for multiple ABDs
+ * to be viewed as a singular ABD.
  *
  * It is possible to make all ABDs linear by setting zfs_abd_scatter_enabled to
  * B_FALSE.
@@ -109,11 +109,15 @@ void
 abd_verify(abd_t *abd)
 {
 #ifdef ZFS_DEBUG
-	ASSERT3U(abd->abd_size, <=, SPA_MAXBLOCKSIZE);
+	if (abd_is_from_pages(abd)) {
+		ASSERT3U(abd->abd_size, <=, DMU_MAX_ACCESS);
+	} else {
+		ASSERT3U(abd->abd_size, <=, SPA_MAXBLOCKSIZE);
+	}
 	ASSERT3U(abd->abd_flags, ==, abd->abd_flags & (ABD_FLAG_LINEAR |
 	    ABD_FLAG_OWNER | ABD_FLAG_META | ABD_FLAG_MULTI_ZONE |
 	    ABD_FLAG_MULTI_CHUNK | ABD_FLAG_LINEAR_PAGE | ABD_FLAG_GANG |
-	    ABD_FLAG_GANG_FREE | ABD_FLAG_ZEROS | ABD_FLAG_ALLOCD));
+	    ABD_FLAG_GANG_FREE | ABD_FLAG_ALLOCD | ABD_FLAG_FROM_PAGES));
 	IMPLY(abd->abd_parent != NULL, !(abd->abd_flags & ABD_FLAG_OWNER));
 	IMPLY(abd->abd_flags & ABD_FLAG_META, abd->abd_flags & ABD_FLAG_OWNER);
 	if (abd_is_linear(abd)) {
@@ -136,7 +140,7 @@ abd_verify(abd_t *abd)
 #endif
 }
 
-static void
+void
 abd_init_struct(abd_t *abd)
 {
 	list_link_init(&abd->abd_gang_link);
@@ -238,6 +242,7 @@ abd_free_linear(abd_t *abd)
 		abd_free_linear_page(abd);
 		return;
 	}
+
 	if (abd->abd_flags & ABD_FLAG_META) {
 		zio_buf_free(ABD_LINEAR_BUF(abd), abd->abd_size);
 	} else {
@@ -520,6 +525,21 @@ abd_get_offset_impl(abd_t *abd, abd_t *sabd, size_t off, size_t size)
 		 */
 		abd->abd_flags |= ABD_FLAG_LINEAR;
 
+		/*
+		 * User pages from Direct I/O requests may be in a single page
+		 * (ABD_FLAG_LINEAR_PAGE), and we must make sure to still flag
+		 * that here for abd. This is required because we have to be
+		 * careful when borrowing the buffer from the ABD because we
+		 * can not place user pages under write protection on Linux.
+		 * See the comments in abd_os.c for abd_borrow_buf(),
+		 * abd_borrow_buf_copy(), abd_return_buf() and
+		 * abd_return_buf_copy().
+		 */
+		if (abd_is_from_pages(sabd)) {
+			abd->abd_flags |= ABD_FLAG_FROM_PAGES |
+			    ABD_FLAG_LINEAR_PAGE;
+		}
+
 		ABD_LINEAR_BUF(abd) = (char *)ABD_LINEAR_BUF(sabd) + off;
 	} else if (abd_is_gang(sabd)) {
 		size_t left = size;
@@ -603,13 +623,11 @@ abd_get_zeros(size_t size)
 }
 
 /*
- * Allocate a linear ABD structure for buf.
+ * Create a linear ABD for an existing buf.
  */
-abd_t *
-abd_get_from_buf(void *buf, size_t size)
+static abd_t *
+abd_get_from_buf_impl(abd_t *abd, void *buf, size_t size)
 {
-	abd_t *abd = abd_alloc_struct(0);
-
 	VERIFY3U(size, <=, SPA_MAXBLOCKSIZE);
 
 	/*
@@ -625,6 +643,20 @@ abd_get_from_buf(void *buf, size_t size)
 	return (abd);
 }
 
+abd_t *
+abd_get_from_buf(void *buf, size_t size)
+{
+	abd_t *abd = abd_alloc_struct(0);
+	return (abd_get_from_buf_impl(abd, buf, size));
+}
+
+abd_t *
+abd_get_from_buf_struct(abd_t *abd, void *buf, size_t size)
+{
+	abd_init_struct(abd);
+	return (abd_get_from_buf_impl(abd, buf, size));
+}
+
 /*
  * Get the raw buffer associated with a linear ABD.
  */
@@ -634,70 +666,6 @@ abd_to_buf(abd_t *abd)
 	ASSERT(abd_is_linear(abd));
 	abd_verify(abd);
 	return (ABD_LINEAR_BUF(abd));
-}
-
-/*
- * Borrow a raw buffer from an ABD without copying the contents of the ABD
- * into the buffer. If the ABD is scattered, this will allocate a raw buffer
- * whose contents are undefined. To copy over the existing data in the ABD, use
- * abd_borrow_buf_copy() instead.
- */
-void *
-abd_borrow_buf(abd_t *abd, size_t n)
-{
-	void *buf;
-	abd_verify(abd);
-	ASSERT3U(abd->abd_size, >=, n);
-	if (abd_is_linear(abd)) {
-		buf = abd_to_buf(abd);
-	} else {
-		buf = zio_buf_alloc(n);
-	}
-#ifdef ZFS_DEBUG
-	(void) zfs_refcount_add_many(&abd->abd_children, n, buf);
-#endif
-	return (buf);
-}
-
-void *
-abd_borrow_buf_copy(abd_t *abd, size_t n)
-{
-	void *buf = abd_borrow_buf(abd, n);
-	if (!abd_is_linear(abd)) {
-		abd_copy_to_buf(buf, abd, n);
-	}
-	return (buf);
-}
-
-/*
- * Return a borrowed raw buffer to an ABD. If the ABD is scattered, this will
- * not change the contents of the ABD and will ASSERT that you didn't modify
- * the buffer since it was borrowed. If you want any changes you made to buf to
- * be copied back to abd, use abd_return_buf_copy() instead.
- */
-void
-abd_return_buf(abd_t *abd, void *buf, size_t n)
-{
-	abd_verify(abd);
-	ASSERT3U(abd->abd_size, >=, n);
-#ifdef ZFS_DEBUG
-	(void) zfs_refcount_remove_many(&abd->abd_children, n, buf);
-#endif
-	if (abd_is_linear(abd)) {
-		ASSERT3P(buf, ==, abd_to_buf(abd));
-	} else {
-		ASSERT0(abd_cmp_buf(abd, buf, n));
-		zio_buf_free(buf, n);
-	}
-}
-
-void
-abd_return_buf_copy(abd_t *abd, void *buf, size_t n)
-{
-	if (!abd_is_linear(abd)) {
-		abd_copy_from_buf(abd, buf, n);
-	}
-	abd_return_buf(abd, buf, n);
 }
 
 void
@@ -802,13 +770,10 @@ abd_iterate_func(abd_t *abd, size_t off, size_t size,
 	abd_verify(abd);
 	ASSERT3U(off + size, <=, abd->abd_size);
 
-	boolean_t gang = abd_is_gang(abd);
 	abd_t *c_abd = abd_init_abd_iter(abd, &aiter, off);
 
 	while (size > 0) {
-		/* If we are at the end of the gang ABD we are done */
-		if (gang && !c_abd)
-			break;
+		IMPLY(abd_is_gang(abd), c_abd != NULL);
 
 		abd_iter_map(&aiter);
 
@@ -828,6 +793,48 @@ abd_iterate_func(abd_t *abd, size_t off, size_t size,
 
 	return (ret);
 }
+
+#if defined(__linux__) && defined(_KERNEL)
+int
+abd_iterate_page_func(abd_t *abd, size_t off, size_t size,
+    abd_iter_page_func_t *func, void *private)
+{
+	struct abd_iter aiter;
+	int ret = 0;
+
+	if (size == 0)
+		return (0);
+
+	abd_verify(abd);
+	ASSERT3U(off + size, <=, abd->abd_size);
+
+	abd_t *c_abd = abd_init_abd_iter(abd, &aiter, off);
+
+	while (size > 0) {
+		IMPLY(abd_is_gang(abd), c_abd != NULL);
+
+		abd_iter_page(&aiter);
+
+		size_t len = MIN(aiter.iter_page_dsize, size);
+		ASSERT3U(len, >, 0);
+
+		ret = func(aiter.iter_page, aiter.iter_page_doff,
+		    len, private);
+
+		aiter.iter_page = NULL;
+		aiter.iter_page_doff = 0;
+		aiter.iter_page_dsize = 0;
+
+		if (ret != 0)
+			break;
+
+		size -= len;
+		c_abd = abd_advance_abd_iter(abd, c_abd, &aiter, len);
+	}
+
+	return (ret);
+}
+#endif
 
 struct buf_arg {
 	void *arg_buf;
@@ -930,7 +937,6 @@ abd_iterate_func2(abd_t *dabd, abd_t *sabd, size_t doff, size_t soff,
 {
 	int ret = 0;
 	struct abd_iter daiter, saiter;
-	boolean_t dabd_is_gang_abd, sabd_is_gang_abd;
 	abd_t *c_dabd, *c_sabd;
 
 	if (size == 0)
@@ -942,16 +948,12 @@ abd_iterate_func2(abd_t *dabd, abd_t *sabd, size_t doff, size_t soff,
 	ASSERT3U(doff + size, <=, dabd->abd_size);
 	ASSERT3U(soff + size, <=, sabd->abd_size);
 
-	dabd_is_gang_abd = abd_is_gang(dabd);
-	sabd_is_gang_abd = abd_is_gang(sabd);
 	c_dabd = abd_init_abd_iter(dabd, &daiter, doff);
 	c_sabd = abd_init_abd_iter(sabd, &saiter, soff);
 
 	while (size > 0) {
-		/* if we are at the end of the gang ABD we are done */
-		if ((dabd_is_gang_abd && !c_dabd) ||
-		    (sabd_is_gang_abd && !c_sabd))
-			break;
+		IMPLY(abd_is_gang(dabd), c_dabd != NULL);
+		IMPLY(abd_is_gang(sabd), c_sabd != NULL);
 
 		abd_iter_map(&daiter);
 		abd_iter_map(&saiter);
@@ -1017,6 +1019,31 @@ abd_cmp(abd_t *dabd, abd_t *sabd)
 }
 
 /*
+ * Check if ABD content is all-zeroes.
+ */
+static int
+abd_cmp_zero_off_cb(void *data, size_t len, void *private)
+{
+	(void) private;
+
+	/* This function can only check whole uint64s. Enforce that. */
+	ASSERT0(P2PHASE(len, 8));
+
+	uint64_t *end = (uint64_t *)((char *)data + len);
+	for (uint64_t *word = (uint64_t *)data; word < end; word++)
+		if (*word != 0)
+			return (1);
+
+	return (0);
+}
+
+int
+abd_cmp_zero_off(abd_t *abd, size_t off, size_t size)
+{
+	return (abd_iterate_func(abd, off, size, abd_cmp_zero_off_cb, NULL));
+}
+
+/*
  * Iterate over code ABDs and a data ABD and call @func_raidz_gen.
  *
  * @cabds          parity ABDs, must have equal size
@@ -1025,87 +1052,63 @@ abd_cmp(abd_t *dabd, abd_t *sabd)
  *                 is the same when taking linear and when taking scatter
  */
 void
-abd_raidz_gen_iterate(abd_t **cabds, abd_t *dabd,
-    ssize_t csize, ssize_t dsize, const unsigned parity,
+abd_raidz_gen_iterate(abd_t **cabds, abd_t *dabd, size_t off,
+    size_t csize, size_t dsize, const unsigned parity,
     void (*func_raidz_gen)(void **, const void *, size_t, size_t))
 {
 	int i;
-	ssize_t len, dlen;
+	size_t len, dlen;
 	struct abd_iter caiters[3];
-	struct abd_iter daiter = {0};
-	void *caddrs[3];
+	struct abd_iter daiter;
+	void *caddrs[3], *daddr;
 	unsigned long flags __maybe_unused = 0;
 	abd_t *c_cabds[3];
 	abd_t *c_dabd = NULL;
-	boolean_t cabds_is_gang_abd[3];
-	boolean_t dabd_is_gang_abd = B_FALSE;
 
 	ASSERT3U(parity, <=, 3);
-
 	for (i = 0; i < parity; i++) {
-		cabds_is_gang_abd[i] = abd_is_gang(cabds[i]);
-		c_cabds[i] = abd_init_abd_iter(cabds[i], &caiters[i], 0);
+		abd_verify(cabds[i]);
+		ASSERT3U(off + csize, <=, cabds[i]->abd_size);
+		c_cabds[i] = abd_init_abd_iter(cabds[i], &caiters[i], off);
 	}
 
-	if (dabd) {
-		dabd_is_gang_abd = abd_is_gang(dabd);
-		c_dabd = abd_init_abd_iter(dabd, &daiter, 0);
+	if (dsize > 0) {
+		ASSERT(dabd);
+		abd_verify(dabd);
+		ASSERT3U(off + dsize, <=, dabd->abd_size);
+		c_dabd = abd_init_abd_iter(dabd, &daiter, off);
 	}
-
-	ASSERT3S(dsize, >=, 0);
 
 	abd_enter_critical(flags);
 	while (csize > 0) {
-		/* if we are at the end of the gang ABD we are done */
-		if (dabd_is_gang_abd && !c_dabd)
-			break;
-
+		len = csize;
 		for (i = 0; i < parity; i++) {
-			/*
-			 * If we are at the end of the gang ABD we are
-			 * done.
-			 */
-			if (cabds_is_gang_abd[i] && !c_cabds[i])
-				break;
+			IMPLY(abd_is_gang(cabds[i]), c_cabds[i] != NULL);
 			abd_iter_map(&caiters[i]);
 			caddrs[i] = caiters[i].iter_mapaddr;
+			len = MIN(caiters[i].iter_mapsize, len);
 		}
 
-		len = csize;
-
-		if (dabd && dsize > 0)
+		if (dsize > 0) {
+			IMPLY(abd_is_gang(dabd), c_dabd != NULL);
 			abd_iter_map(&daiter);
-
-		switch (parity) {
-			case 3:
-				len = MIN(caiters[2].iter_mapsize, len);
-				zfs_fallthrough;
-			case 2:
-				len = MIN(caiters[1].iter_mapsize, len);
-				zfs_fallthrough;
-			case 1:
-				len = MIN(caiters[0].iter_mapsize, len);
-		}
-
-		/* must be progressive */
-		ASSERT3S(len, >, 0);
-
-		if (dabd && dsize > 0) {
-			/* this needs precise iter.length */
+			daddr = daiter.iter_mapaddr;
 			len = MIN(daiter.iter_mapsize, len);
 			dlen = len;
-		} else
+		} else {
+			daddr = NULL;
 			dlen = 0;
+		}
 
 		/* must be progressive */
-		ASSERT3S(len, >, 0);
+		ASSERT3U(len, >, 0);
 		/*
 		 * The iterated function likely will not do well if each
 		 * segment except the last one is not multiple of 512 (raidz).
 		 */
 		ASSERT3U(((uint64_t)len & 511ULL), ==, 0);
 
-		func_raidz_gen(caddrs, daiter.iter_mapaddr, len, dlen);
+		func_raidz_gen(caddrs, daddr, len, dlen);
 
 		for (i = parity-1; i >= 0; i--) {
 			abd_iter_unmap(&caiters[i]);
@@ -1114,7 +1117,7 @@ abd_raidz_gen_iterate(abd_t **cabds, abd_t *dabd,
 			    &caiters[i], len);
 		}
 
-		if (dabd && dsize > 0) {
+		if (dsize > 0) {
 			abd_iter_unmap(&daiter);
 			c_dabd =
 			    abd_advance_abd_iter(dabd, c_dabd, &daiter,
@@ -1123,9 +1126,6 @@ abd_raidz_gen_iterate(abd_t **cabds, abd_t *dabd,
 		}
 
 		csize -= len;
-
-		ASSERT3S(dsize, >=, 0);
-		ASSERT3S(csize, >=, 0);
 	}
 	abd_exit_critical(flags);
 }
@@ -1142,27 +1142,27 @@ abd_raidz_gen_iterate(abd_t **cabds, abd_t *dabd,
  */
 void
 abd_raidz_rec_iterate(abd_t **cabds, abd_t **tabds,
-    ssize_t tsize, const unsigned parity,
+    size_t tsize, const unsigned parity,
     void (*func_raidz_rec)(void **t, const size_t tsize, void **c,
     const unsigned *mul),
     const unsigned *mul)
 {
 	int i;
-	ssize_t len;
+	size_t len;
 	struct abd_iter citers[3];
 	struct abd_iter xiters[3];
 	void *caddrs[3], *xaddrs[3];
 	unsigned long flags __maybe_unused = 0;
-	boolean_t cabds_is_gang_abd[3];
-	boolean_t tabds_is_gang_abd[3];
 	abd_t *c_cabds[3];
 	abd_t *c_tabds[3];
 
 	ASSERT3U(parity, <=, 3);
 
 	for (i = 0; i < parity; i++) {
-		cabds_is_gang_abd[i] = abd_is_gang(cabds[i]);
-		tabds_is_gang_abd[i] = abd_is_gang(tabds[i]);
+		abd_verify(cabds[i]);
+		abd_verify(tabds[i]);
+		ASSERT3U(tsize, <=, cabds[i]->abd_size);
+		ASSERT3U(tsize, <=, tabds[i]->abd_size);
 		c_cabds[i] =
 		    abd_init_abd_iter(cabds[i], &citers[i], 0);
 		c_tabds[i] =
@@ -1171,36 +1171,18 @@ abd_raidz_rec_iterate(abd_t **cabds, abd_t **tabds,
 
 	abd_enter_critical(flags);
 	while (tsize > 0) {
-
+		len = tsize;
 		for (i = 0; i < parity; i++) {
-			/*
-			 * If we are at the end of the gang ABD we
-			 * are done.
-			 */
-			if (cabds_is_gang_abd[i] && !c_cabds[i])
-				break;
-			if (tabds_is_gang_abd[i] && !c_tabds[i])
-				break;
+			IMPLY(abd_is_gang(cabds[i]), c_cabds[i] != NULL);
+			IMPLY(abd_is_gang(tabds[i]), c_tabds[i] != NULL);
 			abd_iter_map(&citers[i]);
 			abd_iter_map(&xiters[i]);
 			caddrs[i] = citers[i].iter_mapaddr;
 			xaddrs[i] = xiters[i].iter_mapaddr;
+			len = MIN(citers[i].iter_mapsize, len);
+			len = MIN(xiters[i].iter_mapsize, len);
 		}
 
-		len = tsize;
-		switch (parity) {
-			case 3:
-				len = MIN(xiters[2].iter_mapsize, len);
-				len = MIN(citers[2].iter_mapsize, len);
-				zfs_fallthrough;
-			case 2:
-				len = MIN(xiters[1].iter_mapsize, len);
-				len = MIN(citers[1].iter_mapsize, len);
-				zfs_fallthrough;
-			case 1:
-				len = MIN(xiters[0].iter_mapsize, len);
-				len = MIN(citers[0].iter_mapsize, len);
-		}
 		/* must be progressive */
 		ASSERT3S(len, >, 0);
 		/*

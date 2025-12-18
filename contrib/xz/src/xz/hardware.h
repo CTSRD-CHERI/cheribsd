@@ -1,12 +1,11 @@
+// SPDX-License-Identifier: 0BSD
+
 ///////////////////////////////////////////////////////////////////////////////
 //
 /// \file       hardware.h
 /// \brief      Detection of available hardware resources
 //
 //  Author:     Lasse Collin
-//
-//  This file has been put into the public domain.
-//  You can do whatever you want with this file.
 //
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -71,4 +70,5 @@ extern bool hardware_memlimit_mtenc_is_default(void);
 extern uint64_t hardware_memlimit_mtdec_get(void);
 
 /// Display the amount of RAM and memory usage limits and exit.
-extern void hardware_memlimit_show(void) lzma_attribute((__noreturn__));
+tuklib_attr_noreturn
+extern void hardware_memlimit_show(void);

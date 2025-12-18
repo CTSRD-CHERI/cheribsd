@@ -517,7 +517,7 @@ qat_ocf_session_init(device_t dev,
 				  M_NOWAIT,
 				  0,
 				  ~1UL,
-				  1 << (bsrl(sessionCtxSize - 1) + 1),
+				  1 << (ilog2(sessionCtxSize - 1) + 1),
 				  0);
 	if (NULL == sessionCtx) {
 		device_printf(dev, "unable to allocate memory for session\n");
@@ -544,7 +544,7 @@ qat_ocf_session_init(device_t dev,
 fail:
 	/* Release resources if any */
 	if (sessionCtx)
-		contigfree(sessionCtx, sessionCtxSize, M_QAT_OCF);
+		free(sessionCtx, M_QAT_OCF);
 
 	return status;
 }
@@ -610,9 +610,7 @@ qat_ocf_remove_session(device_t dev,
 	}
 
 	explicit_bzero(qat_session->sessionCtx, qat_session->sessionCtxSize);
-	contigfree(qat_session->sessionCtx,
-		   qat_session->sessionCtxSize,
-		   M_QAT_OCF);
+	free(qat_session->sessionCtx, M_QAT_OCF);
 	qat_session->sessionCtx = NULL;
 	qat_session->sessionCtxSize = 0;
 

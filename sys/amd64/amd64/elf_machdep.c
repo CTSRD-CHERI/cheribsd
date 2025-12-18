@@ -25,7 +25,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -79,7 +78,8 @@ struct sysentvec elf64_freebsd_sysvec_la48 = {
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_ABI_FREEBSD | SV_ASLR | SV_LP64 | SV_SHP |
-			    SV_TIMEKEEP | SV_RNG_SEED_VER | SV_DSO_SIG,
+			    SV_TIMEKEEP | SV_RNG_SEED_VER | SV_DSO_SIG |
+			    SV_SIGSYS,
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = syscallnames,
@@ -120,7 +120,8 @@ struct sysentvec elf64_freebsd_sysvec_la57 = {
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_ABI_FREEBSD | SV_ASLR | SV_LP64 | SV_SHP |
-			    SV_TIMEKEEP | SV_RNG_SEED_VER | SV_DSO_SIG,
+			    SV_TIMEKEEP | SV_RNG_SEED_VER | SV_DSO_SIG |
+			    SV_SIGSYS,
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = syscallnames,
@@ -162,6 +163,7 @@ amd64_lower_shared_page(struct sysentvec *sv)
 
 static bool
 freebsd_brand_info_la57_img_compat(const struct image_params *imgp,
+    const Elf64_Ehdr *hdr __unused, const Elf64_Phdr *phdr __unused,
     const int32_t *osrel __unused, const uint32_t *fctl0)
 {
 	if ((imgp->proc->p_md.md_flags & P_MD_LA57) != 0)
@@ -274,7 +276,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 {
 	Elf64_Addr *where, val;
 	Elf32_Addr *where32, val32;
-	Elf_Addr addr;
+	uintptr_t addr;
 	Elf_Addr addend;
 	Elf_Size rtype, symidx;
 	const Elf_Rel *rel;

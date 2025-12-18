@@ -173,6 +173,7 @@ typedef struct dsl_scan {
 	dsl_scan_phys_t scn_phys;	/* on disk representation of scan */
 	dsl_scan_phys_t scn_phys_cached;
 	avl_tree_t scn_queue;		/* queue of datasets to scan */
+	kmutex_t scn_queue_lock;	/* serializes scn_queue inserts */
 	uint64_t scn_queues_pending;	/* outstanding data to issue */
 	/* members needed for syncing error scrub status to disk */
 	dsl_errorscrub_phys_t errorscrub_phys;
@@ -201,7 +202,7 @@ boolean_t dsl_scan_resilvering(struct dsl_pool *dp);
 boolean_t dsl_scan_resilver_scheduled(struct dsl_pool *dp);
 boolean_t dsl_dataset_unstable(struct dsl_dataset *ds);
 void dsl_scan_ddt_entry(dsl_scan_t *scn, enum zio_checksum checksum,
-    ddt_entry_t *dde, dmu_tx_t *tx);
+    ddt_t *ddt, ddt_lightweight_entry_t *ddlwe, dmu_tx_t *tx);
 void dsl_scan_ds_destroyed(struct dsl_dataset *ds, struct dmu_tx *tx);
 void dsl_scan_ds_snapshotted(struct dsl_dataset *ds, struct dmu_tx *tx);
 void dsl_scan_ds_clone_swapped(struct dsl_dataset *ds1, struct dsl_dataset *ds2,

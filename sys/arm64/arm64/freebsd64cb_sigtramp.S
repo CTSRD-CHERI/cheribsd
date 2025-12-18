@@ -27,6 +27,7 @@
  */
 
 #include "assym.inc"
+#include <sys/elf_common.h>
 #include <sys/syscall.h>
 #include <machine/asm.h>
 
@@ -43,7 +44,7 @@
 
 SIGCODE(freebsd64cb_sigcode)
 #ifndef __CHERI_PURE_CAPABILITY__
-	.arch_extension c64
+	.code	c64
 #endif
 	blr	x8
 	add	c0, csp, #SF_UC
@@ -58,8 +59,7 @@ SIGCODE(freebsd64cb_sigcode)
 
 	b	1b
 #ifndef __CHERI_PURE_CAPABILITY__
-	.arch_extension noc64
-	.arch_extension a64c
+	.code	a64
 #endif
 	/* This may be copied to the stack, keep it 16-byte aligned */
 	.align	3
@@ -73,3 +73,5 @@ freebsd64cb_esigcode:
 	.size	freebsd64cb_szsigcode, 8
 freebsd64cb_szsigcode:
 	.quad	freebsd64cb_esigcode - freebsd64cb_sigcode
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

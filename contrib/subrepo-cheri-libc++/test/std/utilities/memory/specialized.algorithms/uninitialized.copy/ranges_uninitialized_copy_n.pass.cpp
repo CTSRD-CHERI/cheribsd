@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
-// UNSUPPORTED: libcpp-has-no-incomplete-ranges
 
 // <memory>
 //
@@ -34,9 +33,9 @@
 // libc++-specific.
 LIBCPP_STATIC_ASSERT(std::is_class_v<decltype(std::ranges::uninitialized_copy_n)>);
 
-static_assert(std::is_invocable_v<decltype(std::ranges::uninitialized_copy_n), int*, size_t, long*, long*>);
+static_assert(std::is_invocable_v<decltype(std::ranges::uninitialized_copy_n), int*, std::size_t, long*, long*>);
 struct NotConvertibleFromInt {};
-static_assert(!std::is_invocable_v<decltype(std::ranges::uninitialized_copy_n), int*, size_t, NotConvertibleFromInt*,
+static_assert(!std::is_invocable_v<decltype(std::ranges::uninitialized_copy_n), int*, std::size_t, NotConvertibleFromInt*,
                                    NotConvertibleFromInt*>);
 
 int main(int, char**) {

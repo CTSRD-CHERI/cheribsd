@@ -32,7 +32,7 @@
 #define RTWN_MACID_VALID 	0x8000
 #define RTWN_MACID_LIMIT	128
 
-#define RTWN_TX_TIMEOUT		5000	/* ms */
+#define RTWN_TX_TIMEOUT		1000	/* ms */
 #define RTWN_MAX_EPOUT		4
 #define RTWN_PORT_COUNT		2
 
@@ -96,7 +96,7 @@ struct rtwn_cmdq {
 #define RTWN_CMDQ_SIZE		16
 
 struct rtwn_node {
-	struct ieee80211_node	ni;	/* must be the first */
+	struct ieee80211_node	ni __subobject_member_used_for_c_inheritance;	/* must be the first */
 	int			id;
 
 	struct rtwn_tx_phystat	last_physt;
@@ -105,7 +105,7 @@ struct rtwn_node {
 #define RTWN_NODE(ni)		((struct rtwn_node *)(ni))
 
 struct rtwn_vap {
-	struct ieee80211vap	vap;
+	struct ieee80211vap	vap __subobject_member_used_for_c_inheritance;
 	int			id;
 #define RTWN_VAP_ID_INVALID	-1
 	int			curr_mode;
@@ -174,6 +174,7 @@ struct rtwn_softc {
 #if 1
 	int			sc_ht40;
 #endif
+	int			sc_ena_tsf64;
 	uint32_t		sc_debug;
 	int			sc_hwcrypto;
 	int			sc_ratectl_sysctl;

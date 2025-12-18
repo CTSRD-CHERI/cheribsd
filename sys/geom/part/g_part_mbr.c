@@ -26,7 +26,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/bio.h>
 #include <sys/diskmbr.h>
@@ -116,6 +115,7 @@ static struct g_part_scheme g_part_mbr_scheme = {
 	sizeof(struct g_part_mbr_table),
 	.gps_entrysz = sizeof(struct g_part_mbr_entry),
 	.gps_minent = NDOSPART,
+	.gps_defent = NDOSPART,
 	.gps_maxent = NDOSPART,
 	.gps_bootcodesz = MBRSIZE,
 };

@@ -416,6 +416,11 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		    FM_EREPORT_PAYLOAD_ZFS_VDEV_GUID, &vdev_guid) != 0)
 			return;
 
+		if (vdev_guid == 0) {
+			fmd_hdl_debug(hdl, "Got a zero GUID");
+			return;
+		}
+
 		if (spare) {
 			int nspares = find_and_remove_spares(zhdl, vdev_guid);
 			fmd_hdl_debug(hdl, "%d spares removed", nspares);
@@ -517,6 +522,9 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 			fault_device = B_TRUE;
 		} else if (fmd_nvl_class_match(hdl, fault,
 		    "fault.fs.zfs.vdev.checksum")) {
+			degrade_device = B_TRUE;
+		} else if (fmd_nvl_class_match(hdl, fault,
+		    "fault.fs.zfs.vdev.slow_io")) {
 			degrade_device = B_TRUE;
 		} else if (fmd_nvl_class_match(hdl, fault,
 		    "fault.fs.zfs.device")) {

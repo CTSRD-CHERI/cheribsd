@@ -1,4 +1,4 @@
-
+.include <bsd.init.mk>
 .include "../llvm.pre.mk"
 
 LIB=		llvmminimal
@@ -20,26 +20,26 @@ SRCS+=		Support/DebugCounter.cpp
 SRCS+=		Support/Errno.cpp
 SRCS+=		Support/Error.cpp
 SRCS+=		Support/ErrorHandling.cpp
+SRCS+=		Support/ExtensibleRTTI.cpp
 SRCS+=		Support/FoldingSet.cpp
 SRCS+=		Support/FormatVariadic.cpp
 SRCS+=		Support/FormattedStream.cpp
 SRCS+=		Support/GraphWriter.cpp
-SRCS+=		Support/Hashing.cpp
 SRCS+=		Support/InitLLVM.cpp
 SRCS+=		Support/IntEqClasses.cpp
 SRCS+=		Support/JSON.cpp
 SRCS+=		Support/Locale.cpp
-SRCS+=		Support/LowLevelType.cpp
 SRCS+=		Support/MD5.cpp
 SRCS+=		Support/ManagedStatic.cpp
 SRCS+=		Support/MemAlloc.cpp
 SRCS+=		Support/MemoryBuffer.cpp
 SRCS+=		Support/NativeFormatting.cpp
+SRCS+=		Support/Optional.cpp
 SRCS+=		Support/Path.cpp
 SRCS+=		Support/PrettyStackTrace.cpp
 SRCS+=		Support/Process.cpp
 SRCS+=		Support/Program.cpp
-SRCS+=		Support/RISCVISAInfo.cpp
+SRCS+=		Support/RISCVISAUtils.cpp
 SRCS+=		Support/RandomNumberGenerator.cpp
 SRCS+=		Support/Regex.cpp
 SRCS+=		Support/Signals.cpp
@@ -65,11 +65,13 @@ SRCS+=		Support/WithColor.cpp
 SRCS+=		Support/YAMLParser.cpp
 SRCS+=		Support/circular_raw_ostream.cpp
 SRCS+=		Support/raw_ostream.cpp
+SRCS+=		Support/raw_socket_stream.cpp
 SRCS+=		Support/regcomp.c
 SRCS+=		Support/regerror.c
 SRCS+=		Support/regexec.c
 SRCS+=		Support/regfree.c
 SRCS+=		Support/regstrlcpy.c
+SRCS+=		Support/xxhash.cpp
 SRCS+=		TableGen/DetailedRecordsBackend.cpp
 SRCS+=		TableGen/Error.cpp
 SRCS+=		TableGen/JSONBackend.cpp

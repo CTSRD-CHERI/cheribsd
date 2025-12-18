@@ -181,6 +181,64 @@ basic_v6_cleanup()
 	pft_cleanup
 }
 
+atf_test_case "reuse" "cleanup"
+reuse_head()
+{
+	atf_set descr 'Test handling dumb clients that reuse source ports'
+	atf_set require.user root
+}
+
+reuse_body()
+{
+	sctp_init
+
+	j="sctp:reuse"
+	epair=$(vnet_mkepair)
+
+	vnet_mkjail ${j}a ${epair}a
+	vnet_mkjail ${j}b ${epair}b
+
+	jexec ${j}a ifconfig ${epair}a 192.0.2.1/24 up
+	jexec ${j}b ifconfig ${epair}b 192.0.2.2/24 up
+	# Sanity check
+	atf_check -s exit:0 -o ignore \
+	    jexec ${j}a ping -c 1 192.0.2.2
+
+	jexec ${j}a pfctl -e
+	pft_set_rules ${j}a \
+		"block" \
+		"pass in proto sctp to port 1234"
+
+	echo "foo" | jexec ${j}a nc --sctp -N -l 1234 &
+
+	# Wait for the server to start
+	sleep 1
+
+	out=$(jexec ${j}b nc --sctp -N -w 3 -p 1234 192.0.2.1 1234)
+	if [ "$out" != "foo" ]; then
+		atf_fail "SCTP connection failed"
+	fi
+
+	# Now do the same thing again, with the same port numbers
+	jexec ${j}a pfctl -ss -v
+
+	echo "foo" | jexec ${j}a nc --sctp -N -l 1234 &
+
+	# Wait for the server to start
+	sleep 1
+
+	out=$(jexec ${j}b nc --sctp -N -w 3 -p 1234 192.0.2.1 1234)
+	if [ "$out" != "foo" ]; then
+		atf_fail "SCTP connection failed"
+	fi
+	jexec ${j}a pfctl -ss -v
+}
+
+reuse_cleanup()
+{
+	pft_cleanup
+}
+
 atf_test_case "abort_v4" "cleanup"
 abort_v4_head()
 {
@@ -240,7 +298,7 @@ abort_v4_cleanup()
 }
 
 atf_test_case "abort_v6" "cleanup"
-abort_v4_head()
+abort_v6_head()
 {
 	atf_set descr 'Test sending ABORT messages over IPv6'
 	atf_set require.user root
@@ -292,7 +350,7 @@ abort_v6_body()
 	fi
 }
 
-abort_v4_cleanup()
+abort_v6_cleanup()
 {
 	pft_cleanup
 }
@@ -504,6 +562,7 @@ pfsync_body()
 
 	sctp_init
 	pfsynct_init
+	vnet_init_bridge
 	if ! kldstat -q -m carp
 	then
 		atf_skip "This test requires carp"
@@ -655,14 +714,47 @@ pfsync_cleanup()
 	pfsynct_cleanup
 }
 
+atf_test_case "timeout" "cleanup"
+timeout_head()
+{
+	atf_set descr 'Test setting and retrieving timeout values'
+	atf_set require.user root
+}
+
+timeout_body()
+{
+	sctp_init
+
+	vnet_mkjail timeout
+
+	pft_set_rules timeout \
+		"set timeout sctp.first 13" \
+		"set timeout sctp.opening 14"
+
+	atf_check -s exit:0 -o match:"sctp.first.*13" \
+	    jexec timeout pfctl -st
+	atf_check -s exit:0 -o match:"sctp.opening.*14" \
+	    jexec timeout pfctl -st
+	# We've not changed other timeouts
+	atf_check -s exit:0 -o match:"sctp.established.*86400" \
+	    jexec timeout pfctl -st
+}
+
+timeout_cleanup()
+{
+	pft_cleanup
+}
+
 atf_init_test_cases()
 {
 	atf_add_test_case "basic_v4"
 	atf_add_test_case "basic_v6"
+	atf_add_test_case "reuse"
 	atf_add_test_case "abort_v4"
 	atf_add_test_case "abort_v6"
 	atf_add_test_case "nat_v4"
 	atf_add_test_case "nat_v6"
 	atf_add_test_case "rdr_v4"
 	atf_add_test_case "pfsync"
+	atf_add_test_case "timeout"
 }

@@ -24,6 +24,7 @@
 %token	NOMAKEOPTION 
 %token	SEMICOLON
 %token	INCLUDE
+%token	INCLUDEOPTIONS
 %token	FILES
 
 %token	<str>	ENVLINE
@@ -66,8 +67,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)config.y	8.1 (Berkeley) 6/6/93
  */
 
 #include <assert.h>
@@ -85,16 +84,18 @@ int	yyline;
 const	char *yyfile;
 struct  file_list_head ftab;
 struct  files_name_head fntab;
+struct	options_files_name_head optfntab;
 char	errbuf[80];
 int	maxusers;
 
 #define ns(s)	strdup(s)
 int include(const char *, int);
-void yyerror(const char *s);
+int yyerror(const char *s);
 int yywrap(void);
 
 static void newdev(char *name);
 static void newfile(char *name);
+static void newoptionsfile(char *name);
 static void newenvvar(char *name, bool is_file);
 static void rmdev_schedule(struct device_head *dh, char *name);
 static void newopt(struct opt_head *list, char *name, char *value, int append, int dupe);
@@ -136,6 +137,10 @@ Spec:
 	          if (incignore == 0)
 		  	include($2, 0);
 		};
+		|
+	INCLUDEOPTIONS PATH SEMICOLON { newoptionsfile($2); };
+		|
+	INCLUDEOPTIONS ID SEMICOLON { newoptionsfile($2); };
 		|
 	FILES ID SEMICOLON { newfile($2); };
 	        |
@@ -301,7 +306,7 @@ NoDevice:
 
 %%
 
-void
+int
 yyerror(const char *s)
 {
 
@@ -335,6 +340,21 @@ newfile(char *name)
 		err(EXIT_FAILURE, "calloc");
 	nl->f_name = name;
 	STAILQ_INSERT_TAIL(&fntab, nl, f_next);
+}
+
+/*
+ * Add a new options file to the list of options files.
+ */
+static void
+newoptionsfile(char *name)
+{
+	struct files_name *nl;
+
+	nl = (struct files_name *) calloc(1, sizeof *nl);
+	if (nl == NULL)
+		err(EXIT_FAILURE, "calloc");
+	nl->f_name = name;
+	STAILQ_INSERT_TAIL(&optfntab, nl, f_next);
 }
 
 static void

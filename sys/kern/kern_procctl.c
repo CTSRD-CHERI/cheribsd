@@ -27,12 +27,14 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
+#include "opt_ktrace.h"
+
 #include <sys/param.h>
 #include <sys/_unrhdr.h>
 #include <sys/systm.h>
 #include <sys/capsicum.h>
 #include <sys/lock.h>
+#include <sys/malloc.h>
 #include <sys/mman.h>
 #include <sys/mutex.h>
 #include <sys/priv.h>
@@ -334,7 +336,7 @@ reap_kill_sched(struct reap_kill_tracker_head *tracker, struct proc *p2)
 		PROC_UNLOCK(p2);
 		return;
 	}
-	_PHOLD_LITE(p2);
+	_PHOLD(p2);
 	PROC_UNLOCK(p2);
 	t = malloc(sizeof(struct reap_kill_tracker), M_TEMP, M_WAITOK);
 	t->parent = p2;
@@ -460,7 +462,7 @@ reap_kill_subtree_once(struct thread *td, struct proc *p, struct proc *reaper,
 			} else {
 				PROC_LOCK(p2);
 				if ((p2->p_flag2 & P2_WEXIT) == 0) {
-					_PHOLD_LITE(p2);
+					_PHOLD(p2);
 					p2->p_flag2 |= P2_REAPKILLED;
 					PROC_UNLOCK(p2);
 					w->target = p2;
@@ -542,6 +544,8 @@ reap_kill(struct thread *td, struct proc *p, void *data)
 
 	rk = data;
 	sx_assert(&proctree_lock, SX_LOCKED);
+	if (CAP_TRACING(td))
+		ktrcapfail(CAPFAIL_SIGNAL, &rk->rk_sig);
 	if (IN_CAPABILITY_MODE(td))
 		return (ECAPMODE);
 	if (rk->rk_sig <= 0 || rk->rk_sig > _SIG_MAXSIG ||
@@ -568,17 +572,7 @@ reap_kill(struct thread *td, struct proc *p, void *data)
 		w.rk = rk;
 		w.error = &error;
 		TASK_INIT(&w.t, 0, reap_kill_proc_work, &w);
-
-		/*
-		 * Prevent swapout, since w, ksi, and possibly rk, are
-		 * allocated on the stack.  We sleep in
-		 * reap_kill_subtree_once() waiting for task to
-		 * complete single-threading.
-		 */
-		PHOLD(td->td_proc);
-
 		reap_kill_subtree(td, p, reaper, &w);
-		PRELE(td->td_proc);
 		crfree(w.cr);
 	}
 	PROC_LOCK(p);
@@ -993,6 +987,57 @@ cheri_revoke_status(struct thread *td, struct proc *p, void *data)
 }
 #endif	/* CHERI_CAPREVOKE */
 
+#ifdef PROC_CHERI_C18N_CTL
+static int
+cheri_c18n_ctl(struct thread *td, struct proc *p, void *data)
+{
+	int state;
+
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	state = *(int *)data;
+
+	switch (state) {
+	case PROC_CHERI_C18N_ENABLE:
+		p->p_flag2 |= P2_CHERI_C18N_ENABLE;
+		p->p_flag2 &= ~P2_CHERI_C18N_DISABLE;
+		break;
+	case PROC_CHERI_C18N_DISABLE:
+		p->p_flag2 |= P2_CHERI_C18N_DISABLE;
+		p->p_flag2 &= ~P2_CHERI_C18N_ENABLE;
+		break;
+	case PROC_CHERI_C18N_NOFORCE:
+		p->p_flag2 &= ~P2_CHERI_C18N_MASK;
+		break;
+	default:
+		return (EINVAL);
+	}
+	return (0);
+}
+
+static int
+cheri_c18n_status(struct thread *td, struct proc *p, void *data)
+{
+	int d;
+
+	switch (p->p_flag2 & P2_CHERI_C18N_MASK) {
+	case 0:
+		d = PROC_CHERI_C18N_NOFORCE;
+		break;
+	case P2_CHERI_C18N_ENABLE:
+		d = PROC_CHERI_C18N_ENABLE;
+		break;
+	case P2_CHERI_C18N_DISABLE:
+		d = PROC_CHERI_C18N_DISABLE;
+		break;
+	default:
+		panic("impossible P2_CHERI_C18N flags %x", p->p_flag2 &
+		    P2_CHERI_C18N_MASK);
+	}
+	*(int *)data = d;
+	return (0);
+}
+#endif
+
 static int
 cheri_colocation_ctl(struct thread *td, struct proc *p, void *data)
 {
@@ -1201,6 +1246,20 @@ static const struct procctl_cmd_info procctl_cmds_info[] = {
 	      .need_candebug = false,
 	      .copyin_sz = 0, .copyout_sz = sizeof(int),
 	      .exec = wxmap_status, .copyout_on_error = false, },
+#ifdef PROC_CHERI_C18N_CTL
+	[PROC_CHERI_C18N_CTL] =
+	    { .lock_tree = PCTL_UNLOCKED, .one_proc = true,
+	      .esrch_is_einval = false, .no_nonnull_data = false,
+	      .need_candebug = true,
+	      .copyin_sz = sizeof(int), .copyout_sz = 0,
+	      .exec = cheri_c18n_ctl, .copyout_on_error = false, },
+	[PROC_CHERI_C18N_STATUS] =
+	    { .lock_tree = PCTL_UNLOCKED, .one_proc = true,
+	      .esrch_is_einval = false, .no_nonnull_data = false,
+	      .need_candebug = false,
+	      .copyin_sz = 0, .copyout_sz = sizeof(int),
+	      .exec = cheri_c18n_status, .copyout_on_error = false, },
+#endif
 #ifdef CHERI_CAPREVOKE
 	[PROC_CHERI_REVOKE_CTL] =
 	    { .lock_tree = PCTL_UNLOCKED, .one_proc = true,
@@ -1244,7 +1303,7 @@ sys_procctl(struct thread *td, struct procctl_args *uap)
 	if (uap->com >= PROC_PROCCTL_MD_MIN)
 		return (cpu_procctl(td, uap->idtype, uap->id,
 		    uap->com, uap->data));
-	if (uap->com == 0 || uap->com >= nitems(procctl_cmds_info))
+	if (uap->com <= 0 || uap->com >= nitems(procctl_cmds_info))
 		return (EINVAL);
 	cmd_info = &procctl_cmds_info[uap->com];
 	bzero(&x, sizeof(x));

@@ -711,6 +711,8 @@ phdr_type(unsigned int mach, unsigned int ptype)
 	case PT_SHLIB: return "SHLIB";
 	case PT_PHDR: return "PHDR";
 	case PT_TLS: return "TLS";
+	case PT_C18N_NAME: return "C18N_NAME";
+	case PT_CHERI_PCC: return "CHERI_PCC";
 	case PT_GNU_EH_FRAME: return "GNU_EH_FRAME";
 	case PT_GNU_STACK: return "GNU_STACK";
 	case PT_GNU_RELRO: return "GNU_RELRO";
@@ -885,6 +887,8 @@ dt_type(unsigned int mach, unsigned int dtype)
 	case DT_SUNW_FILTER: return "SUNW_FILTER";
 	case DT_SUNW_CAP: return "SUNW_CAP";
 	case DT_SUNW_ASLR: return "SUNW_ASLR";
+	case DT_C18N_STRTAB: return "C18N_STRTAB";
+	case DT_C18N_STRTABSZ: return "C18N_STRTABSZ";
 	case DT_CHECKSUM: return "CHECKSUM";
 	case DT_PLTPADSZ: return "PLTPADSZ";
 	case DT_MOVEENT: return "MOVEENT";
@@ -2512,7 +2516,7 @@ dump_phdr(struct readelf *re)
 {
 	const char	*rawfile;
 	GElf_Phdr	 phdr;
-	size_t		 phnum, size;
+	size_t		 c18noff, c18nsize, phnum, size;
 	int		 i, j;
 
 #define	PH_HDR	"Type", "Offset", "VirtAddr", "PhysAddr", "FileSiz",	\
@@ -2533,6 +2537,20 @@ dump_phdr(struct readelf *re)
 	if (phnum == 0) {
 		printf("\nThere are no program headers in this file.\n");
 		return;
+	}
+
+	c18noff = 0;
+	c18nsize = 0;
+	for (j = 1; (size_t)j < re->shnum; j++) {
+		if (re->sl[j].type != SHT_STRTAB ||
+		    (re->sl[j].flags & SHF_ALLOC) == 0)
+			continue;
+
+		if (strcmp(re->sl[j].name, ".c18nstrtab") == 0) {
+			c18noff = re->sl[j].off;
+			c18nsize = re->sl[j].sz;
+			break;
+		}
 	}
 
 	printf("\nElf file type is %s", elf_type(re->ehdr.e_type));
@@ -2576,6 +2594,26 @@ dump_phdr(struct readelf *re)
 			}
 			printf("      [Requesting program interpreter: %s]\n",
 				rawfile + phdr.p_offset);
+		}
+		if (phdr.p_type == PT_C18N_NAME) {
+			if (c18noff == 0) {
+				warnx("missing .c18nstrtab");
+				continue;
+			}
+			if ((rawfile = elf_rawfile(re->elf, &size)) == NULL) {
+				warnx("elf_rawfile failed: %s", elf_errmsg(-1));
+				continue;
+			}
+			if (c18noff >= size || c18noff + c18nsize >= size) {
+				warnx("invalid .c18nstrtab bounds");
+				continue;
+			}
+			if (phdr.p_paddr >= c18nsize) {
+				warnx("invalid compartment name offset");
+				continue;
+			}
+			printf("      [Compartment: %s]\n",
+				rawfile + c18noff + phdr.p_paddr);
 		}
 	}
 
@@ -3030,6 +3068,7 @@ dump_dyn_val(struct readelf *re, GElf_Dyn *dyn, uint32_t stab)
 	case DT_GNU_HASH:
 	case DT_GNU_LIBLIST:
 	case DT_GNU_CONFLICT:
+	case DT_C18N_STRTAB:
 		printf(" 0x%jx\n", (uintmax_t) dyn->d_un.d_val);
 		break;
 	case DT_PLTRELSZ:
@@ -3044,6 +3083,7 @@ dump_dyn_val(struct readelf *re, GElf_Dyn *dyn, uint32_t stab)
 	case DT_FINI_ARRAYSZ:
 	case DT_GNU_CONFLICTSZ:
 	case DT_GNU_LIBLISTSZ:
+	case DT_C18N_STRTABSZ:
 		printf(" %ju (bytes)\n", (uintmax_t) dyn->d_un.d_val);
 		break;
  	case DT_RELACOUNT:
@@ -3814,6 +3854,8 @@ static struct flag_desc note_feature_ctl_flags[] = {
 	{ NT_FREEBSD_FCTL_LA48,			"LA48" },
 	{ NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE,	"CHERI_REVOKE_DISABLE" },
 	{ NT_FREEBSD_FCTL_CHERI_REVOKE_ENABLE,	"CHERI_REVOKE_ENABLE" },
+	{ NT_FREEBSD_FCTL_CHERI_C18N_DISABLE,	"CHERI_C18N_DISABLE" },
+	{ NT_FREEBSD_FCTL_CHERI_C18N_ENABLE,	"CHERI_C18N_ENABLE" },
 	{ 0, NULL }
 };
 

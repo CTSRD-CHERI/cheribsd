@@ -50,6 +50,7 @@
 #define MLX5_MAX_NUMBER_OF_VFS 128
 
 #define MLX5_INVALID_QUEUE_HANDLE 0xffffffff
+#define MLX5_ST_SZ_BYTES(typ) (sizeof(struct mlx5_ifc_##typ##_bits) / 8)
 
 enum {
 	MLX5_BOARD_ID_LEN = 64,
@@ -267,6 +268,36 @@ struct cmd_msg_cache {
 struct mlx5_traffic_counter {
 	u64         packets;
 	u64         octets;
+};
+
+struct mlx5_fc_pool {
+	struct mlx5_core_dev *dev;
+	struct mutex pool_lock; /* protects pool lists */
+	struct list_head fully_used;
+	struct list_head partially_used;
+	struct list_head unused;
+	int available_fcs;
+	int used_fcs;
+	int threshold;
+};
+
+struct mlx5_fc_stats {
+	spinlock_t counters_idr_lock; /* protects counters_idr */
+	struct idr counters_idr;
+	struct list_head counters;
+	struct llist_head addlist;
+	struct llist_head dellist;
+
+	struct workqueue_struct *wq;
+	struct delayed_work work;
+	unsigned long next_query;
+	unsigned long sampling_interval; /* jiffies */
+	u32 *bulk_query_out;
+	int bulk_query_len;
+	size_t num_counters;
+	bool bulk_query_alloc_failed;
+	unsigned long next_bulk_query_alloc;
+	struct mlx5_fc_pool fc_pool;
 };
 
 enum mlx5_cmd_mode {
@@ -603,10 +634,13 @@ struct mlx5_priv {
 #endif
 	struct mlx5_pme_stats pme_stats;
 
+	struct mlx5_flow_steering *steering;
 	struct mlx5_eswitch	*eswitch;
 
 	struct mlx5_bfreg_data		bfregs;
 	struct mlx5_uars_page	       *uar;
+	struct mlx5_fc_stats		fc_stats;
+	struct mlx5_ft_pool             *ft_pool;
 };
 
 enum mlx5_device_state {
@@ -696,6 +730,10 @@ struct mlx5_core_dev {
 	struct mlx5_flow_root_namespace *esw_ingress_root_ns;
 	struct mlx5_flow_root_namespace *sniffer_rx_root_ns;
 	struct mlx5_flow_root_namespace *sniffer_tx_root_ns;
+	struct mlx5_flow_root_namespace *nic_tx_root_ns;
+	struct mlx5_flow_root_namespace *rdma_tx_root_ns;
+	struct mlx5_flow_root_namespace *rdma_rx_root_ns;
+
 	u32 num_q_counter_allocated[MLX5_INTERFACE_NUMBER];
 	struct mlx5_crspace_regmap *dump_rege;
 	uint32_t *dump_data;
@@ -703,6 +741,8 @@ struct mlx5_core_dev {
 	bool dump_valid;
 	bool dump_copyout;
 	struct mtx dump_lock;
+
+	bool			iov_pf;
 
 	struct sysctl_ctx_list	sysctl_ctx;
 	int			msix_eqvec;
@@ -722,6 +762,7 @@ struct mlx5_core_dev {
 #ifdef CONFIG_MLX5_FPGA
 	struct mlx5_fpga_device	*fpga;
 #endif
+	struct xarray ipsec_sadb;
 };
 
 enum {
@@ -963,6 +1004,17 @@ int mlx5_cmd_exec_cb(struct mlx5_async_ctx *ctx, void *in, int in_size,
 		     struct mlx5_async_work *work);
 int mlx5_cmd_exec(struct mlx5_core_dev *dev, void *in, int in_size, void *out,
 		  int out_size);
+#define mlx5_cmd_exec_inout(dev, ifc_cmd, in, out)                             \
+	({                                                                     \
+		mlx5_cmd_exec(dev, in, MLX5_ST_SZ_BYTES(ifc_cmd##_in), out,    \
+			      MLX5_ST_SZ_BYTES(ifc_cmd##_out));                \
+	})
+
+#define mlx5_cmd_exec_in(dev, ifc_cmd, in)                                     \
+	({                                                                     \
+		u32 _out[MLX5_ST_SZ_DW(ifc_cmd##_out)] = {};                   \
+		mlx5_cmd_exec_inout(dev, ifc_cmd, in, _out);                   \
+	})
 int mlx5_cmd_exec_polling(struct mlx5_core_dev *dev, void *in, int in_size,
 			  void *out, int out_size);
 int mlx5_cmd_alloc_uar(struct mlx5_core_dev *dev, u32 *uarn);

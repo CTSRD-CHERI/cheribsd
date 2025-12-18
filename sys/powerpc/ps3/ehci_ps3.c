@@ -62,11 +62,6 @@
 
 #include "ps3bus.h"
 
-struct ps3_ehci_softc {
-	ehci_softc_t            base;
-	struct bus_space         tag;
-};
-
 static void
 ehci_ps3_post_reset(struct ehci_softc *ehci_softc)
 {
@@ -127,7 +122,7 @@ ehci_ps3_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	sc->sc_bus.bdev = device_add_child(dev, "usbus", -1);
+	sc->sc_bus.bdev = device_add_child(dev, "usbus", DEVICE_UNIT_ANY);
 	if (!sc->sc_bus.bdev) {
 		device_printf(dev, "Could not add USB device\n");
 		return (ENXIO);

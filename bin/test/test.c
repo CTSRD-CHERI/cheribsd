@@ -14,9 +14,7 @@
  * as a builtin for /bin/sh (#define SHELL).
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 
 #include <ctype.h>
@@ -200,7 +198,7 @@ main(int argc, char **argv)
 		p++;
 	if (strcmp(p, "[") == 0) {
 		if (strcmp(argv[--argc], "]") != 0)
-			error("missing ]");
+			error("missing ']'");
 		argv[argc] = NULL;
 	}
 

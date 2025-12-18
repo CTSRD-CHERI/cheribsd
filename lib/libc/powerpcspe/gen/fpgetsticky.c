@@ -29,7 +29,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 
 #include "namespace.h"
 
@@ -38,10 +37,6 @@
 #include <ieeefp.h>
 
 #ifndef _SOFT_FLOAT
-#ifdef __weak_alias
-__weak_alias(fpgetsticky,_fpgetsticky)
-#endif
-
 fp_except_t
 fpgetsticky()
 {

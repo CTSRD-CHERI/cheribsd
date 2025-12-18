@@ -25,8 +25,6 @@ COMPAT_ARCH=	${MACHINE_ARCH}
 .for _LIBCOMPAT in ${_ALL_LIBCOMPATS}
 LIB${_LIBCOMPAT}CPUTYPE=	${CPUTYPE}
 .endfor
-.include <bsd.compiler.mk>
-COMPAT_COMPILER_TYPE=${COMPILER_TYPE}
 .endif
 
 # -------------------------------------------------------------------
@@ -39,10 +37,7 @@ LIB32CPUFLAGS=	-march=i686 -mmmx -msse -msse2
 .else
 LIB32CPUFLAGS=	-march=${LIB32CPUTYPE}
 .endif
-.if ${COMPAT_COMPILER_TYPE} == gcc
-.else
-LIB32CPUFLAGS+=	-target x86_64-unknown-freebsd${OS_REVISION}
-.endif
+LIB32CPUFLAGS.clang+=	-target x86_64-unknown-freebsd${OS_REVISION}
 LIB32CPUFLAGS+=	-m32
 LIB32_MACHINE=	i386
 LIB32_MACHINE_ARCH=	i386
@@ -58,11 +53,8 @@ LIB32CPUFLAGS=	-mcpu=powerpc
 LIB32CPUFLAGS=	-mcpu=${LIB32CPUTYPE}
 .endif
 
-.if ${COMPAT_COMPILER_TYPE} == "gcc"
-LIB32CPUFLAGS+=	-m32
-.else
-LIB32CPUFLAGS+=	-target powerpc-unknown-freebsd${OS_REVISION}
-.endif
+LIB32CPUFLAGS.gcc+=	-m32
+LIB32CPUFLAGS.clang+=	-target powerpc-unknown-freebsd${OS_REVISION}
 
 LIB32_MACHINE=	powerpc
 LIB32_MACHINE_ARCH=	powerpc
@@ -81,10 +73,7 @@ LIB32CPUFLAGS+=	-mabi=aapcs
 .endif
 
 LIB32CPUFLAGS+=	-m32
-.if ${COMPAT_COMPILER_TYPE} == "gcc"
-.else
-LIB32CPUFLAGS+=	-target armv7-unknown-freebsd${OS_REVISION}-gnueabihf
-.endif
+LIB32CPUFLAGS.clang+=	-target armv7-unknown-freebsd${OS_REVISION}-gnueabihf
 
 LIB32_MACHINE=	arm
 LIB32_MACHINE_ARCH=	armv7
@@ -124,10 +113,7 @@ LIB64CPUFLAGS+=	-march=morello -mabi=aapcs
 
 .if ${COMPAT_ARCH:Mriscv*c*}
 HAS_COMPAT+=	64
-LIB64_RISCV_ABI=	lp64
-.if !${COMPAT_ARCH:Mriscv*sf}
-LIB64_RISCV_ABI:=	${LIB64_RISCV_ABI}d
-.endif
+LIB64_RISCV_ABI=	lp64d
 LIB64_MACHINE=	riscv
 LIB64_MACHINE_ARCH=riscv64
 LIB64WMAKEENV=	MACHINE_CPU="riscv cheri"
@@ -158,10 +144,7 @@ LIB64C_MACHINE=	riscv
 LIB64C_MACHINE_ARCH=	${COMPAT_ARCH}c
 LIB64CWMAKEFLAGS=	CPUTYPE=cheri
 LIB64CCPUFLAGS=	-target riscv64-unknown-freebsd13.0
-LIB64C_RISCV_ABI=	l64pc128
-.if !${MACHINE_ARCH:Mriscv*sf}
-LIB64C_RISCV_ABI:=	${LIB64C_RISCV_ABI}d
-.endif
+LIB64C_RISCV_ABI=	l64pc128d
 LIB64CCPUFLAGS+=	-march=${LIB64C_RISCV_MARCH} -mabi=${LIB64C_RISCV_ABI}
 .endif	# ${COMPAT_ARCH:Mriscv64*}
 .endif # ${MK_LIB64C} != "no"
@@ -169,11 +152,7 @@ LIB64CCPUFLAGS+=	-march=${LIB64C_RISCV_MARCH} -mabi=${LIB64C_RISCV_ABI}
 .if ${COMPAT_ARCH:Mriscv*}
 .for _LIBCOMPAT in ${HAS_COMPAT}
 # See bsd.cpu.mk
-LIB${_LIBCOMPAT}_RISCV_MARCH=	rv64ima
-.if !${COMPAT_ARCH:Mriscv*sf*}
-LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}fd
-.endif
-LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}c
+LIB${_LIBCOMPAT}_RISCV_MARCH=	rv64imafdc
 .if ${COMPAT_ARCH:Mriscv*c*} || ${_LIBCOMPAT:M64C}
 LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}xcheri
 .endif
@@ -278,6 +257,26 @@ _LIBCOMPATS=	${USE_COMPAT}
 
 libcompats=	${_LIBCOMPATS:tl}
 
+# Update MACHINE and MACHINE_ARCH so they can be used in bsd.opts.mk via
+# bsd.compiler.mk
+.if defined(USE_COMPAT)
+_LIBCOMPAT_MAKEVARS=	_MACHINE _MACHINE_ARCH _MACHINE_ABI
+.for _var in ${_LIBCOMPAT_MAKEVARS}
+.if !empty(LIB${USE_COMPAT}${_var})
+LIBCOMPAT${_var}?=	${LIB${USE_COMPAT}${_var}}
+.endif
+.endfor
+
+MACHINE:=	${LIBCOMPAT_MACHINE}
+MACHINE_ARCH:=	${LIBCOMPAT_MACHINE_ARCH}
+MACHINE_ABI:=	${LIBCOMPAT_MACHINE_ABI}
+.endif
+
+.if !defined(COMPAT_COMPILER_TYPE)
+.include <bsd.compiler.mk>
+COMPAT_COMPILER_TYPE=${COMPILER_TYPE}
+.endif
+
 # -------------------------------------------------------------------
 # Generic code for each type.
 # Set defaults based on type.
@@ -288,6 +287,7 @@ WORLDTMP?=		${SYSROOT}
 LIB${_LIBCOMPAT}_OBJTOP?=	${OBJTOP}/obj-lib${_libcompat}
 
 LIB${_LIBCOMPAT}CFLAGS+=	${LIB${_LIBCOMPAT}CPUFLAGS} \
+				${LIB${_LIBCOMPAT}CPUFLAGS.${COMPAT_COMPILER_TYPE}} \
 				-DCOMPAT_LIBCOMPAT=\"${_LIBCOMPAT}\" \
 				-DCOMPAT_libcompat=\"${_libcompat}\" \
 				-DCOMPAT_LIB${_LIBCOMPAT} \
@@ -315,10 +315,11 @@ LIB${_LIBCOMPAT}CFLAGS+=	-B${WORLDTMP}/usr/lib${_libcompat}
 .endfor
 
 .if defined(USE_COMPAT)
+LIB${USE_COMPAT}CPUFLAGS+= ${LIB${USE_COMPAT}CPUFLAGS.${COMPAT_COMPILER_TYPE}}
+
 libcompat=	${USE_COMPAT:tl}
 
 _LIBCOMPAT_MAKEVARS=	_OBJTOP TMP CPUFLAGS CFLAGS CXXFLAGS LDFLAGS \
-			_MACHINE _MACHINE_ARCH _MACHINE_ABI \
 			WMAKEENV WMAKEFLAGS WMAKE WORLDTMP
 .for _var in ${_LIBCOMPAT_MAKEVARS}
 .if !empty(LIB${USE_COMPAT}${_var})
@@ -331,9 +332,6 @@ LIBDATADIR:=	/usr/lib${libcompat}
 _LIB_OBJTOP=	${LIBCOMPAT_OBJTOP}
 CFLAGS+=	${LIBCOMPATCFLAGS}
 LDFLAGS+=	${CFLAGS} ${LIBCOMPATLDFLAGS}
-MACHINE:=	${LIBCOMPAT_MACHINE}
-MACHINE_ARCH:=	${LIBCOMPAT_MACHINE_ARCH}
-MACHINE_ABI:=	${LIBCOMPAT_MACHINE_ABI}
 .endif
 
 .endif

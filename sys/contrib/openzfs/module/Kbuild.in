@@ -16,8 +16,8 @@ src = @abs_srcdir@
 obj = @abs_builddir@
 else
 zfs_include = $(srctree)/include/zfs
-icp_include = $(srctree)/$(src)/icp/include
-zstd_include = $(srctree)/$(src)/zstd/include
+icp_include = $(src)/icp/include
+zstd_include = $(src)/zstd/include
 ZFS_MODULE_CFLAGS += -include $(zfs_include)/zfs_config.h
 endif
 
@@ -79,6 +79,7 @@ SPL_OBJS := \
 	spl-kstat.o \
 	spl-proc.o \
 	spl-procfs-list.o \
+	spl-shrinker.o \
 	spl-taskq.o \
 	spl-thread.o \
 	spl-trace.o \
@@ -100,10 +101,7 @@ ICP_OBJS := \
 	algs/blake3/blake3_generic.o \
 	algs/blake3/blake3_impl.o \
 	algs/edonr/edonr.o \
-	algs/modes/cbc.o \
 	algs/modes/ccm.o \
-	algs/modes/ctr.o \
-	algs/modes/ecb.o \
 	algs/modes/gcm.o \
 	algs/modes/gcm_generic.o \
 	algs/modes/modes.o \
@@ -124,7 +122,6 @@ ICP_OBJS := \
 	illumos-crypto.o \
 	io/aes.o \
 	io/sha2_mod.o \
-	io/skein_mod.o \
 	spi/kcf_spi.o
 
 ICP_OBJS_X86_64 := \
@@ -235,6 +232,7 @@ zfs-objs += $(addprefix unicode/,$(UNICODE_OBJS))
 
 ZCOMMON_OBJS := \
 	cityhash.o \
+	simd_stat.o \
 	zfeature_common.o \
 	zfs_comutil.o \
 	zfs_deleg.o \
@@ -243,6 +241,7 @@ ZCOMMON_OBJS := \
 	zfs_fletcher_superscalar4.o \
 	zfs_namecheck.o \
 	zfs_prop.o \
+	zfs_valstr.o \
 	zpool_prop.o \
 	zprop_common.o
 
@@ -325,8 +324,11 @@ ZFS_OBJS := \
 	dbuf.o \
 	dbuf_stats.o \
 	ddt.o \
+	ddt_log.o \
+	ddt_stats.o \
 	ddt_zap.o \
 	dmu.o \
+	dmu_direct.o \
 	dmu_diff.o \
 	dmu_object.o \
 	dmu_objset.o \
@@ -423,6 +425,7 @@ ZFS_OBJS := \
 	zfs_rlock.o \
 	zfs_sa.o \
 	zfs_vnops.o \
+	zfs_znode.o \
 	zil.o \
 	zio.o \
 	zio_checksum.o \
@@ -445,6 +448,7 @@ ZFS_OBJS_OS := \
 	trace.o \
 	vdev_disk.o \
 	vdev_file.o \
+	vdev_label_os.o \
 	zfs_acl.o \
 	zfs_ctldir.o \
 	zfs_debug.o \
@@ -456,11 +460,12 @@ ZFS_OBJS_OS := \
 	zfs_uio.o \
 	zfs_vfsops.o \
 	zfs_vnops_os.o \
-	zfs_znode.o \
+	zfs_znode_os.o \
 	zio_crypt.o \
 	zpl_ctldir.o \
 	zpl_export.o \
 	zpl_file.o \
+	zpl_file_range.o \
 	zpl_inode.o \
 	zpl_super.o \
 	zpl_xattr.o \
@@ -486,6 +491,12 @@ zfs-$(CONFIG_UML_X86)+= $(addprefix zfs/,$(ZFS_OBJS_X86))
 zfs-$(CONFIG_ARM64) += $(addprefix zfs/,$(ZFS_OBJS_ARM64))
 zfs-$(CONFIG_PPC)   += $(addprefix zfs/,$(ZFS_OBJS_PPC_PPC64))
 zfs-$(CONFIG_PPC64) += $(addprefix zfs/,$(ZFS_OBJS_PPC_PPC64))
+
+UBSAN_SANITIZE_zap_leaf.o := n
+UBSAN_SANITIZE_zap_micro.o := n
+UBSAN_SANITIZE_sa.o := n
+UBSAN_SANITIZE_zfs/zap_micro.o := n
+UBSAN_SANITIZE_zfs/sa.o := n
 
 # Suppress incorrect warnings from versions of objtool which are not
 # aware of x86 EVEX prefix instructions used for AVX512.

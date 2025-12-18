@@ -27,7 +27,6 @@
  * Use is subject to license terms.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 
 #include <sys/dtrace.h>
@@ -55,7 +54,7 @@
 #define	FBT_PATCHVAL		0xf0
 #endif
 
-#define FBT_AFRAMES 2
+#define FBT_AFRAMES 3
 
 int
 fbt_invop(uintptr_t addr, struct trapframe *frame, uintptr_t scratch __unused)

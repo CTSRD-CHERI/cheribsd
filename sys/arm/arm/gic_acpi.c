@@ -37,7 +37,6 @@
 #include "opt_acpi.h"
 #include "opt_platform.h"
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -228,12 +227,19 @@ gic_acpi_attach(device_t dev)
 	/*
 	 * Controller is root:
 	 */
-	if (intr_pic_claim_root(dev, xref, arm_gic_intr, sc,
-	    GIC_LAST_SGI - GIC_FIRST_SGI + 1) != 0) {
+	if (intr_pic_claim_root(dev, xref, arm_gic_intr, sc, INTR_ROOT_IRQ) != 0) {
 		device_printf(dev, "could not set PIC as a root\n");
 		intr_pic_deregister(dev, xref);
 		goto cleanup;
 	}
+
+#ifdef SMP
+	if (intr_ipi_pic_register(dev, 0) != 0) {
+		device_printf(dev, "could not register for IPIs\n");
+		goto cleanup;
+	}
+#endif
+
 	/* If we have children probe and attach them */
 	if (arm_gic_add_children(dev)) {
 		bus_generic_probe(dev);
@@ -274,7 +280,7 @@ madt_gicv2m_handler(ACPI_SUBTABLE_HEADER *entry, void *arg)
 		device_printf(dev, "frame: %x %lx %x %u %u\n", msi->MsiFrameId,
 		    msi->BaseAddress, msi->Flags, msi->SpiCount, msi->SpiBase);
 
-		cdev = device_add_child(dev, NULL, -1);
+		cdev = device_add_child(dev, NULL, DEVICE_UNIT_ANY);
 		if (cdev == NULL)
 			return;
 

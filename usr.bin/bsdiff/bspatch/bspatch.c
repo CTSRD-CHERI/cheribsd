@@ -36,11 +36,13 @@
 #include <fcntl.h>
 #include <libgen.h>
 #include <limits.h>
+#include <stdckdint.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/mman.h>
 
 #ifndef O_BINARY
 #define O_BINARY 0
@@ -64,15 +66,8 @@ add_off_t(off_t a, off_t b)
 {
 	off_t result;
 
-#if __GNUC__ >= 5 || \
-    (defined(__has_builtin) && __has_builtin(__builtin_add_overflow))
-	if (__builtin_add_overflow(a, b, &result))
+	if (ckd_add(&result, a, b))
 		errx(1, "Corrupt patch");
-#else
-	if ((b > 0 && a > OFF_MAX - b) || (b < 0 && a < OFF_MIN - b))
-		errx(1, "Corrupt patch");
-	result = a + b;
-#endif
 	return result;
 }
 
@@ -157,7 +152,7 @@ int main(int argc, char *argv[])
 	if (cap_enter() < 0)
 		err(1, "failed to enter security sandbox");
 
-	cap_rights_init(&rights_ro, CAP_READ, CAP_FSTAT, CAP_SEEK);
+	cap_rights_init(&rights_ro, CAP_READ, CAP_FSTAT, CAP_SEEK, CAP_MMAP_R);
 	cap_rights_init(&rights_wr, CAP_WRITE);
 	cap_rights_init(&rights_dir, CAP_UNLINKAT);
 
@@ -226,12 +221,13 @@ int main(int argc, char *argv[])
 		errx(1, "BZ2_bzReadOpen, bz2err = %d", ebz2err);
 
 	if ((oldsize = lseek(oldfd, 0, SEEK_END)) == -1 ||
-	    oldsize > SSIZE_MAX ||
-	    (old = malloc(oldsize)) == NULL ||
-	    lseek(oldfd, 0, SEEK_SET) != 0 ||
-	    read(oldfd, old, oldsize) != oldsize ||
-	    close(oldfd) == -1)
+	    oldsize > SSIZE_MAX)
 		err(1, "%s", argv[1]);
+
+	old = mmap(NULL, oldsize+1, PROT_READ, MAP_SHARED, oldfd, 0);
+	if (old == MAP_FAILED || close(oldfd) != 0)
+		err(1, "%s", argv[1]);
+
 	if ((new = malloc(newsize)) == NULL)
 		err(1, NULL);
 
@@ -300,7 +296,7 @@ int main(int argc, char *argv[])
 	newfile = NULL;
 
 	free(new);
-	free(old);
+	munmap(old, oldsize+1);
 
 	return (0);
 }

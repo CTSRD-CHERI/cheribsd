@@ -200,7 +200,7 @@ gic_cpu_mask(struct arm_gic_softc *sc)
 
 #ifdef SMP
 static void
-arm_gic_init_secondary(device_t dev)
+arm_gic_init_secondary(device_t dev, uint32_t rootnum)
 {
 	struct arm_gic_softc *sc = device_get_softc(dev);
 	u_int irq, cpu;
@@ -444,7 +444,7 @@ arm_gic_alloc_resource(device_t bus, device_t child, int type, int *rid,
 	struct resource_list *rl;
 	int j;
 
-	KASSERT(type == SYS_RES_MEMORY, ("Invalid resoure type %x", type));
+	KASSERT(type == SYS_RES_MEMORY, ("Invalid resource type %x", type));
 
 	sc = device_get_softc(bus);
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: 0BSD
+
 ///////////////////////////////////////////////////////////////////////////////
 //
 /// \file       sysdefs.h
@@ -7,9 +9,6 @@
 /// file is separate from common.h.
 //
 //  Author:     Lasse Collin
-//
-//  This file has been put into the public domain.
-//  You can do whatever you want with this file.
 //
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -24,7 +23,15 @@
 #	include <config.h>
 #endif
 
-// Get standard-compliant stdio functions under MinGW and MinGW-w64.
+// This #define ensures that C99 and POSIX compliant stdio functions are
+// available with MinGW-w64 (both 32-bit and 64-bit). Modern MinGW-w64 adds
+// this automatically, for example, when the compiler is in C99 (or later)
+// mode when building against msvcrt.dll. It still doesn't hurt to be explicit
+// that we always want this and #define this unconditionally.
+//
+// With Universal CRT (UCRT) this is less important because UCRT contains
+// C99-compatible stdio functions. It's still nice to #define this as UCRT
+// doesn't support the POSIX thousand separator flag in printf (like "%'u").
 #ifdef __MINGW32__
 #	define __USE_MINGW_ANSI_STDIO 1
 #endif
@@ -151,13 +158,16 @@ typedef unsigned char _Bool;
 
 #include <string.h>
 
-// As of MSVC 2013, inline and restrict are supported with
-// non-standard keywords.
-#if defined(_WIN32) && defined(_MSC_VER)
-#	ifndef inline
+// Visual Studio 2013 update 2 supports only __inline, not inline.
+// MSVC v19.0 / VS 2015 and newer support both.
+//
+// MSVC v19.27 (VS 2019 version 16.7) added support for restrict.
+// Older ones support only __restrict.
+#ifdef _MSC_VER
+#	if _MSC_VER < 1900 && !defined(inline)
 #		define inline __inline
 #	endif
-#	ifndef restrict
+#	if _MSC_VER < 1927 && !defined(restrict)
 #		define restrict __restrict
 #	endif
 #endif

@@ -167,6 +167,10 @@ ehci_pci_match(device_t self)
 		return "Intel 82801JI (ICH10) USB 2.0 controller USB-A";
 	case 0x3a3c8086:
 		return "Intel 82801JI (ICH10) USB 2.0 controller USB-B";
+	case 0x3a6c8086:
+		return "Intel 82801JD (ICH10) USB 2.0 controller USB-A";
+	case 0x3a6a8086:
+		return "Intel 82801JD (ICH10) USB 2.0 controller USB-B";
 	case 0x3b348086:
 		return ("Intel PCH USB 2.0 controller USB-A");
 	case 0x3b3c8086:
@@ -356,7 +360,7 @@ ehci_pci_attach(device_t self)
 		device_printf(self, "Could not allocate irq\n");
 		goto error;
 	}
-	sc->sc_bus.bdev = device_add_child(self, "usbus", -1);
+	sc->sc_bus.bdev = device_add_child(self, "usbus", DEVICE_UNIT_ANY);
 	if (!sc->sc_bus.bdev) {
 		device_printf(self, "Could not add USB device\n");
 		goto error;

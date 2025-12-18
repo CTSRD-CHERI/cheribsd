@@ -97,9 +97,6 @@ void	armv7_cpu_sleep			(int);
 void	pj4b_config			(void);
 #endif
 
-#if defined(CPU_ARM1176)
-void    arm11x6_sleep                   (int);  /* no ref. for errata */
-#endif
 
 
 /*
@@ -178,8 +175,8 @@ void cpu_reset		(void) __attribute__((__noreturn__));
  */
 
 /* PRIMARY CACHE VARIABLES */
-extern int	arm_dcache_align;
-extern int	arm_dcache_align_mask;
+extern unsigned int	arm_dcache_align;
+extern unsigned int	arm_dcache_align_mask;
 
 #else	/* !_KERNEL */
 

@@ -60,6 +60,7 @@
 
 #include <machine/_inttypes.h>
 #include <machine/intr_machdep.h>
+#include <x86/acpica_machdep.h>
 #include <x86/apicvar.h>
 #include <x86/init.h>
 #include <machine/pc/bios.h>
@@ -147,33 +148,16 @@ isxen(void)
 }
 
 #define CRASH(...) do {					\
-	if (isxen()) {					\
+	if (isxen())					\
 		xc_printf(__VA_ARGS__);			\
-		HYPERVISOR_shutdown(SHUTDOWN_crash);	\
-	} else {					\
-		halt();					\
-	}						\
+	halt();						\
 } while (0)
 
 uint64_t
 hammer_time_xen(vm_paddr_t start_info_paddr)
 {
 	struct hvm_modlist_entry *mod;
-	struct xen_add_to_physmap xatp;
 	uint64_t physfree;
-	char *kenv;
-	int rc;
-
-	if (isxen()) {
-		xen_domain_type = XEN_HVM_DOMAIN;
-		vm_guest = VM_GUEST_XEN;
-		rc = xen_hvm_init_hypercall_stubs(XEN_HVM_INIT_EARLY);
-		if (rc) {
-			xc_printf("ERROR: failed to initialize hypercall page: %d\n",
-			    rc);
-			HYPERVISOR_shutdown(SHUTDOWN_crash);
-		}
-	}
 
 	start_info = (struct hvm_start_info *)(start_info_paddr + KERNBASE);
 	if (start_info->magic != XEN_HVM_START_MAGIC_VALUE) {
@@ -212,28 +196,6 @@ hammer_time_xen(vm_paddr_t start_info_paddr)
 			    PAGE_SIZE), physfree);
 	}
 
-	if (isxen()) {
-		xatp.domid = DOMID_SELF;
-		xatp.idx = 0;
-		xatp.space = XENMAPSPACE_shared_info;
-		xatp.gpfn = atop(physfree);
-		if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp)) {
-			xc_printf("ERROR: failed to setup shared_info page\n");
-			HYPERVISOR_shutdown(SHUTDOWN_crash);
-		}
-		HYPERVISOR_shared_info = (shared_info_t *)(physfree + KERNBASE);
-		physfree += PAGE_SIZE;
-	}
-
-	/*
-	 * Init a static kenv using a free page. The contents will be filled
-	 * from the parse_preload_data hook.
-	 */
-	kenv = (void *)(physfree + KERNBASE);
-	physfree += PAGE_SIZE;
-	bzero_early(kenv, PAGE_SIZE);
-	init_static_kenv(kenv, PAGE_SIZE);
-
 	/* Set the hooks for early functions that diverge from bare metal */
 	init_ops = xen_pvh_init_ops;
 	hvm_start_flags = start_info->flags;
@@ -243,52 +205,6 @@ hammer_time_xen(vm_paddr_t start_info_paddr)
 }
 
 /*-------------------------------- PV specific -------------------------------*/
-
-/*
- * When booted as a PVH guest FreeBSD needs to avoid using the RSDP address
- * hint provided by the loader because it points to the native set of ACPI
- * tables instead of the ones crafted by Xen. The acpi.rsdp env variable is
- * removed from kenv if present, and a new acpi.rsdp is added to kenv that
- * points to the address of the Xen crafted RSDP.
- */
-static bool reject_option(const char *option)
-{
-	static const char *reject[] = {
-		"acpi.rsdp",
-	};
-	unsigned int i;
-
-	for (i = 0; i < nitems(reject); i++)
-		if (strncmp(option, reject[i], strlen(reject[i])) == 0)
-			return (true);
-
-	return (false);
-}
-
-static void
-xen_pvh_set_env(char *env, bool (*filter)(const char *))
-{
-	char *option;
-
-	if (env == NULL)
-		return;
-
-	option = env;
-	while (*option != 0) {
-		char *value;
-
-		if (filter != NULL && filter(option)) {
-			option += strlen(option) + 1;
-			continue;
-		}
-
-		value = option;
-		option = strsep(&value, "=");
-		if (kern_setenv(option, value) != 0 && isxen())
-			xc_printf("unable to add kenv %s=%s\n", option, value);
-		option = value + strlen(value) + 1;
-	}
-}
 
 #ifdef DDB
 /*
@@ -335,78 +251,6 @@ xen_pvh_parse_symtab(void)
 }
 #endif
 
-static void
-fixup_console(caddr_t kmdp)
-{
-	struct xen_platform_op op = {
-		.cmd = XENPF_get_dom0_console,
-	};
-	xenpf_dom0_console_t *console = &op.u.dom0_console;
-	union {
-		struct efi_fb efi;
-		struct vbe_fb vbe;
-	} *fb = NULL;
-	int size;
-
-	size = HYPERVISOR_platform_op(&op);
-	if (size < 0) {
-		xc_printf("Failed to get dom0 video console info: %d\n", size);
-		return;
-	}
-
-	switch (console->video_type) {
-	case XEN_VGATYPE_VESA_LFB:
-		fb = (__typeof__ (fb))preload_search_info(kmdp,
-		    MODINFO_METADATA | MODINFOMD_VBE_FB);
-
-		if (fb == NULL) {
-			xc_printf("No VBE FB in kernel metadata\n");
-			return;
-		}
-
-		_Static_assert(offsetof(struct vbe_fb, fb_bpp) ==
-		    offsetof(struct efi_fb, fb_mask_reserved) +
-		    sizeof(fb->efi.fb_mask_reserved),
-		    "Bad structure overlay\n");
-		fb->vbe.fb_bpp = console->u.vesa_lfb.bits_per_pixel;
-		/* FALLTHROUGH */
-	case XEN_VGATYPE_EFI_LFB:
-		if (fb == NULL) {
-			fb = (__typeof__ (fb))preload_search_info(kmdp,
-			    MODINFO_METADATA | MODINFOMD_EFI_FB);
-			if (fb == NULL) {
-				xc_printf("No EFI FB in kernel metadata\n");
-				return;
-			}
-		}
-
-		fb->efi.fb_addr = console->u.vesa_lfb.lfb_base;
-		if (size >
-		    offsetof(xenpf_dom0_console_t, u.vesa_lfb.ext_lfb_base))
-			fb->efi.fb_addr |=
-			    (uint64_t)console->u.vesa_lfb.ext_lfb_base << 32;
-		fb->efi.fb_size = console->u.vesa_lfb.lfb_size << 16;
-		fb->efi.fb_height = console->u.vesa_lfb.height;
-		fb->efi.fb_width = console->u.vesa_lfb.width;
-		fb->efi.fb_stride = (console->u.vesa_lfb.bytes_per_line << 3) /
-		    console->u.vesa_lfb.bits_per_pixel;
-#define FBMASK(c) \
-    ((~0u << console->u.vesa_lfb.c ## _pos) & \
-    (~0u >> (32 - console->u.vesa_lfb.c ## _pos - \
-    console->u.vesa_lfb.c ## _size)))
-		fb->efi.fb_mask_red = FBMASK(red);
-		fb->efi.fb_mask_green = FBMASK(green);
-		fb->efi.fb_mask_blue = FBMASK(blue);
-		fb->efi.fb_mask_reserved = FBMASK(rsvd);
-#undef FBMASK
-		break;
-
-	default:
-		xc_printf("Video console type unsupported\n");
-		return;
-	}
-}
-
 static caddr_t
 xen_pvh_parse_preload_data(uint64_t modulep)
 {
@@ -414,7 +258,6 @@ xen_pvh_parse_preload_data(uint64_t modulep)
 	vm_ooffset_t off;
 	vm_paddr_t metadata;
 	char *envp;
-	char acpi_rsdp[19];
 
 	TSENTER();
 	if (start_info->modlist_paddr != 0) {
@@ -480,15 +323,18 @@ xen_pvh_parse_preload_data(uint64_t modulep)
 		envp = MD_FETCH(kmdp, MODINFOMD_ENVP, char *);
 		if (envp != NULL)
 			envp += off;
-		xen_pvh_set_env(envp, reject_option);
+		init_static_kenv(envp, 0);
 
 		if (MD_FETCH(kmdp, MODINFOMD_EFI_MAP, void *) != NULL)
 		    strlcpy(bootmethod, "UEFI", sizeof(bootmethod));
 		else
 		    strlcpy(bootmethod, "BIOS", sizeof(bootmethod));
-
-		fixup_console(kmdp);
 	} else {
+		static char kenv_buffer[PAGE_SIZE];
+
+		/* Provide a static kenv so the command line can be parsed. */
+		init_static_kenv(kenv_buffer, sizeof(kenv_buffer));
+
 		/* Parse the extra boot information given by Xen */
 		if (start_info->cmdline_paddr != 0)
 			boot_parse_cmdline_delim(
@@ -500,9 +346,12 @@ xen_pvh_parse_preload_data(uint64_t modulep)
 
 	boothowto |= boot_env_to_howto();
 
-	snprintf(acpi_rsdp, sizeof(acpi_rsdp), "%#" PRIx64,
-	    start_info->rsdp_paddr);
-	kern_setenv("acpi.rsdp", acpi_rsdp);
+	/*
+	 * When booted as a PVH guest FreeBSD must not use the RSDP address
+	 * hint provided by the loader because it points to the native set of
+	 * ACPI tables instead of the ones crafted by Xen.
+	 */
+	acpi_set_root(start_info->rsdp_paddr);
 
 #ifdef DDB
 	xen_pvh_parse_symtab();

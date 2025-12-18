@@ -38,7 +38,6 @@
  * CHERI CHANGES END
  */
 
-#include <sys/cdefs.h>
 #include "namespace.h"
 #include <sys/types.h>
 #include <sys/rtprio.h>
@@ -57,10 +56,13 @@
 
 static int  create_stack(struct pthread_attr *pattr);
 static void thread_start(struct pthread *curthread) __used;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-__weak_reference(thread_start, _thread_start);
-void _thread_start(struct pthread *curthread);
-__weak_reference(thread_start, _rtld_thread_start);
+#ifdef CHERI_LIB_C18N
+#pragma weak _thread_start = thread_start
+
+/*
+ * This weak symbol will always be resolved at runtime.
+ */
+#pragma weak _rtld_thread_start
 void _rtld_thread_start(struct pthread *);
 #endif
 
@@ -149,7 +151,15 @@ _pthread_create(pthread_t * __restrict thread,
 		new_thread->flags = THR_FLAGS_NEED_SUSPEND;
 		create_suspended = 1;
 	} else {
+#ifdef CHERI_LIB_C18N
+		/*
+		 * c18n: Always block all signals when creating a new thread to
+		 * allow RTLD to set up the environment to handle signals.
+		 */
+		create_suspended = 1;
+#else
 		create_suspended = 0;
+#endif
 	}
 
 	new_thread->state = PS_RUNNING;
@@ -177,7 +187,7 @@ _pthread_create(pthread_t * __restrict thread,
 		locked = 1;
 	} else
 		locked = 0;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#ifdef CHERI_LIB_C18N
 	param.start_func = (void (*)(void *)) _rtld_thread_start;
 #else
 	param.start_func = (void (*)(void *)) thread_start;
@@ -286,8 +296,21 @@ static void
 thread_start(struct pthread *curthread)
 {
 	sigset_t set;
+	bool restore_sigmask;
 
-	if (curthread->attr.suspend == THR_CREATE_SUSPENDED)
+#ifdef CHERI_LIB_C18N
+	/*
+	 * At this point, curthread->tcb contains a fake wrapper TCB created by
+	 * RTLD when the thread was created. The real TCB has now been installed
+	 * by RTLD upon thread start, and the struct member should be set to it.
+	 */
+	curthread->tcb = _tcb_get();
+	restore_sigmask = true;
+#else
+	restore_sigmask = curthread->attr.suspend == THR_CREATE_SUSPENDED;
+#endif
+
+	if (restore_sigmask)
 		set = curthread->sigmask;
 	_thr_signal_block_setup(curthread);
 
@@ -302,7 +325,7 @@ thread_start(struct pthread *curthread)
 	if (curthread->force_exit)
 		_pthread_exit(PTHREAD_CANCELED);
 
-	if (curthread->attr.suspend == THR_CREATE_SUSPENDED) {
+	if (restore_sigmask) {
 #if 0
 		/* Done in THR_UNLOCK() */
 		_thr_ast(curthread);

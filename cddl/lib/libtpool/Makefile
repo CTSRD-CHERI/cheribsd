@@ -1,4 +1,3 @@
-
 .PATH: ${ZFSTOP}/lib/libtpool
 .PATH: ${ZFSTOP}/include
 

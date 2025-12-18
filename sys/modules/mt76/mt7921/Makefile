@@ -1,4 +1,3 @@
-
 DEVDIR=	${SRCTOP}/sys/contrib/dev/mediatek/mt76/mt7921
 
 .PATH: ${DEVDIR}
@@ -7,13 +6,12 @@ KMOD=	if_mt7921
 
 # Common stuff.
 SRCS=	init.c main.c mac.c mcu.c
-#SRCS+=	trace.c
 
 # PCI stuff.
-SRCS+=	pci.c pci_mac.c pci_mcu.c dma.c
+SRCS+=	pci.c pci_mac.c pci_mcu.c
 
 # USB stuff.
-#SRCS+=	usb.c usb_mac.c
+#SRCS+=	usb.c
 
 # SDIO stuff.
 #SRCS+=	sdio.c sdio_mac.c sdio_mcu.c

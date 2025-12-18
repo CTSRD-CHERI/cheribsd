@@ -36,7 +36,6 @@
  * above the MPTable.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/endian.h>
 #include <sys/errno.h>
@@ -327,7 +326,7 @@ basl_load(struct vmctx *ctx, int fd)
 
 	addr = calloc(1, sb.st_size);
 	if (addr == NULL)
-		return (EFAULT);
+		return (ENOMEM);
 
 	if (read(fd, addr, sb.st_size) < 0)
 		return (errno);
@@ -339,6 +338,7 @@ basl_load(struct vmctx *ctx, int fd)
 	BASL_EXEC(basl_table_create(&table, ctx, name, BASL_TABLE_ALIGNMENT));
 	BASL_EXEC(basl_table_append_bytes(table, addr, sb.st_size));
 
+	free(addr);
 	return (0);
 }
 

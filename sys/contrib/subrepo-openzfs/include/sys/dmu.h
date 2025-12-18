@@ -375,7 +375,9 @@ typedef struct dmu_buf {
 #define	DMU_POOL_L2CACHE		"l2cache"
 #define	DMU_POOL_TMP_USERREFS		"tmp_userrefs"
 #define	DMU_POOL_DDT			"DDT-%s-%s-%s"
+#define	DMU_POOL_DDT_LOG		"DDT-log-%s-%u"
 #define	DMU_POOL_DDT_STATS		"DDT-statistics"
+#define	DMU_POOL_DDT_DIR		"DDT-%s"
 #define	DMU_POOL_CREATION_VERSION	"creation_version"
 #define	DMU_POOL_SCAN			"scan"
 #define	DMU_POOL_ERRORSCRUB		"error_scrub"
@@ -505,6 +507,12 @@ void dmu_object_set_checksum(objset_t *os, uint64_t object, uint8_t checksum,
 void dmu_object_set_compress(objset_t *os, uint64_t object, uint8_t compress,
     dmu_tx_t *tx);
 
+/*
+ * Get an estimated cache size for an object. Caller must expect races.
+ */
+int dmu_object_cached_size(objset_t *os, uint64_t object,
+    uint64_t *l1sz, uint64_t *l2sz);
+
 void dmu_write_embedded(objset_t *os, uint64_t object, uint64_t offset,
     void *data, uint8_t etype, uint8_t comp, int uncompressed_size,
     int compressed_size, int byteorder, dmu_tx_t *tx);
@@ -517,6 +525,7 @@ void dmu_redact(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 #define	WP_NOFILL	0x1
 #define	WP_DMU_SYNC	0x2
 #define	WP_SPILL	0x4
+#define	WP_DIRECT_WR	0x8
 
 void dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp,
     struct zio_prop *zp);
@@ -572,11 +581,16 @@ int dmu_buf_hold(objset_t *os, uint64_t object, uint64_t offset,
 int dmu_buf_hold_array(objset_t *os, uint64_t object, uint64_t offset,
     uint64_t length, int read, const void *tag, int *numbufsp,
     dmu_buf_t ***dbpp);
+int dmu_buf_hold_noread(objset_t *os, uint64_t object, uint64_t offset,
+    const void *tag, dmu_buf_t **dbp);
 int dmu_buf_hold_by_dnode(dnode_t *dn, uint64_t offset,
     const void *tag, dmu_buf_t **dbp, int flags);
 int dmu_buf_hold_array_by_dnode(dnode_t *dn, uint64_t offset,
     uint64_t length, boolean_t read, const void *tag, int *numbufsp,
     dmu_buf_t ***dbpp, uint32_t flags);
+int dmu_buf_hold_noread_by_dnode(dnode_t *dn, uint64_t offset, const void *tag,
+    dmu_buf_t **dbp);
+
 /*
  * Add a reference to a dmu buffer that has already been held via
  * dmu_buf_hold() in the current context.
@@ -647,6 +661,9 @@ typedef struct dmu_buf_user {
 	 * Asynchronous user eviction callback state.
 	 */
 	taskq_ent_t	dbu_tqent;
+
+	/* Size of user data, for inclusion in dbuf_cache accounting. */
+	uint64_t	dbu_size;
 
 	/*
 	 * This instance's eviction function pointers.
@@ -730,13 +747,21 @@ void *dmu_buf_replace_user(dmu_buf_t *db,
 void *dmu_buf_remove_user(dmu_buf_t *db, dmu_buf_user_t *user);
 
 /*
+ * User data size accounting. This can be used to artifically inflate the size
+ * of the dbuf during cache accounting, so that dbuf_evict_thread evicts enough
+ * to satisfy memory reclaim requests. It's not used for anything else, and
+ * defaults to 0.
+ */
+uint64_t dmu_buf_user_size(dmu_buf_t *db);
+void dmu_buf_add_user_size(dmu_buf_t *db, uint64_t nadd);
+void dmu_buf_sub_user_size(dmu_buf_t *db, uint64_t nsub);
+
+/*
  * Returns the user data (dmu_buf_user_t *) associated with this dbuf.
  */
 void *dmu_buf_get_user(dmu_buf_t *db);
 
 objset_t *dmu_buf_get_objset(dmu_buf_t *db);
-dnode_t *dmu_buf_dnode_enter(dmu_buf_t *db);
-void dmu_buf_dnode_exit(dmu_buf_t *db);
 
 /* Block until any in-progress dmu buf user evictions complete. */
 void dmu_buf_user_evict_wait(void);
@@ -850,16 +875,20 @@ int dmu_free_long_object(objset_t *os, uint64_t object);
 #define	DMU_READ_PREFETCH	0 /* prefetch */
 #define	DMU_READ_NO_PREFETCH	1 /* don't prefetch */
 #define	DMU_READ_NO_DECRYPT	2 /* don't decrypt */
+#define	DMU_DIRECTIO		4 /* use Direct I/O */
+
 int dmu_read(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
-	void *buf, uint32_t flags);
+    void *buf, uint32_t flags);
 int dmu_read_by_dnode(dnode_t *dn, uint64_t offset, uint64_t size, void *buf,
     uint32_t flags);
 void dmu_write(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
-	const void *buf, dmu_tx_t *tx);
-void dmu_write_by_dnode(dnode_t *dn, uint64_t offset, uint64_t size,
     const void *buf, dmu_tx_t *tx);
+int dmu_write_by_dnode(dnode_t *dn, uint64_t offset, uint64_t size,
+    const void *buf, dmu_tx_t *tx);
+int dmu_write_by_dnode_flags(dnode_t *dn, uint64_t offset, uint64_t size,
+    const void *buf, dmu_tx_t *tx, uint32_t flags);
 void dmu_prealloc(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
-	dmu_tx_t *tx);
+    dmu_tx_t *tx);
 #ifdef _KERNEL
 int dmu_read_uio(objset_t *os, uint64_t object, zfs_uio_t *uio, uint64_t size);
 int dmu_read_uio_dbuf(dmu_buf_t *zdb, zfs_uio_t *uio, uint64_t size);
@@ -885,6 +914,11 @@ extern uint_t zfs_max_recordsize;
  */
 void dmu_prefetch(objset_t *os, uint64_t object, int64_t level, uint64_t offset,
 	uint64_t len, enum zio_priority pri);
+void dmu_prefetch_by_dnode(dnode_t *dn, int64_t level, uint64_t offset,
+	uint64_t len, enum zio_priority pri);
+void dmu_prefetch_dnode(objset_t *os, uint64_t object, enum zio_priority pri);
+int dmu_prefetch_wait(objset_t *os, uint64_t object, uint64_t offset,
+    uint64_t size);
 
 typedef struct dmu_object_info {
 	/* All sizes are in bytes unless otherwise indicated. */
@@ -1068,8 +1102,7 @@ int dmu_offset_next(objset_t *os, uint64_t object, boolean_t hole,
 int dmu_read_l0_bps(objset_t *os, uint64_t object, uint64_t offset,
     uint64_t length, struct blkptr *bps, size_t *nbpsp);
 int dmu_brt_clone(objset_t *os, uint64_t object, uint64_t offset,
-    uint64_t length, dmu_tx_t *tx, const struct blkptr *bps, size_t nbps,
-    boolean_t replay);
+    uint64_t length, dmu_tx_t *tx, const struct blkptr *bps, size_t nbps);
 
 /*
  * Initial setup and final teardown.

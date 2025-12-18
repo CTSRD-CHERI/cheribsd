@@ -29,12 +29,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#if !__has_feature(capabilities)
-#error "This should support capabilities"
-#endif
 
-#ifndef __CHERI__
-#error Must be a hybrid library
+#if !__has_feature(capabilities)
+#error The compiler must support capabilities
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
 #error Must be a hybrid library

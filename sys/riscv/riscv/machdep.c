@@ -34,9 +34,9 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_kstack_pages.h"
 #include "opt_platform.h"
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/boot.h>
@@ -344,7 +344,7 @@ init_proc0(vm_pointer_t kstack)
 
 	proc_linkup0(&proc0, &thread0);
 	thread0.td_kstack = kstack;
-	thread0.td_kstack_pages = kstack_pages;
+	thread0.td_kstack_pages = KSTACK_PAGES;
 	thread0.td_pcb = (struct pcb *)(thread0.td_kstack +
 	    thread0.td_kstack_pages * PAGE_SIZE) - 1;
 	thread0.td_pcb->pcb_fpflags = 0;
@@ -381,7 +381,7 @@ try_load_dtb(caddr_t kmdp)
 		return;
 	}
 
-	if (OF_install(OFW_FDT, 0) == FALSE)
+	if (!OF_install(OFW_FDT, 0))
 		panic("Cannot install FDT");
 
 	if (OF_init((void *)dtbp) != 0)
@@ -448,9 +448,19 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	 * if we have to rederive it later.
 	 */
 
-	/* Copy the DTB to KVA space. */
-	dtb_size = fdt_totalsize(rvbp->dtbp_virt);
+#ifdef __CHERI_PURE_CAPABILITY__
+	const void *dtbp_virt = cheri_setaddress(kernel_root_cap,
+	    rvbp->dtbp_phys);
+	dtb_size = fdt_totalsize(dtbp_virt);
 	lastaddr = CHERI_REPRESENTABLE_ALIGN_UP(lastaddr, dtb_size);
+#else
+	dtb_size = fdt_totalsize(rvbp->dtbp_phys);
+#endif
+
+	/*
+	 * Copy the DTB to KVA space. We are able to dereference the physical
+	 * address due to the identity map created in locore.
+	 */
 	lastaddr = roundup(lastaddr, sizeof(int));
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_METADATA | MODINFOMD_DTBP);
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(vm_offset_t));
@@ -458,10 +468,10 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 #ifdef __CHERI_PURE_CAPABILITY__
 	void *dtbp = cheri_setbounds(cheri_setaddress(kernel_root_cap,
 	    lastaddr), dtb_size);
-	memmove(dtbp, (const void *)rvbp->dtbp_virt, dtb_size);
+	memmove(dtbp, dtbp_virt, dtb_size);
 	lastaddr = roundup(lastaddr + cheri_getlen(dtbp), sizeof(int));
 #else
-	memmove((void *)lastaddr, (const void *)rvbp->dtbp_virt, dtb_size);
+	memmove((void *)lastaddr, (const void *)rvbp->dtbp_phys, dtb_size);
 	lastaddr = roundup(lastaddr + dtb_size, sizeof(int));
 #endif
 
@@ -631,10 +641,6 @@ initriscv(struct riscv_bootparams *rvbp)
 
 	cache_setup();
 
-	/* Bootstrap enough of pmap to enter the kernel proper */
-	kernlen = (lastaddr - KERNBASE);
-	pmap_bootstrap(rvbp->kern_l1pt, rvbp->kern_phys, kernlen);
-
 #ifdef FDT
 	/*
 	 * XXX: Unconditionally exclude the lowest 2MB of physical memory, as
@@ -647,10 +653,15 @@ initriscv(struct riscv_bootparams *rvbp)
 	physmem_exclude_region(mem_regions[0].mr_start, L2_SIZE,
 	    EXFLAG_NODUMP | EXFLAG_NOALLOC);
 #endif
+
+	/* Bootstrap enough of pmap to enter the kernel proper */
+	kernlen = (lastaddr - KERNBASE);
+	pmap_bootstrap(rvbp->kern_phys, kernlen);
+
 	physmem_init_kernel_globals();
 
 	/* Establish static device mappings */
-	devmap_bootstrap(0, NULL);
+	devmap_bootstrap();
 
 	cninit();
 
@@ -698,6 +709,10 @@ initriscv(struct riscv_bootparams *rvbp)
 
 	early_boot = 0;
 
+	if (bootverbose && kstack_pages != KSTACK_PAGES)
+		printf("kern.kstack_pages = %d ignored for thread0\n",
+		    kstack_pages);
+
 	TSEXIT();
 }
 
@@ -706,54 +721,39 @@ void
 cheri_revoke_td_frame(struct thread *td,
     const struct vm_cheri_revoke_cookie *crc)
 {
-	CHERI_REVOKE_STATS_FOR(crst, crc);
-
-#define CHERI_REVOKE_REG(r) \
-	do { if (cheri_gettag(r)) { \
-		CHERI_REVOKE_STATS_BUMP(crst, caps_found); \
-		if (vm_cheri_revoke_test(crc, r)) { \
-			r = cheri_revoke_cap(r); \
-			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared); \
-		} \
-	    }} while(0)
-
-	CHERI_REVOKE_REG(td->td_frame->tf_ra);
-	CHERI_REVOKE_REG(td->td_frame->tf_sp);
-	CHERI_REVOKE_REG(td->td_frame->tf_gp);
-	CHERI_REVOKE_REG(td->td_frame->tf_tp);
-	CHERI_REVOKE_REG(td->td_frame->tf_t[0]);
-	CHERI_REVOKE_REG(td->td_frame->tf_t[1]);
-	CHERI_REVOKE_REG(td->td_frame->tf_t[2]);
-	CHERI_REVOKE_REG(td->td_frame->tf_t[3]);
-	CHERI_REVOKE_REG(td->td_frame->tf_t[4]);
-	CHERI_REVOKE_REG(td->td_frame->tf_t[5]);
-	CHERI_REVOKE_REG(td->td_frame->tf_t[6]);
-	CHERI_REVOKE_REG(td->td_frame->tf_s[0]);
-	CHERI_REVOKE_REG(td->td_frame->tf_s[1]);
-	CHERI_REVOKE_REG(td->td_frame->tf_s[2]);
-	CHERI_REVOKE_REG(td->td_frame->tf_s[3]);
-	CHERI_REVOKE_REG(td->td_frame->tf_s[4]);
-	CHERI_REVOKE_REG(td->td_frame->tf_s[5]);
-	CHERI_REVOKE_REG(td->td_frame->tf_s[6]);
-	CHERI_REVOKE_REG(td->td_frame->tf_s[7]);
-	CHERI_REVOKE_REG(td->td_frame->tf_s[8]);
-	CHERI_REVOKE_REG(td->td_frame->tf_s[9]);
-	CHERI_REVOKE_REG(td->td_frame->tf_s[10]);
-	CHERI_REVOKE_REG(td->td_frame->tf_s[11]);
-	CHERI_REVOKE_REG(td->td_frame->tf_a[0]);
-	CHERI_REVOKE_REG(td->td_frame->tf_a[1]);
-	CHERI_REVOKE_REG(td->td_frame->tf_a[2]);
-	CHERI_REVOKE_REG(td->td_frame->tf_a[3]);
-	CHERI_REVOKE_REG(td->td_frame->tf_a[4]);
-	CHERI_REVOKE_REG(td->td_frame->tf_a[5]);
-	CHERI_REVOKE_REG(td->td_frame->tf_a[6]);
-	CHERI_REVOKE_REG(td->td_frame->tf_a[7]);
-	CHERI_REVOKE_REG(td->td_frame->tf_sepc); /* This could be real exciting! */
-	CHERI_REVOKE_REG(td->td_frame->tf_ddc);
-
-#undef CHERI_REVOKE_REG
-
-	return;
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_ra);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_sp);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_gp);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_tp);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_t[0]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_t[1]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_t[2]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_t[3]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_t[4]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_t[5]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_t[6]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_s[0]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_s[1]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_s[2]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_s[3]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_s[4]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_s[5]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_s[6]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_s[7]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_s[8]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_s[9]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_s[10]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_s[11]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_a[0]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_a[1]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_a[2]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_a[3]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_a[4]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_a[5]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_a[6]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_a[7]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_sepc); /* This could be real exciting! */
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_ddc);
 }
 #endif
 

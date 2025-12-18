@@ -1,10 +1,16 @@
 /*-
  * SPDX-License-Identifier: BSD-4-Clause
  *
+ * Copyright (c) 2024 Capabilities Limited
  * Copyright (c) 2017 Dell EMC
  * Copyright (c) 2009 Stanislav Sedov <stas@FreeBSD.org>
  * Copyright (c) 1988, 1993
  *      The Regents of the University of California.  All rights reserved.
+ *
+ * This software was developed by SRI International, the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology), and Capabilities Limited under Defense Advanced Research
+ * Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -46,7 +52,6 @@
  * CHERI CHANGES END
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/elf.h>
 #include <sys/time.h>
@@ -95,8 +100,6 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#define	_WANT_INPCB
-#include <netinet/in_pcb.h>
 
 #include <assert.h>
 #include <ctype.h>
@@ -356,11 +359,134 @@ procstat_freeprocs(struct procstat *procstat __unused, struct kinfo_proc *p)
 	p = NULL;
 }
 
+int
+procstat_getc18n(struct procstat *procstat, struct kinfo_proc *kp,
+    struct rtld_c18n_stats *stats)
+{
+	int name[4];
+	size_t len = RTLD_C18N_STATS_MAX_SIZE;
+	_Alignas(struct rtld_c18n_stats) char buf[RTLD_C18N_STATS_MAX_SIZE];
+	struct rtld_c18n_stats *rcs = (struct rtld_c18n_stats *)buf;
+
+	if (stats == NULL)
+		goto out;
+
+	switch (procstat->type) {
+	case PROCSTAT_KVM:
+		warnx("kvm method is not supported");
+		goto out;
+
+	case PROCSTAT_SYSCTL:
+		break;
+
+	case PROCSTAT_CORE:
+		warnx("core method is not supported");
+		goto out;
+
+	default:
+		warnx("unknown access method: %d", procstat->type);
+		goto out;
+	}
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_C18N_STATS;
+	name[3] = kp->ki_pid;
+	if (sysctl(name, nitems(name), buf, &len, NULL, 0) != 0) {
+		if (errno != ESRCH && errno != EPERM && errno != ENOEXEC)
+			warn("sysctl(kern.proc.c18n)");
+		goto out;
+	}
+	if (len < sizeof(*stats) || rcs->version != RTLD_C18N_STATS_VERSION)
+		goto out;
+	*stats = *rcs;
+	return (0);
+out:
+	return (-1);
+}
+
+int
+procstat_getcompartments(struct procstat *procstat, struct kinfo_proc *kp,
+    struct kinfo_cheri_c18n_compart **comparts, size_t *ncompartsp)
+{
+	int name[4];
+	char *inbuf;
+	size_t n, i, cur, size;
+	struct kinfo_cheri_c18n_compart *outbuf, *cp;
+
+	if (comparts == NULL || ncompartsp == NULL)
+		goto out;
+
+	switch (procstat->type) {
+	case PROCSTAT_KVM:
+		warnx("kvm method is not supported");
+		goto out;
+
+	case PROCSTAT_SYSCTL:
+		break;
+
+	case PROCSTAT_CORE:
+		warnx("core method is not supported");
+		goto out;
+
+	default:
+		warnx("unknown access method: %d", procstat->type);
+		goto out;
+	}
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_C18N_COMPARTS;
+	name[3] = kp->ki_pid;
+
+	/* Estimate the size of the input buffer. */
+	if (sysctl(name, nitems(name), NULL, &size, NULL, 0) != 0) {
+		if (errno != ESRCH && errno != EPERM && errno != ENOEXEC)
+			warn("sysctl(kern.proc.c18n_compartments)");
+		goto out;
+	}
+
+	/* Receive the input buffer and count the number of items. */
+	inbuf = malloc(size);
+	if (inbuf == NULL)
+		goto out;
+	if (sysctl(name, nitems(name), inbuf, &size, NULL, 0) != 0) {
+		if (errno != ESRCH && errno != EPERM && errno != ENOEXEC)
+			warn("sysctl(kern.proc.c18n_compartments)");
+		goto out_free;
+	}
+	for (n = 0, cur = 0; cur < size; ++n) {
+		cp = (struct kinfo_cheri_c18n_compart *)(void *)(inbuf + cur);
+		cur += cp->kccc_structsize;
+	}
+
+	/* Unpack elements of the input buffer into the output buffer. */
+	outbuf = calloc(n, sizeof(*outbuf));
+	if (outbuf == NULL)
+		goto out_free;
+	for (i = 0, cur = 0; i < n; ++i) {
+		cp = (struct kinfo_cheri_c18n_compart *)(void *)(inbuf + cur);
+		cur += cp->kccc_structsize;
+		memcpy(&outbuf[i], cp, cp->kccc_structsize);
+	}
+
+	*comparts = outbuf;
+	*ncompartsp = n;
+
+	free(inbuf);
+	return (0);
+
+out_free:
+	free(inbuf);
+out:
+	return (-1);
+}
+
 struct filestat_list *
 procstat_getfiles(struct procstat *procstat, struct kinfo_proc *kp, int mmapped)
 {
 
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		return (procstat_getfiles_kvm(procstat, kp, mmapped));
 	case PROCSTAT_SYSCTL:
@@ -1487,7 +1613,6 @@ procstat_get_socket_info_kvm(kvm_t *kd, struct filestat *fst,
     struct sockstat *sock, char *errbuf)
 {
 	struct domain dom;
-	struct inpcb inpcb;
 	struct protosw proto;
 	struct socket s;
 	struct unpcb unpcb;
@@ -1536,28 +1661,15 @@ procstat_get_socket_info_kvm(kvm_t *kd, struct filestat *fst,
 	sock->proto = proto.pr_protocol;
 	sock->dom_family = dom.dom_family;
 	sock->so_pcb = (uintptr_t)s.so_pcb;
+	sock->sendq = s.so_snd.sb_ccc;
+	sock->recvq = s.so_rcv.sb_ccc;
+	sock->so_rcv_sb_state = s.so_rcv.sb_state;
+	sock->so_snd_sb_state = s.so_snd.sb_state;
 
 	/*
 	 * Protocol specific data.
 	 */
-	switch(dom.dom_family) {
-	case AF_INET:
-	case AF_INET6:
-		if (proto.pr_protocol == IPPROTO_TCP) {
-			if (s.so_pcb) {
-				if (kvm_read(kd, (u_long)s.so_pcb,
-				    (char *)&inpcb, sizeof(struct inpcb))
-				    != sizeof(struct inpcb)) {
-					warnx("can't read inpcb at %p",
-					    (void *)s.so_pcb);
-				} else
-					sock->inp_ppcb =
-					    (uintptr_t)inpcb.inp_ppcb;
-				sock->sendq = s.so_snd.sb_ccc;
-				sock->recvq = s.so_rcv.sb_ccc;
-			}
-		}
-		break;
+	switch (dom.dom_family) {
 	case AF_UNIX:
 		if (s.so_pcb) {
 			if (kvm_read(kd, (u_long)s.so_pcb, (char *)&unpcb,
@@ -1565,11 +1677,7 @@ procstat_get_socket_info_kvm(kvm_t *kd, struct filestat *fst,
 				warnx("can't read unpcb at %p",
 				    (void *)s.so_pcb);
 			} else if (unpcb.unp_conn) {
-				sock->so_rcv_sb_state = s.so_rcv.sb_state;
-				sock->so_snd_sb_state = s.so_snd.sb_state;
 				sock->unp_conn = (uintptr_t)unpcb.unp_conn;
-				sock->sendq = s.so_snd.sb_ccc;
-				sock->recvq = s.so_rcv.sb_ccc;
 			}
 		}
 		break;
@@ -1613,11 +1721,10 @@ procstat_get_socket_info_sysctl(struct filestat *fst, struct sockstat *sock,
 	/*
 	 * Protocol specific data.
 	 */
-	switch(sock->dom_family) {
+	switch (sock->dom_family) {
 	case AF_INET:
 	case AF_INET6:
 		if (sock->proto == IPPROTO_TCP) {
-			sock->inp_ppcb = kif->kf_un.kf_sock.kf_sock_inpcb;
 			sock->sendq = kif->kf_un.kf_sock.kf_sock_sendq;
 			sock->recvq = kif->kf_un.kf_sock.kf_sock_recvq;
 		}
@@ -1974,7 +2081,7 @@ procstat_getvmmap(struct procstat *procstat, struct kinfo_proc *kp,
     unsigned int *cntp)
 {
 
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		warnx("kvm method is not supported");
 		return (NULL);
@@ -2079,7 +2186,7 @@ gid_t *
 procstat_getgroups(struct procstat *procstat, struct kinfo_proc *kp,
     unsigned int *cntp)
 {
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		return (procstat_getgroups_kvm(procstat->kd, kp, cntp));
 	case PROCSTAT_SYSCTL:
@@ -2157,7 +2264,7 @@ int
 procstat_getumask(struct procstat *procstat, struct kinfo_proc *kp,
     unsigned short *maskp)
 {
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		return (procstat_getumask_kvm(procstat->kd, kp, maskp));
 	case PROCSTAT_SYSCTL:
@@ -2361,7 +2468,7 @@ int
 procstat_getrlimit(struct procstat *procstat, struct kinfo_proc *kp, int which,
     struct rlimit* rlimit)
 {
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		return (procstat_getrlimit_kvm(procstat->kd, kp, which,
 		    rlimit));
@@ -2420,7 +2527,7 @@ int
 procstat_getpathname(struct procstat *procstat, struct kinfo_proc *kp,
     char *pathname, size_t maxlen)
 {
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		/* XXX: Return empty string. */
 		if (maxlen > 0)
@@ -2493,7 +2600,7 @@ procstat_getosrel_core(struct procstat_core *core, int *osrelp)
 int
 procstat_getosrel(struct procstat *procstat, struct kinfo_proc *kp, int *osrelp)
 {
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		return (procstat_getosrel_kvm(procstat->kd, kp, osrelp));
 	case PROCSTAT_SYSCTL:
@@ -2715,7 +2822,7 @@ Elf_Auxinfo *
 procstat_getauxv(struct procstat *procstat, struct kinfo_proc *kp,
     unsigned int *cntp)
 {
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		warnx("kvm method is not supported");
 		return (NULL);
@@ -2829,7 +2936,7 @@ struct kinfo_kstack *
 procstat_getkstack(struct procstat *procstat, struct kinfo_proc *kp,
     unsigned int *cntp)
 {
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		warnx("kvm method is not supported");
 		return (NULL);
@@ -2958,7 +3065,7 @@ fail:
 struct advlock_list *
 procstat_getadvlock(struct procstat *procstat)
 {
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		warnx("kvm method is not supported");
 		return (NULL);
@@ -2986,3 +3093,56 @@ procstat_freeadvlock(struct procstat *procstat __unused,
 	free(lst);
 }
 
+static rlim_t *
+procstat_getrlimitusage_sysctl(pid_t pid, unsigned *cntp)
+{
+	int error, name[4];
+	rlim_t *val;
+	size_t len;
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_RLIMIT_USAGE;
+	name[3] = pid;
+
+	len = 0;
+	error = sysctl(name, nitems(name), NULL, &len, NULL, 0);
+	if (error == -1)
+		return (NULL);
+	val = malloc(len);
+	if (val == NULL)
+		return (NULL);
+
+	error = sysctl(name, nitems(name), val, &len, NULL, 0);
+	if (error == -1) {
+		free(val);
+		return (NULL);
+	}
+	*cntp = len / sizeof(rlim_t);
+	return (val);
+}
+
+rlim_t *
+procstat_getrlimitusage(struct procstat *procstat, struct kinfo_proc *kp,
+    unsigned int *cntp)
+{
+	switch (procstat->type) {
+	case PROCSTAT_KVM:
+		warnx("kvm method is not supported");
+		return (NULL);
+	case PROCSTAT_SYSCTL:
+		return (procstat_getrlimitusage_sysctl(kp->ki_pid, cntp));
+	case PROCSTAT_CORE:
+		warnx("core method is not supported");
+		return (NULL);
+	default:
+		warnx("unknown access method: %d", procstat->type);
+		return (NULL);
+	}
+}
+
+void
+procstat_freerlimitusage(struct procstat *procstat __unused, rlim_t *resusage)
+{
+	free(resusage);
+}

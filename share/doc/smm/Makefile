@@ -1,5 +1,3 @@
-#	From: @(#)Makefile	8.1 (Berkeley) 6/10/93
-
 .include <src.opts.mk>
 
 # The following modules do not describe FreeBSD:

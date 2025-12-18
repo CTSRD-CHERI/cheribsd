@@ -1,4 +1,3 @@
-
 # thr sources
 .PATH: ${LIBTHR_SRCTOP}/thread
 
@@ -46,6 +45,7 @@ SRCS+= \
 	thr_setprio.c \
 	thr_setschedparam.c \
 	thr_sig.c \
+	thr_sigqueue.c \
 	thr_single_np.c \
 	thr_sleepq.c \
 	thr_spec.c \

@@ -1,3 +1,5 @@
+.\"-
+.\" SPDX-License-Identifier: BSD-2-Clause
 .\"
 .\" Copyright (c) 2017-2018 Netflix, Inc.
 .\"
@@ -22,7 +24,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd February 15, 2023
+.Dd September 22, 2024
 .Dt EFIBOOTMGR 8
 .Os
 .Sh NAME
@@ -67,7 +69,8 @@
 .Fl t Ar timeout
 .Nm
 .Fl T
-.Nm Fl u Ar unix-path
+.Nm
+.Fl u Ar unix-path
 .Sh "DESCRIPTION"
 The
 .Nm
@@ -80,8 +83,8 @@ boot method to be tried once upon the next boot.
 .Pp
 The UEFI standard defines how hosts may control what is used to
 bootstrap the system.
-Each method is encapsulated within a persistent UEFI variable, stored
-by the UEFI BIOS of the form
+Each method is encapsulated within a persistent UEFI variable,
+stored by the UEFI BIOS of the form
 .Cm Boot Ns Em XXXX
 (where XXXX are uppercase hexadecimal digits).
 These variables are numbered, each describing where to load the bootstrap
@@ -115,6 +118,11 @@ When creating or modifying an entry, use
 .Ar bootnum
 as the index.
 When creating a new entry, fail if it already exists.
+For convenience, if
+.Ar bootnum
+is prefixed with
+.Dq boot ,
+that prefix is ignored.
 .It Fl B -delete
 Delete the given
 .Ar bootnum
@@ -125,6 +133,21 @@ Create a new
 variable (aka method or entry).
 .It Fl D -dry-run
 Process but do not change any variables.
+.It Fl e -env
+When creating a
+.Cm Boot
+variable, include a set of environment variables for the loader to set after
+parsing the command line.
+Variables are of the form
+.Dq a=b
+and separated by spaces.
+The argument should be quoted.
+.Nm appends these to the end of the
+.Cm Boot
+environment variable.
+Before processing anything else,
+.Xr loader.efi 8
+will parse this area and set all variables found there.
 .It Fl E -esp
 Print the
 .Fx
@@ -211,16 +234,16 @@ the EFI partition mounted under
 .Pa /boot/efi ,
 mark the method active, using
 the given loader and label the method
-.Qq FreeBSD-11 :
+.Qq FreeBSD-15 :
 .Pp
-.Dl efibootmgr -a -c -l /boot/efi/EFI/freebsd/loader.efi -L FreeBSD-11
+.Dl efibootmgr -a -c -l /boot/efi/EFI/freebsd/loader.efi -L FreeBSD-15
 .Pp
 This will result in the next available bootnum being assigned to a
 new UEFI boot variable, and given the label
-.Qq FreeBSD-11
+.Qq FreeBSD-15
 such as:
 .Pp
-.Dl Boot0009 FreeBSD-11
+.Dl Boot0009 FreeBSD-15
 .Pp
 Note newly created boot entries are, by default, created inactive, hence
 the reason
@@ -255,10 +278,11 @@ for the next reboot use:
 .Pp
 .Dl efibootmgr -o 0009,0003,...
 .Sh SEE ALSO
-.Xr efirt 9 ,
 .Xr efivar 8 ,
 .Xr gpart 8 ,
-.Xr uefi 8
+.Xr loader.efi 8 ,
+.Xr uefi 8 ,
+.Xr efirt 9
 .Sh STANDARDS
 The Unified Extensible Firmware Interface Specification is available
 from

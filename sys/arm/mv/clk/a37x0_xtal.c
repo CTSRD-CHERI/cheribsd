@@ -25,7 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -36,9 +35,9 @@
 
 #include <dev/fdt/simplebus.h>
 
-#include <dev/extres/clk/clk.h>
-#include <dev/extres/clk/clk_fixed.h>
-#include <dev/extres/syscon/syscon.h>
+#include <dev/clk/clk.h>
+#include <dev/clk/clk_fixed.h>
+#include <dev/syscon/syscon.h>
 
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>

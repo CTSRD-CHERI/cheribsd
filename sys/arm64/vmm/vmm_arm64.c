@@ -67,6 +67,7 @@
 #include "io/vgic.h"
 #include "io/vgic_v3.h"
 #include "io/vtimer.h"
+#include "vmm_handlers.h"
 #include "vmm_stat.h"
 
 #define	HANDLED		1
@@ -103,9 +104,6 @@ static vm_pointer_t stack_hyp_va[MAXCPU];
 static vmem_t *el2_mem_alloc;
 
 static void arm_setup_vectors(void *arg);
-static void vmm_pmap_clean_stage2_tlbi(void);
-static void vmm_pmap_invalidate_range(uint64_t, vm_offset_t, vm_offset_t, bool);
-static void vmm_pmap_invalidate_all(uint64_t);
 
 DPCPU_DEFINE_STATIC(struct hypctx *, vcpu);
 
@@ -133,33 +131,6 @@ arm_setup_vectors(void *arg)
 	el2_regs = arg;
 	arm64_set_active_vcpu(NULL);
 
-	daif = intr_disable();
-
-	/*
-	 * Install the temporary vectors which will be responsible for
-	 * initializing the VMM when we next trap into EL2.
-	 *
-	 * x0: the exception vector table responsible for hypervisor
-	 * initialization on the next call.
-	 */
-#if __has_feature(capabilities)
-#ifdef __CHERI_PURE_CAPABILITY__
-	codep = (uintcap_t)cheri_setaddress(kernel_root_cap,
-	    vtophys(&vmm_hyp_code));
-	codep = cheri_andperm(codep, cheri_getperm(cheri_getpcc()));
-#else
-	codep = (uintcap_t)cheri_setaddress(cheri_getpcc(),
-	    vtophys(&vmm_hyp_code));
-#endif
-	codep = (uintcap_t)cheri_setbounds(codep, hyp_code_len);
-#else
-	codep = vtophys(&vmm_hyp_code);
-#endif
-	vmm_call_hyp_init(codep);
-
-	/* Create and map the hypervisor stack */
-	stack_top = stack_hyp_va[PCPU_GET(cpuid)] + VMM_STACK_SIZE;
-
 	/*
 	 * Configure the system control register for EL2:
 	 *
@@ -177,9 +148,40 @@ arm_setup_vectors(void *arg)
 	sctlr_el2 |= SCTLR_EL2_WXN;
 	sctlr_el2 &= ~SCTLR_EL2_EE;
 
-	/* Special call to initialize EL2 */
-	vmm_call_hyp4(vmmpmap_to_ttbr0(), stack_top, el2_regs->tcr_el2,
-	    sctlr_el2, el2_regs->vtcr_el2);
+	daif = intr_disable();
+
+	if (in_vhe()) {
+		WRITE_SPECIALREG(vtcr_el2, el2_regs->vtcr_el2);
+	} else {
+		/*
+		 * Install the temporary vectors which will be responsible for
+		 * initializing the VMM when we next trap into EL2.
+		 *
+		 * x0: the exception vector table responsible for hypervisor
+		 * initialization on the next call.
+		 */
+#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
+		codep = (uintcap_t)cheri_setaddress(kernel_root_cap,
+		    vtophys(&vmm_hyp_code));
+		codep = cheri_andperm(codep, cheri_getperm(cheri_getpcc()));
+#else
+		codep = (uintcap_t)cheri_setaddress(cheri_getpcc(),
+		    vtophys(&vmm_hyp_code));
+#endif
+		codep = (uintcap_t)cheri_setbounds(codep, hyp_code_len);
+#else
+		codep = vtophys(&vmm_hyp_code);
+#endif
+		vmm_call_hyp_init(codep);
+
+		/* Create and map the hypervisor stack */
+		stack_top = stack_hyp_va[PCPU_GET(cpuid)] + VMM_STACK_SIZE;
+
+		/* Special call to initialize EL2 */
+		vmm_call_hyp4(vmmpmap_to_ttbr0(), stack_top, el2_regs->tcr_el2,
+		    sctlr_el2, el2_regs->vtcr_el2);
+	}
 
 	intr_restore(daif);
 }
@@ -293,11 +295,10 @@ vmmops_modinit(int ipinum)
 	vm_paddr_t vmm_base;
 	uint64_t id_aa64mmfr0_el1, pa_range_bits, pa_range_field;
 	uint64_t cnthctl_el2;
-	register_t daif;
 	int cpu, i;
 	bool rv __diagused;
 
-	if (!virt_enabled()) {
+	if (!has_hyp()) {
 		printf(
 		    "vmm: Processor doesn't have support for virtualization\n");
 		return (ENXIO);
@@ -336,82 +337,86 @@ vmmops_modinit(int ipinum)
 	}
 	pa_range_bits = pa_range_field >> ID_AA64MMFR0_PARange_SHIFT;
 
-	/* Initialise the EL2 MMU */
-	if (!vmmpmap_init()) {
-		printf("vmm: Failed to init the EL2 MMU\n");
-		return (ENOMEM);
+	if (!in_vhe()) {
+		/* Initialise the EL2 MMU */
+		if (!vmmpmap_init()) {
+			printf("vmm: Failed to init the EL2 MMU\n");
+			return (ENOMEM);
+		}
 	}
 
 	/* Set up the stage 2 pmap callbacks */
 	MPASS(pmap_clean_stage2_tlbi == NULL);
-	pmap_clean_stage2_tlbi = vmm_pmap_clean_stage2_tlbi;
-	pmap_stage2_invalidate_range = vmm_pmap_invalidate_range;
-	pmap_stage2_invalidate_all = vmm_pmap_invalidate_all;
+	pmap_clean_stage2_tlbi = vmm_clean_s2_tlbi;
+	pmap_stage2_invalidate_range = vmm_s2_tlbi_range;
+	pmap_stage2_invalidate_all = vmm_s2_tlbi_all;
 
-	/*
-	 * Create an allocator for the virtual address space used by EL2.
-	 * EL2 code is identity-mapped; the allocator is used to find space for
-	 * VM structures.
-	 */
-	el2_mem_alloc = vmem_create("VMM EL2", 0, 0, PAGE_SIZE, 0, M_WAITOK,
-	    VMEM_CAPABILITY_ARENA);
+	if (!in_vhe()) {
+		/*
+		 * Create an allocator for the virtual address space used by
+		 * EL2. EL2 code is identity-mapped; the allocator is used to
+		 * find space for VM structures.
+		 */
+		el2_mem_alloc = vmem_create("VMM EL2", 0, 0, PAGE_SIZE, 0,
+		    M_WAITOK, VMEM_CAPABILITY_ARENA);
 
-	/* Create the mappings for the hypervisor translation table. */
-	hyp_code_len = round_page(&vmm_hyp_code_end - &vmm_hyp_code);
+		/* Create the mappings for the hypervisor translation table. */
+		hyp_code_len = round_page(&vmm_hyp_code_end - &vmm_hyp_code);
 
-	/* We need an physical identity mapping for when we activate the MMU */
-	hyp_code_base = vmm_base = vtophys(&vmm_hyp_code);
-	rv = vmmpmap_enter(vmm_base, hyp_code_len, vmm_base,
-	    VM_PROT_READ | VM_PROT_READ_CAP | VM_PROT_EXECUTE);
-	MPASS(rv);
+		/* We need an physical identity mapping for when we activate the MMU */
+		hyp_code_base = vmm_base = vtophys(&vmm_hyp_code);
+		rv = vmmpmap_enter(vmm_base, hyp_code_len, vmm_base,
+		    VM_PROT_READ | VM_PROT_READ_CAP | VM_PROT_EXECUTE);
+		MPASS(rv);
 
-	next_hyp_va = roundup2(vmm_base + hyp_code_len, L2_SIZE);
+		next_hyp_va = roundup2(vmm_base + hyp_code_len, L2_SIZE);
 
-	/* Create a per-CPU hypervisor stack */
-	CPU_FOREACH(cpu) {
-		vm_pointer_t stack_base;
+		/* Create a per-CPU hypervisor stack */
+		CPU_FOREACH(cpu) {
+			vm_pointer_t stack_base;
 
-		stack[cpu] = malloc(VMM_STACK_SIZE, M_HYP, M_WAITOK | M_ZERO);
+			stack[cpu] = malloc(VMM_STACK_SIZE, M_HYP, M_WAITOK | M_ZERO);
 #ifdef __CHERI_PURE_CAPABILITY__
-		stack_base = (vm_pointer_t)cheri_setaddress(vmm_el2_root_cap,
-		    next_hyp_va);
-		stack_base = (vm_pointer_t)cheri_setboundsexact(stack_base,
-		    VMM_STACK_SIZE);
+			stack_base =
+			    (vm_pointer_t)cheri_setaddress(vmm_el2_root_cap,
+				next_hyp_va);
+			stack_base = cheri_setboundsexact(stack_base,
+			    VMM_STACK_SIZE);
 #else
-		stack_base = next_hyp_va;
+			stack_base = next_hyp_va;
 #endif
-
-		stack_hyp_va[cpu] = stack_base;
-		for (i = 0; i < VMM_STACK_PAGES; i++) {
-			rv = vmmpmap_enter(stack_hyp_va[cpu] + ptoa(i),
-			    PAGE_SIZE, vtophys(stack[cpu] + ptoa(i)),
-			    VM_PROT_READ | VM_PROT_READ_CAP | VM_PROT_WRITE |
-			    VM_PROT_WRITE_CAP);
-			MPASS(rv);
+			stack_hyp_va[cpu] = stack_base;
+			for (i = 0; i < VMM_STACK_PAGES; i++) {
+				rv = vmmpmap_enter(stack_hyp_va[cpu] + ptoa(i),
+				    PAGE_SIZE, vtophys(stack[cpu] + ptoa(i)),
+				    VM_PROT_READ | VM_PROT_READ_CAP |
+				    VM_PROT_WRITE | VM_PROT_WRITE_CAP);
+				MPASS(rv);
+			}
+			next_hyp_va += L2_SIZE;
 		}
-		next_hyp_va += L2_SIZE;
-	}
 
-	el2_regs.tcr_el2 = TCR_EL2_RES1;
-	el2_regs.tcr_el2 |= min(pa_range_bits << TCR_EL2_PS_SHIFT,
-	    TCR_EL2_PS_52BITS);
-	el2_regs.tcr_el2 |= TCR_EL2_T0SZ(64 - EL2_VIRT_BITS);
-	el2_regs.tcr_el2 |= TCR_EL2_IRGN0_WBWA | TCR_EL2_ORGN0_WBWA;
+		el2_regs.tcr_el2 = TCR_EL2_RES1;
+		el2_regs.tcr_el2 |= min(pa_range_bits << TCR_EL2_PS_SHIFT,
+		    TCR_EL2_PS_52BITS);
+		el2_regs.tcr_el2 |= TCR_EL2_T0SZ(64 - EL2_VIRT_BITS);
+		el2_regs.tcr_el2 |= TCR_EL2_IRGN0_WBWA | TCR_EL2_ORGN0_WBWA;
 #if PAGE_SIZE == PAGE_SIZE_4K
-	el2_regs.tcr_el2 |= TCR_EL2_TG0_4K;
+		el2_regs.tcr_el2 |= TCR_EL2_TG0_4K;
 #elif PAGE_SIZE == PAGE_SIZE_16K
-	el2_regs.tcr_el2 |= TCR_EL2_TG0_16K;
+		el2_regs.tcr_el2 |= TCR_EL2_TG0_16K;
 #else
 #error Unsupported page size
 #endif
 #ifdef SMP
-	el2_regs.tcr_el2 |= TCR_EL2_SH0_IS;
+		el2_regs.tcr_el2 |= TCR_EL2_SH0_IS;
 #endif
 #if __has_feature(capabilities)
-	el2_regs.tcr_el2 |= TCR_EL2_HWU | TCR_EL2_HPD;
+		el2_regs.tcr_el2 |= TCR_EL2_HWU | TCR_EL2_HPD;
 #endif
+	}
 
-	switch (el2_regs.tcr_el2 & TCR_EL2_PS_MASK) {
+	switch (pa_range_bits << TCR_EL2_PS_SHIFT) {
 	case TCR_EL2_PS_32BITS:
 		vmm_max_ipa_bits = 32;
 		break;
@@ -470,40 +475,48 @@ vmmops_modinit(int ipinum)
 	 */
 	el2_regs.vtcr_el2 |= VTCR_EL2_HWU59 | VTCR_EL2_HWU60 | VTCR_EL2_HWU61;
 #endif
+	/*
+	 * If FEAT_LPA2 is enabled in the host then we need to enable it here
+	 * so the page tables created by pmap.c are correct. The meaning of
+	 * the shareability field changes to become address bits when this
+	 * is set.
+	 */
+	if ((READ_SPECIALREG(tcr_el1) & TCR_DS) != 0)
+		el2_regs.vtcr_el2 |= VTCR_EL2_DS;
 
 	smp_rendezvous(NULL, arm_setup_vectors, NULL, &el2_regs);
 
-	/* Add memory to the vmem allocator (checking there is space) */
-	if (vmm_base > (L2_SIZE + PAGE_SIZE)) {
-		/*
-		 * Ensure there is an L2 block before the vmm code to check
-		 * for buffer overflows on earlier data. Include the PAGE_SIZE
-		 * of the minimum we can allocate.
-		 */
-		vmm_base -= L2_SIZE + PAGE_SIZE;
-		vmm_base = rounddown2(vmm_base, L2_SIZE);
+	if (!in_vhe()) {
+		/* Add memory to the vmem allocator (checking there is space) */
+		if (vmm_base > (L2_SIZE + PAGE_SIZE)) {
+			/*
+			 * Ensure there is an L2 block before the vmm code to check
+			 * for buffer overflows on earlier data. Include the PAGE_SIZE
+			 * of the minimum we can allocate.
+			 */
+			vmm_base -= L2_SIZE + PAGE_SIZE;
+			vmm_base = rounddown2(vmm_base, L2_SIZE);
+
+			/*
+			 * Check there is memory before the vmm code to add.
+			 *
+			 * Reserve the L2 block at address 0 so NULL dereference will
+			 * raise an exception.
+			 */
+			if (vmm_base > L2_SIZE)
+				el2_vmem_add(L2_SIZE, vmm_base - L2_SIZE);
+		}
 
 		/*
-		 * Check there is memory before the vmm code to add.
-		 *
-		 * Reserve the L2 block at address 0 so NULL dereference will
-		 * raise an exception.
+		 * Add the memory after the stacks. There is most of an L2 block
+		 * between the last stack and the first allocation so this should
+		 * be safe without adding more padding.
 		 */
-		if (vmm_base > L2_SIZE)
-			el2_vmem_add(L2_SIZE, vmm_base - L2_SIZE);
+		if (next_hyp_va < HYP_VM_MAX_ADDRESS - PAGE_SIZE)
+			el2_vmem_add(next_hyp_va,
+			    HYP_VM_MAX_ADDRESS - next_hyp_va);
 	}
-
-	/*
-	 * Add the memory after the stacks. There is most of an L2 block
-	 * between the last stack and the first allocation so this should
-	 * be safe without adding more padding.
-	 */
-	if (next_hyp_va < HYP_VM_MAX_ADDRESS - PAGE_SIZE)
-		el2_vmem_add(next_hyp_va, HYP_VM_MAX_ADDRESS - next_hyp_va);
-
-	daif = intr_disable();
-	cnthctl_el2 = vmm_call_hyp1(HYP_READ_REGISTER, HYP_REG_CNTHCTL);
-	intr_restore(daif);
+	cnthctl_el2 = vmm_read_reg(HYP_REG_CNTHCTL);
 
 	vgic_init();
 	vtimer_init(cnthctl_el2);
@@ -516,21 +529,25 @@ vmmops_modcleanup(void)
 {
 	int cpu;
 
-	smp_rendezvous(NULL, arm_teardown_vectors, NULL, NULL);
+	if (!in_vhe()) {
+		smp_rendezvous(NULL, arm_teardown_vectors, NULL, NULL);
 
-	CPU_FOREACH(cpu) {
-		vmmpmap_remove(stack_hyp_va[cpu], VMM_STACK_PAGES * PAGE_SIZE,
-		    false);
+		CPU_FOREACH(cpu) {
+			vmmpmap_remove(stack_hyp_va[cpu],
+			    VMM_STACK_PAGES * PAGE_SIZE, false);
+		}
+
+		vmmpmap_remove(hyp_code_base, hyp_code_len, false);
 	}
-
-	vmmpmap_remove(hyp_code_base, hyp_code_len, false);
 
 	vtimer_cleanup();
 
-	vmmpmap_fini();
+	if (!in_vhe()) {
+		vmmpmap_fini();
 
-	CPU_FOREACH(cpu)
-		free(stack[cpu], M_HYP);
+		CPU_FOREACH(cpu)
+			free(stack[cpu], M_HYP);
+	}
 
 	pmap_clean_stage2_tlbi = NULL;
 	pmap_stage2_invalidate_range = NULL;
@@ -582,9 +599,10 @@ vmmops_init(struct vm *vm, pmap_t pmap)
 	vtimer_vminit(hyp);
 	vgic_vminit(hyp);
 
-	hyp->el2_addr = el2_map_enter((vm_offset_t)hyp, size,
-	    VM_PROT_READ | VM_PROT_WRITE |
-	    VM_PROT_READ_CAP | VM_PROT_WRITE_CAP);
+	if (!in_vhe())
+		hyp->el2_addr = el2_map_enter((vm_offset_t)hyp, size,
+		    VM_PROT_READ | VM_PROT_WRITE |
+		    VM_PROT_READ_CAP | VM_PROT_WRITE_CAP);
 
 	return (hyp);
 }
@@ -612,9 +630,10 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	vtimer_cpuinit(hypctx);
 	vgic_cpuinit(hypctx);
 
-	hypctx->el2_addr = el2_map_enter((vm_offset_t)hypctx, size,
-	    VM_PROT_READ | VM_PROT_WRITE |
-	    VM_PROT_READ_CAP | VM_PROT_WRITE_CAP);
+	if (!in_vhe())
+		hypctx->el2_addr = el2_map_enter((vm_offset_t)hypctx, size,
+		    VM_PROT_READ | VM_PROT_WRITE |
+		    VM_PROT_READ_CAP | VM_PROT_WRITE_CAP);
 
 	return (hypctx);
 }
@@ -649,26 +668,6 @@ vmmops_vmspace_free(struct vmspace *vmspace)
 
 	pmap_remove_pages(vmspace_pmap(vmspace));
 	vmspace_free(vmspace);
-}
-
-static void
-vmm_pmap_clean_stage2_tlbi(void)
-{
-	vmm_call_hyp0(HYP_CLEAN_S2_TLBI);
-}
-
-static void
-vmm_pmap_invalidate_range(uint64_t vttbr, vm_offset_t sva, vm_offset_t eva,
-    bool final_only)
-{
-	MPASS(eva > sva);
-	vmm_call_hyp4(HYP_S2_TLBI_RANGE, vttbr, sva, eva, final_only);
-}
-
-static void
-vmm_pmap_invalidate_all(uint64_t vttbr)
-{
-	vmm_call_hyp1(HYP_S2_TLBI_ALL, vttbr);
 }
 
 static inline void
@@ -787,6 +786,10 @@ handle_el1_sync_excp(struct hypctx *hypctx, struct vm_exit *vme_ret,
 	case EXCP_BRK:
 		vmm_stat_incr(hypctx->vcpu, VMEXIT_BRK, 1);
 		vme_ret->exitcode = VM_EXITCODE_BRK;
+		break;
+	case EXCP_SOFTSTP_EL0:
+		vmm_stat_incr(hypctx->vcpu, VMEXIT_SS, 1);
+		vme_ret->exitcode = VM_EXITCODE_SS;
 		break;
 	case EXCP_INSN_ABORT_L:
 	case EXCP_DATA_ABORT_L:
@@ -1162,30 +1165,60 @@ vmmops_run(void *vcpui, uintcap_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 	for (;;) {
 		if (hypctx->has_exception) {
+			size_t off;
+			uint64_t c64mask;
+
 			hypctx->has_exception = false;
 			hypctx->elr_el1 = hypctx->tf.tf_elr;
 
 			mode = hypctx->tf.tf_spsr & (PSR_M_MASK | PSR_M_32);
 
 			if (mode == PSR_M_EL1t) {
-				hypctx->tf.tf_elr = hypctx->vbar_el1 + 0x0;
+				off = 0;
 			} else if (mode == PSR_M_EL1h) {
-				hypctx->tf.tf_elr = hypctx->vbar_el1 + 0x200;
+				off = 0x200;
 			} else if ((mode & PSR_M_32) == PSR_M_64) {
 				/* 64-bit EL0 */
-				hypctx->tf.tf_elr = hypctx->vbar_el1 + 0x400;
+				off = 0x400;
 			} else {
 				/* 32-bit EL0 */
-				hypctx->tf.tf_elr = hypctx->vbar_el1 + 0x600;
+				off = 0x600;
 			}
+			c64mask = 0;
+#if __has_feature(capabilities)
+			switch (hypctx->cpacr_el1 & CPACR_CEN_MASK) {
+			case CPACR_CEN_TRAP_ALL1:
+			case CPACR_CEN_TRAP_ALL2:
+				hypctx->tf.tf_elr = cheri_setaddress(hypctx->elr_el1,
+				    hypctx->vbar_el1 + off);
+				break;
+			default:
+				hypctx->tf.tf_elr = hypctx->vbar_el1 + off;
+				if (hypctx->cctlr_el1 & CCTLR_EL1_C64E_MASK)
+					c64mask = PSR_C64;
+				break;
+			}
+#else
+			hypctx->tf.tf_elr = hypctx->vbar_el1 + off;
+#endif
 
 			/* Set the new spsr */
 			hypctx->spsr_el1 = hypctx->tf.tf_spsr;
 
 			/* Set the new cpsr */
 			hypctx->tf.tf_spsr = hypctx->spsr_el1 & PSR_FLAGS;
-			/* TODO: DIT, PAN, SSBS */
-			hypctx->tf.tf_spsr |= PSR_DAIF | PSR_M_EL1h;
+			hypctx->tf.tf_spsr |= PSR_DAIF | PSR_M_EL1h | c64mask;
+
+			/*
+			 * Update fields that may change on exeption entry
+			 * based on how sctlr_el1 is configured.
+			 */
+			if ((hypctx->sctlr_el1 & SCTLR_SPAN) == 0)
+				hypctx->tf.tf_spsr |= PSR_PAN;
+			if ((hypctx->sctlr_el1 & SCTLR_DSSBS) == 0)
+				hypctx->tf.tf_spsr &= ~PSR_SSBS;
+			else
+				hypctx->tf.tf_spsr |= PSR_SSBS;
 		}
 
 		daif = intr_disable();
@@ -1214,16 +1247,14 @@ vmmops_run(void *vcpui, uintcap_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		arm64_set_active_vcpu(hypctx);
 		vgic_flush_hwstate(hypctx);
 
-		excp_type = vmm_call_hyp2(HYP_ENTER_GUEST,
-		    hyp->el2_addr, hypctx->el2_addr);
+		/* Call into EL2 to switch to the guest */
+		excp_type = vmm_enter_guest(hyp, hypctx);
 
 		vgic_sync_hwstate(hypctx);
 		vtimer_sync_hwstate(hypctx);
 
 		/*
-		 * Deactivate the stage2 pmap. vmm_pmap_clean_stage2_tlbi
-		 * depends on this meaning we activate the VM before entering
-		 * the vm again
+		 * Deactivate the stage2 pmap.
 		 */
 		PCPU_SET(curvmpmap, NULL);
 		intr_restore(daif);
@@ -1276,7 +1307,8 @@ vmmops_vcpu_cleanup(void *vcpui)
 	vtimer_cpucleanup(hypctx);
 	vgic_cpucleanup(hypctx);
 
-	vmmpmap_remove(hypctx->el2_addr, el2_hypctx_size(), true);
+	if (!in_vhe())
+		vmmpmap_remove(hypctx->el2_addr, el2_hypctx_size(), true);
 
 	free(hypctx, M_HYP);
 }
@@ -1291,7 +1323,8 @@ vmmops_cleanup(void *vmi)
 
 	smp_rendezvous(NULL, arm_pcpu_vmcleanup, NULL, hyp);
 
-	vmmpmap_remove(hyp->el2_addr, el2_hyp_size(hyp->vm), true);
+	if (!in_vhe())
+		vmmpmap_remove(hyp->el2_addr, el2_hyp_size(hyp->vm), true);
 
 	free(hyp, M_HYP);
 }
@@ -1306,9 +1339,19 @@ hypctx_regptr(struct hypctx *hypctx, int reg)
 	switch (reg) {
 	case VM_REG_GUEST_X0 ... VM_REG_GUEST_X29:
 		return (&hypctx->tf.tf_x[reg]);
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_C0 ... VM_REG_GUEST_C29:
+		return (&hypctx->tf.tf_x[reg - VM_REG_GUEST_C0]);
+#endif
 	case VM_REG_GUEST_LR:
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_C30:
+#endif
 		return (&hypctx->tf.tf_lr);
 	case VM_REG_GUEST_SP:
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_CSP:
+#endif
 		return (&hypctx->tf.tf_sp);
 	case VM_REG_GUEST_CPSR:
 		return (&hypctx->tf.tf_spsr);
@@ -1324,6 +1367,24 @@ hypctx_regptr(struct hypctx *hypctx, int reg)
 		return (&hypctx->tcr_el1);
 	case VM_REG_GUEST_TCR2_EL1:
 		return (&hypctx->tcr2_el1);
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_PCC:
+		return (&hypctx->tf.tf_elr); /* XXX-MJ */
+	case VM_REG_GUEST_DDC:
+		return (&hypctx->tf.tf_ddc);
+	case VM_REG_GUEST_CTPIDR:
+		return (&hypctx->tpidr_el0);
+	case VM_REG_GUEST_RCSP:
+		return (&hypctx->rcsp_el0);
+	case VM_REG_GUEST_RDDC:
+		return (&hypctx->rddc_el0);
+	case VM_REG_GUEST_RCTPIDR:
+		return (&hypctx->rctpidr_el0);
+	case VM_REG_GUEST_CID:
+		return (&hypctx->cid_el0);
+	case VM_REG_GUEST_CCTLR:
+		return (&hypctx->cctlr_el1);
+#endif
 	default:
 		break;
 	}
@@ -1350,6 +1411,17 @@ vmmops_getreg(void *vcpui, int reg, uintcap_t *retval)
 	case VM_REG_GUEST_LR:
 	case VM_REG_GUEST_SP:
 	case VM_REG_GUEST_X0 ... VM_REG_GUEST_X29:
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_CSP:
+	case VM_REG_GUEST_PCC:
+	case VM_REG_GUEST_DDC:
+	case VM_REG_GUEST_CTPIDR:
+	case VM_REG_GUEST_RCSP:
+	case VM_REG_GUEST_RDDC:
+	case VM_REG_GUEST_RCTPIDR:
+	case VM_REG_GUEST_CID:
+	case VM_REG_GUEST_C0 ... VM_REG_GUEST_C30:
+#endif
 		*retval = *(uintcap_t *)regp;
 		break;
 	default:
@@ -1390,6 +1462,16 @@ vmmops_setreg(void *vcpui, int reg, uintcap_t val)
 	case VM_REG_GUEST_LR:
 	case VM_REG_GUEST_SP:
 	case VM_REG_GUEST_X0 ... VM_REG_GUEST_X29:
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_CSP:
+	case VM_REG_GUEST_PCC:
+	case VM_REG_GUEST_DDC:
+	case VM_REG_GUEST_CTPIDR:
+	case VM_REG_GUEST_RCSP:
+	case VM_REG_GUEST_RCTPIDR:
+	case VM_REG_GUEST_CID:
+	case VM_REG_GUEST_C0 ... VM_REG_GUEST_C30:
+#endif
 		*(uintcap_t *)regp = val;
 		break;
 	default:
@@ -1431,9 +1513,10 @@ vmmops_getcap(void *vcpui, int num, int *retval)
 		*retval = 1;
 		ret = 0;
 		break;
-	case VM_CAP_BPT_EXIT:
-		*retval = (hypctx->mdcr_el2 & MDCR_EL2_TDE) != 0;
-		ret = 0;
+	case VM_CAP_BRK_EXIT:
+	case VM_CAP_SS_EXIT:
+	case VM_CAP_MASK_HWINTR:
+		*retval = (hypctx->setcaps & (1ul << num)) != 0;
 		break;
 	default:
 		break;
@@ -1448,16 +1531,63 @@ vmmops_setcap(void *vcpui, int num, int val)
 	struct hypctx *hypctx = vcpui;
 	int ret;
 
-	ret = ENOENT;
+	ret = 0;
 
 	switch (num) {
-	case VM_CAP_BPT_EXIT:
+	case VM_CAP_BRK_EXIT:
+		if ((val != 0) == ((hypctx->setcaps & (1ul << num)) != 0))
+			break;
 		if (val != 0)
 			hypctx->mdcr_el2 |= MDCR_EL2_TDE;
 		else
 			hypctx->mdcr_el2 &= ~MDCR_EL2_TDE;
-		ret = 0;
 		break;
+	case VM_CAP_SS_EXIT:
+		if ((val != 0) == ((hypctx->setcaps & (1ul << num)) != 0))
+			break;
+
+		if (val != 0) {
+			hypctx->debug_spsr |= (hypctx->tf.tf_spsr & PSR_SS);
+			hypctx->debug_mdscr |= (hypctx->mdscr_el1 & MDSCR_SS);
+
+			hypctx->tf.tf_spsr |= PSR_SS;
+			hypctx->mdscr_el1 |= MDSCR_SS;
+			hypctx->mdcr_el2 |= MDCR_EL2_TDE;
+		} else {
+			hypctx->tf.tf_spsr &= ~PSR_SS;
+			hypctx->tf.tf_spsr |= hypctx->debug_spsr;
+			hypctx->debug_spsr &= ~PSR_SS;
+			hypctx->mdscr_el1 &= ~MDSCR_SS;
+			hypctx->mdscr_el1 |= hypctx->debug_mdscr;
+			hypctx->debug_mdscr &= ~MDSCR_SS;
+			hypctx->mdcr_el2 &= ~MDCR_EL2_TDE;
+		}
+		break;
+	case VM_CAP_MASK_HWINTR:
+		if ((val != 0) == ((hypctx->setcaps & (1ul << num)) != 0))
+			break;
+
+		if (val != 0) {
+			hypctx->debug_spsr |= (hypctx->tf.tf_spsr &
+			    (PSR_I | PSR_F));
+			hypctx->tf.tf_spsr |= PSR_I | PSR_F;
+		} else {
+			hypctx->tf.tf_spsr &= ~(PSR_I | PSR_F);
+			hypctx->tf.tf_spsr |= (hypctx->debug_spsr &
+			    (PSR_I | PSR_F));
+			hypctx->debug_spsr &= ~(PSR_I | PSR_F);
+		}
+		break;
+	default:
+		ret = ENOENT;
+		break;
+	}
+
+	if (ret == 0) {
+		if (val == 0)
+			hypctx->setcaps &= ~(1ul << num);
+		else
+			hypctx->setcaps |= (1ul << num);
 	}
 
 	return (ret);

@@ -28,29 +28,32 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #include <sys/module.h>
-#include <sys/bus.h>
 #include <sys/bio.h>
+#include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/eventhandler.h>
-#include <sys/malloc.h>
+#include <sys/kernel.h>
 #include <sys/lock.h>
+#include <sys/malloc.h>
 #include <sys/mutex.h>
+#include <sys/proc.h>
+#include <sys/rman.h>
+
 #include <vm/vm.h>
 #include <vm/pmap.h>
+
 #include <machine/stdarg.h>
 #include <machine/resource.h>
 #include <machine/bus.h>
-#include <sys/rman.h>
+
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
-#include <geom/geom_disk.h>
-
 #include "dev/pst/pst-iop.h"
+
+#include <geom/geom_disk.h>
 
 struct pst_softc {
     struct iop_softc		*iop;
@@ -71,7 +74,7 @@ struct pst_request {
 static disk_strategy_t pststrategy;
 static int pst_probe(device_t);
 static int pst_attach(device_t);
-static int pst_shutdown(device_t);
+static void pst_shutdown_post_sync(device_t, int);
 static void pst_start(struct pst_softc *);
 static void pst_done(struct iop_softc *, u_int32_t, struct i2o_single_reply *);
 static int pst_rw(struct pst_request *);
@@ -85,7 +88,7 @@ int
 pst_add_raid(struct iop_softc *sc, struct i2o_lct_entry *lct)
 {
     struct pst_softc *psc;
-    device_t child = device_add_child(sc->dev, "pst", -1);
+    device_t child = device_add_child(sc->dev, "pst", DEVICE_UNIT_ANY);
 
     if (!child)
 	return ENOMEM;
@@ -123,11 +126,11 @@ pst_attach(device_t dev)
 
     if (!(psc->info = (struct i2o_bsa_device *)
 	    malloc(sizeof(struct i2o_bsa_device), M_PSTRAID, M_NOWAIT))) {
-	contigfree(reply, PAGE_SIZE, M_PSTIOP);
+	free(reply, M_PSTIOP);
 	return ENOMEM;
     }
     bcopy(reply->result, psc->info, sizeof(struct i2o_bsa_device));
-    contigfree(reply, PAGE_SIZE, M_PSTIOP);
+    free(reply, M_PSTIOP);
 
     if (!(reply = iop_get_util_params(psc->iop, psc->lct->local_tid,
 				      I2O_PARAMS_OPERATION_FIELD_GET,
@@ -145,7 +148,7 @@ pst_attach(device_t dev)
     bpack(ident->vendor, ident->vendor, 16);
     bpack(ident->product, ident->product, 16);
     sprintf(name, "%s %s", ident->vendor, ident->product);
-    contigfree(reply, PAGE_SIZE, M_PSTIOP);
+    free(reply, M_PSTIOP);
 
     bioq_init(&psc->queue);
 
@@ -168,17 +171,22 @@ pst_attach(device_t dev)
 	   name, psc->info->capacity/(512*255*63), 255, 63,
 	   device_get_nameunit(psc->iop->dev));
 
-    EVENTHANDLER_REGISTER(shutdown_post_sync, pst_shutdown,
+    EVENTHANDLER_REGISTER(shutdown_post_sync, pst_shutdown_post_sync,
 			  dev, SHUTDOWN_PRI_FIRST);
     return 0;
 }
 
-static int
-pst_shutdown(device_t dev)
+static void
+pst_shutdown_post_sync(device_t dev, int howto __unused)
 {
     struct pst_softc *psc = device_get_softc(dev);
     struct i2o_bsa_cache_flush_message *msg;
     int mfa;
+
+    if (SCHEDULER_STOPPED()) {
+	/* Request polled shutdown. */
+	psc->iop->reg->oqueue_intr_mask = 0xffffffff;
+    }
 
     mfa = iop_get_mfa(psc->iop);
     msg = (struct i2o_bsa_cache_flush_message *)(psc->iop->ibase + mfa);
@@ -192,7 +200,6 @@ pst_shutdown(device_t dev)
     msg->control_flags = 0x0; /* 0x80 = post progress reports */
     if (iop_queue_wait_msg(psc->iop, mfa, (struct i2o_basic_message *)msg))
 	printf("pst: shutdown failed!\n");
-    return 0;
 }
 
 static void

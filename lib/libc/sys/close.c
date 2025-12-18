@@ -29,7 +29,6 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/fcntl.h>
 #include <unistd.h>
@@ -41,6 +40,5 @@ __weak_reference(__sys_close, __close);
 int
 close(int fd)
 {
-
-	return (((int (*)(int))__libc_interposing[INTERPOS_close])(fd));
+	return (INTERPOS_SYS(close, fd));
 }

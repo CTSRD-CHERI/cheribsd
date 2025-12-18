@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/mman.h>
 #include <sys/sysctl.h>
@@ -1420,6 +1419,12 @@ eli_setkey_detached(struct gctl_req *req, const char *prov,
 
 	bcopy(mkey, mkeydst, sizeof(mkey));
 	explicit_bzero(mkey, sizeof(mkey));
+
+	/*
+	 * The previous eli_genkey() set cached_passphrase, we do not want to
+	 * use that for the new passphrase so always prompt for it
+	 */
+	explicit_bzero(cached_passphrase, sizeof(cached_passphrase));
 
 	/* Generate key for Master Key encryption. */
 	if (eli_genkey_single(req, md, key, true) == NULL) {

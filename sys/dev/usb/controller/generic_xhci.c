@@ -61,7 +61,13 @@
 
 #include "generic_xhci.h"
 
+#if __SIZEOF_LONG__ == 8
+#define	IS_DMA_32B	0
+#elif __SIZEOF_LONG__ == 4
 #define	IS_DMA_32B	1
+#else
+#error unsupported long size
+#endif
 
 int
 generic_xhci_attach(device_t dev)
@@ -93,7 +99,7 @@ generic_xhci_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	sc->sc_bus.bdev = device_add_child(dev, "usbus", -1);
+	sc->sc_bus.bdev = device_add_child(dev, "usbus", DEVICE_UNIT_ANY);
 	if (sc->sc_bus.bdev == NULL) {
 		device_printf(dev, "Failed to add USB device\n");
 		generic_xhci_detach(dev);
@@ -114,7 +120,8 @@ generic_xhci_attach(device_t dev)
 		return (err);
 	}
 
-	err = xhci_init(sc, dev, IS_DMA_32B);
+	err = xhci_init(sc, dev,
+	    (sc->sc_quirks & XHCI_QUIRK_DMA_32B) == 0 ? IS_DMA_32B : 1);
 	if (err != 0) {
 		device_printf(dev, "Failed to init XHCI, with error %d\n", err);
 		generic_xhci_detach(dev);

@@ -29,7 +29,6 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/fcntl.h>
 #include <unistd.h>
@@ -40,6 +39,5 @@ __weak_reference(__sys_fsync, __fsync);
 int
 fsync(int fd)
 {
-
-	return (((int (*)(int))__libc_interposing[INTERPOS_fsync])(fd));
+	return (INTERPOS_SYS(fsync, fd));
 }

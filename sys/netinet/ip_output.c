@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)ip_output.c	8.3 (Berkeley) 1/21/94
  */
 
 #include <sys/cdefs.h>
@@ -675,7 +673,7 @@ sendit:
 			error = ENOBUFS;
 			goto bad;
 		}
-		if ((error = IPSEC_OUTPUT(ipv4, m, inp)) != 0) {
+		if ((error = IPSEC_OUTPUT(ipv4, ifp, m, inp, mtu)) != 0) {
 			if (error == EINPROGRESS)
 				error = 0;
 			goto done;

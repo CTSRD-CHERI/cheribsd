@@ -1,4 +1,3 @@
-/* @(#)e_jn.c 1.4 95/01/18 */
 /*
  * ====================================================
  * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -10,7 +9,6 @@
  * ====================================================
  */
 
-#include <sys/cdefs.h>
 /*
  * jn(n, x), yn(n, x)
  * floating point Bessel's function of the 1st and 2nd kind

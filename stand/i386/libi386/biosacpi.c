@@ -24,7 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <stand.h>
 #include <machine/stdarg.h>
 #include <bootstrap.h>
@@ -53,6 +52,8 @@ biosacpi_detect(void)
     ACPI_TABLE_RSDP	*rsdp;
     char		buf[24];
     int			revision;
+
+    feature_enable(FEATURE_EARLY_ACPI);
 
     /* locate and validate the RSDP */
     if ((rsdp = biosacpi_find_rsdp()) == NULL)

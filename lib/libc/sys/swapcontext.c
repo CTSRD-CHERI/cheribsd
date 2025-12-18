@@ -28,7 +28,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/signal.h>
 #include <sys/ucontext.h>
@@ -45,7 +44,5 @@ __sym_default(swapcontext, swapcontext, FBSD_1.2);
 int
 swapcontext(ucontext_t *oucp, const ucontext_t *ucp)
 {
-
-	return (((int (*)(ucontext_t *, const ucontext_t *))
-	    __libc_interposing[INTERPOS_swapcontext])(oucp, ucp));
+	return (INTERPOS_SYS(swapcontext, oucp, ucp));
 }

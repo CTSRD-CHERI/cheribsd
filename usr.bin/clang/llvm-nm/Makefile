@@ -1,12 +1,10 @@
-
 .include <src.opts.mk>
 
 PROG_CXX=	llvm-nm
 
 SRCDIR=		llvm/tools/llvm-nm
+SRCS+=		llvm-nm-driver.cpp
 SRCS+=		llvm-nm.cpp
-
-CFLAGS.llvm-nm.cpp+=	-Dllvm_nm_main=main
 
 .include "${SRCTOP}/lib/clang/llvm.pre.mk"
 

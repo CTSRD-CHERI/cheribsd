@@ -1,0 +1,10 @@
+#
+# GENERIC-MORELLO-PURECAP-NOSUBOBJECT -- Generic kernel configuration file for CheriBSD/Morello pure capability ABI kernel, without sub-object bounds
+#
+
+include "GENERIC-MORELLO-PURECAP"
+
+ident		GENERIC-MORELLO-PURECAP-NOSUBOBJECT
+
+nomakeoption 	CHERI_SUBOBJECT_BOUNDS
+makeoptions 	CHERI_SUBOBJECT_BOUNDS=conservative

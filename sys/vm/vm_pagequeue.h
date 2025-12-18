@@ -31,8 +31,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	from: @(#)vm_page.h	8.2 (Berkeley) 12/13/93
- *
  *
  * Copyright (c) 1987, 1990 Carnegie-Mellon University.
  * All rights reserved.
@@ -245,9 +243,14 @@ struct vm_domain {
 	} vmd_pgcache[VM_NFREEPOOL];
 	struct vmem *vmd_kernel_arena;	/* (c) per-domain kva R/W arena. */
 	struct vmem *vmd_kernel_rwx_arena; /* (c) per-domain kva R/W/X arena. */
+	struct vmem *vmd_kernel_nofree_arena; /* (c) per-domain kva NOFREE arena. */
 	u_int vmd_domain;		/* (c) Domain number. */
 	u_int vmd_page_count;		/* (c) Total page count. */
 	long vmd_segs;			/* (c) bitmask of the segments */
+	struct vm_nofreeq {
+		vm_page_t ma;
+		int offs;
+	} vmd_nofreeq;			/* (f) NOFREE page bump allocator. */
 	u_int __aligned(CACHE_LINE_SIZE) vmd_free_count; /* (a,f) free page count */
 	u_int vmd_pageout_deficit;	/* (a) Estimated number of pages deficit */
 	uint8_t vmd_pad[CACHE_LINE_SIZE - (sizeof(u_int) * 2)];
@@ -354,6 +357,12 @@ vm_batchqueue_init(struct vm_batchqueue *bq)
 {
 
 	bq->bq_cnt = 0;
+}
+
+static inline bool
+vm_batchqueue_empty(const struct vm_batchqueue *bq)
+{
+	return (bq->bq_cnt == 0);
 }
 
 static inline int

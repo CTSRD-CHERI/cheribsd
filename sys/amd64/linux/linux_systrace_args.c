@@ -1,8 +1,9 @@
 /*
- * System call argument to DTrace register array converstion.
+ * System call argument to DTrace register array conversion.
+ *
+ * This file is part of the DTrace syscall provider.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * This file is part of the DTrace syscall provider.
  */
 
 static void
@@ -11,7 +12,6 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	int64_t *iarg = (int64_t *)uarg;
 	int a = 0;
 	switch (sysnum) {
-#define	nosys	linux_nosys
 	/* read */
 	case 0: {
 		struct read_args *p = params;
@@ -21,9 +21,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* write */
+	/* linux_write */
 	case 1: {
-		struct write_args *p = params;
+		struct linux_write_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		uarg[a++] = (intptr_t)p->buf; /* char * */
 		iarg[a++] = p->nbyte; /* l_size_t */
@@ -189,9 +189,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* writev */
+	/* linux_writev */
 	case 20: {
-		struct writev_args *p = params;
+		struct linux_writev_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		uarg[a++] = (intptr_t)p->iovp; /* struct iovec * */
 		uarg[a++] = p->iovcnt; /* u_int */
@@ -1677,7 +1677,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 222: {
 		struct linux_timer_create_args *p = params;
 		iarg[a++] = p->clock_id; /* clockid_t */
-		uarg[a++] = (intptr_t)p->evp; /* struct sigevent * */
+		uarg[a++] = (intptr_t)p->evp; /* struct l_sigevent * */
 		uarg[a++] = (intptr_t)p->timerid; /* l_timer_t * */
 		*n_args = 3;
 		break;
@@ -1850,7 +1850,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 244: {
 		struct linux_mq_notify_args *p = params;
 		iarg[a++] = p->mqd; /* l_mqd_t */
-		uarg[a++] = (intptr_t)p->abs_timeout; /* const struct l_timespec * */
+		uarg[a++] = (intptr_t)p->sevp; /* const struct l_sigevent * */
 		*n_args = 2;
 		break;
 	}
@@ -2751,6 +2751,61 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 0;
 		break;
 	}
+	/* linux_quotactl_fd */
+	case 443: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_landlock_create_ruleset */
+	case 444: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_landlock_add_rule */
+	case 445: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_landlock_restrict_self */
+	case 446: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_memfd_secret */
+	case 447: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_process_mrelease */
+	case 448: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_futex_waitv */
+	case 449: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_set_mempolicy_home_node */
+	case 450: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_cachestat */
+	case 451: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_fchmodat2 */
+	case 452: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_map_shadow_stack */
+	case 453: {
+		*n_args = 0;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -2761,7 +2816,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 {
 	const char *p = NULL;
 	switch (sysnum) {
-#define	nosys	linux_nosys
 	/* read */
 	case 0:
 		switch (ndx) {
@@ -2778,7 +2832,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* write */
+	/* linux_write */
 	case 1:
 		switch (ndx) {
 		case 0:
@@ -3073,7 +3127,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* writev */
+	/* linux_writev */
 	case 20:
 		switch (ndx) {
 		case 0:
@@ -5431,7 +5485,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "clockid_t";
 			break;
 		case 1:
-			p = "userland struct sigevent *";
+			p = "userland struct l_sigevent *";
 			break;
 		case 2:
 			p = "userland l_timer_t *";
@@ -5716,7 +5770,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "l_mqd_t";
 			break;
 		case 1:
-			p = "userland const struct l_timespec *";
+			p = "userland const struct l_sigevent *";
 			break;
 		default:
 			break;
@@ -7181,6 +7235,39 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* linux_mount_setattr */
 	case 442:
 		break;
+	/* linux_quotactl_fd */
+	case 443:
+		break;
+	/* linux_landlock_create_ruleset */
+	case 444:
+		break;
+	/* linux_landlock_add_rule */
+	case 445:
+		break;
+	/* linux_landlock_restrict_self */
+	case 446:
+		break;
+	/* linux_memfd_secret */
+	case 447:
+		break;
+	/* linux_process_mrelease */
+	case 448:
+		break;
+	/* linux_futex_waitv */
+	case 449:
+		break;
+	/* linux_set_mempolicy_home_node */
+	case 450:
+		break;
+	/* linux_cachestat */
+	case 451:
+		break;
+	/* linux_fchmodat2 */
+	case 452:
+		break;
+	/* linux_map_shadow_stack */
+	case 453:
+		break;
 	default:
 		break;
 	};
@@ -7192,13 +7279,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 {
 	const char *p = NULL;
 	switch (sysnum) {
-#define	nosys	linux_nosys
 	/* read */
 	case 0:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* write */
+	/* linux_write */
 	case 1:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -7293,7 +7379,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* writev */
+	/* linux_writev */
 	case 20:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8681,6 +8767,28 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* linux_mount_setattr */
 	case 442:
+	/* linux_quotactl_fd */
+	case 443:
+	/* linux_landlock_create_ruleset */
+	case 444:
+	/* linux_landlock_add_rule */
+	case 445:
+	/* linux_landlock_restrict_self */
+	case 446:
+	/* linux_memfd_secret */
+	case 447:
+	/* linux_process_mrelease */
+	case 448:
+	/* linux_futex_waitv */
+	case 449:
+	/* linux_set_mempolicy_home_node */
+	case 450:
+	/* linux_cachestat */
+	case 451:
+	/* linux_fchmodat2 */
+	case 452:
+	/* linux_map_shadow_stack */
+	case 453:
 	default:
 		break;
 	};

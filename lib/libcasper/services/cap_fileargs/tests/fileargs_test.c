@@ -23,7 +23,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/stat.h>
@@ -292,7 +291,7 @@ ATF_TC_BODY(fileargs__open_read, tc)
 
 	prepare_files(MAX_FILES, true);
 
-	cap_rights_init(&rights, CAP_READ | CAP_FCNTL);
+	cap_rights_init(&rights, CAP_READ, CAP_FCNTL);
 	cap_rights_init(&norights, CAP_WRITE);
 	fa = fileargs_init(MAX_FILES, files, O_RDONLY, 0, &rights,
 	    FA_OPEN);
@@ -339,7 +338,7 @@ ATF_TC_BODY(fileargs__open_write, tc)
 
 	prepare_files(MAX_FILES, true);
 
-	cap_rights_init(&rights, CAP_WRITE | CAP_FCNTL);
+	cap_rights_init(&rights, CAP_WRITE, CAP_FCNTL);
 	cap_rights_init(&norights, CAP_READ);
 	fa = fileargs_init(MAX_FILES, files, O_WRONLY, 0, &rights,
 	    FA_OPEN);
@@ -386,7 +385,7 @@ ATF_TC_BODY(fileargs__open_create, tc)
 
 	prepare_files(MAX_FILES, false);
 
-	cap_rights_init(&rights, CAP_WRITE | CAP_FCNTL | CAP_READ);
+	cap_rights_init(&rights, CAP_WRITE, CAP_FCNTL, CAP_READ);
 	cap_rights_init(&norights, CAP_FCHMOD);
 	fa = fileargs_init(MAX_FILES, files, O_RDWR | O_CREAT, 666,
 	    &rights, FA_OPEN);
@@ -467,7 +466,7 @@ ATF_TC_BODY(fileargs__fopen_read, tc)
 
 	prepare_files(MAX_FILES, true);
 
-	cap_rights_init(&rights, CAP_READ | CAP_FCNTL);
+	cap_rights_init(&rights, CAP_READ, CAP_FCNTL);
 	cap_rights_init(&norights, CAP_WRITE);
 	fa = fileargs_init(MAX_FILES, files, O_RDONLY, 0, &rights,
 	    FA_OPEN);
@@ -517,7 +516,7 @@ ATF_TC_BODY(fileargs__fopen_write, tc)
 
 	prepare_files(MAX_FILES, true);
 
-	cap_rights_init(&rights, CAP_WRITE | CAP_FCNTL);
+	cap_rights_init(&rights, CAP_WRITE, CAP_FCNTL);
 	cap_rights_init(&norights, CAP_READ);
 	fa = fileargs_init(MAX_FILES, files, O_WRONLY, 0, &rights,
 	    FA_OPEN);
@@ -567,7 +566,7 @@ ATF_TC_BODY(fileargs__fopen_create, tc)
 
 	prepare_files(MAX_FILES, false);
 
-	cap_rights_init(&rights, CAP_READ | CAP_WRITE | CAP_FCNTL);
+	cap_rights_init(&rights, CAP_READ, CAP_WRITE, CAP_FCNTL);
 	fa = fileargs_init(MAX_FILES, files, O_RDWR | O_CREAT, 0, &rights,
 	    FA_OPEN);
 	ATF_REQUIRE(fa != NULL);
@@ -673,7 +672,7 @@ ATF_TC_BODY(fileargs__open_lstat, tc)
 
 	prepare_files(MAX_FILES, true);
 
-	cap_rights_init(&rights, CAP_READ | CAP_FCNTL);
+	cap_rights_init(&rights, CAP_READ, CAP_FCNTL);
 	cap_rights_init(&norights, CAP_WRITE);
 	fa = fileargs_init(MAX_FILES, files, O_RDONLY, 0, &rights,
 	    FA_OPEN | FA_LSTAT);
@@ -721,7 +720,7 @@ ATF_TC_BODY(fileargs__open_realpath, tc)
 
 	prepare_files(MAX_FILES, true);
 
-	cap_rights_init(&rights, CAP_READ | CAP_FCNTL);
+	cap_rights_init(&rights, CAP_READ, CAP_FCNTL);
 	cap_rights_init(&norights, CAP_WRITE);
 	fa = fileargs_init(MAX_FILES, files, O_RDONLY, 0, &rights,
 	    FA_OPEN | FA_REALPATH);

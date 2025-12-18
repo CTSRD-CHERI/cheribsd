@@ -703,7 +703,7 @@ pf_krule_to_nvrule(struct pf_krule *rule)
 
 	for (int i = 0; i < PF_SKIP_COUNT; i++) {
 		nvlist_append_number_array(nvl, "skip",
-		    rule->skip[i].ptr ? rule->skip[i].ptr->nr : -1);
+		    rule->skip[i] ? rule->skip[i]->nr : -1);
 	}
 
 	for (int i = 0; i < PF_RULE_MAX_LABEL_COUNT; i++) {
@@ -873,6 +873,9 @@ pf_nvstate_kill_to_kstate_kill(const nvlist_t *nvl,
 	    sizeof(kill->psk_label)));
 	PFNV_CHK(pf_nvbool(nvl, "kill_match", &kill->psk_kill_match));
 
+	if (nvlist_exists_bool(nvl, "nat"))
+		PFNV_CHK(pf_nvbool(nvl, "nat", &kill->psk_nat));
+
 errout:
 	return (error);
 }
@@ -966,12 +969,12 @@ pf_state_to_nvstate(const struct pf_kstate *s)
 	nvlist_add_nvlist(nvl, "rt_addr", tmp);
 	nvlist_destroy(tmp);
 
-	nvlist_add_number(nvl, "rule", s->rule.ptr ? s->rule.ptr->nr : -1);
+	nvlist_add_number(nvl, "rule", s->rule ? s->rule->nr : -1);
 	nvlist_add_number(nvl, "anchor",
-	    s->anchor.ptr ? s->anchor.ptr->nr : -1);
+	    s->anchor ? s->anchor->nr : -1);
 	nvlist_add_number(nvl, "nat_rule",
-	    s->nat_rule.ptr ? s->nat_rule.ptr->nr : -1);
-	nvlist_add_number(nvl, "creation", s->creation);
+	    s->nat_rule ? s->nat_rule->nr : -1);
+	nvlist_add_number(nvl, "creation", s->creation / 1000);
 
 	expire = pf_state_expires(s);
 	if (expire <= time_uptime)

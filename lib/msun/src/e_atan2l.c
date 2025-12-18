@@ -1,5 +1,4 @@
 
-/* @(#)e_atan2.c 1.3 95/01/18 */
 /* FreeBSD: head/lib/msun/src/e_atan2.c 176451 2008-02-22 02:30:36Z das */
 /*
  * ====================================================
@@ -13,7 +12,6 @@
  *
  */
 
-#include <sys/cdefs.h>
 /*
  * See comments in e_atan2.c.
  * Converted to long double by David Schultz <das@FreeBSD.ORG>.

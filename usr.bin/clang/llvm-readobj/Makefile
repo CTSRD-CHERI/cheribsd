@@ -1,4 +1,3 @@
-
 .include <src.opts.mk>
 
 PROG_CXX=	llvm-readobj
@@ -9,15 +8,14 @@ SRCS+=		ARMWinEHPrinter.cpp
 SRCS+=		COFFDumper.cpp
 SRCS+=		COFFImportDumper.cpp
 SRCS+=		ELFDumper.cpp
-SRCS+=		llvm-readobj.cpp
 SRCS+=		MachODumper.cpp
 SRCS+=		ObjDumper.cpp
 SRCS+=		WasmDumper.cpp
 SRCS+=		Win64EHDumper.cpp
 SRCS+=		WindowsResourceDumper.cpp
 SRCS+=		XCOFFDumper.cpp
-
-CFLAGS.llvm-readobj.cpp+=	-Dllvm_readobj_main=main
+SRCS+=		llvm-readobj-driver.cpp
+SRCS+=		llvm-readobj.cpp
 
 .include "${SRCTOP}/lib/clang/llvm.pre.mk"
 

@@ -64,7 +64,8 @@ static void
 zil_prt_rec_create(zilog_t *zilog, int txtype, const void *arg)
 {
 	(void) zilog;
-	const lr_create_t *lr = arg;
+	const lr_create_t *lrc = arg;
+	const _lr_create_t *lr = &lrc->lr_create;
 	time_t crtime = lr->lr_crtime[0];
 	char *name, *link;
 	lr_attr_t *lrattr;
@@ -121,7 +122,8 @@ static void
 zil_prt_rec_rename(zilog_t *zilog, int txtype, const void *arg)
 {
 	(void) zilog, (void) txtype;
-	const lr_rename_t *lr = arg;
+	const lr_rename_t *lrr = arg;
+	const _lr_rename_t *lr = &lrr->lr_rename;
 	char *snm = (char *)(lr + 1);
 	char *tnm = snm + strlen(snm) + 1;
 
@@ -168,23 +170,25 @@ zil_prt_rec_write(zilog_t *zilog, int txtype, const void *arg)
 	    (u_longlong_t)lr->lr_foid, (u_longlong_t)lr->lr_offset,
 	    (u_longlong_t)lr->lr_length);
 
-	if (txtype == TX_WRITE2 || verbose < 5)
+	if (txtype == TX_WRITE2 || verbose < 4)
 		return;
 
 	if (lr->lr_common.lrc_reclen == sizeof (lr_write_t)) {
 		(void) printf("%shas blkptr, %s\n", tab_prefix,
-		    !BP_IS_HOLE(bp) &&
-		    bp->blk_birth >= spa_min_claim_txg(zilog->zl_spa) ?
+		    !BP_IS_HOLE(bp) && BP_GET_LOGICAL_BIRTH(bp) >=
+		    spa_min_claim_txg(zilog->zl_spa) ?
 		    "will claim" : "won't claim");
 		print_log_bp(bp, tab_prefix);
 
+		if (verbose < 5)
+			return;
 		if (BP_IS_HOLE(bp)) {
 			(void) printf("\t\t\tLSIZE 0x%llx\n",
 			    (u_longlong_t)BP_GET_LSIZE(bp));
 			(void) printf("%s<hole>\n", tab_prefix);
 			return;
 		}
-		if (bp->blk_birth < zilog->zl_header->zh_claim_txg) {
+		if (BP_GET_LOGICAL_BIRTH(bp) < zilog->zl_header->zh_claim_txg) {
 			(void) printf("%s<block already committed>\n",
 			    tab_prefix);
 			return;
@@ -202,6 +206,9 @@ zil_prt_rec_write(zilog_t *zilog, int txtype, const void *arg)
 		if (error)
 			goto out;
 	} else {
+		if (verbose < 5)
+			return;
+
 		/* data is stored after the end of the lr_write record */
 		data = abd_alloc(lr->lr_length, B_FALSE);
 		abd_copy_from_buf(data, lr + 1, lr->lr_length);
@@ -215,6 +222,28 @@ zil_prt_rec_write(zilog_t *zilog, int txtype, const void *arg)
 
 out:
 	abd_free(data);
+}
+
+static void
+zil_prt_rec_write_enc(zilog_t *zilog, int txtype, const void *arg)
+{
+	(void) txtype;
+	const lr_write_t *lr = arg;
+	const blkptr_t *bp = &lr->lr_blkptr;
+	int verbose = MAX(dump_opt['d'], dump_opt['i']);
+
+	(void) printf("%s(encrypted)\n", tab_prefix);
+
+	if (verbose < 4)
+		return;
+
+	if (lr->lr_common.lrc_reclen == sizeof (lr_write_t)) {
+		(void) printf("%shas blkptr, %s\n", tab_prefix,
+		    !BP_IS_HOLE(bp) && BP_GET_LOGICAL_BIRTH(bp) >=
+		    spa_min_claim_txg(zilog->zl_spa) ?
+		    "will claim" : "won't claim");
+		print_log_bp(bp, tab_prefix);
+	}
 }
 
 static void
@@ -312,10 +341,33 @@ zil_prt_rec_clone_range(zilog_t *zilog, int txtype, const void *arg)
 {
 	(void) zilog, (void) txtype;
 	const lr_clone_range_t *lr = arg;
+	int verbose = MAX(dump_opt['d'], dump_opt['i']);
 
 	(void) printf("%sfoid %llu, offset %llx, length %llx, blksize %llx\n",
 	    tab_prefix, (u_longlong_t)lr->lr_foid, (u_longlong_t)lr->lr_offset,
 	    (u_longlong_t)lr->lr_length, (u_longlong_t)lr->lr_blksz);
+
+	if (verbose < 4)
+		return;
+
+	for (unsigned int i = 0; i < lr->lr_nbps; i++) {
+		(void) printf("%s[%u/%llu] ", tab_prefix, i + 1,
+		    (u_longlong_t)lr->lr_nbps);
+		print_log_bp(&lr->lr_bps[i], "");
+	}
+}
+
+static void
+zil_prt_rec_clone_range_enc(zilog_t *zilog, int txtype, const void *arg)
+{
+	(void) zilog, (void) txtype;
+	const lr_clone_range_t *lr = arg;
+	int verbose = MAX(dump_opt['d'], dump_opt['i']);
+
+	(void) printf("%s(encrypted)\n", tab_prefix);
+
+	if (verbose < 4)
+		return;
 
 	for (unsigned int i = 0; i < lr->lr_nbps; i++) {
 		(void) printf("%s[%u/%llu] ", tab_prefix, i + 1,
@@ -327,6 +379,7 @@ zil_prt_rec_clone_range(zilog_t *zilog, int txtype, const void *arg)
 typedef void (*zil_prt_rec_func_t)(zilog_t *, int, const void *);
 typedef struct zil_rec_info {
 	zil_prt_rec_func_t	zri_print;
+	zil_prt_rec_func_t	zri_print_enc;
 	const char		*zri_name;
 	uint64_t		zri_count;
 } zil_rec_info_t;
@@ -341,7 +394,9 @@ static zil_rec_info_t zil_rec_info[TX_MAX_TYPE] = {
 	{.zri_print = zil_prt_rec_remove,   .zri_name = "TX_RMDIR           "},
 	{.zri_print = zil_prt_rec_link,	    .zri_name = "TX_LINK            "},
 	{.zri_print = zil_prt_rec_rename,   .zri_name = "TX_RENAME          "},
-	{.zri_print = zil_prt_rec_write,    .zri_name = "TX_WRITE           "},
+	{.zri_print = zil_prt_rec_write,
+	    .zri_print_enc = zil_prt_rec_write_enc,
+	    .zri_name = "TX_WRITE           "},
 	{.zri_print = zil_prt_rec_truncate, .zri_name = "TX_TRUNCATE        "},
 	{.zri_print = zil_prt_rec_setattr,  .zri_name = "TX_SETATTR         "},
 	{.zri_print = zil_prt_rec_acl,	    .zri_name = "TX_ACL_V0          "},
@@ -358,6 +413,7 @@ static zil_rec_info_t zil_rec_info[TX_MAX_TYPE] = {
 	{.zri_print = zil_prt_rec_rename,   .zri_name = "TX_RENAME_EXCHANGE "},
 	{.zri_print = zil_prt_rec_rename,   .zri_name = "TX_RENAME_WHITEOUT "},
 	{.zri_print = zil_prt_rec_clone_range,
+	    .zri_print_enc = zil_prt_rec_clone_range_enc,
 	    .zri_name = "TX_CLONE_RANGE     "},
 };
 
@@ -384,6 +440,8 @@ print_log_record(zilog_t *zilog, const lr_t *lr, void *arg, uint64_t claim_txg)
 	if (txtype && verbose >= 3) {
 		if (!zilog->zl_os->os_encrypted) {
 			zil_rec_info[txtype].zri_print(zilog, txtype, lr);
+		} else if (zil_rec_info[txtype].zri_print_enc) {
+			zil_rec_info[txtype].zri_print_enc(zilog, txtype, lr);
 		} else {
 			(void) printf("%s(encrypted)\n", tab_prefix);
 		}
@@ -417,7 +475,7 @@ print_log_block(zilog_t *zilog, const blkptr_t *bp, void *arg,
 
 	if (claim_txg != 0)
 		claim = "already claimed";
-	else if (bp->blk_birth >= spa_min_claim_txg(zilog->zl_spa))
+	else if (BP_GET_LOGICAL_BIRTH(bp) >= spa_min_claim_txg(zilog->zl_spa))
 		claim = "will claim";
 	else
 		claim = "won't claim";

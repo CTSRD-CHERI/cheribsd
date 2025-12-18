@@ -1,4 +1,3 @@
-
 LOADER_NET_SUPPORT?=	yes
 LOADER_MSDOS_SUPPORT?=	yes
 LOADER_UFS_SUPPORT?=	yes
@@ -7,7 +6,13 @@ LOADER_EXT2FS_SUPPORT?=	no
 
 .include <bsd.init.mk>
 
+.if ${MACHINE} == "amd64" && ${DO32:U0} == 1
+__arch=	i386
+LOADER?=	loader_ia32
+.else
+__arch=	${MACHINE}
 LOADER?=	loader_${LOADER_INTERP}
+.endif
 PROG=		${LOADER}.sym
 INTERNALPROG=
 WARNS?=		3
@@ -53,13 +58,13 @@ CFLAGS.gfx_fb.c += -DHAVE_MEMCPY -I${SRCTOP}/sys/contrib/zlib
 CWARNFLAGS.main.c+=	-Wno-format
 
 .PATH: ${.CURDIR}/../loader
-.PATH: ${.CURDIR}/../loader/arch/${MACHINE}
-.include "${.CURDIR}/../loader/arch/${MACHINE}/Makefile.inc"
+.PATH: ${.CURDIR}/../loader/arch/${__arch}
+.include "${.CURDIR}/../loader/arch/${__arch}/Makefile.inc"
 
 CFLAGS+=	-I${.CURDIR}
-CFLAGS+=	-I${.CURDIR}/arch/${MACHINE}
+CFLAGS+=	-I${.CURDIR}/arch/${__arch}
 CFLAGS+=	-I${EFISRC}/include
-CFLAGS+=	-I${EFISRC}/include/${MACHINE}
+CFLAGS+=	-I${EFISRC}/include/${__arch}
 CFLAGS+=	-I${SYSDIR}/contrib/dev/acpica/include
 CFLAGS+=	-I${BOOTSRC}/i386/libi386
 CFLAGS+=	-DEFI
@@ -81,7 +86,7 @@ CFLAGS+=	-DEFI_STAGING_SIZE=${EFI_STAGING_SIZE}
 CFLAGS+= -DEFI_SECUREBOOT
 .endif
 
-NEWVERSWHAT=	"EFI loader" ${MACHINE}
+NEWVERSWHAT?=	"EFI loader" ${MACHINE}
 VERSION_FILE=	${.CURDIR}/../loader/version
 HELP_FILENAME=	loader.help.efi
 
@@ -96,14 +101,23 @@ CLEANFILES+=	8x16.c
 FILES+=	${LOADER}.efi
 FILESMODE_${LOADER}.efi=	${BINMODE}
 
-.if ${LOADER_INTERP} == ${LOADER_DEFAULT_INTERP}
+.if ${LOADER_INTERP} == ${LOADER_DEFAULT_INTERP} && ${__arch} != "i386"
 LINKS+=		${BINDIR}/${LOADER}.efi ${BINDIR}/loader.efi
 .endif
 
-LDSCRIPT=	${.CURDIR}/../loader/arch/${MACHINE}/ldscript.${MACHINE}
+LDSCRIPT=	${.CURDIR}/../loader/arch/${__arch}/${__arch}.ldscript
 LDFLAGS+=	-Wl,-T${LDSCRIPT},-Bsymbolic,-znotext -pie
 .if ${LINKER_TYPE} == "bfd" && ${LINKER_VERSION} >= 23400
 LDFLAGS+=	-Wl,--no-dynamic-linker
+.endif
+
+.include <bsd.linker.mk>
+
+.if ${LINKER_TYPE} == "lld" && ${LINKER_FREEBSD_VERSION} < 1500001
+# When lld is using multiple threads, which it does by default, it can
+# result in non-reproducible output with the custom linker script. Work
+# around this by disabling threading.
+LDFLAGS+=	-Wl,--threads=1
 .endif
 
 CLEANFILES+=	${LOADER}.efi
@@ -117,12 +131,18 @@ ${LOADER}.efi: ${PROG}
 	${OBJCOPY} -j .peheader -j .text -j .sdata -j .data \
 		-j .dynamic -j .dynsym -j .rel.dyn \
 		-j .rela.dyn -j .reloc -j .eh_frame -j set_Xcommand_set \
-		-j set_Xficl_compile_set \
+		-j set_X${LOADER_INTERP}_compile_set \
 		--output-target=${EFI_TARGET} ${.ALLSRC} ${.TARGET}
 
 LIBEFI=		${BOOTOBJ}/efi/libefi/libefi.a
+LIBEFI32=	${BOOTOBJ}/efi/libefi32/libefi.a
 
+.if ${__arch} == "i386"
+DPADD=		${LDR_INTERP32} ${LIBEFI32} ${LIBSA32} ${LDSCRIPT}
+LDADD=		${LDR_INTERP32} ${LIBEFI32} ${LIBSA32}
+.else
 DPADD=		${LDR_INTERP} ${LIBEFI} ${LIBSAFDT} ${LIBEFI_FDT} ${LIBSA} ${LDSCRIPT}
 LDADD=		${LDR_INTERP} ${LIBEFI} ${LIBSAFDT} ${LIBEFI_FDT} ${LIBSA}
+.endif
 
 .include <bsd.prog.mk>

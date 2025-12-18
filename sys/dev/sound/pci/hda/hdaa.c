@@ -267,7 +267,8 @@ hdaa_channels_handler(struct hdaa_audio_as *as)
 	struct hdaa_chan *ch = &devinfo->chans[as->chans[0]];
 	struct hdaa_widget *w;
 	uint8_t *eld;
-	int i, total, sub, assume, channels;
+	int total, sub, assume, channels;
+	size_t i;
 	uint16_t cpins, upins, tpins;
 
 	cpins = upins = 0;
@@ -347,7 +348,7 @@ hdaa_channels_handler(struct hdaa_audio_as *as)
 			printf("\n");
 		);
 		/* Look for maximal fitting matrix. */
-		for (i = 0; i < sizeof(matrixes) / sizeof(struct matrix); i++) {
+		for (i = 0; i < nitems(matrixes); i++) {
 			if (as->pinset != 0 && matrixes[i].analog == 0)
 				continue;
 			if ((matrixes[i].m.mask & ~channels) == 0) {
@@ -1252,7 +1253,8 @@ hdaa_sysctl_config(SYSCTL_HANDLER_ARGS)
 static void
 hdaa_config_fetch(const char *str, uint32_t *on, uint32_t *off)
 {
-	int i = 0, j, k, len, inv;
+	size_t k;
+	int i = 0, j, len, inv;
 
 	for (;;) {
 		while (str[i] != '\0' &&
@@ -1292,7 +1294,8 @@ static int
 hdaa_sysctl_quirks(SYSCTL_HANDLER_ARGS)
 {
 	char buf[256];
-	int error, n = 0, i;
+	int error, n = 0;
+	size_t i;
 	uint32_t quirks, quirks_off;
 
 	quirks = *(uint32_t *)oidp->oid_arg1;
@@ -3030,8 +3033,7 @@ hdaa_audio_ctl_parse(struct hdaa_devinfo *devinfo)
 	if (max < 1)
 		return;
 
-	ctls = (struct hdaa_audio_ctl *)malloc(
-	    sizeof(*ctls) * max, M_HDAA, M_ZERO | M_NOWAIT);
+	ctls = malloc(sizeof(*ctls) * max, M_HDAA, M_ZERO | M_NOWAIT);
 
 	if (ctls == NULL) {
 		/* Blekh! */
@@ -3183,8 +3185,7 @@ hdaa_audio_as_parse(struct hdaa_devinfo *devinfo)
 	if (max < 1)
 		return;
 
-	as = (struct hdaa_audio_as *)malloc(
-	    sizeof(*as) * max, M_HDAA, M_ZERO | M_NOWAIT);
+	as = malloc(sizeof(*as) * max, M_HDAA, M_ZERO | M_NOWAIT);
 
 	if (as == NULL) {
 		/* Blekh! */
@@ -4074,8 +4075,7 @@ hdaa_audio_bind_as(struct hdaa_devinfo *devinfo)
 			cnt += as[j].num_chans;
 	}
 	if (devinfo->num_chans == 0) {
-		devinfo->chans = (struct hdaa_chan *)malloc(
-		    sizeof(struct hdaa_chan) * cnt,
+		devinfo->chans = malloc(sizeof(struct hdaa_chan) * cnt,
 		    M_HDAA, M_ZERO | M_NOWAIT);
 		if (devinfo->chans == NULL) {
 			device_printf(devinfo->dev,
@@ -5426,7 +5426,6 @@ hdaa_pcmchannel_setup(struct hdaa_chan *ch)
 		if (HDA_PARAM_SUPP_STREAM_FORMATS_AC3(fmtcap)) {
 			ch->fmtlist[i++] = SND_FORMAT(AFMT_AC3, 2, 0);
 			if (channels >= 8) {
-				ch->fmtlist[i++] = SND_FORMAT(AFMT_AC3, 8, 0);
 				ch->fmtlist[i++] = SND_FORMAT(AFMT_AC3, 8, 1);
 			}
 		}
@@ -5488,10 +5487,8 @@ hdaa_prepare_pcms(struct hdaa_devinfo *devinfo)
 	}
 	devinfo->num_devs =
 	    max(ardev, apdev) + max(drdev, dpdev);
-	devinfo->devs =
-	    (struct hdaa_pcm_devinfo *)malloc(
-	    devinfo->num_devs * sizeof(struct hdaa_pcm_devinfo),
-	    M_HDAA, M_ZERO | M_NOWAIT);
+	devinfo->devs = malloc(devinfo->num_devs *
+	    sizeof(struct hdaa_pcm_devinfo), M_HDAA, M_ZERO | M_NOWAIT);
 	if (devinfo->devs == NULL) {
 		device_printf(devinfo->dev,
 		    "Unable to allocate memory for devices\n");
@@ -5540,7 +5537,7 @@ hdaa_create_pcms(struct hdaa_devinfo *devinfo)
 	for (i = 0; i < devinfo->num_devs; i++) {
 		struct hdaa_pcm_devinfo *pdevinfo = &devinfo->devs[i];
 
-		pdevinfo->dev = device_add_child(devinfo->dev, "pcm", -1);
+		pdevinfo->dev = device_add_child(devinfo->dev, "pcm", DEVICE_UNIT_ANY);
 		device_set_ivars(pdevinfo->dev, (void *)pdevinfo);
 	}
 }
@@ -6577,14 +6574,12 @@ static int
 hdaa_probe(device_t dev)
 {
 	const char *pdesc;
-	char buf[128];
 
 	if (hda_get_node_type(dev) != HDA_PARAM_FCT_GRP_TYPE_NODE_TYPE_AUDIO)
 		return (ENXIO);
 	pdesc = device_get_desc(device_get_parent(dev));
-	snprintf(buf, sizeof(buf), "%.*s Audio Function Group",
+	device_set_descf(dev, "%.*s Audio Function Group",
 	    (int)(strlen(pdesc) - 10), pdesc);
-	device_set_desc_copy(dev, buf);
 	return (BUS_PROBE_DEFAULT);
 }
 
@@ -6625,9 +6620,8 @@ hdaa_attach(device_t dev)
 	);
 
 	if (devinfo->nodecnt > 0)
-		devinfo->widget = (struct hdaa_widget *)malloc(
-		    sizeof(*(devinfo->widget)) * devinfo->nodecnt, M_HDAA,
-		    M_WAITOK | M_ZERO);
+		devinfo->widget = malloc(sizeof(*(devinfo->widget)) *
+		    devinfo->nodecnt, M_HDAA, M_WAITOK | M_ZERO);
 	else
 		devinfo->widget = NULL;
 
@@ -6939,7 +6933,6 @@ hdaa_pcm_probe(device_t dev)
 	struct hdaa_devinfo *devinfo = pdevinfo->devinfo;
 	const char *pdesc;
 	char chans1[8], chans2[8];
-	char buf[128];
 	int loc1, loc2, t1, t2;
 
 	if (pdevinfo->playas >= 0)
@@ -6984,7 +6977,7 @@ hdaa_pcm_probe(device_t dev)
 	if (pdevinfo->digital)
 		t1 = -2;
 	pdesc = device_get_desc(device_get_parent(dev));
-	snprintf(buf, sizeof(buf), "%.*s (%s%s%s%s%s%s%s%s%s)",
+	device_set_descf(dev, "%.*s (%s%s%s%s%s%s%s%s%s)",
 	    (int)(strlen(pdesc) - 21), pdesc,
 	    loc1 >= 0 ? HDA_LOCS[loc1] : "", loc1 >= 0 ? " " : "",
 	    (pdevinfo->digital == 0x7)?"HDMI/DP":
@@ -6994,7 +6987,6 @@ hdaa_pcm_probe(device_t dev)
 	    chans1[0] ? " " : "", chans1,
 	    chans2[0] ? "/" : "", chans2,
 	    t1 >= 0 ? " " : "", t1 >= 0 ? HDA_DEVS[t1] : "");
-	device_set_desc_copy(dev, buf);
 	return (BUS_PROBE_SPECIFIC);
 }
 
@@ -7114,9 +7106,8 @@ hdaa_pcm_attach(device_t dev)
 		hdaa_unlock(devinfo);
 	}
 
-	snprintf(status, SND_STATUSLEN, "on %s %s",
-	    device_get_nameunit(device_get_parent(dev)),
-	    PCM_KLDSTRING(snd_hda));
+	snprintf(status, SND_STATUSLEN, "on %s",
+	    device_get_nameunit(device_get_parent(dev)));
 	pcm_setstatus(dev, status);
 
 	return (0);

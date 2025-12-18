@@ -72,7 +72,7 @@
 
 _Static_assert(sizeof(mcontext64_t) == 864, "mcontext64_t size incorrect");
 _Static_assert(sizeof(ucontext64_t) == 936, "ucontext64_t size incorrect");
-_Static_assert(sizeof(struct siginfo64) == 80, "struct siginfo64 size incorrect");
+_Static_assert(sizeof(struct __siginfo64) == 80, "struct __siginfo64 size incorrect");
 
 static void	freebsd64_sendsig(sig_t, ksiginfo_t *, sigset_t *);
 
@@ -102,7 +102,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP | SV_TIMEKEEP |
-	    SV_ASLR | SV_RNG_SEED_VER,
+	    SV_ASLR | SV_RNG_SEED_VER | SV_SIGSYS,
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = freebsd64_syscallnames,

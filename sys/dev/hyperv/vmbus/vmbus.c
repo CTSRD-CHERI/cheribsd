@@ -29,7 +29,7 @@
 /*
  * VM Bus Driver Implementation
  */
-#include <sys/cdefs.h>
+
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -137,7 +137,12 @@ static void			vmbus_intr_teardown(struct vmbus_softc *);
 static int			vmbus_doattach(struct vmbus_softc *);
 static void			vmbus_event_proc_dummy(struct vmbus_softc *,
 				    int);
+static bus_dma_tag_t	vmbus_get_dma_tag(device_t parent, device_t child);
 static struct vmbus_softc	*vmbus_sc;
+#if defined(__x86_64__)
+static int vmbus_alloc_cpu_mem(struct vmbus_softc *sc);
+static void vmbus_free_cpu_mem(struct vmbus_softc *sc);
+#endif
 
 SYSCTL_NODE(_hw, OID_AUTO, vmbus, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
     "Hyper-V vmbus");
@@ -145,6 +150,13 @@ SYSCTL_NODE(_hw, OID_AUTO, vmbus, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
 static int			vmbus_pin_evttask = 1;
 SYSCTL_INT(_hw_vmbus, OID_AUTO, pin_evttask, CTLFLAG_RDTUN,
     &vmbus_pin_evttask, 0, "Pin event tasks to their respective CPU");
+
+#if defined(__x86_64__)
+static int			hv_tlb_hcall = 1;
+SYSCTL_INT(_hw_vmbus, OID_AUTO, tlb_hcall , CTLFLAG_RDTUN,
+    &hv_tlb_hcall, 0, "Use Hyper_V hyercall for tlb flush");
+#endif
+
 uint32_t			vmbus_current_version;
 
 static const uint32_t		vmbus_version[] = {
@@ -183,6 +195,7 @@ static device_method_t vmbus_methods[] = {
 	DEVMETHOD(bus_setup_intr,		bus_generic_setup_intr),
 	DEVMETHOD(bus_teardown_intr,		bus_generic_teardown_intr),
 	DEVMETHOD(bus_get_cpus,			bus_generic_get_cpus),
+	DEVMETHOD(bus_get_dma_tag,		vmbus_get_dma_tag),
 
 	/* pcib interface */
 	DEVMETHOD(pcib_alloc_msi,		vmbus_alloc_msi),
@@ -206,6 +219,8 @@ static driver_t vmbus_driver = {
 	sizeof(struct vmbus_softc)
 };
 
+uint32_t hv_max_vp_index;
+
 DRIVER_MODULE(vmbus, pcib, vmbus_driver, NULL, NULL);
 DRIVER_MODULE(vmbus, acpi_syscontainer, vmbus_driver, NULL, NULL);
 
@@ -217,6 +232,13 @@ static __inline struct vmbus_softc *
 vmbus_get_softc(void)
 {
 	return vmbus_sc;
+}
+
+static bus_dma_tag_t
+vmbus_get_dma_tag(device_t dev, device_t child)
+{
+	struct vmbus_softc *sc = vmbus_get_softc();
+	return (sc->dmat);
 }
 
 void
@@ -739,6 +761,9 @@ vmbus_synic_setup(void *xsc)
 		VMBUS_PCPU_GET(sc, vcpuid, cpu) = 0;
 	}
 
+	if (VMBUS_PCPU_GET(sc, vcpuid, cpu) > hv_max_vp_index)
+		hv_max_vp_index = VMBUS_PCPU_GET(sc, vcpuid, cpu);
+
 	/*
 	 * Setup the SynIC message.
 	 */
@@ -776,6 +801,16 @@ vmbus_synic_setup(void *xsc)
 	val = MSR_HV_SCTRL_ENABLE | (orig & MSR_HV_SCTRL_RSVD_MASK);
 	WRMSR(MSR_HV_SCONTROL, val);
 }
+
+#if defined(__x86_64__)
+void
+hyperv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
+    smp_invl_local_cb_t curcpu_cb, enum invl_op_codes op)
+{
+	struct vmbus_softc *sc = vmbus_get_softc();
+	return hv_vm_tlb_flush(pmap, addr1, addr2, op, sc, curcpu_cb);
+}
+#endif /*__x86_64__*/
 
 static void
 vmbus_synic_teardown(void *arg)
@@ -865,29 +900,27 @@ vmbus_dma_free(struct vmbus_softc *sc)
 	int cpu;
 
 	if (sc->vmbus_evtflags != NULL) {
-		contigfree(sc->vmbus_evtflags, PAGE_SIZE, M_DEVBUF);
+		free(sc->vmbus_evtflags, M_DEVBUF);
 		sc->vmbus_evtflags = NULL;
 		sc->vmbus_rx_evtflags = NULL;
 		sc->vmbus_tx_evtflags = NULL;
 	}
 	if (sc->vmbus_mnf1 != NULL) {
-		contigfree(sc->vmbus_mnf1, PAGE_SIZE, M_DEVBUF);
+		free(sc->vmbus_mnf1, M_DEVBUF);
 		sc->vmbus_mnf1 = NULL;
 	}
 	if (sc->vmbus_mnf2 != NULL) {
-		contigfree(sc->vmbus_mnf2, sizeof(struct vmbus_mnf), M_DEVBUF);
+		free(sc->vmbus_mnf2, M_DEVBUF);
 		sc->vmbus_mnf2 = NULL;
 	}
 
 	CPU_FOREACH(cpu) {
 		if (VMBUS_PCPU_GET(sc, message, cpu) != NULL) {
-			contigfree(VMBUS_PCPU_GET(sc, message, cpu), PAGE_SIZE,
-			    M_DEVBUF);
+			free(VMBUS_PCPU_GET(sc, message, cpu), M_DEVBUF);
 			VMBUS_PCPU_GET(sc, message, cpu) = NULL;
 		}
 		if (VMBUS_PCPU_GET(sc, event_flags, cpu) != NULL) {
-			contigfree(VMBUS_PCPU_GET(sc, event_flags, cpu),
-			    PAGE_SIZE, M_DEVBUF);
+			free(VMBUS_PCPU_GET(sc, event_flags, cpu), M_DEVBUF);
 			VMBUS_PCPU_GET(sc, event_flags, cpu) = NULL;
 		}
 	}
@@ -980,7 +1013,8 @@ vmbus_add_child(struct vmbus_channel *chan)
 	device_t parent = sc->vmbus_dev;
 
 	bus_topo_lock();
-	chan->ch_dev = device_add_child(parent, NULL, -1);
+
+	chan->ch_dev = device_add_child(parent, NULL, DEVICE_UNIT_ANY);
 	if (chan->ch_dev == NULL) {
 		bus_topo_unlock();
 		device_printf(parent, "device_add_child for chan%u failed\n",
@@ -1034,15 +1068,12 @@ vmbus_alloc_resource(device_t dev, device_t child, int type, int *rid,
 	device_t parent = device_get_parent(dev);
 	struct resource *res;
 
-#ifdef NEW_PCIB
 	if (type == SYS_RES_MEMORY) {
 		struct vmbus_softc *sc = device_get_softc(dev);
 
 		res = pcib_host_res_alloc(&sc->vmbus_mmio_res, child, type,
 		    rid, start, end, count, flags);
-	} else
-#endif
-	{
+	} else {
 		res = BUS_ALLOC_RESOURCE(parent, child, type, rid, start,
 		    end, count, flags);
 	}
@@ -1123,7 +1154,6 @@ vmbus_get_eventtq_method(device_t bus, device_t dev __unused, int cpu)
 	return (VMBUS_PCPU_GET(sc, event_tq, cpu));
 }
 
-#ifdef NEW_PCIB
 #define VTPM_BASE_ADDR 0xfed40000
 #define FOUR_GB (1ULL << 32)
 
@@ -1340,7 +1370,6 @@ vmbus_free_mmio_res(device_t dev)
 	if (hv_fb_res)
 		hv_fb_res = NULL;
 }
-#endif	/* NEW_PCIB */
 
 static void
 vmbus_identify(driver_t *driver, device_t parent)
@@ -1349,7 +1378,7 @@ vmbus_identify(driver_t *driver, device_t parent)
 	if (device_get_unit(parent) != 0 || vm_guest != VM_GUEST_HV ||
 	    (hyperv_features & CPUID_HV_MSR_SYNIC) == 0)
 		return;
-	device_add_child(parent, "vmbus", -1);
+	device_add_child(parent, "vmbus", DEVICE_UNIT_ANY);
 }
 
 static int
@@ -1363,6 +1392,42 @@ vmbus_probe(device_t dev)
 	device_set_desc(dev, "Hyper-V Vmbus");
 	return (BUS_PROBE_DEFAULT);
 }
+
+#if defined(__x86_64__)
+static int
+vmbus_alloc_cpu_mem(struct vmbus_softc *sc)
+{
+	int cpu;
+
+	CPU_FOREACH(cpu) {
+		void **hv_cpu_mem;
+
+		hv_cpu_mem = VMBUS_PCPU_PTR(sc, cpu_mem, cpu);
+		*hv_cpu_mem = contigmalloc(PAGE_SIZE, M_DEVBUF,
+		    M_NOWAIT | M_ZERO, 0ul, ~0ul, PAGE_SIZE, 0);
+
+		if (*hv_cpu_mem == NULL)
+			return ENOMEM;
+	}
+
+	return 0;
+}
+
+static void
+vmbus_free_cpu_mem(struct vmbus_softc *sc)
+{
+	int cpu;
+
+	CPU_FOREACH(cpu) {
+		void **hv_cpu_mem;
+		hv_cpu_mem = VMBUS_PCPU_PTR(sc, cpu_mem, cpu);
+		if(*hv_cpu_mem != NULL) {
+			free(*hv_cpu_mem, M_DEVBUF);
+			*hv_cpu_mem = NULL;
+		}
+	}
+}
+#endif
 
 /**
  * @brief Main vmbus driver initialization routine.
@@ -1382,14 +1447,15 @@ vmbus_doattach(struct vmbus_softc *sc)
 	struct sysctl_oid_list *child;
 	struct sysctl_ctx_list *ctx;
 	int ret;
+	device_t dev_res;
+	ACPI_HANDLE handle;
+	unsigned int coherent = 0;
 
 	if (sc->vmbus_flags & VMBUS_FLAG_ATTACHED)
 		return (0);
 
-#ifdef NEW_PCIB
 	vmbus_get_mmio_res(sc->vmbus_dev);
 	vmbus_fb_mmio_res(sc->vmbus_dev);
-#endif
 
 	sc->vmbus_flags |= VMBUS_FLAG_ATTACHED;
 
@@ -1402,6 +1468,29 @@ vmbus_doattach(struct vmbus_softc *sc)
 	    sizeof(struct vmbus_channel *) * VMBUS_CHAN_MAX, M_DEVBUF,
 	    M_WAITOK | M_ZERO);
 
+	/* Coherency attribute */
+	dev_res =  devclass_get_device(devclass_find("vmbus_res"), 0);
+	if (dev_res != NULL) {
+		handle = acpi_get_handle(dev_res);
+
+		if (ACPI_FAILURE(acpi_GetInteger(handle, "_CCA", &coherent)))
+			coherent = 0;
+	}
+	if (bootverbose)
+		device_printf(sc->vmbus_dev, "Bus is%s cache-coherent\n",
+			coherent ? "" : " not");
+
+	bus_dma_tag_create(bus_get_dma_tag(sc->vmbus_dev),
+		1, 0,
+		BUS_SPACE_MAXADDR,
+		BUS_SPACE_MAXADDR,
+		NULL, NULL,
+		BUS_SPACE_MAXSIZE,
+		BUS_SPACE_UNRESTRICTED,
+		BUS_SPACE_MAXSIZE,
+		coherent ? BUS_DMA_COHERENT : 0,
+		NULL, NULL,
+		&sc->dmat);
 	/*
 	 * Create context for "post message" Hypercalls
 	 */
@@ -1427,6 +1516,25 @@ vmbus_doattach(struct vmbus_softc *sc)
 	if (ret != 0)
 		goto cleanup;
 
+#if defined(__x86_64__)
+	/*
+	 * Alloc per cpu memory for tlb flush hypercall
+	 */
+	if (hv_tlb_hcall) {
+		ret = vmbus_alloc_cpu_mem(sc);
+		if (ret != 0) {
+			hv_tlb_hcall = 0;
+			if (bootverbose)
+				device_printf(sc->vmbus_dev,
+				    "cannot alloc contig memory for "
+				    "cpu_mem, use system provided "
+				    "tlb flush call.\n");
+
+			vmbus_free_cpu_mem(sc);
+		}
+	}
+#endif
+
 	/*
 	 * Setup SynIC.
 	 */
@@ -1434,6 +1542,11 @@ vmbus_doattach(struct vmbus_softc *sc)
 		device_printf(sc->vmbus_dev, "smp_started = %d\n", smp_started);
 	smp_rendezvous(NULL, vmbus_synic_setup, NULL, sc);
 	sc->vmbus_flags |= VMBUS_FLAG_SYNIC;
+
+#if defined(__x86_64__)
+	if (hv_tlb_hcall)
+		smp_targeted_tlb_shootdown = &hyperv_vm_tlb_flush;
+#endif
 
 	/*
 	 * Initialize vmbus, e.g. connect to Hypervisor.
@@ -1538,6 +1651,16 @@ vmbus_detach(device_t dev)
 		smp_rendezvous(NULL, vmbus_synic_teardown, NULL, NULL);
 	}
 
+#if defined(__x86_64__)
+	/*
+	 * Restore the tlb flush to native call
+	 */
+	if (hv_tlb_hcall) {
+		smp_targeted_tlb_shootdown = &smp_targeted_tlb_shootdown_native;
+		vmbus_free_cpu_mem(sc);
+	}
+#endif
+
 	vmbus_intr_teardown(sc);
 	vmbus_dma_free(sc);
 
@@ -1550,9 +1673,7 @@ vmbus_detach(device_t dev)
 	mtx_destroy(&sc->vmbus_prichan_lock);
 	mtx_destroy(&sc->vmbus_chan_lock);
 
-#ifdef NEW_PCIB
 	vmbus_free_mmio_res(dev);
-#endif
 
 #if defined(__aarch64__)
 	bus_release_resource(device_get_parent(dev), SYS_RES_IRQ, sc->vector,

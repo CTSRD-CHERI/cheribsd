@@ -57,6 +57,14 @@ void expect_lookup(const char *relpath, uint64_t ino, uint64_t size)
 }
 };
 
+class RofsRead: public Read {
+public:
+virtual void SetUp() {
+	m_ro = true;
+	Read::SetUp();
+}
+};
+
 class Read_7_8: public FuseTest {
 public:
 virtual void SetUp() {
@@ -452,6 +460,47 @@ TEST_F(Read, atime_during_close)
 	ASSERT_EQ(0, fstat(fd, &sb));
 
 	close(fd);
+}
+
+/*
+ * When not using -o default_permissions, the daemon may make its own decisions
+ * regarding access permissions, and these may be unpredictable.  If it rejects
+ * our attempt to set atime, that should not cause close(2) to fail.
+ */
+TEST_F(Read, atime_during_close_eacces)
+{
+	const char FULLPATH[] = "mountpoint/some_file.txt";
+	const char RELPATH[] = "some_file.txt";
+	const char *CONTENTS = "abcdefgh";
+	uint64_t ino = 42;
+	int fd;
+	ssize_t bufsize = strlen(CONTENTS);
+	uint8_t buf[bufsize];
+
+	expect_lookup(RELPATH, ino, bufsize);
+	expect_open(ino, 0, 1);
+	expect_read(ino, 0, bufsize, bufsize, CONTENTS);
+	EXPECT_CALL(*m_mock, process(
+		ResultOf([&](auto in) {
+			uint32_t valid = FATTR_ATIME;
+			return (in.header.opcode == FUSE_SETATTR &&
+				in.header.nodeid == ino &&
+				in.body.setattr.valid == valid);
+		}, Eq(true)),
+		_)
+	).WillOnce(Invoke(ReturnErrno(EACCES)));
+	expect_flush(ino, 1, ReturnErrno(0));
+	expect_release(ino, FuseTest::FH);
+
+	fd = open(FULLPATH, O_RDONLY);
+	ASSERT_LE(0, fd) << strerror(errno);
+
+	/* Ensure atime will be different than during lookup */
+	nap();
+
+	ASSERT_EQ(bufsize, read(fd, buf, bufsize)) << strerror(errno);
+
+	ASSERT_EQ(0, close(fd));
 }
 
 /* A cached atime should be flushed during FUSE_SETATTR */
@@ -1167,8 +1216,7 @@ TEST_F(Read, cache_block)
 	char buf[bufsize];
 	const char *contents1 = CONTENTS0 + bufsize;
 
-	contents = (char*)calloc(1, filesize);
-	ASSERT_NE(nullptr, contents);
+	contents = new char[filesize]();
 	memmove(contents, CONTENTS0, strlen(CONTENTS0));
 
 	expect_lookup(RELPATH, ino, filesize);
@@ -1186,7 +1234,7 @@ TEST_F(Read, cache_block)
 	ASSERT_EQ(bufsize, read(fd, buf, bufsize)) << strerror(errno);
 	ASSERT_EQ(0, memcmp(buf, contents1, bufsize));
 	leak(fd);
-	free(contents);
+	delete[] contents;
 }
 
 /* Reading with sendfile should work (though it obviously won't be 0-copy) */
@@ -1283,16 +1331,15 @@ TEST_P(ReadAhead, readahead) {
 	char *rbuf, *contents;
 	off_t offs;
 
-	contents = (char*)malloc(filesize);
-	ASSERT_NE(nullptr, contents);
+	contents = new char[filesize];
 	memset(contents, 'X', filesize);
-	rbuf = (char*)calloc(1, bufsize);
+	rbuf = new char[bufsize]();
 
 	expect_lookup(RELPATH, ino, filesize);
 	expect_open(ino, 0, 1);
 	maxcontig = m_noclusterr ? m_maxbcachebuf :
 		m_maxbcachebuf + m_maxreadahead;
-	clustersize = MIN(maxcontig, m_maxphys);
+	clustersize = MIN((unsigned long )maxcontig, m_maxphys);
 	for (offs = 0; offs < bufsize; offs += clustersize) {
 		len = std::min((size_t)clustersize, (size_t)(filesize - offs));
 		expect_read(ino, offs, len, len, contents + offs);
@@ -1308,8 +1355,8 @@ TEST_P(ReadAhead, readahead) {
 	ASSERT_EQ(0, memcmp(rbuf, contents, bufsize));
 
 	leak(fd);
-	free(rbuf);
-	free(contents);
+	delete[] rbuf;
+	delete[] contents;
 }
 
 INSTANTIATE_TEST_SUITE_P(RA, ReadAhead,
@@ -1320,6 +1367,40 @@ INSTANTIATE_TEST_SUITE_P(RA, ReadAhead,
 	       tuple<bool, int>(true, 0),
 	       tuple<bool, int>(true, 1),
 	       tuple<bool, int>(true, 2)));
+
+/* With read-only mounts, fuse should never update atime during close */
+TEST_F(RofsRead, atime_during_close)
+{
+	const char FULLPATH[] = "mountpoint/some_file.txt";
+	const char RELPATH[] = "some_file.txt";
+	const char *CONTENTS = "abcdefgh";
+	uint64_t ino = 42;
+	int fd;
+	ssize_t bufsize = strlen(CONTENTS);
+	uint8_t buf[bufsize];
+
+	expect_lookup(RELPATH, ino, bufsize);
+	expect_open(ino, 0, 1);
+	expect_read(ino, 0, bufsize, bufsize, CONTENTS);
+	EXPECT_CALL(*m_mock, process(
+		ResultOf([&](auto in) {
+			return (in.header.opcode == FUSE_SETATTR);
+		}, Eq(true)),
+		_)
+	).Times(0);
+	expect_flush(ino, 1, ReturnErrno(0));
+	expect_release(ino, FuseTest::FH);
+
+	fd = open(FULLPATH, O_RDONLY);
+	ASSERT_LE(0, fd) << strerror(errno);
+
+	/* Ensure atime will be different than during lookup */
+	nap();
+
+	ASSERT_EQ(bufsize, read(fd, buf, bufsize)) << strerror(errno);
+
+	close(fd);
+}
 
 /* fuse_init_out.time_gran controls the granularity of timestamps */
 TEST_P(TimeGran, atime_during_setattr)

@@ -29,8 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__SCCSID("@(#)exec.c	8.1 (Berkeley) 6/4/93");
 #include "namespace.h"
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -138,7 +136,7 @@ execv(const char *name, char * const *argv)
 int
 execvp(const char *name, char * const *argv)
 {
-	return (coexecvp(-1, name, argv));
+	return (_coexecvpe(-1, name, argv, environ));
 }
 
 int
@@ -313,6 +311,18 @@ _coexecvpec(pid_t pid, const char *name, char * const argv[],
 		path = _PATH_DEFPATH;
 
 	return (coexecvPec(pid, name, path, argv, envp, capv, capc));
+}
+
+int
+execvpe(const char *name, char * const argv[], char * const envp[])
+{
+	const char *path;
+
+	/* Get the path we're searching. */
+	if ((path = getenv("PATH")) == NULL)
+		path = _PATH_DEFPATH;
+
+	return (coexecvPec(-1, name, path, argv, envp, NULL, 0));
 }
 
 int

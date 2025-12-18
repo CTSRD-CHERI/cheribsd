@@ -204,13 +204,13 @@ handle_remount() { # $1 = mount point
 }
 
 # Create a generic memory disk.
-# The 'auto' parameter will attempt to use tmpfs(5), falls back to md(4).
+# The 'auto' parameter will attempt to use tmpfs(4), falls back to md(4).
 # $1 is size in 512-byte sectors, $2 is the mount point.
 mount_md() {
     if [ ${o_verbose} -gt 0 ] ; then
-        /sbin/mdmfs -XL -s $1 auto $2
+        /sbin/mdmfs -XL -S -s $1 auto $2
     else
-        /sbin/mdmfs -s $1 auto $2
+        /sbin/mdmfs -S -s $1 auto $2
     fi
 }
 
@@ -362,6 +362,8 @@ done
 # so if the cpio archive is present, it prevents the files from dir/
 # from being copied.
 
+PATH=${PATH}:/rescue
+
 for i in ${templates} ; do
     for j in /conf/$i/* ; do
 	subdir=${j##*/}
@@ -376,7 +378,7 @@ for i in ${templates} ; do
 	if [ -f $j ]; then
 	    create_md $subdir
 	    echo "Loading /$subdir from cpio archive $j"
-	    (cd / ; /rescue/tar -xpf $j)
+	    (cd / ; tar -xpf $j)
 	fi
     done
     for j in /conf/$i/*/extract ; do

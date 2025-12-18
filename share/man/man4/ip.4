@@ -25,8 +25,6 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     @(#)ip.4	8.2 (Berkeley) 11/30/93
-.\"
 .Dd August 9, 2021
 .Dt IP 4
 .Os
@@ -90,7 +88,7 @@ setsockopt(s, IPPROTO_IP, IP_OPTIONS, NULL, 0);
 .Pp
 .Dv IP_TOS
 may be used to set the differential service codepoint (DSCP) and the
-explicit congestion notfication (ECN) codepoint.
+explicit congestion notification (ECN) codepoint.
 Setting the ECN codepoint - the two least significant bits - on a
 socket using a transport protocol implementing ECN has no effect.
 .Pp
@@ -229,7 +227,7 @@ The socket should be either bound to
 .Dv INADDR_ANY
 and a local port, and the address supplied with
 .Dv IP_SENDSRCADDR
-should't be
+shouldn't be
 .Dv INADDR_ANY ,
 or the socket should be bound to a local address and the address supplied with
 .Dv IP_SENDSRCADDR

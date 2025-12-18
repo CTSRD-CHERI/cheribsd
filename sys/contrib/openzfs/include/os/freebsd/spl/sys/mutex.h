@@ -64,9 +64,11 @@ typedef enum {
 } while (0)
 #define	mutex_destroy(lock)	sx_destroy(lock)
 #define	mutex_enter(lock)	sx_xlock(lock)
+#define	mutex_enter_interruptible(lock)	sx_xlock_sig(lock)
 #define	mutex_enter_nested(lock, type)	sx_xlock(lock)
 #define	mutex_tryenter(lock)	sx_try_xlock(lock)
 #define	mutex_exit(lock)	sx_xunlock(lock)
 #define	mutex_owned(lock)	sx_xlocked(lock)
 #define	mutex_owner(lock)	sx_xholder(lock)
+
 #endif	/* _OPENSOLARIS_SYS_MUTEX_H_ */

@@ -48,19 +48,38 @@ f_include $BSDCFG_SHARE/dialog.subr
 #
 
 INTERFACE=$1
+AUTO="${2:-}"
 case "${INTERFACE}" in
 "")	bsddialog --backtitle "$OSNAME Installer" --title 'Network Configuration' \
 	    --msgbox 'No interface specified for IPv6 configuration.' 0 0
 	exit 1
 	;;
 esac
+case "$AUTO" in
+""|auto)
+	;;
+*)
+	bsddialog --backtitle "$OSNAME Installer" --title 'Network Configuration' \
+	    --msgbox "Bad auto option '$AUTO'." 0 0
+	exit 1
+	;;
+esac
 
 AGAIN=""
 while : ; do
-	MSG="Would you like to try stateless address autoconfiguration (SLAAC)${AGAIN}?"
-	bsddialog --backtitle "$OSNAME Installer" --title 'Network Configuration' \
-	    --yesno "${MSG}" 0 0
-	if [ $? -eq $BSDDIALOG_OK ]; then
+	if [ -n "$AUTO" ]; then
+		SLAAC=1
+	else
+		MSG="Would you like to try stateless address autoconfiguration (SLAAC)${AGAIN}?"
+		bsddialog --backtitle "$OSNAME Installer" --title 'Network Configuration' \
+		    --yesno "${MSG}" 0 0
+		if [ $? -eq $BSDDIALOG_OK ]; then
+			SLAAC=1
+		else
+			SLAAC=0
+		fi
+	fi
+	if [ $SLAAC -eq 1 ]; then
 		if [ ! -z $BSDINSTALL_CONFIGCURRENT ]; then
 			bsddialog --backtitle "$OSNAME Installer" \
 			    --infobox "Sending Router Solicitation ..." 0 0
@@ -68,12 +87,15 @@ while : ; do
 			err=$( rtsol -F $INTERFACE 2>&1 )
 			if [ $? -ne 0 ]; then
 				f_dprintf "%s" "$err"
+				if [ -n "$AUTO" ]; then
+					exit 1
+				fi
 				bsddialog --backtitle "$OSNAME Installer" --msgbox "SLAAC failed." 0 0
 				AGAIN=" again"
 				continue
 			fi
 		fi
-		echo ifconfig_${INTERFACE}_ipv6=\"inet6 accept_rtadv\" >> $BSDINSTALL_TMPETC/._rc.conf.net
+		sysrc -f $BSDINSTALL_TMPETC/._rc.conf.net ifconfig_${INTERFACE}_ipv6="inet6 accept_rtadv"
 		exit 0
 	else
 		break
@@ -107,13 +129,13 @@ END {
 	printf "\"Default Router\" %d 1 \"%s\" %d 16 50 50 0 ", n, dfr, n;
 }'`
 
-exec 3>&1
+exec 5>&1
 IF_CONFIG=$(echo ${ADDRS} | xargs -o bsddialog --backtitle "$OSNAME Installer" \
 	--title 'Network Configuration' \
 	--mixedform 'Static IPv6 Network Interface Configuration' 0 0 0 \
-2>&1 1>&3)
+2>&1 1>&5)
 if [ $? -eq $BSDDIALOG_CANCEL ]; then exit 1; fi
-exec 3>&-
+exec 5>&-
 
 echo ${IF_CONFIG} | tr ' ' '\n' | \
 awk -v iface="${INTERFACE}" '

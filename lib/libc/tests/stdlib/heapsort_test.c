@@ -28,7 +28,6 @@
  * Test for heapsort() routine.
  */
 
-#include <sys/cdefs.h>
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>

@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)route.c	8.3.1.1 (Berkeley) 2/23/95
  */
 /************************************************************************
  * Note: In this file a 'fib' is a "forwarding information base"	*
@@ -76,6 +74,10 @@ VNET_PCPUSTAT_SYSINIT(rtstat);
 #ifdef VIMAGE
 VNET_PCPUSTAT_SYSUNINIT(rtstat);
 #endif
+
+SYSCTL_DECL(_net_route);
+SYSCTL_VNET_PCPUSTAT(_net_route, OID_AUTO, stats, struct rtstat,
+    rtstat, "route statistics");
 
 EVENTHANDLER_LIST_DEFINE(rt_addrmsg);
 

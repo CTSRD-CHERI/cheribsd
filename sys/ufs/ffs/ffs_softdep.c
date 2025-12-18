@@ -37,8 +37,6 @@
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *	from: @(#)ffs_softdep.c	9.59 (McKusick) 6/21/00
  */
 
 #include <sys/cdefs.h>
@@ -1906,7 +1904,6 @@ process_worklist_item(struct mount *mp,
 	 */
 	if (curthread->td_pflags & TDP_COWINPROGRESS)
 		return (-1);
-	PHOLD(curproc);	/* Don't let the stack go away. */
 	ump = VFSTOUFS(mp);
 	LOCK_OWNED(ump);
 	matchcnt = 0;
@@ -1979,7 +1976,6 @@ process_worklist_item(struct mount *mp,
 		ump->softdep_worklist_tail =
 		    (struct worklist *)sentinel.wk_list.le_prev;
 	LIST_REMOVE(&sentinel, wk_list);
-	PRELE(curproc);
 	return (matchcnt);
 }
 
@@ -2635,7 +2631,8 @@ softdep_mount(struct vnode *devvp,
 
 	if ((fs->fs_flags & FS_SUJ) &&
 	    (error = journal_mount(mp, fs, cred)) != 0) {
-		printf("Failed to start journal: %d\n", error);
+		printf("%s: failed to start journal: %d\n",
+		    mp->mnt_stat.f_mntonname, error);
 		softdep_unmount(mp);
 		return (error);
 	}
@@ -2645,10 +2642,18 @@ softdep_mount(struct vnode *devvp,
 	ACQUIRE_LOCK(ump);
 	ump->softdep_flags |= FLUSH_STARTING;
 	FREE_LOCK(ump);
-	kproc_kthread_add(&softdep_flush, mp, &bufdaemonproc,
+	error = kproc_kthread_add(&softdep_flush, mp, &bufdaemonproc,
 	    &ump->softdep_flushtd, 0, 0, "softdepflush", "%s worker",
 	    mp->mnt_stat.f_mntonname);
 	ACQUIRE_LOCK(ump);
+	if (error != 0) {
+		printf("%s: failed to start softdepflush thread: %d\n",
+		    mp->mnt_stat.f_mntonname, error);
+		ump->softdep_flags &= ~FLUSH_STARTING;
+		FREE_LOCK(ump);
+		softdep_unmount(mp);
+		return (error);
+	}
 	while ((ump->softdep_flags & FLUSH_STARTING) != 0) {
 		msleep(&ump->softdep_flushtd, LOCK_PTR(ump), PVM, "sdstart",
 		    hz / 2);
@@ -10048,7 +10053,7 @@ handle_workitem_remove(struct dirrem *dirrem, int flags)
 		KASSERT(ip->i_nlink >= 0, ("handle_workitem_remove: file ino "
 		    "%ju negative i_nlink %d", (intmax_t)ip->i_number,
 		    ip->i_nlink));
-		DIP_SET(ip, i_nlink, ip->i_nlink);
+		DIP_SET_NLINK(ip, ip->i_nlink);
 		UFS_INODE_SET_FLAG(ip, IN_CHANGE);
 		if (ip->i_nlink < ip->i_effnlink)
 			panic("handle_workitem_remove: bad file delta");
@@ -10071,7 +10076,7 @@ handle_workitem_remove(struct dirrem *dirrem, int flags)
 	ip->i_nlink -= 2;
 	KASSERT(ip->i_nlink >= 0, ("handle_workitem_remove: directory ino "
 	    "%ju negative i_nlink %d", (intmax_t)ip->i_number, ip->i_nlink));
-	DIP_SET(ip, i_nlink, ip->i_nlink);
+	DIP_SET_NLINK(ip, ip->i_nlink);
 	UFS_INODE_SET_FLAG(ip, IN_CHANGE);
 	if (ip->i_nlink < ip->i_effnlink)
 		panic("handle_workitem_remove: bad dir delta");
@@ -10232,7 +10237,6 @@ softdep_disk_io_initiation(
 		return;
 
 	marker.wk_type = D_LAST + 1;	/* Not a normal workitem */
-	PHOLD(curproc);			/* Don't swap out kernel stack */
 	ACQUIRE_LOCK(ump);
 	/*
 	 * Do any necessary pre-I/O processing.
@@ -10317,7 +10321,6 @@ softdep_disk_io_initiation(
 		}
 	}
 	FREE_LOCK(ump);
-	PRELE(curproc);			/* Allow swapout of kernel stack */
 }
 
 /*

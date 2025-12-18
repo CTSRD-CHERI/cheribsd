@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2015-2024 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -63,7 +63,7 @@ atomic_##NAME##_rel_##WIDTH(__volatile uint##WIDTH##_t *p, uint##WIDTH##_t v)\
 	atomic_##NAME##_##WIDTH(p, v);					\
 }
 
-#define	ATOMIC_CMPSET_ORDER(WIDTH, SUFFIX, ORDER)			\
+#define	ATOMIC_CMPSET_ORDER(WIDTH, SUFFIX, SUCCESS, FAIL)		\
 static __inline  int							\
 atomic_cmpset##SUFFIX##WIDTH(__volatile uint##WIDTH##_t *p,		\
     uint##WIDTH##_t cmpval, uint##WIDTH##_t newval)			\
@@ -71,10 +71,10 @@ atomic_cmpset##SUFFIX##WIDTH(__volatile uint##WIDTH##_t *p,		\
 									\
 	/* Return 1 on success, 0 on failure */				\
 	return (__atomic_compare_exchange_n(				\
-	    p, &cmpval, newval, 0, ORDER, ORDER));			\
+	    p, &cmpval, newval, 0, SUCCESS, FAIL));			\
 }
 
-#define	ATOMIC_FCMPSET_ORDER(WIDTH, SUFFIX, ORDER)			\
+#define	ATOMIC_FCMPSET_ORDER(WIDTH, SUFFIX, SUCCESS, FAIL)		\
 static __inline  int							\
 atomic_fcmpset##SUFFIX##WIDTH(__volatile uint##WIDTH##_t *p,		\
     uint##WIDTH##_t* cmpval, uint##WIDTH##_t newval)			\
@@ -82,24 +82,24 @@ atomic_fcmpset##SUFFIX##WIDTH(__volatile uint##WIDTH##_t *p,		\
 									\
 	/* fcmpset updates cmpval on failure and uses weak cmpxchg */	\
 	return (__atomic_compare_exchange_n(				\
-	    p, cmpval, newval, 1, ORDER, ORDER));			\
+	    p, cmpval, newval, 1, SUCCESS, FAIL));			\
 }
 
 
 #define	ATOMIC_CMPSET_ACQ_REL(WIDTH)					\
-	ATOMIC_CMPSET_ORDER(WIDTH, _acq_, __ATOMIC_ACQUIRE)		\
-	ATOMIC_CMPSET_ORDER(WIDTH, _rel_, __ATOMIC_RELEASE)
+	ATOMIC_CMPSET_ORDER(WIDTH, _acq_, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE) \
+	ATOMIC_CMPSET_ORDER(WIDTH, _rel_, __ATOMIC_RELEASE, __ATOMIC_RELAXED)
 
 #define	ATOMIC_CMPSET(WIDTH)						\
-	ATOMIC_CMPSET_ORDER(WIDTH, _, __ATOMIC_RELAXED)			\
+	ATOMIC_CMPSET_ORDER(WIDTH, _, __ATOMIC_RELAXED, __ATOMIC_RELAXED) \
 	ATOMIC_CMPSET_ACQ_REL(WIDTH)
 
 #define	ATOMIC_FCMPSET_ACQ_REL(WIDTH)					\
-	ATOMIC_FCMPSET_ORDER(WIDTH, _acq_, __ATOMIC_ACQUIRE)		\
-	ATOMIC_FCMPSET_ORDER(WIDTH, _rel_, __ATOMIC_RELEASE)
+	ATOMIC_FCMPSET_ORDER(WIDTH, _acq_, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE) \
+	ATOMIC_FCMPSET_ORDER(WIDTH, _rel_, __ATOMIC_RELEASE, __ATOMIC_RELAXED)
 
 #define	ATOMIC_FCMPSET(WIDTH)						\
-	ATOMIC_FCMPSET_ORDER(WIDTH, _, __ATOMIC_RELAXED)		\
+	ATOMIC_FCMPSET_ORDER(WIDTH, _, __ATOMIC_RELAXED, __ATOMIC_RELAXED) \
 	ATOMIC_FCMPSET_ACQ_REL(WIDTH)					\
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -108,17 +108,11 @@ atomic_fcmpset##SUFFIX##WIDTH(__volatile uint##WIDTH##_t *p,		\
  */
 ATOMIC_CMPSET(8);
 ATOMIC_FCMPSET(8);
-ATOMIC_CMPSET(16);
-ATOMIC_FCMPSET(16);
-#define	atomic_cmpset_8		atomic_cmpset_8
+#define	atomic_cmpset_8			atomic_cmpset_8
 #define	atomic_fcmpset_8		atomic_fcmpset_8
-#define	atomic_cmpset_16		atomic_cmpset_16
-#define	atomic_fcmpset_16		atomic_fcmpset_16
 #else
 ATOMIC_CMPSET_ACQ_REL(8);
 ATOMIC_FCMPSET_ACQ_REL(8);
-ATOMIC_CMPSET_ACQ_REL(16);
-ATOMIC_FCMPSET_ACQ_REL(16);
 #endif
 
 #define	atomic_cmpset_char		atomic_cmpset_8
@@ -129,11 +123,50 @@ ATOMIC_FCMPSET_ACQ_REL(16);
 #define	atomic_fcmpset_rel_char		atomic_fcmpset_rel_8
 
 #define	atomic_cmpset_short		atomic_cmpset_16
-#define	atomic_cmpset_acq_short		atomic_cmpset_acq_16
-#define	atomic_cmpset_rel_short		atomic_cmpset_rel_16
 #define	atomic_fcmpset_short		atomic_fcmpset_16
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * In a purecap kernel we cannot use the generic sub-word implementation.
+ */
+ATOMIC_CMPSET(16);
+ATOMIC_FCMPSET(16);
+#define	atomic_cmpset_16		atomic_cmpset_16
+#define	atomic_fcmpset_16		atomic_fcmpset_16
+#else
+ATOMIC_CMPSET_ACQ_REL(16);
+ATOMIC_FCMPSET_ACQ_REL(16);
+#endif
+
+#define	atomic_load_acq_16	atomic_load_acq_16
+static __inline uint16_t
+atomic_load_acq_16(volatile uint16_t *p)
+{
+	uint16_t ret;
+
+	ret = *p;
+
+	fence();
+
+	return (ret);
+}
+
+static __inline void
+atomic_store_rel_16(volatile uint16_t *p, uint16_t val)
+{
+
+	fence();
+
+	*p = val;
+}
+
+#define	atomic_cmpset_acq_short		atomic_cmpset_acq_16
 #define	atomic_fcmpset_acq_short	atomic_fcmpset_acq_16
+#define	atomic_load_acq_short		atomic_load_acq_16
+
+#define	atomic_cmpset_rel_short		atomic_cmpset_rel_16
 #define	atomic_fcmpset_rel_short	atomic_fcmpset_rel_16
+#define	atomic_store_rel_short		atomic_store_rel_16
 
 #define	ATOMIC_OP_IMPL(WIDTH, OP, FN, PRE)					\
 	static __inline void							\
@@ -196,6 +229,26 @@ atomic_readandclear_32(volatile uint32_t *p)
 {
 
 	return (__atomic_exchange_n(p, 0, __ATOMIC_RELAXED));
+}
+
+static __inline int
+atomic_testandclear_32(volatile uint32_t *p, u_int val)
+{
+	uint32_t mask, old;
+
+	mask = (1u << (val & 31));
+	old = __atomic_fetch_and(p, ~mask, __ATOMIC_RELAXED);
+	return ((old & mask) != 0);
+}
+
+static __inline int
+atomic_testandset_32(volatile uint32_t *p, u_int val)
+{
+	uint32_t mask, old;
+
+	mask = (1u << (val & 31));
+	old = __atomic_fetch_or(p, mask, __ATOMIC_RELAXED);
+	return ((old & mask) != 0);
 }
 
 #define	atomic_add_int		atomic_add_32
@@ -278,6 +331,36 @@ atomic_swap_64(volatile uint64_t *p, uint64_t val)
 	return (__atomic_exchange_n(p, val, __ATOMIC_RELAXED));
 }
 
+static __inline int
+atomic_testandclear_64(volatile uint64_t *p, u_int val)
+{
+	uint64_t mask, old;
+
+	mask = (1ul << (val & 63));
+	old = __atomic_fetch_and(p, ~mask, __ATOMIC_RELAXED);
+	return ((old & mask) != 0);
+}
+
+static __inline int
+atomic_testandset_64(volatile uint64_t *p, u_int val)
+{
+	uint64_t mask, old;
+
+	mask = (1ul << (val & 63));
+	old = __atomic_fetch_or(p, mask, __ATOMIC_RELAXED);
+	return ((old & mask) != 0);
+}
+
+static __inline int
+atomic_testandset_acq_64(volatile uint64_t *p, u_int val)
+{
+	uint64_t mask, old;
+
+	mask = (1ul << (val & 63));
+	old = __atomic_fetch_or(p, mask, __ATOMIC_ACQUIRE);
+	return ((old & mask) != 0);
+}
+
 #ifdef __CHERI_PURE_CAPABILITY__
 static __inline uintptr_t
 atomic_swap_ptr(volatile uintptr_t *p, uintptr_t val)
@@ -298,6 +381,9 @@ atomic_swap_ptr(volatile uintptr_t *p, uintptr_t val)
 #define	atomic_set_long			atomic_set_64
 #define	atomic_subtract_long		atomic_subtract_64
 #define	atomic_swap_long		atomic_swap_64
+#define	atomic_testandclear_long	atomic_testandclear_64
+#define	atomic_testandset_long		atomic_testandset_64
+#define	atomic_testandset_acq_long	atomic_testandset_acq_64
 
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	atomic_add_ptr			atomic_add_64
@@ -309,6 +395,8 @@ atomic_swap_ptr(volatile uintptr_t *p, uintptr_t val)
 #define	atomic_set_ptr			atomic_set_64
 #define	atomic_subtract_ptr		atomic_subtract_64
 #define	atomic_swap_ptr			atomic_swap_64
+#define	atomic_testandclear_ptr		atomic_testandclear_64
+#define	atomic_testandset_ptr		atomic_testandset_64
 #endif
 
 ATOMIC_ACQ_REL(set, 64)
@@ -425,6 +513,62 @@ atomic_readandclear_ptr(volatile uintptr_t *p)
 {
 
 	return (__atomic_exchange_n(p, 0, __ATOMIC_RELAXED));
+}
+
+static __inline int
+atomic_testandclear_ptr(volatile uintptr_t *p, u_int val)
+{
+	uintptr_t old;
+	ptraddr_t mask;
+
+	mask = ((ptraddr_t)1) << (val & 63);
+#ifdef notyet
+	old = __atomic_or_fetch(p, val, __ATOMIC_RELAXED);
+#else
+	uintptr_t temp1;
+	u_long temp2;
+
+	__asm __volatile(
+		"1:	clr.c	%1, %0\n"
+		"	cgetaddr %3, %1\n"
+		"	and	%3, %3, %4\n"
+		"	csetaddr %2, %1, %3\n"
+		"	csc.c	%3, %2, %0\n"
+		"	bnez	%3, 1b\n"
+		: "+A" (*p), "=&C" (old), "=&C" (temp1), "=&r" (temp2)
+		: "r" (~(ptraddr_t)mask)
+		: "memory");
+#endif
+
+	return ((old & mask) != 0);
+}
+
+static __inline int
+atomic_testandset_ptr(volatile uintptr_t *p, u_int val)
+{
+	uintptr_t old;
+	ptraddr_t mask;
+
+	mask = ((ptraddr_t)1) << (val & 63);
+#ifdef notyet
+	old = __atomic_or_fetch(p, val, __ATOMIC_RELAXED);
+#else
+	uintptr_t temp1;
+	u_long temp2;
+
+	__asm __volatile(
+		"1:	clr.c	%1, %0\n"
+		"	cgetaddr %3, %1\n"
+		"	or	%3, %3, %4\n"
+		"	csetaddr %2, %1, %3\n"
+		"	csc.c	%3, %2, %0\n"
+		"	bnez	%3, 1b\n"
+		: "+A" (*p), "=&C" (old), "=&C" (temp1), "=&r" (temp2)
+		: "r" ((ptraddr_t)mask)
+		: "memory");
+#endif
+
+	return ((old & mask) != 0);
 }
 
 ATOMIC_ACQ_REL(set, ptr);

@@ -29,11 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD$";
-#endif /* not lint */
-
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -165,17 +160,6 @@ pcp:
 }
 
 #else
-static uint8_t
-convert_iftype(uint8_t iftype)
-{
-	switch (iftype) {
-	case IFT_IEEE8023ADLAG:
-		return (IFT_ETHER);
-	case IFT_INFINIBANDLAG:
-		return (IFT_INFINIBAND);
-	}
-	return (iftype);
-}
 
 static void
 link_status_nl(if_ctx *ctx, if_link_t *link, if_addr_t *ifa __unused)

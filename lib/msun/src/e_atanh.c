@@ -1,5 +1,4 @@
 
-/* @(#)e_atanh.c 1.3 95/01/18 */
 /*
  * ====================================================
  * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -12,7 +11,6 @@
  *
  */
 
-#include <sys/cdefs.h>
 /* atanh(x)
  * Method :
  *    1.Reduced x to positive by atanh(-x) = -atanh(x)

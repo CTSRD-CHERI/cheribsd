@@ -61,17 +61,17 @@ extern "C" {
 /*
  * The simplified state transition diagram for dbufs looks like:
  *
- *                  +--> READ --+
- *                  |           |
- *                  |           V
- *  (alloc)-->UNCACHED       CACHED-->EVICTING-->(free)
- *             ^    |           ^        ^
- *             |    |           |        |
- *             |    +--> FILL --+        |
- *             |    |                    |
- *             |    |                    |
- *             |    +------> NOFILL -----+
- *             |               |
+ *                  +-------> READ ------+
+ *                  |                    |
+ *                  |                    V
+ *  (alloc)-->UNCACHED                  CACHED-->EVICTING-->(free)
+ *             ^    |                    ^          ^
+ *             |    |                    |          |
+ *             |    +-------> FILL ------+          |
+ *             |    |                    |          |
+ *             |    |                    |          |
+ *             |    +------> NOFILL -----+-----> UNCACHED
+ *             |               |               (Direct I/O)
  *             +---------------+
  *
  * DB_SEARCH is an invalid state for a dbuf. It is used by dbuf_free_range
@@ -79,6 +79,7 @@ extern "C" {
  * dbuf_states_t (see comment on dn_dbufs in dnode.h).
  */
 typedef enum dbuf_states {
+	DB_MARKER = -2,
 	DB_SEARCH = -1,
 	DB_UNCACHED,
 	DB_FILL,
@@ -175,6 +176,7 @@ typedef struct dbuf_dirty_record {
 			uint8_t dr_copies;
 			boolean_t dr_nopwrite;
 			boolean_t dr_brtwrite;
+			boolean_t dr_diowrite;
 			boolean_t dr_has_raw_params;
 
 			/*
@@ -213,9 +215,15 @@ typedef struct dmu_buf_impl {
 	struct objset *db_objset;
 
 	/*
-	 * handle to safely access the dnode we belong to (NULL when evicted)
+	 * Handle to safely access the dnode we belong to (NULL when evicted)
+	 * if dnode_move() is used on the platform, or just dnode otherwise.
 	 */
+#if !defined(__linux__) && !defined(__FreeBSD__)
+#define	USE_DNODE_HANDLE	1
 	struct dnode_handle *db_dnode_handle;
+#else
+	struct dnode *db_dnode;
+#endif
 
 	/*
 	 * our parent buffer; if the dnode points to us directly,
@@ -377,15 +385,17 @@ dmu_buf_impl_t *dbuf_find(struct objset *os, uint64_t object, uint8_t level,
     uint64_t blkid, uint64_t *hash_out);
 
 int dbuf_read(dmu_buf_impl_t *db, zio_t *zio, uint32_t flags);
-void dmu_buf_will_clone(dmu_buf_t *db, dmu_tx_t *tx);
+void dmu_buf_will_clone_or_dio(dmu_buf_t *db, dmu_tx_t *tx);
 void dmu_buf_will_not_fill(dmu_buf_t *db, dmu_tx_t *tx);
-void dmu_buf_will_fill(dmu_buf_t *db, dmu_tx_t *tx);
-void dmu_buf_fill_done(dmu_buf_t *db, dmu_tx_t *tx);
+void dmu_buf_will_fill(dmu_buf_t *db, dmu_tx_t *tx, boolean_t canfail);
+boolean_t dmu_buf_fill_done(dmu_buf_t *db, dmu_tx_t *tx, boolean_t failed);
 void dbuf_assign_arcbuf(dmu_buf_impl_t *db, arc_buf_t *buf, dmu_tx_t *tx);
 dbuf_dirty_record_t *dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
 dbuf_dirty_record_t *dbuf_dirty_lightweight(dnode_t *dn, uint64_t blkid,
     dmu_tx_t *tx);
 boolean_t dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
+int dmu_buf_get_bp_from_dbuf(dmu_buf_impl_t *db, blkptr_t **bp);
+int dmu_buf_untransform_direct(dmu_buf_impl_t *db, spa_t *spa);
 arc_buf_t *dbuf_loan_arcbuf(dmu_buf_impl_t *db);
 void dmu_buf_write_embedded(dmu_buf_t *dbuf, void *data,
     bp_embedded_type_t etype, enum zio_compress comp,
@@ -416,11 +426,19 @@ void dbuf_stats_destroy(void);
 int dbuf_dnode_findbp(dnode_t *dn, uint64_t level, uint64_t blkid,
     blkptr_t *bp, uint16_t *datablkszsec, uint8_t *indblkshift);
 
+#ifdef USE_DNODE_HANDLE
 #define	DB_DNODE(_db)		((_db)->db_dnode_handle->dnh_dnode)
 #define	DB_DNODE_LOCK(_db)	((_db)->db_dnode_handle->dnh_zrlock)
 #define	DB_DNODE_ENTER(_db)	(zrl_add(&DB_DNODE_LOCK(_db)))
 #define	DB_DNODE_EXIT(_db)	(zrl_remove(&DB_DNODE_LOCK(_db)))
 #define	DB_DNODE_HELD(_db)	(!zrl_is_zero(&DB_DNODE_LOCK(_db)))
+#else
+#define	DB_DNODE(_db)		((_db)->db_dnode)
+#define	DB_DNODE_LOCK(_db)
+#define	DB_DNODE_ENTER(_db)
+#define	DB_DNODE_EXIT(_db)
+#define	DB_DNODE_HELD(_db)	(B_TRUE)
+#endif
 
 void dbuf_init(void);
 void dbuf_fini(void);
@@ -458,7 +476,7 @@ dbuf_find_dirty_eq(dmu_buf_impl_t *db, uint64_t txg)
 	(dbuf_is_metadata(_db) &&					\
 	((_db)->db_objset->os_primary_cache == ZFS_CACHE_METADATA)))
 
-boolean_t dbuf_is_l2cacheable(dmu_buf_impl_t *db);
+boolean_t dbuf_is_l2cacheable(dmu_buf_impl_t *db, blkptr_t *db_bp);
 
 #ifdef ZFS_DEBUG
 

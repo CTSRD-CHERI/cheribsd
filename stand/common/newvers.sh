@@ -28,8 +28,6 @@
 # LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
-#
-#	@(#)newvers.sh	8.1 (Berkeley) 4/20/94
 
 tempfile=$(mktemp tmp.XXXXXX) || exit
 trap "rm -f $tempfile" EXIT INT TERM
@@ -46,7 +44,6 @@ shift $((OPTIND - 1))
 
 LC_ALL=C; export LC_ALL
 u=${USER-root} h=${HOSTNAME-`hostname`} t=`date`
-#r=`head -n 6 $1 | tail -n 1 | awk -F: ' { print $1 } '`
 r=`awk -F: ' /^[0-9]\.[0-9]+:/ { print $1; exit }' $1`
 
 bootprog_info="FreeBSD/${3} ${2}, Revision ${r}\\n"

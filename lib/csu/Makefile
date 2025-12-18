@@ -1,4 +1,3 @@
-
 .include <src.opts.mk>
 
 .if exists(${.CURDIR}/${MACHINE_ARCH:S/aarch64cb/aarch64c/:S/powerpc64le/powerpc64/})

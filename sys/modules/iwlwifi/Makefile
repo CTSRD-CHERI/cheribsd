@@ -1,8 +1,8 @@
-
 DEVIWLWIFIDIR=	${SRCTOP}/sys/contrib/dev/iwlwifi
 
 .PATH: ${DEVIWLWIFIDIR}
 
+WITH_CONFIG_PM=	0
 WITH_DEBUGFS=	0
 
 KMOD=	if_iwlwifi
@@ -12,6 +12,7 @@ SRCS+=	iwl-dbg-tlv.c iwl-debug.c
 SRCS+=	iwl-eeprom-parse.c iwl-eeprom-read.c
 SRCS+=	iwl-io.c iwl-nvm-parse.c iwl-phy-db.c iwl-trans.c
 SRCS+=	cfg/7000.c cfg/8000.c cfg/9000.c cfg/22000.c
+SRCS+=	cfg/ax210.c cfg/bz.c cfg/sc.c
 SRCS+=	fw/dbg.c fw/dump.c fw/img.c fw/notif-wait.c
 SRCS+=	fw/paging.c fw/pnvm.c fw/rs.c fw/smem.c fw/init.c
 #SRCS+=	fw/uefi.c
@@ -21,6 +22,9 @@ SRCS+=	mvm/mac80211.c mvm/nvm.c mvm/offloading.c mvm/ops.c
 SRCS+=	mvm/phy-ctxt.c mvm/power.c mvm/quota.c mvm/rs-fw.c mvm/rfi.c
 SRCS+=	mvm/rx.c mvm/rxmq.c mvm/scan.c mvm/sf.c mvm/sta.c mvm/tdls.c
 SRCS+=	mvm/time-event.c mvm/tt.c mvm/tx.c mvm/utils.c
+SRCS+=	mvm/link.c
+SRCS+=	mvm/mld-key.c mvm/mld-mac.c mvm/mld-mac80211.c mvm/mld-sta.c
+SRCS+=	mvm/ptp.c mvm/time-sync.c
 #SRCS+=	mvm/led.c
 SRCS+=	pcie/ctxt-info-gen3.c pcie/ctxt-info.c
 SRCS+=	pcie/drv.c pcie/rx.c pcie/trans-gen2.c pcie/trans.c
@@ -31,6 +35,11 @@ SRCS+=	queue/tx.c
 SRCS+=	fw/debugfs.c mvm/debugfs.c mvm/debugfs-vif.c
 CFLAGS+=	-DCONFIG_IWLWIFI_DEBUGFS=${WITH_DEBUGFS}
 CFLAGS+=	-DCONFIG_MAC80211_DEBUGFS=${WITH_DEBUGFS}
+.endif
+.if defined(WITH_CONFIG_PM) && ${WITH_CONFIG_PM} > 0
+SRCS+=	mvm/d3.c
+CFLAGS+=	-DCONFIG_PM=${WITH_CONFIG_PM}
+CFLAGS+=	-DCONFIG_PM_SLEEP=${WITH_CONFIG_PM}
 .endif
 
 SRCS+=	iwl-devtrace.c
@@ -57,8 +66,6 @@ CFLAGS+=	-DCONFIG_IWLWIFI_DEBUG=1
 CFLAGS+=	-DCONFIG_IWLWIFI_DEVICE_TRACING=1
 #CFLAGS+=	-DCONFIG_LOCKDEP=1
 #CFLAGS+=	-DCONFIG_NL80211_TESTMODE=1
-#CFLAGS+=	-DCONFIG_PM=1
-#CFLAGS+=	-DCONFIG_PM_SLEEP=1
 #CFLAGS+=	-DCONFIG_THERMAL=1
 #CFLAGS+=	-DCONFIG_EFI=1
 

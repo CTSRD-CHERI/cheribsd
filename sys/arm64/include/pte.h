@@ -90,6 +90,7 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 
 #define	ATTR_CONTIGUOUS		(1UL << 52)
 #define	ATTR_DBM		(1UL << 51)
+#define	ATTR_S1_GP		(1UL << 50)
 #define	ATTR_S1_nG		(1 << 11)
 #define	ATTR_AF			(1 << 10)
 #define	ATTR_SH(x)		((x) << 8)
@@ -121,14 +122,8 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	 ATTR_S2_MEMATTR_WB		0xf
 
 #if __has_feature(capabilities)
-/*
- * The aarch64 orr instruction cannot handle ATTR_DEFAULT |
- * ATTR_CAP_RW as a single operand, so separate orr instructions are
- * required for ATTR_CAP_RW.
- */
 #define	ATTR_CAP_RW	(ATTR_LC_ENABLED | ATTR_SC)
 #endif
-#define	ATTR_DEFAULT	(ATTR_AF | ATTR_SH(ATTR_SH_IS))
 
 #define	ATTR_DESCR_MASK		3
 #define	ATTR_DESCR_VALID	1
@@ -136,6 +131,12 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	ATTR_DESCR_TYPE_TABLE	2
 #define	ATTR_DESCR_TYPE_PAGE	2
 #define	ATTR_DESCR_TYPE_BLOCK	0
+
+/*
+ * Superpage promotion requires that the bits specified by the following
+ * mask all be identical in the constituent PTEs.
+ */
+#define	ATTR_PROMOTE	(ATTR_MASK & ~(ATTR_CONTIGUOUS | ATTR_AF))
 
 #if PAGE_SIZE == PAGE_SIZE_4K
 #define	L0_SHIFT	39
@@ -181,7 +182,11 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 	/* 0x2 also marks an invalid address */
 #define	L3_PAGE		0x3
 
-#define	PMAP_MAPDEV_EARLY_SIZE	(L2_SIZE * 8)
+/*
+ * A substantial portion of this is to make sure that we can cope with 4K
+ * framebuffers in early boot, assuming a common 4K resolution @ 32-bit depth.
+ */
+#define	PMAP_MAPDEV_EARLY_SIZE	(L2_SIZE * 20)
 
 #if PAGE_SIZE == PAGE_SIZE_4K
 #define	L0_ENTRIES_SHIFT 9
@@ -199,6 +204,26 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	Ln_ENTRIES	(1 << Ln_ENTRIES_SHIFT)
 #define	Ln_ADDR_MASK	(Ln_ENTRIES - 1)
 #define	Ln_TABLE_MASK	((1 << 12) - 1)
+
+/*
+ * The number of contiguous Level 3 entries (with ATTR_CONTIGUOUS set) that
+ * can be coalesced into a single TLB entry
+ */
+#if PAGE_SIZE == PAGE_SIZE_4K
+#define	L2C_ENTRIES	16
+#define	L3C_ENTRIES	16
+#elif PAGE_SIZE == PAGE_SIZE_16K
+#define	L2C_ENTRIES	32
+#define	L3C_ENTRIES	128
+#else
+#error Unsupported page size
+#endif
+
+#define	L2C_SIZE	(L2C_ENTRIES * L2_SIZE)
+#define	L2C_OFFSET	(L2C_SIZE - 1)
+
+#define	L3C_SIZE	(L3C_ENTRIES * L3_SIZE)
+#define	L3C_OFFSET	(L3C_SIZE - 1)
 
 #define	pmap_l0_index(va)	(((va) >> L0_SHIFT) & L0_ADDR_MASK)
 #define	pmap_l1_index(va)	(((va) >> L1_SHIFT) & Ln_ADDR_MASK)

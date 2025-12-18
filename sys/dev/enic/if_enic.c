@@ -117,6 +117,7 @@ static int enic_dev_wait(struct vnic_dev *, int (*) (struct vnic_dev *, int),
     int (*) (struct vnic_dev *, int *), int arg);
 static int enic_map_bar(struct enic_softc *, struct enic_bar_info *, int, bool);
 static void enic_update_packet_filter(struct enic *enic);
+static bool enic_if_needs_restart(if_ctx_t, enum iflib_restart_event);
 
 typedef enum {
 	ENIC_BARRIER_RD,
@@ -173,6 +174,8 @@ static device_method_t enic_iflib_methods[] = {
 	DEVMETHOD(ifdi_intr_enable, enic_intr_enable_all),
 	DEVMETHOD(ifdi_intr_disable, enic_intr_disable_all),
 	DEVMETHOD(ifdi_msix_intr_assign, enic_msix_intr_assign),
+
+	DEVMETHOD(ifdi_needs_restart, enic_if_needs_restart),
 
 	DEVMETHOD_END
 };
@@ -1564,6 +1567,16 @@ enic_update_packet_filter(struct enic *enic)
 	ENIC_UNLOCK(softc);
 }
 
+static bool
+enic_if_needs_restart(if_ctx_t ctx __unused, enum iflib_restart_event event)
+{
+	switch (event) {
+	case IFLIB_RESTART_VLAN_CONFIG:
+	default:
+		return (false);
+	}
+}
+
 int
 enic_setup_finish(struct enic *enic)
 {
@@ -1574,7 +1587,7 @@ enic_setup_finish(struct enic *enic)
 	softc->multicast = 0;
 	softc->broadcast = 1;
 	softc->promisc = 0;
-	softc->allmulti = 1;;
+	softc->allmulti = 1;
 	enic_update_packet_filter(enic);
 
 	return 0;

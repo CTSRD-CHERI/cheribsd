@@ -42,7 +42,7 @@
 #include <vm/vm_kern.h>
 #include <vm/pmap.h>
 
-#include <dev/extres/clk/clk.h>
+#include <dev/clk/clk.h>
 
 #include <drm/drm_gem.h>
 #include <drm/drm_atomic_helper.h>

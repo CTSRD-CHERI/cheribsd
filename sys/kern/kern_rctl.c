@@ -28,7 +28,8 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
+#ifdef RCTL
+
 #include <sys/param.h>
 #include <sys/devctl.h>
 #include <sys/malloc.h>
@@ -38,6 +39,7 @@
 #include <sys/kernel.h>
 #include <sys/limits.h>
 #include <sys/loginclass.h>
+#include <sys/malloc.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
 #include <sys/racct.h>
@@ -57,7 +59,6 @@
 #include <sys/tree.h>
 #include <vm/uma.h>
 
-#ifdef RCTL
 #ifndef RACCT
 #error "The RCTL option requires the RACCT option"
 #endif
@@ -580,7 +581,7 @@ rctl_enforce(struct proc *p, int resource, uint64_t amount)
 				continue;
 			}
 			sbuf_new(&sb, buf, RCTL_LOG_BUFSIZE, SBUF_FIXEDLEN);
-			sbuf_printf(&sb, "rule=");
+			sbuf_cat(&sb, "rule=");
 			rctl_rule_to_sbuf(&sb, rule);
 			sbuf_printf(&sb, " pid=%d ruid=%d jail=%s",
 			    p->p_pid, p->p_ucred->cr_ruid,
@@ -1484,28 +1485,28 @@ rctl_rule_to_sbuf(struct sbuf *sb, const struct rctl_rule *rule)
 	switch (rule->rr_subject_type) {
 	case RCTL_SUBJECT_TYPE_PROCESS:
 		if (rule->rr_subject.rs_proc == NULL)
-			sbuf_printf(sb, ":");
+			sbuf_putc(sb, ':');
 		else
 			sbuf_printf(sb, "%d:",
 			    rule->rr_subject.rs_proc->p_pid);
 		break;
 	case RCTL_SUBJECT_TYPE_USER:
 		if (rule->rr_subject.rs_uip == NULL)
-			sbuf_printf(sb, ":");
+			sbuf_putc(sb, ':');
 		else
 			sbuf_printf(sb, "%d:",
 			    rule->rr_subject.rs_uip->ui_uid);
 		break;
 	case RCTL_SUBJECT_TYPE_LOGINCLASS:
 		if (rule->rr_subject.rs_loginclass == NULL)
-			sbuf_printf(sb, ":");
+			sbuf_putc(sb, ':');
 		else
 			sbuf_printf(sb, "%s:",
 			    rule->rr_subject.rs_loginclass->lc_name);
 		break;
 	case RCTL_SUBJECT_TYPE_JAIL:
 		if (rule->rr_subject.rs_prison_racct == NULL)
-			sbuf_printf(sb, ":");
+			sbuf_putc(sb, ':');
 		else
 			sbuf_printf(sb, "%s:",
 			    rule->rr_subject.rs_prison_racct->prr_name);
@@ -1708,7 +1709,7 @@ rctl_get_rules_callback(struct racct *racct, void *arg2, void *arg3)
 		if (!rctl_rule_matches(link->rrl_rule, filter))
 			continue;
 		rctl_rule_to_sbuf(sb, link->rrl_rule);
-		sbuf_printf(sb, ",");
+		sbuf_putc(sb, ',');
 	}
 }
 
@@ -1774,7 +1775,7 @@ kern_rctl_get_rules(struct thread *td, const void * __capability inbufp,
 			if (!rctl_rule_matches(link->rrl_rule, filter))
 				continue;
 			rctl_rule_to_sbuf(sb, link->rrl_rule);
-			sbuf_printf(sb, ",");
+			sbuf_putc(sb, ',');
 		}
 		RACCT_UNLOCK();
 	}
@@ -1876,7 +1877,7 @@ kern_rctl_get_limits(struct thread *td, const void * __capability inbufp,
 	LIST_FOREACH(link, &filter->rr_subject.rs_proc->p_racct->r_rule_links,
 	    rrl_next) {
 		rctl_rule_to_sbuf(sb, link->rrl_rule);
-		sbuf_printf(sb, ",");
+		sbuf_putc(sb, ',');
 	}
 	RACCT_UNLOCK();
 	if (sbuf_error(sb) == ENOMEM) {
@@ -2252,6 +2253,10 @@ rctl_init(void)
 
 #else /* !RCTL */
 
+#include <sys/types.h>
+#include <sys/errno.h>
+#include <sys/sysproto.h>
+
 int
 sys_rctl_get_racct(struct thread *td, struct rctl_get_racct_args *uap)
 {
@@ -2287,7 +2292,7 @@ sys_rctl_remove_rule(struct thread *td, struct rctl_remove_rule_args *uap)
 	return (ENOSYS);
 }
 
-#endif /* !RCTL */
+#endif /* RCTL */
 // CHERI CHANGES START
 // {
 //   "updated": 20230509,

@@ -36,6 +36,17 @@
 
 #include <cheri/cheri.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+FEATURE(cheri_purecap_kernel, "CHERI pure-capability kernel");
+#ifdef __CHERI_SUBOBJECT_BOUNDS__
+FEATURE(cheri_subobject_bounds_kernel,
+    "CHERI pure-capability kernel with sub-object bounds");
+#endif
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+FEATURE(morello_purecap_benchmark_abi_kernel, "Morello benchmark ABI kernel");
+#endif
+#endif /* __CHERI_PURE_CAPABILITY__ */
+
 SYSCTL_NODE(_security, OID_AUTO, cheri, CTLFLAG_RD, 0,
     "CHERI settings and statistics");
 
@@ -46,20 +57,10 @@ SYSCTL_UINT(_security_cheri, OID_AUTO, capability_size, CTLFLAG_RD,
 SYSCTL_NODE(_security_cheri, OID_AUTO, stats, CTLFLAG_RD, 0,
     "CHERI statistics");
 
-/* XXXRW: Should possibly be u_long. */
-u_int	security_cheri_syscall_violations;
-SYSCTL_UINT(_security_cheri_stats, OID_AUTO, syscall_violations, CTLFLAG_RD,
-    &security_cheri_syscall_violations, 0, "Number of system calls blocked");
-
 /*
  * A set of sysctls that cause the kernel debugger to enter following a policy
  * violation or signal delivery due to CHERI or while in a sandbox.
  */
-u_int	security_cheri_debugger_on_sandbox_syscall;
-SYSCTL_UINT(_security_cheri, OID_AUTO, debugger_on_sandbox_syscall, CTLFLAG_RW,
-    &security_cheri_debugger_on_sandbox_syscall, 0,
-    "Enter KDB when a syscall is rejected while in a sandbox");
-
 u_int	security_cheri_abort_on_memcpy_tag_loss;
 SYSCTL_UINT(_security_cheri, OID_AUTO, abort_on_memcpy_tag_loss,
     CTLFLAG_RW, &security_cheri_abort_on_memcpy_tag_loss, 0,
@@ -69,6 +70,35 @@ u_int	security_cheri_bound_legacy_capabilities;
 SYSCTL_INT(_security_cheri, OID_AUTO, bound_legacy_capabilities,
     CTLFLAG_RWTUN, &security_cheri_bound_legacy_capabilities, 0,
     "Set bounds on userspace capabilities created by legacy ABIs.");
+
+#ifdef __aarch64__
+/*
+ * Set the default state of library-based compartmentalisation (c18n) in
+ * userspace.
+ */
+bool security_cheri_lib_based_c18n_default = false;
+SYSCTL_BOOL(_security_cheri, OID_AUTO, lib_based_c18n_default, CTLFLAG_RWTUN,
+    &security_cheri_lib_based_c18n_default, 0,
+    "Userspace library-based compartmentalisation default");
+
+/*
+ * When userspace library-based compartmentalisation (c18n) is enabled, wrap
+ * function pointers in trampolines.
+ */
+bool security_cheri_lib_based_c18n_wrap_fptr = false;
+SYSCTL_BOOL(_security_cheri, OID_AUTO, lib_based_c18n_wrap_fptr, CTLFLAG_RWTUN,
+    &security_cheri_lib_based_c18n_wrap_fptr, 0,
+    "When userspace library-based compartmentalisation is enabled, wrap "
+    "function pointers in trampolines");
+#endif
+
+/*
+ * Forbid system calls from code without CHERI_PERM_SYSCALL.
+ */
+bool security_cheri_check_perm_syscall = false;
+SYSCTL_BOOL(_security_cheri, OID_AUTO, check_perm_syscall,
+    CTLFLAG_RWTUN, &security_cheri_check_perm_syscall, 0,
+    "Forbid system calls from code without CHERI_PERM_SYSCALL");
 
 #ifdef CHERI_CAPREVOKE
 /*
@@ -89,4 +119,13 @@ int security_cheri_runtime_revocation_every_free_default = 0;
 SYSCTL_INT(_security_cheri, OID_AUTO, runtime_revocation_every_free_default,
     CTLFLAG_RWTUN, &security_cheri_runtime_revocation_every_free_default, 0,
     "Userspace runtime revocation on every free for debugging default");
+
+/*
+ * Set the default policy for synchronous vs. asynchronous revocation.  This is
+ * used to compute the revocation policy flag in AT_BSDFLAGS.
+ */
+int security_cheri_runtime_revocation_async = 1;
+SYSCTL_INT(_security_cheri, OID_AUTO, runtime_revocation_async,
+    CTLFLAG_RWTUN, &security_cheri_runtime_revocation_async, 0,
+    "Userspace requests (a)synchronous revocation by default");
 #endif  /* CHERI_CAPREVOKE */

@@ -156,7 +156,7 @@ struct cheri_test {
 	const char	*ct_desc;
 	void		(*ct_func)(void);
 	void		(*ct_child_func)(void);
-	const char *	(*ct_check_skip)(const char *);
+	const char *	(*ct_check_skip)(const struct cheri_test *);
 	const char *	(*ct_check_xfail)(const char *);
 	u_int		 ct_flags;
 	int		 ct_signum;
@@ -253,6 +253,14 @@ _cheribsdtest_check_cap_eq(void *__capability a, void *__capability b,
 #define CHERIBSDTEST_CHECK_EQ_CAP(a, b)	\
 	_cheribsdtest_check_cap_eq(a, b, __STRING(a), __STRING(b))
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	CHERIBSDTEST_CHECK_EQ_PTR(a, b)	\
+	CHERIBSDTEST_CHECK_EQ_CAP(a, b)
+#else
+#define	CHERIBSDTEST_CHECK_EQ_PTR(a, b)	\
+	CHERIBSDTEST_CHECK_EQ(void *, "%p", a, b, __STRING(a), __STRING(b))
+#endif
+
 static inline void
 _cheribsdtest_check_cap_bounds_precise(void *__capability c,
     size_t expected_len)
@@ -307,15 +315,25 @@ _cheribsdtest_check_errno(const char *context, int actual, int expected)
 	    context, actual, actual_str, expected, expected_str);
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	__CHERIBSDTEST_PTR_FMT	"%#p"
+#else
+#define	__CHERIBSDTEST_PTR_FMT	"%p"
+#endif
+
 /** Check that @p call fails and errno is set to @p expected_errno */
-#define CHERIBSDTEST_CHECK_CALL_ERROR(call, expected_errno)			\
-	do {									\
-		errno = 0;							\
-		int __ret = call;						\
-		int call_errno = errno;						\
-		CHERIBSDTEST_VERIFY2(__ret == -1,				\
-		    #call " unexpectedly returned %d", __ret);			\
-		_cheribsdtest_check_errno(#call, call_errno, expected_errno);	\
+#define CHERIBSDTEST_CHECK_CALL_ERROR(call, expected_errno)		\
+	do {								\
+		errno = 0;						\
+		__typeof(call) __ret = call;				\
+		int call_errno = errno;					\
+		CHERIBSDTEST_VERIFY2(__ret == (__typeof(__ret))-1,	\
+		    _Generic((__ret),					\
+			void *: #call " unexpectedly returned " __CHERIBSDTEST_PTR_FMT, \
+			default: #call " unexpectedly returned %d"),	\
+		    __ret);						\
+		_cheribsdtest_check_errno(#call, call_errno,		\
+		    expected_errno);					\
 	} while (0)
 
 /* For libc_memcpy and libc_memset tests and the unaligned copy tests: */
@@ -336,6 +354,9 @@ extern void cheribsdtest_exec_child(void);
  */
 extern pid_t cheribsdtest_spawn_child(enum spawn_child_mode mode);
 
-const char *skip_need_cheri_revoke(const char *name);
+const char *skip_need_cheri_revoke(const struct cheri_test *ctp);
+
+const char *cheribsdtest_get_helper_path(void);
+const char *cheribsdtest_skip_no_helper(const struct cheri_test *ctp);
 
 #endif /* !_CHERIBSDTEST_H_ */

@@ -43,7 +43,6 @@
  * }
  * CHERI CHANGES END
  */
-#include <sys/cdefs.h>
 #include "namespace.h"
 #include <sys/param.h>
 #ifdef YP

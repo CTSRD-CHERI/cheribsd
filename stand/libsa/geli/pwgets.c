@@ -27,11 +27,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)gets.c	8.1 (Berkeley) 6/11/93
  */
 
-#include <sys/cdefs.h>
 #include "stand.h"
 
 /* gets() with constrained input length, for passwords */

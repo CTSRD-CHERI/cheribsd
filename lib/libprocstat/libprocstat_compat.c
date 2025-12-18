@@ -24,7 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/user.h>
 #include <sys/socket.h>
@@ -183,7 +182,7 @@ freebsd11_procstat_get_socket_info(struct procstat *procstat, struct filestat *f
 	r = procstat_get_socket_info(procstat, fst, &sock, errbuf);
 	if (r != 0)
 		return (r);
-	sock_compat->inp_ppcb = sock.inp_ppcb;
+	sock_compat->inp_ppcb = sock.so_pcb;
 	sock_compat->so_addr = sock.so_addr;
 	sock_compat->so_pcb = sock.so_pcb;
 	sock_compat->unp_conn = sock.unp_conn;

@@ -28,7 +28,6 @@
  *
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/module.h>
@@ -400,7 +399,7 @@ pmu_attach(device_t dev)
 			device_printf(dev, "PMU child <%s>\n",name);
 
 		if (strncmp(name, "adb", 4) == 0) {
-			sc->adb_bus = device_add_child(dev,"adb",-1);
+			sc->adb_bus = device_add_child(dev,"adb",DEVICE_UNIT_ANY);
 		}
 
 		if (strncmp(name, "power-mgt", 9) == 0) {
@@ -812,10 +811,12 @@ pmu_shutdown(void *xsc, int howto)
 	struct pmu_softc *sc = xsc;
 	uint8_t cmd[] = {'M', 'A', 'T', 'T'};
 
-	if (howto & RB_HALT)
+	if ((howto & RB_POWEROFF) != 0)
 		pmu_send(sc, PMU_POWER_OFF, 4, cmd, 0, NULL);
-	else
+	else if ((howto & RB_HALT) == 0)
 		pmu_send(sc, PMU_RESET_CPU, 0, NULL, 0, NULL);
+	else
+		return;
 
 	for (;;);
 }

@@ -1,6 +1,6 @@
 #NO_UNIVERSE
 
 include "SPIKE"
-include "../../conf/std.nodebug"
+include "std.nodebug"
 
 ident SPIKE-NODEBUG

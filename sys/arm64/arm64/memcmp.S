@@ -9,6 +9,8 @@
  * ARMv8-a, AArch64, unaligned accesses.
  */
 
+#include <sys/elf_common.h>
+
 #include <machine/asm.h>
 
 #define L(l) .L ## l
@@ -108,7 +110,7 @@ L(return):
 L(ret_eq):
 	cset	result, ne
 	cneg	result, result, lo
-	ret
+	RETURN
 
 	.p2align 4
 	/* Compare up to 8 bytes.  Limit is [-8..-1].  */
@@ -130,7 +132,8 @@ L(byte_loop):
 	ccmp	data1w, data2w, 0, ne	/* NZCV = 0b0000.  */
 	b.eq	L(byte_loop)
 	sub	result, data1w, data2w
-	ret
+	RETURN
 
 END (memcmp)
 
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

@@ -32,18 +32,6 @@
  * SUCH DAMAGE.
  */
 
-#if 0
-#ifndef lint
-static char const copyright[] =
-"@(#) Copyright (c) 1989, 1993, 1994\n\
-	The Regents of the University of California.  All rights reserved.\n";
-#endif /* not lint */
-
-#ifndef lint
-static char sccsid[] = "@(#)mv.c	8.2 (Berkeley) 4/2/94";
-#endif /* not lint */
-#endif
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/acl.h>
 #include <sys/param.h>
@@ -184,7 +172,7 @@ do_move(const char *from, const char *to)
 	 */
 	if (!fflg && !access(to, F_OK)) {
 
-		/* prompt only if source exist */
+		/* prompt only if source exists */
 	        if (lstat(from, &sb) == -1) {
 			warn("%s", from);
 			return (1);
@@ -331,6 +319,12 @@ err:		if (unlink(to))
 	 */
 	preserve_fd_acls(from_fd, to_fd, from, to);
 	(void)close(from_fd);
+
+	ts[0] = sbp->st_atim;
+	ts[1] = sbp->st_mtim;
+	if (futimens(to_fd, ts))
+		warn("%s: set times", to);
+
 	/*
 	 * XXX
 	 * NFS doesn't support chflags; ignore errors unless there's reason
@@ -350,11 +344,6 @@ err:		if (unlink(to))
 		}
 	} else
 		warn("%s: cannot stat", to);
-
-	ts[0] = sbp->st_atim;
-	ts[1] = sbp->st_mtim;
-	if (futimens(to_fd, ts))
-		warn("%s: set times", to);
 
 	if (close(to_fd)) {
 		warn("%s", to);

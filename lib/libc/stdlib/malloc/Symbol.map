@@ -1,6 +1,3 @@
-/*
- */
-
 FBSD_1.0 {
 	_malloc_options;
 	_malloc_message;
@@ -12,6 +9,8 @@ FBSD_1.0 {
 	malloc_usable_size;
 	malloc_revoke;
 	malloc_is_revoking;
+	malloc_revoke_quarantine_force_flush;
+	malloc_revoke_enabled;
 };
 
 FBSD_1.3 {
@@ -28,11 +27,6 @@ FBSD_1.3 {
 	sallocx;
 	dallocx;
 	nallocx;
-	allocm;
-	rallocm;
-	sallocm;
-	dallocm;
-	nallocm;
 	__malloc;
 	__calloc;
 	__realloc;
@@ -45,11 +39,6 @@ FBSD_1.3 {
 	__sallocx;
 	__dallocx;
 	__nallocx;
-	__allocm;
-	__rallocm;
-	__sallocm;
-	__dallocm;
-	__nallocm;
 };
 
 FBSD_1.4 {

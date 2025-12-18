@@ -29,18 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#if 0
-#ifndef lint
-static const char copyright[] =
-"@(#) Copyright (c) 1988, 1990, 1993\n\
-	The Regents of the University of California.  All rights reserved.\n";
-#endif /* not lint */
-
-#ifndef lint
-static char sccsid[] = "@(#)shutdown.c	8.4 (Berkeley) 4/28/95";
-#endif /* not lint */
-#endif
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/boottrace.h>
 #include <sys/resource.h>
@@ -55,6 +43,7 @@ static char sccsid[] = "@(#)shutdown.c	8.4 (Berkeley) 4/28/95";
 #include <pwd.h>
 #include <setjmp.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -98,7 +87,7 @@ static void badtime(void);
 static void die_you_gravy_sucking_pig_dog(void);
 static void finish(int);
 static void getoffset(char *);
-static void loop(void);
+static void loop(bool);
 static void nolog(void);
 static void timeout(int);
 static void timewarn(int);
@@ -112,12 +101,14 @@ main(int argc, char **argv)
 	char *p, *endp;
 	struct passwd *pw;
 	int arglen, ch, len, readstdin;
+	bool dowarn;
 
 #ifndef DEBUG
 	if (geteuid())
 		errx(1, "NOT super-user");
 #endif
 
+	dowarn = true;
 	nosync = NULL;
 	readstdin = 0;
 
@@ -142,7 +133,7 @@ main(int argc, char **argv)
 		goto poweroff;
 	}
 
-	while ((ch = getopt(argc, argv, "-chknopr")) != -1)
+	while ((ch = getopt(argc, argv, "-chknopqr")) != -1)
 		switch (ch) {
 		case '-':
 			readstdin = 1;
@@ -164,6 +155,9 @@ main(int argc, char **argv)
 			break;
 		case 'p':
 			dopower = 1;
+			break;
+		case 'q':
+			dowarn = false;
 			break;
 		case 'r':
 			doreboot = 1;
@@ -190,6 +184,8 @@ main(int argc, char **argv)
 	getoffset(*argv++);
 
 poweroff:
+	if (!dowarn && *argv != NULL)
+		usage("warning-message supplied but suppressed with -q");
 	if (*argv) {
 		for (p = mbuf, len = sizeof(mbuf); *argv; ++argv) {
 			arglen = strlen(*argv);
@@ -247,12 +243,12 @@ poweroff:
 	setsid();
 #endif
 	openlog("shutdown", LOG_CONS, LOG_AUTH);
-	loop();
+	loop(dowarn);
 	return(0);
 }
 
 static void
-loop(void)
+loop(bool dowarn)
 {
 	struct interval *tp;
 	u_int sltime;
@@ -275,13 +271,14 @@ loop(void)
 		 * the next wait time.
 		 */
 		if ((sltime = offset - tp->timeleft)) {
-			if (sltime > (u_int)(tp->timetowait / 5))
+			if (dowarn && sltime > (u_int)(tp->timetowait / 5))
 				timewarn(offset);
 			(void)sleep(sltime);
 		}
 	}
 	for (;; ++tp) {
-		timewarn(tp->timeleft);
+		if (dowarn)
+			timewarn(tp->timeleft);
 		if (!logged && tp->timeleft <= NOLOG_TIME) {
 			logged = 1;
 			nolog();
@@ -596,7 +593,7 @@ usage(const char *cp)
 	if (cp != NULL)
 		warnx("%s", cp);
 	(void)fprintf(stderr,
-	    "usage: shutdown [-] [-c | -h | -p | -r | -k] [-o [-n]] time [warning-message ...]\n"
+	    "usage: shutdown [-] [-c | -h | -p | -r | -k] [-o [-n]] [-q] time [warning-message ...]\n"
 	    "       poweroff\n");
 	exit(1);
 }

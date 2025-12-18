@@ -1406,6 +1406,17 @@ typedef enum {
 #define	SM2_RUN_MAX		SM2_RUN_DECODE(~0ULL)
 #define	SM2_OFFSET_MAX		SM2_OFFSET_DECODE(~0ULL)
 
+typedef enum dd_used {
+	DD_USED_HEAD,
+	DD_USED_SNAP,
+	DD_USED_CHILD,
+	DD_USED_CHILD_RSRV,
+	DD_USED_REFRSRV,
+	DD_USED_NUM
+} dd_used_t;
+
+#define	DD_FLAG_USED_BREAKDOWN (1 << 0)
+
 typedef struct dsl_dir_phys {
 	uint64_t dd_creation_time; /* not actually used */
 	uint64_t dd_head_dataset_obj;
@@ -1424,7 +1435,9 @@ typedef struct dsl_dir_phys {
 	/* Administrative reservation setting */
 	uint64_t dd_reserved;
 	uint64_t dd_props_zapobj;
-	uint64_t dd_pad[7];
+	uint64_t dd_pad[1];
+	uint64_t dd_flags;
+	uint64_t dd_used_breakdown[DD_USED_NUM];
 	uint64_t dd_clones;
 	uint64_t dd_pad1[13]; /* pad out to 256 bytes for good measure */
 } dsl_dir_phys_t;
@@ -1452,7 +1465,10 @@ typedef struct dsl_dataset_phys {
 	uint64_t ds_guid;
 	uint64_t ds_flags;
 	blkptr_t ds_bp;
-	uint64_t ds_pad[8]; /* pad out to 320 bytes for good measure */
+	uint64_t ds_next_clones_obj;	/* DMU_OT_DSL_CLONES */
+	uint64_t ds_props_obj;		/* DMU_OT_DSL_PROPS for snaps */
+	uint64_t ds_userrefs_obj;	/* DMU_OT_USERREFS */
+	uint64_t ds_pad[5]; /* pad out to 320 bytes for good measure */
 } dsl_dataset_phys_t;
 
 typedef struct dsl_deadlist_phys {

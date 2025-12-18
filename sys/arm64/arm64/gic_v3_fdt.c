@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bitstring.h>
@@ -162,11 +161,19 @@ gic_v3_fdt_attach(device_t dev)
 	/* Register xref */
 	OF_device_register_xref(xref, dev);
 
-	if (intr_pic_claim_root(dev, xref, arm_gic_v3_intr, sc,
-	    GIC_LAST_SGI - GIC_FIRST_SGI + 1) != 0) {
+	err = intr_pic_claim_root(dev, xref, arm_gic_v3_intr, sc, INTR_ROOT_IRQ);
+	if (err != 0) {
 		err = ENXIO;
 		goto error;
 	}
+
+#ifdef SMP
+	err = intr_ipi_pic_register(dev, 0);
+	if (err != 0) {
+		device_printf(dev, "could not register for IPIs\n");
+		goto error;
+	}
+#endif
 
 	/*
 	 * Try to register ITS to this GIC.
@@ -333,7 +340,7 @@ gic_v3_ofw_bus_attach(device_t dev)
 			/* Should not have any interrupts, so don't add any */
 
 			/* Add newbus device for this FDT node */
-			child = device_add_child(dev, NULL, -1);
+			child = device_add_child(dev, NULL, DEVICE_UNIT_ANY);
 			if (!child) {
 				if (bootverbose) {
 					device_printf(dev,

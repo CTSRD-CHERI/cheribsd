@@ -1,0 +1,11 @@
+SRCS+=	__vdso_gettc.c \
+	sched_getcpu_gen.c
+
+MDASM=	cerror.S \
+	vfork.S
+
+.if ${MACHINE_ABI:Mpurecap}
+SYM_MAPS+= ${LIBSYS_SRCTOP}/riscv/Symbol.map
+
+SRCS+=	_coaccept.S _cocall.S
+.endif

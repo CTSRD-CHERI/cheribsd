@@ -54,7 +54,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/condvar.h>
@@ -644,7 +643,7 @@ exca_init(struct exca_softc *sc, device_t dev,
 	sc->flags = 0;
 	sc->getb = exca_mem_getb;
 	sc->putb = exca_mem_putb;
-	sc->pccarddev = device_add_child(dev, "pccard", -1);
+	sc->pccarddev = device_add_child(dev, "pccard", DEVICE_UNIT_ANY);
 	if (sc->pccarddev == NULL)
 		DEVPRINTF(brdev, "WARNING: cannot add pccard bus.\n");
 	else if (device_probe_and_attach(sc->pccarddev) != 0)
@@ -812,18 +811,18 @@ exca_removal(struct exca_softc *exca)
 }
 
 int
-exca_activate_resource(struct exca_softc *exca, device_t child, int type,
-    int rid, struct resource *res)
+exca_activate_resource(struct exca_softc *exca, device_t child,
+    struct resource *res)
 {
 	int err;
 
 	if (rman_get_flags(res) & RF_ACTIVE)
 		return (0);
 	err = BUS_ACTIVATE_RESOURCE(device_get_parent(exca->dev), child,
-	    type, rid, res);
+	    res);
 	if (err)
 		return (err);
-	switch (type) {
+	switch (rman_get_type(res)) {
 	case SYS_RES_IOPORT:
 		err = exca_io_map(exca, PCCARD_WIDTH_AUTO, res);
 		break;
@@ -833,16 +832,16 @@ exca_activate_resource(struct exca_softc *exca, device_t child, int type,
 	}
 	if (err)
 		BUS_DEACTIVATE_RESOURCE(device_get_parent(exca->dev), child,
-		    type, rid, res);
+		    res);
 	return (err);
 }
 
 int
-exca_deactivate_resource(struct exca_softc *exca, device_t child, int type,
-    int rid, struct resource *res)
+exca_deactivate_resource(struct exca_softc *exca, device_t child,
+    struct resource *res)
 {
 	if (rman_get_flags(res) & RF_ACTIVE) { /* if activated */
-		switch (type) {
+		switch (rman_get_type(res)) {
 		case SYS_RES_IOPORT:
 			if (exca_io_unmap_res(exca, res))
 				return (ENOENT);
@@ -854,7 +853,7 @@ exca_deactivate_resource(struct exca_softc *exca, device_t child, int type,
 		}
 	}
 	return (BUS_DEACTIVATE_RESOURCE(device_get_parent(exca->dev), child,
-	    type, rid, res));
+	    res));
 }
 
 #if 0

@@ -34,7 +34,6 @@
  * Inspired by the Linux applesmc driver.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
@@ -277,6 +276,12 @@ static const struct asmc_model asmc_models[] = {
 	  "MacBookPro11,3", "Apple SMC MacBook Pro Retina Core i7 (2013/2014)",
 	  ASMC_SMS_FUNCS, ASMC_FAN_FUNCS, ASMC_LIGHT_FUNCS,
 	  ASMC_MBP113_TEMPS, ASMC_MBP113_TEMPNAMES, ASMC_MBP113_TEMPDESCS
+	},
+
+	{
+	  "MacBookPro11,4", "Apple SMC MacBook Pro Retina Core i7 (mid 2015, 15-inch)",
+	  ASMC_SMS_FUNCS_DISABLED, ASMC_FAN_FUNCS, ASMC_LIGHT_FUNCS,
+	  ASMC_MBP114_TEMPS, ASMC_MBP114_TEMPNAMES, ASMC_MBP114_TEMPDESCS
 	},
 
 	/* The Mac Mini has no SMS */

@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/kernel.h>
@@ -185,7 +184,7 @@ linuxkpi___napi_schedule(struct napi_struct *napi)
 	}
 }
 
-void
+bool
 linuxkpi_napi_schedule(struct napi_struct *napi)
 {
 
@@ -195,8 +194,12 @@ linuxkpi_napi_schedule(struct napi_struct *napi)
 	 * iwlwifi calls this sequence instead of napi_schedule()
 	 * to be able to test the prep result.
 	 */
-	if (napi_schedule_prep(napi))
+	if (napi_schedule_prep(napi)) {
 		__napi_schedule(napi);
+		return (true);
+	}
+
+	return (false);
 }
 
 void
@@ -406,7 +409,8 @@ linuxkpi_alloc_netdev(size_t len, const char *name, uint32_t flags,
 
 	/* This needs extending as we support more. */
 
-	setup_func(ndev);
+	if (setup_func != NULL)
+		setup_func(ndev);
 
 	return (ndev);
 }

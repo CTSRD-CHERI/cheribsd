@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause AND BSD-4-Clause
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010 Justin T. Gibbs, Spectra Logic Corporation
  * All rights reserved.
@@ -28,39 +28,6 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
- */
-
-/*-
- * PV suspend/resume support:
- *
- * Copyright (c) 2004 Christian Limpach.
- * Copyright (c) 2004-2006,2008 Kip Macy
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Christian Limpach.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 /*-
@@ -345,12 +312,18 @@ xctrl_crash(void)
 }
 
 static void
-shutdown_final(void *arg, int howto)
+xctrl_shutdown_final(void *arg, int howto)
 {
-	/* Inform the hypervisor that shutdown is complete. */
-	if (howto & RB_POWEROFF)
+	/*
+	 * Inform the hypervisor that shutdown is complete, and specify the
+	 * nature of the shutdown. RB_HALT is not handled by this function.
+	 */
+	if (KERNEL_PANICKED())
+		HYPERVISOR_shutdown(SHUTDOWN_crash);
+	else if ((howto & RB_POWEROFF) != 0)
 		HYPERVISOR_shutdown(SHUTDOWN_poweroff);
-	else if (howto & RB_POWERCYCLE)
+	else if ((howto & RB_HALT) == 0)
+		/* RB_POWERCYCLE or regular reset. */
 		HYPERVISOR_shutdown(SHUTDOWN_reboot);
 }
 
@@ -388,6 +361,20 @@ xctrl_on_watch_event(struct xs_watch *watch, const char **vec, unsigned int len)
 }
 
 /*------------------ Private Device Attachment Functions  --------------------*/
+
+static void
+notify_support(void)
+{
+	/*
+	 * Notify kernel is ready to handle "control/shutdown" events.  Ignore
+	 * errors if the nodes haven't been created by the toolstack, as the
+	 * parent "control" directory should be read-only for the guest.
+	 */
+	xs_write(XST_NIL, "control", "feature-poweroff", "1");
+	xs_write(XST_NIL, "control", "feature-reboot", "1");
+	xs_write(XST_NIL, "control", "feature-suspend", "1");
+}
+
 /**
  * \brief Identify instances of this device type in the system.
  *
@@ -395,7 +382,7 @@ xctrl_on_watch_event(struct xs_watch *watch, const char **vec, unsigned int len)
  * \param parent  The NewBus parent device for any devices this method adds.
  */
 static void
-xctrl_identify(driver_t *driver __unused, device_t parent)
+xctrl_identify(driver_t *driver, device_t parent)
 {
 	/*
 	 * A single device instance for our driver is always present
@@ -446,8 +433,10 @@ xctrl_attach(device_t dev)
 	xctrl->xctrl_watch.max_pending = 1;
 	xs_register_watch(&xctrl->xctrl_watch);
 
-	EVENTHANDLER_REGISTER(shutdown_final, shutdown_final, NULL,
+	EVENTHANDLER_REGISTER(shutdown_final, xctrl_shutdown_final, NULL,
 	    SHUTDOWN_PRI_LAST);
+
+	notify_support();
 
 	return (0);
 }
@@ -473,6 +462,14 @@ xctrl_detach(device_t dev)
 	return (0);
 }
 
+static int
+xctrl_resume(device_t dev)
+{
+	notify_support();
+
+	return (0);
+}
+
 /*-------------------- Private Device Attachment Data  -----------------------*/
 static device_method_t xctrl_methods[] = { 
 	/* Device interface */ 
@@ -480,6 +477,7 @@ static device_method_t xctrl_methods[] = {
 	DEVMETHOD(device_probe,         xctrl_probe), 
 	DEVMETHOD(device_attach,        xctrl_attach), 
 	DEVMETHOD(device_detach,        xctrl_detach), 
+	DEVMETHOD(device_resume,        xctrl_resume),
 
 	DEVMETHOD_END
 }; 

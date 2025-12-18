@@ -238,7 +238,7 @@ static int
 kdb_sysctl_trap(SYSCTL_HANDLER_ARGS)
 {
 	int error, i;
-	int *addr = (int *)0x10;
+	int *volatile addr = (int *)0x10;
 
 	error = sysctl_wire_old_buffer(req, sizeof(int));
 	if (error == 0) {
@@ -764,7 +764,7 @@ kdb_trap(int type, int code, struct trapframe *tf)
 		CPU_CLR(PCPU_GET(cpuid), &other_cpus);
 		stop_cpus_hard(other_cpus);
 #endif
-		curthread->td_stopsched = 1;
+		scheduler_stopped = true;
 		did_stop_cpus = 1;
 	} else
 		did_stop_cpus = 0;
@@ -801,7 +801,7 @@ kdb_trap(int type, int code, struct trapframe *tf)
 	kdb_active--;
 
 	if (did_stop_cpus) {
-		curthread->td_stopsched = 0;
+		scheduler_stopped = false;
 #ifdef SMP
 		CPU_AND(&other_cpus, &other_cpus, &stopped_cpus);
 		restart_cpus(other_cpus);

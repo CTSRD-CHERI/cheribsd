@@ -134,9 +134,10 @@ enum rt_scope_t {
 
 /*
  * Routing table identifiers.
- * FreeBSD route table numbering starts from 0, where 0 is a valid default routing table.
- * Indicating "all tables" via netlink can be done by not including RTA_TABLE attribute
- * and keeping rtm_table=0 (compatibility) or setting RTA_TABLE value to RT_TABLE_UNSPEC.
+ * FreeBSD route table numbering starts from 0, where 0 is a valid default
+ * routing table.  Indicating "all tables" via netlink can be done by not
+ * including RTA_TABLE attribute and keeping rtm_table=0 (compatibility) or
+ * setting RTA_TABLE value to RT_TABLE_UNSPEC.
  */
 #define	RT_TABLE_MAIN	0		/* RT_DEFAULT_FIB */
 #define	RT_TABLE_UNSPEC	0xFFFFFFFF	/* RT_ALL_FIBS */
@@ -282,8 +283,8 @@ struct rtvia {
 	NL_RTAX_RTO_MIN			= 13, /* not supported */
 	NL_RTAX_INITRWND		= 14, /* not supported */
 	NL_RTAX_QUICKACK		= 15, /* not supported */
-	NL_RTAX_CC_ALGO			= 15, /* not supported */
-	NL_RTAX_FASTOPEN_NO_COOKIE	= 16, /* not supported */
+	NL_RTAX_CC_ALGO			= 16, /* not supported */
+	NL_RTAX_FASTOPEN_NO_COOKIE	= 17, /* not supported */
 	__NL_RTAX_MAX
 };
 #define NL_RTAX_MAX (__NL_RTAX_MAX - 1)

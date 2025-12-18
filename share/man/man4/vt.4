@@ -1,3 +1,6 @@
+.\"-
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
 .\" Copyright (c) 2014 Warren Block
 .\" All rights reserved.
 .\"
@@ -22,12 +25,12 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd May 8, 2023
+.Dd July 7, 2024
 .Dt "VT" 4
 .Os
 .Sh NAME
 .Nm vt
-.Nd virtual terminal console driver
+.Nd virtual terminal system video console driver
 .Sh SYNOPSIS
 .Cd "options TERMINAL_KERN_ATTR=_attribute_"
 .Cd "options TERMINAL_NORM_ATTR=_attribute_"
@@ -47,6 +50,7 @@ In
 .Cd kern.vt.color.<colornum>.rgb="<colorspec>"
 .Cd kern.vt.fb.default_mode="<X>x<Y>"
 .Cd kern.vt.fb.modes.<connector>="<X>x<Y>"
+.Cd screen.font="<X>x<Y>"
 .Pp
 In
 .Xr loader.conf 5 or
@@ -219,6 +223,11 @@ The
 kernel uses
 .Nm
 when this value is not set.
+Note that
+.Ql sc
+is not compatible with
+.Xr UEFI 8
+boot.
 .It Va kern.vt.color. Ns Ar colornum Ns Va .rgb
 Set this value to override default palette entry for color
 .Pa colornum
@@ -257,6 +266,11 @@ It will contain a list of connectors and their associated tunables.
 This is currently only supported by the
 .Cm vt_fb
 backend when it is paired with a KMS video driver.
+.It Va screen.font
+Set this value to the base name of the desired font file located in
+.Pa /boot/fonts .
+Fonts can be converted for use with
+.Xr vtfontcvt 8 .
 .El
 .Sh KEYBOARD SYSCTL TUNABLES
 These settings control whether certain special key combinations are enabled or
@@ -358,6 +372,14 @@ To set black and white colors of console palette
 .Pp
 .Dl kern.vt.color.0.rgb="10,10,10"
 .Dl kern.vt.color.15.rgb="#f0f0f0"
+.Pp
+Load the 8x16 font in
+.Xr loader.conf 5
+from
+.Pa /boot/fonts/*.fnt[.gz]
+at boot:
+.Pp
+.Dl screen.font="8x16"
 .Sh SEE ALSO
 .Xr kbdcontrol 1 ,
 .Xr login 1 ,
@@ -371,6 +393,7 @@ To set black and white colors of console palette
 .Xr syscons 4 ,
 .Xr ukbd 4 ,
 .Xr kbdmap 5 ,
+.Xr loader.conf 5 ,
 .Xr rc.conf 5 ,
 .Xr ttys 5 ,
 .Xr config 8 ,

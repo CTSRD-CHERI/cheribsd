@@ -69,6 +69,10 @@ extern int _DYNAMIC __no_subobject_bounds;
 #pragma weak _DYNAMIC
 
 #if defined(CRT_IRELOC_RELA)
+#ifdef __CHERI_PURE_CAPABILITY__
+extern Elf_Auxinfo *__auxargs;
+#endif
+
 extern const Elf_Rela __rela_iplt_start[] __weak_symbol __hidden;
 extern const Elf_Rela __rela_iplt_end[] __weak_symbol __hidden;
 
@@ -175,15 +179,43 @@ handle_argv(int argc, char *argv[], char **env)
 	}
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static void
+handle_irelocs(void *data_cap, const void *code_cap)
+{
+#ifndef CRT_IRELOC_SUPPRESS
+	ifunc_init(__auxargs);
+	process_irelocs(data_cap, code_cap);
+#else
+	(void)data_cap;
+	(void)code_cap;
+#endif
+}
+#else
+static void
+handle_irelocs(char *env[])
+{
+#ifndef CRT_IRELOC_SUPPRESS
+	const Elf_Auxinfo *aux;
+
+	/* Find the auxiliary vector on the stack. */
+	while (*env++ != 0)	/* Skip over environment, and NULL terminator */
+		;
+	aux = (const Elf_Auxinfo *)env;
+
+	ifunc_init(aux);
+	process_irelocs();
+#else
+	(void)env;
+#endif
+}
+#endif
+
 void
 __libc_start1(int argc, char *argv[], char *env[], void (*cleanup)(void),
     int (*mainX)(int, char *[], char *[])
 #ifdef __CHERI_PURE_CAPABILITY__
-#ifdef CRT_IRELOC_SUPPRESS
-    , void *data_cap __unused, const void *code_cap __unused
-#else
     , void *data_cap, const void *code_cap
-#endif
 #endif
 	)
 {
@@ -196,13 +228,10 @@ __libc_start1(int argc, char *argv[], char *env[], void (*cleanup)(void),
 #endif
 		atexit(cleanup);
 	} else {
-#ifndef CRT_IRELOC_SUPPRESS
-		INIT_IRELOCS;
 #ifdef __CHERI_PURE_CAPABILITY__
-		process_irelocs(data_cap, code_cap);
+		handle_irelocs(data_cap, code_cap);
 #else
-		process_irelocs();
-#endif
+		handle_irelocs(env);
 #endif
 		_init_tls();
 	}
@@ -226,10 +255,7 @@ __libc_start1_gcrt(int argc, char *argv[], char *env[],
 	if (&_DYNAMIC != NULL) {
 		atexit(cleanup);
 	} else {
-#ifndef CRT_IRELOC_SUPPRESS
-		INIT_IRELOCS;
-		process_irelocs();
-#endif
+		handle_irelocs(env);
 		_init_tls();
 	}
 

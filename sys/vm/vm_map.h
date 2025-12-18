@@ -31,8 +31,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)vm_map.h	8.9 (Berkeley) 5/17/95
- *
  *
  * Copyright (c) 1987, 1990 Carnegie-Mellon University.
  * All rights reserved.
@@ -244,7 +242,9 @@ struct vm_map {
 #ifdef CHERI_CAPREVOKE
 	struct cv vm_cheri_revoke_cv;	/* (c) Cap. rev. is single file */
 	cheri_revoke_state_t vm_cheri_revoke_st;	/* Cap. rev. state */
-
+	cheri_revoke_state_t vm_cheri_async_revoke_st;
+	int vm_cheri_async_revoke_status;
+	const uint8_t * __capability vm_cheri_async_revoke_shadow;
 	/*
 	 * If revocation is in progress (as determined by vm_cheri_revoke_st,
 	 * this holds our current test predicate.
@@ -570,6 +570,8 @@ boolean_t vm_map_check_protection (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t
 int vm_map_delete(vm_map_t, vm_offset_t, vm_offset_t, bool);
 int vm_map_find(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t *, vm_size_t,
     vm_offset_t, int, vm_prot_t, vm_prot_t, int);
+int vm_map_find_locked(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t *,
+    vm_size_t, vm_offset_t, int, vm_prot_t, vm_prot_t, int);
 int vm_map_find_min(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t *,
     vm_size_t, vm_offset_t, vm_offset_t, int, vm_prot_t, vm_prot_t, int);
 int vm_map_find_aligned(vm_map_t map, vm_offset_t *addr, vm_size_t length,

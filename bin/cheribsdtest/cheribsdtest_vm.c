@@ -67,6 +67,7 @@
 #include <inttypes.h>
 #include <libprocstat.h>
 #include <signal.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,9 +75,14 @@
 #include <sysexits.h>
 #include <unistd.h>
 
+#ifdef CHERIBSD_THREAD_TESTS
+#include <pthread.h>
+#endif
+
 #include "cheribsdtest.h"
 
-static const char *skip_need_writable_tmp(const char *name __unused);
+static const char *skip_need_writable_tmp(
+    const struct cheri_test *ctp __unused);
 
 /*
  * Tests to check that tags are ... or aren't ... preserved for various page
@@ -110,6 +116,81 @@ CHERIBSDTEST(vm_tag_mmap_anon,
     "check tags are stored for MAP_ANON pages")
 {
 	mmap_and_check_tag_stored(-1, PROT_READ | PROT_WRITE, MAP_ANON);
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(vm_tag_mmap_anon_cap,
+    "check tags are stored for MAP_ANON pages with explicit permissions")
+{
+	mmap_and_check_tag_stored(-1, PROT_READ | PROT_WRITE | PROT_CAP,
+	    MAP_ANON);
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(vm_notag_mmap_no_cap,
+    "check tags are not stored it we request no capablity permissions",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_STORETAG,
+    .ct_si_trapno = TRAPNO_STORE_CAP_PF,
+    .ct_check_skip = skip_need_writable_tmp)
+{
+	void * __capability volatile *cp;
+	void * __capability cp_value;
+	int v;
+
+	cp = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+	    PROT_READ | PROT_WRITE | PROT_NO_CAP, MAP_ANON, -1, 0));
+	cheribsdtest_set_expected_si_addr(NULL_DERIVED_VOIDP(cp));
+	cp_value = cheri_ptr(&v, sizeof(v));
+	*cp = cp_value;
+	cheribsdtest_failure_errx("tagged store succeeded");
+}
+
+CHERIBSDTEST(vm_notag_mprotect_no_cap,
+    "check tags are not stored if we remove capability page permissions",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_STORETAG,
+    .ct_si_trapno = TRAPNO_STORE_CAP_PF,
+    .ct_check_skip = skip_need_writable_tmp)
+{
+	void * __capability volatile *cp;
+	void * __capability cp_value;
+	int v;
+
+	cp = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERIBSDTEST_CHECK_SYSCALL(mprotect(__DEVOLATILE(void *, cp),
+	    getpagesize(), PROT_READ | PROT_WRITE | PROT_NO_CAP));
+	cheribsdtest_set_expected_si_addr(NULL_DERIVED_VOIDP(cp));
+	cp_value = cheri_ptr(&v, sizeof(v));
+	*cp = cp_value;
+	cheribsdtest_failure_errx("tagged store succeeded");
+}
+
+static void
+mmap_check_bad_protections(int prot, int expected_errno)
+{
+	CHERIBSDTEST_CHECK_CALL_ERROR(mmap(NULL, getpagesize(),
+	    prot, MAP_ANON, -1, 0), expected_errno);
+}
+
+CHERIBSDTEST(vm_mmap_diallowed_prot,
+    "check that disallowed protection combinations are rejected")
+{
+	/* Max protections not a superset */
+	mmap_check_bad_protections(PROT_READ | PROT_WRITE | PROT_MAX(PROT_READ),
+	    ENOTSUP);
+
+	/* Mixing implied and explict protections */
+	mmap_check_bad_protections(PROT_READ | PROT_CAP | PROT_MAX(PROT_READ),
+	    ENOTSUP);
+
+	/* Disallowed explicit capability protection combinations */
+	mmap_check_bad_protections(PROT_CAP, ENOTSUP);
+	mmap_check_bad_protections(PROT_MAX(PROT_CAP), ENOTSUP);
+
 	cheribsdtest_success();
 }
 
@@ -175,14 +256,17 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 		cheribsdtest_failure_errx("Fork failed; errno=%d", errno);
 
 	if (pid == 0) {
-		void * __capability * map;
+		void * __capability *map;
 		void * __capability c;
 		int fd, tag;
 		struct msghdr msg = { 0 };
 		struct cmsghdr * cmsg;
 		char cmsgbuf[CMSG_SPACE(sizeof(fd))] = { 0 } ;
 		char iovbuf[16];
-		struct iovec iov = { .iov_base = iovbuf, .iov_len = sizeof(iovbuf) };
+		struct iovec iov = {
+			.iov_base = iovbuf,
+			.iov_len = sizeof(iovbuf)
+		};
 
 		close(sv[1]);
 
@@ -194,15 +278,13 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 		CHERIBSDTEST_CHECK_SYSCALL(recvmsg(sv[0], &msg, 0));
 
 		/* Deconstruct cmsg */
-		/* XXX Doesn't compile: cmsg = CMSG_FIRSTHDR(&msg); */
-		cmsg = msg.msg_control;
-		memmove(&fd, CMSG_DATA(cmsg), sizeof(fd));
+		cmsg = CMSG_FIRSTHDR(&msg);
+		memcpy(&fd, CMSG_DATA(cmsg), sizeof(fd));
 
 		CHERIBSDTEST_VERIFY2(fd >= 0, "fd read OK");
 
 		map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
-						PROT_READ, MAP_SHARED, fd,
-						0));
+		    PROT_READ, MAP_SHARED, fd, 0));
 		c = *map;
 
 		if (verbose)
@@ -217,14 +299,17 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 
 		exit(tag);
 	} else {
-		void * __capability * map;
+		void * __capability *map;
 		void * __capability c;
 		int fd, res;
 		struct msghdr msg = { 0 };
 		struct cmsghdr * cmsg;
 		char cmsgbuf[CMSG_SPACE(sizeof(fd))] = { 0 };
 		char iovbuf[16] = { 0 };
-		struct iovec iov = { .iov_base = iovbuf, .iov_len = sizeof(iovbuf) };
+		struct iovec iov = {
+			.iov_base = iovbuf,
+			.iov_len = sizeof(iovbuf)
+		};
 
 		close(sv[0]);
 
@@ -250,12 +335,11 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 		msg.msg_iovlen = 1;
 		msg.msg_control = cmsgbuf;
 		msg.msg_controllen = sizeof(cmsgbuf);
-		/* XXX cmsg = CMSG_FIRSTHDR(&msg); */
-		cmsg = msg.msg_control;
+		cmsg = CMSG_FIRSTHDR(&msg);
 		cmsg->cmsg_level = SOL_SOCKET;
 		cmsg->cmsg_type = SCM_RIGHTS;
 		cmsg->cmsg_len = CMSG_LEN(sizeof fd);
-		memmove(CMSG_DATA(cmsg), &fd, sizeof(fd));
+		memcpy(CMSG_DATA(cmsg), &fd, sizeof(fd));
 		msg.msg_controllen = cmsg->cmsg_len;
 
 		/* Send! */
@@ -528,7 +612,7 @@ CHERIBSDTEST(vm_tag_tmpfile_private_prefault,
 }
 
 static const char *
-skip_need_writable_tmp(const char *name __unused)
+skip_need_writable_tmp(const struct cheri_test *ctp __unused)
 {
 	static const char *reason = NULL;
 	static int checked = 0;
@@ -812,19 +896,6 @@ CHERIBSDTEST(vm_reservation_align,
 	    ((ptraddr_t)(map) & ((1 << (align_shift + 1)) - 1)) == 0,
 	    "mmap failed to align representable region with requested "
 	    "alignment %lx for %p", align_shift + 1, map);
-
-	/* Explicit cheri alignment */
-	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
-	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED_CHERI, -1, 0));
-	CHERIBSDTEST_VERIFY2(((ptraddr_t)(map) & align_mask) == 0,
-	    "mmap failed to align representable region with requested "
-	    "cheri alignment for %p", map);
-
-	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
-	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED_CHERI_SEAL, -1, 0));
-	CHERIBSDTEST_VERIFY2(((ptraddr_t)(map) & align_mask) == 0,
-	    "mmap failed to align representable region with requested "
-	    "cheri seal alignment for %p", map);
 
 	cheribsdtest_success();
 }
@@ -1294,7 +1365,8 @@ CHERIBSDTEST(vm_capdirty, "verify capdirty marking and mincore")
  */
 
 static const char *
-skip_need_quarantine_unmapped_reservations(const char *name __unused)
+skip_need_quarantine_unmapped_reservations(
+    const struct cheri_test *ctp __unused)
 {
 	if (!feature_present("cheri_revoke"))
 		return ("Kernel does not support revocation");
@@ -1604,6 +1676,159 @@ CHERIBSDTEST(cheri_revoke_loadside, "Test load-side revoker",
 
 #undef CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG
 }
+
+CHERIBSDTEST(cheri_revoke_async,
+    "A gentle test of asynchronous capability revocation",
+    .ct_check_skip = skip_need_cheri_revoke)
+{
+	struct cheri_revoke_syscall_info crsi;
+	const volatile struct cheri_revoke_info *cri;
+	cheri_revoke_epoch_t epoch;
+	void **mb;
+	void *sh;
+
+	mb = CHERIBSDTEST_CHECK_SYSCALL(
+	    mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMEM, mb, &sh));
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
+	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL, __DEQUALIFY(void **, &cri)));
+
+	mb[1] = cheri_andperm(mb, ~CHERI_PERM_SW_VMEM);
+	((uint8_t *)sh)[0] = 1;
+	epoch = cri->epochs.dequeue;
+
+	memset(&crsi, 0, sizeof(crsi));
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_ASYNC | CHERI_REVOKE_IGNORE_START, 0,
+	    &crsi));
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.enqueue == crsi.epochs.enqueue,
+	    "Bad shared enqueue clock (%lu %lu)",
+	    cri->epochs.enqueue, crsi.epochs.enqueue);
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue,
+	    "Bad shared dequeue clock (%lu %lu)",
+	    cri->epochs.dequeue, crsi.epochs.dequeue);
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.enqueue == cri->epochs.dequeue + 1,
+	    "Bad shared clock (%lu %lu)",
+	    cri->epochs.enqueue, cri->epochs.dequeue);
+
+	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, epoch)) {
+		CHERIBSDTEST_CHECK_SYSCALL(
+		    cheri_revoke(CHERI_REVOKE_ASYNC | CHERI_REVOKE_IGNORE_START,
+		    0, NULL));
+		usleep(1000);
+	}
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.enqueue == cri->epochs.dequeue,
+	    "Bad shared post-revocation clock (%lu %lu)",
+	    cri->epochs.enqueue, cri->epochs.dequeue);
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue + 2,
+	    "Unexpected clock jump (%lu %lu)",
+	    cri->epochs.dequeue, crsi.epochs.dequeue);
+
+	CHERIBSDTEST_VERIFY2(check_revoked(mb[1]), "Memory tag persists");
+
+	cheribsdtest_success();
+}
+
+#ifdef CHERIBSD_THREAD_TESTS
+static void *
+forker(void *arg)
+{
+	atomic_int *p = arg;
+
+	while (*p == 0) {
+		pid_t child = fork();
+		CHERIBSDTEST_VERIFY2(child > 0, "fork failed");
+		if (child == 0)
+			_exit(0);
+		(void)waitpid(child, NULL, 0);
+	}
+
+	return (NULL);
+}
+
+CHERIBSDTEST(cheri_revoke_async_fork,
+    "A test of asynchronous capability revocation with concurrent forks",
+    .ct_check_skip = skip_need_cheri_revoke)
+{
+	struct cheri_revoke_syscall_info crsi;
+	const volatile struct cheri_revoke_info *cri;
+	cheri_revoke_epoch_t epoch;
+	pthread_t thr;
+	void **mb;
+	void *sh;
+	atomic_int forker_res;
+	int error;
+
+	forker_res = 0;
+	error = pthread_create(&thr, NULL, forker, &forker_res);
+	if (error != 0)
+		cheribsdtest_failure_errc(error, "pthread_create");
+
+	mb = CHERIBSDTEST_CHECK_SYSCALL(
+	    mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMEM, mb, &sh));
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
+	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL, __DEQUALIFY(void **, &cri)));
+
+	mb[1] = cheri_andperm(mb, ~CHERI_PERM_SW_VMEM);
+	((uint8_t *)sh)[0] = 1;
+	epoch = cri->epochs.dequeue;
+
+	memset(&crsi, 0, sizeof(crsi));
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_ASYNC | CHERI_REVOKE_IGNORE_START, 0,
+	    &crsi));
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.enqueue == crsi.epochs.enqueue,
+	    "Bad shared enqueue clock (%lu %lu)",
+	    cri->epochs.enqueue, crsi.epochs.enqueue);
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue,
+	    "Bad shared dequeue clock (%lu %lu)",
+	    cri->epochs.dequeue, crsi.epochs.dequeue);
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.enqueue == cri->epochs.dequeue + 1,
+	    "Bad shared clock (%lu %lu)",
+	    cri->epochs.enqueue, cri->epochs.dequeue);
+
+	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, epoch)) {
+		CHERIBSDTEST_CHECK_SYSCALL(
+		    cheri_revoke(CHERI_REVOKE_ASYNC | CHERI_REVOKE_IGNORE_START,
+		    0, NULL));
+		usleep(1000);
+	}
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.enqueue == cri->epochs.dequeue,
+	    "Bad shared post-revocation clock (%lu %lu)",
+	    cri->epochs.enqueue, cri->epochs.dequeue);
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue + 2,
+	    "Unexpected clock jump (%lu %lu)",
+	    cri->epochs.dequeue, crsi.epochs.dequeue);
+
+	CHERIBSDTEST_VERIFY2(check_revoked(mb[1]), "Memory tag persists");
+
+	forker_res = 1;
+	error = pthread_join(thr, NULL);
+	if (error != 0)
+		cheribsdtest_failure_errc(error, "pthread_join");
+
+	cheribsdtest_success();
+}
+#endif /* CHERIBSD_THREAD_TESTS */
 
 /*
  * Repeatedly invoke libcheri_caprevoke logic.
@@ -2469,6 +2694,201 @@ CHERIBSDTEST(cheri_revoke_cow_mapping,
 
 	cheribsdtest_success();
 }
+
+CHERIBSDTEST(cheri_revoke_shm_anon_hoard_unmapped,
+    "Capability is revoked within an unmapped shm object",
+    .ct_xfail_reason = "unmapped part of shm objects aren't revoked")
+{
+	int fd, ret;
+	void * volatile to_revoke;
+	void * volatile *map;
+
+	fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
+
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+
+	to_revoke = malloc(1);
+	*map = to_revoke;
+	CHERIBSDTEST_VERIFY(cheri_gettag(*map));
+
+	munmap(__DEVOLATILE(void *, map), getpagesize());
+
+	free(to_revoke);
+	CHERIBSDTEST_VERIFY2((ret = malloc_revoke_quarantine_force_flush()) == 0,
+	   "malloc_revoke_quarantine_force_flush returned %d", ret);
+	CHERIBSDTEST_VERIFY(check_revoked(to_revoke));
+
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+
+	CHERIBSDTEST_VERIFY(to_revoke == *map);
+	CHERIBSDTEST_VERIFY(check_revoked(*map));
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(cheri_revoke_shm_anon_hoard_closed,
+    "Capability is revoked within an unmapped and closed shm object",
+    .ct_xfail_reason = "unmapped part of shm objects aren't revoked")
+{
+	int sv[2];
+	int pid;
+
+	CHERIBSDTEST_CHECK_SYSCALL(socketpair(AF_UNIX, SOCK_DGRAM, 0, sv) != 0);
+
+	pid = fork();
+	if (pid == -1)
+		cheribsdtest_failure_errx("Fork failed; errno=%d", errno);
+
+	if (pid == 0) {
+		int fd;
+		struct msghdr msg = { 0 };
+		struct cmsghdr * cmsg;
+		char cmsgbuf[CMSG_SPACE(sizeof(fd))] = { 0 } ;
+		char iovbuf[16];
+		struct iovec iov = {
+			.iov_base = iovbuf,
+			.iov_len = sizeof(iovbuf)
+		};
+
+		close(sv[1]);
+
+		/* Read from socket */
+		msg.msg_iov = &iov;
+		msg.msg_iovlen = 1;
+		msg.msg_control = cmsgbuf;
+		msg.msg_controllen = sizeof(cmsgbuf);
+		CHERIBSDTEST_CHECK_SYSCALL(recvmsg(sv[0], &msg, 0));
+
+		/* Deconstruct cmsg */
+		cmsg = CMSG_FIRSTHDR(&msg);
+		memcpy(&fd, CMSG_DATA(cmsg), sizeof(fd));
+
+		CHERIBSDTEST_VERIFY2(fd >= 0, "fd read OK");
+
+		/* Send the fd back. */
+		CHERIBSDTEST_CHECK_SYSCALL(sendmsg(sv[0], &msg, 0));
+
+		close(sv[0]);
+		close(fd);
+
+		exit(0);
+	} else {
+		void * volatile to_revoke;
+		void * volatile * map;
+		int fd, res, ret;
+		struct msghdr msg = { 0 };
+		struct cmsghdr * cmsg;
+		char cmsgbuf[CMSG_SPACE(sizeof(fd))] = { 0 };
+		char iovbuf[16] = { 0 };
+		struct iovec iov = {
+			.iov_base = iovbuf,
+			.iov_len = sizeof(iovbuf)
+		};
+
+		close(sv[0]);
+
+		fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+		CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
+
+		map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+		    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+
+		to_revoke = malloc(1);
+		*map = to_revoke;
+		CHERIBSDTEST_VERIFY(cheri_gettag(*map));
+
+		CHERIBSDTEST_CHECK_SYSCALL(munmap(__DEVOLATILE(void *, map),
+		    getpagesize()));
+
+		/* Construct control message */
+		msg.msg_iov = &iov;
+		msg.msg_iovlen = 1;
+		msg.msg_control = cmsgbuf;
+		msg.msg_controllen = sizeof(cmsgbuf);
+		cmsg = CMSG_FIRSTHDR(&msg);
+		cmsg->cmsg_level = SOL_SOCKET;
+		cmsg->cmsg_type = SCM_RIGHTS;
+		cmsg->cmsg_len = CMSG_LEN(sizeof fd);
+		memcpy(CMSG_DATA(cmsg), &fd, sizeof(fd));
+		msg.msg_controllen = cmsg->cmsg_len;
+
+		/* Send! */
+		CHERIBSDTEST_CHECK_SYSCALL(sendmsg(sv[1], &msg, 0));
+		close(fd);
+
+		/* Revoke the pointer */
+		free(to_revoke);
+		CHERIBSDTEST_VERIFY2(
+		    (ret = malloc_revoke_quarantine_force_flush()) == 0,
+		    "malloc_revoke_quarantine_force_flush returned %d", ret);
+		CHERIBSDTEST_VERIFY(check_revoked(to_revoke));
+
+		/* Receive the fd back */
+		msg.msg_controllen = sizeof(cmsgbuf);
+		CHERIBSDTEST_CHECK_SYSCALL(recvmsg(sv[1], &msg, 0));
+
+		/* Deconstruct cmsg */
+		cmsg = CMSG_FIRSTHDR(&msg);
+		memcpy(&fd, CMSG_DATA(cmsg), sizeof(fd));
+
+		CHERIBSDTEST_VERIFY2(fd >= 0, "fd read OK");
+
+		map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+		    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+
+		CHERIBSDTEST_VERIFY(to_revoke == *map);
+		CHERIBSDTEST_VERIFY(check_revoked(*map));
+
+		close(sv[1]);
+		close(fd);
+
+		waitpid(pid, &res, 0);
+		if (res == 0) {
+			cheribsdtest_success();
+		} else {
+			cheribsdtest_failure_errx("child failed");
+		}
+	}
+}
+
 #endif /* CHERIBSDTEST_CHERI_REVOKE_TESTS */
+
+/*
+ * This test is derived from a syskiller panic.  Bugs in
+ * vm_map_stack_locked() when the stack was being inserted into an
+ * existing reservation (why would anyone do this in the real world?)
+ * caused a panic.
+ * https://github.com/CTSRD-CHERI/cheribsd/issues/2252
+ */
+CHERIBSDTEST(mmap_insert_stack,
+    "try to insert a stack mapping in a reservation")
+{
+	void *p;
+
+	p = CHERIBSDTEST_CHECK_SYSCALL(mmap((void *)(intptr_t)0x20000000,
+	    0x1000000, PROT_WRITE | PROT_READ,
+	    MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
+
+	/*
+	 * Historically would fail, but leave the map in a broken state
+	 * due to trying to insert a reservation inside an existing one.
+	 * This is now rejected outright.
+	 */
+	CHERIBSDTEST_CHECK_CALL_ERROR(mmap(cheri_setaddress(p, 0x20ffc000),
+	    0x2000, PROT_WRITE | PROT_READ, MAP_STACK | MAP_FIXED, -1, 0),
+	    ENOMEM);
+
+	/*
+	 * This would trigger a panic by trying to remove an unmapped
+	 * entry left by the previous mmap.
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL(munmap(cheri_setaddress(p, 0x20ffc000),
+	    0x3000));
+
+	cheribsdtest_success();
+}
 
 #endif /* __CHERI_PURE_CAPABILITY__ */

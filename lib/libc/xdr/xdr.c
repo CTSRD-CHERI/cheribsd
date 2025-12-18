@@ -45,11 +45,6 @@
  * CHERI CHANGES END
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char *sccsid2 = "@(#)xdr.c 1.35 87/08/12";
-static char *sccsid = "@(#)xdr.c	2.1 88/07/29 4.0 RPCSRC";
-#endif
-#include <sys/cdefs.h>
 /*
  * xdr.c, Generic XDR routines implementation.
  *
@@ -638,7 +633,7 @@ xdr_netobj(XDR *xdrs, struct netobj *np)
 }
 
 /*
- * XDR a descriminated union
+ * XDR a discriminated union
  * Support routine for discriminated unions.
  * You create an array of xdrdiscrim structures, terminated with
  * an entry with a null procedure pointer.  The routine gets

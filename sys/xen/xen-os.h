@@ -39,6 +39,8 @@
 #include <contrib/xen/xen.h>
 
 #ifndef __ASSEMBLY__
+#include <sys/rman.h>
+
 #include <xen/hvm.h>
 #include <contrib/xen/event_channel.h>
 
@@ -79,30 +81,22 @@ extern shared_info_t *HYPERVISOR_shared_info;
 
 extern bool xen_suspend_cancelled;
 
-enum xen_domain_type {
-	XEN_NATIVE,             /* running on bare hardware    */
-	XEN_PV_DOMAIN,          /* running in a PV domain      */
-	XEN_HVM_DOMAIN,         /* running in a Xen hvm domain */
-};
-
-extern enum xen_domain_type xen_domain_type;
-
-static inline int
+static inline bool
 xen_domain(void)
 {
-	return (xen_domain_type != XEN_NATIVE);
+	return (vm_guest == VM_GUEST_XEN);
 }
 
-static inline int
+static inline bool
 xen_pv_domain(void)
 {
-	return (xen_domain_type == XEN_PV_DOMAIN);
+	return (false);
 }
 
-static inline int
+static inline bool
 xen_hvm_domain(void)
 {
-	return (xen_domain_type == XEN_HVM_DOMAIN);
+	return (vm_guest == VM_GUEST_XEN);
 }
 
 static inline bool
@@ -128,23 +122,23 @@ xen_initial_domain(void)
 #define NBPL (NBBY * sizeof(long))
 
 static inline bool
-xen_test_bit(int bit, volatile long *addr)
+xen_test_bit(int bit, volatile xen_ulong_t *addr)
 {
 	unsigned long mask = 1UL << (bit % NBPL);
 
-	return !!(atomic_load_acq_long(&addr[bit / NBPL]) & mask);
+	return !!(atomic_load_acq_xen_ulong(&addr[bit / NBPL]) & mask);
 }
 
 static inline void
-xen_set_bit(int bit, volatile long *addr)
+xen_set_bit(int bit, volatile xen_ulong_t *addr)
 {
-	atomic_set_long(&addr[bit / NBPL], 1UL << (bit % NBPL));
+	atomic_set_xen_ulong(&addr[bit / NBPL], 1UL << (bit % NBPL));
 }
 
 static inline void
-xen_clear_bit(int bit, volatile long *addr)
+xen_clear_bit(int bit, volatile xen_ulong_t *addr)
 {
-	atomic_clear_long(&addr[bit / NBPL], 1UL << (bit % NBPL));
+	atomic_clear_xen_ulong(&addr[bit / NBPL], 1UL << (bit % NBPL));
 }
 
 #undef NBPL
@@ -158,6 +152,16 @@ int xenmem_free(device_t dev, int res_id, struct resource *res);
 
 /* Debug/emergency function, prints directly to hypervisor console */
 void xc_printf(const char *, ...) __printflike(1, 2);
+
+/*
+ * Emergency print function, can be defined per-arch, otherwise defaults to
+ * HYPERVISOR_console_write.  Should not be called directly, use xc_printf
+ * instead.
+ */
+void xen_emergency_print(const char *str, size_t size);
+
+/* Arch-specific helper to init scratch mapping space. */
+int xen_arch_init_physmem(device_t dev, struct rman *mem);
 
 #ifndef xen_mb
 #define xen_mb() mb()

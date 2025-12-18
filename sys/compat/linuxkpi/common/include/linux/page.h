@@ -50,8 +50,8 @@ typedef unsigned long pgprot_t;
 
 #define page	vm_page
 
-#define	LINUXKPI_PROT_VALID (1 << 5)
-#define	LINUXKPI_CACHE_MODE_SHIFT 6
+#define	LINUXKPI_PROT_VALID (1 << 6)
+#define	LINUXKPI_CACHE_MODE_SHIFT 7
 
 CTASSERT((VM_PROT_ALL & -LINUXKPI_PROT_VALID) == 0);
 
@@ -72,6 +72,7 @@ pgprot2cachemode(pgprot_t prot)
 		return (VM_MEMATTR_DEFAULT);
 }
 
+#define	page_to_virt(page)	linux_page_address(page)
 #define	virt_to_page(x)		PHYS_TO_VM_PAGE(vtophys(x))
 #define	page_to_pfn(pp)		(VM_PAGE_TO_PHYS(pp) >> PAGE_SHIFT)
 #define	pfn_to_page(pfn)	(PHYS_TO_VM_PAGE((pfn) << PAGE_SHIFT))

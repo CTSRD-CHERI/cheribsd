@@ -1,5 +1,3 @@
-#  @(#)Makefile 5.1beta 93/09/24
-#
 #  ====================================================
 #  Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
 #
@@ -28,7 +26,7 @@ CFLAGS+=	-I${.CURDIR}/x86
 CFLAGS+=	-I${.CURDIR}/ld80
 .elif ${LDBL_PREC} == 113
 .PATH:  ${.CURDIR}/ld128
-CFLAGS+=	-I${.CURDIR}/ld128
+CFLAGS+=	-I${.CURDIR}/ld128 -I${SRCTOP}/contrib/arm-optimized-routines/math
 .endif
 
 CFLAGS+=	-I${.CURDIR}/${ARCH_SUBDIR}
@@ -97,17 +95,27 @@ COMMON_SRCS+= s_cospi.c s_cospif.c \
 	s_sinpi.c s_sinpif.c \
 	s_tanpi.c s_tanpif.c
 
+# LIBCSRCDIR is defined lazily, so can't be used for exists() below
+LIBC_SRCTOP=${SRCTOP}/lib/libc
 # Location of fpmath.h and _fpmath.h
-.if exists(${LIBCSRCDIR}/${MACHINE_ARCH})
-LIBC_ARCH=${MACHINE_ARCH}
+
+# Pick the current architecture directory for libc. In general, this is named
+# MACHINE_CPUARCH, but some ABIs are different enough to require their own libc,
+# so allow a directory named MACHINE_ARCH to override this (though treat
+# powerpc64le and powerpc64 the same).
+# Note: This is copied from libc/Makefile
+M=${MACHINE_ARCH:S/powerpc64le/powerpc64/}
+.if exists(${LIBC_SRCTOP}/${M})
+LIBC_ARCH=${M}
 .else
 LIBC_ARCH=${MACHINE_CPUARCH}
 .endif
-CFLAGS+=	-I${.CURDIR}/src -I${LIBCSRCDIR}/include \
-	-I${LIBCSRCDIR}/${LIBC_ARCH}
+
+CFLAGS+=	-I${.CURDIR}/src -I${LIBC_SRCTOP}/include \
+		-I${LIBC_SRCTOP}/${LIBC_ARCH}
 SYM_MAPS+=	${.CURDIR}/Symbol.map
 
-VERSION_DEF=	${LIBCSRCDIR}/Versions.def
+VERSION_DEF=	${LIBC_SRCTOP}/Versions.def
 SYMBOL_MAPS=	${SYM_MAPS}
 
 # C99 long double functions
@@ -146,7 +154,8 @@ COMMON_SRCS+=	catrig.c catrigf.c \
 	s_cproj.c s_cprojf.c s_creal.c s_crealf.c s_creall.c \
 	s_csinh.c s_csinhf.c s_ctanh.c s_ctanhf.c
 
-# FreeBSD's C library supplies these functions:
+# FreeBSD's C library supplies these functions (but note we still have s_frexp.c
+# and s_isnan.c enabled above, so they are duplicated):
 #COMMON_SRCS+=	s_fabs.c s_frexp.c s_isnan.c s_ldexp.c s_modf.c
 
 # Exclude the generic versions of what we provide in the MD area.

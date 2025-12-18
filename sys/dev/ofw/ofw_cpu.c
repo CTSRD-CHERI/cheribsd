@@ -28,7 +28,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -44,7 +43,7 @@
 #include <dev/ofw/ofw_cpu.h>
 
 #if defined(__arm__) || defined(__arm64__) || defined(__riscv__)
-#include <dev/extres/clk/clk.h>
+#include <dev/clk/clk.h>
 #endif
 
 static int	ofw_cpulist_probe(device_t);
@@ -124,7 +123,7 @@ ofw_cpulist_attach(device_t dev)
 			free(dinfo, M_OFWCPU);
 			continue;
 		}
-		cdev = device_add_child(dev, NULL, -1);
+		cdev = device_add_child(dev, NULL, DEVICE_UNIT_ANY);
 		if (cdev == NULL) {
 			device_printf(dev, "<%s>: device_add_child failed\n",
 			    dinfo->obd_name);
@@ -152,7 +151,7 @@ static int	ofw_cpu_read_ivar(device_t dev, device_t child, int index,
 struct ofw_cpu_softc {
 	struct pcpu	*sc_cpu_pcpu;
 	uint32_t	 sc_nominal_mhz;
-	boolean_t	 sc_reg_valid;
+	bool		 sc_reg_valid;
 	pcell_t		 sc_reg[2];
 };
 
@@ -336,7 +335,7 @@ ofw_cpu_read_ivar(device_t dev, device_t child, int index, uintptr_t *result)
 }
 
 int
-ofw_cpu_early_foreach(ofw_cpu_foreach_cb callback, boolean_t only_runnable)
+ofw_cpu_early_foreach(ofw_cpu_foreach_cb callback, bool only_runnable)
 {
 	phandle_t node, child;
 	pcell_t addr_cells, reg[2];

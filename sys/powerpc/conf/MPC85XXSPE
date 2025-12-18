@@ -69,6 +69,7 @@ options 	COMPAT_FREEBSD10	# Compatible with FreeBSD10
 options 	COMPAT_FREEBSD11	# Compatible with FreeBSD11
 options 	COMPAT_FREEBSD12	# Compatible with FreeBSD12
 options 	COMPAT_FREEBSD13	# Compatible with FreeBSD13
+options 	COMPAT_FREEBSD14	# Compatible with FreeBSD14
 
 options 	HWPMC_HOOKS
 options 	KDTRACE_HOOKS		# Kernel DTrace hooks
@@ -115,10 +116,13 @@ device		uart
 options 	USB_DEBUG	# enable debug msgs
 #device		uhci
 device		ehci
+device  	hkbd
 device  	ukbd
+device  	hms
 device  	ums
 device		umass
 device		usb
+device		usbhid
 device		vlan
 
 # VirtIO support
@@ -135,6 +139,12 @@ device  	videomode
 device  	vt
 device  	fbd
 
+# evdev interface
+options 	EVDEV_SUPPORT		# evdev support in legacy drivers
+device		evdev			# input event device support
+device		uinput			# install /dev/uinput cdev
+
 # HID support
 options 	HID_DEBUG	# enable debug msgs
 device		hid		# Generic HID support
+device		hidbus		# Generic HID bus

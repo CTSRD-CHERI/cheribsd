@@ -1,5 +1,5 @@
 #! /usr/bin/env perl
-# Copyright 2016-2020 The OpenSSL Project Authors. All Rights Reserved.
+# Copyright 2016-2023 The OpenSSL Project Authors. All Rights Reserved.
 #
 # Licensed under the Apache License 2.0 (the "License").  You may not use
 # this file except in compliance with the License.  You can obtain a copy
@@ -49,8 +49,10 @@ open OUT,"| \"$^X\" $xlate $flavour \"$output\""
     or die "can't call $xlate: $!";
 *STDOUT=*OUT;
 
-my ($ctx,$inp,$len,$padbit) = map("x$_",(0..3));
-my ($mac,$nonce)=($inp,$len);
+my ($ctx,$inp,$len,$padbit) = ("PTR(0)","PTR(1)","x2","x3");
+my ($mac,$nonce)=($inp,"PTR(2)");
+my ($inpx) = ("x1");
+my ($func,$r0p,$r1p,$d0p,$d1p) = map("PTR($_)",(2,7..8,12..13));
 
 my ($h0,$h1,$h2,$r0,$r1,$s1,$t0,$t1,$d0,$d1,$d2) = map("x$_",(4..14));
 
@@ -72,20 +74,27 @@ $code.=<<___;
 .type	poly1305_init,%function
 .align	5
 poly1305_init:
-	cmp	$inp,xzr
+	AARCH64_VALID_CALL_TARGET
+	cmp	$inpx,xzr
 	stp	xzr,xzr,[$ctx]		// zero hash value
 	stp	xzr,xzr,[$ctx,#16]	// [along with is_base2_26]
 
-	csel	x0,xzr,x0,eq
+	csel	$ctx,PTR(zr),$ctx,eq
 	b.eq	.Lno_key
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	adrp	c17,:got:OPENSSL_armcap_P
+	ldr	c17,[c17,#:got_lo12:OPENSSL_armcap_P]
+	ldr	w17,[c17]
+#else
 	adrp	x17,OPENSSL_armcap_P
 	ldr	w17,[x17,#:lo12:OPENSSL_armcap_P]
+#endif
 
 	ldp	$r0,$r1,[$inp]		// load key
 	mov	$s1,#0xfffffffc0fffffff
 	movk	$s1,#0x0fff,lsl#48
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	$r0,$r0			// flip bytes
 	rev	$r1,$r1
 #endif
@@ -96,18 +105,18 @@ poly1305_init:
 
 	tst	w17,#ARMV7_NEON
 
-	adr	$d0,.Lpoly1305_blocks
-	adr	$r0,.Lpoly1305_blocks_neon
-	adr	$d1,.Lpoly1305_emit
-	adr	$r1,.Lpoly1305_emit_neon
+	adr	$d0p,.Lpoly1305_blocks
+	adr	$r0p,.Lpoly1305_blocks_neon
+	adr	$d1p,.Lpoly1305_emit
+	adr	$r1p,.Lpoly1305_emit_neon
 
-	csel	$d0,$d0,$r0,eq
-	csel	$d1,$d1,$r1,eq
+	csel	$d0p,$d0p,$r0p,eq
+	csel	$d1p,$d1p,$r1p,eq
 
 #ifdef	__ILP32__
-	stp	w12,w13,[$len]
+	stp	w12,w13,[$func]
 #else
-	stp	$d0,$d1,[$len]
+	stp	$d0p,$d1p,[$func]
 #endif
 
 	mov	x0,#1
@@ -116,9 +125,13 @@ poly1305_init:
 .size	poly1305_init,.-poly1305_init
 
 .type	poly1305_blocks,%function
+.type	.Lpoly1305_blocks,%function
 .align	5
 poly1305_blocks:
 .Lpoly1305_blocks:
+	// The symbol .Lpoly1305_blocks is not a .globl symbol
+	// but a pointer to it is returned by poly1305_init
+	AARCH64_VALID_CALL_TARGET
 	ands	$len,$len,#-16
 	b.eq	.Lno_data
 
@@ -132,7 +145,7 @@ poly1305_blocks:
 .Loop:
 	ldp	$t0,$t1,[$inp],#16	// load input
 	sub	$len,$len,#16
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	$t0,$t0
 	rev	$t1,$t1
 #endif
@@ -181,9 +194,13 @@ poly1305_blocks:
 .size	poly1305_blocks,.-poly1305_blocks
 
 .type	poly1305_emit,%function
+.type	Lpoly1305_emit,%function
 .align	5
 poly1305_emit:
 .Lpoly1305_emit:
+	// The symbol .poly1305_emit is not a .globl symbol
+	// but a pointer to it is returned by poly1305_init
+	AARCH64_VALID_CALL_TARGET
 	ldp	$h0,$h1,[$ctx]		// load hash base 2^64
 	ldr	$h2,[$ctx,#16]
 	ldp	$t0,$t1,[$nonce]	// load nonce
@@ -197,13 +214,13 @@ poly1305_emit:
 	csel	$h0,$h0,$d0,eq
 	csel	$h1,$h1,$d1,eq
 
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	ror	$t0,$t0,#32		// flip nonce words
 	ror	$t1,$t1,#32
 #endif
 	adds	$h0,$h0,$t0		// accumulate nonce
 	adc	$h1,$h1,$t1
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	$h0,$h0			// flip output bytes
 	rev	$h1,$h1
 #endif
@@ -219,8 +236,8 @@ my ($ACC0,$ACC1,$ACC2,$ACC3,$ACC4) = map("v$_.2d",(19..23));
 my ($H0,$H1,$H2,$H3,$H4) = map("v$_.2s",(24..28));
 my ($T0,$T1,$MASK) = map("v$_",(29..31));
 
-my ($in2,$zeros)=("x16","x17");
-my $is_base2_26 = $zeros;		# borrow
+my ($in2,$zeros)=("PTR(16)","PTR(17)");
+my $is_base2_26 = "x17";		# borrow
 
 $code.=<<___;
 .type	poly1305_mult,%function
@@ -288,18 +305,22 @@ poly1305_splat:
 .size	poly1305_splat,.-poly1305_splat
 
 .type	poly1305_blocks_neon,%function
+.type	.Lpoly1305_blocks_neon,%function
 .align	5
 poly1305_blocks_neon:
 .Lpoly1305_blocks_neon:
+	// The symbol .Lpoly1305_blocks_neon is not a .globl symbol
+	// but a pointer to it is returned by poly1305_init
+	AARCH64_VALID_CALL_TARGET
 	ldr	$is_base2_26,[$ctx,#24]
 	cmp	$len,#128
 	b.hs	.Lblocks_neon
 	cbz	$is_base2_26,.Lpoly1305_blocks
 
 .Lblocks_neon:
-	.inst	0xd503233f		// paciasp
-	stp	x29,x30,[sp,#-80]!
-	add	x29,sp,#0
+	AARCH64_SIGN_LINK_REGISTER
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH+64)]!
+	add	PTR(29),PTRN(sp),#0
 
 	ands	$len,$len,#-16
 	b.eq	.Lno_data_neon
@@ -335,7 +356,7 @@ poly1305_blocks_neon:
 	adcs	$h1,$h1,xzr
 	adc	$h2,$h2,xzr
 
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	$d0,$d0
 	rev	$d1,$d1
 #endif
@@ -344,7 +365,7 @@ poly1305_blocks_neon:
 	adc	$h2,$h2,$padbit
 
 	bl	poly1305_mult
-	ldr	x30,[sp,#8]
+	ldr	PTR(30),[PTRN(sp),#PTR_WIDTH]
 
 	cbz	$padbit,.Lstore_base2_64_neon
 
@@ -381,7 +402,7 @@ poly1305_blocks_neon:
 	ldp	$d0,$d1,[$inp],#16	// load input
 	sub	$len,$len,#16
 	add	$s1,$r1,$r1,lsr#2	// s1 = r1 + (r1 >> 2)
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	$d0,$d0
 	rev	$d1,$d1
 #endif
@@ -399,10 +420,10 @@ poly1305_blocks_neon:
 	ubfx	x13,$h1,#14,#26
 	extr	x14,$h2,$h1,#40
 
-	stp	d8,d9,[sp,#16]		// meet ABI requirements
-	stp	d10,d11,[sp,#32]
-	stp	d12,d13,[sp,#48]
-	stp	d14,d15,[sp,#64]
+	stp	d8,d9,[PTRN(sp),#2*PTR_WIDTH]	// meet ABI requirements
+	stp	d10,d11,[PTRN(sp),#2*PTR_WIDTH+16]
+	stp	d12,d13,[PTRN(sp),#2*PTR_WIDTH+32]
+	stp	d14,d15,[PTRN(sp),#2*PTR_WIDTH+48]
 
 	fmov	${H0},x10
 	fmov	${H1},x11
@@ -429,7 +450,7 @@ poly1305_blocks_neon:
 	bl	poly1305_mult		// r^4
 	sub	$ctx,$ctx,#4
 	bl	poly1305_splat
-	ldr	x30,[sp,#8]
+	ldr	PTR(30),[PTRN(sp),#PTR_WIDTH]
 
 	add	$in2,$inp,#32
 	adr	$zeros,.Lzeros
@@ -448,10 +469,10 @@ poly1305_blocks_neon:
 	subs	$len,$len,#64
 	csel	$in2,$zeros,$in2,lo
 
-	stp	d8,d9,[sp,#16]		// meet ABI requirements
-	stp	d10,d11,[sp,#32]
-	stp	d12,d13,[sp,#48]
-	stp	d14,d15,[sp,#64]
+	stp	d8,d9,[PTRN(sp),#2*PTR_WIDTH]	// meet ABI requirements
+	stp	d10,d11,[PTRN(sp),#2*PTR_WIDTH+16]
+	stp	d12,d13,[PTRN(sp),#2*PTR_WIDTH+32]
+	stp	d14,d15,[PTRN(sp),#2*PTR_WIDTH+48]
 
 	fmov	${H0},x10
 	fmov	${H1},x11
@@ -464,9 +485,9 @@ poly1305_blocks_neon:
 	ldp	x9,x13,[$in2],#48
 
 	lsl	$padbit,$padbit,#24
-	add	x15,$ctx,#48
+	add	PTR(15),$ctx,#48
 
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x8,x8
 	rev	x12,x12
 	rev	x9,x9
@@ -498,11 +519,11 @@ poly1305_blocks_neon:
 	ldp	x8,x12,[$inp],#16	// inp[0:1]
 	ldp	x9,x13,[$inp],#48
 
-	ld1	{$R0,$R1,$S1,$R2},[x15],#64
-	ld1	{$S2,$R3,$S3,$R4},[x15],#64
-	ld1	{$S4},[x15]
+	ld1	{$R0,$R1,$S1,$R2},[PTR(15)],#64
+	ld1	{$S2,$R3,$S3,$R4},[PTR(15)],#64
+	ld1	{$S4},[PTR(15)]
 
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	x8,x8
 	rev	x12,x12
 	rev	x9,x9
@@ -563,7 +584,7 @@ poly1305_blocks_neon:
 	umull	$ACC1,$IN23_0,${R1}[2]
 	 ldp	x9,x13,[$in2],#48
 	umull	$ACC0,$IN23_0,${R0}[2]
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	 rev	x8,x8
 	 rev	x12,x12
 	 rev	x9,x9
@@ -628,7 +649,7 @@ poly1305_blocks_neon:
 	umlal	$ACC4,$IN01_2,${R2}[0]
 	umlal	$ACC1,$IN01_2,${S4}[0]
 	umlal	$ACC2,$IN01_2,${R0}[0]
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	 rev	x8,x8
 	 rev	x12,x12
 	 rev	x9,x9
@@ -819,13 +840,13 @@ poly1305_blocks_neon:
 	// horizontal add
 
 	addp	$ACC3,$ACC3,$ACC3
-	 ldp	d8,d9,[sp,#16]		// meet ABI requirements
+	 ldp	d8,d9,[PTRN(sp),#2*PTR_WIDTH]	// meet ABI requirements
 	addp	$ACC0,$ACC0,$ACC0
-	 ldp	d10,d11,[sp,#32]
+	 ldp	d10,d11,[PTRN(sp),#2*PTR_WIDTH+16]
 	addp	$ACC4,$ACC4,$ACC4
-	 ldp	d12,d13,[sp,#48]
+	 ldp	d12,d13,[PTRN(sp),#2*PTR_WIDTH+32]
 	addp	$ACC1,$ACC1,$ACC1
-	 ldp	d14,d15,[sp,#64]
+	 ldp	d14,d15,[PTRN(sp),#2*PTR_WIDTH+48]
 	addp	$ACC2,$ACC2,$ACC2
 
 	////////////////////////////////////////////////////////////////
@@ -866,15 +887,19 @@ poly1305_blocks_neon:
 	st1	{$ACC4}[0],[$ctx]
 
 .Lno_data_neon:
-	ldr	x29,[sp],#80
-	.inst	0xd50323bf		// autiasp
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH+64)
+	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	poly1305_blocks_neon,.-poly1305_blocks_neon
 
 .type	poly1305_emit_neon,%function
+.type	.Lpoly1305_emit_neon,%function
 .align	5
 poly1305_emit_neon:
 .Lpoly1305_emit_neon:
+	// The symbol .Lpoly1305_emit_neon is not a .globl symbol
+	// but a pointer to it is returned by poly1305_init
+	AARCH64_VALID_CALL_TARGET
 	ldr	$is_base2_26,[$ctx,#24]
 	cbz	$is_base2_26,poly1305_emit
 
@@ -909,13 +934,13 @@ poly1305_emit_neon:
 	csel	$h0,$h0,$d0,eq
 	csel	$h1,$h1,$d1,eq
 
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	ror	$t0,$t0,#32		// flip nonce words
 	ror	$t1,$t1,#32
 #endif
 	adds	$h0,$h0,$t0		// accumulate nonce
 	adc	$h1,$h1,$t1
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	rev	$h0,$h0			// flip output bytes
 	rev	$h1,$h1
 #endif

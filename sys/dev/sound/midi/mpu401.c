@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -119,7 +118,7 @@ static int
 mpu401_intr(struct mpu401 *m)
 {
 #define MPU_INTR_BUF	16
-	MIDI_TYPE b[MPU_INTR_BUF];
+	uint8_t b[MPU_INTR_BUF];
 	int i;
 	int s;
 

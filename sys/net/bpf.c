@@ -33,8 +33,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *      @(#)bpf.c	8.4 (Berkeley) 1/9/95
  */
 
 #include <sys/cdefs.h>
@@ -101,7 +99,7 @@
 
 MALLOC_DEFINE(M_BPF, "BPF", "BPF data");
 
-static struct bpf_if_ext dead_bpf_if = {
+static const struct bpf_if_ext dead_bpf_if = {
 	.bif_dlist = CK_LIST_HEAD_INITIALIZER()
 };
 
@@ -209,7 +207,7 @@ struct bpf_dltlist64 {
     _CASE_IOC_BPF_PROGRAM64(cmd)				\
     (cmd)
 
-#define BPF_LOCK()	   sx_xlock(&bpf_sx)
+#define BPF_LOCK()		sx_xlock(&bpf_sx)
 #define BPF_UNLOCK()		sx_xunlock(&bpf_sx)
 #define BPF_LOCK_ASSERT()	sx_assert(&bpf_sx, SA_XLOCKED)
 /*
@@ -685,7 +683,7 @@ bpf_movein(struct uio *uio, int linktype, struct ifnet *ifp, struct mbuf **mp,
 	if (len < hlen || len - hlen > ifp->if_mtu)
 		return (EMSGSIZE);
 
-	/* Allocate a mbuf for our write, since m_get2 fails if len >= to MJUMPAGESIZE, use m_getjcl for bigger buffers */
+	/* Allocate a mbuf, up to MJUM16BYTES bytes, for our write. */
 	m = m_get3(len, M_WAITOK, MT_DATA, M_PKTHDR);
 	if (m == NULL)
 		return (EIO);
@@ -1062,7 +1060,7 @@ bpfread(struct cdev *dev, struct uio *uio, int ioflag)
 	d->bd_state = BPF_IDLE;
 	while (d->bd_hbuf_in_use) {
 		error = mtx_sleep(&d->bd_hbuf_in_use, &d->bd_lock,
-		    PRINET|PCATCH, "bd_hbuf", 0);
+		    PRINET | PCATCH, "bd_hbuf", 0);
 		if (error != 0) {
 			BPFD_UNLOCK(d);
 			return (error);
@@ -1105,7 +1103,7 @@ bpfread(struct cdev *dev, struct uio *uio, int ioflag)
 			BPFD_UNLOCK(d);
 			return (EWOULDBLOCK);
 		}
-		error = msleep(d, &d->bd_lock, PRINET|PCATCH,
+		error = msleep(d, &d->bd_lock, PRINET | PCATCH,
 		     "bpf", d->bd_rtout);
 		if (error == EINTR || error == ERESTART) {
 			BPFD_UNLOCK(d);
@@ -2141,7 +2139,7 @@ bpfpoll(struct cdev *dev, int events, struct thread *td)
 
 	if (devfs_get_cdevpriv((void **)&d) != 0 || d->bd_bif == NULL)
 		return (events &
-		    (POLLHUP|POLLIN|POLLRDNORM|POLLOUT|POLLWRNORM));
+		    (POLLHUP | POLLIN | POLLRDNORM | POLLOUT | POLLWRNORM));
 
 	/*
 	 * Refresh PID associated with this descriptor.
@@ -2870,7 +2868,7 @@ bpfdetach(struct ifnet *ifp)
 			continue;
 
 		CK_LIST_REMOVE(bp, bif_next);
-		*bp->bif_bpf = (struct bpf_if *)&dead_bpf_if;
+		*bp->bif_bpf = __DECONST(struct bpf_if *, &dead_bpf_if);
 
 		CTR4(KTR_NET,
 		    "%s: sheduling free for encap %d (%p) for if %p",
@@ -2888,6 +2886,12 @@ bpfdetach(struct ifnet *ifp)
 		bpfif_rele(bp);
 	}
 	BPF_UNLOCK();
+}
+
+bool
+bpf_peers_present_if(struct ifnet *ifp)
+{
+	return (bpf_peers_present(ifp->if_bpf));
 }
 
 static u_int * __capability
@@ -3140,7 +3144,7 @@ bpf_stats_sysctl(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSINIT(bpfdev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE,bpf_drvinit,NULL);
+SYSINIT(bpfdev, SI_SUB_DRIVERS, SI_ORDER_MIDDLE, bpf_drvinit, NULL);
 
 #else /* !DEV_BPF && !NETGRAPH_BPF */
 
@@ -3192,7 +3196,7 @@ void
 bpfattach2(struct ifnet *ifp, u_int dlt, u_int hdrlen, struct bpf_if **driverp)
 {
 
-	*driverp = (struct bpf_if *)&dead_bpf_if;
+	*driverp = __DECONST(struct bpf_if *, &dead_bpf_if);
 }
 
 void
@@ -3200,16 +3204,22 @@ bpfdetach(struct ifnet *ifp)
 {
 }
 
+bool
+bpf_peers_present_if(struct ifnet *ifp)
+{
+	return (false);
+}
+
 u_int
 bpf_filter(const struct bpf_insn *pc, u_char *p, u_int wirelen, u_int buflen)
 {
-	return -1;	/* "no filter" behaviour */
+	return (-1);	/* "no filter" behaviour */
 }
 
 int
 bpf_validate(const struct bpf_insn *f, int len)
 {
-	return 0;		/* false */
+	return (0);	/* false */
 }
 
 #endif /* !DEV_BPF && !NETGRAPH_BPF */

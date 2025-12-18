@@ -25,7 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <net/ethernet.h>
 #include <netinet/in.h>
@@ -353,7 +352,7 @@ struct devsw efinet_dev = {
 };
 
 static int
-efinet_dev_init()
+efinet_dev_init(void)
 {
 	struct netif_dif *dif;
 	struct netif_stats *stats;

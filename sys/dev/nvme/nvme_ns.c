@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/bio.h>
 #include <sys/bus.h>
@@ -44,6 +43,7 @@
 #include <geom/geom.h>
 
 #include "nvme_private.h"
+#include "nvme_linux.h"
 
 static void		nvme_bio_child_inbed(struct bio *parent, int bio_error);
 static void		nvme_bio_child_done(void *arg,
@@ -83,9 +83,8 @@ nvme_ns_ioctl(struct cdev *cdev, u_long cmd, caddr_t arg, int flag,
 	case NVME_GET_NSID:
 	{
 		struct nvme_get_nsid *gnsid = (struct nvme_get_nsid *)arg;
-		strncpy(gnsid->cdev, device_get_nameunit(ctrlr->dev),
+		strlcpy(gnsid->cdev, device_get_nameunit(ctrlr->dev),
 		    sizeof(gnsid->cdev));
-		gnsid->cdev[sizeof(gnsid->cdev) - 1] = '\0';
 		gnsid->nsid = ns->id;
 		break;
 	}
@@ -95,6 +94,18 @@ nvme_ns_ioctl(struct cdev *cdev, u_long cmd, caddr_t arg, int flag,
 	case DIOCGSECTORSIZE:
 		*(u_int *)arg = nvme_ns_get_sector_size(ns);
 		break;
+	/* Linux Compatible (see nvme_linux.h) */
+	case NVME_IOCTL_ID:
+		td->td_retval[0] = ns->id;
+		return (0);
+
+	case NVME_IOCTL_ADMIN_CMD:
+	case NVME_IOCTL_IO_CMD: {
+		struct nvme_passthru_cmd *npc = (struct nvme_passthru_cmd *)arg;
+
+		return (nvme_ctrlr_linux_passthru_cmd(ctrlr, npc, ns->id, true,
+		    cmd == NVME_IOCTL_ADMIN_CMD));
+	}
 	default:
 		return (ENOTTY);
 	}
@@ -181,10 +192,8 @@ nvme_ns_get_sector_size(struct nvme_namespace *ns)
 {
 	uint8_t flbas_fmt, lbads;
 
-	flbas_fmt = (ns->data.flbas >> NVME_NS_DATA_FLBAS_FORMAT_SHIFT) &
-		NVME_NS_DATA_FLBAS_FORMAT_MASK;
-	lbads = (ns->data.lbaf[flbas_fmt] >> NVME_NS_DATA_LBAF_LBADS_SHIFT) &
-		NVME_NS_DATA_LBAF_LBADS_MASK;
+	flbas_fmt = NVMEV(NVME_NS_DATA_FLBAS_FORMAT, ns->data.flbas);
+	lbads = NVMEV(NVME_NS_DATA_LBAF_LBADS, ns->data.lbaf[flbas_fmt]);
 
 	return (1 << lbads);
 }
@@ -231,8 +240,7 @@ nvme_ns_get_stripesize(struct nvme_namespace *ns)
 {
 	uint32_t ss;
 
-	if (((ns->data.nsfeat >> NVME_NS_DATA_NSFEAT_NPVALID_SHIFT) &
-	    NVME_NS_DATA_NSFEAT_NPVALID_MASK) != 0) {
+	if (NVMEV(NVME_NS_DATA_NSFEAT_NPVALID, ns->data.nsfeat) != 0) {
 		ss = nvme_ns_get_sector_size(ns);
 		if (ns->data.npwa != 0)
 			return ((ns->data.npwa + 1) * ss);
@@ -289,8 +297,9 @@ nvme_bio_child_inbed(struct bio *parent, int bio_error)
 	if (inbed == children) {
 		bzero(&parent_cpl, sizeof(parent_cpl));
 		if (parent->bio_flags & BIO_ERROR) {
-			parent_cpl.status &= ~(NVME_STATUS_SC_MASK << NVME_STATUS_SC_SHIFT);
-			parent_cpl.status |= (NVME_SC_DATA_TRANSFER_ERROR) << NVME_STATUS_SC_SHIFT;
+			parent_cpl.status &= ~NVMEM(NVME_STATUS_SC);
+			parent_cpl.status |= NVMEF(NVME_STATUS_SC,
+			    NVME_SC_DATA_TRANSFER_ERROR);
 		}
 		nvme_ns_bio_done(parent, &parent_cpl);
 	}
@@ -432,6 +441,7 @@ nvme_ns_split_bio(struct nvme_namespace *ns, struct bio *bp,
 	if (child_bios == NULL)
 		return (ENOMEM);
 
+	counter_u64_add(ns->ctrlr->alignment_splits, 1);
 	for (i = 0; i < num_bios; i++) {
 		child = child_bios[i];
 		err = nvme_ns_bio_process(ns, child, nvme_bio_child_done);
@@ -552,8 +562,8 @@ nvme_ns_construct(struct nvme_namespace *ns, uint32_t id,
 	if (ns->data.nsze == 0)
 		return (ENXIO);
 
-	flbas_fmt = (ns->data.flbas >> NVME_NS_DATA_FLBAS_FORMAT_SHIFT) &
-		NVME_NS_DATA_FLBAS_FORMAT_MASK;
+	flbas_fmt = NVMEV(NVME_NS_DATA_FLBAS_FORMAT, ns->data.flbas);
+
 	/*
 	 * Note: format is a 0-based value, so > is appropriate here,
 	 *  not >=.
@@ -585,8 +595,7 @@ nvme_ns_construct(struct nvme_namespace *ns, uint32_t id,
 	if (nvme_ctrlr_has_dataset_mgmt(&ctrlr->cdata))
 		ns->flags |= NVME_NS_DEALLOCATE_SUPPORTED;
 
-	vwc_present = (ctrlr->cdata.vwc >> NVME_CTRLR_DATA_VWC_PRESENT_SHIFT) &
-		NVME_CTRLR_DATA_VWC_PRESENT_MASK;
+	vwc_present = NVMEV(NVME_CTRLR_DATA_VWC_PRESENT, ctrlr->cdata.vwc);
 	if (vwc_present)
 		ns->flags |= NVME_NS_FLUSH_SUPPORTED;
 
@@ -608,11 +617,12 @@ nvme_ns_construct(struct nvme_namespace *ns, uint32_t id,
 	md_args.mda_unit = unit;
 	md_args.mda_mode = 0600;
 	md_args.mda_si_drv1 = ns;
-	res = make_dev_s(&md_args, &ns->cdev, "nvme%dns%d",
-	    device_get_unit(ctrlr->dev), ns->id);
+	res = make_dev_s(&md_args, &ns->cdev, "%sn%d",
+	    device_get_nameunit(ctrlr->dev), ns->id);
 	if (res != 0)
 		return (ENXIO);
-
+	ns->cdev->si_drv2 = make_dev_alias(ns->cdev, "%sns%d",
+	    device_get_nameunit(ctrlr->dev), ns->id);
 	ns->cdev->si_flags |= SI_UNMAPPED;
 
 	return (0);
@@ -622,6 +632,9 @@ void
 nvme_ns_destruct(struct nvme_namespace *ns)
 {
 
-	if (ns->cdev != NULL)
+	if (ns->cdev != NULL) {
+		if (ns->cdev->si_drv2 != NULL)
+			destroy_dev(ns->cdev->si_drv2);
 		destroy_dev(ns->cdev);
+	}
 }

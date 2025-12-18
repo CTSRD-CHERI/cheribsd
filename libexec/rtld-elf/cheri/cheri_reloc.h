@@ -35,28 +35,15 @@
 
 #include "debug.h"
 #include "rtld.h"
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#ifdef CHERI_LIB_C18N
 #include "rtld_c18n.h"
 #endif
 
 #ifdef RTLD_HAS_CAPRELOCS
-/* The clang-provided header is not warning-clean: */
-__unused static void cheri_init_globals(void);
 #include <cheri_init_globals.h>
 #if !defined(CHERI_INIT_GLOBALS_VERSION) || CHERI_INIT_GLOBALS_VERSION < 5
 #error "cheri_init_globals.h is outdated. Please update LLVM"
 #endif
-
-/* FIXME: replace this with cheri_init_globals_impl once everyone has updated clang */
-static __attribute__((always_inline))
-void _do___caprelocs(const struct capreloc *start_relocs,
-    const struct capreloc *stop_relocs, void * __capability gdc,
-    const void * __capability pcc, ptraddr_t base_addr, bool tight_pcc_bounds)
-{
-	cheri_init_globals_impl(start_relocs, stop_relocs, /*data_cap=*/gdc,
-	    /*code_cap=*/pcc, /*rodata_cap=*/pcc,
-	    /*tight_code_bounds=*/tight_pcc_bounds, base_addr);
-}
 #endif
 
 static inline int
@@ -119,20 +106,22 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		}
 		/* Remove write permissions and set bounds */
 		symval = make_function_cap_with_addend(def, defobj, addend);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-		symval = tramp_intern(obj, &(struct tramp_data) {
-			.target = __DECONST(void *, symval),
-			.defobj = defobj,
-			.def = def,
-			.sig = tramp_fetch_sig(obj, r_symndx)
-		});
-#endif
 		if (__predict_false(symval == NULL)) {
 			_rtld_error("Could not create function pointer for %s "
 				    "(in %s)\n",
 			    symname(obj, r_symndx), obj->path);
 			return -1;
 		}
+#ifdef CHERI_LIB_C18N
+		if (C18N_FPTR_ENABLED)
+			symval = tramp_intern(NULL, RTLD_COMPART_ID,
+			    &(struct tramp_data) {
+				.target = __DECONST(void *, symval),
+				.defobj = defobj,
+				.def = def,
+				.sig = sigtab_get(obj, r_symndx)
+			});
+#endif
 	} else {
 		/* Remove execute permissions and set bounds */
 		symval = cheri_incoffset(make_data_cap(def, defobj), addend);

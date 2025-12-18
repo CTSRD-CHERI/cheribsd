@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <sys/cdefs.h>
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/sysctl.h>
@@ -105,7 +105,7 @@ getpagesize(void)
 	return (page_size);
 }
 
-extern int __sys___sysctl(const int *name, u_int namelen, void *oldp,
+int __sys___sysctl(const int *name, u_int namelen, void *oldp,
     size_t *oldlenp, const void *newp, size_t newlen);
 
 int

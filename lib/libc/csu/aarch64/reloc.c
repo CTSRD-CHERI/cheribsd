@@ -27,6 +27,11 @@
 
 #include <sys/cdefs.h>
 
+static void
+ifunc_init(const Elf_Auxinfo *aux __unused)
+{
+}
+
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
 

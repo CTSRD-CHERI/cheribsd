@@ -2145,11 +2145,6 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	dev = priv->dev = if_alloc(IFT_ETHER);
-	if (dev == NULL) {
-		en_err(priv, "Net device allocation failed\n");
-		kfree(priv);
-		return -ENOMEM;
-	}
 	if_setsoftc(dev, priv);
 	if_initname(dev, "mlxen", (device_get_unit(
 	    mdev->pdev->dev.bsddev) * MLX4_MAX_PORTS) + port - 1);
@@ -2295,7 +2290,6 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 		dev_addr[ETHER_ADDR_LEN - 1 - i] = (u8) (priv->mac >> (8 * i));
 
 
-	ether_ifattach(dev, dev_addr);
 	if_link_state_change(dev, LINK_STATE_DOWN);
 	ifmedia_init(&priv->media, IFM_IMASK | IFM_ETH_FMASK,
 	    mlx4_en_media_change, mlx4_en_media_status);
@@ -2307,6 +2301,8 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 	ifmedia_set(&priv->media, IFM_ETHER | IFM_AUTO);
 
 	DEBUGNET_SET(dev, mlx4_en);
+
+	ether_ifattach(dev, dev_addr);
 
 	en_warn(priv, "Using %d TX rings\n", prof->tx_ring_num);
 	en_warn(priv, "Using %d RX rings\n", prof->rx_ring_num);

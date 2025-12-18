@@ -2,8 +2,7 @@
 
 .include <src.opts.mk>
 MK_SSP=	no
-MK_INIT_ALL_ZERO=	no
-MK_INIT_ALL_PATTERN=	no
+OPT_INIT_ALL=	none
 
 PACKAGE=lib${LIB}
 LIB=	simple_printf
@@ -20,7 +19,7 @@ LDFLAGS+=	-nostdlib -nodefaultlibs
 # For the standalone case (no libc), we provide our own __sys_write implementation
 CFLAGS+=-ffreestanding -fno-builtin
 CFLAGS+=-DSIMPLE_PRINTF_AVOID_LIBC_FUNCTIONS=1
-CFLAGS+=-I${SRCTOP}/lib/libc/${LIBSIMPLE_PRINTF_ARCH}
+CFLAGS+=-I${SRCTOP}/lib/libsys/${LIBSIMPLE_PRINTF_ARCH}
 .if exists(${PRINTF_DIR}/${MACHINE_ARCH})
 LIBSIMPLE_PRINTF_ARCH=	${MACHINE_ARCH}
 .else

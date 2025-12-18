@@ -3,9 +3,6 @@
  * Copyright 2007 Nuova Systems, Inc.  All rights reserved.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: $");
-
 #ifndef _ENIC_H
 #define _ENIC_H
 
@@ -231,7 +228,7 @@ struct enic {
 
 	/* interrupt vectors (len = conf_intr_count) */
 	struct vnic_intr *intr;
-	struct intr_queue *intr_queues;;
+	struct intr_queue *intr_queues;
 	unsigned int intr_count; /* equals enabled interrupts (lsc + rxqs) */
 
 

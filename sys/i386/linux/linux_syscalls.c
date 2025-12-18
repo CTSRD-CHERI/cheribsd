@@ -5,12 +5,11 @@
  */
 
 const char *linux_syscallnames[] = {
-#define	nosys	linux_nosys
 	"#0",			/* 0 = setup */
 	"linux_exit",			/* 1 = linux_exit */
 	"linux_fork",			/* 2 = linux_fork */
 	"read",			/* 3 = read */
-	"write",			/* 4 = write */
+	"linux_write",			/* 4 = linux_write */
 	"linux_open",			/* 5 = linux_open */
 	"close",			/* 6 = close */
 	"linux_waitpid",			/* 7 = linux_waitpid */
@@ -152,7 +151,7 @@ const char *linux_syscallnames[] = {
 	"flock",			/* 143 = flock */
 	"linux_msync",			/* 144 = linux_msync */
 	"readv",			/* 145 = readv */
-	"writev",			/* 146 = writev */
+	"linux_writev",			/* 146 = linux_writev */
 	"linux_getsid",			/* 147 = linux_getsid */
 	"linux_fdatasync",			/* 148 = linux_fdatasync */
 	"linux_sysctl",			/* 149 = linux_sysctl */
@@ -449,5 +448,14 @@ const char *linux_syscallnames[] = {
 	"linux_process_madvise",			/* 440 = linux_process_madvise */
 	"linux_epoll_pwait2_64",			/* 441 = linux_epoll_pwait2_64 */
 	"linux_mount_setattr",			/* 442 = linux_mount_setattr */
-	"#443",			/* 443 = nosys */
+	"linux_quotactl_fd",			/* 443 = linux_quotactl_fd */
+	"linux_landlock_create_ruleset",			/* 444 = linux_landlock_create_ruleset */
+	"linux_landlock_add_rule",			/* 445 = linux_landlock_add_rule */
+	"linux_landlock_restrict_self",			/* 446 = linux_landlock_restrict_self */
+	"linux_memfd_secret",			/* 447 = linux_memfd_secret */
+	"linux_process_mrelease",			/* 448 = linux_process_mrelease */
+	"linux_futex_waitv",			/* 449 = linux_futex_waitv */
+	"linux_set_mempolicy_home_node",			/* 450 = linux_set_mempolicy_home_node */
+	"linux_cachestat",			/* 451 = linux_cachestat */
+	"linux_fchmodat2",			/* 452 = linux_fchmodat2 */
 };

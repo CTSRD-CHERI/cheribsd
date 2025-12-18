@@ -29,7 +29,6 @@
  * Rockchip PHY TYPEC
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -44,10 +43,10 @@
 #include <dev/ofw/ofw_bus_subr.h>
 #include <dev/ofw/ofw_subr.h>
 
-#include <dev/extres/clk/clk.h>
-#include <dev/extres/phy/phy_usb.h>
-#include <dev/extres/syscon/syscon.h>
-#include <dev/extres/hwreset/hwreset.h>
+#include <dev/clk/clk.h>
+#include <dev/phy/phy_usb.h>
+#include <dev/syscon/syscon.h>
+#include <dev/hwreset/hwreset.h>
 
 #include "syscon_if.h"
 

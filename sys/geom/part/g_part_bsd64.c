@@ -24,7 +24,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/bio.h>
 #include <sys/gsb_crc32.h>
@@ -161,6 +160,7 @@ static struct g_part_scheme g_part_bsd64_scheme = {
 	sizeof(struct g_part_bsd64_table),
 	.gps_entrysz = sizeof(struct g_part_bsd64_entry),
 	.gps_minent = MAXPARTITIONS64,
+	.gps_defent = MAXPARTITIONS64,
 	.gps_maxent = MAXPARTITIONS64
 };
 G_PART_SCHEME_DECLARE(g_part_bsd64);

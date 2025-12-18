@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	From: @(#)if_loop.c	8.1 (Berkeley) 6/10/93
  */
 
 /*
@@ -104,11 +102,6 @@ edsc_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 	 */
 	sc = malloc(sizeof(struct edsc_softc), M_EDSC, M_WAITOK | M_ZERO);
 	ifp = sc->sc_ifp = if_alloc(IFT_ETHER);
-	if (ifp == NULL) {
-		free(sc, M_EDSC);
-		return (ENOSPC);
-	}
-
 	ifp->if_softc = sc;
 
 	/*

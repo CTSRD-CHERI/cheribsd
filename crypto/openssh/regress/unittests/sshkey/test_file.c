@@ -1,4 +1,4 @@
-/* 	$OpenBSD: test_file.c,v 1.10 2021/12/14 21:25:27 deraadt Exp $ */
+/* 	$OpenBSD: test_file.c,v 1.12 2024/08/15 00:52:23 djm Exp $ */
 /*
  * Regress test for sshkey.h key management API
  *
@@ -165,6 +165,7 @@ sshkey_file_tests(void)
 
 	sshkey_free(k1);
 
+#ifdef WITH_DSA
 	TEST_START("parse DSA from private");
 	buf = load_file("dsa_1");
 	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf, "", &k1, NULL), 0);
@@ -255,6 +256,7 @@ sshkey_file_tests(void)
 	TEST_DONE();
 
 	sshkey_free(k1);
+#endif
 
 #ifdef OPENSSL_HAS_ECC
 	TEST_START("parse ECDSA from private");
@@ -269,11 +271,12 @@ sshkey_file_tests(void)
 #ifndef OPENSSL_IS_BORINGSSL /* lacks EC_POINT_point2bn() */
 	a = load_bignum("ecdsa_1.param.priv");
 	b = load_bignum("ecdsa_1.param.pub");
-	c = EC_POINT_point2bn(EC_KEY_get0_group(k1->ecdsa),
-	    EC_KEY_get0_public_key(k1->ecdsa), POINT_CONVERSION_UNCOMPRESSED,
-	    NULL, NULL);
+	c = EC_POINT_point2bn(EC_KEY_get0_group(EVP_PKEY_get0_EC_KEY(k1->pkey)),
+	    EC_KEY_get0_public_key(EVP_PKEY_get0_EC_KEY(k1->pkey)),
+	    POINT_CONVERSION_UNCOMPRESSED, NULL, NULL);
 	ASSERT_PTR_NE(c, NULL);
-	ASSERT_BIGNUM_EQ(EC_KEY_get0_private_key(k1->ecdsa), a);
+	ASSERT_BIGNUM_EQ(
+	    EC_KEY_get0_private_key(EVP_PKEY_get0_EC_KEY(k1->pkey)), a);
 	ASSERT_BIGNUM_EQ(b, c);
 	BN_free(a);
 	BN_free(b);

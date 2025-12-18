@@ -6,7 +6,11 @@
 
 VMTARGETS=	vm-image
 VMFORMATS?=	vhd vmdk qcow2 raw
+.if ${TARGET_ARCH} == riscv64
+VMSIZE?=	6144m
+.else
 VMSIZE?=	5120m
+.endif
 VMFS?=		ufs
 VMFSLIST?=	ufs zfs
 SWAPSIZE?=	1g
@@ -17,44 +21,56 @@ VMDK_DESC=	VMWare, VirtualBox disk image
 QCOW2_DESC=	Qemu, KVM disk image
 RAW_DESC=	Unformatted raw disk image
 
-CLOUDWARE?=	BASIC-CI \
+CLOUDWARE_TYPES?= AZURE \
+		BASIC-CI \
+		BASIC-CLOUDINIT \
 		EC2 \
 		GCE \
-		OCI \
-		VAGRANT-VIRTUALBOX \
-		VAGRANT-VMWARE
+		ORACLE \
+		VAGRANT
 AZURE_FORMAT=	vhdf
-AZURE_FSLIST=	ufs
+AZURE_FSLIST?=	ufs zfs
 AZURE_DESC=	Microsoft Azure platform image
-AZURE_DISK=	${OSRELEASE}.${AZURE_FORMAT}
 BASIC-CI_FORMAT=	raw
-BASIC-CI_FSLIST=	ufs
+BASIC-CI_FSLIST?=	ufs
 BASIC-CI_DESC=		Image for CI
-BASIC-CI_DISK=	${OSRELEASE}.${BASIC-CI_FORMAT}
+BASIC-CLOUDINIT_FORMAT=	raw qcow2
+BASIC-CLOUDINIT_FSLIST?=	ufs zfs
+BASIC-CLOUDINIT_DESC?=	Images for VM with cloudinit disk config support
 EC2_FORMAT=	raw
-EC2_FSLIST=	ufs zfs
-EC2_DESC=	Amazon EC2 image
-EC2_DISK=	${OSRELEASE}.${EC2_FORMAT}
+EC2_FSLIST?=	ufs zfs
+EC2_FLAVOURS?=	BASE CLOUD-INIT SMALL
+EC2-BASE_DESC=	Amazon EC2 image
+EC2-CLOUD-INIT_DESC=	Amazon EC2 Cloud-Init image
+EC2-SMALL_DESC=	Amazon EC2 small image
 GCE_FORMAT=	raw
-GCE_FSLIST=	ufs
+GCE_FSLIST?=	ufs zfs
 GCE_DESC=	Google Compute Engine image
-GCE_DISK=	disk.${GCE_FORMAT}
-OCI_FORMAT=	qcow2
-OCI_FSLIST=	ufs
-OCI_DESC=	Oracle Cloud Infrastructure image
-OCI_DISK=	${OSRELEASE}.${OCI_FORMAT}
+ORACLE_FORMAT=	raw
+ORACLE_FSLIST?=	ufs zfs
+ORACLE_DESC=	Oracle Cloud Infrastructure image
 OPENSTACK_FORMAT=qcow2
-OPENSTACK_FSLIST=	ufs
+OPENSTACK_FSLIST?=	ufs
 OPENSTACK_DESC=	OpenStack platform image
-OPENSTACK_DISK=	${OSRELEASE}.${OPENSTACK_FORMAT}
-VAGRANT-VIRTUALBOX_FORMAT=	vmdk
-VAGRANT-VIRTUALBOX_FSLIST=	ufs
+VAGRANT_FORMAT=	vmdk
+VAGRANT_FSLIST?=	ufs
+VAGRANT_FLAVOURS?=	VIRTUALBOX VMWARE
 VAGRANT-VIRTUALBOX_DESC=	Vagrant Image for VirtualBox
-VAGRANT-VIRTUALBOX_DISK=	${OSRELEASE}.vbox.${VAGRANT_FORMAT}
-VAGRANT-VMWARE_FORMAT=	vmdk
-VAGRANT-VMWARE_FSLIST=	ufs
 VAGRANT-VMWARE_DESC=	Vagrant Image for VMWare
-VAGRANT-VMWARE_DISK=	${OSRELEASE}.vmware.${VAGRANT_FORMAT}
+
+.for _CWT in ${CLOUDWARE_TYPES}
+. if defined(${_CWT}_FLAVOURS)
+.  for _CWF in ${${_CWT}_FLAVOURS}
+CLOUDWARE_GEN+=	${_CWT}-${_CWF}
+${_CWT}-${_CWF}_FORMAT?=	${${_CWT}_FORMAT}
+${_CWT}-${_CWF}_FSLIST?=	${${_CWT}_FSLIST}
+${_CWT}-${_CWF}_DESC?=	${${_CWT}_DESC}
+.  endfor
+. else
+CLOUDWARE_GEN+=	${_CWT}
+. endif
+.endfor
+CLOUDWARE?=	${CLOUDWARE_GEN}
 
 .for _V in TYPE BRANCH REVISION
 . if !defined(${_V}) || empty(${_V})
@@ -63,11 +79,12 @@ ${_V}!=	eval $$(awk '/^${_V}=/{print}' ${.CURDIR}/../sys/conf/newvers.sh); echo 
 .endfor
 
 emulator-portinstall:
-.if ${TARGET_ARCH} != ${MACHINE_ARCH}
-.if ( ${TARGET_ARCH} != "i386" ) || ( ${MACHINE_ARCH} != "amd64" )
 .if !exists(/usr/local/bin/qemu-${TARGET_ARCH}-static)
 .if exists(${PORTSDIR}/emulators/qemu-user-static/Makefile)
-	env - UNAME_r=${UNAME_r} PATH=$$PATH make -C ${PORTSDIR}/emulators/qemu-user-static BATCH=1 all install clean
+	env - UNAME_r=${UNAME_r} PATH=$$PATH \
+	    make -C ${PORTSDIR}/emulators/qemu-user-static \
+	    BATCH=1 WRKDIRPREFIX=/tmp/ports DISTDIR=/tmp/distfiles \
+	    all install clean
 .else
 .if !exists(/usr/local/sbin/pkg-static)
 	env ASSUME_ALWAYS_YES=yes pkg bootstrap -y
@@ -75,10 +92,15 @@ emulator-portinstall:
 	env ASSUME_ALWAYS_YES=yes pkg install -y emulators/qemu-user-static
 .endif
 .endif
+	touch ${.TARGET}
 
+.if ${TARGET_ARCH} != ${MACHINE_ARCH}
+.if ( ${TARGET_ARCH} != "i386" ) || ( ${MACHINE_ARCH} != "amd64" )
 QEMUSTATIC=/usr/local/bin/qemu-${TARGET_ARCH}-static
+QEMUTGT=emulator-portinstall
 .endif
 .endif
+QEMUTGT?=
 
 .if defined(WITH_CLOUDWARE) && !empty(WITH_CLOUDWARE) && !empty(CLOUDWARE)
 . for _CW in ${CLOUDWARE}
@@ -86,52 +108,52 @@ QEMUSTATIC=/usr/local/bin/qemu-${TARGET_ARCH}-static
 ${_CW:tu}CONF?=	${.CURDIR}/tools/${_CW:tl}.conf
 .  endif
 .  for _FS in ${${_CW:tu}_FSLIST}
-CLOUDTARGETS+=	cw-${_CW:tl}-${_FS}
-CLEANDIRS+=	cw-${_CW:tl}-${_FS}
-CLEANFILES+=	${_CW:tl}.${_FS}.img \
-		${_CW:tl}.${_FS}.${${_CW:tu}_FORMAT} \
-		${_CW:tl}.${_FS}.${${_CW:tu}_FORMAT}.raw \
-		cw${_CW:tl}-package
-CLOUDPACKAGE+=	cw${_CW:tl}-package
-${_CW:tu}${_FS:tu}IMAGE=	${_CW:tl}.${_FS}.${${_CW:tu}_FORMAT}
+.   for _FMT in ${${_CW:tu}_FORMAT}
+CLOUDTARGETS+=	cw-${_CW:tl}-${_FS}-${_FMT}
+CLEANDIRS+=	cw-${_CW:tl}-${_FS}-${_FMT}
+CLEANFILES+=	${_CW:tl}.${_FS}.${_FMT}.img \
+		${_CW:tl}.${_FS}.${_FMT} \
+		${_CW:tl}.${_FS}.${_FMT}.raw
+${_CW:tu}${_FS:tu}${_FMT:tu}IMAGE=	${_CW:tl}.${_FS}.${_FMT}
 
-cw-${_CW:tl}-${_FS}: emulator-portinstall
+cw-${_CW:tl}-${_FS}-${_FMT}: ${QEMUTGT}
 	mkdir -p ${.OBJDIR}/${.TARGET}
 	env TARGET=${TARGET} TARGET_ARCH=${TARGET_ARCH} SWAPSIZE=${SWAPSIZE} \
 		QEMUSTATIC=${QEMUSTATIC} \
 		${.CURDIR}/scripts/mk-vmimage.sh \
 		-C ${.CURDIR}/tools/vmimage.subr -d ${.OBJDIR}/${.TARGET} -F ${_FS} \
-		-i ${.OBJDIR}/${_CW:tl}.${_FS}.img -s ${VMSIZE} -f ${${_CW:tu}_FORMAT} \
-		-S ${WORLDDIR} -o ${.OBJDIR}/${${_CW:tu}${_FS:tu}IMAGE} -c ${${_CW:tu}CONF}
+		-i ${.OBJDIR}/${_CW:tl}.${_FS}.${_FMT}.img -s ${VMSIZE} -f ${_FMT} \
+		-S ${WORLDDIR} -o ${.OBJDIR}/${${_CW:tu}${_FS:tu}${_FMT:tu}IMAGE} -c ${${_CW:tu}CONF}
 	touch ${.TARGET}
+.   endfor
 .  endfor
 
-# Hardlinks from "foo.bar" to "foo-${VMFS}.bar".  These can go away once all
-# of the cloudware code knows how to handle multiple filesystem images (or
+# Hardlinks from "foo.${FMT}" to "foo-${VMFS}.${FMT}".  These can go away once
+# all of the cloudware code knows how to handle multiple filesystem images (or
 # at least knows the name of the UFS image).
-CLOUDTARGETS+=	cw-${_CW:tl}
-CLEANFILES+=	${_CW:tl}.${${_CW:tu}_FORMAT}
-${_CW:tu}IMAGE=	${_CW:tl}.${${_CW:tu}_FORMAT}
-cw-${_CW:tl}: cw-${_CW:tl}-${VMFS}
-	ln -f ${${_CW:tu}${VMFS:tu}IMAGE} ${${_CW:tu}IMAGE}
+.  for _FMT in ${${_CW:tu}_FORMAT}
+CLOUDTARGETS+=	cw-${_CW:tl}-${_FMT}
+CLEANFILES+=	${_CW:tl}.${_FMT}
+${_CW:tu}${_FMT:tu}IMAGE=	${_CW:tl}.${_FMT}
+cw-${_CW:tl}-${_FMT}: cw-${_CW:tl}-${VMFS}-${_FMT}
+	ln -f ${${_CW:tu}${VMFS:tu}${_FMT:tu}IMAGE} ${${_CW:tu}${_FMT:tu}IMAGE}
+.  endfor
 
-cw${_CW:tl}-package:
-	@# Special target to handle packaging cloud images in the formats
-	@# specific to each hosting provider.
-.if exists(${.CURDIR}/tools/${_CW:tl}-package.sh)
-	env TARGET=${TARGET} TARGET_ARCH=${TARGET_ARCH} \
-		${.CURDIR}/tools/${_CW:tl}-package.sh \
-		-D ${DESTDIR} -I ${${_CW}_DISK} -S ${WORLDDIR}
-.endif
-	touch ${.TARGET}
-
+# Targets without a disk format listed are the first disk format on the list
+.  for _FS in ${${_CW:tu}_FSLIST}
+${_CW:tu}${_FS:tu}IMAGE=	${_CW:tl}.${_FS}.${${_CW:tu}_FORMAT:[1]}
+cw-${_CW:tl}-${_FS}: cw-${_CW:tl}-${_FS}-${${_CW:tu}_FORMAT:[1]}
+.  endfor
+${_CW:tu}IMAGE=	${_CW:tl}.${${_CW:tu}_FORMAT:[1]}
+cw-${_CW:tl}:	cw-${_CW:tl}-${${_CW:tu}_FORMAT:[1]}
 . endfor
 .endif
 
 .if defined(WITH_VMIMAGES) && !empty(WITH_VMIMAGES)
-CLEANDIRS+=	${VMTARGETS}
+CLEANFILES+=	vm-image
 . for FORMAT in ${VMFORMATS}
 .  for FS in ${VMFSLIST}
+CLEANDIRS+=	vm-image-${FORMAT}-${FS}
 CLEANFILES+=	${FORMAT}.${FS}.img
 CLEANFILES+=	${VMBASE}.${FS}.${FORMAT}
 .  endfor
@@ -140,14 +162,16 @@ CLEANFILES+=	${VMBASE}.${FS}.${FORMAT}
 
 vm-base:	vm-image
 
-vm-image:
+vm-image:	${QEMUTGT}
 .if defined(WITH_VMIMAGES) && !empty(WITH_VMIMAGES)
 . for FORMAT in ${VMFORMATS}
 .  for FS in ${VMFSLIST}
-	mkdir -p ${.OBJDIR}/${.TARGET}
+	mkdir -p ${.OBJDIR}/${.TARGET}-${FORMAT}-${FS}
 	env TARGET=${TARGET} TARGET_ARCH=${TARGET_ARCH} SWAPSIZE=${SWAPSIZE} \
+		QEMUSTATIC=${QEMUSTATIC} \
 		${.CURDIR}/scripts/mk-vmimage.sh \
-		-C ${.CURDIR}/tools/vmimage.subr -d ${.OBJDIR}/${.TARGET} -F ${FS} \
+		-C ${.CURDIR}/tools/vmimage.subr \
+		-d ${.OBJDIR}/${.TARGET}-${FORMAT}-${FS} -F ${FS} \
 		-i ${.OBJDIR}/${FORMAT}.${FS}.img -s ${VMSIZE} -f ${FORMAT} \
 		-S ${WORLDDIR} -o ${.OBJDIR}/${VMBASE}.${FS}.${FORMAT}
 .  endfor
@@ -190,28 +214,60 @@ vm-install:
 .   endfor
 .  endfor
 . endif
-	# Compatibility hardlinks from "foo.bar" to "foo-${VMFS}.bar".
-. for FORMAT in ${VMFORMATS}
-.  if defined(WITH_COMPRESSED_VMIMAGES) && !empty(WITH_COMPRESSED_VMIMAGES)
-	ln -f ${DESTDIR}/vmimages/${OSRELEASE}-${VMFS}.${FORMAT}.xz ${DESTDIR}/vmimages/${OSRELEASE}.${FORMAT}.xz
-.  else
-	ln -f ${DESTDIR}/vmimages/${OSRELEASE}-${VMFS}.${FORMAT} ${DESTDIR}/vmimages/${OSRELEASE}.${FORMAT}
-.  endif
-. endfor
 	cd ${DESTDIR}/vmimages && sha512 ${OSRELEASE}* > \
 		${DESTDIR}/vmimages/CHECKSUM.SHA512
 	cd ${DESTDIR}/vmimages && sha256 ${OSRELEASE}* > \
 		${DESTDIR}/vmimages/CHECKSUM.SHA256
 .endif
 
-vm-release:
+cloud-install-BASIC-CI:
+	mkdir -p ${DESTDIR}/ciimages
+.for _FS in ${BASIC-CI_FSLIST}
+. for _FMT in ${BASIC-CI_FORMAT}
+	cp -p ${.OBJDIR}/${BASIC-CI${_FS:tu}${_FMT:tu}IMAGE} \
+		${DESTDIR}/ciimages/${OSRELEASE}-BASIC-CI-${_FS}.${_FMT}
+	${XZ_CMD} ${DESTDIR}/ciimages/${OSRELEASE}-BASIC-CI-${_FS}.${_FMT}
+. endfor
+.endfor
+	cd ${DESTDIR}/ciimages && sha512 ${OSRELEASE}* > \
+		${DESTDIR}/ciimages/CHECKSUM.SHA512
+	cd ${DESTDIR}/ciimages && sha256 ${OSRELEASE}* > \
+		${DESTDIR}/ciimages/CHECKSUM.SHA256
+
+cloud-install-BASIC-CLOUDINIT:
+	mkdir -p ${DESTDIR}/vmimages
+.for _FS in ${BASIC-CLOUDINIT_FSLIST}
+. for _FMT in ${BASIC-CLOUDINIT_FORMAT}
+	cp -p ${.OBJDIR}/${BASIC-CLOUDINIT${_FS:tu}${_FMT:tu}IMAGE} \
+		${DESTDIR}/vmimages/${OSRELEASE}-BASIC-CLOUDINIT.${_FS}.${_FMT}
+	${XZ_CMD} ${DESTDIR}/vmimages/${OSRELEASE}-BASIC-CLOUDINIT.${_FS}.${_FMT}
+. endfor
+.endfor
+	cd ${DESTDIR}/vmimages && sha512 ${OSRELEASE}* > \
+		${DESTDIR}/vmimages/CHECKSUM.SHA512
+	cd ${DESTDIR}/vmimages && sha256 ${OSRELEASE}* > \
+		${DESTDIR}/vmimages/CHECKSUM.SHA256
+
+CLOUD_INSTALL_TGTS=
+.if defined(WITH_CLOUDWARE) && !empty(WITH_CLOUDWARE)
+. for _CW in ${CLOUDWARE}
+.  if target(cloud-install-${_CW})
+CLOUD_INSTALL_TGTS+=	cloud-install-${_CW}
+.  endif
+. endfor
+.endif
+cloud-install:	${CLOUD_INSTALL_TGTS}
+
 .if defined(WITH_VMIMAGES) && !empty(WITH_VMIMAGES)
-	${MAKE} -C ${.CURDIR} ${.MAKEFLAGS} ${VMTARGETS}
+vm-release:	${VMTARGETS}
+.else
+vm-release:
 .endif
 
-cloudware-release:
 .if defined(WITH_CLOUDWARE) && !empty(WITH_CLOUDWARE) && !empty(CLOUDWARE)
-	${MAKE} -C ${.CURDIR} ${.MAKEFLAGS} ${CLOUDTARGETS}
+cloudware-release:	${CLOUDTARGETS}
+.else
+cloudware-release:
 .endif
 
 .include "${.CURDIR}/Makefile.azure"

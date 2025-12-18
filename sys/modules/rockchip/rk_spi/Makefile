@@ -1,5 +1,4 @@
-
-.PATH: ${SRCTOP}/sys/arm64/rockchip
+.PATH: ${SRCTOP}/sys/dev/spibus/controller/rockchip
 
 KMOD=	rk_spi
 SRCS=	rk_spi.c

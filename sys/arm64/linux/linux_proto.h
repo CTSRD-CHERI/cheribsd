@@ -7,8 +7,8 @@
 #ifndef _LINUX_SYSPROTO_H_
 #define	_LINUX_SYSPROTO_H_
 
+#include <sys/types.h>
 #include <sys/signal.h>
-#include <sys/acl.h>
 #include <sys/cpuset.h>
 #include <sys/domainset.h>
 #include <sys/_ffcounter.h>
@@ -33,7 +33,6 @@ struct thread;
 #define	PADR_(t)	0
 #endif
 
-#define	nosys	linux_nosys
 struct linux_setxattr_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
 	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
@@ -270,6 +269,16 @@ struct linux_lseek_args {
 	char off_l_[PADL_(l_off_t)]; l_off_t off; char off_r_[PADR_(l_off_t)];
 	char whence_l_[PADL_(l_int)]; l_int whence; char whence_r_[PADR_(l_int)];
 };
+struct linux_write_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char buf_l_[PADL_(char *)]; char * buf; char buf_r_[PADR_(char *)];
+	char nbyte_l_[PADL_(l_size_t)]; l_size_t nbyte; char nbyte_r_[PADR_(l_size_t)];
+};
+struct linux_writev_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char iovp_l_[PADL_(struct iovec *)]; struct iovec * iovp; char iovp_r_[PADR_(struct iovec *)];
+	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
+};
 struct linux_pread_args {
 	char fd_l_[PADL_(l_uint)]; l_uint fd; char fd_r_[PADR_(l_uint)];
 	char buf_l_[PADL_(char *)]; char * buf; char buf_r_[PADR_(char *)];
@@ -450,7 +459,7 @@ struct linux_delete_module_args {
 };
 struct linux_timer_create_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
-	char evp_l_[PADL_(struct sigevent *)]; struct sigevent * evp; char evp_r_[PADR_(struct sigevent *)];
+	char evp_l_[PADL_(struct l_sigevent *)]; struct l_sigevent * evp; char evp_r_[PADR_(struct l_sigevent *)];
 	char timerid_l_[PADL_(l_timer_t *)]; l_timer_t * timerid; char timerid_r_[PADR_(l_timer_t *)];
 };
 struct linux_timer_gettime_args {
@@ -692,7 +701,7 @@ struct linux_mq_timedreceive_args {
 };
 struct linux_mq_notify_args {
 	char mqd_l_[PADL_(l_mqd_t)]; l_mqd_t mqd; char mqd_r_[PADR_(l_mqd_t)];
-	char abs_timeout_l_[PADL_(const struct l_timespec *)]; const struct l_timespec * abs_timeout; char abs_timeout_r_[PADR_(const struct l_timespec *)];
+	char sevp_l_[PADL_(const struct l_sigevent *)]; const struct l_sigevent * sevp; char sevp_r_[PADR_(const struct l_sigevent *)];
 };
 struct linux_mq_getsetattr_args {
 	char mqd_l_[PADL_(l_mqd_t)]; l_mqd_t mqd; char mqd_r_[PADR_(l_mqd_t)];
@@ -1205,7 +1214,36 @@ struct linux_epoll_pwait2_args {
 struct linux_mount_setattr_args {
 	syscallarg_t dummy;
 };
-#define	nosys	linux_nosys
+struct linux_quotactl_fd_args {
+	syscallarg_t dummy;
+};
+struct linux_landlock_create_ruleset_args {
+	syscallarg_t dummy;
+};
+struct linux_landlock_add_rule_args {
+	syscallarg_t dummy;
+};
+struct linux_landlock_restrict_self_args {
+	syscallarg_t dummy;
+};
+struct linux_memfd_secret_args {
+	syscallarg_t dummy;
+};
+struct linux_process_mrelease_args {
+	syscallarg_t dummy;
+};
+struct linux_futex_waitv_args {
+	syscallarg_t dummy;
+};
+struct linux_set_mempolicy_home_node_args {
+	syscallarg_t dummy;
+};
+struct linux_cachestat_args {
+	syscallarg_t dummy;
+};
+struct linux_fchmodat2_args {
+	syscallarg_t dummy;
+};
 int	linux_setxattr(struct thread *, struct linux_setxattr_args *);
 int	linux_lsetxattr(struct thread *, struct linux_lsetxattr_args *);
 int	linux_fsetxattr(struct thread *, struct linux_fsetxattr_args *);
@@ -1254,6 +1292,8 @@ int	linux_vhangup(struct thread *, struct linux_vhangup_args *);
 int	linux_pipe2(struct thread *, struct linux_pipe2_args *);
 int	linux_getdents64(struct thread *, struct linux_getdents64_args *);
 int	linux_lseek(struct thread *, struct linux_lseek_args *);
+int	linux_write(struct thread *, struct linux_write_args *);
+int	linux_writev(struct thread *, struct linux_writev_args *);
 int	linux_pread(struct thread *, struct linux_pread_args *);
 int	linux_pwrite(struct thread *, struct linux_pwrite_args *);
 int	linux_preadv(struct thread *, struct linux_preadv_args *);
@@ -1454,6 +1494,16 @@ int	linux_faccessat2(struct thread *, struct linux_faccessat2_args *);
 int	linux_process_madvise(struct thread *, struct linux_process_madvise_args *);
 int	linux_epoll_pwait2(struct thread *, struct linux_epoll_pwait2_args *);
 int	linux_mount_setattr(struct thread *, struct linux_mount_setattr_args *);
+int	linux_quotactl_fd(struct thread *, struct linux_quotactl_fd_args *);
+int	linux_landlock_create_ruleset(struct thread *, struct linux_landlock_create_ruleset_args *);
+int	linux_landlock_add_rule(struct thread *, struct linux_landlock_add_rule_args *);
+int	linux_landlock_restrict_self(struct thread *, struct linux_landlock_restrict_self_args *);
+int	linux_memfd_secret(struct thread *, struct linux_memfd_secret_args *);
+int	linux_process_mrelease(struct thread *, struct linux_process_mrelease_args *);
+int	linux_futex_waitv(struct thread *, struct linux_futex_waitv_args *);
+int	linux_set_mempolicy_home_node(struct thread *, struct linux_set_mempolicy_home_node_args *);
+int	linux_cachestat(struct thread *, struct linux_cachestat_args *);
+int	linux_fchmodat2(struct thread *, struct linux_fchmodat2_args *);
 #define	LINUX_SYS_AUE_linux_setxattr	AUE_NULL
 #define	LINUX_SYS_AUE_linux_lsetxattr	AUE_NULL
 #define	LINUX_SYS_AUE_linux_fsetxattr	AUE_NULL
@@ -1502,6 +1552,8 @@ int	linux_mount_setattr(struct thread *, struct linux_mount_setattr_args *);
 #define	LINUX_SYS_AUE_linux_pipe2	AUE_NULL
 #define	LINUX_SYS_AUE_linux_getdents64	AUE_GETDIRENTRIES
 #define	LINUX_SYS_AUE_linux_lseek	AUE_LSEEK
+#define	LINUX_SYS_AUE_linux_write	AUE_NULL
+#define	LINUX_SYS_AUE_linux_writev	AUE_WRITEV
 #define	LINUX_SYS_AUE_linux_pread	AUE_PREAD
 #define	LINUX_SYS_AUE_linux_pwrite	AUE_PWRITE
 #define	LINUX_SYS_AUE_linux_preadv	AUE_NULL
@@ -1702,6 +1754,16 @@ int	linux_mount_setattr(struct thread *, struct linux_mount_setattr_args *);
 #define	LINUX_SYS_AUE_linux_process_madvise	AUE_NULL
 #define	LINUX_SYS_AUE_linux_epoll_pwait2	AUE_NULL
 #define	LINUX_SYS_AUE_linux_mount_setattr	AUE_NULL
+#define	LINUX_SYS_AUE_linux_quotactl_fd	AUE_NULL
+#define	LINUX_SYS_AUE_linux_landlock_create_ruleset	AUE_NULL
+#define	LINUX_SYS_AUE_linux_landlock_add_rule	AUE_NULL
+#define	LINUX_SYS_AUE_linux_landlock_restrict_self	AUE_NULL
+#define	LINUX_SYS_AUE_linux_memfd_secret	AUE_NULL
+#define	LINUX_SYS_AUE_linux_process_mrelease	AUE_NULL
+#define	LINUX_SYS_AUE_linux_futex_waitv	AUE_NULL
+#define	LINUX_SYS_AUE_linux_set_mempolicy_home_node	AUE_NULL
+#define	LINUX_SYS_AUE_linux_cachestat	AUE_NULL
+#define	LINUX_SYS_AUE_linux_fchmodat2	AUE_NULL
 
 #undef PAD_
 #undef PADL_

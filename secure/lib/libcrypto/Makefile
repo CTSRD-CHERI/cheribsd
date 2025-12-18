@@ -1,6 +1,7 @@
-
 SHLIBDIR?=	/lib
+.if !defined(LIBCRYPTO_WITHOUT_SUBDIRS)
 SUBDIR=		engines modules
+.endif
 
 .include <bsd.own.mk>
 .include <src.opts.mk>
@@ -23,7 +24,7 @@ SRCS+=	param_build.c param_build_set.c params.c params_dup.c params_from_text.c
 SRCS+=	passphrase.c provider.c provider_child.c provider_conf.c provider_core.c provider_predefined.c punycode.c self_test_core.c sparse_array.c threads_lib.c threads_none.c threads_pthread.c trace.c uid.c
 .if defined(ASM_aarch64)
 SRCS+=	arm64cpuid.S armcap.c
-ACFLAGS.arm64cpuid.S=	-march=armv8-a+crypto
+ACFLAGS.arm64cpuid.S=	${CFLAGS_CRYPTO}
 .elif defined(ASM_amd64)
 SRCS+=	x86_64cpuid.S
 .elif defined(ASM_arm)
@@ -41,25 +42,25 @@ SRCS+=	mem_clr.c
 .endif
 
 # aes
-SRCS+=	aes_cbc.c aes_cfb.c aes_ecb.c aes_ige.c aes_misc.c aes_ofb.c aes_wrap.c
+SRCS+=	aes_cfb.c aes_ecb.c aes_ige.c aes_misc.c aes_ofb.c aes_wrap.c
 .if defined(ASM_aarch64)
-SRCS+=	aes_core.c aesv8-armx.S vpaes-armv8.S
-ACFLAGS.aesv8-armx.S=	-march=armv8-a+crypto
+SRCS+=	aes_cbc.c aes_core.c aesv8-armx.S vpaes-armv8.S
+ACFLAGS.aesv8-armx.S=	${CFLAGS_CRYPTO}
 .elif defined(ASM_amd64)
-SRCS+=	aes_core.c aesni-mb-x86_64.S aesni-sha1-x86_64.S aesni-sha256-x86_64.S
-SRCS+=	aesni-x86_64.S vpaes-x86_64.S
+SRCS+=	aes-x86_64.S aesni-mb-x86_64.S aesni-sha1-x86_64.S
+SRCS+=	aesni-sha256-x86_64.S aesni-x86_64.S bsaes-x86_64.S vpaes-x86_64.S
 .elif defined(ASM_arm)
-SRCS+=	aes-armv4.S aesv8-armx.S bsaes-armv7.S
+SRCS+=	aes_cbc.c aes-armv4.S aesv8-armx.S bsaes-armv7.S
 .elif defined(ASM_i386)
-SRCS+=	aes_core.c aesni-x86.S vpaes-x86.S
+SRCS+=	aes-586.S aesni-x86.S vpaes-x86.S
 .elif defined(ASM_powerpc)
-SRCS+=	aes_core.c aes-ppc.S vpaes-ppc.S aesp8-ppc.S
+SRCS+=	aes_cbc.c aes_core.c aes-ppc.S vpaes-ppc.S aesp8-ppc.S
 .elif defined(ASM_powerpc64)
-SRCS+=	aes_core.c aes-ppc.S vpaes-ppc.S aesp8-ppc.S
+SRCS+=	aes_cbc.c aes_core.c aes-ppc.S vpaes-ppc.S aesp8-ppc.S
 .elif defined(ASM_powerpc64le)
-SRCS+=	aes_core.c aes-ppc.S vpaes-ppc.S aesp8-ppc.S
+SRCS+=	aes_cbc.c aes_core.c aes-ppc.S vpaes-ppc.S aesp8-ppc.S
 .else
-SRCS+=	aes_core.c
+SRCS+=	aes_cbc.c aes_core.c
 .endif
 
 # asn1
@@ -194,14 +195,14 @@ SRCS+=	des_enc.c fcrypt_b.c
 .endif
 
 # dh
-SRCS+=	dh_ameth.c dh_asn1.c dh_backend.c dh_check.c dh_err.c dh_gen.c
+SRCS+=	dh_ameth.c dh_asn1.c dh_backend.c dh_check.c dh_depr.c dh_err.c dh_gen.c
 SRCS+=	dh_group_params.c dh_kdf.c dh_key.c dh_lib.c dh_meth.c dh_pmeth.c
 SRCS+=	dh_prn.c dh_rfc5114.c
 
 # dsa
-SRCS+=	dsa_ameth.c dsa_asn1.c dsa_backend.c dsa_check.c dsa_err.c dsa_gen.c
-SRCS+=	dsa_key.c dsa_lib.c dsa_meth.c dsa_ossl.c dsa_pmeth.c dsa_prn.c
-SRCS+=	dsa_sign.c dsa_vrf.c
+SRCS+=	dsa_ameth.c dsa_asn1.c dsa_backend.c dsa_check.c dsa_depr.c dsa_err.c
+SRCS+=	dsa_gen.c dsa_key.c dsa_lib.c dsa_meth.c dsa_ossl.c dsa_pmeth.c
+SRCS+=	dsa_prn.c dsa_sign.c dsa_vrf.c
 
 # dso
 SRCS+=	dso_dlfcn.c dso_err.c dso_lib.c
@@ -293,7 +294,8 @@ SRCS+=	cbc128.c ccm128.c cfb128.c ctr128.c cts128.c gcm128.c ocb128.c
 SRCS+=	ofb128.c siv128.c wrap128.c xts128.c
 .if defined(ASM_aarch64)
 SRCS+=	ghashv8-armx.S aes-gcm-armv8_64.S
-ACFLAGS.ghashv8-armx.S=	-march=armv8-a+crypto
+ACFLAGS.ghashv8-armx.S=	${CFLAGS_CRYPTO}
+ACFLAGS.aes-gcm-armv8_64.S=	${CFLAGS_CRYPTO}
 .elif defined(ASM_amd64)
 SRCS+=	aesni-gcm-x86_64.S ghash-x86_64.S
 .elif defined(ASM_arm)
@@ -606,17 +608,24 @@ buildinf.h: Makefile
 	echo "static const char compiler_flags[] = \"compiler: ${COMPILER_TYPE}\";" ) \
 	> ${.TARGET}
 
+buildasm cleanasm:
+.for arch in aarch64 amd64 arm i386 powerpc powerpc64 powerpc64le
+	make MK_AUTO_OBJ=no -DWITHOUT_AUTO_ASM -DASM_${arch} \
+	    -f ${.CURDIR}/Makefile.asm -C ${SRCTOP}/sys/crypto/openssl/${arch} \
+	    ${.TARGET:S/build/all/:S/asm$//}
+.endfor
+
 .include <bsd.lib.mk>
 
 PICFLAG+=	-DOPENSSL_PIC
 
 .if defined(ASM_${MACHINE_CPUARCH})
-.PATH:	${SRCTOP}/secure/lib/libcrypto/arch/${MACHINE_CPUARCH}
+.PATH:	${SRCTOP}/sys/crypto/openssl/${MACHINE_CPUARCH}
 .if defined(ASM_amd64)
 .PATH:	${LCRYPTO_SRC}/crypto/bn/asm
 .endif
 .elif defined(ASM_${MACHINE_ARCH})
-.PATH:	${SRCTOP}/secure/lib/libcrypto/arch/${MACHINE_ARCH}
+.PATH:	${SRCTOP}/sys/crypto/openssl/${MACHINE_ARCH}
 .endif
 
 .PATH:	${LCRYPTO_SRC}/crypto \

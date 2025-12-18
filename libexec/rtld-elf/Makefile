@@ -1,4 +1,3 @@
-
 # Use the following command to build local debug version of dynamic
 # linker:
 # make DEBUG_FLAGS=-g WITHOUT_TESTS=yes all
@@ -29,11 +28,19 @@ MK_UBSAN=	no
 
 .include <bsd.compat.pre.mk>
 
-.ifdef RTLD_SANDBOX
-CFLAGS+=-DRTLD_SANDBOX
+# SSP forced off already implies FORTIFY_SOURCE=0, but we must make sure that
+# one cannot turn it back on.
+FORTIFY_SOURCE=	0
+
+.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
+CHERI_LIB_C18N=
 .endif
 
-.if !defined(NEED_COMPAT) && !defined(RTLD_SANDBOX)
+.ifdef CHERI_LIB_C18N
+CFLAGS+=-DCHERI_LIB_C18N
+.endif
+
+.if !defined(NEED_COMPAT) && !defined(BUILD_RTLD_DEBUG)
 CONFS=		libmap.conf
 .endif
 PROG?=		ld-elf.so.1
@@ -59,7 +66,7 @@ SRCS+= \
 .endif
 MAN?=		rtld.1
 ACFLAGS+=	-DLOCORE
-CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
+CFLAGS+=	-Wall -DIN_RTLD -ffreestanding
 CFLAGS+=	-I${SRCTOP}/lib/csu/common
 .if exists(${RTLD_ELF_DIR}/${MACHINE_ARCH:S/powerpc64le/powerpc64/})
 RTLD_ARCH=	${MACHINE_ARCH:S/powerpc64le/powerpc64/}
@@ -77,8 +84,6 @@ MLINKS?=	rtld.1 ld-elf.so.1.1 \
 		rtld.1 ld.so.1
 
 CFLAGS+=	-fpic -DPIC $(DEBUG)
-# Since we pass -shared, we shouldn't also pass -pie
-MK_PIE:=	no
 
 LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs -nostdlib -e ${RTLD_ENTRY}
 # Pull in the dependencies that we use from libc
@@ -93,12 +98,37 @@ LDFLAGS+=	-Wl,--version-script=${VERSION_MAP}
 SYMBOL_MAPS+=	${RTLD_ELF_DIR}/${RTLD_ARCH}/Symbol.map
 .endif
 
-.ifdef RTLD_SANDBOX
+.ifdef CHERI_LIB_C18N
 SYMBOL_MAPS+=	${RTLD_ELF_DIR}/Symbol-c18n.map
 .endif
 
 .sinclude "${RTLD_ELF_DIR}/${RTLD_ARCH}/Makefile.inc"
 RTLD_ENTRY?=	.rtld_start
+
+# Always produce the map file so that may be inspected to confirm
+# undesired code is not linked from libsys/libc.
+MAPFILE=	ld-elf.so.1.map
+LDFLAGS+=	-Wl,-Map=${MAPFILE} -Wl,--cref
+CLEANFILES+=	${MAPFILE}
+
+afterbuild:
+	@if grep __libsys_interposing ${MAPFILE} >/dev/null ; then \
+		echo "libsys_interposing leaked" 1>&2 ; \
+		exit 1 ; \
+	fi
+	@if grep __libc_interposing ${MAPFILE} >/dev/null ; then \
+		echo "libc_interposing leaked" 1>&2 ; \
+		exit 1 ; \
+	fi
+	@if grep xlocale ${MAPFILE} >/dev/null ; then \
+		echo "xlocale leaked" 1>&2 ; \
+		exit 1 ; \
+	fi
+	@if grep fprintf ${MAPFILE} >/dev/null ; then \
+		echo "stdio leaked" 1>&2 ; \
+		exit 1 ; \
+	fi
+
 
 # Since moving rtld-elf to /libexec, we need to create a symlink.
 # Fixup the existing binary that's there so we can symlink over it.
@@ -115,16 +145,17 @@ SRCS+=		cheri_reloc.c
 CFLAGS+=	-I${RTLD_ELF_DIR}/cheri
 .endif
 
-.ifdef RTLD_SANDBOX
-SRCS+=		rtld_c18n.c rtld_c18n_machdep.c rtld_c18n_asm.S
+.ifdef CHERI_LIB_C18N
+SRCS+= \
+	rtld_c18n.c \
+	rtld_c18n_mi.S \
+	rtld_c18n_machdep.c \
+	rtld_c18n_asm.S
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}
 .PATH: ${SRCTOP}/lib/libmalloc_simple
 SRCS+=		heap.c malloc.c
-
-CFLAGS+=	-I${SRCTOP}/lib/libc/${RTLD_ARCH}
-CXXFLAGS+=	-Wall -Wextra
 
 SIMPLE_PRINTF_PREFIX=rtld
 .include "${SRCTOP}/lib/libsimple_printf/Makefile.inc"

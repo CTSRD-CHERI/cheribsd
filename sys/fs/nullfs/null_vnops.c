@@ -31,12 +31,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)null_vnops.c	8.6 (Berkeley) 5/27/95
- *
  * Ancestors:
- *	@(#)lofs_vnops.c	1.2 (Berkeley) 6/18/92
  *	...and...
- *	@(#)null_vnodeops.c 1.20 92/07/07 UCLA Ficus project
  */
 
 /*
@@ -532,7 +528,7 @@ null_setattr(struct vop_setattr_args *ap)
 		}
 	}
 
-	return (null_bypass((struct vop_generic_args *)ap));
+	return (null_bypass(&ap->a_gen));
 }
 
 /*
@@ -543,7 +539,7 @@ null_stat(struct vop_stat_args *ap)
 {
 	int error;
 
-	if ((error = null_bypass((struct vop_generic_args *)ap)) != 0)
+	if ((error = null_bypass(&ap->a_gen)) != 0)
 		return (error);
 
 	ap->a_sb->st_dev = ap->a_vp->v_mount->mnt_stat.f_fsid.val[0];
@@ -555,7 +551,7 @@ null_getattr(struct vop_getattr_args *ap)
 {
 	int error;
 
-	if ((error = null_bypass((struct vop_generic_args *)ap)) != 0)
+	if ((error = null_bypass(&ap->a_gen)) != 0)
 		return (error);
 
 	ap->a_vap->va_fsid = ap->a_vp->v_mount->mnt_stat.f_fsid.val[0];
@@ -588,7 +584,7 @@ null_access(struct vop_access_args *ap)
 			break;
 		}
 	}
-	return (null_bypass((struct vop_generic_args *)ap));
+	return (null_bypass(&ap->a_gen));
 }
 
 static int
@@ -614,7 +610,7 @@ null_accessx(struct vop_accessx_args *ap)
 			break;
 		}
 	}
-	return (null_bypass((struct vop_generic_args *)ap));
+	return (null_bypass(&ap->a_gen));
 }
 
 /*
@@ -1131,6 +1127,23 @@ null_vput_pair(struct vop_vput_pair_args *ap)
 	return (res);
 }
 
+static int
+null_getlowvnode(struct vop_getlowvnode_args *ap)
+{
+	struct vnode *vp, *vpl;
+
+	vp = ap->a_vp;
+	if (vn_lock(vp, LK_SHARED) != 0)
+		return (EBADF);
+
+	vpl = NULLVPTOLOWERVP(vp);
+	vhold(vpl);
+	VOP_UNLOCK(vp);
+	VOP_GETLOWVNODE(vpl, ap->a_vplp, ap->a_flags);
+	vdrop(vpl);
+	return (0);
+}
+
 /*
  * Global vfs data structures
  */
@@ -1143,6 +1156,7 @@ struct vop_vector null_vnodeops = {
 	.vop_bmap =		VOP_EOPNOTSUPP,
 	.vop_stat =		null_stat,
 	.vop_getattr =		null_getattr,
+	.vop_getlowvnode =	null_getlowvnode,
 	.vop_getwritemount =	null_getwritemount,
 	.vop_inactive =		null_inactive,
 	.vop_need_inactive =	null_need_inactive,
@@ -1163,5 +1177,6 @@ struct vop_vector null_vnodeops = {
 	.vop_vptofh =		null_vptofh,
 	.vop_add_writecount =	null_add_writecount,
 	.vop_vput_pair =	null_vput_pair,
+	.vop_copy_file_range =	VOP_PANIC,
 };
 VFS_VOP_VECTOR_REGISTER(null_vnodeops);

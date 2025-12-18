@@ -55,7 +55,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include "opt_sysvipc.h"
 
 #include <sys/param.h>
@@ -220,7 +219,7 @@ static struct syscall_helper_data msg64_syscalls[] = {
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_msgrcv),
 	FREEBSD64_SYSCALL_INIT_HELPER_COMPAT(msgget),
 #if defined(COMPAT_FREEBSD7)
-	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_msgsys),
+	FREEBSD64_SYSCALL_INIT_HELPER_COMPAT(msgsys),
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd7_freebsd64_msgctl),
 #endif
 	SYSCALL_INIT_LAST
@@ -1476,6 +1475,43 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
+int
+kern_get_msqids(struct thread *td, struct msqid_kernel **res, size_t *sz)
+{
+	struct msqid_kernel *pmsqk;
+	struct prison *pr, *rpr;
+	int i, mi;
+
+	*sz = mi = msginfo.msgmni;
+	if (res == NULL)
+		return (0);
+
+	pr = td->td_ucred->cr_prison;
+	rpr = msg_find_prison(td->td_ucred);
+	*res = malloc(sizeof(struct msqid_kernel) * mi, M_TEMP, M_WAITOK);
+	for (i = 0; i < mi; i++) {
+		pmsqk = &(*res)[i];
+		mtx_lock(&msq_mtx);
+		if (msqids[i].u.msg_qbytes == 0 || rpr == NULL ||
+		    msq_prison_cansee(rpr, &msqids[i]) != 0)
+			bzero(pmsqk, sizeof(*pmsqk));
+		else {
+			*pmsqk = msqids[i];
+			if (pmsqk->cred->cr_prison != pr)
+				pmsqk->u.msg_perm.key = IPC_PRIVATE;
+		}
+		mtx_unlock(&msq_mtx);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+		pmsqk->u.__msg_first = NULL;
+		pmsqk->u.__msg_last = NULL;
+#pragma GCC diagnostic pop
+		pmsqk->label = NULL;
+		pmsqk->cred = NULL;
+	}
+	return (0);
+}
+
 SYSCTL_INT(_kern_ipc, OID_AUTO, msgmax, CTLFLAG_RD, &msginfo.msgmax, 0,
     "Maximum message size");
 SYSCTL_INT(_kern_ipc, OID_AUTO, msgmni, CTLFLAG_RDTUN, &msginfo.msgmni, 0,
@@ -1818,30 +1854,6 @@ freebsd32_msgrcv(struct thread *td, struct freebsd32_msgrcv_args *uap)
 #endif
 
 #ifdef COMPAT_FREEBSD64
-int
-freebsd64_msgsys(struct thread *td, struct freebsd64_msgsys_args *uap)
-{
-
-#ifdef COMPAT_FREEBSD7
-	AUDIT_ARG_SVIPC_WHICH(uap->which);
-	switch (uap->which) {
-	case 0:
-		return (freebsd7_freebsd64_msgctl(td,
-		    (struct freebsd7_freebsd64_msgctl_args *)&uap->a2));
-	case 2:
-		return (freebsd64_msgsnd(td,
-		    (struct freebsd64_msgsnd_args *)&uap->a2));
-	case 3:
-		return (freebsd64_msgrcv(td,
-		    (struct freebsd64_msgrcv_args *)&uap->a2));
-	default:
-		return (sys_msgsys(td, (struct msgsys_args *)uap));
-	}
-#else
-	return (nosys(td, (struct nosys_args *)uap));
-#endif
-}
-
 #if defined(COMPAT_FREEBSD7)
 int
 freebsd7_freebsd64_msgctl(struct thread *td,

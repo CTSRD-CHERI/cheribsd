@@ -31,22 +31,36 @@
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/sysctl.h>
+
+#include <machine/tls.h>
+
 #include <link.h>
 #include <stddef.h>
 #include <string.h>
+
 #include "libc_private.h"
-#include "static_tls.h"
 
 #ifndef __CHERI_PURE_CAPABILITY__
 void __pthread_map_stacks_exec(void);
 #endif
 void __pthread_distribute_static_tls(size_t, void *, size_t, size_t);
 
+#ifdef CHERI_LIB_C18N
+ptraddr_t _rtld_tramp_reflect(const void *);
+#endif
+
 int
 __elf_phdr_match_addr(struct dl_phdr_info *phdr_info, void *addr)
 {
 	const Elf_Phdr *ph;
 	int i;
+#ifdef CHERI_LIB_C18N
+	ptraddr_t target;
+
+	target = _rtld_tramp_reflect(addr);
+	if (target != 0)
+		addr = (void *)(uintptr_t)target;
+#endif
 
 	for (i = 0; i < phdr_info->dlpi_phnum; i++) {
 		ph = &phdr_info->dlpi_phdr[i];
@@ -111,11 +125,15 @@ void
 __libc_distribute_static_tls(size_t offset, void *src, size_t len,
     size_t total_len)
 {
-	uintptr_t tlsbase;
+	char *tlsbase;
 
-	tlsbase = _libc_get_static_tls_base(offset);
-	memcpy((void *)tlsbase, src, len);
-	memset((char *)tlsbase + len, 0, total_len - len);
+#ifdef TLS_VARIANT_I
+	tlsbase = (char *)_tcb_get() + offset;
+#else
+	tlsbase = (char *)_tcb_get() - offset;
+#endif
+	memcpy(tlsbase, src, len);
+	memset(tlsbase + len, 0, total_len - len);
 }
 
 #pragma weak __pthread_distribute_static_tls

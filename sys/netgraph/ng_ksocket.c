@@ -152,6 +152,10 @@ static const struct ng_ksocket_alias ng_ksocket_protos[] = {
 
 /* Helper functions */
 static int	ng_ksocket_accept(priv_p);
+static int	ng_ksocket_listen_upcall(struct socket *so, void *arg,
+    int waitflag);
+static void	ng_ksocket_listen_upcall2(node_p node, hook_p hook,
+    void *arg1, int arg2);
 static int	ng_ksocket_incoming(struct socket *so, void *arg, int waitflag);
 static int	ng_ksocket_parse(const struct ng_ksocket_alias *aliases,
 			const char *s, int family);
@@ -604,12 +608,12 @@ ng_ksocket_connect(hook_p hook)
 	struct socket *const so = priv->so;
 
 	/* Add our hook for incoming data and other events */
-	SOCKBUF_LOCK(&priv->so->so_rcv);
+	SOCK_RECVBUF_LOCK(so);
 	soupcall_set(priv->so, SO_RCV, ng_ksocket_incoming, node);
-	SOCKBUF_UNLOCK(&priv->so->so_rcv);
-	SOCKBUF_LOCK(&priv->so->so_snd);
+	SOCK_RECVBUF_UNLOCK(so);
+	SOCK_SENDBUF_LOCK(so);
 	soupcall_set(priv->so, SO_SND, ng_ksocket_incoming, node);
-	SOCKBUF_UNLOCK(&priv->so->so_snd);
+	SOCK_SENDBUF_UNLOCK(so);
 	SOCK_LOCK(priv->so);
 	priv->so->so_state |= SS_NBIO;
 	SOCK_UNLOCK(priv->so);
@@ -695,6 +699,12 @@ ng_ksocket_rcvmsg(node_p node, item_p item, hook_p lasthook)
 			/* Listen */
 			so->so_state |= SS_NBIO;
 			error = solisten(so, *((int32_t *)msg->data), td);
+			if (error == 0) {
+				SOLISTEN_LOCK(so);
+				solisten_upcall_set(so,
+				    ng_ksocket_listen_upcall, priv);
+				SOLISTEN_UNLOCK(so);
+			}
 			break;
 		    }
 
@@ -715,11 +725,15 @@ ng_ksocket_rcvmsg(node_p node, item_p item, hook_p lasthook)
 			/*
 			 * If a connection is already complete, take it.
 			 * Otherwise let the upcall function deal with
-			 * the connection when it comes in.
+			 * the connection when it comes in.  Don't return
+			 * EWOULDBLOCK, per ng_ksocket(4) documentation.
 			 */
 			error = ng_ksocket_accept(priv);
-			if (error != 0 && error != EWOULDBLOCK)
+			if (error == EWOULDBLOCK)
+				error = 0;
+			if (error != 0)
 				ERROUT(error);
+
 			priv->response_token = msg->header.token;
 			priv->response_addr = NGI_RETADDR(item);
 			break;
@@ -757,9 +771,8 @@ ng_ksocket_rcvmsg(node_p node, item_p item, hook_p lasthook)
 		case NGM_KSOCKET_GETNAME:
 		case NGM_KSOCKET_GETPEERNAME:
 		    {
-			int (*func)(struct socket *so, struct sockaddr **nam);
-			struct sockaddr *sa = NULL;
-			int len;
+			int (*func)(struct socket *so, struct sockaddr *sa);
+			struct sockaddr_storage ss = { .ss_len = sizeof(ss) };
 
 			/* Sanity check */
 			if (msg->header.arglen != 0)
@@ -769,30 +782,24 @@ ng_ksocket_rcvmsg(node_p node, item_p item, hook_p lasthook)
 
 			/* Get function */
 			if (msg->header.cmd == NGM_KSOCKET_GETPEERNAME) {
-				if ((so->so_state
-				    & (SS_ISCONNECTED|SS_ISCONFIRMING)) == 0)
+				if ((so->so_state & SS_ISCONNECTED) == 0)
 					ERROUT(ENOTCONN);
-				func = so->so_proto->pr_peeraddr;
+				func = sopeeraddr;
 			} else
-				func = so->so_proto->pr_sockaddr;
+				func = sosockaddr;
 
 			/* Get local or peer address */
-			if ((error = (*func)(so, &sa)) != 0)
-				goto bail;
-			len = (sa == NULL) ? 0 : sa->sa_len;
+			error = (*func)(so, (struct sockaddr *)&ss);
+			if (error)
+				break;
 
 			/* Send it back in a response */
-			NG_MKRESPONSE(resp, msg, len, M_NOWAIT);
-			if (resp == NULL) {
+			NG_MKRESPONSE(resp, msg, ss.ss_len, M_NOWAIT);
+			if (resp != NULL)
+				bcopy(&ss, resp->data, ss.ss_len);
+			else
 				error = ENOMEM;
-				goto bail;
-			}
-			bcopy(sa, resp->data, len);
 
-		bail:
-			/* Cleanup */
-			if (sa != NULL)
-				free(sa, M_SONAME);
 			break;
 		    }
 
@@ -929,17 +936,24 @@ static int
 ng_ksocket_shutdown(node_p node)
 {
 	const priv_p priv = NG_NODE_PRIVATE(node);
+	struct socket *so = priv->so;
 	priv_p embryo;
 
 	/* Close our socket (if any) */
 	if (priv->so != NULL) {
-		SOCKBUF_LOCK(&priv->so->so_rcv);
-		soupcall_clear(priv->so, SO_RCV);
-		SOCKBUF_UNLOCK(&priv->so->so_rcv);
-		SOCKBUF_LOCK(&priv->so->so_snd);
-		soupcall_clear(priv->so, SO_SND);
-		SOCKBUF_UNLOCK(&priv->so->so_snd);
-		soclose(priv->so);
+		if (SOLISTENING(so)) {
+			SOLISTEN_LOCK(so);
+			solisten_upcall_set(so, NULL, NULL);
+			SOLISTEN_UNLOCK(so);
+		} else {
+			SOCK_RECVBUF_LOCK(so);
+			soupcall_clear(so, SO_RCV);
+			SOCK_RECVBUF_UNLOCK(so);
+			SOCK_SENDBUF_LOCK(so);
+			soupcall_clear(so, SO_SND);
+			SOCK_SENDBUF_UNLOCK(so);
+		}
+		soclose(so);
 		priv->so = NULL;
 	}
 
@@ -1057,10 +1071,6 @@ ng_ksocket_incoming2(node_p node, hook_p hook, void *arg1, int arg2)
 		}
 	}
 
-	/* Check whether a pending accept operation has completed */
-	if (priv->flags & KSF_ACCEPTING)
-		(void )ng_ksocket_accept(priv);
-
 	/*
 	 * If we don't have a hook, we must handle data events later.  When
 	 * the hook gets created and is connected, this upcall function
@@ -1161,7 +1171,7 @@ ng_ksocket_accept(priv_p priv)
 {
 	struct socket *const head = priv->so;
 	struct socket *so;
-	struct sockaddr *sa = NULL;
+	struct sockaddr_storage ss = { .ss_len = sizeof(ss) };
 	struct ng_mesg *resp;
 	struct ng_ksocket_accept *resp_data;
 	node_p node;
@@ -1179,12 +1189,11 @@ ng_ksocket_accept(priv_p priv)
 	if (error)
 		return (error);
 
-	if ((error = soaccept(so, &sa)) != 0)
+	if ((error = soaccept(so, (struct sockaddr *)&ss)) != 0)
 		return (error);
 
 	len = OFFSETOF(struct ng_ksocket_accept, addr);
-	if (sa != NULL)
-		len += sa->sa_len;
+	len += ss.ss_len;
 
 	NG_MKMESSAGE(resp, NGM_KSOCKET_COOKIE, NGM_KSOCKET_ACCEPT, len,
 	    M_NOWAIT);
@@ -1222,25 +1231,41 @@ ng_ksocket_accept(priv_p priv)
 	 */
 	LIST_INSERT_HEAD(&priv->embryos, priv2, siblings);
 
-	SOCKBUF_LOCK(&so->so_rcv);
+	SOCK_RECVBUF_LOCK(so);
 	soupcall_set(so, SO_RCV, ng_ksocket_incoming, node);
-	SOCKBUF_UNLOCK(&so->so_rcv);
-	SOCKBUF_LOCK(&so->so_snd);
+	SOCK_RECVBUF_UNLOCK(so);
+	SOCK_SENDBUF_LOCK(so);
 	soupcall_set(so, SO_SND, ng_ksocket_incoming, node);
-	SOCKBUF_UNLOCK(&so->so_snd);
+	SOCK_SENDBUF_UNLOCK(so);
 
 	/* Fill in the response data and send it or return it to the caller */
 	resp_data = (struct ng_ksocket_accept *)resp->data;
 	resp_data->nodeid = NG_NODE_ID(node);
-	if (sa != NULL)
-		bcopy(sa, &resp_data->addr, sa->sa_len);
+	bcopy(&ss, &resp_data->addr, ss.ss_len);
 	NG_SEND_MSG_ID(error, node, resp, priv->response_addr, 0);
 
 out:
-	if (sa != NULL)
-		free(sa, M_SONAME);
 
 	return (0);
+}
+
+static int
+ng_ksocket_listen_upcall(struct socket *so, void *arg, int waitflag)
+{
+	priv_p priv = arg;
+	int wait = ((waitflag & M_WAITOK) ? NG_WAITOK : 0) | NG_QUEUE;
+
+	ng_send_fn1(priv->node, NULL, &ng_ksocket_listen_upcall2, priv, 0,
+	    wait);
+	return (SU_OK);
+}
+
+static void
+ng_ksocket_listen_upcall2(node_p node, hook_p hook, void *arg1, int arg2)
+{
+	const priv_p priv = NG_NODE_PRIVATE(node);
+
+	(void )ng_ksocket_accept(priv);
 }
 
 /*

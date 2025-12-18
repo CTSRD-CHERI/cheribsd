@@ -29,7 +29,6 @@
 
 /* Driver for Atheros AR813x/AR815x PCIe Ethernet. */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -92,8 +91,14 @@ MODULE_DEPEND(alc, miibus, 1, 1, 1);
 
 /* Tunables. */
 static int msi_disable = 0;
-static int msix_disable = 0;
 TUNABLE_INT("hw.alc.msi_disable", &msi_disable);
+
+/*
+ * The default value of msix_disable is 2, which means to decide whether to
+ * enable MSI-X in alc_attach() depending on the card type.  The operator can
+ * set this to 0 or 1 to override the default.
+ */
+static int msix_disable = 2;
 TUNABLE_INT("hw.alc.msix_disable", &msix_disable);
 
 /*
@@ -1411,6 +1416,14 @@ alc_attach(device_t dev)
 	case DEVICEID_ATHEROS_E2400:
 	case DEVICEID_ATHEROS_E2500:
 		sc->alc_flags |= ALC_FLAG_E2X00;
+
+		/*
+		 * Disable MSI-X by default on Killer devices, since this is
+		 * reported by several users to not work well.
+		 */
+		if (msix_disable == 2)
+			msix_disable = 1;
+
 		/* FALLTHROUGH */
 	case DEVICEID_ATHEROS_AR8161:
 		if (pci_get_subvendor(dev) == VENDORID_ATHEROS &&
@@ -1440,6 +1453,14 @@ alc_attach(device_t dev)
 	default:
 		break;
 	}
+
+	/*
+	 * The default value of msix_disable is 2, which means auto-detect.  If
+	 * we didn't auto-detect it, default to enabling it.
+	 */
+	if (msix_disable == 2)
+		msix_disable = 0;
+
 	sc->alc_flags |= ALC_FLAG_JUMBO;
 
 	/*
@@ -1563,12 +1584,6 @@ alc_attach(device_t dev)
 	alc_get_macaddr(sc);
 
 	ifp = sc->alc_ifp = if_alloc(IFT_ETHER);
-	if (ifp == NULL) {
-		device_printf(dev, "cannot allocate ifnet structure.\n");
-		error = ENXIO;
-		goto fail;
-	}
-
 	if_setsoftc(ifp, sc);
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	if_setflags(ifp, IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
@@ -1624,12 +1639,6 @@ alc_attach(device_t dev)
 	/* Create local taskq. */
 	sc->alc_tq = taskqueue_create_fast("alc_taskq", M_WAITOK,
 	    taskqueue_thread_enqueue, &sc->alc_tq);
-	if (sc->alc_tq == NULL) {
-		device_printf(dev, "could not create taskqueue.\n");
-		ether_ifdetach(ifp);
-		error = ENXIO;
-		goto fail;
-	}
 	taskqueue_start_threads(&sc->alc_tq, 1, PI_NET, "%s taskq",
 	    device_get_nameunit(sc->alc_dev));
 

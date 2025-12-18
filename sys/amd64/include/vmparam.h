@@ -38,8 +38,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	from: @(#)vmparam.h	5.9 (Berkeley) 5/12/91
  */
 
 #ifdef __i386__
@@ -74,12 +72,12 @@
 #endif
 
 /*
- * We provide a machine specific single page allocator through the use
- * of the direct mapped segment.  This uses 2MB pages for reduced
+ * We provide a single page allocator through the use of the
+ * direct mapped segment.  This uses 2MB pages for reduced
  * TLB pressure.
  */
 #if !defined(KASAN) && !defined(KMSAN)
-#define	UMA_MD_SMALL_ALLOC
+#define UMA_USE_DMAP
 #endif
 
 /*
@@ -91,19 +89,21 @@
  * The number of PHYSSEG entries must be one greater than the number
  * of phys_avail entries because the phys_avail entry that spans the
  * largest physical address that is accessible by ISA DMA is split
- * into two PHYSSEG entries. 
+ * into two PHYSSEG entries.
  */
 #define	VM_PHYSSEG_MAX		63
 
 /*
- * Create two free page pools: VM_FREEPOOL_DEFAULT is the default pool
- * from which physical pages are allocated and VM_FREEPOOL_DIRECT is
- * the pool from which physical pages for page tables and small UMA
- * objects are allocated.
+ * Create three free page pools: VM_FREEPOOL_DEFAULT is the default pool from
+ * which physical pages are allocated and VM_FREEPOOL_DIRECT is the pool from
+ * which physical pages for page tables and small UMA objects are allocated.
+ * VM_FREEPOOL_LAZYINIT is a special-purpose pool that is populated only during
+ * boot and is used to implement deferred initialization of page structures.
  */
-#define	VM_NFREEPOOL		2
-#define	VM_FREEPOOL_DEFAULT	0
-#define	VM_FREEPOOL_DIRECT	1
+#define	VM_NFREEPOOL		3
+#define	VM_FREEPOOL_LAZYINIT	0
+#define	VM_FREEPOOL_DEFAULT	1
+#define	VM_FREEPOOL_DIRECT	2
 
 /*
  * Create up to three free page lists: VM_FREELIST_DMA32 is for physical pages
@@ -296,7 +296,8 @@
 /*
  * Need a page dump array for minidump.
  */
-#define MINIDUMP_PAGE_TRACKING	1
+#define MINIDUMP_PAGE_TRACKING	       1
+#define MINIDUMP_STARTUP_PAGE_TRACKING 1
 
 #endif /* _MACHINE_VMPARAM_H_ */
 

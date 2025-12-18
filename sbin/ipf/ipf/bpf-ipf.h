@@ -35,10 +35,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *      @(#)bpf.h       7.1 (Berkeley) 5/7/91
- *
- * @(#) $Header: /devel/CVS/IP-Filter/bpf-ipf.h,v 2.1 2002/10/26 12:14:26 darrenr Exp $ (LBL)
  */
 
 #ifndef BPF_MAJOR_VERSION
@@ -90,7 +86,7 @@ struct bpf_stat {
  * bpf understands a program iff kernel_major == filter_major &&
  * kernel_minor >= filter_minor, that is, if the value returned by the
  * running kernel has the same major number and a minor number equal
- * equal to or less than the filter being downloaded.  Otherwise, the
+ * to or less than the filter being downloaded.  Otherwise, the
  * results are undefined, meaning an error may be returned or packets
  * may be accepted haphazardly.
  * It has nothing to do with the source code version.

@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -53,6 +52,7 @@
 
 /* keyboard device commands */
 #define	PS2KC_RESET_DEV		0xff
+#define	PS2KC_SET_DEFAULTS	0xf6
 #define	PS2KC_DISABLE		0xf5
 #define	PS2KC_ENABLE		0xf4
 #define	PS2KC_SET_TYPEMATIC	0xf3
@@ -299,6 +299,10 @@ ps2kbd_write(struct ps2kbd_softc *sc, uint8_t val)
 			fifo_reset(sc);
 			fifo_put(sc, PS2KC_ACK);
 			fifo_put(sc, PS2KC_BAT_SUCCESS);
+			break;
+		case PS2KC_SET_DEFAULTS:
+			fifo_reset(sc);
+			fifo_put(sc, PS2KC_ACK);
 			break;
 		case PS2KC_DISABLE:
 			sc->enabled = false;

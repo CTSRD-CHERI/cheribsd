@@ -93,9 +93,8 @@ NFSREQSPINLOCK;
 NFSCLSTATEMUTEX;
 int nfscl_inited = 0;
 struct nfsclhead nfsclhead;	/* Head of clientid list */
-int nfscl_deleghighwater = NFSCLDELEGHIGHWATER;
-int nfscl_layouthighwater = NFSCLLAYOUTHIGHWATER;
 
+static int nfscl_deleghighwater = NFSCLDELEGHIGHWATER;
 static int nfscl_delegcnt = 0;
 static int nfscl_layoutcnt = 0;
 static int nfscl_getopen(struct nfsclownerhead *, struct nfsclopenhash *,
@@ -440,18 +439,6 @@ nfscl_deleg(mount_t mp, struct nfsclclient *clp, u_int8_t *nfhp,
 
 	KASSERT(mp != NULL, ("nfscl_deleg: mp NULL"));
 	nmp = VFSTONFS(mp);
-	/*
-	 * First, if we have received a Read delegation for a file on a
-	 * read/write file system, just return it, because they aren't
-	 * useful, imho.
-	 */
-	if (dp != NULL && !NFSMNT_RDONLY(mp) &&
-	    (dp->nfsdl_flags & NFSCLDL_READ)) {
-		nfscl_trydelegreturn(dp, cred, nmp, p);
-		free(dp, M_NFSCLDELEG);
-		*dpp = NULL;
-		return (0);
-	}
 
 	/*
 	 * Since a delegation might be added to the mount,
@@ -479,17 +466,35 @@ nfscl_deleg(mount_t mp, struct nfsclclient *clp, u_int8_t *nfhp,
 		nfscl_delegcnt++;
 	} else {
 		/*
-		 * Delegation already exists, what do we do if a new one??
+		 * A delegation already exists.  If the new one is a Write
+		 * delegation and the old one a Read delegation, return the
+		 * Read delegation.  Otherwise, return the new delegation.
 		 */
 		if (dp != NULL) {
-			printf("Deleg already exists!\n");
-			free(dp, M_NFSCLDELEG);
-			*dpp = NULL;
+			if ((dp->nfsdl_flags & NFSCLDL_WRITE) != 0 &&
+			    (tdp->nfsdl_flags & NFSCLDL_READ) != 0) {
+				TAILQ_REMOVE(&clp->nfsc_deleg, tdp, nfsdl_list);
+				LIST_REMOVE(tdp, nfsdl_hash);
+				*dpp = NULL;
+				TAILQ_INSERT_HEAD(&clp->nfsc_deleg, dp,
+				    nfsdl_list);
+				LIST_INSERT_HEAD(NFSCLDELEGHASH(clp, nfhp,
+				    fhlen), dp, nfsdl_hash);
+				dp->nfsdl_timestamp = NFSD_MONOSEC + 120;
+			} else {
+				*dpp = NULL;
+				tdp = dp;	/* Return this one. */
+			}
 		} else {
 			*dpp = tdp;
+			tdp = NULL;
 		}
 	}
 	NFSUNLOCKCLSTATE();
+	if (tdp != NULL) {
+		nfscl_trydelegreturn(tdp, cred, nmp, p);
+		free(tdp, M_NFSCLDELEG);
+	}
 	return (0);
 }
 
@@ -526,6 +531,7 @@ nfscl_getstateid(vnode_t vp, u_int8_t *nfhp, int fhlen, u_int32_t mode,
 	struct nfscldeleg *dp;
 	struct nfsnode *np;
 	struct nfsmount *nmp;
+	struct nfscred ncr;
 	u_int8_t own[NFSV4CL_LOCKNAMELEN], lockown[NFSV4CL_LOCKNAMELEN];
 	int error;
 	bool done;
@@ -683,7 +689,7 @@ nfscl_getstateid(vnode_t vp, u_int8_t *nfhp, int fhlen, u_int32_t mode,
 		 * A read ahead or write behind is indicated by p == NULL.
 		 */
 		if (p == NULL)
-			newnfs_copycred(&op->nfso_cred, cred);
+			memcpy(&ncr, &op->nfso_cred, sizeof(ncr));
 	}
 
 	/*
@@ -697,6 +703,8 @@ nfscl_getstateid(vnode_t vp, u_int8_t *nfhp, int fhlen, u_int32_t mode,
 	stateidp->other[1] = op->nfso_stateid.other[1];
 	stateidp->other[2] = op->nfso_stateid.other[2];
 	NFSUNLOCKCLSTATE();
+	if (p == NULL)
+		newnfs_copycred(&ncr, cred);
 	return (0);
 }
 
@@ -4383,9 +4391,15 @@ nfscl_moveopen(vnode_t vp, struct nfsclclient *clp, struct nfsmount *nmp,
 	nfscl_newopen(clp, NULL, &owp, NULL, &op, &nop, owp->nfsow_owner,
 	    lop->nfso_fh, lop->nfso_fhlen, cred, &newone);
 	ndp = dp;
-	error = nfscl_tryopen(nmp, vp, np->n_v4->n4_data, np->n_v4->n4_fhlen,
-	    lop->nfso_fh, lop->nfso_fhlen, lop->nfso_mode, op,
-	    NFS4NODENAME(np->n_v4), np->n_v4->n4_namelen, &ndp, 0, 0, cred, p);
+	if (NFSHASNFSV4N(nmp))
+		error = nfscl_tryopen(nmp, vp, lop->nfso_fh, lop->nfso_fhlen,
+		    lop->nfso_fh, lop->nfso_fhlen, lop->nfso_mode, op,
+		    NULL, 0, &ndp, 0, 0, cred, p);
+	else
+		error = nfscl_tryopen(nmp, vp, np->n_v4->n4_data,
+		    np->n_v4->n4_fhlen, lop->nfso_fh, lop->nfso_fhlen,
+		    lop->nfso_mode, op, NFS4NODENAME(np->n_v4),
+		    np->n_v4->n4_namelen, &ndp, 0, 0, cred, p);
 	if (error) {
 		if (newone)
 			nfscl_freeopen(op, 0, true);
@@ -4476,14 +4490,16 @@ nfsrpc_reopen(struct nfsmount *nmp, u_int8_t *fhp, int fhlen,
 	if (error)
 		return (error);
 	vp = NFSTOV(np);
-	if (np->n_v4 != NULL) {
+	if (NFSHASNFSV4N(nmp))
+		error = nfscl_tryopen(nmp, vp, fhp, fhlen, fhp, fhlen, mode, op,
+		    NULL, 0, dpp, 0, 0, cred, p);
+	else if (np->n_v4 != NULL)
 		error = nfscl_tryopen(nmp, vp, np->n_v4->n4_data,
 		    np->n_v4->n4_fhlen, fhp, fhlen, mode, op,
 		    NFS4NODENAME(np->n_v4), np->n_v4->n4_namelen, dpp, 0, 0,
 		    cred, p);
-	} else {
+	else
 		error = EINVAL;
-	}
 	vrele(vp);
 	return (error);
 }
@@ -4500,8 +4516,11 @@ nfscl_tryopen(struct nfsmount *nmp, vnode_t vp, u_int8_t *fhp, int fhlen,
     int reclaim, u_int32_t delegtype, struct ucred *cred, NFSPROC_T *p)
 {
 	int error;
+	struct nfscldeleg *dp;
 
+	dp = *ndpp;
 	do {
+		*ndpp = dp;	/* *ndpp needs to be set for retries. */
 		error = nfsrpc_openrpc(nmp, vp, fhp, fhlen, newfhp, newfhlen,
 		    mode, op, name, namelen, ndpp, reclaim, delegtype, cred, p,
 		    0, 0);
@@ -4512,6 +4531,7 @@ nfscl_tryopen(struct nfsmount *nmp, vnode_t vp, u_int8_t *fhp, int fhlen,
 		/* Try again using system credentials */
 		newnfs_setroot(cred);
 		do {
+		    *ndpp = dp;	/* *ndpp needs to be set for retries. */
 		    error = nfsrpc_openrpc(nmp, vp, fhp, fhlen, newfhp,
 			newfhlen, mode, op, name, namelen, ndpp, reclaim,
 			delegtype, cred, p, 1, 0);
@@ -4632,7 +4652,7 @@ nfscl_mustflush(vnode_t vp)
 
 	np = VTONFS(vp);
 	nmp = VFSTONFS(vp->v_mount);
-	if (!NFSHASNFSV4(nmp))
+	if (!NFSHASNFSV4(nmp) || vp->v_type != VREG)
 		return (1);
 	NFSLOCKMNT(nmp);
 	if ((nmp->nm_privflag & NFSMNTP_DELEGISSUED) == 0) {
@@ -4672,7 +4692,7 @@ nfscl_nodeleg(vnode_t vp, int writedeleg)
 
 	np = VTONFS(vp);
 	nmp = VFSTONFS(vp->v_mount);
-	if (!NFSHASNFSV4(nmp))
+	if (!NFSHASNFSV4(nmp) || vp->v_type != VREG)
 		return (1);
 	NFSLOCKMNT(nmp);
 	if ((nmp->nm_privflag & NFSMNTP_DELEGISSUED) == 0) {

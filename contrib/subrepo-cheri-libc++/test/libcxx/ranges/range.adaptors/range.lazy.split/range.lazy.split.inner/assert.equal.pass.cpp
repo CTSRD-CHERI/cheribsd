@@ -7,8 +7,9 @@
 //===----------------------------------------------------------------------===//
 
 // REQUIRES: has-unix-headers
-// UNSUPPORTED: c++03, c++11, c++14, c++17, !libcpp-has-debug-mode, libcpp-has-no-incomplete-ranges
-// ADDITIONAL_COMPILE_FLAGS: -D_LIBCPP_ENABLE_ASSERTIONS=1
+// UNSUPPORTED: c++03, c++11, c++14, c++17
+// UNSUPPORTED: !libcpp-has-debug-mode
+// XFAIL: availability-verbose_abort-missing
 
 // <ranges>
 

@@ -27,6 +27,7 @@ SRCS=	\
 	config.c		\
 	console.c		\
 	crc16.c			\
+	ctl_nvme_all.c		\
 	ctl_scsi_all.c		\
 	ctl_util.c		\
 	hda_codec.c		\
@@ -37,9 +38,14 @@ SRCS=	\
 	net_backend_slirp.c	\
 	net_backends.c		\
 	net_utils.c		\
+	pci_ahci.c		\
+	pci_e82545.c		\
 	pci_emul.c		\
+	pci_hda.c		\
 	pci_hostbridge.c	\
+	pci_irq.c		\
 	pci_nvme.c		\
+	pci_uart.c		\
 	pci_virtio_9p.c		\
 	pci_virtio_block.c	\
 	pci_virtio_console.c	\
@@ -47,12 +53,14 @@ SRCS=	\
 	pci_virtio_net.c	\
 	pci_virtio_rnd.c	\
 	pci_virtio_scsi.c	\
+	pci_xhci.c		\
 	qemu_fwcfg.c		\
 	qemu_loader.c		\
 	smbiostbl.c		\
 	sockstream.c		\
 	tpm_device.c		\
 	tpm_emul_passthru.c	\
+	tpm_emul_swtpm.c	\
 	tpm_intf_crb.c		\
 	tpm_ppi_qemu.c		\
 	uart_backend.c		\
@@ -80,6 +88,7 @@ CFLAGS+= -DBHYVE_GDB
 .ifdef GDB_LOG
 CFLAGS+=-DGDB_LOG
 .endif
+SUBDIR+= gdb
 .endif
 
 CFLAGS+=-I${.CURDIR}		\

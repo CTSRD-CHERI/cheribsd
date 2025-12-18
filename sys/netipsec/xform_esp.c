@@ -83,8 +83,7 @@
 #define SPI_SIZE	4
 
 VNET_DEFINE(int, esp_enable) = 1;
-VNET_DEFINE_STATIC(int, esp_ctr_compatibility) = 1;
-#define V_esp_ctr_compatibility VNET(esp_ctr_compatibility)
+VNET_DEFINE(int, esp_ctr_compatibility) = 1;
 VNET_PCPUSTAT_DEFINE(struct espstat, espstat);
 VNET_PCPUSTAT_SYSINIT(espstat);
 
@@ -508,6 +507,13 @@ esp_input_cb(struct cryptop *crp)
 	xd = crp->crp_opaque;
 	CURVNET_SET(xd->vnet);
 	sav = xd->sav;
+	if (sav->state >= SADB_SASTATE_DEAD) {
+		/* saidx is freed */
+		DPRINTF(("%s: dead SA %p spi %#x\n", __func__, sav, sav->spi));
+		ESPSTAT_INC(esps_notdb);
+		error = ESRCH;
+		goto bad;
+	}
 	skip = xd->skip;
 	protoff = xd->protoff;
 	cryptoid = xd->cryptoid;
@@ -542,12 +548,12 @@ esp_input_cb(struct cryptop *crp)
 		error = EINVAL;
 		goto bad;
 	}
-	ESPSTAT_INC(esps_hist[sav->alg_enc]);
+	ESPSTAT_INC2(esps_hist, sav->alg_enc);
 
 	/* If authentication was performed, check now. */
 	if (esph != NULL) {
 		alen = xform_ah_authsize(esph);
-		AHSTAT_INC(ahs_hist[sav->alg_auth]);
+		AHSTAT_INC2(ahs_hist, sav->alg_auth);
 		if (crp->crp_etype == EBADMSG) {
 			DPRINTF(("%s: authentication hash mismatch for "
 			    "packet in SA %s/%08lx\n", __func__,
@@ -1027,9 +1033,9 @@ esp_output_cb(struct cryptop *crp)
 	free(xd, M_ESP);
 	free(crp->crp_aad, M_ESP);
 	crypto_freereq(crp);
-	ESPSTAT_INC(esps_hist[sav->alg_enc]);
+	ESPSTAT_INC2(esps_hist, sav->alg_enc);
 	if (sav->tdb_authalgxform != NULL)
-		AHSTAT_INC(ahs_hist[sav->alg_auth]);
+		AHSTAT_INC2(ahs_hist, sav->alg_auth);
 
 #ifdef REGRESSION
 	/* Emulate man-in-the-middle attack when ipsec_integrity is TRUE. */

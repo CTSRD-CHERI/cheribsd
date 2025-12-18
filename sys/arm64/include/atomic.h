@@ -66,8 +66,9 @@ extern _Bool lse_supported;
 #include <sys/atomic_common.h>
 #include <machine/cheri.h>
 
-#ifdef _KERNEL
-
+#if defined(__ARM_FEATURE_ATOMICS)
+#define	_ATOMIC_LSE_SUPPORTED	1
+#elif defined(_KERNEL)
 #ifdef LSE_ATOMICS
 #define	_ATOMIC_LSE_SUPPORTED	1
 #else
@@ -619,6 +620,8 @@ _ATOMIC_STORE_REL_IMPL(64,  ,  )
 #define	atomic_set_ptr			atomic_set_64
 #define	atomic_swap_ptr			atomic_swap_64
 #define	atomic_subtract_ptr		atomic_subtract_64
+#define	atomic_testandclear_ptr		atomic_testandclear_64
+#define	atomic_testandset_ptr		atomic_testandset_64
 #endif
 
 #define	atomic_add_acq_long		atomic_add_acq_64
@@ -665,21 +668,19 @@ static __inline void							\
 atomic_##op##_##bar##ptr(volatile uintptr_t *p, uintptr_t val)		\
 {									\
 	uintptr_t previous;						\
-	ptraddr_t tmp1, tmp2;						\
+	ptraddr_t tmp;							\
 	int res;							\
 									\
 	__asm __volatile(						\
 		"1:"							\
 		"ld" #a "xr %0, [%4]\n"					\
 		"gcvalue %2, %0\n"					\
-		"gcvalue %3, %5\n"					\
 		"" #asm_op " %2, %2, %3\n"				\
 		"scvalue %0, %0, %2\n"					\
 		"st" #l "xr %w1, %0, [%4]\n"				\
 		"cbnz %w1, 1b"						\
-		: "=&C" (previous), "=&r" (res), "=&r" (tmp1),		\
-		"=&r" (tmp2)						\
-		: "C" (p), "C" (val)					\
+		: "=&C" (previous), "=&r" (res), "=&r" (tmp)		\
+		: "r" ((ptraddr_t)val), "C" (p)				\
 		: "memory", "cc");					\
 }
 
@@ -786,6 +787,33 @@ atomic_readandclear_ptr(volatile uintptr_t *p)
 {
 	return (__atomic_exchange_n(p, 0, __ATOMIC_RELAXED));
 }
+
+#define	_ATOMIC_PTR_TEST_OP(op, asm_op)					\
+static __inline int							\
+atomic_testand##op##_ptr(volatile uintptr_t *p, u_int val)		\
+{									\
+	uintptr_t old, tmp;						\
+	ptraddr_t mask, tmpaddr;					\
+	int res;							\
+									\
+	mask = ((ptraddr_t)1) << (val & 63);				\
+	__asm __volatile(						\
+	    "1: ldxr		%2, [%4]\n"				\
+	    "   gcvalue		%3, %2\n"				\
+	    "  "#asm_op"	%3, %3, %5\n"				\
+	    "   scvalue		%0, %2, %3\n"				\
+	    "   stxr		%w1, %0, [%4]\n"			\
+	    "   cbnz		%w1, 1b\n"				\
+	    : "=&C" (tmp), "=&r" (res), "=&C" (old), "=&r" (tmpaddr)	\
+	    : ASM_PTR_CONSTR (p), "r" (mask)				\
+	    : "memory"							\
+	);								\
+									\
+	return ((old & mask) != 0);					\
+}
+
+_ATOMIC_PTR_TEST_OP(clear, bic)
+_ATOMIC_PTR_TEST_OP(set,   orr)
 
 static __inline uintptr_t
 atomic_fetchadd_ptr(volatile uintptr_t *p, uintptr_t val)

@@ -16,9 +16,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <string.h>
+
+#undef strlcpy	/* FORTIFY_SOURCE */
 
 /*
  * Copy string src to buffer dst of size dsize.  At most dsize-1

@@ -62,9 +62,6 @@
  * messages from MMCCAM to newbus and back.
  */
 
-#include <sys/cdefs.h>
-#include "opt_cam.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/types.h>
@@ -561,7 +558,7 @@ sdiob_attach(device_t dev)
 	 * Do this before any child gets a chance to attach.
 	 */
 	for (i = 0; i < sc->cardinfo.num_funcs; i++) {
-		sc->child[i] = device_add_child(dev, NULL, -1);
+		sc->child[i] = device_add_child(dev, NULL, DEVICE_UNIT_ANY);
 		if (sc->child[i] == NULL) {
 			device_printf(dev, "%s: failed to add child\n", __func__);
 			return (ENXIO);

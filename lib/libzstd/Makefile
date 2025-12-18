@@ -1,4 +1,3 @@
-
 LIB=	zstd
 SRCS=	entropy_common.c \
 	error_private.c \
@@ -37,6 +36,13 @@ INCS=	zstd.h
 CFLAGS+=	-I${ZSTDDIR}/lib -I${ZSTDDIR}/lib/common -DXXH_NAMESPACE=ZSTD_ \
 		-DZSTD_MULTITHREAD=1 -fvisibility=hidden
 LIBADD=	pthread
+
+# ZSTD_ASM_SUPPORTED is 0 on FreeBSD but 1 on macOS and Linux. Since we build
+# this as a bootstrap library and don't include any assembly sources in SRCS,
+# explicitly disable assembly.
+CFLAGS+=	-DZSTD_DISABLE_ASM
+
+COMPARTMENT_POLICY=	${.CURDIR}/Compartments.json
 
 PRIVATELIB=	yes
 PACKAGE=	runtime

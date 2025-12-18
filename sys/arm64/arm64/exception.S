@@ -25,8 +25,11 @@
  *
  */
 
+#include <sys/elf_common.h>
+
 #include <machine/asm.h>
 #include <machine/armreg.h>
+
 #include "assym.inc"
 
 	.text
@@ -92,7 +95,11 @@
 	ldr	PTR(1), [PTR(18), #PC_SSBD]
 	cbz	x1, 1f
 	mov	w0, #1
+#ifdef __ASM_MORELLO_PURECAP_BENCHMARK_ABI
+	blr	x1
+#else
 	blr	PTR(1)
+#endif
 1:
 
 #ifdef PAC
@@ -135,7 +142,11 @@
 	ldr	PTR(1), [PTR(18), #PC_SSBD]
 	cbz	x1, 1f
 	mov	w0, #0
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	blr	x1
+#else
 	blr	PTR(1)
+#endif
 1:
 .endif
 	ldp	CAP(18), CAPN(lr), [PTRN(sp), #(TF_SP)]
@@ -171,7 +182,17 @@
 	 * registers so must always do this.
 	 */
 #endif
+.if \el == 1
+	/*
+	 * In the kernel, x18 is always used as the per-CPU data pointer and is
+	 * reset to the value in tpidr_el1 further below.  At this point when
+	 * returning to EL1, x18 contains the saved stack pointer, so be careful
+	 * not to clobber it.
+	 */
+	ldr		 CAP(19), [PTRN(sp), #(TF_X + 19 * CAP_WIDTH)]
+.else
 	ldp	CAP(18), CAP(19), [PTRN(sp), #(TF_X + 18 * CAP_WIDTH)]
+.endif
 	ldp	CAP(20), CAP(21), [PTRN(sp), #(TF_X + 20 * CAP_WIDTH)]
 	ldp	CAP(22), CAP(23), [PTRN(sp), #(TF_X + 22 * CAP_WIDTH)]
 	ldp	CAP(24), CAP(25), [PTRN(sp), #(TF_X + 24 * CAP_WIDTH)]
@@ -193,7 +214,7 @@
 .macro	do_ast
 	mrs	x19, daif
 	/* Make sure the IRQs are enabled before calling ast() */
-	bic	x19, x19, #PSR_I
+	bic	x19, x19, #(PSR_I | PSR_F)
 1:
 	/*
 	 * Mask interrupts while checking the ast pending flag
@@ -219,55 +240,125 @@
 2:
 .endm
 
+#ifdef KMSAN
+/*
+ * The KMSAN runtime relies on a TLS block to track initialization and origin
+ * state for function parameters and return values.  To keep this state
+ * consistent in the face of asynchronous kernel-mode traps, the runtime
+ * maintains a stack of blocks: when handling an exception or interrupt,
+ * kmsan_intr_enter() pushes the new block to be used until the handler is
+ * complete, at which point kmsan_intr_leave() restores the previous block.
+ *
+ * Thus, KMSAN_ENTER/LEAVE hooks are required only in handlers for events that
+ * may have happened while in kernel-mode.  In particular, they are not required
+ * around amd64_syscall() or ast() calls.  Otherwise, kmsan_intr_enter() can be
+ * called unconditionally, without distinguishing between entry from user-mode
+ * or kernel-mode.
+ */
+#define	KMSAN_ENTER	bl kmsan_intr_enter
+#define	KMSAN_LEAVE	bl kmsan_intr_leave
+#else
+#define	KMSAN_ENTER
+#define	KMSAN_LEAVE
+#endif
+
 ENTRY(handle_el1h_sync)
 	save_registers 1
+	KMSAN_ENTER
 	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
 	mov	PTR(1), PTRN(sp)
 	bl	do_el1h_sync
+	KMSAN_LEAVE
 	restore_registers 1
 	ERET
 END(handle_el1h_sync)
 
 ENTRY(handle_el1h_irq)
 	save_registers 1
+	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
+	mov	x1, #INTR_ROOT_IRQ
 	bl	intr_irq_handler
+	KMSAN_LEAVE
 	restore_registers 1
 	ERET
 END(handle_el1h_irq)
 
+ENTRY(handle_el1h_fiq)
+	save_registers 1
+	KMSAN_ENTER
+	mov	PTR(0), PTRN(sp)
+	mov	x1, #INTR_ROOT_FIQ
+	bl	intr_irq_handler
+	KMSAN_LEAVE
+	restore_registers 1
+	ERET
+END(handle_el1h_fiq)
+
+ENTRY(handle_el1h_serror)
+	save_registers 1
+	KMSAN_ENTER
+	mov	PTR(0), PTRN(sp)
+1:	bl	do_serror
+	b	1b
+	KMSAN_LEAVE
+END(handle_el1h_serror)
+
 ENTRY(handle_el0_sync)
 	save_registers 0
+	KMSAN_ENTER
 	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
 	mov	PTR(1), PTRN(sp)
+	mov	PTR(22), PTR(0)
 	str	PTR(1), [PTR(0), #TD_FRAME]
 	bl	do_el0_sync
 	do_ast
+	str	PTR(zr), [PTR(22), #TD_FRAME]
+	KMSAN_LEAVE
 	restore_registers 0
 	ERET
 END(handle_el0_sync)
 
 ENTRY(handle_el0_irq)
 	save_registers 0
+	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
+	mov	x1, #INTR_ROOT_IRQ
 	bl	intr_irq_handler
 	do_ast
+	KMSAN_LEAVE
 	restore_registers 0
 	ERET
 END(handle_el0_irq)
 
-ENTRY(handle_serror)
+ENTRY(handle_el0_fiq)
 	save_registers 0
+	KMSAN_ENTER
+	mov	PTR(0), PTRN(sp)
+	mov	x1, #INTR_ROOT_FIQ
+	bl	intr_irq_handler
+	do_ast
+	KMSAN_LEAVE
+	restore_registers 0
+	ERET
+END(handle_el0_fiq)
+
+ENTRY(handle_el0_serror)
+	save_registers 0
+	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
 1:	bl	do_serror
 	b	1b
-END(handle_serror)
+	KMSAN_LEAVE
+END(handle_el0_serror)
 
 ENTRY(handle_empty_exception)
 	save_registers 0
+	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
 1:	bl	unhandled_exception
 	b	1b
+	KMSAN_LEAVE
 END(handle_empty_exception)
 
 .macro	vector	name, el
@@ -294,16 +385,17 @@ exception_vectors:
 
 	vector el1h_sync 1	/* Synchronous EL1h */
 	vector el1h_irq 1	/* IRQ EL1h */
-	vempty 1		/* FIQ EL1h */
-	vector serror 1		/* Error EL1h */
+	vector el1h_fiq 1	/* FIQ EL1h */
+	vector el1h_serror 1	/* Error EL1h */
 
 	vector el0_sync 0	/* Synchronous 64-bit EL0 */
 	vector el0_irq 0	/* IRQ 64-bit EL0 */
-	vempty 0		/* FIQ 64-bit EL0 */
-	vector serror 0		/* Error 64-bit EL0 */
+	vector el0_fiq 0	/* FIQ 64-bit EL0 */
+	vector el0_serror 0	/* Error 64-bit EL0 */
 
 	vector el0_sync 0	/* Synchronous 32-bit EL0 */
 	vector el0_irq 0	/* IRQ 32-bit EL0 */
-	vempty 0		/* FIQ 32-bit EL0 */
-	vector serror 0		/* Error 32-bit EL0 */
+	vector el0_fiq 0	/* FIQ 32-bit EL0 */
+	vector el0_serror 0	/* Error 32-bit EL0 */
 
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

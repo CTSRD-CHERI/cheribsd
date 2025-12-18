@@ -28,18 +28,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)extern.h	8.3 (Berkeley) 4/2/94
- *
  */
 
 #define OK_EXIT		0
 #define DIFF_EXIT	1
 #define ERR_EXIT	2	/* error exit code */
 
-void	c_link(const char *, off_t, const char *, off_t, off_t);
-void	c_regular(int, const char *, off_t, off_t, int, const char *, off_t,
+int	c_link(const char *, off_t, const char *, off_t, off_t);
+int	c_regular(int, const char *, off_t, off_t, int, const char *, off_t,
 	    off_t, off_t);
-void	c_special(int, const char *, off_t, int, const char *, off_t, off_t);
+int	c_special(int, const char *, off_t, int, const char *, off_t, off_t);
 void	diffmsg(const char *, const char *, off_t, off_t, int, int);
 void	eofmsg(const char *);
 

@@ -1,4 +1,3 @@
-
 SRCS=		callout.cc		\
 		case_file.cc		\
 		zfsd_event.cc		\
@@ -18,12 +17,13 @@ CFLAGS+= -DIN_BASE
 CFLAGS+= -I${ZFSTOP}/include
 CFLAGS+= -I${ZFSTOP}/lib/libspl/include
 CFLAGS+= -I${ZFSTOP}/lib/libspl/include/os/freebsd
+CFLAGS+= -I${ZFSTOP}/lib/libzpool/include
 CFLAGS+= -I${SRCTOP}/sys
 CFLAGS+= -include ${ZFSTOP}/include/os/freebsd/spl/sys/ccompile.h
 CFLAGS+= -I${SRCTOP}/cddl/usr.sbin
 
-# use issetugid(2)
 CFLAGS+= -DHAVE_ISSETUGID
+CFLAGS+= -DHAVE_EXECVPE
 
 LIBADD+=	devdctl zfs util geom bsdxml sbuf nvpair avl uutil zutil
 

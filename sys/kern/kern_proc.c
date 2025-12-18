@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)kern_proc.c	8.7 (Berkeley) 2/14/95
  */
 
 #include <sys/cdefs.h>
@@ -40,10 +38,12 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bitstring.h>
+#include <sys/conf.h>
 #include <sys/elf.h>
 #include <sys/eventhandler.h>
 #include <sys/exec.h>
 #include <sys/fcntl.h>
+#include <sys/ipc.h>
 #include <sys/jail.h>
 #include <sys/kernel.h>
 #include <sys/limits.h>
@@ -62,6 +62,7 @@
 #include <sys/sbuf.h>
 #include <sys/sysent.h>
 #include <sys/sched.h>
+#include <sys/shm.h>
 #include <sys/smp.h>
 #include <sys/stack.h>
 #include <sys/stat.h>
@@ -105,6 +106,7 @@
 #endif
 
 #if __has_feature(capabilities)
+#include <cheri/c18n.h>
 #include <cheri/cheric.h>
 #endif
 
@@ -170,7 +172,8 @@ EVENTHANDLER_LIST_DEFINE(process_fork);
 EVENTHANDLER_LIST_DEFINE(process_exec);
 
 int kstack_pages = KSTACK_PAGES;
-SYSCTL_INT(_kern, OID_AUTO, kstack_pages, CTLFLAG_RD, &kstack_pages, 0,
+SYSCTL_INT(_kern, OID_AUTO, kstack_pages, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &kstack_pages, 0,
     "Kernel stack size in pages");
 static int vmmap_skip_res_cnt = 0;
 SYSCTL_INT(_kern, OID_AUTO, proc_vmmap_skip_resident_count, CTLFLAG_RW,
@@ -288,6 +291,7 @@ proc_init(void *mem, int size, int flags)
 	EVENTHANDLER_DIRECT_INVOKE(process_init, p);
 	p->p_stats = pstats_alloc();
 	p->p_pgrp = NULL;
+	TAILQ_INIT(&p->p_kqtim_stop);
 	return (0);
 }
 
@@ -1159,20 +1163,15 @@ fill_kinfo_proc_only(struct proc *p, struct kinfo_proc *kp)
 
 		kp->ki_size = vm->vm_map.size;
 		kp->ki_rssize = vmspace_resident_count(vm); /*XXX*/
-		FOREACH_THREAD_IN_PROC(p, td0) {
-			if (!TD_IS_SWAPPED(td0))
-				kp->ki_rssize += td0->td_kstack_pages;
-		}
+		FOREACH_THREAD_IN_PROC(p, td0)
+			kp->ki_rssize += td0->td_kstack_pages;
 		kp->ki_swrss = vm->vm_swrss;
 		kp->ki_tsize = vm->vm_tsize;
 		kp->ki_dsize = vm->vm_dsize;
 		kp->ki_ssize = p->p_vm_ssize;
 	} else if (p->p_state == PRS_ZOMBIE)
 		kp->ki_stat = SZOMB;
-	if (kp->ki_flag & P_INMEM)
-		kp->ki_sflag = PS_INMEM;
-	else
-		kp->ki_sflag = 0;
+	kp->ki_sflag = PS_INMEM;
 	/* Calculate legacy swtime as seconds since 'swtick'. */
 	kp->ki_swtime = (ticks - p->p_swtick) / hz;
 	kp->ki_pid = p->p_pid;
@@ -2506,6 +2505,247 @@ sysctl_kern_proc_auxv(SYSCTL_HANDLER_ARGS)
 	return (error != 0 ? error : error2);
 }
 
+#if __has_feature(capabilities)
+/*
+ * Return the c18n statistics block from the target process.
+ */
+static int
+sysctl_kern_proc_c18n(SYSCTL_HANDLER_ARGS)
+{
+	int *name = (int *)arg1;
+	u_int namelen = arg2;
+	struct proc *p;
+	struct cheri_c18n_info info;
+	int error;
+	void *buffer;
+	ssize_t n;
+
+	if (namelen != 1)
+		return (EINVAL);
+
+	error = pget((pid_t)name[0], PGET_WANTREAD, &p);
+	if (error != 0)
+		return (error);
+
+	if ((p->p_flag & P_SYSTEM) != 0 ||
+	    SV_PROC_FLAG(p, SV_CHERI) == 0 ||
+	    p->p_c18n_info == NULL)
+		goto out;
+
+	n = proc_readmem_cap(curthread, p, (vm_offset_t)p->p_c18n_info, &info,
+	    sizeof(info));
+	if (n != sizeof(info)) {
+		error = EFAULT;
+		goto out;
+	}
+
+	/*
+	 * If there is a version mismatch or the statistics block is oversized,
+	 * error out.
+	 */
+	if (info.version != CHERI_C18N_INFO_VERSION ||
+	    info.stats_size == 0 ||
+	    info.stats_size > RTLD_C18N_STATS_MAX_SIZE) {
+		error = ENOEXEC;
+		goto out;
+	}
+
+	if (!cheri_can_access(info.stats, CHERI_PERM_LOAD,
+	    (__cheri_addr ptraddr_t)info.stats, info.stats_size)) {
+		error = EPROT;
+		goto out;
+	}
+	buffer = malloc(info.stats_size, M_TEMP, M_WAITOK);
+	n = proc_readmem(curthread, p, (__cheri_addr vm_offset_t)info.stats,
+	    buffer, info.stats_size);
+	if (n != info.stats_size) {
+		error = EFAULT;
+		goto out_free;
+	}
+	error = SYSCTL_OUT(req, buffer, info.stats_size);
+out_free:
+	free(buffer, M_TEMP);
+out:
+	PRELE(p);
+	return (error);
+}
+
+/*
+ * Reads a possibly truncated null-terminated string into the buffer.
+ */
+static int
+proc_read_string_properly(struct thread *td, struct proc *p,
+    const char * __capability sptr, char *buf, size_t len)
+{
+	ssize_t readlen;
+	size_t valid;
+
+	if (len < 1)
+		return (EFAULT);
+	valid = MIN(len, cheri_bytes_remaining(sptr));
+	if (!cheri_can_access(sptr, CHERI_PERM_LOAD,
+	    (__cheri_addr ptraddr_t)sptr, valid))
+		return (EPROT);
+	readlen = proc_readmem(td, p, (__cheri_addr ptraddr_t)sptr, buf, valid);
+	if (readlen <= 0)
+		return (EFAULT);
+
+	/* Reading a null-terminated string is success. */
+	if (strnlen(buf, readlen) < readlen)
+		return (0);
+
+	/*
+	 * If the entire buffer was in bounds and was read
+	 * successfully, the string is just longer than the buffer, so
+	 * truncate the result.
+	 */
+	if (cheri_bytes_remaining(sptr) > len && readlen == len) {
+		buf[len - 1] = '\0';
+		return (0);
+	}
+
+	/*
+	 * If the read was shorter than the bounds of the pointer,
+	 * fail with EFAULT.
+	 */
+	if (cheri_bytes_remaining(sptr) > readlen)
+		return (EFAULT);
+
+	/*
+	 * The string was not terminated in-bounds, fail with EPROT.
+	 */
+	return (EPROT);
+}
+
+/*
+ * If usefully accessible, return a c18n compartment list from the target
+ * process.
+ */
+static int
+sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
+{
+	int error, *name = (int *)arg1;
+	u_int namelen = arg2;
+	struct proc *p;
+	struct cheri_c18n_info info;
+	struct rtld_c18n_compart rcc;
+	struct kinfo_cheri_c18n_compart kccc;
+	vm_offset_t rccp;
+	ssize_t len;
+	size_t gen;
+
+	if (namelen != 1)
+		return (EINVAL);
+
+	error = pget((pid_t)name[0], PGET_WANTREAD, &p);
+	if (error != 0)
+		return (error);
+
+	if ((p->p_flag & P_SYSTEM) != 0 ||
+	    SV_PROC_FLAG(p, SV_CHERI) == 0 ||
+	    p->p_c18n_info == NULL)
+		goto out;
+
+	len = proc_readmem_cap(curthread, p, (vm_offset_t)p->p_c18n_info, &info,
+	    sizeof(info));
+	if (len != sizeof(info)) {
+		error = EFAULT;
+		goto out;
+	}
+
+	/*
+	 * If there is a version mismatch or the compartment array is malformed,
+	 * error out.
+	 */
+	if (info.version != CHERI_C18N_INFO_VERSION ||
+	    info.comparts_gen % 2 != 0 ||
+	    info.comparts_entry_size < sizeof(rcc)) {
+		error = ENOEXEC;
+		goto out;
+	}
+
+	/*
+	 * If the compartments array is not fully accessible, error
+	 * out.
+	 */
+	if (!cheri_can_access(info.comparts,
+	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
+	    (__cheri_addr vm_offset_t)info.comparts,
+	    info.comparts_size * info.comparts_entry_size)) {
+		error = EPROT;
+		goto out;
+	}
+
+	/*
+	 * If the old pointer is NULL, output the number of compartments.
+	 */
+	if (req->oldptr == NULL) {
+		error = SYSCTL_OUT(req, NULL,
+		    info.comparts_size * sizeof(kccc));
+		goto out;
+	}
+
+	/*
+	 * One by one, copy compartment info structures out of the
+	 * target process's memory and into a template struct that we
+	 * copy out to userspace.
+	 */
+	for (size_t i = 0; i < info.comparts_size; ++i) {
+		/* Initialize userspace structure, including padding. */
+		bzero(&kccc, sizeof(kccc));
+
+		rccp = (__cheri_addr vm_offset_t)info.comparts +
+		    i * info.comparts_entry_size;
+
+		/* Copy in next compartment info structure. */
+		len = proc_readmem_cap(curthread, p, rccp, &rcc, sizeof(rcc));
+		if (len != sizeof(rcc)) {
+			error = EFAULT;
+			goto out;
+		}
+
+		/*
+		 * Copy in compartment name string. Capability access checks are
+		 * performed by proc_read_string_properly().
+		 */
+		error = proc_read_string_properly(curthread, p,
+		    rcc.rcc_name, kccc.kccc_name, sizeof(kccc.kccc_name));
+		if (error != 0)
+			goto out;
+
+		/* If the generation counter has changed, abort. */
+		len = proc_readmem(curthread, p,
+		    (vm_offset_t)&p->p_c18n_info->comparts_gen, &gen,
+		    sizeof(gen));
+		if (len != sizeof(gen)) {
+			error = EFAULT;
+			goto out;
+		}
+		if (gen != info.comparts_gen) {
+			error = ENOEXEC;
+			goto out;
+		}
+
+		len = offsetof(struct kinfo_cheri_c18n_compart, kccc_name) +
+		    strlen(kccc.kccc_name) + 1;
+		len = roundup2(len, _Alignof(struct kinfo_cheri_c18n_compart));
+		kccc.kccc_structsize = len;
+		kccc.kccc_id = rcc.rcc_id;;
+		kccc.kccc_dlopened_explicitly = rcc.rcc_dlopened_explicitly;
+		kccc.kccc_dlopened = rcc.rcc_dlopened;
+
+		/* Copy out userspace structure. */
+		error = SYSCTL_OUT(req, &kccc, len);
+		if (error != 0)
+			goto out;
+	}
+
+out:
+	PRELE(p);
+	return (error);
+}
+#endif
+
 /*
  * Look up the canonical executable path running in the specified process.
  * It tries to return the same hardlink name as was used for execve(2).
@@ -2796,6 +3036,7 @@ kern_proc_vmmap_resident(vm_map_t map, vm_map_entry_t entry,
 	vm_offset_t addr;
 	vm_paddr_t pa;
 	vm_pindex_t pi, pi_adv, pindex;
+	int incore;
 
 	*super = false;
 	*resident_count = 0;
@@ -2831,10 +3072,15 @@ kern_proc_vmmap_resident(vm_map_t map, vm_map_entry_t entry,
 		}
 		m_adv = NULL;
 		if (m->psind != 0 && addr + pagesizes[1] <= entry->end &&
-		    (addr & (pagesizes[1] - 1)) == 0 &&
-		    (pmap_mincore(map->pmap, addr, &pa) & MINCORE_SUPER) != 0) {
+		    (addr & (pagesizes[1] - 1)) == 0 && (incore =
+		    pmap_mincore(map->pmap, addr, &pa) & MINCORE_SUPER) != 0) {
 			*super = true;
-			pi_adv = atop(pagesizes[1]);
+			/*
+			 * The virtual page might be smaller than the physical
+			 * page, so we use the page size reported by the pmap
+			 * rather than m->psind.
+			 */
+			pi_adv = atop(pagesizes[incore >> MINCORE_PSIND_SHIFT]);
 		} else {
 			/*
 			 * We do not test the found page on validity.
@@ -2865,9 +3111,13 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 	struct ucred *cred;
 	struct vnode *vp;
 	struct vmspace *vm;
+	struct cdev *cdev;
+	struct cdevsw *csw;
 	vm_offset_t addr;
 	unsigned int last_timestamp;
-	int error;
+	int error, ref;
+	key_t key;
+	unsigned short seq;
 	bool guard, quarantined, super;
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
@@ -2938,6 +3188,16 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 			kve->kve_protection |= KVME_PROT_READ_CAP;
 		if (entry->protection & VM_PROT_WRITE_CAP)
 			kve->kve_protection |= KVME_PROT_WRITE_CAP;
+		if (entry->max_protection & VM_PROT_READ)
+			kve->kve_protection |= KVME_MAX_PROT_READ;
+		if (entry->max_protection & VM_PROT_WRITE)
+			kve->kve_protection |= KVME_MAX_PROT_WRITE;
+		if (entry->max_protection & VM_PROT_EXECUTE)
+			kve->kve_protection |= KVME_MAX_PROT_EXEC;
+		if (entry->max_protection & VM_PROT_READ_CAP)
+			kve->kve_protection |= KVME_MAX_PROT_READ_CAP;
+		if (entry->max_protection & VM_PROT_WRITE_CAP)
+			kve->kve_protection |= KVME_MAX_PROT_WRITE_CAP;
 
 		if (entry->eflags & MAP_ENTRY_COW)
 			kve->kve_flags |= KVME_FLAG_COW;
@@ -2974,7 +3234,32 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 
 			kve->kve_ref_count = obj->ref_count;
 			kve->kve_shadow_count = obj->shadow_count;
+			if ((obj->type == OBJT_DEVICE ||
+			    obj->type == OBJT_MGTDEVICE) &&
+			    (obj->flags & OBJ_CDEVH) != 0) {
+				cdev = obj->un_pager.devp.handle;
+				if (cdev != NULL) {
+					csw = dev_refthread(cdev, &ref);
+					if (csw != NULL) {
+						strlcpy(kve->kve_path,
+						    cdev->si_name, sizeof(
+						    kve->kve_path));
+						dev_relthread(cdev, ref);
+					}
+				}
+			}
 			VM_OBJECT_RUNLOCK(obj);
+			if ((lobj->flags & OBJ_SYSVSHM) != 0) {
+				kve->kve_flags |= KVME_FLAG_SYSVSHM;
+				shmobjinfo(lobj, &key, &seq);
+				kve->kve_vn_fileid = key;
+				kve->kve_vn_fsid_freebsd11 = seq;
+			}
+			if ((lobj->flags & OBJ_POSIXSHM) != 0) {
+				kve->kve_flags |= KVME_FLAG_POSIXSHM;
+				shm_get_path(lobj, kve->kve_path,
+				    sizeof(kve->kve_path));
+			}
 			if (vp != NULL) {
 				vn_fullpath(vp, &fullpath, &freepath);
 				kve->kve_vn_type = vntype_to_kinfo(vp->v_type);
@@ -2994,6 +3279,9 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 					kve->kve_status = KF_ATTR_VALID;
 				}
 				vput(vp);
+				strlcpy(kve->kve_path, fullpath, sizeof(
+				    kve->kve_path));
+				free(freepath, M_TEMP);
 			}
 		} else {
 			if (quarantined)
@@ -3005,10 +3293,6 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 			kve->kve_ref_count = 0;
 			kve->kve_shadow_count = 0;
 		}
-
-		strlcpy(kve->kve_path, fullpath, sizeof(kve->kve_path));
-		if (freepath != NULL)
-			free(freepath, M_TEMP);
 
 		/* Pack record size down */
 		if ((flags & KERN_VMMAP_PACK_KINFO) != 0)
@@ -3138,9 +3422,7 @@ sysctl_kern_proc_kstack(SYSCTL_HANDLER_ARGS)
 		    sizeof(kkstp->kkst_trace), SBUF_FIXEDLEN);
 		thread_lock(td);
 		kkstp->kkst_tid = td->td_tid;
-		if (TD_IS_SWAPPED(td))
-			kkstp->kkst_state = KKST_STATE_SWAPPED;
-		else if (stack_save_td(st, td) == 0)
+		if (stack_save_td(st, td) == 0)
 			kkstp->kkst_state = KKST_STATE_STACKOK;
 		else
 			kkstp->kkst_state = KKST_STATE_RUNNING;
@@ -3695,6 +3977,16 @@ static SYSCTL_NODE(_kern_proc, KERN_PROC_ENV, env, CTLFLAG_RD | CTLFLAG_MPSAFE,
 static SYSCTL_NODE(_kern_proc, KERN_PROC_AUXV, auxv, CTLFLAG_RD |
 	CTLFLAG_MPSAFE, sysctl_kern_proc_auxv, "Process ELF auxiliary vector");
 
+#if __has_feature(capabilities)
+static SYSCTL_NODE(_kern_proc, KERN_PROC_C18N_STATS, c18n, CTLFLAG_RD |
+	CTLFLAG_MPSAFE, sysctl_kern_proc_c18n,
+	"Compartmentalisation statistics");
+
+static SYSCTL_NODE(_kern_proc, KERN_PROC_C18N_COMPARTS, c18n_compartments,
+	CTLFLAG_RD | CTLFLAG_MPSAFE, sysctl_kern_proc_c18n_compartments,
+	"Compartment list");
+#endif
+
 static SYSCTL_NODE(_kern_proc, KERN_PROC_PATHNAME, pathname, CTLFLAG_RD |
 	CTLFLAG_MPSAFE, sysctl_kern_proc_pathname, "Process executable path");
 
@@ -3820,7 +4112,8 @@ allproc_loop:
 		LIST_REMOVE(cp, p_list);
 		LIST_INSERT_AFTER(p, cp, p_list);
 		PROC_LOCK(p);
-		if ((p->p_flag & (P_KPROC | P_SYSTEM | P_TOTAL_STOP)) != 0) {
+		if ((p->p_flag & (P_KPROC | P_SYSTEM | P_TOTAL_STOP |
+		    P_STOPPED_SIG)) != 0) {
 			PROC_UNLOCK(p);
 			continue;
 		}
@@ -3838,6 +4131,16 @@ allproc_loop:
 			 * thread running.
 			 */
 			seen_stopped = true;
+			PROC_UNLOCK(p);
+			continue;
+		}
+		if ((p->p_flag & P_TRACED) != 0) {
+			/*
+			 * thread_single() below cannot stop traced p,
+			 * so skip it.  OTOH, we cannot require
+			 * restart because debugger might be either
+			 * already stopped or traced as well.
+			 */
 			PROC_UNLOCK(p);
 			continue;
 		}

@@ -55,7 +55,7 @@
 
 #define	IEEE80211_RADIOTAP_HDRLEN	64	/* XXX deprecated */
 
-struct ieee80211_radiotap_vendor_header {
+struct __no_subobject_bounds ieee80211_radiotap_vendor_header {
 	uint8_t		vh_oui[3];	/* 3 byte vendor OUI */
 	uint8_t		vh_sub_ns;	/* Sub namespace of this section */
 	uint16_t	vh_skip_len;	/* Length of this vendor section */
@@ -66,7 +66,7 @@ struct ieee80211_radiotap_vendor_header {
  *
  * Note well: all radiotap fields are little-endian.
  */
-struct ieee80211_radiotap_header {
+struct __no_subobject_bounds ieee80211_radiotap_header {
 	uint8_t		it_version;	/* Version 0. Only increases
 					 * for drastic changes,
 					 * introduction of compatible
@@ -540,6 +540,11 @@ struct ieee80211_radiotap_eht_usig {
 #define	IEEE80211_RADIOTAP_EHT_USIG_COMMON_VALIDATE_BITS_OK	0x00000080
 #define	IEEE80211_RADIOTAP_EHT_USIG_COMMON_PHY_VER		0x00007000
 #define	IEEE80211_RADIOTAP_EHT_USIG_COMMON_BW			0x00038000
+#define	IEEE80211_RADIOTAP_EHT_USIG_COMMON_BW_20MHZ		0x0
+#define	IEEE80211_RADIOTAP_EHT_USIG_COMMON_BW_40MHZ		0x1
+#define	IEEE80211_RADIOTAP_EHT_USIG_COMMON_BW_80MHZ		0x2
+#define	IEEE80211_RADIOTAP_EHT_USIG_COMMON_BW_160MHZ		0x3
+#define	IEEE80211_RADIOTAP_EHT_USIG_COMMON_BW_320MHZ_1		0x4
 #define	IEEE80211_RADIOTAP_EHT_USIG_COMMON_UL_DL		0x00040000
 #define	IEEE80211_RADIOTAP_EHT_USIG_COMMON_BSS_COLOR		0x01f80000
 #define	IEEE80211_RADIOTAP_EHT_USIG_COMMON_TXOP			0xfe000000

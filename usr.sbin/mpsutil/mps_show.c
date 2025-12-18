@@ -31,12 +31,10 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/endian.h>
 #include <err.h>
-#include <libutil.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,7 +55,7 @@ MPS_TABLE(top, show);
 static int
 show_adapter(int ac, char **av)
 {
-	const char* pcie_speed[] = { "2.5", "5.0", "8.0" };
+	const char* pcie_speed[] = { "2.5", "5.0", "8.0", "16.0", "32.0" };
 	const char* temp_units[] = { "", "F", "C" };
 	const char* ioc_speeds[] = { "", "Full", "Half", "Quarter", "Eighth" };
 

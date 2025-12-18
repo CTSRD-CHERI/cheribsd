@@ -34,6 +34,9 @@
 #include <sys/malloc.h>
 #include <sys/module.h>
 
+#if defined(__i386__) || defined(__amd64__)
+#include <machine/pci_cfgreg.h>
+#endif
 #include <machine/bus.h>
 #include <machine/resource.h>
 #include <sys/rman.h>
@@ -61,6 +64,8 @@ struct lookup_irq_request {
     int		trig;
     int		pol;
 };
+
+static char *pcilink_ids[] = { "PNP0C0F", NULL };
 
 static ACPI_STATUS
 acpi_lookup_irq_handler(ACPI_RESOURCE *res, void *context)
@@ -154,14 +159,11 @@ acpi_config_intr(device_t dev, ACPI_RESOURCE *res)
     }
 
 #if defined(__amd64__) || defined(__i386__)
-    /*
-     * XXX: Certain BIOSes have buggy AML that specify an IRQ that is
-     * edge-sensitive and active-lo.  However, edge-sensitive IRQs
-     * should be active-hi.  Force IRQs with an ISA IRQ value to be
-     * active-hi instead.
-     */
-    if (irq < 16 && trig == ACPI_EDGE_SENSITIVE && pol == ACPI_ACTIVE_LOW)
+    if (irq < 16 && trig == ACPI_EDGE_SENSITIVE && pol == ACPI_ACTIVE_LOW &&
+	acpi_override_isa_irq_polarity) {
+	device_printf(dev, "forcing active-hi polarity for IRQ %u\n", irq);
 	pol = ACPI_ACTIVE_HIGH;
+    }
 #endif
     BUS_CONFIG_INTR(dev, irq, (trig == ACPI_EDGE_SENSITIVE) ?
 	INTR_TRIGGER_EDGE : INTR_TRIGGER_LEVEL, (pol == ACPI_ACTIVE_HIGH) ?
@@ -517,6 +519,13 @@ acpi_parse_resources(device_t dev, ACPI_HANDLE handle,
         acpi_MatchHid(handle, "ARMHD620") != ACPI_MATCHHID_NOMATCH)
 	    arc.ignore_producer_flag = true;
 
+    /*
+     * The DesignWare I2C Controller on Ampere Altra sets ResourceProducer on
+     * memory resources.
+     */
+    if (acpi_MatchHid(handle, "APMC0D0F") != ACPI_MATCHHID_NOMATCH)
+	    arc.ignore_producer_flag = true;
+
     status = AcpiWalkResources(handle, "_CRS", acpi_parse_resource, &arc);
     if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
 	printf("can't fetch resources for %s - %s\n",
@@ -575,6 +584,52 @@ struct acpi_res_context {
     void 	*ar_parent;
 };
 
+/*
+ * Some resources reported via _CRS should not be added as bus
+ * resources.  This function returns true if a resource reported via
+ * _CRS should be ignored.
+ */
+static bool
+acpi_res_ignore(device_t dev, int type, rman_res_t start, rman_res_t count)
+{
+    struct acpi_device *ad = device_get_ivars(dev);
+    ACPI_DEVICE_INFO *devinfo;
+    bool allow;
+
+    /* Ignore IRQ resources for PCI link devices. */
+    if (type == SYS_RES_IRQ &&
+	ACPI_ID_PROBE(device_get_parent(dev), dev, pcilink_ids, NULL) <= 0)
+	return (true);
+
+    /*
+     * Ignore most resources for PCI root bridges.  Some BIOSes
+     * incorrectly enumerate the memory ranges they decode as plain
+     * memory resources instead of as ResourceProducer ranges.  Other
+     * BIOSes incorrectly list system resource entries for I/O ranges
+     * under the PCI bridge.  Do allow the one known-correct case on
+     * x86 of a PCI bridge claiming the I/O ports used for PCI config
+     * access.
+     */
+    if (type == SYS_RES_MEMORY || type == SYS_RES_IOPORT) {
+	if (ACPI_SUCCESS(AcpiGetObjectInfo(ad->ad_handle, &devinfo))) {
+	    if ((devinfo->Flags & ACPI_PCI_ROOT_BRIDGE) != 0) {
+#if defined(__i386__) || defined(__amd64__)
+		allow = (type == SYS_RES_IOPORT && start == CONF1_ADDR_PORT);
+#else
+		allow = false;
+#endif
+		if (!allow) {
+		    AcpiOsFree(devinfo);
+		    return (true);
+		}
+	    }
+	    AcpiOsFree(devinfo);
+	}
+    }
+
+    return (false);
+}
+
 static void
 acpi_res_set_init(device_t dev, void *arg, void **context)
 {
@@ -605,6 +660,8 @@ acpi_res_set_ioport(device_t dev, void *context, uint64_t base,
 
     if (cp == NULL)
 	return;
+    if (acpi_res_ignore(dev, SYS_RES_IOPORT, base, length))
+	return;
     bus_set_resource(dev, SYS_RES_IOPORT, cp->ar_nio++, base, length);
 }
 
@@ -630,6 +687,8 @@ acpi_res_set_iorange(device_t dev, void *context, uint64_t low,
 	    device_printf(dev,
 		"_CRS has fixed I/O port range defined as relocatable\n");
 
+	if (acpi_res_ignore(dev, SYS_RES_IOPORT, low, length))
+	    return;
 	bus_set_resource(dev, SYS_RES_IOPORT, cp->ar_nio++, low, length);
 	return;
     }
@@ -644,6 +703,8 @@ acpi_res_set_memory(device_t dev, void *context, uint64_t base,
     struct acpi_res_context	*cp = (struct acpi_res_context *)context;
 
     if (cp == NULL)
+	return;
+    if (acpi_res_ignore(dev, SYS_RES_MEMORY, base, length))
 	return;
     bus_set_resource(dev, SYS_RES_MEMORY, cp->ar_nmem++, base, length);
 }
@@ -669,8 +730,11 @@ acpi_res_set_irq(device_t dev, void *context, uint8_t *irq, int count,
     if (cp == NULL || irq == NULL)
 	return;
 
-    for (i = 0; i < count; i++)
+    for (i = 0; i < count; i++) {
+	if (acpi_res_ignore(dev, SYS_RES_IRQ, irq[i], 1))
+	    continue;
         bus_set_resource(dev, SYS_RES_IRQ, cp->ar_nirq++, irq[i], 1);
+    }
 }
 
 static void
@@ -683,8 +747,11 @@ acpi_res_set_ext_irq(device_t dev, void *context, uint32_t *irq, int count,
     if (cp == NULL || irq == NULL)
 	return;
 
-    for (i = 0; i < count; i++)
+    for (i = 0; i < count; i++) {
+	if (acpi_res_ignore(dev, SYS_RES_IRQ, irq[i], 1))
+	    continue;
         bus_set_resource(dev, SYS_RES_IRQ, cp->ar_nirq++, irq[i], 1);
+    }
 }
 
 static void
@@ -699,6 +766,8 @@ acpi_res_set_drq(device_t dev, void *context, uint8_t *drq, int count)
     if (count != 1)
 	return;
 
+    if (acpi_res_ignore(dev, SYS_RES_DRQ, *drq, 1))
+	return;
     bus_set_resource(dev, SYS_RES_DRQ, cp->ar_ndrq++, *drq, 1);
 }
 
@@ -729,8 +798,6 @@ acpi_res_set_end_dependent(device_t dev, void *context)
  * child devices.  The acpi parent manages these resources through a
  * private rman.
  */
-
-static int	acpi_sysres_rid = 100;
 
 static int	acpi_sysres_probe(device_t dev);
 static int	acpi_sysres_attach(device_t dev);
@@ -773,6 +840,7 @@ static int
 acpi_sysres_attach(device_t dev)
 {
     device_t bus;
+    struct acpi_softc *bus_sc;
     struct resource_list_entry *bus_rle, *dev_rle;
     struct resource_list *bus_rl, *dev_rl;
     int done, type;
@@ -787,7 +855,8 @@ acpi_sysres_attach(device_t dev)
      */
     bus = device_get_parent(dev);
     dev_rl = BUS_GET_RESOURCE_LIST(bus, dev);
-    bus_rl = BUS_GET_RESOURCE_LIST(device_get_parent(bus), bus);
+    bus_sc = acpi_device_get_parent_softc(dev);
+    bus_rl = &bus_sc->sysres_rl;
     STAILQ_FOREACH(dev_rle, dev_rl, link) {
 	if (dev_rle->type != SYS_RES_IOPORT && dev_rle->type != SYS_RES_MEMORY)
 	    continue;
@@ -827,7 +896,7 @@ acpi_sysres_attach(device_t dev)
 
 	/* If we didn't merge with anything, add this resource. */
 	if (bus_rle == NULL)
-	    bus_set_resource(bus, type, acpi_sysres_rid++, start, count);
+	    resource_list_add_next(bus_rl, type, start, end, count);
     }
 
     /* After merging/moving resources to the parent, free the list. */

@@ -1,6 +1,6 @@
 #NO_UNIVERSE
 
 include "CHERI-PURECAP-GFE"
-include "../../conf/std.nodebug"
+include "std.nodebug"
 
 ident CHERI-PURECAP-GFE-NODEBUG

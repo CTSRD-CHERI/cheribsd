@@ -30,7 +30,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/cpuset.h>
 #include <sys/event.h>
@@ -129,7 +128,7 @@ pmcstat_symbol_compare(const void *a, const void *b)
  */
 
 struct pmcstat_symbol *
-pmcstat_symbol_search(struct pmcstat_image *image, uintfptr_t addr)
+pmcstat_symbol_search(struct pmcstat_image *image, ptraddr_t addr)
 {
 	struct pmcstat_symbol sym;
 

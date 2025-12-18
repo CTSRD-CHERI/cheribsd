@@ -1,8 +1,8 @@
-
 .include <src.opts.mk>
 
 .PATH: ${SRCTOP}/contrib/libevent
 
+PACKAGE= ntp
 LIB= ntpevent
 INTERNALLIB=
 

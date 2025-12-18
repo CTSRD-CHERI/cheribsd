@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)kern_time.c	8.1 (Berkeley) 6/10/93
  */
 
 #include <sys/cdefs.h>
@@ -60,6 +58,7 @@
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
+#include <vm/uma.h>
 #ifdef CHERI_CAPREVOKE
 #include <vm/vm_cheri_revoke.h>
 #ifdef CHERI_CAPREVOKE_STATS
@@ -1429,8 +1428,6 @@ ktimer_cheri_revoke(struct proc *p, const struct vm_cheri_revoke_cookie *crc)
 {
 	int i;
 
-	CHERI_REVOKE_STATS_FOR(crst, crc);
-
 	if (p->p_itimers == NULL)
 		return;
 
@@ -1444,17 +1441,8 @@ ktimer_cheri_revoke(struct proc *p, const struct vm_cheri_revoke_cookie *crc)
 		if (it == NULL)
 			continue;
 
-		uintcap_t v = (uintcap_t)it->it_sigev.sigev_value.sival_ptr;
-
-		if (!cheri_gettag(v))
-			continue;
-
-		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
-		if (vm_cheri_revoke_test(crc, v)) {
-			it->it_sigev.sigev_value.sival_ptr =
-			    (void * __capability)cheri_revoke_cap(v);
-			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
-		}
+		vm_cheri_revoke_cap(crc,
+		    (uintcap_t *)&it->it_sigev.sigev_value.sival_ptr);
 	}
 	PROC_UNLOCK(p);
 }

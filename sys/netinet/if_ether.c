@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)if_ether.c	8.1 (Berkeley) 6/10/93
  */
 
 /*
@@ -683,6 +681,10 @@ arpintr(struct mbuf *m)
 	case ARPHRD_ETHER:
 		hlen = ETHER_ADDR_LEN; /* RFC 826 */
 		layer = "ethernet";
+		break;
+	case ARPHRD_IEEE802:
+		hlen = ETHER_ADDR_LEN;
+		layer = "ieee802";
 		break;
 	case ARPHRD_INFINIBAND:
 		hlen = 20;	/* RFC 4391, INFINIBAND_ALEN */

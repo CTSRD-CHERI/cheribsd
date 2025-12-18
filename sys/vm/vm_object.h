@@ -31,8 +31,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	from: @(#)vm_object.h	8.3 (Berkeley) 1/12/94
- *
  *
  * Copyright (c) 1987, 1990 Carnegie-Mellon University.
  * All rights reserved.
@@ -139,7 +137,7 @@ struct vm_object {
 		struct {
 			TAILQ_HEAD(, vm_page) devp_pglist;
 			const struct cdev_pager_ops *ops;
-			struct cdev *dev;
+			void *handle;
 		} devp;
 
 		/*
@@ -174,6 +172,7 @@ struct vm_object {
 				void *data_ptr;
 				uintptr_t data_val;
 			};
+			void *phys_priv;
 		} phys;
 	} un_pager;
 	struct ucred *cred;
@@ -184,26 +183,32 @@ struct vm_object {
 /*
  * Flags
  */
-#define	OBJ_FICTITIOUS	0x0001		/* (c) contains fictitious pages */
-#define	OBJ_UNMANAGED	0x0002		/* (c) contains unmanaged pages */
-#define	OBJ_POPULATE	0x0004		/* pager implements populate() */
-#define	OBJ_DEAD	0x0008		/* dead objects (during rundown) */
-#define	OBJ_ANON	0x0010		/* (c) contains anonymous memory */
-#define	OBJ_UMTXDEAD	0x0020		/* umtx pshared was terminated */
-#define	OBJ_SIZEVNLOCK	0x0040		/* lock vnode to check obj size */
-#define	OBJ_PG_DTOR	0x0080		/* dont reset object, leave that for dtor */
-#define	OBJ_SHADOWLIST	0x0100		/* Object is on the shadow list. */
-#define	OBJ_SWAP	0x0200		/* object swaps, type will be OBJT_SWAP
+#define	OBJ_FICTITIOUS	0x00000001	/* (c) contains fictitious pages */
+#define	OBJ_UNMANAGED	0x00000002	/* (c) contains unmanaged pages */
+#define	OBJ_POPULATE	0x00000004	/* pager implements populate() */
+#define	OBJ_DEAD	0x00000008	/* dead objects (during rundown) */
+#define	OBJ_ANON	0x00000010	/* (c) contains anonymous memory */
+#define	OBJ_UMTXDEAD	0x00000020	/* umtx pshared was terminated */
+#define	OBJ_SIZEVNLOCK	0x00000040	/* lock vnode to check obj size */
+#define	OBJ_PG_DTOR	0x00000080	/* do not reset object, leave that
+					   for dtor */
+#define	OBJ_SHADOWLIST	0x00000100	/* Object is on the shadow list. */
+#define	OBJ_SWAP	0x00000200	/* object swaps, type will be OBJT_SWAP
 					   or dynamically registered */
-#define	OBJ_SPLIT	0x0400		/* object is being split */
-#define	OBJ_COLLAPSING	0x0800		/* Parent of collapse. */
-#define	OBJ_COLORED	0x1000		/* pg_color is defined */
-#define	OBJ_ONEMAPPING	0x2000		/* One USE (a single, non-forked) mapping flag */
-#define	OBJ_PAGERPRIV1	0x4000		/* Pager private */
-#define	OBJ_PAGERPRIV2	0x8000		/* Pager private */
-#define	OBJ_HASCAP	0x10000		/* object can store capabilities */
-#define	OBJ_NOCAP	0x20000		/* object and all shadow objects can
+#define	OBJ_SPLIT	0x00000400	/* object is being split */
+#define	OBJ_COLLAPSING	0x00000800	/* Parent of collapse. */
+#define	OBJ_COLORED	0x00001000	/* pg_color is defined */
+#define	OBJ_ONEMAPPING	0x00002000	/* One USE (a single, non-forked)
+					   mapping flag */
+#define	OBJ_PAGERPRIV1	0x00004000	/* Pager private */
+#define	OBJ_PAGERPRIV2	0x00008000	/* Pager private */
+#define	OBJ_SYSVSHM	0x00010000	/* SysV SHM */
+#define	OBJ_POSIXSHM	0x00020000	/* Posix SHM */
+#define	OBJ_CDEVH	0x00040000	/* OBJT_DEVICE handle is cdev */
+#define	OBJ_HASCAP	0x01000000	/* object can store capabilities */
+#define	OBJ_NOCAP	0x02000000	/* object and all shadow objects can
 					   not store capabilities */
+#define	OBJ_CHERISHADOW	0x04000000	/* object is the shadow bitmap */
 
 /*
  * Helpers to perform conversion between vm_object page indexes and offsets.

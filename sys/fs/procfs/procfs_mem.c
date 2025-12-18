@@ -32,8 +32,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)procfs_mem.c	8.5 (Berkeley) 6/15/94
  */
 
 #include <sys/param.h>
@@ -43,6 +41,7 @@
 #include <sys/ptrace.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
+#include <sys/priv.h>
 
 #include <fs/pseudofs/pseudofs.h>
 #include <fs/procfs/procfs.h>
@@ -63,6 +62,8 @@ procfs_doprocmem(PFS_FILL_ARGS)
 
 	PROC_LOCK(p);
 	error = p_candebug(td, p);
+	if (error == 0 && uio->uio_rw == UIO_WRITE)
+		error = priv_check(td, PRIV_PROC_MEM_WRITE);
 	PROC_UNLOCK(p);
 	if (error == 0)
 		error = proc_rwmem(p, uio);

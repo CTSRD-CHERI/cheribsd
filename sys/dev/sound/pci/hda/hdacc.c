@@ -79,6 +79,7 @@ static const struct {
 	{ HDA_CODEC_ALC221, 0,		"Realtek ALC221" },
 	{ HDA_CODEC_ALC222, 0,		"Realtek ALC222" },
 	{ HDA_CODEC_ALC225, 0,		"Realtek ALC225" },
+	{ HDA_CODEC_ALC230, 0,		"Realtek ALC230" },
 	{ HDA_CODEC_ALC231, 0,		"Realtek ALC231" },
 	{ HDA_CODEC_ALC233, 0,		"Realtek ALC233" },
 	{ HDA_CODEC_ALC234, 0,		"Realtek ALC234" },
@@ -357,6 +358,7 @@ static const struct {
 	{ HDA_CODEC_NVIDIAMCP78_3, 0,	"NVIDIA MCP78" },
 	{ HDA_CODEC_NVIDIAMCP78_4, 0,	"NVIDIA MCP78" },
 	{ HDA_CODEC_NVIDIAMCP7A, 0,	"NVIDIA MCP7A" },
+	{ HDA_CODEC_NVIDIAGM204, 0,	"NVIDIA GM204" },
 	{ HDA_CODEC_NVIDIAGT220, 0,	"NVIDIA GT220" },
 	{ HDA_CODEC_NVIDIAGT21X, 0,	"NVIDIA GT21x" },
 	{ HDA_CODEC_NVIDIAMCP89, 0,	"NVIDIA MCP89" },
@@ -392,6 +394,7 @@ static const struct {
 	{ HDA_CODEC_INTELGMLK1, 0,	"Intel Gemini Lake" },
 	{ HDA_CODEC_INTELICLK, 0,	"Intel Ice Lake" },
 	{ HDA_CODEC_INTELTGLK, 0,	"Intel Tiger Lake" },
+	{ HDA_CODEC_INTELTGLKH, 0,	"Intel Tiger Lake-H" },
 	{ HDA_CODEC_INTELALLK, 0,	"Intel Alder Lake" },
 	{ HDA_CODEC_SII1390, 0,		"Silicon Image SiI1390" },
 	{ HDA_CODEC_SII1392, 0,		"Silicon Image SiI1392" },
@@ -472,8 +475,7 @@ hdacc_probe(device_t dev)
 			    hdacc_codecs[i].name, hda_get_device_id(dev));
 	} else
 		snprintf(buf, sizeof(buf), "Generic (0x%04x)", id);
-	strlcat(buf, " HDA CODEC", sizeof(buf));
-	device_set_desc_copy(dev, buf);
+	device_set_descf(dev, "%s HDA CODEC", buf);
 	return (BUS_PROBE_DEFAULT);
 }
 
@@ -520,7 +522,7 @@ hdacc_attach(device_t dev)
 		codec->fgs[n].subsystem_id = hda_command(dev,
 		    HDA_CMD_GET_SUBSYSTEM_ID(0, i));
 		hdacc_unlock(codec);
-		codec->fgs[n].dev = child = device_add_child(dev, NULL, -1);
+		codec->fgs[n].dev = child = device_add_child(dev, NULL, DEVICE_UNIT_ANY);
 		if (child == NULL) {
 			device_printf(dev, "Failed to add function device\n");
 			continue;
@@ -539,9 +541,10 @@ hdacc_detach(device_t dev)
 	struct hdacc_softc *codec = device_get_softc(dev);
 	int error;
 
-	error = device_delete_children(dev);
+	if ((error = device_delete_children(dev)) != 0)
+		return (error);
 	free(codec->fgs, M_HDACC);
-	return (error);
+	return (0);
 }
 
 static int

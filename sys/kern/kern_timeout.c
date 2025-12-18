@@ -32,8 +32,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	From: @(#)kern_clock.c	8.5 (Berkeley) 1/21/94
  */
 
 #include <sys/cdefs.h>
@@ -144,7 +142,6 @@ static u_int __read_mostly callwheelmask;
  */
 struct cc_exec {
 	struct callout		*cc_curr;
-	callout_func_t		*cc_drain;
 	void			*cc_last_func;
 	void			*cc_last_arg;
 #ifdef SMP
@@ -182,7 +179,6 @@ struct callout_cpu {
 #define	cc_exec_curr(cc, dir)		cc->cc_exec_entity[dir].cc_curr
 #define	cc_exec_last_func(cc, dir)	cc->cc_exec_entity[dir].cc_last_func
 #define	cc_exec_last_arg(cc, dir)	cc->cc_exec_entity[dir].cc_last_arg
-#define	cc_exec_drain(cc, dir)		cc->cc_exec_entity[dir].cc_drain
 #define	cc_exec_next(cc)		cc->cc_next
 #define	cc_exec_cancel(cc, dir)		cc->cc_exec_entity[dir].cc_cancel
 #define	cc_exec_waiting(cc, dir)	cc->cc_exec_entity[dir].cc_waiting
@@ -633,7 +629,7 @@ softclock_call_cc(struct callout *c, struct callout_cpu *cc,
     int direct)
 {
 	struct rm_priotracker tracker;
-	callout_func_t *c_func, *drain;
+	callout_func_t *c_func;
 	void *c_arg;
 	struct lock_class *class;
 	struct lock_object *c_lock;
@@ -653,6 +649,7 @@ softclock_call_cc(struct callout *c, struct callout_cpu *cc,
 	static callout_func_t *lastfunc;
 #endif
 
+	CC_LOCK_ASSERT(cc);
 	KASSERT((c->c_iflags & CALLOUT_PENDING) == CALLOUT_PENDING,
 	    ("softclock_call_cc: pend %p %x", c, c->c_iflags));
 	KASSERT((c->c_flags & CALLOUT_ACTIVE) == CALLOUT_ACTIVE,
@@ -675,17 +672,29 @@ softclock_call_cc(struct callout *c, struct callout_cpu *cc,
 	cc_exec_last_func(cc, direct) = c_func;
 	cc_exec_last_arg(cc, direct) = c_arg;
 	cc_exec_cancel(cc, direct) = false;
-	cc_exec_drain(cc, direct) = NULL;
-	CC_UNLOCK(cc);
 	if (c_lock != NULL) {
-		class->lc_lock(c_lock, lock_status);
-		/*
-		 * The callout may have been cancelled
-		 * while we switched locks.
-		 */
-		if (cc_exec_cancel(cc, direct)) {
-			class->lc_unlock(c_lock);
-			goto skip;
+		if (c_iflags & CALLOUT_TRYLOCK) {
+			if (__predict_false(class->lc_trylock(c_lock,
+			    lock_status) == 0)) {
+				cc_exec_curr(cc, direct) = NULL;
+				callout_cc_add(c, cc,
+				    cc->cc_lastscan + c->c_precision / 2,
+				    qmax(c->c_precision / 2, 1), c_func, c_arg,
+				    (direct) ? C_DIRECT_EXEC : 0);
+				return;
+			}
+			CC_UNLOCK(cc);
+		} else {
+			CC_UNLOCK(cc);
+			class->lc_lock(c_lock, lock_status);
+			/*
+			 * The callout may have been cancelled
+			 * while we switched locks.
+			 */
+			if (cc_exec_cancel(cc, direct)) {
+				class->lc_unlock(c_lock);
+				goto skip;
+			}
 		}
 		/* The callout cannot be stopped now. */
 		cc_exec_cancel(cc, direct) = true;
@@ -703,6 +712,7 @@ softclock_call_cc(struct callout *c, struct callout_cpu *cc,
 			    c, c_func, c_arg);
 		}
 	} else {
+		CC_UNLOCK(cc);
 #ifdef CALLOUT_PROFILING
 		(*mpcalls)++;
 #endif
@@ -741,13 +751,6 @@ skip:
 	CC_LOCK(cc);
 	KASSERT(cc_exec_curr(cc, direct) == c, ("mishandled cc_curr"));
 	cc_exec_curr(cc, direct) = NULL;
-	if (cc_exec_drain(cc, direct)) {
-		drain = cc_exec_drain(cc, direct);
-		cc_exec_drain(cc, direct) = NULL;
-		CC_UNLOCK(cc);
-		drain(c_arg);
-		CC_LOCK(cc);
-	}
 	if (cc_exec_waiting(cc, direct)) {
 		/*
 		 * There is someone waiting for the
@@ -971,7 +974,7 @@ callout_reset_sbt_on(struct callout *c, sbintime_t sbt, sbintime_t prec,
 		 */
 		if (c->c_lock != NULL && !cc_exec_cancel(cc, direct))
 			cancelled = cc_exec_cancel(cc, direct) = true;
-		if (cc_exec_waiting(cc, direct) || cc_exec_drain(cc, direct)) {
+		if (cc_exec_waiting(cc, direct)) {
 			/*
 			 * Someone has called callout_drain to kill this
 			 * callout.  Don't reschedule.
@@ -1082,7 +1085,7 @@ callout_schedule(struct callout *c, int to_ticks)
 }
 
 int
-_callout_stop_safe(struct callout *c, int flags, callout_func_t *drain)
+_callout_stop_safe(struct callout *c, int flags)
 {
 	struct callout_cpu *cc, *old_cc;
 	struct lock_class *class;
@@ -1092,9 +1095,6 @@ _callout_stop_safe(struct callout *c, int flags, callout_func_t *drain)
 	if ((flags & CS_DRAIN) != 0)
 		WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, c->c_lock,
 		    "calling %s", __func__);
-
-	KASSERT((flags & CS_DRAIN) == 0 || drain == NULL,
-	    ("Cannot set drain callback and CS_DRAIN flag at the same time"));
 
 	/*
 	 * Some old subsystems don't hold Giant while running a callout_stop(),
@@ -1230,8 +1230,7 @@ again:
 				goto again;
 			}
 			c->c_flags &= ~CALLOUT_ACTIVE;
-		} else if (use_lock &&
-			   !cc_exec_cancel(cc, direct) && (drain == NULL)) {
+		} else if (use_lock && !cc_exec_cancel(cc, direct)) {
 			
 			/*
 			 * The current callout is waiting for its
@@ -1239,8 +1238,7 @@ again:
 			 * and return.  After our caller drops the
 			 * lock, the callout will be skipped in
 			 * softclock(). This *only* works with a
-			 * callout_stop() *not* callout_drain() or
-			 * callout_async_drain().
+			 * callout_stop() *not* with callout_drain().
 			 */
 			cc_exec_cancel(cc, direct) = true;
 			CTR3(KTR_CALLOUT, "cancelled %p func %p arg %p",
@@ -1286,23 +1284,11 @@ again:
 #endif
 			CTR3(KTR_CALLOUT, "postponing stop %p func %p arg %p",
 			    c, c->c_func, c->c_arg);
- 			if (drain) {
-				KASSERT(cc_exec_drain(cc, direct) == NULL,
-				    ("callout drain function already set to %p",
-				    cc_exec_drain(cc, direct)));
-				cc_exec_drain(cc, direct) = drain;
-			}
 			CC_UNLOCK(cc);
 			return (0);
 		} else {
 			CTR3(KTR_CALLOUT, "failed to stop %p func %p arg %p",
 			    c, c->c_func, c->c_arg);
-			if (drain) {
-				KASSERT(cc_exec_drain(cc, direct) == NULL,
-				    ("callout drain function already set to %p",
-				    cc_exec_drain(cc, direct)));
-				cc_exec_drain(cc, direct) = drain;
-			}
 		}
 		KASSERT(!sq_locked, ("sleepqueue chain still locked"));
 		cancelled = 0;
@@ -1360,16 +1346,22 @@ callout_init(struct callout *c, int mpsafe)
 void
 _callout_init_lock(struct callout *c, struct lock_object *lock, int flags)
 {
-	bzero(c, sizeof *c);
-	c->c_lock = lock;
-	KASSERT((flags & ~(CALLOUT_RETURNUNLOCKED | CALLOUT_SHAREDLOCK)) == 0,
-	    ("callout_init_lock: bad flags %d", flags));
-	KASSERT(lock != NULL || (flags & CALLOUT_RETURNUNLOCKED) == 0,
-	    ("callout_init_lock: CALLOUT_RETURNUNLOCKED with no lock"));
-	KASSERT(lock == NULL || !(LOCK_CLASS(lock)->lc_flags & LC_SLEEPABLE),
+	KASSERT(lock != NULL, ("%s: no lock", __func__));
+	KASSERT((flags & ~(CALLOUT_RETURNUNLOCKED | CALLOUT_SHAREDLOCK |
+	    CALLOUT_TRYLOCK)) == 0,
+	    ("%s: bad flags %d", __func__, flags));
+	KASSERT(!(LOCK_CLASS(lock)->lc_flags & LC_SLEEPABLE),
 	    ("%s: callout %p has sleepable lock", __func__, c));
-	c->c_iflags = flags & (CALLOUT_RETURNUNLOCKED | CALLOUT_SHAREDLOCK);
-	c->c_cpu = cc_default_cpu;
+	KASSERT(!(flags & CALLOUT_TRYLOCK) ||
+	    (LOCK_CLASS(lock)->lc_trylock != NULL),
+	    ("%s: CALLOUT_TRYLOCK requested for %s",
+	    __func__, LOCK_CLASS(lock)->lc_name));
+
+	*c = (struct callout ){
+		.c_lock = lock,
+		.c_iflags = flags,
+		.c_cpu = cc_default_cpu,
+	};
 }
 
 static int

@@ -34,7 +34,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/module.h>
 #include <sys/systm.h> /* For FreeBSD 11 */
@@ -312,7 +311,7 @@ static int	rtsx_resume(device_t dev);
 #define	RTSX_DMA_ALIGN		4
 #define	RTSX_HOSTCMD_MAX	256
 #define	RTSX_DMA_CMD_BIFSIZE	(sizeof(uint32_t) * RTSX_HOSTCMD_MAX)
-#define	RTSX_DMA_DATA_BUFSIZE	MAXPHYS
+#define	RTSX_DMA_DATA_BUFSIZE	maxphys
 
 #define	ISSET(t, f) ((t) & (f))
 
@@ -666,7 +665,7 @@ rtsx_card_task(void *arg, int pending __unused)
 			mmc_cam_sim_discover(&sc->rtsx_mmc_sim);
 #else  /* !MMCCAM */
 			RTSX_LOCK(sc);
-			sc->rtsx_mmc_dev = device_add_child(sc->rtsx_dev, "mmc", -1);
+			sc->rtsx_mmc_dev = device_add_child(sc->rtsx_dev, "mmc", DEVICE_UNIT_ANY);
 			RTSX_UNLOCK(sc);
 			if (sc->rtsx_mmc_dev == NULL) {
 				device_printf(sc->rtsx_dev, "Adding MMC bus failed\n");
@@ -2763,7 +2762,7 @@ rtsx_xfer(struct rtsx_softc *sc, struct mmc_command *cmd)
 			      (unsigned long)cmd->data->len, (unsigned long)cmd->data->xfer_len);
 
 	if (cmd->data->len > RTSX_DMA_DATA_BUFSIZE) {
-		device_printf(sc->rtsx_dev, "rtsx_xfer() length too large: %ld > %d\n",
+		device_printf(sc->rtsx_dev, "rtsx_xfer() length too large: %ld > %ld\n",
 			      (unsigned long)cmd->data->len, RTSX_DMA_DATA_BUFSIZE);
 		cmd->error = MMC_ERR_INVALID;
 		return (MMC_ERR_INVALID);

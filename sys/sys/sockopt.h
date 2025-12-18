@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)socketvar.h	8.3 (Berkeley) 2/19/95
  */
 #ifndef _SYS_SOCKOPT_H_
 #define _SYS_SOCKOPT_H_
@@ -37,6 +35,7 @@
 #error "no user-serviceable parts inside"
 #endif
 
+struct cap_rights;
 struct thread;
 struct socket;
 
@@ -47,10 +46,6 @@ struct socket;
 enum sopt_dir {
 	SOPT_GET,
 	SOPT_SET,
-#if __has_feature(capabilities)
-	SOPT_GETCAP,
-	SOPT_SETCAP,
-#endif
 };
 
 struct	sockopt {
@@ -59,12 +54,19 @@ struct	sockopt {
 	int	sopt_name;	/* third arg of [gs]etsockopt */
 	void   * __capability sopt_val;	/* fourth arg of [gs]etsockopt */
 	size_t	sopt_valsize;	/* (almost) fifth arg of [gs]etsockopt */
+	const struct cap_rights *sopt_rights; /* Capsicum rights for the fd */
 	struct	thread *sopt_td; /* calling thread or null if kernel */
 };
 
 int	sosetopt(struct socket *so, struct sockopt *sopt);
 int	sogetopt(struct socket *so, struct sockopt *sopt);
 int	sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen);
+#if __has_feature(capabilities)
+int	sooptcopyincap(struct sockopt *sopt, void *buf, size_t len,
+    size_t minlen);
+#else
+#define	sooptcopyincap	sooptcopyin
+#endif
 int	sooptcopyout(struct sockopt *sopt, const void *buf, size_t len);
 int	soopt_getm(struct sockopt *sopt, struct mbuf **mp);
 int	soopt_mcopyin(struct sockopt *sopt, struct mbuf *m);

@@ -1,4 +1,4 @@
-# $NetBSD: directive-for-errors.mk,v 1.6 2023/06/01 20:56:35 rillig Exp $
+# $NetBSD: directive-for-errors.mk,v 1.13 2024/07/06 10:14:35 rillig Exp $
 #
 # Tests for error handling in .for loops.
 
@@ -7,10 +7,10 @@
 # in a parse error.
 # expect+1: Unknown directive "fori"
 .fori in 1 2 3
+# expect+1: warning: <>
 .  warning <${i}>
+# expect+1: for-less endfor
 .endfor
-# expect-2: <>
-# expect-2: for-less endfor
 
 
 # A slash is not whitespace, therefore this is not parsed as a .for loop.
@@ -23,10 +23,10 @@
 # name is parsed a bit differently.
 # expect+1: Unknown directive "for"
 .for/i in 1 2 3
+# expect+1: warning: <>
 .  warning <${i}>
+# expect+1: for-less endfor
 .endfor
-# expect-2: warning: <>
-# expect-2: for-less endfor
 
 
 # Before for.c 1.173 from 2023-05-08, the variable name could be an arbitrary
@@ -35,13 +35,13 @@
 #
 # The '$$' was not replaced with the values '1' or '3' from the .for loop,
 # instead it was kept as-is, and when the .info directive expanded its
-# argument, each '$$' got replaced with a single '$'.  The "long variable
+# argument, each '$$' got replaced with a single '$'.  The "long
 # expression" ${$} got replaced though, even though this would be a parse
 # error everywhere outside a .for loop.
 ${:U\$}=	dollar		# see whether the "variable" '$' is local
 ${:U\\}=	backslash	# see whether the "variable" '\' is local
 # expect+1: invalid character '$' in .for loop variable name
-.for $ \ in 1 2 3 4
+.for a b $ \ in 1 2 3 4
 .  info Dollar $$ ${$} $($) and backslash $\ ${\} $(\).
 .endfor
 
@@ -67,7 +67,7 @@ ${:U\\}=	backslash	# see whether the "variable" '\' is local
 
 
 # The list of values after the 'in' may be empty, no matter if this emptiness
-# comes from an empty expansion or even from a syntactically empty line.
+# comes from an expanded expression or from a syntactically empty line.
 .for i in
 .  info Would be reached if there were items to loop over.
 .endfor
@@ -85,10 +85,10 @@ ${:U\\}=	backslash	# see whether the "variable" '\' is local
 #
 # XXX: As of 2020-12-31, Var_Subst doesn't report any errors, therefore
 # the loop body is expanded as if no error had happened.
-# expect+1: Unknown modifier "Z"
+# expect+1: while evaluating "${:U3:Z} 4" with value "3": Unknown modifier "Z"
 .for i in 1 2 ${:U3:Z} 4
+# expect+3: warning: Should not be reached.
+# expect+2: warning: Should not be reached.
+# expect+1: warning: Should not be reached.
 .  warning Should not be reached.
 .endfor
-# expect-2: Should not be reached.
-# expect-3: Should not be reached.
-# expect-4: Should not be reached.

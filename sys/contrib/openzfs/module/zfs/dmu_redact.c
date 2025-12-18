@@ -189,7 +189,7 @@ zfs_get_deleteq(objset_t *os)
 	objlist_t *deleteq_objlist = objlist_create();
 	uint64_t deleteq_obj;
 	zap_cursor_t zc;
-	zap_attribute_t za;
+	zap_attribute_t *za;
 	dmu_object_info_t doi;
 
 	ASSERT3U(os->os_phys->os_type, ==, DMU_OST_ZFS);
@@ -208,13 +208,15 @@ zfs_get_deleteq(objset_t *os)
 	avl_create(&at, objnode_compare, sizeof (struct objnode),
 	    offsetof(struct objnode, node));
 
+	za = zap_attribute_alloc();
 	for (zap_cursor_init(&zc, os, deleteq_obj);
-	    zap_cursor_retrieve(&zc, &za) == 0; zap_cursor_advance(&zc)) {
+	    zap_cursor_retrieve(&zc, za) == 0; zap_cursor_advance(&zc)) {
 		struct objnode *obj = kmem_zalloc(sizeof (*obj), KM_SLEEP);
-		obj->obj = za.za_first_integer;
+		obj->obj = za->za_first_integer;
 		avl_add(&at, obj);
 	}
 	zap_cursor_fini(&zc);
+	zap_attribute_free(za);
 
 	struct objnode *next, *found = avl_first(&at);
 	while (found != NULL) {
@@ -746,7 +748,7 @@ perform_thread_merge(bqueue_t *q, uint32_t num_threads,
 		bqueue_enqueue(q, record, sizeof (*record));
 		return (0);
 	}
-	redact_nodes = kmem_zalloc(num_threads *
+	redact_nodes = vmem_zalloc(num_threads *
 	    sizeof (*redact_nodes), KM_SLEEP);
 
 	avl_create(&start_tree, redact_node_compare_start,
@@ -820,7 +822,7 @@ perform_thread_merge(bqueue_t *q, uint32_t num_threads,
 
 	avl_destroy(&start_tree);
 	avl_destroy(&end_tree);
-	kmem_free(redact_nodes, num_threads * sizeof (*redact_nodes));
+	vmem_free(redact_nodes, num_threads * sizeof (*redact_nodes));
 	if (current_record != NULL)
 		bqueue_enqueue(q, current_record, sizeof (*current_record));
 	return (err);
@@ -912,7 +914,7 @@ perform_redaction(objset_t *os, redaction_list_t *rl,
 			object = prev_obj;
 		}
 		while (err == 0 && object <= rec->end_object) {
-			if (issig(JUSTLOOKING) && issig(FORREAL)) {
+			if (issig()) {
 				err = EINTR;
 				break;
 			}
@@ -1030,7 +1032,7 @@ dmu_redact_snap(const char *snapname, nvlist_t *redactnvl,
 
 	numsnaps = fnvlist_num_pairs(redactnvl);
 	if (numsnaps > 0)
-		args = kmem_zalloc(numsnaps * sizeof (*args), KM_SLEEP);
+		args = vmem_zalloc(numsnaps * sizeof (*args), KM_SLEEP);
 
 	nvpair_t *pair = NULL;
 	for (int i = 0; i < numsnaps; i++) {
@@ -1079,7 +1081,7 @@ dmu_redact_snap(const char *snapname, nvlist_t *redactnvl,
 		kmem_free(newredactbook,
 		    sizeof (char) * ZFS_MAX_DATASET_NAME_LEN);
 		if (args != NULL)
-			kmem_free(args, numsnaps * sizeof (*args));
+			vmem_free(args, numsnaps * sizeof (*args));
 		return (SET_ERROR(ENAMETOOLONG));
 	}
 	err = dsl_bookmark_lookup(dp, newredactbook, NULL, &bookmark);
@@ -1119,7 +1121,7 @@ dmu_redact_snap(const char *snapname, nvlist_t *redactnvl,
 	} else {
 		uint64_t *guids = NULL;
 		if (numsnaps > 0) {
-			guids = kmem_zalloc(numsnaps * sizeof (uint64_t),
+			guids = vmem_zalloc(numsnaps * sizeof (uint64_t),
 			    KM_SLEEP);
 		}
 		for (int i = 0; i < numsnaps; i++) {
@@ -1131,10 +1133,9 @@ dmu_redact_snap(const char *snapname, nvlist_t *redactnvl,
 		dp = NULL;
 		err = dsl_bookmark_create_redacted(newredactbook, snapname,
 		    numsnaps, guids, FTAG, &new_rl);
-		kmem_free(guids, numsnaps * sizeof (uint64_t));
-		if (err != 0) {
+		vmem_free(guids, numsnaps * sizeof (uint64_t));
+		if (err != 0)
 			goto out;
-		}
 	}
 
 	for (int i = 0; i < numsnaps; i++) {
@@ -1188,7 +1189,7 @@ out:
 	}
 
 	if (args != NULL)
-		kmem_free(args, numsnaps * sizeof (*args));
+		vmem_free(args, numsnaps * sizeof (*args));
 	if (dp != NULL)
 		dsl_pool_rele(dp, FTAG);
 	if (ds != NULL) {

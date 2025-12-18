@@ -241,7 +241,7 @@ CHERIBSDTEST(signal_returncap,
     "Test value of signal handler return capability")
 {
 	struct sigaction sa;
-	uintmax_t v;
+	uintmax_t v, expect;
 
 	sa.sa_handler = returncap_func;
 	sigemptyset(&sa.sa_mask);
@@ -261,15 +261,20 @@ CHERIBSDTEST(signal_returncap,
 		cheribsdtest_failure_errx("kill(getpid(), SIGUSR1) failed: %s",
 		                       strerror(errno));
 
-	/* Length -- 256 bytes should be more than enough to cover sigcode. */
+	/* Length. */
 	v = cheri_getlen(handler_returncap);
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	CHERIBSDTEST_VERIFY2(v == CHERI_CAP_USER_CODE_LENGTH,
-	    "length 0x%jx (expected <= 0x%jx)", v,
-	    (uintmax_t)CHERI_CAP_USER_CODE_LENGTH);
+	/* The purecap benchmark ABI does not bound PCC capabilities. */
+	expect = CHERI_CAP_USER_CODE_LENGTH;
+#elif defined(CHERIBSD_C18N_TESTS)
+	/* Signal handlers return to a c18n trampoline. */
+	expect = 0x300;
 #else
-	CHERIBSDTEST_VERIFY2(v <= 0x100, "length 0x%jx (expected <= 0x100)", v);
+	/* 256 bytes should be more than enough to cover sigcode. */
+	expect = 0x100;
 #endif
+	CHERIBSDTEST_VERIFY2(v <= expect, "length %#jx (expected <= %#jx)",
+	    v, expect);
 
 	/* Type -- should be a sentry capability. */
 	v = cheri_gettype(handler_returncap);
@@ -294,5 +299,98 @@ CHERIBSDTEST(signal_returncap,
 	    "perms %jx (store_local_cap present)", v);
 
 	cheribsdtest_success();
+}
+#endif
+
+#ifndef __CHERI_PURE_CAPABILITY__
+/*
+ * Ensure that invalid addresses still raise SIGSEGV (rather than
+ * SIGPROT) for hybrid mode.
+ */
+CHERIBSDTEST(null_pointer_load_sigsegv,
+    "Check that loading from NULL raises SIGSEGV",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_MAPERR,
+    .ct_si_trapno = TRAPNO_LOAD_PF)
+{
+	volatile char *p = (void *)(uintptr_t)1;
+
+	(void)*p;
+	cheribsdtest_failure_errx("Unexpected load from NULL pointer");
+}
+
+CHERIBSDTEST(null_pointer_store_sigsegv,
+    "Check that storing to NULL raises SIGSEGV",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_MAPERR,
+    .ct_si_trapno = TRAPNO_STORE_PF)
+{
+	char *p = (void *)(uintptr_t)1;
+
+	*p = 1;
+	cheribsdtest_failure_errx("Unexpected store to NULL pointer");
+}
+
+CHERIBSDTEST(null_pointer_exec_sigsegv,
+    "Check that branching to NULL raises SIGSEGV",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_MAPERR,
+    .ct_si_trapno = TRAPNO_EXEC_PF)
+{
+	void (*p)(void) = (void *)(uintptr_t)1;
+
+	p();
+	cheribsdtest_failure_errx("Unexpected branch to NULL pointer");
+}
+
+CHERIBSDTEST(kernel_pointer_load_sigsegv,
+    "Check that loading from a kernel address raises SIGSEGV",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_MAPERR,
+    .ct_si_trapno = TRAPNO_LOAD_PF)
+{
+	volatile char *p = (void *)(uintptr_t)VM_MIN_KERNEL_ADDRESS;
+
+	(void)*p;
+	cheribsdtest_failure_errx("Unexpected load from kernel address");
+}
+
+CHERIBSDTEST(kernel_pointer_store_sigsegv,
+    "Check that storing to a kernel address raises SIGSEGV",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_MAPERR,
+#ifdef __riscv
+    /*
+     * CHERI RISC-V doesn't differentiate loads from stores when
+     * emulating SIGSEGV.
+     */
+    .ct_si_trapno = TRAPNO_LOAD_PF
+#else
+    .ct_si_trapno = TRAPNO_STORE_PF
+#endif
+	)
+{
+	char *p = (void *)(uintptr_t)VM_MIN_KERNEL_ADDRESS;
+
+	*p = 1;
+	cheribsdtest_failure_errx("Unexpected store to kernel address");
+}
+
+CHERIBSDTEST(kernel_pointer_exec_sigsegv,
+    "Check that branching to a kernel address raises SIGSEGV",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_MAPERR,
+    .ct_si_trapno = TRAPNO_EXEC_PF)
+{
+	void (*p)(void) = (void *)(uintptr_t)VM_MIN_KERNEL_ADDRESS;
+
+	p();
+	cheribsdtest_failure_errx("Unexpected branch to kernel address");
 }
 #endif

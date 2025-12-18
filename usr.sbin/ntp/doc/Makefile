@@ -1,6 +1,6 @@
-
 .include <src.opts.mk>
 
+PACKAGE=ntp
 SUBDIR=	drivers hints icons pic scripts
 
 FILESDIR=	${SHAREDIR}/doc/ntp

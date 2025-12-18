@@ -1,5 +1,3 @@
-#	From: @(#)Makefile	8.3 (Berkeley) 1/7/94
-
 .include <src.opts.mk>
 
 SUBDIR=	alias \
@@ -85,12 +83,13 @@ SUBDIR=	alias \
 	logins \
 	logname \
 	look \
-	lorder \
 	lsvfs \
 	lzmainfo \
 	m4 \
 	mandoc \
+	mdo \
 	mesg \
+	mididump \
 	ministat \
 	mkdep \
 	mkfifo \
@@ -113,6 +112,7 @@ SUBDIR=	alias \
 	pathchk \
 	perror \
 	pie \
+	posixmqcontrol \
 	posixshmcontrol \
 	pr \
 	printenv \
@@ -242,6 +242,9 @@ SUBDIR+=		gh-bc
 SUBDIR.${MK_OPENSSL}+=	bc
 SUBDIR.${MK_OPENSSL}+=	dc
 .endif
+.if ${MK_GNU_DIFF} == "no"
+SUBDIR+=		diff3
+.endif
 SUBDIR.${MK_HESIOD}+=	hesinfo
 SUBDIR.${MK_ICONV}+=	iconv
 SUBDIR.${MK_ICONV}+=	mkcsmapper
@@ -299,6 +302,7 @@ SUBDIR.${MK_TOOLCHAIN}+=	file2c
 SUBDIR.${MK_TOOLCHAIN}+=	gprof
 SUBDIR.${MK_TOOLCHAIN}+=	indent
 SUBDIR.${MK_TOOLCHAIN}+=	lex
+SUBDIR.${MK_TOOLCHAIN}+=	lorder
 SUBDIR.${MK_TOOLCHAIN}+=	mkstr
 SUBDIR.${MK_TOOLCHAIN}+=	rpcgen
 SUBDIR.${MK_TOOLCHAIN}+=	unifdef

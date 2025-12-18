@@ -27,15 +27,15 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)ktrace.h	8.1 (Berkeley) 6/2/93
  */
 
 #ifndef _SYS_KTRACE_H_
 #define _SYS_KTRACE_H_
 
+#include <sys/param.h>
 #include <sys/caprights.h>
 #include <sys/signal.h>
+#include <sys/socket.h>
 #include <sys/_uio.h>
 
 /*
@@ -207,16 +207,31 @@ struct ktr_proc_ctor {
  * KTR_CAPFAIL - trace capability check failures
  */
 #define KTR_CAPFAIL	12
-enum ktr_cap_fail_type {
+enum ktr_cap_violation {
 	CAPFAIL_NOTCAPABLE,	/* insufficient capabilities in cap_check() */
-	CAPFAIL_INCREASE,	/* attempt to increase capabilities */
+	CAPFAIL_INCREASE,	/* attempt to increase rights on a capability */
 	CAPFAIL_SYSCALL,	/* disallowed system call */
-	CAPFAIL_LOOKUP,		/* disallowed VFS lookup */
+	CAPFAIL_SIGNAL,		/* sent signal to process other than self */
+	CAPFAIL_PROTO,		/* disallowed protocol */
+	CAPFAIL_SOCKADDR,	/* restricted address lookup */
+	CAPFAIL_NAMEI,		/* restricted namei lookup */
+	CAPFAIL_CPUSET,		/* restricted CPU set modification */
 };
+
+union ktr_cap_data {
+	cap_rights_t	cap_rights[2];
+#define	cap_needed	cap_rights[0]
+#define	cap_held	cap_rights[1]
+	int		cap_int;
+	struct sockaddr	cap_sockaddr;
+	char		cap_path[MAXPATHLEN];
+};
+
 struct ktr_cap_fail {
-	enum ktr_cap_fail_type cap_type;
-	cap_rights_t	cap_needed;
-	cap_rights_t	cap_held;
+	enum ktr_cap_violation cap_type;
+	short	cap_code;
+	u_int	cap_svflags;
+	union ktr_cap_data cap_data;
 };
 
 /*
@@ -329,8 +344,7 @@ void	ktrstruct(const char *, const void *, size_t);
 void	ktrstruct_error(const char *, const void *, size_t, int);
 void	ktrstructarray(const char *, enum uio_seg, const void * __capability,
 	    int, size_t);
-void	ktrcapfail(enum ktr_cap_fail_type, const cap_rights_t *,
-	    const cap_rights_t *);
+void	ktrcapfail(enum ktr_cap_violation, const void *);
 #define ktrcaprights(s) \
 	ktrstruct("caprights", (s), sizeof(cap_rights_t))
 #define	ktritimerval(s) \
@@ -345,11 +359,15 @@ void	ktrsyserrcause(const char *format, ...) __printflike(1, 2);
 	ktrstruct_error("stat", (s), sizeof(struct stat), error)
 #define ktrcpuset(s, l) \
 	ktrstruct("cpuset_t", (s), l)
+#define	ktrsplice(s) \
+	ktrstruct("splice", (s), sizeof(struct splice))
 extern u_int ktr_geniosize;
 #ifdef	KTRACE
 extern int ktr_filesize_limit_signal;
+#define	__ktrace_used
 #else
 #define	ktr_filesize_limit_signal 0
+#define	__ktrace_used	__unused
 #endif
 
 #ifdef KTRACE

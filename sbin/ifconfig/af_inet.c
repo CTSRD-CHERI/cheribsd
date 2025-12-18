@@ -29,11 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD$";
-#endif /* not lint */
-
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -360,7 +355,7 @@ in_delete_first_nl(if_ctx *ctx)
 	ifahdr->ifa_family = AF_INET;
 	ifahdr->ifa_index = ifindex;
 
-	if (!snl_finalize_msg(&nw) || !snl_send_message(ss, hdr))
+	if (! (hdr = snl_finalize_msg(&nw)) || !snl_send_message(ss, hdr))
 		return (EINVAL);
 
 	nlmsg_seq = hdr->nlmsg_seq;
@@ -391,7 +386,7 @@ in_delete_first_nl(if_ctx *ctx)
 	ifahdr->ifa_index = ifindex;
 	snl_add_msg_attr_ip4(&nw, IFA_LOCAL, &addr);
 
-	if (!snl_finalize_msg(&nw) || !snl_send_message(ss, hdr))
+	if (! (hdr = snl_finalize_msg(&nw)) || !snl_send_message(ss, hdr))
 		return (EINVAL);
 	memset(&e, 0, sizeof(e));
 	snl_read_reply_code(ss, hdr->nlmsg_seq, &e);
@@ -431,7 +426,7 @@ in_exec_nl(if_ctx *ctx, unsigned long action, void *data)
 		snl_add_msg_attr_u32(&nw, IFAF_VHID, pdata->vhid);
 	snl_end_attr_nested(&nw, off);
 
-	if (!snl_finalize_msg(&nw) || !snl_send_message(ctx->io_ss, hdr))
+	if (! (hdr = snl_finalize_msg(&nw)) || !snl_send_message(ctx->io_ss, hdr))
 		return (0);
 
 	struct snl_errmsg_data e = {};
@@ -441,36 +436,13 @@ in_exec_nl(if_ctx *ctx, unsigned long action, void *data)
 
 	return (e.error);
 }
-
-static void
-in_setdefaultmask_nl(void)
-{
-        struct in_px *px = sintab_nl[ADDR];
-
-	in_addr_t i = ntohl(px->addr.s_addr);
-
-	/*
-	 * If netmask isn't supplied, use historical default.
-	 * This is deprecated for interfaces other than loopback
-	 * or point-to-point; warn in other cases.  In the future
-	 * we should return an error rather than warning.
-	 */
-	if (IN_CLASSA(i))
-		px->plen = IN_CLASSA_NSHIFT;
-	else if (IN_CLASSB(i))
-		px->plen = IN_CLASSB_NSHIFT;
-	else
-		px->plen = IN_CLASSC_NSHIFT;
-	px->maskset = true;
-}
 #endif
 
 static void
-warn_nomask(int ifflags)
+err_nomask(int ifflags)
 {
     if ((ifflags & (IFF_POINTOPOINT | IFF_LOOPBACK)) == 0) {
-	warnx("WARNING: setting interface address without mask "
-	    "is deprecated,\ndefault mask may not be correct.");
+	errx(1, "ERROR: setting interface address without mask is no longer supported.");
     }
 }
 
@@ -479,12 +451,11 @@ in_postproc(if_ctx *ctx __unused, int newaddr, int ifflags)
 {
 #ifdef WITHOUT_NETLINK
 	if (sintab[ADDR]->sin_len != 0 && sintab[MASK]->sin_len == 0 && newaddr) {
-		warn_nomask(ifflags);
+		err_nomask(ifflags);
 	}
 #else
 	if (sintab_nl[ADDR]->addrset && !sintab_nl[ADDR]->maskset && newaddr) {
-		warn_nomask(ifflags);
-	    in_setdefaultmask_nl();
+		err_nomask(ifflags);
 	}
 #endif
 }

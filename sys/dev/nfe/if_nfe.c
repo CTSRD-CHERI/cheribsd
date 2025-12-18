@@ -567,11 +567,6 @@ nfe_attach(device_t dev)
 		goto fail;
 
 	ifp = sc->nfe_ifp = if_gethandle(IFT_ETHER);
-	if (ifp == NULL) {
-		device_printf(dev, "can not if_gethandle()\n");
-		error = ENOSPC;
-		goto fail;
-	}
 
 	/*
 	 * Allocate Tx and Rx rings.
@@ -2621,7 +2616,7 @@ nfe_start_locked(if_t ifp)
 			break;
 		}
 		enq++;
-		if_etherbpfmtap(ifp, m0);
+		ether_bpf_mtap_if(ifp, m0);
 	}
 
 	if (enq > 0) {

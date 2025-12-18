@@ -52,6 +52,7 @@ __<bsd.opts.mk>__:
 
 __DEFAULT_YES_OPTIONS = \
     ASSERT_DEBUG \
+    CHERI_CODEPTR_RELOCS \
     DEBUG_FILES \
     DOCCOMPRESS \
     INCLUDES \
@@ -60,6 +61,7 @@ __DEFAULT_YES_OPTIONS = \
     MAKE_CHECK_USE_SANDBOX \
     MAN \
     MANCOMPRESS \
+    MANSPLITPKG \
     NIS \
     NLS \
     OPENSSH \
@@ -73,16 +75,16 @@ __DEFAULT_YES_OPTIONS = \
 __DEFAULT_NO_OPTIONS = \
     ASAN \
     BIND_NOW \
+    BRANCH_PROTECTION \
     CCACHE_BUILD \
+    COMPARTMENT_POLICY \
     CTF \
-    INIT_ALL_PATTERN \
-    INIT_ALL_ZERO \
     INSTALL_AS_USER \
-    MANSPLITPKG \
     PROFILE \
     RETPOLINE \
     STALE_STAGED \
-    UBSAN
+    UBSAN \
+    UNDEFINED_VERSION
 
 __DEFAULT_DEPENDENT_OPTIONS = \
     MAKE_CHECK_USE_SANDBOX/TESTS \
@@ -95,7 +97,7 @@ __DEFAULT_DEPENDENT_OPTIONS = \
 # means that ASLR is of limited effectiveness, and it may cause issues with
 # some memory-hungry workloads.
 #
-.if ${MACHINE_ARCH} == "armv6" || ${MACHINE_ARCH} == "armv7" \
+.if ${MACHINE_ARCH} == "armv7" \
     || ${MACHINE_ARCH} == "i386" || ${MACHINE_ARCH} == "powerpc" \
     || ${MACHINE_ARCH} == "powerpcspe"
 __DEFAULT_NO_OPTIONS+= PIE
@@ -103,33 +105,19 @@ __DEFAULT_NO_OPTIONS+= PIE
 __DEFAULT_YES_OPTIONS+=PIE
 .endif
 
+.if ${MACHINE_CPUARCH} != "aarch64"
+BROKEN_OPTIONS+=	BRANCH_PROTECTION
+.endif
+
+__SINGLE_OPTIONS = \
+   INIT_ALL
+
+__INIT_ALL_OPTIONS=	none pattern zero
+__INIT_ALL_DEFAULT=	none
+
 .-include <local.opts.mk>
 
 .include <bsd.mkopt.mk>
-
-.if ${MK_INIT_ALL_PATTERN} == "yes" && ${MK_INIT_ALL_ZERO} == "yes"
-.warning WITH_INIT_ALL_PATTERN and WITH_INIT_ALL_ZERO are mutually exclusive.
-.endif
-
-#
-# Supported NO_* options (if defined, MK_* will be forced to "no",
-# regardless of user's setting).
-#
-# These are transitional and will disappaer in the FreeBSD 12.
-#
-.for var in \
-    CTF \
-    DEBUG_FILES \
-    INSTALLLIB \
-    MAN \
-    PROFILE \
-    WARNS \
-    WERROR
-.if defined(NO_${var})
-.error NO_${var} is defined, but deprecated. Please use MK_${var}=no instead.
-MK_${var}:=no
-.endif
-.endfor
 
 .include <bsd.cpu.mk>
 

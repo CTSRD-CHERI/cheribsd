@@ -12,7 +12,7 @@ attach_d_body()
 	geli_test_setup
 
 	sectors=100
-	md=$(attach_md -t malloc -s `expr $sectors + 1`)
+	attach_md md -t malloc -s `expr $sectors + 1`
 
 	atf_check dd if=/dev/random of=keyfile bs=512 count=16 status=none
 
@@ -39,6 +39,34 @@ attach_d_cleanup()
 	geli_test_cleanup
 }
 
+atf_test_case atach_multiple_fails cleanup
+attach_multiple_fails_head()
+{
+	atf_set "descr" "test multiple failed attach of geli provider"
+	atf_set "require.user" "root"
+}
+attach_multiple_fails_body()
+{
+	geli_test_setup
+
+	sectors=1000
+	attach_md md -t malloc -s `expr $sectors + 1`
+	atf_check dd if=/dev/random of=keyfile bs=512 count=16 status=none
+
+	atf_check geli init -B none -P -K keyfile ${md}
+	atf_check geli attach -d -p -k keyfile ${md}
+
+	for i in $(jot 100); do
+		atf_check -s not-exit:0 -e ignore -- geli attach -d -p -k keyfile ${md}
+	done
+	atf_check -o ignore -- newfs ${md}.eli
+}
+attach_multiple_fails_cleanup()
+{
+	geli_test_cleanup
+}
+
+
 atf_test_case attach_r cleanup
 attach_r_head()
 {
@@ -50,7 +78,7 @@ attach_r_body()
 	geli_test_setup
 
 	sectors=100
-	md=$(attach_md -t malloc -s `expr $sectors + 1`)
+	attach_md md -t malloc -s `expr $sectors + 1`
 	atf_check dd if=/dev/random of=keyfile bs=512 count=16 status=none
 
 	atf_check geli init -B none -P -K keyfile ${md}
@@ -78,9 +106,9 @@ attach_multiple_body()
 	geli_test_setup
 
 	sectors=100
-	md0=$(attach_md -t malloc -s `expr $sectors + 1`)
-	md1=$(attach_md -t malloc -s `expr $sectors + 1`)
-	md2=$(attach_md -t malloc -s `expr $sectors + 1`)
+	attach_md md0 -t malloc -s `expr $sectors + 1`
+	attach_md md1 -t malloc -s `expr $sectors + 1`
+	attach_md md2 -t malloc -s `expr $sectors + 1`
 	atf_check dd if=/dev/random of=keyfile bs=512 count=16 status=none
 
 	atf_check geli init -B none -P -K keyfile ${md0}
@@ -108,7 +136,7 @@ nokey_body()
 	geli_test_setup
 
 	sectors=100
-	md=$(attach_md -t malloc -s `expr $sectors + 1`)
+	attach_md md -t malloc -s `expr $sectors + 1`
 	atf_check dd if=/dev/random of=keyfile bs=512 count=16 status=none
 
 	atf_check geli init -B none -P -K keyfile ${md}
@@ -125,5 +153,6 @@ atf_init_test_cases()
 	atf_add_test_case attach_d
 	atf_add_test_case attach_r
 	atf_add_test_case attach_multiple
+	atf_add_test_case attach_multiple_fails
 	atf_add_test_case nokey
 }

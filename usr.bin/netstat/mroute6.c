@@ -63,8 +63,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)mroute.c	8.2 (Berkeley) 4/28/95
  */
 
 #include <sys/cdefs.h>
@@ -83,7 +81,6 @@
 
 #include <netinet/in.h>
 
-#include <err.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

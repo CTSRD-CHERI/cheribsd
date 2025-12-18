@@ -2693,7 +2693,7 @@ numarray_find(struct table_info *ti, void *key)
 	struct numarray *ri;
 
 	ri = bsearch(key, ti->state, ti->data, sizeof(struct numarray),
-	    compare_ifidx);
+	    compare_numarray);
 
 	return (ri);
 }
@@ -4017,7 +4017,7 @@ struct table_algo addr_kfib = {
 };
 
 struct mac_radix_entry {
-	struct radix_node	rn[2];
+	struct radix_node	rn[2] __subobject_use_container_bounds;
 	uint32_t		value;
 	uint8_t			masklen;
 	struct sa_mac		sa;

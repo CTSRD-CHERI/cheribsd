@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *      from: @(#)proc.h        7.1 (Berkeley) 5/15/91
  *	from: FreeBSD: src/sys/i386/include/proc.h,v 1.11 2001/06/29
  */
 
@@ -180,7 +178,11 @@ struct mdthread {
 		struct ptrauth_key apia;
 	} md_ptrauth_kern;
 
-	uint64_t md_reserved[4];
+	uint64_t md_efirt_tmp;
+	int md_efirt_dis_pf;
+
+	int md_reserved0;
+	uint64_t md_reserved[2];
 };
 
 struct mdproc {

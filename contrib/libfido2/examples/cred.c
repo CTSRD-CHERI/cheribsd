@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2018-2021 Yubico AB. All rights reserved.
+ * Copyright (c) 2018-2023 Yubico AB. All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file.
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #include <errno.h>
@@ -34,8 +35,8 @@ static const unsigned char user_id[32] = {
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: cred [-t ecdsa|rsa|eddsa] [-k pubkey] "
-	    "[-ei cred_id] [-P pin] [-T seconds] [-b blobkey] [-hruv] "
+	fprintf(stderr, "usage: cred [-t es256|es384|rs256|eddsa] [-k pubkey] "
+	    "[-ei cred_id] [-P pin] [-T seconds] [-b blobkey] [-c cred_protect] [-hruv] "
 	    "<device>\n");
 	exit(EXIT_FAILURE);
 }
@@ -43,7 +44,8 @@ usage(void)
 static void
 verify_cred(int type, const char *fmt, const unsigned char *authdata_ptr,
     size_t authdata_len, const unsigned char *attstmt_ptr, size_t attstmt_len,
-    bool rk, bool uv, int ext, const char *key_out, const char *id_out)
+    bool rk, bool uv, int ext, int cred_protect, const char *key_out,
+    const char *id_out)
 {
 	fido_cred_t	*cred;
 	int		 r;
@@ -84,6 +86,11 @@ verify_cred(int type, const char *fmt, const unsigned char *authdata_ptr,
 	if (uv && (r = fido_cred_set_uv(cred, FIDO_OPT_TRUE)) != FIDO_OK)
 		errx(1, "fido_cred_set_uv: %s (0x%x)", fido_strerr(r), r);
 
+	/* credProt */
+	if (cred_protect != 0 && (r = fido_cred_set_prot(cred,
+	    cred_protect)) != FIDO_OK)
+		errx(1, "fido_cred_set_prot: %s (0x%x)", fido_strerr(r), r);
+
 	/* fmt */
 	r = fido_cred_set_fmt(cred, fmt);
 	if (r != FIDO_OK)
@@ -107,15 +114,23 @@ out:
 	if (key_out != NULL) {
 		/* extract the credential pubkey */
 		if (type == COSE_ES256) {
-			if (write_ec_pubkey(key_out, fido_cred_pubkey_ptr(cred),
+			if (write_es256_pubkey(key_out,
+			    fido_cred_pubkey_ptr(cred),
 			    fido_cred_pubkey_len(cred)) < 0)
-				errx(1, "write_ec_pubkey");
+				errx(1, "write_es256_pubkey");
+		} else if (type == COSE_ES384) {
+			if (write_es384_pubkey(key_out,
+			    fido_cred_pubkey_ptr(cred),
+			    fido_cred_pubkey_len(cred)) < 0)
+				errx(1, "write_es384_pubkey");
 		} else if (type == COSE_RS256) {
-			if (write_rsa_pubkey(key_out, fido_cred_pubkey_ptr(cred),
+			if (write_rs256_pubkey(key_out,
+			    fido_cred_pubkey_ptr(cred),
 			    fido_cred_pubkey_len(cred)) < 0)
-				errx(1, "write_rsa_pubkey");
+				errx(1, "write_rs256_pubkey");
 		} else if (type == COSE_EDDSA) {
-			if (write_eddsa_pubkey(key_out, fido_cred_pubkey_ptr(cred),
+			if (write_eddsa_pubkey(key_out,
+			    fido_cred_pubkey_ptr(cred),
 			    fido_cred_pubkey_len(cred)) < 0)
 				errx(1, "write_eddsa_pubkey");
 		}
@@ -150,11 +165,12 @@ main(int argc, char **argv)
 	int		 ext = 0;
 	int		 ch;
 	int		 r;
+	long long cred_protect = 0;
 
 	if ((cred = fido_cred_new()) == NULL)
 		errx(1, "fido_cred_new");
 
-	while ((ch = getopt(argc, argv, "P:T:b:e:hi:k:rt:uv")) != -1) {
+	while ((ch = getopt(argc, argv, "P:T:b:e:hi:k:rt:uvc:")) != -1) {
 		switch (ch) {
 		case 'P':
 			pin = optarg;
@@ -183,6 +199,13 @@ main(int argc, char **argv)
 		case 'h':
 			ext |= FIDO_EXT_HMAC_SECRET;
 			break;
+		case 'c':
+			if (base10(optarg, &cred_protect) < 0)
+				errx(1, "base10: %s", optarg);
+			if (cred_protect <= 0 || cred_protect > 3)
+				errx(1, "-c: %s must be in (1,3)", optarg);
+			ext |= FIDO_EXT_CRED_PROTECT;
+			break;
 		case 'i':
 			id_out = optarg;
 			break;
@@ -193,9 +216,11 @@ main(int argc, char **argv)
 			rk = true;
 			break;
 		case 't':
-			if (strcmp(optarg, "ecdsa") == 0)
+			if (strcmp(optarg, "es256") == 0)
 				type = COSE_ES256;
-			else if (strcmp(optarg, "rsa") == 0)
+			else if (strcmp(optarg, "es384") == 0)
+				type = COSE_ES384;
+			else if (strcmp(optarg, "rs256") == 0)
 				type = COSE_RS256;
 			else if (strcmp(optarg, "eddsa") == 0)
 				type = COSE_EDDSA;
@@ -264,6 +289,11 @@ main(int argc, char **argv)
 	if (uv && (r = fido_cred_set_uv(cred, FIDO_OPT_TRUE)) != FIDO_OK)
 		errx(1, "fido_cred_set_uv: %s (0x%x)", fido_strerr(r), r);
 
+	/* credProt */
+	if (cred_protect != 0 && (r = fido_cred_set_prot(cred,
+	    (int)cred_protect)) != FIDO_OK)
+		errx(1, "fido_cred_set_prot: %s (0x%x)", fido_strerr(r), r);
+	
 	/* timeout */
 	if (ms != 0 && (r = fido_dev_set_timeout(dev, (int)ms)) != FIDO_OK)
 		errx(1, "fido_dev_set_timeout: %s (0x%x)", fido_strerr(r), r);
@@ -285,7 +315,8 @@ main(int argc, char **argv)
 
 	verify_cred(type, fido_cred_fmt(cred), fido_cred_authdata_ptr(cred),
 	    fido_cred_authdata_len(cred), fido_cred_attstmt_ptr(cred),
-	    fido_cred_attstmt_len(cred), rk, uv, ext, key_out, id_out);
+	    fido_cred_attstmt_len(cred), rk, uv, ext, fido_cred_prot(cred),
+	    key_out, id_out);
 
 	if (blobkey_out != NULL) {
 		/* extract the "largeBlob" key */

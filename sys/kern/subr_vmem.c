@@ -241,9 +241,7 @@ static uma_zone_t vmem_bt_zone;
 static struct vmem kernel_arena_storage;
 static struct vmem buffer_arena_storage;
 static struct vmem transient_arena_storage;
-/* kernel and kmem arenas are aliased for backwards KPI compat. */
 vmem_t *kernel_arena = &kernel_arena_storage;
-vmem_t *kmem_arena = &kernel_arena_storage;
 vmem_t *buffer_arena = &buffer_arena_storage;
 vmem_t *transient_arena = &transient_arena_storage;
 
@@ -662,14 +660,14 @@ qc_drain(vmem_t *vm)
 		uma_zone_reclaim(vm->vm_qcache[i].qc_cache, UMA_RECLAIM_DRAIN);
 }
 
-#ifndef UMA_MD_SMALL_ALLOC
+#ifndef UMA_USE_DMAP
 
 static struct mtx_padalign __exclusive_cache_line vmem_bt_lock;
 
 /*
  * vmem_bt_alloc:  Allocate a new page of boundary tags.
  *
- * On architectures with uma_small_alloc there is no recursion; no address
+ * On architectures with UMA_USE_DMAP there is no recursion; no address
  * space need be allocated to allocate boundary tags.  For the others, we
  * must handle recursion.  Boundary tags are necessary to allocate new
  * boundary tags.
@@ -745,7 +743,7 @@ vmem_startup(void)
 	vmem_bt_zone = uma_zcreate("vmem btag",
 	    sizeof(struct vmem_btag), NULL, NULL, NULL, NULL,
 	    UMA_ALIGN_PTR, UMA_ZONE_VM);
-#ifndef UMA_MD_SMALL_ALLOC
+#ifndef UMA_USE_DMAP
 	mtx_init(&vmem_bt_lock, "btag lock", NULL, MTX_DEF);
 	uma_prealloc(vmem_bt_zone, BT_MAXALLOC);
 	/*
@@ -980,9 +978,9 @@ vmem_import(vmem_t *vm, vmem_size_t size, vmem_size_t align, int flags)
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
 		KASSERT(cheri_gettag(addr), ("Expected valid capability"));
-		KASSERT(cheri_getlen(addr) == size,
-		    ("Inexact bounds expected %zx found %zx",
-		    (size_t)size, cheri_getlen(addr)));
+		KASSERT(cheri_bytes_remaining((void *)addr) >= size,
+		    ("Insufficient bounds for size %zx in %#p",
+			(size_t)size, (void *)addr));
 	}
 #endif
 

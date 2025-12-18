@@ -31,12 +31,12 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ktr.h>
 #include <sys/limits.h>
 #include <sys/lock.h>
+#include <sys/mman.h>
 #include <sys/mutex.h>
 #include <sys/reg.h>
 #include <sys/syscallsubr.h>
@@ -73,7 +73,7 @@
 #define	PROC_ASSERT_TRACEREQ(p)	MPASS(((p)->p_flag2 & P2_PTRACEREQ) != 0)
 
 /*
- * Functions implemented using PROC_ACTION():
+ * Functions implemented below:
  *
  * proc_read_regs(proc, regs)
  *	Get the current user-visible register set from the process
@@ -98,43 +98,32 @@
  *	Arrange for the process to trap after executing a single instruction.
  */
 
-#define	PROC_ACTION(action) do {					\
-	int error;							\
-									\
-	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);			\
-	if ((td->td_proc->p_flag & P_INMEM) == 0)			\
-		error = EIO;						\
-	else								\
-		error = (action);					\
-	return (error);							\
-} while (0)
-
 int
 proc_read_regs(struct thread *td, struct reg *regs)
 {
-
-	PROC_ACTION(fill_regs(td, regs));
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
+	return (fill_regs(td, regs));
 }
 
 int
 proc_write_regs(struct thread *td, struct reg *regs)
 {
-
-	PROC_ACTION(set_regs(td, regs));
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
+	return (set_regs(td, regs));
 }
 
 int
 proc_read_dbregs(struct thread *td, struct dbreg *dbregs)
 {
-
-	PROC_ACTION(fill_dbregs(td, dbregs));
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
+	return (fill_dbregs(td, dbregs));
 }
 
 int
 proc_write_dbregs(struct thread *td, struct dbreg *dbregs)
 {
-
-	PROC_ACTION(set_dbregs(td, dbregs));
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
+	return (set_dbregs(td, dbregs));
 }
 
 /*
@@ -144,28 +133,30 @@ proc_write_dbregs(struct thread *td, struct dbreg *dbregs)
 int
 proc_read_fpregs(struct thread *td, struct fpreg *fpregs)
 {
-
-	PROC_ACTION(fill_fpregs(td, fpregs));
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
+	return (fill_fpregs(td, fpregs));
 }
 
 int
 proc_write_fpregs(struct thread *td, struct fpreg *fpregs)
 {
-
-	PROC_ACTION(set_fpregs(td, fpregs));
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
+	return (set_fpregs(td, fpregs));
 }
 
 #if __has_feature(capabilities)
 int
 proc_read_capregs(struct thread *td, struct capreg *capregs)
 {
-	PROC_ACTION(fill_capregs(td, capregs));
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
+	return (fill_capregs(td, capregs));
 }
 
 int
 proc_write_capregs(struct thread *td, struct capreg *capregs)
 {
-	PROC_ACTION(set_capregs(td, capregs));
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
+	return (set_capregs(td, capregs));
 }
 #endif
 
@@ -205,8 +196,21 @@ proc_read_regset(struct thread *td, int note, struct iovec *iov)
 	if (regset == NULL)
 		return (EINVAL);
 
+	if (regset->get == NULL)
+		return (EINVAL);
+
+	size = regset->size;
+	/*
+	 * The regset is dynamically sized, e.g. the size could change
+	 * depending on the hardware, or may have a per-thread size.
+	 */
+	if (size == 0) {
+		if (!regset->get(regset, td, NULL, &size))
+			return (EINVAL);
+	}
+
 	if (iov->iov_base == NULL) {
-		iov->iov_len = regset->size;
+		iov->iov_len = size;
 		if (iov->iov_len == 0)
 			return (EINVAL);
 
@@ -214,14 +218,10 @@ proc_read_regset(struct thread *td, int note, struct iovec *iov)
 	}
 
 	/* The length is wrong, return an error */
-	if (iov->iov_len != regset->size)
-		return (EINVAL);
-
-	if (regset->get == NULL)
+	if (iov->iov_len != size)
 		return (EINVAL);
 
 	error = 0;
-	size = regset->size;
 	p = td->td_proc;
 
 	/* Drop the proc lock while allocating the temp buffer */
@@ -233,7 +233,7 @@ proc_read_regset(struct thread *td, int note, struct iovec *iov)
 	if (!regset->get(regset, td, buf, &size)) {
 		error = EINVAL;
 	} else {
-		KASSERT(size == regset->size,
+		KASSERT(size == regset->size || regset->size == 0,
 		    ("%s: Getter function changed the size", __func__));
 
 		iov->iov_len = size;
@@ -260,14 +260,23 @@ proc_write_regset(struct thread *td, int note, struct iovec *iov)
 	if (regset == NULL)
 		return (EINVAL);
 
+	size = regset->size;
+	/*
+	 * The regset is dynamically sized, e.g. the size could change
+	 * depending on the hardware, or may have a per-thread size.
+	 */
+	if (size == 0) {
+		if (!regset->get(regset, td, NULL, &size))
+			return (EINVAL);
+	}
+
 	/* The length is wrong, return an error */
-	if (iov->iov_len != regset->size)
+	if (iov->iov_len != size)
 		return (EINVAL);
 
 	if (regset->set == NULL)
 		return (EINVAL);
 
-	size = regset->size;
 	p = td->td_proc;
 
 	/* Drop the proc lock while allocating the temp buffer */
@@ -293,43 +302,43 @@ proc_write_regset(struct thread *td, int note, struct iovec *iov)
 int
 proc_read_regs32(struct thread *td, struct reg32 *regs32)
 {
-
-	PROC_ACTION(fill_regs32(td, regs32));
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
+	return (fill_regs32(td, regs32));
 }
 
 int
 proc_write_regs32(struct thread *td, struct reg32 *regs32)
 {
-
-	PROC_ACTION(set_regs32(td, regs32));
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
+	return (set_regs32(td, regs32));
 }
 
 int
 proc_read_dbregs32(struct thread *td, struct dbreg32 *dbregs32)
 {
-
-	PROC_ACTION(fill_dbregs32(td, dbregs32));
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
+	return (fill_dbregs32(td, dbregs32));
 }
 
 int
 proc_write_dbregs32(struct thread *td, struct dbreg32 *dbregs32)
 {
-
-	PROC_ACTION(set_dbregs32(td, dbregs32));
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
+	return (set_dbregs32(td, dbregs32));
 }
 
 int
 proc_read_fpregs32(struct thread *td, struct fpreg32 *fpregs32)
 {
-
-	PROC_ACTION(fill_fpregs32(td, fpregs32));
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
+	return (fill_fpregs32(td, fpregs32));
 }
 
 int
 proc_write_fpregs32(struct thread *td, struct fpreg32 *fpregs32)
 {
-
-	PROC_ACTION(set_fpregs32(td, fpregs32));
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
+	return (set_fpregs32(td, fpregs32));
 }
 
 #if __has_feature(capabilities)
@@ -350,8 +359,8 @@ proc_write_capregs32(struct thread *td, struct capreg *capregs)
 int
 proc_sstep(struct thread *td)
 {
-
-	PROC_ACTION(ptrace_single_step(td));
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
+	return (ptrace_single_step(td));
 }
 
 int
@@ -491,6 +500,13 @@ proc_readmem(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
 }
 
 ssize_t
+proc_readmem_cap(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
+    size_t len)
+{
+	return (proc_iop(td, p, va, buf, len, UIO_READ_CAP));
+}
+
+ssize_t
 proc_writemem(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
     size_t len)
 {
@@ -514,7 +530,8 @@ proc_read_cheri_tags_page(vm_map_t map, vm_offset_t va, void *tagbuf,
 	 * Fault in the next page, but only if it already exists.  If
 	 * the page doesn't exist, fill the tag buffer with zeroes.
 	 */
-	error = vm_fault(map, va, VM_PROT_READ, VM_FAULT_NOFILL, &m);
+	error = vm_fault(map, va, VM_PROT_READ,
+	    VM_FAULT_NOFILL | VM_FAULT_NOPMAP, &m);
 	if (error == KERN_PAGE_NOT_FILLED) {
 		memset(tagbuf, 0, TAG_BYTES_PER_PAGE);
 		*hastagsp = false;
@@ -603,7 +620,8 @@ proc_read_cheri_cap_page(vm_map_t map, vm_offset_t va, struct uio *uio)
 	todo = MIN(todo, uio->uio_resid);
 	va = trunc_page(va);
 
-	error = vm_fault(map, va, VM_PROT_READ, VM_FAULT_NOFILL, &m);
+	error = vm_fault(map, va, VM_PROT_READ,
+	    VM_FAULT_NOFILL | VM_FAULT_NOPMAP, &m);
 	if (error == KERN_PAGE_NOT_FILLED) {
 		memset(capbuf, 0, sizeof(capbuf));
 		while (todo > 0) {
@@ -680,7 +698,8 @@ proc_write_cheri_cap_page(struct proc *p, vm_map_t map, vm_offset_t va,
 	todo = MIN(todo, uio->uio_resid);
 	va = trunc_page(va);
 
-	error = vm_fault(map, va, VM_PROT_WRITE | VM_PROT_WRITE_CAP, 0, &m);
+	error = vm_fault(map, va, VM_PROT_WRITE | VM_PROT_WRITE_CAP,
+	    VM_FAULT_NOPMAP, &m);
 	if (error != KERN_SUCCESS)
 		return (EFAULT);
 
@@ -783,7 +802,8 @@ ptrace_vm_entry(struct thread *td, struct proc *p,
 		pve->pve_start = entry->start;
 		pve->pve_end = entry->end - 1;
 		pve->pve_offset = entry->offset;
-		pve->pve_prot = entry->protection;
+		pve->pve_prot = entry->protection |
+		    PROT_MAX(entry->max_protection);
 
 		/* Backing object's path needed? */
 		if (pve->pve_pathlen == 0)

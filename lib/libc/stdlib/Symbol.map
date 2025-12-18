@@ -1,6 +1,3 @@
-/*
- */
-
 FBSD_1.0 {
 	_Exit;
 	a64l;
@@ -128,7 +125,6 @@ FBSD_1.6 {
 FBSD_1.7 {
 	clearenv;
 	qsort_r;
-	cocachedpid;
 	secure_getenv;
 };
 

@@ -27,10 +27,7 @@
 #ifndef	_VMM_DEV_H_
 #define	_VMM_DEV_H_
 
-#ifdef _KERNEL
-void	vmmdev_init(void);
-int	vmmdev_cleanup(void);
-#endif
+#include <machine/vmm.h>
 
 struct vm_memmap {
 	vm_paddr_t	gpa;
@@ -60,12 +57,29 @@ struct vm_register {
 	kuintcap_t	regval;
 };
 
+#if __has_feature(capabilities)
+struct vm_register_cheri_capability_tag {
+	int		cpuid;
+	int		regnum;		/* enum vm_reg_name */
+	uint8_t		tag;
+};
+#endif
+
 struct vm_register_set {
 	int		cpuid;
 	unsigned int	count;
 	const int	* __kerncap regnums;	/* enum vm_reg_name */
 	uintcap_t	* __kerncap regvals;
 };
+
+#if __has_feature(capabilities)
+struct vm_register_cheri_capability_tag_set {
+	int		cpuid;
+	unsigned int	count;
+	const int	* __kerncap regnums;	/* enum vm_reg_name */
+	uint8_t		* __kerncap tags;
+};
+#endif
 
 struct vm_run {
 	int		cpuid;
@@ -162,6 +176,13 @@ struct vm_cpu_topology {
 	uint16_t	maxcpus;
 };
 
+#if __has_feature(capabilities)
+struct vm_cheri_capability_tag {
+	vm_paddr_t	gpa;	/* input, must be aligned */
+	uint8_t		tag;	/* output */
+};
+#endif
+
 enum {
 	/* general routines */
 	IOCNUM_ABIVERS = 0,
@@ -209,6 +230,12 @@ enum {
 	/* vm_attach_vgic */
 	IOCNUM_GET_VGIC_VERSION = 110,
 	IOCNUM_ATTACH_VGIC = 111,
+
+#if __has_feature(capabilities)
+	IOCNUM_GET_CHERI_CAPABILITY_TAG = 200,
+	IOCNUM_GET_REGISTER_CHERI_CAPABILITY_TAG = 201,
+	IOCNUM_GET_REGISTER_CHERI_CAPABILITY_TAG_SET = 202,
+#endif
 };
 
 #define	VM_RUN		\
@@ -269,4 +296,15 @@ enum {
 	_IOR('v', IOCNUM_GET_VGIC_VERSION, struct vm_vgic_version)
 #define	VM_ATTACH_VGIC	\
 	_IOW('v', IOCNUM_ATTACH_VGIC, struct vm_vgic_descr)
+#if __has_feature(capabilities)
+#define	VM_GET_CHERI_CAPABILITY_TAG			\
+	_IOWR('v', IOCNUM_GET_CHERI_CAPABILITY_TAG,	\
+	    struct vm_cheri_capability_tag)
+#define	VM_GET_REGISTER_CHERI_CAPABILITY_TAG			\
+	_IOWR('v', IOCNUM_GET_REGISTER_CHERI_CAPABILITY_TAG,	\
+	    struct vm_register_cheri_capability_tag)
+#define	VM_GET_REGISTER_CHERI_CAPABILITY_TAG_SET		\
+	_IOW('v', IOCNUM_GET_REGISTER_CHERI_CAPABILITY_TAG_SET,	\
+	    struct vm_register_cheri_capability_tag_set)
+#endif
 #endif

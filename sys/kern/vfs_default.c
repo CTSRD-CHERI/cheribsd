@@ -7,8 +7,6 @@
  * This code is derived from software contributed
  * to Berkeley by John Heidemann of the UCLA Ficus project.
  *
- * Source: * @(#)i405_init.c 2.10 92/04/27 UCLA Ficus project
- *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -34,7 +32,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bio.h>
@@ -85,6 +82,7 @@ static int vop_stdgetpages_async(struct vop_getpages_async_args *ap);
 static int vop_stdread_pgcache(struct vop_read_pgcache_args *ap);
 static int vop_stdstat(struct vop_stat_args *ap);
 static int vop_stdvput_pair(struct vop_vput_pair_args *ap);
+static int vop_stdgetlowvnode(struct vop_getlowvnode_args *ap);
 
 /*
  * This vnode table stores what we want to do if the filesystem doesn't
@@ -115,9 +113,10 @@ struct vop_vector default_vnodeops = {
 	.vop_fsync =		VOP_NULL,
 	.vop_stat =		vop_stdstat,
 	.vop_fdatasync =	vop_stdfdatasync,
+	.vop_getlowvnode =	vop_stdgetlowvnode,
 	.vop_getpages =		vop_stdgetpages,
 	.vop_getpages_async =	vop_stdgetpages_async,
-	.vop_getwritemount = 	vop_stdgetwritemount,
+	.vop_getwritemount =	vop_stdgetwritemount,
 	.vop_inactive =		VOP_NULL,
 	.vop_need_inactive =	vop_stdneed_inactive,
 	.vop_ioctl =		vop_stdioctl,
@@ -1061,8 +1060,8 @@ vop_stdadvise(struct vop_advise_args *ap)
 {
 	struct vnode *vp;
 	struct bufobj *bo;
+	uintmax_t bstart, bend;
 	daddr_t startn, endn;
-	off_t bstart, bend, start, end;
 	int bsize, error;
 
 	vp = ap->a_vp;
@@ -1085,7 +1084,7 @@ vop_stdadvise(struct vop_advise_args *ap)
 
 		/*
 		 * Round to block boundaries (and later possibly further to
-		 * page boundaries).  Applications cannot reasonably be aware  
+		 * page boundaries).  Applications cannot reasonably be aware
 		 * of the boundaries, and the rounding must be to expand at
 		 * both extremities to cover enough.  It still doesn't cover
 		 * read-ahead.  For partial blocks, this gives unnecessary
@@ -1094,7 +1093,8 @@ vop_stdadvise(struct vop_advise_args *ap)
 		 */
 		bsize = vp->v_bufobj.bo_bsize;
 		bstart = rounddown(ap->a_start, bsize);
-		bend = roundup(ap->a_end, bsize);
+		bend = ap->a_end;
+		bend = roundup(bend, bsize);
 
 		/*
 		 * Deactivate pages in the specified range from the backing VM
@@ -1103,18 +1103,17 @@ vop_stdadvise(struct vop_advise_args *ap)
 		 * below.
 		 */
 		if (vp->v_object != NULL) {
-			start = trunc_page(bstart);
-			end = round_page(bend);
 			VM_OBJECT_RLOCK(vp->v_object);
-			vm_object_page_noreuse(vp->v_object, OFF_TO_IDX(start),
-			    OFF_TO_IDX(end));
+			vm_object_page_noreuse(vp->v_object,
+			    OFF_TO_IDX(trunc_page(bstart)),
+			    OFF_TO_IDX(round_page(bend)));
 			VM_OBJECT_RUNLOCK(vp->v_object);
 		}
 
 		bo = &vp->v_bufobj;
-		BO_RLOCK(bo);
 		startn = bstart / bsize;
 		endn = bend / bsize;
+		BO_RLOCK(bo);
 		error = bnoreuselist(&bo->bo_clean, bo, startn, endn);
 		if (error == 0)
 			error = bnoreuselist(&bo->bo_dirty, bo, startn, endn);
@@ -1238,7 +1237,7 @@ vop_stdunset_text(struct vop_unset_text_args *ap)
 	__assert_unreachable();
 }
 
-static int __always_inline
+static __always_inline int
 vop_stdadd_writecount_impl(struct vop_add_writecount_args *ap, bool handle_msync)
 {
 	struct vnode *vp;
@@ -1606,6 +1605,14 @@ vop_stdvput_pair(struct vop_vput_pair_args *ap)
 	vput(dvp);
 	if (vpp != NULL && ap->a_unlock_vp && (vp = *vpp) != NULL)
 		vput(vp);
+	return (0);
+}
+
+static int
+vop_stdgetlowvnode(struct vop_getlowvnode_args *ap)
+{
+	vref(ap->a_vp);
+	*ap->a_vplp = ap->a_vp;
 	return (0);
 }
 // CHERI CHANGES START

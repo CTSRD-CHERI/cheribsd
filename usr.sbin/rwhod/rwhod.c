@@ -30,19 +30,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char copyright[] =
-"@(#) Copyright (c) 1983, 1993\n\
-	The Regents of the University of California.  All rights reserved.\n";
-#endif /* not lint */
-
-#if 0
-#ifndef lint
-static char sccsid[] = "@(#)rwhod.c	8.1 (Berkeley) 6/6/93";
-#endif /* not lint */
-#endif
-
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/ioctl.h>
@@ -491,7 +478,7 @@ sender_process(void)
 				we->we_idle = htonl(now - stb.st_atime);
 		}
 		(void) getloadavg(avenrun,
-		    sizeof(avenrun) / sizeof(avenrun[0]));
+		    nitems(avenrun));
 		for (i = 0; i < 3; i++)
 			mywd.wd_loadav[i] = htonl((u_long)(avenrun[i] * 100));
 		cc = (char *)wend - (char *)&mywd;

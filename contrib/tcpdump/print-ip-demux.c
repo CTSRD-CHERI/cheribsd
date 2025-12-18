@@ -21,9 +21,7 @@
 
 /* \summary: IPv4/IPv6 payload printer */
 
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include "netdissect-stdinc.h"
 
@@ -215,6 +213,12 @@ again:
 			nd_print_invalid(ndo);
 		}
 		break;
+
+#ifdef HAVE_NET_IF_PFLOG_H
+	case IPPROTO_PFSYNC:
+		pfsync_ip_print(ndo, bp, length);
+		break;
+#endif
 
 	case IPPROTO_NONE:
 		ND_PRINT("no next header");

@@ -48,7 +48,7 @@ caprev_shadow_set_fw(uint64_t * __capability fw, void * __capability user_obj,
 	__asm__ __volatile__ (
 #ifndef __CHERI_PURE_CAPABILITY__
 		"bx #4\n\t"
-		".arch_extension c64\n\t"
+		".code c64\n\t"
 #endif
 		"1:\n\t"
 		/* Load reserve first word */
@@ -95,8 +95,7 @@ caprev_shadow_set_fw(uint64_t * __capability fw, void * __capability user_obj,
 		"2:\n\t"
 #ifndef __CHERI_PURE_CAPABILITY__
 		"bx #4\n\t"
-		".arch_extension noc64\n\t"
-		".arch_extension a64c\n\t"
+		".code a64\n\t"
 #endif
 	: /* outputs */
 		[stxr_status] "+&r" (stxr_status),

@@ -25,7 +25,6 @@
 #include "test.h"
 #include <unistd.h>
 #include <stdio.h>
-__FBSDID("$FreeBSD$");
 
 /*
  * This was inspired by an ISO fuzz tester written by Michal Zalewski

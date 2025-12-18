@@ -1,5 +1,83 @@
 # News
 
+## 7.0.2
+
+This is a production release that fixes `Ctrl+d` on FreeBSD and Linux when using
+`editline`.
+
+This bug was caused by the macOS fix in `7.0.0`. Unfortunately, this means that
+macOS does not respond properly to `Ctrl+d`.
+
+## 7.0.1
+
+This is a production release that fixes a warning using GCC on FreeBSD.
+
+Other users do ***NOT*** need to upgrade.
+
+## 7.0.0
+
+This is a production release to fix three bugs.
+
+The first bug is that `bc`/`dc` will exit on macOS when the terminal is resized.
+
+The second bug is that an array, which should only be a function parameter, was
+accepted as part of larger expressions.
+
+The third bug is that value stack for `dc` was cleared on any error. However,
+this is not how other `dc` behave. To bring `dc` more in line with other
+implementations, this behavior was changed. This change is why this version is a
+new major version.
+
+## 6.7.6
+
+This is a production release to fix one bug.
+
+The bug was that `bc` attempted to jump out when flushing `stdout` on exit, but
+there is no jump buf at that point.
+
+## 6.7.5
+
+This is a production release to fix one small bug.
+
+The bug is that sometimes numbers are printed to incorrect line lengths. The
+number is always correct; the line is just longer than the limit.
+
+Users who do not care do not need to update.
+
+## 6.7.4
+
+This is a production release to fix problems in the `bc` manual.
+
+Users only need to update if desired.
+
+## 6.7.3
+
+This is a production release to fix the library build on Mac OSX.
+
+Users on other platforms do *not* need to update.
+
+## 6.7.2
+
+This is a production release to remove some debugging code that I accidentally
+committed.
+
+## 6.7.1
+
+This is a production release with a bug fix for `SIGINT` only being handled
+once.
+
+## 6.7.0
+
+This is a production release with three new functions in the [extended math
+library][16]: `min()`, `max()`, and `i2rand()`.
+
+## 6.6.1
+
+This is a production release with an improved `p()` function in the [extended
+math library][16].
+
+Users who don't care do not need to upgrade.
+
 ## 6.6.0
 
 This is a production release with two bug fixes and one change.
@@ -751,7 +829,7 @@ function, `strdup()`, which is not in POSIX 2001, and it is in the X/Open System
 Interfaces group 2001. It is, however, in POSIX 2008, and since POSIX 2008 is
 old enough to be supported anywhere that I care, that should be the requirement.
 
-Second, the BcVm global variable was put into `bss`. This actually slightly
+Second, the `BcVm` global variable was put into `bss`. This actually slightly
 reduces the size of the executable from a massive code shrink, and it will stop
 `bc` from allocating a large set of memory when `bc` starts.
 

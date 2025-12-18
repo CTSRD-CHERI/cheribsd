@@ -34,7 +34,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/eventhandler.h>
@@ -315,7 +314,7 @@ fw_asystart(struct fw_xfer *xfer)
 static void
 firewire_identify(driver_t *driver, device_t parent)
 {
-	BUS_ADD_CHILD(parent, 0, "firewire", -1);
+	BUS_ADD_CHILD(parent, 0, "firewire", DEVICE_UNIT_ANY);
 }
 
 static int

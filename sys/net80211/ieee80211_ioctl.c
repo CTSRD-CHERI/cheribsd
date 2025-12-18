@@ -147,7 +147,8 @@ ieee80211_ioctl_getchaninfo(struct ieee80211vap *vap, struct ieee80211req *ireq)
 	if (space > ireq->i_len)
 		space = ireq->i_len;
 	/* XXX assumes compatible layout */
-	return copyout(&ic->ic_nchans, ireq->i_data, space);
+	return copyout((char *)ic + __offsetof(struct ieee80211com, ic_nchans),
+	    ireq->i_data, space);
 }
 
 static int
@@ -710,9 +711,13 @@ ieee80211_ioctl_getdevcaps(struct ieee80211com *ic,
 	if (dc == NULL)
 		return ENOMEM;
 	dc->dc_drivercaps = ic->ic_caps;
-	dc->dc_cryptocaps = ic->ic_cryptocaps;
+	/*
+	 * Announce the set of both hardware and software supported
+	 * ciphers.
+	 */
+	dc->dc_cryptocaps = ic->ic_cryptocaps | ic->ic_sw_cryptocaps;
 	dc->dc_htcaps = ic->ic_htcaps;
-	dc->dc_vhtcaps = ic->ic_vhtcaps;
+	dc->dc_vhtcaps = ic->ic_vht_cap.vht_cap_info;
 	ci = &dc->dc_chaninfo;
 	ic->ic_getradiocaps(ic, maxchans, &ci->ic_nchans, ci->ic_chans);
 	KASSERT(ci->ic_nchans <= maxchans,
@@ -1157,7 +1162,7 @@ ieee80211_ioctl_get80211(struct ieee80211vap *vap, u_long cmd,
 			ireq->i_val = 1;
 		break;
 	case IEEE80211_IOC_VHTCONF:
-		ireq->i_val = vap->iv_flags_vht & IEEE80211_FVHT_MASK;
+		ireq->i_val = vap->iv_vht_flags & IEEE80211_FVHT_MASK;
 		break;
 	default:
 		error = ieee80211_ioctl_getdefault(vap, ireq);
@@ -2591,8 +2596,10 @@ ieee80211_scanreq(struct ieee80211vap *vap, struct ieee80211_scan_req *sr)
 		sr->sr_flags |= IEEE80211_IOC_SCAN_NOPICK;
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
-	    "%s: flags 0x%x%s duration 0x%x mindwell %u maxdwell %u nssid %d\n",
-	    __func__, sr->sr_flags,
+	    "%s: vap %p iv_state %#x (%s) flags 0x%x%s "
+	    "duration 0x%x mindwell %u maxdwell %u nssid %d\n",
+	    __func__, vap, vap->iv_state, ieee80211_state_name[vap->iv_state],
+	    sr->sr_flags,
 	    (vap->iv_ifp->if_flags & IFF_UP) == 0 ? " (!IFF_UP)" : "",
 	    sr->sr_duration, sr->sr_mindwell, sr->sr_maxdwell, sr->sr_nssid);
 	/*
@@ -3635,8 +3642,8 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case CASE_IOC_IFREQ(SIOCG80211STATS):
 		ifr = (struct ifreq *)data;
-		copyout(&vap->iv_stats, ifr_data_get_ptr(cmd, ifr),
-		    sizeof (vap->iv_stats));
+		error = copyout(&vap->iv_stats, ifr_data_get_ptr(cmd, ifr),
+		    sizeof(vap->iv_stats));
 		break;
 	case SIOCSIFMTU:
 		ifr = (struct ifreq *)data;

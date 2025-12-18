@@ -177,7 +177,8 @@ physmem_print_tables(void)
  *
  * Updates the value at *pavail with the sum of all pages in all hw regions.
  *
- * Returns the number of pages of non-excluded memory added to the avail list.
+ * Returns the number of entries in the avail list, which is twice the number
+ * of returned regions.
  */
 static size_t
 regions_to_avail(vm_paddr_t *avail, uint32_t exflags, size_t maxavail,
@@ -188,6 +189,8 @@ regions_to_avail(vm_paddr_t *avail, uint32_t exflags, size_t maxavail,
 	long availmem, totalmem;
 	const struct region *exp, *hwp;
 	uint64_t availsz;
+
+	bzero(avail, maxavail * sizeof(vm_paddr_t));
 
 	totalmem = 0;
 	availmem = 0;
@@ -582,13 +585,11 @@ ram_attach(device_t dev)
 {
 	vm_paddr_t avail_list[PHYS_AVAIL_COUNT];
 	rman_res_t start, end;
-	struct region *hwp;
 	int rid, i;
 
 	rid = 0;
 
 	/* Get the avail list. */
-	bzero(avail_list, sizeof(avail_list));
 	regions_to_avail(avail_list, EXFLAG_NOALLOC | EXFLAG_NODUMP,
 	    PHYS_AVAIL_COUNT, 0, NULL, NULL);
 
@@ -605,30 +606,6 @@ ram_attach(device_t dev)
 		if (bus_alloc_resource(dev, SYS_RES_MEMORY, &rid, start, end,
 		    end - start, 0) == NULL)
 			panic("ram_attach: resource %d failed to attach", rid);
-		rid++;
-	}
-
-	/* Now, reserve the excluded memory regions. */
-	for (i = 0, hwp = exregions; i < excnt; i++, hwp++) {
-		start = hwp->addr;
-		end = hwp->addr + hwp->size;
-
-		if (bootverbose)
-			device_printf(dev,
-			    "reserving excluded region: %jx-%jx\n",
-			    (uintmax_t)start, (uintmax_t)(end - 1));
-
-		/*
-		 * Best-effort attempt to reserve the range. This may fail, as
-		 * sometimes the excluded ranges provided by the device tree
-		 * will cover or overlap some I/O range.
-		 */
-		if (bus_alloc_resource(dev, SYS_RES_MEMORY, &rid, start, end,
-		    end - start, 0) == NULL) {
-			if (bootverbose)
-				device_printf(dev, "failed to reserve region\n");
-			continue;
-		}
 		rid++;
 	}
 

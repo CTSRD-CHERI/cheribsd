@@ -6,11 +6,14 @@ MAX_SECSIZE=8192
 
 attach_md()
 {
-	local test_md
+	local _md
+	local rv=$1
+	shift
 
-	test_md=$(mdconfig -a "$@") || atf_fail "failed to allocate md(4)"
-	echo $test_md >> $TEST_MDS_FILE || exit
-	echo $test_md
+	[ -c /dev/mdctl ] || atf_skip "no /dev/mdctl to create md devices"
+	_md=$(mdconfig -a "$@") || atf_fail "failed to allocate md(4)"
+	echo $_md >> $TEST_MDS_FILE || exit
+	eval "${rv}='${_md}'"
 }
 
 # Execute `func` for each combination of cipher, sectorsize, and hmac algo
@@ -47,9 +50,9 @@ for_each_geli_config() {
 		# Use a file-backed md(4) device, so we can deliberatly corrupt
 		# it without detaching the geli device first.
 		truncate -s $bytes backing_file
-		md=$(attach_md -t vnode -f backing_file)
+		attach_md md -t vnode -f backing_file
 	else
-		md=$(attach_md -t malloc -s $bytes)
+		attach_md md -t malloc -s $bytes
 	fi
 
 
@@ -89,7 +92,7 @@ for_each_geli_config_nointegrity() {
 
 	# geli needs 512B for the label.
 	bytes=`expr $MAX_SECSIZE \* $sectors + 512`b
-	md=$(attach_md -t malloc -s $bytes)
+	attach_md md -t malloc -s $bytes
 	for cipher in $ciphers; do
 		ealgo=${cipher%%:*}
 		keylen=${cipher##*:}

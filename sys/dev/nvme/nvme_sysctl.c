@@ -30,6 +30,7 @@
 #include "opt_nvme.h"
 
 #include <sys/param.h>
+#include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/sysctl.h>
 
@@ -132,8 +133,8 @@ nvme_sysctl_int_coal_threshold(SYSCTL_HANDLER_ARGS)
 static int
 nvme_sysctl_timeout_period(SYSCTL_HANDLER_ARGS)
 {
-	struct nvme_controller *ctrlr = arg1;
-	uint32_t newval = ctrlr->timeout_period;
+	uint32_t *ptr = arg1;
+	uint32_t newval = *ptr;
 	int error = sysctl_handle_int(oidp, &newval, 0, req);
 
 	if (error || (req->newptr == NULL))
@@ -143,7 +144,7 @@ nvme_sysctl_timeout_period(SYSCTL_HANDLER_ARGS)
 	    newval < NVME_MIN_TIMEOUT_PERIOD) {
 		return (EINVAL);
 	} else {
-		ctrlr->timeout_period = newval;
+		*ptr = newval;
 	}
 
 	return (0);
@@ -163,6 +164,7 @@ nvme_qpair_reset_stats(struct nvme_qpair *qpair)
 	qpair->num_retries = 0;
 	qpair->num_failures = 0;
 	qpair->num_ignored = 0;
+	qpair->num_recovery_nolock = 0;
 }
 
 static int
@@ -174,8 +176,10 @@ nvme_sysctl_num_cmds(SYSCTL_HANDLER_ARGS)
 
 	num_cmds = ctrlr->adminq.num_cmds;
 
-	for (i = 0; i < ctrlr->num_io_queues; i++)
-		num_cmds += ctrlr->ioq[i].num_cmds;
+	if (ctrlr->ioq != NULL) {
+		for (i = 0; i < ctrlr->num_io_queues; i++)
+			num_cmds += ctrlr->ioq[i].num_cmds;
+	}
 
 	return (sysctl_handle_64(oidp, &num_cmds, 0, req));
 }
@@ -189,8 +193,10 @@ nvme_sysctl_num_intr_handler_calls(SYSCTL_HANDLER_ARGS)
 
 	num_intr_handler_calls = ctrlr->adminq.num_intr_handler_calls;
 
-	for (i = 0; i < ctrlr->num_io_queues; i++)
-		num_intr_handler_calls += ctrlr->ioq[i].num_intr_handler_calls;
+	if (ctrlr->ioq != NULL) {
+		for (i = 0; i < ctrlr->num_io_queues; i++)
+			num_intr_handler_calls += ctrlr->ioq[i].num_intr_handler_calls;
+	}
 
 	return (sysctl_handle_64(oidp, &num_intr_handler_calls, 0, req));
 }
@@ -204,8 +210,10 @@ nvme_sysctl_num_retries(SYSCTL_HANDLER_ARGS)
 
 	num_retries = ctrlr->adminq.num_retries;
 
-	for (i = 0; i < ctrlr->num_io_queues; i++)
-		num_retries += ctrlr->ioq[i].num_retries;
+	if (ctrlr->ioq != NULL) {
+		for (i = 0; i < ctrlr->num_io_queues; i++)
+			num_retries += ctrlr->ioq[i].num_retries;
+	}
 
 	return (sysctl_handle_64(oidp, &num_retries, 0, req));
 }
@@ -219,8 +227,10 @@ nvme_sysctl_num_failures(SYSCTL_HANDLER_ARGS)
 
 	num_failures = ctrlr->adminq.num_failures;
 
-	for (i = 0; i < ctrlr->num_io_queues; i++)
-		num_failures += ctrlr->ioq[i].num_failures;
+	if (ctrlr->ioq != NULL) {
+		for (i = 0; i < ctrlr->num_io_queues; i++)
+			num_failures += ctrlr->ioq[i].num_failures;
+	}
 
 	return (sysctl_handle_64(oidp, &num_failures, 0, req));
 }
@@ -234,10 +244,29 @@ nvme_sysctl_num_ignored(SYSCTL_HANDLER_ARGS)
 
 	num_ignored = ctrlr->adminq.num_ignored;
 
-	for (i = 0; i < ctrlr->num_io_queues; i++)
-		num_ignored += ctrlr->ioq[i].num_ignored;
+	if (ctrlr->ioq != NULL) {
+		for (i = 0; i < ctrlr->num_io_queues; i++)
+			num_ignored += ctrlr->ioq[i].num_ignored;
+	}
 
 	return (sysctl_handle_64(oidp, &num_ignored, 0, req));
+}
+
+static int
+nvme_sysctl_num_recovery_nolock(SYSCTL_HANDLER_ARGS)
+{
+	struct nvme_controller 	*ctrlr = arg1;
+	int64_t			num;
+	int			i;
+
+	num = ctrlr->adminq.num_recovery_nolock;
+
+	if (ctrlr->ioq != NULL) {
+		for (i = 0; i < ctrlr->num_io_queues; i++)
+			num += ctrlr->ioq[i].num_recovery_nolock;
+	}
+
+	return (sysctl_handle_64(oidp, &num, 0, req));
 }
 
 static int
@@ -254,8 +283,10 @@ nvme_sysctl_reset_stats(SYSCTL_HANDLER_ARGS)
 	if (val != 0) {
 		nvme_qpair_reset_stats(&ctrlr->adminq);
 
-		for (i = 0; i < ctrlr->num_io_queues; i++)
-			nvme_qpair_reset_stats(&ctrlr->ioq[i]);
+		if (ctrlr->ioq != NULL) {
+			for (i = 0; i < ctrlr->num_io_queues; i++)
+				nvme_qpair_reset_stats(&ctrlr->ioq[i]);
+		}
 	}
 
 	return (0);
@@ -298,6 +329,13 @@ nvme_sysctl_initialize_queue(struct nvme_qpair *qpair,
 	SYSCTL_ADD_QUAD(ctrlr_ctx, que_list, OID_AUTO, "num_ignored",
 	    CTLFLAG_RD, &qpair->num_ignored,
 	    "Number of interrupts posted, but were administratively ignored");
+	SYSCTL_ADD_QUAD(ctrlr_ctx, que_list, OID_AUTO, "num_recovery_nolock",
+	    CTLFLAG_RD, &qpair->num_recovery_nolock,
+	    "Number of times that we failed to lock recovery in the ISR");
+
+	SYSCTL_ADD_UINT(ctrlr_ctx, que_list, OID_AUTO, "recovery",
+	    CTLFLAG_RW, &qpair->recovery_state, 0,
+	    "Current recovery state of the queue");
 
 	SYSCTL_ADD_PROC(ctrlr_ctx, que_list, OID_AUTO,
 	    "dump_debug", CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE,
@@ -334,9 +372,14 @@ nvme_sysctl_initialize_ctrlr(struct nvme_controller *ctrlr)
 	    "Interrupt coalescing threshold");
 
 	SYSCTL_ADD_PROC(ctrlr_ctx, ctrlr_list, OID_AUTO,
+	    "admin_timeout_period", CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE,
+	    &ctrlr->admin_timeout_period, 0, nvme_sysctl_timeout_period, "IU",
+	    "Timeout period for Admin queue (in seconds)");
+
+	SYSCTL_ADD_PROC(ctrlr_ctx, ctrlr_list, OID_AUTO,
 	    "timeout_period", CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE,
-	    ctrlr, 0, nvme_sysctl_timeout_period, "IU",
-	    "Timeout period (in seconds)");
+	    &ctrlr->timeout_period, 0, nvme_sysctl_timeout_period, "IU",
+	    "Timeout period for I/O queues (in seconds)");
 
 	SYSCTL_ADD_PROC(ctrlr_ctx, ctrlr_list, OID_AUTO,
 	    "num_cmds", CTLTYPE_S64 | CTLFLAG_RD | CTLFLAG_MPSAFE,
@@ -367,6 +410,11 @@ nvme_sysctl_initialize_ctrlr(struct nvme_controller *ctrlr)
 	    "Number of interrupts ignored administratively");
 
 	SYSCTL_ADD_PROC(ctrlr_ctx, ctrlr_list, OID_AUTO,
+	    "num_recovery_nolock", CTLTYPE_S64 | CTLFLAG_RD | CTLFLAG_MPSAFE,
+	    ctrlr, 0, nvme_sysctl_num_recovery_nolock, "IU",
+	    "Number of times that we failed to lock recovery in the ISR");
+
+	SYSCTL_ADD_PROC(ctrlr_ctx, ctrlr_list, OID_AUTO,
 	    "reset_stats", CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE, ctrlr,
 	    0, nvme_sysctl_reset_stats, "IU", "Reset statistics to zero");
 
@@ -378,16 +426,31 @@ nvme_sysctl_initialize_ctrlr(struct nvme_controller *ctrlr)
 	    CTLFLAG_RD, &ctrlr->cap_hi, 0,
 	    "Hi 32-bits of capacities for the drive");
 
+	SYSCTL_ADD_UINT(ctrlr_ctx, ctrlr_list, OID_AUTO, "fail_on_reset",
+	    CTLFLAG_RD, &ctrlr->fail_on_reset, 0,
+	    "Pretend the next reset fails and fail the controller");
+
 	que_tree = SYSCTL_ADD_NODE(ctrlr_ctx, ctrlr_list, OID_AUTO, "adminq",
 	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "Admin Queue");
 
 	nvme_sysctl_initialize_queue(&ctrlr->adminq, ctrlr_ctx, que_tree);
 
-	for (i = 0; i < ctrlr->num_io_queues; i++) {
-		snprintf(queue_name, QUEUE_NAME_LENGTH, "ioq%d", i);
-		que_tree = SYSCTL_ADD_NODE(ctrlr_ctx, ctrlr_list, OID_AUTO,
-		    queue_name, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "IO Queue");
-		nvme_sysctl_initialize_queue(&ctrlr->ioq[i], ctrlr_ctx,
-		    que_tree);
+	/*
+	 * Make sure that we've constructed the I/O queues before setting up the
+	 * sysctls. Failed controllers won't allocate it, but we want the rest
+	 * of the sysctls to diagnose things.
+	 */
+	if (ctrlr->ioq != NULL) {
+		for (i = 0; i < ctrlr->num_io_queues; i++) {
+			snprintf(queue_name, QUEUE_NAME_LENGTH, "ioq%d", i);
+			que_tree = SYSCTL_ADD_NODE(ctrlr_ctx, ctrlr_list, OID_AUTO,
+			    queue_name, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "IO Queue");
+			nvme_sysctl_initialize_queue(&ctrlr->ioq[i], ctrlr_ctx,
+			    que_tree);
+		}
 	}
+
+	SYSCTL_ADD_COUNTER_U64(ctrlr_ctx, ctrlr_list, OID_AUTO, "alignment_splits",
+	    CTLFLAG_RD, &ctrlr->alignment_splits,
+	    "Number of times we split the I/O alignment for drives with preferred alignment");
 }

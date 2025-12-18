@@ -29,7 +29,6 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <signal.h>
 #include "libc_private.h"
@@ -41,7 +40,5 @@ __weak_reference(sigsuspend, __libc_sigsuspend);
 int
 sigsuspend(const sigset_t *set)
 {
-
-	return (((int (*)(const sigset_t *))
-	    __libc_interposing[INTERPOS_sigsuspend])(set));
+	return (INTERPOS_SYS(sigsuspend, set));
 }

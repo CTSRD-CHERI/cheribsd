@@ -1,6 +1,10 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * Copyright (c) 2015-2018 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
+ * Copyright (c) 2019-2021 Mitchell Horne <mhorne@FreeBSD.org>
+ * Copyright (c) 2022-2024 The FreeBSD Foundation
  *
  * Portions of this software were developed by SRI International and the
  * University of Cambridge Computer Laboratory under DARPA/AFRL contract
@@ -9,6 +13,9 @@
  * Portions of this software were developed by the University of Cambridge
  * Computer Laboratory as part of the CTSRD Project, with support from the
  * UK Higher Education Innovation Fund (HEIF).
+ *
+ * Portions of this software were developed by Mitchell Horne
+ * <mhorne@FreeBSD.org> under sponsorship from the FreeBSD Foundation.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,13 +41,11 @@
 
 #include "assym.inc"
 
-#include <sys/syscall.h>
 #include <machine/asm.h>
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <machine/cherireg.h>
 #endif
 #include <machine/param.h>
-#include <machine/trap.h>
 #include <machine/riscvreg.h>
 #include <machine/pte.h>
 
@@ -149,21 +154,29 @@ _start:
 	mv	a1, zero
 
 	/*
-	 * Set up page tables: map a 1GB region starting at KERNBASE using 2MB
-	 * superpages, starting from the first 2MB physical page into which the
-	 * kernel was loaded.  Also reserve an L2 page for the early device map
-	 * and map the DTB, if any, using the second-last entry of that L2
-	 * page.  This is hopefully enough to get us to pmap_bootstrap().
+	 * Set up page tables: Our goal is to enable virtual memory, doing the
+	 * minimum amount of work in assembly; just what is required to
+	 * bootstrap. We will construct the real page tables in C code, in
+	 * pmap_bootstrap().
 	 *
-	 * Implementations are required to provide SV39 mode, so we use that
-	 * initially and will optionally enable SV48 mode during kernel pmap
-	 * initialization.
+	 * Here we map a 1GB region starting at KERNBASE using 2MB superpages,
+	 * starting from the first 2MB physical page into which the kernel was
+	 * loaded.
 	 *
+	 * We also use an L1 entry to create a 1GB identity map (1:1 PA->VA).
+	 * This is useful for two reasons:
+	 *  - handling the DTB pointer passed from SBI firmware (physical addr)
+	 *  - simpler construction of pagetables in pmap_bootstrap()
+	 *
+	 * Implementations are required to provide Sv39 mode, so we use that
+	 * here and will conditionally enable Sv48 (or higher) later.
+	 *
+	 * We arrive here with:
 	 *  a0 - modulep or zero
 	 *  a1 - zero or dtbp
 	 */
 pagetables:
-	/* Get the kernel's load address */
+	/* Get the kernel's load address (kernstart) in s9 */
 #ifdef __CHERI_PURE_CAPABILITY__
 	cllc	cra, get_physmem
 	cjalr	cra
@@ -171,13 +184,39 @@ pagetables:
 	jal	get_physmem
 #endif
 
+	/* Construct 1GB Identity Map (1:1 PA->VA) */
+#ifdef __CHERI_PURE_CAPABILITY__
+	cllc	cs1, bootstrap_pt_l1
+#else
+	lla	s1, bootstrap_pt_l1
+#endif
+
+	srli	s2, s9, L1_SHIFT	/* kernstart >> L1_SHIFT */
+	andi	a5, s2, Ln_ADDR_MASK	/* & Ln_ADDR_MASK */
+	li	t4, (PTE_KERN)
+	slli	s2, s2, PTE_PPN2_S	/* (s2 << PTE_PPN2_S) */
+	or	t6, t4, s2
+
+	/* Store L1 PTE entry to position */
+	li	a6, PTE_SIZE
+	mulw	a5, a5, a6		/* calculate L1 slot */
+#ifdef __CHERI_PURE_CAPABILITY__
+	cincoffset ct0, cs1, a5
+	csd	t6, (ct0)		/* Store new PTE */
+#else
+	add	t0, s1, a5
+	sd	t6, (t0)		/* Store new PTE */
+#endif
+
+	/* Construct the virtual address space at KERNBASE */
+
 	/* Add L1 entry for kernel */
 #ifdef __CHERI_PURE_CAPABILITY__
-	cllc	cs1, pagetable_l1
-	cllc	cs2, pagetable_l2	/* Link to next level PN */
+	cllc	cs1, bootstrap_pt_l1
+	cllc	cs2, bootstrap_pt_l2	/* Link to next level PN */
 #else
-	lla	s1, pagetable_l1
-	lla	s2, pagetable_l2	/* Link to next level PN */
+	lla	s1, bootstrap_pt_l1
+	lla	s2, bootstrap_pt_l2	/* Link to next level PN */
 #endif
 	srli	s2, s2, PAGE_SHIFT
 
@@ -201,12 +240,12 @@ pagetables:
 
 	/* Level 2 superpages (512 x 2MiB) */
 #ifdef __CHERI_PURE_CAPABILITY__
-	cllc	cs1, pagetable_l2
+	cllc	cs1, bootstrap_pt_l2
 #else
-	lla	s1, pagetable_l2
+	lla	s1, bootstrap_pt_l2
 #endif
 	srli	t4, s9, L2_SHIFT	/* Div physmem base by 2 MiB */
-	li	t2, 512			/* Build 512 entries */
+	li	t2, Ln_ENTRIES		/* Build 512 entries */
 	add	t3, t4, t2
 	li	t0, (PTE_KERN_CAP | PTE_X)
 1:
@@ -223,70 +262,13 @@ pagetables:
 	addi	t4, t4, 1
 	bltu	t4, t3, 1b
 
-	/* Create an L1 table entry for early devmap */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	cs1, pagetable_l1
-	cllc	cs2, pagetable_l2_devmap /* Link to next level PN */
-#else
-	lla	s1, pagetable_l1
-	lla	s2, pagetable_l2_devmap	/* Link to next level PN */
-#endif
-	srli	s2, s2, PAGE_SHIFT
-
-	li	a5, (VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE)
-	srli	a5, a5, L1_SHIFT	/* >> L1_SHIFT */
-	andi	a5, a5, Ln_ADDR_MASK	/* & Ln_ADDR_MASK */
-	li	t4, PTE_V
-	slli	t5, s2, PTE_PPN0_S	/* (s2 << PTE_PPN0_S) */
-	or	t6, t4, t5
-
-	/* Store the L1 table entry */
-	li	a6, PTE_SIZE
-	mulw	a5, a5, a6
-#ifdef __CHERI_PURE_CAPABILITY__
-	cincoffset ct0, cs1, a5
-	csd	t6, (ct0)
-#else
-	add	t0, s1, a5
-	sd	t6, (t0)
-#endif
-
-	/* Check if we have a DTB that needs to be mapped */
-	beqz	a1, 2f
-
-	/* Create an L2 mapping for the DTB */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	cs1, pagetable_l2_devmap
-#else
-	lla	s1, pagetable_l2_devmap
-#endif
-	mv	s2, a1
-	srli	s2, s2, PAGE_SHIFT
-	/* Mask off any bits that aren't aligned */
-	andi	s2, s2, ~((1 << (PTE_PPN1_S - PTE_PPN0_S)) - 1)
-
-	li	t0, (PTE_KERN)
-	slli	t2, s2, PTE_PPN0_S	/* << PTE_PPN0_S */
-	or	t0, t0, t2
-
-	/* Store the L2 table entry for the DTB */
-	li	a6, PTE_SIZE
-	li	a5, VM_EARLY_DTB_ADDRESS
-	srli	a5, a5, L2_SHIFT    /* >> L2_SHIFT */
-	andi	a5, a5, Ln_ADDR_MASK    /* & Ln_ADDR_MASK */
-	mulw	a5, a5, a6
-#ifdef __CHERI_PURE_CAPABILITY__
-	cincoffset ct1, cs1, a5
-	csd	t0, (ct1)
-#else
-	add	t1, s1, a5
-	sd	t0, (t1)
-#endif
-
 	/* Page tables END */
 
-	/* Setup supervisor trap vector */
-2:
+	/*
+	 * Set the supervisor trap vector temporarily. Enabling virtual memory
+	 * may generate a page fault. We simply wish to continue onwards, so
+	 * have the trap deliver us to 'va'.
+	 */
 	li	t1, KERNBASE
 	sub	t1, t1, s9
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -301,9 +283,9 @@ pagetables:
 
 	/* Set page tables base register */
 #ifdef __CHERI_PURE_CAPABILITY__
-	cllc	cs2, pagetable_l1
+	cllc	cs2, bootstrap_pt_l1
 #else
-	lla	s2, pagetable_l1
+	lla	s2, bootstrap_pt_l1
 #endif
 	srli	s2, s2, PAGE_SHIFT
 	li	t0, SATP_MODE_SV39
@@ -336,12 +318,10 @@ va:
 1:
 #endif
 
-	/* Setup supervisor trap vector */
+	/* Set the trap vector to the real handler. */
 #ifdef __CHERI_PURE_CAPABILITY__
 	cllc	ct0, cpu_exception_handler
 	cspecialw stcc, ct0
-	cmove	ct1, cnull
-	cspecialw stdc, ct1
 #else
 	la	t0, cpu_exception_handler
 #if __has_feature(capabilities)
@@ -350,8 +330,6 @@ va:
 	li	t0, 1
 	csetflags ct1, ct1, t0
 	cspecialw stcc, ct1
-	cspecialr ct1, ddc
-	cspecialw stdc, ct1
 #else
 	csrw	stvec, t0
 #endif
@@ -361,6 +339,8 @@ va:
 #if __has_feature(capabilities)
 	cmove	ct0, cnull
 	cspecialw sscratchc, ct0
+	/* Ensure stdc is null and thus not used */
+	cspecialw stdc, ct0
 #else
 	li	t0, 0
 	csrw	sscratch, t0
@@ -401,10 +381,10 @@ va:
 	/* Initialize cap relocs. */
 	li	t0, CHERI_PERMS_KERNEL_DATA
 	candperm ca0, cs0, t0
-	cllc	ca1, _C_LABEL(init_cap_relocs)
+	cllc	cra, _C_LABEL(init_cap_relocs)
 	li	t0, CHERI_PERMS_KERNEL_CODE
-	candperm ca2, cs0, t0
-	cjalr	ca1
+	candperm ca1, cra, t0
+	cjalr	cra
 
 	/* Initialize capabilities. */
 	cmove	ca0, cs0
@@ -412,29 +392,10 @@ va:
 	cjalr	cra
 
 	/* Fill riscv_bootparams */
-	cllc	ct0, pagetable_l1
-	li	t1, PAGE_SIZE
-	csetbounds ct0, ct0, t1
-	li	t1, CHERI_PERMS_KERNEL_DATA
-	candperm ct0, ct0, t1
-	csc	ct0, RISCV_BOOTPARAMS_KERN_L1PT(csp)
 	csd	s9, RISCV_BOOTPARAMS_KERN_PHYS(csp)
 
 	csc	cs3, RISCV_BOOTPARAMS_KERN_STACK(csp)
-
-	li	t0, (VM_EARLY_DTB_ADDRESS)
-	csetaddr ct0, cs0, t0
-	li	t1, L2_SIZE
-	csetbounds ct0, ct0, t1
-	/* Add offset of DTB within superpage */
-	li	t1, (L2_OFFSET)
-	and	t1, s1, t1
-	cincoffset ct0, ct0, t1
-	li	t1, CHERI_PERMS_KERNEL_DATA
-	candperm ct0, ct0, t1
-	csc	ct0, RISCV_BOOTPARAMS_DTBP_VIRT(csp)
 	csd	s1, RISCV_BOOTPARAMS_DTBP_PHYS(csp)
-
 	csc	cs2, RISCV_BOOTPARAMS_MODULEP(csp)
 
 	/* Discard omnipotent cs0. */
@@ -481,21 +442,11 @@ va:
 #endif
 
 	/* Fill riscv_bootparams */
-	la	t0, pagetable_l1
-	sd	t0, RISCV_BOOTPARAMS_KERN_L1PT(sp)
 	sd	s9, RISCV_BOOTPARAMS_KERN_PHYS(sp)
 
 	la	t0, initstack
 	sd	t0, RISCV_BOOTPARAMS_KERN_STACK(sp)
-
-	li	t0, (VM_EARLY_DTB_ADDRESS)
-	/* Add offset of DTB within superpage */
-	li	t1, (L2_OFFSET)
-	and	t1, s1, t1
-	add	t0, t0, t1
-	sd	t0, RISCV_BOOTPARAMS_DTBP_VIRT(sp)
 	sd	s1, RISCV_BOOTPARAMS_DTBP_PHYS(sp)
-
 	sd	s2, RISCV_BOOTPARAMS_MODULEP(sp)
 
 	mv	a0, sp
@@ -530,111 +481,24 @@ initstack:
 initstack_end:
 
 /*
- * sigcode has to be labeled as an @object type so that captable pointers
- * to it will be able to read it.  This is fine as the code is never
- * executed directly in the kernel, just copied to places for userland
- * to execute.
+ * Static space for the bootstrap page tables. Unused after pmap_bootstrap().
  */
-#define	SIGCODE(sym)						\
-	.text; .globl sym; .type sym,@object; .align 4; sym: .cfi_startproc
-
-.option push
-#if __has_feature(capabilities)
-.option capmode
-#endif
-SIGCODE(sigcode)
-#if __has_feature(capabilities)
-	cincoffset ca0, csp, SF_UC
-#else
-	mv	a0, sp
-	addi	a0, a0, SF_UC
-#endif
-
-1:
-	li	t0, SYS_sigreturn
-	ecall
-
-	/* sigreturn failed, exit */
-	li	t0, SYS_exit
-	ecall
-
-	j	1b
-	/* This may be copied to the stack, keep it 16-byte aligned */
-	.align	3
-END(sigcode)
-esigcode:
-.option pop
-
-#ifdef COMPAT_FREEBSD64
-.option push
-#if __has_feature(capabilities)
-.option nocapmode
-#endif
-SIGCODE(freebsd64_sigcode)
-	mv	a0, sp
-	addi	a0, a0, SF64_UC
-
-1:
-	li	t0, SYS_sigreturn
-	ecall
-
-	/* sigreturn failed, exit */
-	li	t0, SYS_exit
-	ecall
-
-	j	1b
-	/* This may be copied to the stack, keep it 16-byte aligned */
-	.align	3
-END(freebsd64_sigcode)
-freebsd64_esigcode:
-.option pop
-#endif
-
 	.data
-	.align	3
-	.global	szsigcode
-	.type	szsigcode, @object
-szsigcode:
-	.quad	esigcode - sigcode
-	.size	szsigcode, . - szsigcode
-#ifdef COMPAT_FREEBSD64
-	.global	freebsd64_szsigcode
-	.type	freebsd64_szsigcode, @object
-freebsd64_szsigcode:
-	.quad	freebsd64_esigcode - freebsd64_sigcode
-	.size	freebsd64_szsigcode, . - freebsd64_szsigcode
-#endif
-
-	.align	12
-pagetable_l1:
+	.balign	PAGE_SIZE
+	.type	bootstrap_pt_l1, @object
+bootstrap_pt_l1:
 	.space	PAGE_SIZE
-	.type	pagetable_l2, @object
-pagetable_l2:
+	.size	bootstrap_pt_l1, . - bootstrap_pt_l1
+	.type	bootstrap_pt_l2, @object
+bootstrap_pt_l2:
 	.space	PAGE_SIZE
-	.size	pagetable_l2, . - pagetable_l2
-pagetable_l2_devmap:
-	.space	PAGE_SIZE
+	.size	bootstrap_pt_l2, . - bootstrap_pt_l2
 
 	.align 3
 virt_map:
 	.quad   virt_map
 hart_lottery:
 	.space	4
-
-	.globl init_pt_va
-	.type	init_pt_va, @object
-#ifdef __CHERI_PURE_CAPABILITY__
-	.align 4
-#else
-	.align 3
-#endif
-init_pt_va:
-#ifdef __CHERI_PURE_CAPABILITY__
-	.chericap pagetable_l2	/* XXX: Keep page tables VA */
-#else
-	.quad pagetable_l2	/* XXX: Keep page tables VA */
-#endif
-	.size	init_pt_va, . - init_pt_va
 
 #ifndef SMP
 ENTRY(mpentry)
@@ -695,7 +559,11 @@ ENTRY(mpentry)
 	/* Get the kernel's load address */
 	jal	get_physmem
 
-	/* Setup supervisor trap vector */
+	/*
+	 * Set the supervisor trap vector temporarily. Enabling virtual memory
+	 * may generate a page fault. We simply wish to continue onwards, so
+	 * have the trap deliver us to 'mpva'.
+	 */
 	lla	t0, mpva
 	sub	t0, t0, s9
 	li	t1, KERNBASE
@@ -705,13 +573,12 @@ ENTRY(mpentry)
 
 	/* Set page tables base register */
 #ifdef __CHERI_PURE_CAPABILITY__
-	cllc	cs2, pagetable_l1
+	cllc	ct2, kernel_pmap_store
+	cld	s2, PM_SATP(ct2)
 #else
-	lla	s2, pagetable_l1
+	lla	t2, kernel_pmap_store
+	ld	s2, PM_SATP(t2)
 #endif
-	srli	s2, s2, PAGE_SHIFT
-	li	t0, SATP_MODE_SV39
-	or	s2, s2, t0
 	sfence.vma
 	csrw	satp, s2
 
@@ -739,14 +606,13 @@ mpva:
 	csetaddr ct1, ct1, t0
 	cjr	ct1
 1:
+#endif
 
-	/* Setup supervisor trap vector */
+	/* Set the trap vector to the real handler. */
+#ifdef __CHERI_PURE_CAPABILITY__
 	cllc	ct0, cpu_exception_handler
 	cspecialw stcc, ct0
-	cmove	ct1, cnull
-	cspecialw stdc, ct1
 #else
-	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler
 #if __has_feature(capabilities)
 	cspecialr ct1, pcc
@@ -754,8 +620,6 @@ mpva:
 	li	t0, 1
 	csetflags ct1, ct1, t0
 	cspecialw stcc, ct1
-	cspecialr ct1, ddc
-	cspecialw stdc, ct1
 #else
 	csrw	stvec, t0
 #endif
@@ -765,6 +629,8 @@ mpva:
 #if __has_feature(capabilities)
 	cmove	ct0, cnull
 	cspecialw sscratchc, ct0
+	/* Ensure stdc is null and thus not used */
+	cspecialw stdc, ct0
 #else
 	li	t0, 0
 	csrw	sscratch, t0

@@ -31,7 +31,6 @@
 
 #include "opt_bus.h"
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -44,8 +43,8 @@
 #include <dev/ofw/ofw_bus_subr.h>
 
 #include <dev/ahci/ahci.h>
-#include <dev/extres/clk/clk.h>
-#include <dev/extres/regulator/regulator.h>
+#include <dev/clk/clk.h>
+#include <dev/regulator/regulator.h>
 
 /*
  * Allwinner a1x/a2x/a8x SATA attachment.  This is just the AHCI register

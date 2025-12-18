@@ -25,11 +25,6 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD$";
-#endif
-
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -53,7 +48,9 @@ static const char rcsid[] =
 
 #include "ifconfig.h"
 
-#define	GIFBITS	"\020\2IGNORE_SOURCE"
+static const char *GIFBITS[] = {
+	[1] = "IGNORE_SOURCE",
+};
 
 static void
 gif_status(if_ctx *ctx)
@@ -65,7 +62,8 @@ gif_status(if_ctx *ctx)
 		return;
 	if (opts == 0)
 		return;
-	printb("\toptions", opts, GIFBITS);
+	printf("\toptions=%x", opts);
+	print_bits("options", &opts, 1, GIFBITS, nitems(GIFBITS));
 	putchar('\n');
 }
 

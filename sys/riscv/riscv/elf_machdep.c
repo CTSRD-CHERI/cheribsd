@@ -34,7 +34,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -63,6 +62,12 @@
 #endif
 
 #include "linker_if.h"
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	PTR_ALT	"#"
+#else
+#define	PTR_ALT
+#endif
 
 u_long elf_hwcap;
 
@@ -94,7 +99,7 @@ static struct sysentvec elf_freebsd_sysvec = {
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP | SV_TIMEKEEP |
-	    SV_RNG_SEED_VER |
+	    SV_RNG_SEED_VER | SV_SIGSYS |
 #if __has_feature(capabilities)
 	    SV_CHERI,
 #else
@@ -362,12 +367,14 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 {
 	Elf_Size rtype, symidx;
 	const Elf_Rela *rela;
-	Elf_Addr val, addr;
+	uintptr_t addr;
+	Elf_Addr val;
 #ifdef __CHERI_PURE_CAPABILITY__
-	uintcap_t beforecap, cap;
+	uintcap_t beforecap;
 #endif
 	Elf64_Addr *where;
 	Elf_Addr addend;
+	uintptr_t beforeptr;
 	uint32_t before32_1;
 	uint32_t before32;
 	uint64_t before64;
@@ -412,12 +419,12 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		if (error != 0)
 			return (-1);
 
-		before64 = *where;
-		*where = addr;
+		beforeptr = *(uintptr_t *)where;
+		*(uintptr_t *)where = addr;
 		if (debug_kld)
-			printf("%p %c %-24s %016lx -> %016lx\n", where,
-			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
-			    before64, *where);
+			printf("%p %c %-24s %" PTR_ALT "p -> %" PTR_ALT "p\n",
+			    where, (local ? 'l' : 'g'), reloctype_to_str(rtype),
+			    (void *)beforeptr, (void *)addr);
 		break;
 
 	case R_RISCV_RELATIVE:
@@ -577,18 +584,34 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	case R_RISCV_CHERI_CAPABILITY:
-		error = LINKER_SYMIDX_CAPABILITY(lf, symidx, 1, &cap);
+		error = lookup(lf, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
-		cap += addend;
-		beforecap = *(uintcap_t *)where;
-		*(uintcap_t *)where = cap;
+		/*
+		 * XXX: This is conditional to avoid invalidating
+		 * sentries.  The addend should probably be passed to
+		 * the lookup function instead.
+		 */
+		if (addend != 0) {
+			KASSERT(!cheri_getsealed(addr),
+			    ("%s: sentry %#p with non-zero addend %#lx",
+			    __func__, (void *)addr, addend));
+
+			/*
+			 * XXX: Prevent the add below from being
+			 * hoisted out of the condition.
+			 */
+			__asm__("" : "+r" (addend));
+			addr += addend;
+		}
+
+		beforecap = *(uintptr_t *)where;
+		*(uintptr_t *)where = addr;
 		if (debug_kld)
-			printf("%p %c %-24s %#lp -> %#lp\n", where,
+			printf("%p %c %-24s %#lp -> %#p\n", where,
 			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
-			    (void * __capability)beforecap,
-			    (void * __capability)cap);
+			    (void *)beforecap, (void *)addr);
 		break;
 #endif
 	default:

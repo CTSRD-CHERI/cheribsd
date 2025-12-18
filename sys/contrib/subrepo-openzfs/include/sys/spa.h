@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, 2021 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2024 by Delphix. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
  * Copyright 2013 Saso Kiselkov. All rights reserved.
@@ -35,11 +35,10 @@
 #ifndef _SYS_SPA_H
 #define	_SYS_SPA_H
 
-#include <sys/avl.h>
 #include <sys/zfs_context.h>
+#include <sys/avl.h>
 #include <sys/kstat.h>
 #include <sys/nvpair.h>
-#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/fs/zfs.h>
 #include <sys/spa_checksum.h>
@@ -62,8 +61,6 @@ typedef struct metaslab_class metaslab_class_t;
 typedef struct zio zio_t;
 typedef struct zilog zilog_t;
 typedef struct spa_aux_vdev spa_aux_vdev_t;
-typedef struct ddt ddt_t;
-typedef struct ddt_entry ddt_entry_t;
 typedef struct zbookmark_phys zbookmark_phys_t;
 typedef struct zbookmark_err_phys zbookmark_err_phys_t;
 
@@ -127,15 +124,15 @@ typedef struct zio_cksum_salt {
  *
  *	64	56	48	40	32	24	16	8	0
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
- * 0	|  pad  |	  vdev1         | GRID  |	  ASIZE		|
+ * 0	|  pad  |	  vdev1         | pad   |	  ASIZE		|
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
  * 1	|G|			 offset1				|
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
- * 2	|  pad  |	  vdev2         | GRID  |	  ASIZE		|
+ * 2	|  pad  |	  vdev2         | pad   |	  ASIZE		|
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
  * 3	|G|			 offset2				|
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
- * 4	|  pad  |	  vdev3         | GRID  |	  ASIZE		|
+ * 4	|  pad  |	  vdev3         | pad   |	  ASIZE		|
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
  * 5	|G|			 offset3				|
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
@@ -167,7 +164,6 @@ typedef struct zio_cksum_salt {
  * LSIZE	logical size
  * PSIZE	physical size (after compression)
  * ASIZE	allocated size (including RAID-Z parity and gang block headers)
- * GRID		RAID-Z layout information (reserved for future use)
  * cksum	checksum function
  * comp		compression function
  * G		gang block indicator
@@ -192,11 +188,11 @@ typedef struct zio_cksum_salt {
  *
  *	64	56	48	40	32	24	16	8	0
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
- * 0	|		vdev1		| GRID  |	  ASIZE		|
+ * 0	|		vdev1		| pad   |	  ASIZE		|
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
  * 1	|G|			 offset1				|
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
- * 2	|		vdev2		| GRID  |	  ASIZE		|
+ * 2	|		vdev2		| pad   |	  ASIZE		|
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
  * 3	|G|			 offset2				|
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
@@ -357,7 +353,7 @@ typedef enum bp_embedded_type {
 #define	BPE_NUM_WORDS 14
 #define	BPE_PAYLOAD_SIZE (BPE_NUM_WORDS * sizeof (uint64_t))
 #define	BPE_IS_PAYLOADWORD(bp, wp) \
-	((wp) != &(bp)->blk_prop && (wp) != &(bp)->blk_birth)
+	((wp) != &(bp)->blk_prop && (wp) != (&(bp)->blk_birth_word[1]))
 
 #define	SPA_BLKPTRSHIFT	7		/* blkptr_t is 128 bytes	*/
 #define	SPA_DVAS_PER_BP	3		/* Number of DVAs in a bp	*/
@@ -376,8 +372,7 @@ typedef struct blkptr {
 	dva_t		blk_dva[SPA_DVAS_PER_BP]; /* Data Virtual Addresses */
 	uint64_t	blk_prop;	/* size, compression, type, etc	    */
 	uint64_t	blk_pad[2];	/* Extra space for the future	    */
-	uint64_t	blk_phys_birth;	/* txg when block was allocated	    */
-	uint64_t	blk_birth;	/* transaction group at birth	    */
+	uint64_t	blk_birth_word[2];
 	uint64_t	blk_fill;	/* fill count			    */
 	zio_cksum_t	blk_cksum;	/* 256-bit checksum		    */
 } blkptr_t;
@@ -396,9 +391,6 @@ typedef struct blkptr {
 #define	DVA_SET_ASIZE(dva, x)	\
 	BF64_SET_SB((dva)->dva_word[0], 0, SPA_ASIZEBITS, \
 	SPA_MINBLOCKSHIFT, 0, x)
-
-#define	DVA_GET_GRID(dva)	BF64_GET((dva)->dva_word[0], 24, 8)
-#define	DVA_SET_GRID(dva, x)	BF64_SET((dva)->dva_word[0], 24, 8, x)
 
 #define	DVA_GET_VDEV(dva)	BF64_GET((dva)->dva_word[0], 32, SPA_VDEVBITS)
 #define	DVA_SET_VDEV(dva, x)	\
@@ -482,15 +474,23 @@ typedef struct blkptr {
 #define	BP_GET_FREE(bp)			BF64_GET((bp)->blk_fill, 0, 1)
 #define	BP_SET_FREE(bp, x)		BF64_SET((bp)->blk_fill, 0, 1, x)
 
-#define	BP_PHYSICAL_BIRTH(bp)		\
-	(BP_IS_EMBEDDED(bp) ? 0 : \
-	(bp)->blk_phys_birth ? (bp)->blk_phys_birth : (bp)->blk_birth)
+#define	BP_GET_LOGICAL_BIRTH(bp)	(bp)->blk_birth_word[1]
+#define	BP_SET_LOGICAL_BIRTH(bp, x)	((bp)->blk_birth_word[1] = (x))
+
+#define	BP_GET_PHYSICAL_BIRTH(bp)	(bp)->blk_birth_word[0]
+#define	BP_SET_PHYSICAL_BIRTH(bp, x)	((bp)->blk_birth_word[0] = (x))
+
+#define	BP_GET_BIRTH(bp)					\
+	(BP_IS_EMBEDDED(bp) ? 0 : 				\
+	BP_GET_PHYSICAL_BIRTH(bp) ? BP_GET_PHYSICAL_BIRTH(bp) :	\
+	BP_GET_LOGICAL_BIRTH(bp))
 
 #define	BP_SET_BIRTH(bp, logical, physical)	\
 {						\
 	ASSERT(!BP_IS_EMBEDDED(bp));		\
-	(bp)->blk_birth = (logical);		\
-	(bp)->blk_phys_birth = ((logical) == (physical) ? 0 : (physical)); \
+	BP_SET_LOGICAL_BIRTH(bp, logical);	\
+	BP_SET_PHYSICAL_BIRTH(bp, 		\
+	    ((logical) == (physical) ? 0 : (physical))); \
 }
 
 #define	BP_GET_FILL(bp)				\
@@ -543,8 +543,8 @@ typedef struct blkptr {
 	(dva1)->dva_word[0] == (dva2)->dva_word[0])
 
 #define	BP_EQUAL(bp1, bp2)	\
-	(BP_PHYSICAL_BIRTH(bp1) == BP_PHYSICAL_BIRTH(bp2) &&	\
-	(bp1)->blk_birth == (bp2)->blk_birth &&			\
+	(BP_GET_BIRTH(bp1) == BP_GET_BIRTH(bp2) &&	\
+	BP_GET_LOGICAL_BIRTH(bp1) == BP_GET_LOGICAL_BIRTH(bp2) &&	\
 	DVA_EQUAL(&(bp1)->blk_dva[0], &(bp2)->blk_dva[0]) &&	\
 	DVA_EQUAL(&(bp1)->blk_dva[1], &(bp2)->blk_dva[1]) &&	\
 	DVA_EQUAL(&(bp1)->blk_dva[2], &(bp2)->blk_dva[2]))
@@ -572,7 +572,7 @@ typedef struct blkptr {
 #define	BP_IS_RAIDZ(bp)		(DVA_GET_ASIZE(&(bp)->blk_dva[0]) > \
 				BP_GET_PSIZE(bp))
 
-#define	BP_ZERO(bp)				\
+#define	BP_ZERO_DVAS(bp)			\
 {						\
 	(bp)->blk_dva[0].dva_word[0] = 0;	\
 	(bp)->blk_dva[0].dva_word[1] = 0;	\
@@ -580,11 +580,16 @@ typedef struct blkptr {
 	(bp)->blk_dva[1].dva_word[1] = 0;	\
 	(bp)->blk_dva[2].dva_word[0] = 0;	\
 	(bp)->blk_dva[2].dva_word[1] = 0;	\
+}
+
+#define	BP_ZERO(bp)				\
+{						\
+	BP_ZERO_DVAS(bp);			\
 	(bp)->blk_prop = 0;			\
 	(bp)->blk_pad[0] = 0;			\
 	(bp)->blk_pad[1] = 0;			\
-	(bp)->blk_phys_birth = 0;		\
-	(bp)->blk_birth = 0;			\
+	(bp)->blk_birth_word[0] = 0;		\
+	(bp)->blk_birth_word[1] = 0;		\
 	(bp)->blk_fill = 0;			\
 	ZIO_SET_CHECKSUM(&(bp)->blk_cksum, 0, 0, 0, 0);	\
 }
@@ -633,7 +638,7 @@ typedef struct blkptr {
 		    (u_longlong_t)BP_GET_LEVEL(bp),			\
 		    type,						\
 		    (u_longlong_t)BP_GET_LSIZE(bp),			\
-		    (u_longlong_t)bp->blk_birth);			\
+		    (u_longlong_t)BP_GET_LOGICAL_BIRTH(bp));		\
 	} else if (BP_IS_EMBEDDED(bp)) {				\
 		len = func(buf + len, size - len,			\
 		    "EMBEDDED [L%llu %s] et=%u %s "			\
@@ -644,14 +649,14 @@ typedef struct blkptr {
 		    compress,						\
 		    (u_longlong_t)BPE_GET_LSIZE(bp),			\
 		    (u_longlong_t)BPE_GET_PSIZE(bp),			\
-		    (u_longlong_t)bp->blk_birth);			\
+		    (u_longlong_t)BP_GET_LOGICAL_BIRTH(bp));		\
 	} else if (BP_IS_REDACTED(bp)) {				\
 		len += func(buf + len, size - len,			\
 		    "REDACTED [L%llu %s] size=%llxL birth=%lluL",	\
 		    (u_longlong_t)BP_GET_LEVEL(bp),			\
 		    type,						\
 		    (u_longlong_t)BP_GET_LSIZE(bp),			\
-		    (u_longlong_t)bp->blk_birth);			\
+		    (u_longlong_t)BP_GET_LOGICAL_BIRTH(bp));		\
 	} else {							\
 		for (int d = 0; d < BP_GET_NDVAS(bp); d++) {		\
 			const dva_t *dva = &bp->blk_dva[d];		\
@@ -693,8 +698,8 @@ typedef struct blkptr {
 		    ws,							\
 		    (u_longlong_t)BP_GET_LSIZE(bp),			\
 		    (u_longlong_t)BP_GET_PSIZE(bp),			\
-		    (u_longlong_t)bp->blk_birth,			\
-		    (u_longlong_t)BP_PHYSICAL_BIRTH(bp),		\
+		    (u_longlong_t)BP_GET_LOGICAL_BIRTH(bp),		\
+		    (u_longlong_t)BP_GET_BIRTH(bp),			\
 		    (u_longlong_t)BP_GET_FILL(bp),			\
 		    ws,							\
 		    (u_longlong_t)bp->blk_cksum.zc_word[0],		\
@@ -769,7 +774,7 @@ extern int bpobj_enqueue_free_cb(void *arg, const blkptr_t *bp, dmu_tx_t *tx);
 
 #define	SPA_ASYNC_CONFIG_UPDATE			0x01
 #define	SPA_ASYNC_REMOVE			0x02
-#define	SPA_ASYNC_PROBE				0x04
+#define	SPA_ASYNC_FAULT_VDEV			0x04
 #define	SPA_ASYNC_RESILVER_DONE			0x08
 #define	SPA_ASYNC_RESILVER			0x10
 #define	SPA_ASYNC_AUTOEXPAND			0x20
@@ -784,7 +789,7 @@ extern int bpobj_enqueue_free_cb(void *arg, const blkptr_t *bp, dmu_tx_t *tx);
 #define	SPA_ASYNC_DETACH_SPARE			0x4000
 
 /* device manipulation */
-extern int spa_vdev_add(spa_t *spa, nvlist_t *nvroot);
+extern int spa_vdev_add(spa_t *spa, nvlist_t *nvroot, boolean_t ashift_check);
 extern int spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot,
     int replacing, int rebuild);
 extern int spa_vdev_detach(spa_t *spa, uint64_t guid, uint64_t pguid,
@@ -825,8 +830,17 @@ extern void spa_sync_allpools(void);
 
 extern uint_t zfs_sync_pass_deferred_free;
 
+/* spa sync taskqueues */
+taskq_t *spa_sync_tq_create(spa_t *spa, const char *name);
+void spa_sync_tq_destroy(spa_t *spa);
+uint_t spa_acq_allocator(spa_t *spa);
+void spa_rel_allocator(spa_t *spa, uint_t allocator);
+void spa_select_allocator(zio_t *zio);
+
 /* spa namespace global mutex */
 extern kmutex_t spa_namespace_lock;
+extern avl_tree_t spa_namespace_avl;
+extern kcondvar_t spa_namespace_cv;
 
 /*
  * SPA configuration functions in spa_config.c
@@ -837,7 +851,7 @@ extern kmutex_t spa_namespace_lock;
 
 extern void spa_write_cachefile(spa_t *, boolean_t, boolean_t, boolean_t);
 extern void spa_config_load(void);
-extern nvlist_t *spa_all_configs(uint64_t *);
+extern int spa_all_configs(uint64_t *generation, nvlist_t **pools);
 extern void spa_config_set(spa_t *spa, nvlist_t *config);
 extern nvlist_t *spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg,
     int getstats);
@@ -935,6 +949,14 @@ typedef struct spa_iostats {
 	kstat_named_t	simple_trim_bytes_skipped;
 	kstat_named_t	simple_trim_extents_failed;
 	kstat_named_t	simple_trim_bytes_failed;
+	kstat_named_t	arc_read_count;
+	kstat_named_t	arc_read_bytes;
+	kstat_named_t	arc_write_count;
+	kstat_named_t	arc_write_bytes;
+	kstat_named_t	direct_read_count;
+	kstat_named_t	direct_read_bytes;
+	kstat_named_t	direct_write_count;
+	kstat_named_t	direct_write_bytes;
 } spa_iostats_t;
 
 extern void spa_stats_init(spa_t *spa);
@@ -958,6 +980,10 @@ extern void spa_iostats_trim_add(spa_t *spa, trim_type_t type,
     uint64_t extents_written, uint64_t bytes_written,
     uint64_t extents_skipped, uint64_t bytes_skipped,
     uint64_t extents_failed, uint64_t bytes_failed);
+extern void spa_iostats_read_add(spa_t *spa, uint64_t size, uint64_t iops,
+    uint32_t flags);
+extern void spa_iostats_write_add(spa_t *spa, uint64_t size, uint64_t iops,
+    uint32_t flags);
 extern void spa_import_progress_add(spa_t *spa);
 extern void spa_import_progress_remove(uint64_t spa_guid);
 extern int spa_import_progress_set_mmp_check(uint64_t pool_guid,
@@ -966,6 +992,10 @@ extern int spa_import_progress_set_max_txg(uint64_t pool_guid,
     uint64_t max_txg);
 extern int spa_import_progress_set_state(uint64_t pool_guid,
     spa_load_state_t spa_load_state);
+extern void spa_import_progress_set_notes(spa_t *spa,
+    const char *fmt, ...) __printflike(2, 3);
+extern void spa_import_progress_set_notes_nolog(spa_t *spa,
+    const char *fmt, ...) __printflike(2, 3);
 
 /* Pool configuration locks */
 extern int spa_config_tryenter(spa_t *spa, int locks, const void *tag,
@@ -1036,8 +1066,8 @@ extern metaslab_class_t *spa_log_class(spa_t *spa);
 extern metaslab_class_t *spa_embedded_log_class(spa_t *spa);
 extern metaslab_class_t *spa_special_class(spa_t *spa);
 extern metaslab_class_t *spa_dedup_class(spa_t *spa);
-extern metaslab_class_t *spa_preferred_class(spa_t *spa, uint64_t size,
-    dmu_object_type_t objtype, uint_t level, uint_t special_smallblk);
+extern metaslab_class_t *spa_preferred_class(spa_t *spa, const zio_t *zio);
+extern boolean_t spa_special_has_ddt(spa_t *spa);
 
 extern void spa_evicting_os_register(spa_t *, objset_t *os);
 extern void spa_evicting_os_deregister(spa_t *, objset_t *os);
@@ -1056,6 +1086,8 @@ extern uint64_t spa_deadman_synctime(spa_t *spa);
 extern uint64_t spa_deadman_ziotime(spa_t *spa);
 extern uint64_t spa_dirty_data(spa_t *spa);
 extern spa_autotrim_t spa_get_autotrim(spa_t *spa);
+extern int spa_get_allocator(spa_t *spa);
+extern void spa_set_allocator(spa_t *spa, const char *allocator);
 
 /* Miscellaneous support routines */
 extern void spa_load_failed(spa_t *spa, const char *fmt, ...)
@@ -1072,7 +1104,7 @@ extern void spa_strfree(char *);
 extern uint64_t spa_generate_guid(spa_t *spa);
 extern void snprintf_blkptr(char *buf, size_t buflen, const blkptr_t *bp);
 extern void spa_freeze(spa_t *spa);
-extern int spa_change_guid(spa_t *spa);
+extern int spa_change_guid(spa_t *spa, const uint64_t *guidp);
 extern void spa_upgrade(spa_t *spa, uint64_t version);
 extern void spa_evict_all(void);
 extern vdev_t *spa_lookup_by_guid(spa_t *spa, uint64_t guid,
@@ -1109,6 +1141,8 @@ extern uint32_t spa_get_hostid(spa_t *spa);
 extern void spa_activate_allocation_classes(spa_t *, dmu_tx_t *);
 extern boolean_t spa_livelist_delete_check(spa_t *spa);
 
+extern boolean_t spa_mmp_remote_host_activity(spa_t *spa);
+
 extern spa_mode_t spa_mode(spa_t *spa);
 extern uint64_t zfs_strtonum(const char *str, char **nptr);
 
@@ -1133,9 +1167,9 @@ extern const char *spa_state_to_name(spa_t *spa);
 /* error handling */
 struct zbookmark_phys;
 extern void spa_log_error(spa_t *spa, const zbookmark_phys_t *zb,
-    const uint64_t *birth);
+    const uint64_t birth);
 extern void spa_remove_error(spa_t *spa, zbookmark_phys_t *zb,
-    const uint64_t *birth);
+    uint64_t birth);
 extern int zfs_ereport_post(const char *clazz, spa_t *spa, vdev_t *vd,
     const zbookmark_phys_t *zb, zio_t *zio, uint64_t state);
 extern boolean_t zfs_ereport_is_valid(const char *clazz, spa_t *spa, vdev_t *vd,
@@ -1179,7 +1213,9 @@ extern void spa_boot_init(void);
 
 /* properties */
 extern int spa_prop_set(spa_t *spa, nvlist_t *nvp);
-extern int spa_prop_get(spa_t *spa, nvlist_t **nvp);
+extern int spa_prop_get(spa_t *spa, nvlist_t *nvp);
+extern int spa_prop_get_nvlist(spa_t *spa, char **props,
+    unsigned int n_props, nvlist_t *outnvl);
 extern void spa_prop_clear_bootfs(spa_t *spa, uint64_t obj, dmu_tx_t *tx);
 extern void spa_configfile_set(spa_t *, nvlist_t *, boolean_t);
 
@@ -1207,6 +1243,7 @@ int param_set_deadman_ziotime(ZFS_MODULE_PARAM_ARGS);
 int param_set_deadman_synctime(ZFS_MODULE_PARAM_ARGS);
 int param_set_slop_shift(ZFS_MODULE_PARAM_ARGS);
 int param_set_deadman_failmode(ZFS_MODULE_PARAM_ARGS);
+int param_set_active_allocator(ZFS_MODULE_PARAM_ARGS);
 
 #ifdef ZFS_DEBUG
 #define	dprintf_bp(bp, fmt, ...) do {				\

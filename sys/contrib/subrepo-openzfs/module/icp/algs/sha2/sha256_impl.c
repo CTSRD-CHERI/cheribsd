@@ -119,7 +119,15 @@ const sha256_ops_t sha256_shani_impl = {
 #endif
 
 #elif (defined(__aarch64__) && !defined(__CHERI_PURE_CAPABILITY__)) || \
-    (defined(__arm__) && __ARM_ARCH > 6)
+    defined(__arm__)
+extern void zfs_sha256_block_armv7(uint32_t s[8], const void *, size_t);
+const sha256_ops_t sha256_armv7_impl = {
+	.is_supported = sha2_is_supported,
+	.transform = zfs_sha256_block_armv7,
+	.name = "armv7"
+};
+
+#if __ARM_ARCH > 6
 static boolean_t sha256_have_neon(void)
 {
 	return (kfpu_allowed() && zfs_neon_available());
@@ -129,13 +137,6 @@ static boolean_t sha256_have_armv8ce(void)
 {
 	return (kfpu_allowed() && zfs_sha256_available());
 }
-
-extern void zfs_sha256_block_armv7(uint32_t s[8], const void *, size_t);
-const sha256_ops_t sha256_armv7_impl = {
-	.is_supported = sha2_is_supported,
-	.transform = zfs_sha256_block_armv7,
-	.name = "armv7"
-};
 
 TF(zfs_sha256_block_neon, tf_sha256_neon);
 const sha256_ops_t sha256_neon_impl = {
@@ -150,6 +151,7 @@ const sha256_ops_t sha256_armv8_impl = {
 	.transform = tf_sha256_armv8ce,
 	.name = "armv8-ce"
 };
+#endif
 
 #elif defined(__PPC64__)
 static boolean_t sha256_have_isa207(void)
@@ -194,10 +196,12 @@ static const sha256_ops_t *const sha256_impls[] = {
 	&sha256_shani_impl,
 #endif
 #if (defined(__aarch64__) && !defined(__CHERI_PURE_CAPABILITY__)) || \
-    (defined(__arm__) && __ARM_ARCH > 6)
+    defined(__arm__)
 	&sha256_armv7_impl,
+#if __ARM_ARCH > 6
 	&sha256_neon_impl,
 	&sha256_armv8_impl,
+#endif
 #endif
 #if defined(__PPC64__)
 	&sha256_ppc_impl,

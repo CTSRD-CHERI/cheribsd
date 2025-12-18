@@ -32,7 +32,6 @@
 #ifndef _RTLD_AVOID_LIBC_DEPS_H_
 #define _RTLD_AVOID_LIBC_DEPS_H_
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/fcntl.h>
 #include <sys/stat.h>
@@ -52,8 +51,10 @@ int	__sys___getcwd(char *, size_t);
 int	__sys_sigprocmask(int, const sigset_t *, sigset_t *);
 int	__sys_thr_kill(long, int);
 int	__sys_thr_self(long *);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-void	__sys_thr_exit(long *);
+#ifdef CHERI_LIB_C18N
+void    __sys_thr_exit(long *);
+struct sigaction;
+int     __sys_sigaction(int, const struct sigaction *, struct sigaction *);
 #endif
 __ssize_t	__sys_pread(int, void *, __size_t, __off_t);
 __ssize_t	__sys_read(int, void *, __size_t);

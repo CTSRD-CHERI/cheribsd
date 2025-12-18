@@ -32,6 +32,7 @@
 #include <sys/param.h>
 #include <sys/bio.h>
 #include <sys/bus.h>
+#include <sys/counter.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
@@ -57,9 +58,6 @@ MALLOC_DECLARE(M_NVME);
 
 #define NVME_ADMIN_TRACKERS	(16)
 #define NVME_ADMIN_ENTRIES	(128)
-/* min and max are defined in admin queue attributes section of spec */
-#define NVME_MIN_ADMIN_ENTRIES	(2)
-#define NVME_MAX_ADMIN_ENTRIES	(4096)
 
 /*
  * NVME_IO_ENTRIES defines the size of an I/O qpair's submission and completion
@@ -74,11 +72,6 @@ MALLOC_DECLARE(M_NVME);
 #define NVME_MIN_IO_TRACKERS	(4)
 #define NVME_MAX_IO_TRACKERS	(1024)
 
-/*
- * NVME_MAX_IO_ENTRIES is not defined, since it is specified in CC.MQES
- *  for each controller.
- */
-
 #define NVME_INT_COAL_TIME	(0)	/* disabled */
 #define NVME_INT_COAL_THRESHOLD (0)	/* 0-based */
 
@@ -86,6 +79,7 @@ MALLOC_DECLARE(M_NVME);
 #define NVME_MAX_CONSUMERS	(2)
 #define NVME_MAX_ASYNC_EVENTS	(8)
 
+#define NVME_ADMIN_TIMEOUT_PERIOD	(60)    /* in seconds */
 #define NVME_DEFAULT_TIMEOUT_PERIOD	(30)    /* in seconds */
 #define NVME_MIN_TIMEOUT_PERIOD		(5)
 #define NVME_MAX_TIMEOUT_PERIOD		(120)
@@ -149,8 +143,6 @@ struct nvme_tracker {
 
 enum nvme_recovery {
 	RECOVERY_NONE = 0,		/* Normal operations */
-	RECOVERY_START,			/* Deadline has passed, start recovering */
-	RECOVERY_RESET,			/* This pass, initiate reset of controller */
 	RECOVERY_WAITING,		/* waiting for the reset to complete */
 };
 struct nvme_qpair {
@@ -164,10 +156,9 @@ struct nvme_qpair {
 	struct resource		*res;
 	void 			*tag;
 
-	struct callout		timer;
-	sbintime_t		deadline;
-	bool			timer_armed;
-	enum nvme_recovery	recovery_state;
+	struct callout		timer;			/* recovery lock */
+	bool			timer_armed;		/* recovery lock */
+	enum nvme_recovery	recovery_state;		/* recovery lock */
 
 	uint32_t		num_entries;
 	uint32_t		num_trackers;
@@ -184,6 +175,7 @@ struct nvme_qpair {
 	int64_t			num_retries;
 	int64_t			num_failures;
 	int64_t			num_ignored;
+	int64_t			num_recovery_nolock;
 
 	struct nvme_command	*cmd;
 	struct nvme_completion	*cpl;
@@ -202,7 +194,7 @@ struct nvme_qpair {
 	struct nvme_tracker	**act_tr;
 
 	struct mtx_padalign	lock;
-
+	struct mtx_padalign	recovery;
 } __aligned(CACHE_LINE_SIZE);
 
 struct nvme_namespace {
@@ -256,7 +248,6 @@ struct nvme_controller {
 	uint32_t		queues_created;
 
 	struct task		reset_task;
-	struct task		fail_req_task;
 	struct taskqueue	*taskqueue;
 
 	/* For shared legacy interrupt. */
@@ -282,6 +273,7 @@ struct nvme_controller {
 	uint32_t		int_coal_threshold;
 
 	/** timeout period in seconds */
+	uint32_t		admin_timeout_period;
 	uint32_t		timeout_period;
 
 	/** doorbell stride */
@@ -306,11 +298,15 @@ struct nvme_controller {
 	void				*cons_cookie[NVME_MAX_CONSUMERS];
 
 	uint32_t			is_resetting;
-	uint32_t			is_initialized;
 	uint32_t			notification_sent;
+	u_int				fail_on_reset;
 
 	bool				is_failed;
+	bool				is_failed_admin;
 	bool				is_dying;
+	bool				isr_warned;
+	bool				is_initialized;
+
 	STAILQ_HEAD(, nvme_request)	fail_req;
 
 	/* Host Memory Buffer */
@@ -326,6 +322,9 @@ struct nvme_controller {
 	bus_dmamap_t			hmb_desc_map;
 	struct nvme_hmb_desc		*hmb_desc_vaddr;
 	uint64_t			hmb_desc_paddr;
+
+	/* Statistics */
+	counter_u64_t			alignment_splits;
 };
 
 #define nvme_mmio_offsetof(reg)						       \
@@ -411,8 +410,6 @@ void	nvme_ctrlr_submit_admin_request(struct nvme_controller *ctrlr,
 					struct nvme_request *req);
 void	nvme_ctrlr_submit_io_request(struct nvme_controller *ctrlr,
 				     struct nvme_request *req);
-void	nvme_ctrlr_post_failed_request(struct nvme_controller *ctrlr,
-				       struct nvme_request *req);
 
 int	nvme_qpair_construct(struct nvme_qpair *qpair,
 			     uint32_t num_entries, uint32_t num_trackers,
@@ -424,9 +421,6 @@ void	nvme_qpair_submit_request(struct nvme_qpair *qpair,
 				  struct nvme_request *req);
 void	nvme_qpair_reset(struct nvme_qpair *qpair);
 void	nvme_qpair_fail(struct nvme_qpair *qpair);
-void	nvme_qpair_manual_complete_request(struct nvme_qpair *qpair,
-					   struct nvme_request *req,
-                                           uint32_t sct, uint32_t sc);
 
 void	nvme_admin_qpair_enable(struct nvme_qpair *qpair);
 void	nvme_admin_qpair_disable(struct nvme_qpair *qpair);

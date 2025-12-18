@@ -1,4 +1,3 @@
-
 Note: If you modify these files, please keep hier(7) updated!
 
 These files are used to create empty file hierarchies for building the
@@ -24,8 +23,8 @@ and keep them in good working order.
 
             mkdir /tmp/MTREE
             mtree -deU -f BSD.X.dist -p /tmp/MTREE
-            mtree -cdin -k uname,gname,mode -p /tmp/MTREE | \
-		sed -e 's/ *$//' >BSD.X.new
+            mtree -bcdjn -F freebsd9 -k uname,gname,mode -p /tmp/MTREE | \
+                sed -e 's/ *$//' >BSD.X.new
             diff -u BSD.X.dist BSD.X.new
             rm -r /tmp/MTREE
 

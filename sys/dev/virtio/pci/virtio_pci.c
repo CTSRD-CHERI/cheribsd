@@ -26,7 +26,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -169,7 +168,7 @@ vtpci_add_child(struct vtpci_common *cn)
 
 	dev = cn->vtpci_dev;
 
-	child = device_add_child(dev, NULL, -1);
+	child = device_add_child(dev, NULL, DEVICE_UNIT_ANY);
 	if (child == NULL) {
 		device_printf(dev, "cannot create child device\n");
 		return (ENOMEM);
@@ -267,7 +266,7 @@ vtpci_negotiate_features(struct vtpci_common *cn,
 	return (features);
 }
 
-int
+bool
 vtpci_with_feature(struct vtpci_common *cn, uint64_t feature)
 {
 	return ((cn->vtpci_features & feature) != 0);
@@ -324,7 +323,7 @@ vtpci_write_ivar(struct vtpci_common *cn, int index, uintptr_t value)
 }
 
 int
-vtpci_alloc_virtqueues(struct vtpci_common *cn, int flags, int nvqs,
+vtpci_alloc_virtqueues(struct vtpci_common *cn, int nvqs,
     struct vq_alloc_info *vq_info)
 {
 	device_t dev;

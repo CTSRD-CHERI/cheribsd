@@ -48,7 +48,9 @@
 #define __cond_lock(x,c)		(c)
 #define	__bitwise
 #define __devinitdata
+#ifndef	__deprecated
 #define	__deprecated
+#endif
 #define __init
 #define	__initconst
 #define	__devinit
@@ -67,6 +69,17 @@
 #define	____cacheline_aligned_in_smp	__aligned(CACHE_LINE_SIZE)
 #define	fallthrough			/* FALLTHROUGH */ do { } while(0)
 
+#if __has_attribute(__nonstring__)
+#define	__nonstring			__attribute__((__nonstring__))
+#else
+#define	__nonstring
+#endif
+#if __has_attribute(__counted_by__)
+#define	__counted_by(_x)		__attribute__((__counted_by__(_x)))
+#else
+#define	__counted_by(_x)
+#endif
+
 #define	likely(x)			__builtin_expect(!!(x), 1)
 #define	unlikely(x)			__builtin_expect(!!(x), 0)
 #define typeof(x)			__typeof(x)
@@ -77,6 +90,10 @@
 #define	__must_check			__result_use_check
 
 #define	__printf(a,b)			__printflike(a,b)
+
+#define __diag_push()
+#define __diag_pop()
+#define __diag_ignore_all(...)
 
 #define	barrier()			__asm__ __volatile__("": : :"memory")
 
@@ -109,5 +126,8 @@
 #define	__must_be_array(a)	__same_type(a, &(a)[0])
 
 #define	sizeof_field(_s, _m)	sizeof(((_s *)0)->_m)
+
+#define is_signed_type(t)	((t)-1 < (t)1)
+#define is_unsigned_type(t)	((t)-1 > (t)1)
 
 #endif	/* _LINUXKPI_LINUX_COMPILER_H_ */

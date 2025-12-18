@@ -52,6 +52,7 @@ daichi [label="Daichi Goto\ndaichi@FreeBSD.org\n2002/10/17\n2018/06/01"]
 dhn [label="Dennis Herrmann\ndhn@FreeBSD.org\n2009/03/03\n2015/06/11"]
 dryice [label="Dryice Dong Liu\ndryice@FreeBSD.org\n2006/12/25\n2018/11/06"]
 dteske [label="Devin Teske\ndteske@FreeBSD.org\n2018/03/01\n2019/11/05"]
+dutra [label="Gabriel M. Dutra\ndutra@FreeBSD.org\n2024/01/12"]
 edwin [label="Edwin Groothuis\nedwin@FreeBSD.org\n2002/10/22\n2016/11/16"]
 eik [label="Oliver Eikemeier\neik@FreeBSD.org\n2003/11/12\n2006/12/14"]
 erwin [label="Erwin Lansing\nerwin@FreeBSD.org\n2003/06/04\n2016/10/12"]
@@ -129,6 +130,7 @@ tabthorpe [label="Thomas Abthorpe\ntabthorpe@FreeBSD.org\n2007/08/20\n2018/02/23
 tj [label="Tom Judge\ntj@FreeBSD.org\n2012/05/28\n2018/11/06"]
 tmclaugh [label="Tom McLaughlin\ntmclaugh@FreeBSD.org\n2005/09/15\n2011/04/16"]
 trasz [label="Edward Tomasz Napierala\ntrasz@FreeBSD.org\n2007/04/12\n2022/06/06"]
+uzsolt [label="Zsolt Udvari\nuzsolt@FreeBSD.org\n2024/01/12"]
 vg [label="Veniamin Gvozdikov\nvg@FreeBSD.org\n2013/06/11\n2018/02/23"]
 wg [label="William Grzybowski\nwg@FreeBSD.org\n2013/04/01\n2022/06/06"]
 will [label="Will Andrews\nwill@FreeBSD.org\n2000/03/20\n2006/09/01"]
@@ -203,6 +205,7 @@ grembo [label="Michael Gmelin\ngrembo@FreeBSD.org\n2014/01/21"]
 hrs [label="Hiroki Sato\nhrs@FreeBSD.org\n2004/04/10"]
 jase [label="Jase Thew\njase@FreeBSD.org\n2012/05/30"]
 jbeich [label="Jan Beich\njbeich@FreeBSD.org\n2015/01/19"]
+jbo [label="Joel Bodenmann\njbo@FreeBSD.org\n2023/09/06"]
 jgh [label="Jason Helfman\njgh@FreeBSD.org\n2011/12/16"]
 jhale [label="Jason E. Hale\njhale@FreeBSD.org\n2012/09/10"]
 jhixson [label="John Hixson\njhixson@FreeBSD.org\n2018/07/16"]
@@ -239,6 +242,7 @@ mat [label="Mathieu Arnold\nmat@FreeBSD.org\n2003/08/15"]
 matthew [label="Matthew Seaman\nmatthew@FreeBSD.org\n2012/02/07"]
 meta [label="Koichiro Iwao\nmeta@FreeBSD.org\n2018/03/19"]
 mfechner [label="Matthias Fechner\nmfechner@FreeBSD.org\n2018/03/01"]
+michaelo [label="Michael Osipov\nmichaelo@FreeBSD.org\n2023/10/16"]
 mikael [label="Mikael Urankar\nmikael@FreeBSD.org\n2020/01/16"]
 milki [label="Jonathan Chu\nmilki@FreeBSD.org\n2013/12/15"]
 misha [label="Mikhail Pchelin\nmisha@FreeBSD.org\n2016/11/15"]
@@ -386,6 +390,8 @@ beech -> mva
 billf -> sobomax
 billf -> will
 
+bofh -> uzsolt
+
 brooks -> kmoore
 
 clement -> tdb
@@ -412,6 +418,7 @@ culot -> wg
 db -> tj
 db -> shurd
 
+dbaio -> dutra
 dbaio -> eduardo
 
 decke -> sperber
@@ -421,6 +428,8 @@ delphij -> nemoliu
 delphij -> rafan
 
 demon -> mat
+
+diizzy -> uzsolt
 
 eadler -> ak
 eadler -> antoine
@@ -489,6 +498,7 @@ gabor -> scheidell
 garga -> acm
 garga -> alepulver
 garga -> dbaio
+garga -> dutra
 garga -> eduardo
 garga -> mandree
 garga -> mm
@@ -532,6 +542,7 @@ joneum -> kai
 
 jrm -> dch
 jrm -> jwb
+jrm -> michaelo
 
 junovitch -> tz
 
@@ -677,6 +688,8 @@ olivier -> pizzamig
 osa -> otis
 osa -> vg
 
+otis -> michaelo
+
 pat -> adamw
 
 pav -> ahze
@@ -791,6 +804,7 @@ tcberner -> adridg
 tcberner -> arrowd
 tcberner -> diizzy
 tcberner -> fernape
+tcberner -> jbo
 tcberner -> joneum
 tcberner -> kai
 tcberner -> lbartoletti
@@ -841,5 +855,7 @@ wxs -> swills
 wxs -> zi
 
 ygy -> yasu
+
+zirias -> jbo
 
 }

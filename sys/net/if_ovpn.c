@@ -255,6 +255,7 @@ static const char ovpnname[] = "ovpn";
 static const char ovpngroupname[] = "openvpn";
 
 static MALLOC_DEFINE(M_OVPN, ovpnname, "OpenVPN DCO Interface");
+#define	MTAG_OVPN_LOOP		0x6f76706e /* ovpn */
 
 SYSCTL_DECL(_net_link);
 static SYSCTL_NODE(_net_link, IFT_OTHER, openvpn, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
@@ -378,7 +379,7 @@ ovpn_has_peers(struct ovpn_softc *sc)
 }
 
 static void
-ovpn_rele_so(struct ovpn_softc *sc, struct ovpn_kpeer *peer)
+ovpn_rele_so(struct ovpn_softc *sc)
 {
 	bool has_peers;
 
@@ -389,15 +390,11 @@ ovpn_rele_so(struct ovpn_softc *sc, struct ovpn_kpeer *peer)
 
 	has_peers = ovpn_has_peers(sc);
 
-	/* Only remove the tunnel function if we're releasing the socket for
-	 * the last peer. */
-	if (! has_peers)
-		(void)udp_set_kernel_tunneling(sc->so, NULL, NULL, NULL);
-
-	sorele(sc->so);
-
-	if (! has_peers)
-		sc->so = NULL;
+	if (! has_peers) {
+		MPASS(sc->peercount == 0);
+	} else {
+		MPASS(sc->peercount > 0);
+	}
 }
 
 static void
@@ -488,7 +485,7 @@ ovpn_peer_release_ref(struct ovpn_kpeer *peer, bool locked)
 		ovpn_free_kkey_dir(peer->keys[i].decrypt);
 	}
 
-	ovpn_rele_so(sc, peer);
+	ovpn_rele_so(sc);
 
 	callout_stop(&peer->ping_send);
 	callout_stop(&peer->ping_rcv);
@@ -508,13 +505,13 @@ ovpn_new_peer(struct ifnet *ifp, const nvlist_t *nvl)
 	struct sockaddr_storage remote;
 	struct ovpn_kpeer *peer = NULL;
 	struct file *fp = NULL;
-	struct sockaddr *name = NULL;
 	struct ovpn_softc *sc = ifp->if_softc;
 	struct thread *td = curthread;
 	struct socket *so = NULL;
 	int fd;
 	uint32_t peerid;
 	int ret = 0;
+	bool setcb = false;
 
 	if (nvl == NULL)
 		return (EINVAL);
@@ -574,23 +571,21 @@ ovpn_new_peer(struct ifnet *ifp, const nvlist_t *nvl)
 	callout_init_rm(&peer->ping_send, &sc->lock, CALLOUT_SHAREDLOCK);
 	callout_init_rm(&peer->ping_rcv, &sc->lock, 0);
 
-	ret = so->so_proto->pr_sockaddr(so, &name);
+	peer->local.ss_len = sizeof(peer->local);
+	ret = sosockaddr(so, (struct sockaddr *)&peer->local);
 	if (ret)
 		goto error;
 
-	if (ovpn_get_port((struct sockaddr_storage *)name) == 0) {
+	if (ovpn_get_port(&peer->local) == 0) {
 		ret = EINVAL;
 		goto error;
 	}
-	if (name->sa_family != remote.ss_family) {
+	if (peer->local.ss_family != remote.ss_family) {
 		ret = EINVAL;
 		goto error;
 	}
 
-	memcpy(&peer->local, name, name->sa_len);
 	memcpy(&peer->remote, &remote, sizeof(remote));
-	free(name, M_SONAME);
-	name = NULL;
 
 	if (peer->local.ss_family == AF_INET6 &&
 	    IN6_IS_ADDR_V4MAPPED(&TO_IN6(&peer->remote)->sin6_addr)) {
@@ -630,33 +625,32 @@ ovpn_new_peer(struct ifnet *ifp, const nvlist_t *nvl)
 	if (sc->so != NULL && so != sc->so)
 		goto error_locked;
 
-	if (sc->so == NULL)
+	if (sc->so == NULL) {
 		sc->so = so;
+		/*
+		 * Maintain one extra ref so the socket doesn't go away until
+		 * we're destroying the ifp.
+		 */
+		soref(sc->so);
+		setcb = true;
+	}
 
 	/* Insert the peer into the list. */
 	RB_INSERT(ovpn_kpeers, &sc->peers, peer);
 	sc->peercount++;
-	soref(sc->so);
-
-	ret = udp_set_kernel_tunneling(sc->so, ovpn_udp_input, NULL, sc);
-	if (ret == EBUSY) {
-		/* Fine, another peer already set the input function. */
-		ret = 0;
-	}
-	if (ret != 0) {
-		RB_REMOVE(ovpn_kpeers, &sc->peers, peer);
-		sc->peercount--;
-		goto error_locked;
-	}
 
 	OVPN_WUNLOCK(sc);
+
+	if (setcb) {
+		ret = udp_set_kernel_tunneling(sc->so, ovpn_udp_input, NULL, sc);
+		MPASS(ret == 0);
+	}
 
 	goto done;
 
 error_locked:
 	OVPN_WUNLOCK(sc);
 error:
-	free(name, M_SONAME);
 	COUNTER_ARRAY_FREE(peer->counters, OVPN_PEER_COUNTER_SIZE);
 	uma_zfree_pcpu(pcpu_zone_4, peer->last_active);
 	free(peer, M_OVPN);
@@ -1548,6 +1542,10 @@ ovpn_finish_rx(struct ovpn_softc *sc, struct mbuf *m,
 	/* Clear checksum flags in case the real hardware set them. */
 	m->m_pkthdr.csum_flags = 0;
 
+	/* Clear mbuf tags & flags */
+	m_tag_delete_nonpersistent(m);
+	m_clrprotoflags(m);
+
 	/* Ensure we can read the first byte. */
 	m = m_pullup(m, 1);
 	if (m == NULL) {
@@ -1854,6 +1852,14 @@ ovpn_transmit_to_peer(struct ifnet *ifp, struct mbuf *m,
 	if (af != 0)
 		BPF_MTAP2(ifp, &af, sizeof(af), m);
 
+	if (__predict_false(if_tunnel_check_nesting(ifp, m, MTAG_OVPN_LOOP, 3))) {
+		if (_ovpn_lock_trackerp != NULL)
+			OVPN_RUNLOCK(sc);
+		OVPN_COUNTER_ADD(sc, lost_data_pkts_out, 1);
+		m_freem(m);
+		return (ELOOP);
+	}
+
 	len = m->m_pkthdr.len;
 	MPASS(len <= ifp->if_mtu);
 
@@ -2106,6 +2112,12 @@ ovpn_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 
 	sc = ifp->if_softc;
 
+	m = m_unshare(m, M_NOWAIT);
+	if (m == NULL) {
+		OVPN_COUNTER_ADD(sc, lost_data_pkts_out, 1);
+		return (ENOBUFS);
+	}
+
 	OVPN_RLOCK(sc);
 
 	SDT_PROBE1(if_ovpn, tx, transmit, start, m);
@@ -2223,6 +2235,12 @@ ovpn_udp_input(struct mbuf *m, int off, struct inpcb *inp,
 	OVPN_RLOCK_TRACKER;
 
 	M_ASSERTPKTHDR(m);
+
+	m = m_unshare(m, M_NOWAIT);
+	if (m == NULL) {
+		OVPN_COUNTER_ADD(sc, nomem_data_pkts_in, 1);
+		return (true);
+	}
 
 	OVPN_COUNTER_ADD(sc, transport_bytes_received, m->m_pkthdr.len - off);
 
@@ -2472,11 +2490,20 @@ static void
 ovpn_clone_destroy_cb(struct epoch_context *ctx)
 {
 	struct ovpn_softc *sc;
+	int ret __diagused;
 
 	sc = __containerof(ctx, struct ovpn_softc, epoch_ctx);
 
 	MPASS(sc->peercount == 0);
 	MPASS(RB_EMPTY(&sc->peers));
+
+	if (sc->so != NULL) {
+		CURVNET_SET(sc->ifp->if_vnet);
+		ret = udp_set_kernel_tunneling(sc->so, NULL, NULL, NULL);
+		MPASS(ret == 0);
+		sorele(sc->so);
+		CURVNET_RESTORE();
+	}
 
 	COUNTER_ARRAY_FREE(sc->counters, OVPN_COUNTER_SIZE);
 
@@ -2573,3 +2600,4 @@ static moduledata_t ovpn_mod = {
 
 DECLARE_MODULE(if_ovpn, ovpn_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 MODULE_VERSION(if_ovpn, 1);
+MODULE_DEPEND(if_ovpn, crypto, 1, 1, 1);

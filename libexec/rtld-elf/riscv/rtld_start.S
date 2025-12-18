@@ -38,6 +38,49 @@
 #include <machine/riscvreg.h>
 #endif
 
+#define	INT_SIZE	8
+#define	INT(x)		x
+#define	LOAD_INT	PTR(ld)
+#define	STORE_INT	PTR(sd)
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	LOAD_PTR	LOAD_CAP
+#define	STORE_PTR	STORE_CAP
+#define	ADD_PTR		cincoffset
+#define	MV_PTR		cmove
+#define	PTR_SIZE	CAP_SIZE
+#define	PTR(x)		CAP(x)
+#else
+#define	LOAD_PTR	LOAD_INT
+#define	STORE_PTR	STORE_INT
+#define	ADD_PTR		add
+#define	MV_PTR		mv
+#define	PTR_SIZE	INT_SIZE
+#define	PTR(x)		INT(x)
+#endif
+
+#define	JR_PTR		PTR(jr)
+
+#if __has_feature(capabilities)
+#define	LOAD_CAP	PTR(lc)
+#define	STORE_CAP	PTR(sc)
+#define	CAP_SIZE	16
+#define	CAP(x)		c ## x
+#else
+#define	LOAD_CAP	ld
+#define	STORE_CAP	sd
+#define	CAP_SIZE	8
+#define	CAP(x)		x
+#endif
+
+#ifdef __riscv_float_abi_double
+#define	FLT_SIZE	8
+#define	LOAD_FLT	PTR(fld)
+#define	STORE_FLT	PTR(fsd)
+#else
+#define	FLT_SIZE	0
+#endif
+
 /*
  * Pure-capability:
  *
@@ -56,6 +99,7 @@
  */
 
 ENTRY(.rtld_start)
+	.cfi_undefined PTR(ra)	/* Do not attempt to unwind any further. */
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	cs0, ca0				/* Put aux in a callee-saved register */
 	cmove	cs1, csp				/* And the stack pointer */
@@ -102,58 +146,11 @@ ENTRY(.rtld_start)
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(.rtld_start)
 
-#define	INT_SIZE	8
-#define	INT(x)		x
-#define	LOAD_INT	PTR(ld)
-#define	STORE_INT	PTR(sd)
-
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	LOAD_PTR	LOAD_CAP
-#define	STORE_PTR	STORE_CAP
-#define	ADD_PTR		cincoffset
-#define	MV_PTR		cmove
-#define	PTR_SIZE	CAP_SIZE
-#define	PTR(x)		CAP(x)
-#else
-#define	LOAD_PTR	LOAD_INT
-#define	STORE_PTR	STORE_INT
-#define	ADD_PTR		add
-#define	MV_PTR		mv
-#define	PTR_SIZE	INT_SIZE
-#define	PTR(x)		INT(x)
-#endif
-
-#define	JR_PTR		PTR(jr)
-
-#if __has_feature(capabilities)
-#define	LOAD_CAP	PTR(lc)
-#define	STORE_CAP	PTR(sc)
-#define	CAP_SIZE	16
-#define	CAP(x)		c ## x
-#else
-#define	LOAD_CAP	ld
-#define	STORE_CAP	sd
-#define	CAP_SIZE	8
-#define	CAP(x)		x
-#endif
-
-#ifdef __riscv_float_abi_double
-#define	FLT_SIZE	8
-#define	LOAD_FLT	PTR(fld)
-#define	STORE_FLT	PTR(fsd)
-#else
-#define	FLT_SIZE	0
-#endif
-
 /*
- * t0 = obj pointer
+ * (c)t0 = plt pointer
  * t1 = reloc offset
  */
 ENTRY(_rtld_bind_start)
-#ifdef __CHERI_PURE_CAPABILITY__
-	/* Currently unused and unimplemented for pure-capability code */
-	unimp
-#else /* defined(__CHERI_PURE_CAPABILITY__) */
 	/* Save the arguments and (c)ra */
 	/*
 	 * We require 8 GP(C)Rs, 1 pointer and 8 FPRs, but the stack must be
@@ -185,15 +182,23 @@ ENTRY(_rtld_bind_start)
 	STORE_FLT	fa7, (FLT_OFFSET + FLT_SIZE * 7)(PTR(sp))
 #endif
 
-	/* Reloc offset is 3x of the .got.plt offset */
+	/* Reloc offset is 3x or 1.5x of the .got.plt offset */
+#ifdef __CHERI_PURE_CAPABILITY__
+	srli	a1, t1, 1	/* Divide items by 2 */
+#else
 	slli	a1, t1, 1	/* Mult items by 2 */
+#endif
 	add	a1, a1, t1	/* Plus item */
 
-	/* Load obj */
+	/* Load plt */
 	MV_PTR	PTR(a0), PTR(t0)
 
 	/* Call into rtld */
+#ifdef __CHERI_PURE_CAPABILITY__
+	cjal	_rtld_bind
+#else
 	jal	_rtld_bind
+#endif
 
 	/* Backup the address to branch to */
 	MV_PTR	PTR(t0), PTR(a0)
@@ -224,5 +229,4 @@ ENTRY(_rtld_bind_start)
 
 	/* Call into the correct function */
 	JR_PTR	PTR(t0)
-#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_bind_start)

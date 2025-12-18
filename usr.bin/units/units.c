@@ -17,11 +17,6 @@
  * improvements you might make to this program.
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD$";
-#endif /* not lint */
-
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
@@ -502,8 +497,7 @@ lookupunit(const char *unit)
 			}
 		}
 		free(copy);
-	}
-	if (unit[strlen(unit) - 1] == 's') {
+	} else if (unit[strlen(unit) - 1] == 's') {
 		copy = dupstr(unit);
 		copy[strlen(copy) - 1] = 0;
 		for (i = 0; i < unitcount; i++) {

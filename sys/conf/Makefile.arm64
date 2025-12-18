@@ -1,6 +1,5 @@
 # Makefile.arm64 -- with config changes.
 # Copyright 1990 W. Jolitz
-#	from: @(#)Makefile.i386	7.1 5/10/91
 #	from FreeBSD: src/sys/conf/Makefile.i386,v 1.255 2002/02/20 23:35:49
 #
 # Makefile for FreeBSD
@@ -43,7 +42,8 @@ CFLAGS += -DLINUX_DTS_VERSION=\"${LINUX_DTS_VERSION}\"
 
 PERTHREAD_SSP_ENABLED!=	grep PERTHREAD_SSP opt_global.h || true ; echo
 .if !empty(PERTHREAD_SSP_ENABLED)
-. if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 130000
+. if (${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 130000) || \
+  ${COMPILER_TYPE} == "gcc"
 ARM64_SSP_CFLAGS = -mstack-protector-guard=sysreg
 ARM64_SSP_CFLAGS += -mstack-protector-guard-reg=sp_el0
 ARM64_SSP_CFLAGS += -mstack-protector-guard-offset=0
@@ -70,11 +70,6 @@ SYSTEM_LD= \
 	    --strip-symbol='$$[acdtx]*' \
 	    ${.TARGET}
 
-# Generate the .bin (booti images) kernel as an extra build output.
-# The targets and rules to generate these appear near the end of the file.
-KERNEL_EXTRA+= ${KERNEL_KO}.bin
-KERNEL_EXTRA_INSTALL+= ${KERNEL_KO}.bin
-
 .if !empty(DDB_ENABLED) || !empty(DTRACE_ENABLED) || !empty(HWPMC_ENABLED)
 CFLAGS += -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
 .endif
@@ -90,7 +85,6 @@ CFLAGS += -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
 %FILES.m
 
 %CLEAN
-CLEAN+=	${KERNEL_KO}.bin
 
 %RULES
 

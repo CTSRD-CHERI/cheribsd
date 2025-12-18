@@ -45,18 +45,45 @@ empty_body() {
 	[ ${ost_birthtime} -eq ${ost_mtime} ] || atf_fail "Incorrect mtime"
 
 	sleep 1
-	atf_check -s eq:0 -o ignore -e empty cat a
+	atf_check -s eq:0 -o empty -e empty cat a
 	eval $(stat -s a) || atf_fail "stat failed"
 	[ ${st_atime} -gt ${ost_atime} ] || atf_fail "Incorrect atime"
 	[ ${st_ctime} -eq ${ost_ctime} ] || atf_fail "Incorrect ctime"
 	[ ${st_mtime} -eq ${ost_mtime} ] || atf_fail "Incorrect mtime"
 
 	sleep 1
+	ost_atime=${st_atime}
 	echo foo >a || atf_fail "Write failed"
 	eval $(stat -s a) || atf_fail "stat failed"
 	[ ${st_atime} -gt ${ost_atime} ] || atf_fail "Incorrect atime"
 	[ ${st_ctime} -gt ${ost_ctime} ] || atf_fail "Incorrect ctime"
 	[ ${st_mtime} -gt ${ost_mtime} ] || atf_fail "Incorrect mtime"
+
+	test_unmount
+}
+
+atf_test_case holey
+holey_head() {
+	atf_set "descr" "Tests that creating a file consisting entirely" \
+		        "of a hole and later" \
+	                "manipulating it updates times correctly"
+	atf_set "require.user" "root"
+}
+holey_body() {
+	test_mount
+
+	atf_check -s eq:0 -o empty -e empty truncate -s 8k a
+	eval $(stat -s a | sed -e 's|st_|ost_|g') || atf_fail "stat failed"
+	[ ${ost_birthtime} -eq ${ost_atime} ] || atf_fail "Incorrect atime"
+	[ ${ost_birthtime} -eq ${ost_ctime} ] || atf_fail "Incorrect ctime"
+	[ ${ost_birthtime} -eq ${ost_mtime} ] || atf_fail "Incorrect mtime"
+
+	sleep 1
+	atf_check -s eq:0 -o ignore -e empty cat a
+	eval $(stat -s a) || atf_fail "stat failed"
+	[ ${st_atime} -gt ${ost_atime} ] || atf_fail "Incorrect atime"
+	[ ${st_ctime} -eq ${ost_ctime} ] || atf_fail "Incorrect ctime"
+	[ ${st_mtime} -eq ${ost_mtime} ] || atf_fail "Incorrect mtime"
 
 	test_unmount
 }
@@ -74,7 +101,7 @@ non_empty_body() {
 	eval $(stat -s b | sed -e 's|st_|ost_|g') || atf_fail "stat failed"
 
 	sleep 1
-	atf_check -s eq:0 -o ignore -e empty cat b
+	atf_check -s eq:0 -o inline:"foo\n" -e empty cat b
 	eval $(stat -s b) || atf_fail "stat failed"
 	[ ${st_atime} -gt ${ost_atime} ] || atf_fail "Incorrect atime"
 	[ ${st_ctime} -eq ${ost_ctime} ] || atf_fail "Incorrect ctime"
@@ -135,6 +162,7 @@ atf_init_test_cases() {
 	. $(atf_get_srcdir)/h_funcs.subr
 
 	atf_add_test_case empty
+	atf_add_test_case holey
 	atf_add_test_case non_empty
 	atf_add_test_case link
 	atf_add_test_case rename

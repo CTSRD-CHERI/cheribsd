@@ -25,7 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/ck.h>
@@ -227,7 +226,7 @@ hidbus_enumerate_children(device_t dev, const void* data, hid_size_t len)
 	while (hid_get_item(hd, &hi)) {
 		if (hi.kind != hid_collection || hi.collevel != 1)
 			continue;
-		child = BUS_ADD_CHILD(dev, 0, NULL, -1);
+		child = BUS_ADD_CHILD(dev, 0, NULL, DEVICE_UNIT_ANY);
 		if (child == NULL) {
 			device_printf(dev, "Could not add HID device\n");
 			continue;
@@ -526,14 +525,12 @@ hidbus_set_desc(device_t child, const char *suffix)
 	struct hidbus_softc *sc = device_get_softc(bus);
 	struct hid_device_info *devinfo = device_get_ivars(bus);
 	struct hidbus_ivars *tlc = device_get_ivars(child);
-	char buf[80];
 
 	/* Do not add NULL suffix or if device name already contains it. */
 	if (suffix != NULL && strcasestr(devinfo->name, suffix) == NULL &&
-	    (sc->nauto > 1 || (tlc->flags & HIDBUS_FLAG_AUTOCHILD) == 0)) {
-		snprintf(buf, sizeof(buf), "%s %s", devinfo->name, suffix);
-		device_set_desc_copy(child, buf);
-	} else
+	    (sc->nauto > 1 || (tlc->flags & HIDBUS_FLAG_AUTOCHILD) == 0))
+		device_set_descf(child, "%s %s", devinfo->name, suffix);
+	else
 		device_set_desc(child, devinfo->name);
 }
 
@@ -605,7 +602,7 @@ hidbus_set_intr(device_t child, hid_intr_t *handler, void *context)
 static int
 hidbus_intr_start(device_t bus, device_t child)
 {
-	MPASS(bus = device_get_parent(child));
+	MPASS(bus == device_get_parent(child));
 	struct hidbus_softc *sc = device_get_softc(bus);
 	struct hidbus_ivars *ivar = device_get_ivars(child);
 	struct hidbus_ivars *tlc;
@@ -631,7 +628,7 @@ hidbus_intr_start(device_t bus, device_t child)
 static int
 hidbus_intr_stop(device_t bus, device_t child)
 {
-	MPASS(bus = device_get_parent(child));
+	MPASS(bus == device_get_parent(child));
 	struct hidbus_softc *sc = device_get_softc(bus);
 	struct hidbus_ivars *ivar = device_get_ivars(child);
 	struct hidbus_ivars *tlc;
@@ -973,6 +970,7 @@ driver_t hidbus_driver = {
 
 MODULE_DEPEND(hidbus, hid, 1, 1, 1);
 MODULE_VERSION(hidbus, 1);
+DRIVER_MODULE(hidbus, atopcase, hidbus_driver, 0, 0);
 DRIVER_MODULE(hidbus, hvhid, hidbus_driver, 0, 0);
 DRIVER_MODULE(hidbus, iichid, hidbus_driver, 0, 0);
 DRIVER_MODULE(hidbus, usbhid, hidbus_driver, 0, 0);

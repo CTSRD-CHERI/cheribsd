@@ -62,8 +62,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)in_pcb.c	8.2 (Berkeley) 1/4/94
  */
 
 #include <sys/cdefs.h>
@@ -85,6 +83,7 @@
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/sockio.h>
+#include <sys/sysctl.h>
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <sys/priv.h>
@@ -99,6 +98,7 @@
 #include <net/if_types.h>
 #include <net/route.h>
 #include <net/route/nhop.h>
+#include <net/vnet.h>
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -113,6 +113,14 @@
 #include <netinet6/in6_pcb.h>
 #include <netinet6/in6_fib.h>
 #include <netinet6/scope6_var.h>
+
+SYSCTL_DECL(_net_inet6);
+SYSCTL_DECL(_net_inet6_ip6);
+VNET_DEFINE_STATIC(int, connect_in6addr_wild) = 1;
+#define	V_connect_in6addr_wild	VNET(connect_in6addr_wild)
+SYSCTL_INT(_net_inet6_ip6, OID_AUTO, connect_in6addr_wild,
+    CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(connect_in6addr_wild), 0,
+    "Allow connecting to the unspecified address for connect(2)");
 
 int
 in6_pcbsetport(struct in6_addr *laddr, struct inpcb *inp, struct ucred *cred)
@@ -335,7 +343,7 @@ in6_pcbbind(struct inpcb *inp, struct sockaddr_in6 *sin6, struct ucred *cred)
  */
 static int
 in6_pcbladdr(struct inpcb *inp, struct sockaddr_in6 *sin6,
-    struct in6_addr *plocal_addr6)
+    struct in6_addr *plocal_addr6, bool sas_required)
 {
 	int error = 0;
 	int scope_ambiguous = 0;
@@ -353,24 +361,39 @@ in6_pcbladdr(struct inpcb *inp, struct sockaddr_in6 *sin6,
 	if ((error = sa6_embedscope(sin6, V_ip6_use_defzone)) != 0)
 		return(error);
 
-	if (!CK_STAILQ_EMPTY(&V_in6_ifaddrhead)) {
+	if (V_connect_in6addr_wild && !CK_STAILQ_EMPTY(&V_in6_ifaddrhead)) {
 		/*
 		 * If the destination address is UNSPECIFIED addr,
 		 * use the loopback addr, e.g ::1.
 		 */
 		if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
 			sin6->sin6_addr = in6addr_loopback;
+	} else if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
+		return (ENETUNREACH);
 	}
+
 	if ((error = prison_remote_ip6(inp->inp_cred, &sin6->sin6_addr)) != 0)
 		return (error);
 
-	error = in6_selectsrc_socket(sin6, inp->in6p_outputopts,
-	    inp, inp->inp_cred, scope_ambiguous, &in6a, NULL);
-	if (error)
-		return (error);
+	if (sas_required) {
+		error = in6_selectsrc_socket(sin6, inp->in6p_outputopts,
+		    inp, inp->inp_cred, scope_ambiguous, &in6a, NULL);
+		if (error)
+			return (error);
+	} else {
+		/*
+		 * Source address selection isn't required when syncache
+		 * has already established connection and both source and
+		 * destination addresses was chosen.
+		 *
+		 * This also includes the case when fwd_tag was used to
+		 * select source address in tcp_input().
+		 */
+		in6a = inp->in6p_laddr;
+	}
+
 	if (IN6_IS_ADDR_UNSPECIFIED(&in6a))
 		return (EHOSTUNREACH);
-
 	/*
 	 * Do not update this earlier, in case we return with an error.
 	 *
@@ -398,7 +421,7 @@ in6_pcbladdr(struct inpcb *inp, struct sockaddr_in6 *sin6,
  */
 int
 in6_pcbconnect(struct inpcb *inp, struct sockaddr_in6 *sin6, struct ucred *cred,
-    bool rehash __unused)
+    bool sas_required)
 {
 	struct inpcbinfo *pcbinfo = inp->inp_pcbinfo;
 	struct sockaddr_in6 laddr6;
@@ -432,7 +455,8 @@ in6_pcbconnect(struct inpcb *inp, struct sockaddr_in6 *sin6, struct ucred *cred,
 	 * Call inner routine, to assign local interface address.
 	 * in6_pcbladdr() may automatically fill in sin6_scope_id.
 	 */
-	if ((error = in6_pcbladdr(inp, sin6, &laddr6.sin6_addr)) != 0)
+	if ((error = in6_pcbladdr(inp, sin6, &laddr6.sin6_addr,
+	    sas_required)) != 0)
 		return (error);
 
 	if (in6_pcblookup_hash_locked(pcbinfo, &sin6->sin6_addr,
@@ -490,121 +514,94 @@ in6_pcbdisconnect(struct inpcb *inp)
 	inp->inp_flow &= ~IPV6_FLOWLABEL_MASK;
 }
 
-struct sockaddr *
-in6_sockaddr(in_port_t port, struct in6_addr *addr_p)
-{
-	struct sockaddr_in6 *sin6;
-
-	sin6 = malloc(sizeof *sin6, M_SONAME, M_WAITOK);
-	bzero(sin6, sizeof *sin6);
-	sin6->sin6_family = AF_INET6;
-	sin6->sin6_len = sizeof(*sin6);
-	sin6->sin6_port = port;
-	sin6->sin6_addr = *addr_p;
-	(void)sa6_recoverscope(sin6); /* XXX: should catch errors */
-
-	return (struct sockaddr *)sin6;
-}
-
-struct sockaddr *
-in6_v4mapsin6_sockaddr(in_port_t port, struct in_addr *addr_p)
-{
-	struct sockaddr_in sin;
-	struct sockaddr_in6 *sin6_p;
-
-	bzero(&sin, sizeof sin);
-	sin.sin_family = AF_INET;
-	sin.sin_len = sizeof(sin);
-	sin.sin_port = port;
-	sin.sin_addr = *addr_p;
-
-	sin6_p = malloc(sizeof *sin6_p, M_SONAME,
-		M_WAITOK);
-	in6_sin_2_v4mapsin6(&sin, sin6_p);
-
-	return (struct sockaddr *)sin6_p;
-}
-
 int
-in6_getsockaddr(struct socket *so, struct sockaddr **nam)
+in6_getsockaddr(struct socket *so, struct sockaddr *sa)
 {
 	struct inpcb *inp;
-	struct in6_addr addr;
-	in_port_t port;
 
 	inp = sotoinpcb(so);
 	KASSERT(inp != NULL, ("in6_getsockaddr: inp == NULL"));
 
-	INP_RLOCK(inp);
-	port = inp->inp_lport;
-	addr = inp->in6p_laddr;
-	INP_RUNLOCK(inp);
+	*(struct sockaddr_in6 *)sa = (struct sockaddr_in6 ){
+		.sin6_len = sizeof(struct sockaddr_in6),
+		.sin6_family = AF_INET6,
+		.sin6_port = inp->inp_lport,
+		.sin6_addr = inp->in6p_laddr,
+	};
+	/* XXX: should catch errors */
+	(void)sa6_recoverscope((struct sockaddr_in6 *)sa);
 
-	*nam = in6_sockaddr(port, &addr);
-	return 0;
+	return (0);
 }
 
 int
-in6_getpeeraddr(struct socket *so, struct sockaddr **nam)
+in6_getpeeraddr(struct socket *so, struct sockaddr *sa)
 {
 	struct inpcb *inp;
-	struct in6_addr addr;
-	in_port_t port;
 
 	inp = sotoinpcb(so);
 	KASSERT(inp != NULL, ("in6_getpeeraddr: inp == NULL"));
 
-	INP_RLOCK(inp);
-	port = inp->inp_fport;
-	addr = inp->in6p_faddr;
-	INP_RUNLOCK(inp);
+	*(struct sockaddr_in6 *)sa = (struct sockaddr_in6 ){
+		.sin6_len = sizeof(struct sockaddr_in6),
+		.sin6_family = AF_INET6,
+		.sin6_port = inp->inp_fport,
+		.sin6_addr = inp->in6p_faddr,
+	};
+	/* XXX: should catch errors */
+	(void)sa6_recoverscope((struct sockaddr_in6 *)sa);
 
-	*nam = in6_sockaddr(port, &addr);
-	return 0;
+	return (0);
 }
 
 int
-in6_mapped_sockaddr(struct socket *so, struct sockaddr **nam)
+in6_mapped_sockaddr(struct socket *so, struct sockaddr *sa)
 {
-	struct	inpcb *inp;
 	int	error;
+#ifdef INET
+	struct	inpcb *inp;
 
 	inp = sotoinpcb(so);
 	KASSERT(inp != NULL, ("in6_mapped_sockaddr: inp == NULL"));
 
-#ifdef INET
 	if ((inp->inp_vflag & (INP_IPV4 | INP_IPV6)) == INP_IPV4) {
-		error = in_getsockaddr(so, nam);
+		struct sockaddr_in sin;
+
+		error = in_getsockaddr(so, (struct sockaddr *)&sin);
 		if (error == 0)
-			in6_sin_2_v4mapsin6_in_sock(nam);
+			in6_sin_2_v4mapsin6(&sin, (struct sockaddr_in6 *)sa);
 	} else
 #endif
 	{
 		/* scope issues will be handled in in6_getsockaddr(). */
-		error = in6_getsockaddr(so, nam);
+		error = in6_getsockaddr(so, sa);
 	}
 
 	return error;
 }
 
 int
-in6_mapped_peeraddr(struct socket *so, struct sockaddr **nam)
+in6_mapped_peeraddr(struct socket *so, struct sockaddr *sa)
 {
-	struct	inpcb *inp;
 	int	error;
+#ifdef INET
+	struct	inpcb *inp;
 
 	inp = sotoinpcb(so);
 	KASSERT(inp != NULL, ("in6_mapped_peeraddr: inp == NULL"));
 
-#ifdef INET
 	if ((inp->inp_vflag & (INP_IPV4 | INP_IPV6)) == INP_IPV4) {
-		error = in_getpeeraddr(so, nam);
+		struct sockaddr_in sin;
+
+		error = in_getpeeraddr(so, (struct sockaddr *)&sin);
 		if (error == 0)
-			in6_sin_2_v4mapsin6_in_sock(nam);
+			in6_sin_2_v4mapsin6(&sin, (struct sockaddr_in6 *)sa);
 	} else
 #endif
-	/* scope issues will be handled in in6_getpeeraddr(). */
-	error = in6_getpeeraddr(so, nam);
+	{
+		/* scope issues will be handled in in6_getpeeraddr(). */
+		error = in6_getpeeraddr(so, sa);
+	}
 
 	return error;
 }

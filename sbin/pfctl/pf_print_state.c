@@ -32,7 +32,6 @@
  *
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/endian.h>
@@ -129,7 +128,7 @@ print_addr(struct pf_addr_wrap *addr, sa_family_t af, int verbose)
 	    PF_AZERO(&addr->v.a.mask, AF_INET6))) {
 		int bits = unmask(&addr->v.a.mask, af);
 
-		if (bits != (af == AF_INET ? 32 : 128))
+		if (bits < (af == AF_INET ? 32 : 128))
 			printf("/%d", bits);
 	}
 }
@@ -377,6 +376,8 @@ print_state(struct pfctl_state *s, int opts)
 			printf(", sloppy");
 		if (s->state_flags & PFSTATE_NOSYNC)
 			printf(", no-sync");
+		if (s->state_flags & PFSTATE_PFLOW)
+			printf(", pflow");
 		if (s->state_flags & PFSTATE_ACK)
 			printf(", psync-ack");
 		if (s->state_flags & PFSTATE_NODF)

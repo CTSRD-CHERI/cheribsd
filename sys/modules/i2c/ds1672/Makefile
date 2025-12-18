@@ -1,5 +1,4 @@
-
-.PATH:	${SRCTOP}/sys/dev/iicbus
+.PATH:	${SRCTOP}/sys/dev/iicbus/rtc
 KMOD	= ds1672
 SRCS	= ds1672.c 
 

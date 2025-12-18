@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/bus.h>
 #include <sys/lock.h>
@@ -1806,7 +1805,7 @@ ccr_identify(driver_t *driver, device_t parent)
 	sc = device_get_softc(parent);
 	if (sc->cryptocaps & FW_CAPS_CONFIG_CRYPTO_LOOKASIDE &&
 	    device_find_child(parent, "ccr", -1) == NULL)
-		device_add_child(parent, "ccr", -1);
+		device_add_child(parent, "ccr", DEVICE_UNIT_ANY);
 }
 
 static int
@@ -1925,7 +1924,7 @@ ccr_init_port(struct ccr_softc *sc, int port)
 	pi = sc->adapter->port[port];
 	sc->ports[port].txq = &sc->adapter->sge.ctrlq[port];
 	sc->ports[port].rxq = &sc->adapter->sge.rxq[pi->vi->first_rxq];
-	sc->ports[port].rx_channel_id = pi->rx_c_chan;
+	sc->ports[port].rx_channel_id = pi->rx_chan;
 	sc->ports[port].tx_channel_id = pi->tx_chan;
 	sc->ports[port].stats_queued = counter_u64_alloc(M_WAITOK);
 	sc->ports[port].stats_completed = counter_u64_alloc(M_WAITOK);

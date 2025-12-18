@@ -26,7 +26,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kdb.h>
@@ -267,6 +266,11 @@ nofeatures:
 	gdb_tx_varhex(GDB_BUFSZ + strlen("$#nn") - 1);
 
 	gdb_tx_str(";qXfer:threads:read+");
+
+#ifdef HAS_HW_BREAKPOINT
+	if ((*feat & GDB_HWBREAK) != 0)
+		gdb_tx_str(";hwbreak+");
+#endif
 
 	/*
 	 * If the debugport is a reliable transport, request No Ack mode from
@@ -518,8 +522,6 @@ do_qXfer_threads_read(void)
 				sbuf_cat(&ctx.qXfer.sb, "Blocked");
 			else if (TD_IS_SLEEPING(ctx.iter))
 				sbuf_cat(&ctx.qXfer.sb, "Sleeping");
-			else if (TD_IS_SWAPPED(ctx.iter))
-				sbuf_cat(&ctx.qXfer.sb, "Swapped");
 			else if (TD_AWAITING_INTR(ctx.iter))
 				sbuf_cat(&ctx.qXfer.sb, "IthreadWait");
 			else if (TD_IS_SUSPENDED(ctx.iter))
@@ -649,6 +651,10 @@ gdb_z_insert(void)
 		    (vm_size_t)length, KDB_DBG_ACCESS_RW);
 		break;
 	case '1': /* hardware breakpoint */
+#ifdef HAS_HW_BREAKPOINT
+		error = kdb_cpu_set_breakpoint((vm_offset_t)addr);
+		break;
+#endif
 	case '0': /* software breakpoint */
 		/* Not implemented. */
 		gdb_tx_empty();
@@ -693,6 +699,10 @@ gdb_z_remove(void)
 		    (vm_size_t)length);
 		break;
 	case '1': /* hardware breakpoint */
+#ifdef HAS_HW_BREAKPOINT
+		error = kdb_cpu_clr_breakpoint((vm_offset_t)addr);
+		break;
+#endif
 	case '0': /* software breakpoint */
 		/* Not implemented. */
 		gdb_tx_empty();

@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/efi.h>
 #include <sys/kernel.h>
@@ -45,11 +44,8 @@
 #include <sys/systm.h>
 #include <sys/vmmeter.h>
 #include <isa/rtc.h>
-#include <machine/fpu.h>
 #include <machine/efi.h>
-#include <machine/metadata.h>
 #include <machine/md_var.h>
-#include <machine/smp.h>
 #include <machine/vmparam.h>
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -240,7 +236,7 @@ efi_create_1t1_map(struct efi_md *map, int ndesc, int descsz)
 				    "attributes unsupported\n", i);
 			mode = VM_MEMATTR_UNCACHEABLE;
 		}
-		bits = pmap_cache_bits(kernel_pmap, mode, FALSE) | X86_PG_RW |
+		bits = pmap_cache_bits(kernel_pmap, mode, false) | X86_PG_RW |
 		    X86_PG_V;
 		VM_OBJECT_WLOCK(obj_1t1_pt);
 		for (va = p->md_phys, idx = 0; idx < p->md_pages; idx++,
@@ -250,7 +246,8 @@ efi_create_1t1_map(struct efi_md *map, int ndesc, int descsz)
 
 			m = PHYS_TO_VM_PAGE(va);
 			if (m != NULL && VM_PAGE_TO_PHYS(m) == 0) {
-				vm_page_init_page(m, va, -1);
+				vm_page_init_page(m, va, -1,
+				    VM_FREEPOOL_DEFAULT);
 				m->order = VM_NFREEORDER + 1; /* invalid */
 				m->pool = VM_NFREEPOOL + 1; /* invalid */
 				pmap_page_set_memattr_noflush(m, mode);
@@ -280,11 +277,6 @@ fail:
  * mapping.  As result, we must provide 1:1 mapping anyway, so no
  * reason to bother with the virtual map, and no need to add a
  * complexity into loader.
- *
- * The fpu_kern_enter() call allows firmware to use FPU, as mandated
- * by the specification.  In particular, CR0.TS bit is cleared.  Also
- * it enters critical section, giving us neccessary protection against
- * context switch.
  *
  * There is no need to disable interrupts around the change of %cr3,
  * the kernel mappings are correct, while we only grabbed the

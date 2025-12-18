@@ -1,4 +1,4 @@
-# $NetBSD: varmod-gmtime.mk,v 1.15 2023/06/01 20:56:35 rillig Exp $
+# $NetBSD: varmod-gmtime.mk,v 1.24 2024/07/05 19:47:22 rillig Exp $
 #
 # Tests for the :gmtime variable modifier, which formats a timestamp
 # using strftime(3) in UTC.
@@ -45,7 +45,7 @@
 
 
 # Before var.c 1.1050 from 2023-05-09, it was not possible to pass the
-# seconds via a variable expression.
+# seconds via an expression.
 .if ${%Y:L:gmtime=${:U1593536400}} != "2020"
 .  error
 .endif
@@ -56,7 +56,7 @@
 # 1970.  Going back 50 years in the past is not a practical use case for
 # make.  Therefore, since var.c 1.631, negative time stamps produce a
 # parse error.
-# expect+2: Invalid time value "-1"
+# expect+2: while evaluating "${:L:gmtime=-1} != """ with value "": Invalid time value "-1"
 # expect+1: Malformed conditional (${:L:gmtime=-1} != "")
 .if ${:L:gmtime=-1} != ""
 .  error
@@ -67,7 +67,7 @@
 
 # Spaces were allowed before var.c 1.631 from 2020-10-31 21:40:20, not
 # because it would make sense but just as a side-effect from using strtoul.
-# expect+2: Invalid time value " 1"
+# expect+2: while evaluating "${:L:gmtime= 1} != """ with value "": Invalid time value " 1"
 # expect+1: Malformed conditional (${:L:gmtime= 1} != "")
 .if ${:L:gmtime= 1} != ""
 .  error
@@ -115,7 +115,7 @@
 #
 # Since var.c 1.631 from 2020-10-31, the overflow is detected and produces a
 # parse error.
-# expect+2: Invalid time value "10000000000000000000000000000000"
+# expect+2: while evaluating "${:L:gmtime=10000000000000000000000000000000} != """ with value "": Invalid time value "10000000000000000000000000000000"
 # expect+1: Malformed conditional (${:L:gmtime=10000000000000000000000000000000} != "")
 .if ${:L:gmtime=10000000000000000000000000000000} != ""
 .  error
@@ -128,7 +128,7 @@
 # stopped after the '=', and the remaining string was parsed for more variable
 # modifiers.  Because of the unknown modifier 'e' from the 'error', the whole
 # variable value was discarded and thus not printed.
-# expect+2: Invalid time value "error"
+# expect+2: while evaluating "${:L:gmtime=error} != """ with value "": Invalid time value "error"
 # expect+1: Malformed conditional (${:L:gmtime=error} != "")
 .if ${:L:gmtime=error} != ""
 .  error
@@ -139,10 +139,50 @@
 # Before var.c 1.1050 from 2023-05-09, the timestamp could be directly
 # followed by the next modifier, without a ':' separator.  This was the same
 # bug as for the ':L' and ':P' modifiers.
-# expect+2: Invalid time value "100000S,1970,bad,"
+# expect+2: while evaluating variable "%Y" with value "%Y": Invalid time value "100000S,1970,bad,"
 # expect+1: Malformed conditional (${%Y:L:gmtime=100000S,1970,bad,} != "bad")
 .if ${%Y:L:gmtime=100000S,1970,bad,} != "bad"
 .  error
 .endif
+
+
+# Before var.c 1.1062 from 2023-08-19, ':gmtime' but not ':localtime' reported
+# wrong values for '%s', depending on the operating system and the timezone.
+export TZ=UTC
+.for t in ${%s:L:gmtime} ${%s:L:localtime}
+TIMESTAMPS+= $t
+.endfor
+export TZ=Europe/Berlin
+.for t in ${%s:L:gmtime} ${%s:L:localtime}
+TIMESTAMPS+= $t
+.endfor
+export TZ=UTC
+.for t in ${%s:L:gmtime} ${%s:L:localtime}
+TIMESTAMPS+= $t
+.endfor
+export TZ=America/Los_Angeles
+.for t in ${%s:L:gmtime} ${%s:L:localtime}
+TIMESTAMPS+= $t
+.endfor
+export TZ=UTC
+.for t in ${%s:L:gmtime} ${%s:L:localtime}
+TIMESTAMPS+= $t
+.endfor
+.for a b in ${TIMESTAMPS:[1]} ${TIMESTAMPS:@t@$t $t@} ${TIMESTAMPS:[-1]}
+.  if $a > $b
+.    warning timestamp $a > $b
+.  endif
+.endfor
+
+
+.if ${year=%Y month=%m day=%d:L:gmtime=1459494000} != "year=2016 month=04 day=01"
+.  error
+.endif
+# Slightly contorted syntax to convert a UTC timestamp from an expression to a
+# formatted timestamp.
+.if ${%Y%m%d:L:${gmtime=${:U1459494000}:L}} != "20160401"
+.  error
+.endif
+
 
 all:

@@ -32,7 +32,6 @@
  * and Kohno ("FS&K").
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/limits.h>
 
@@ -72,8 +71,6 @@
 #include <dev/random/fortuna.h>
 
 /* Defined in FS&K */
-#define	RANDOM_FORTUNA_NPOOLS 32		/* The number of accumulation pools */
-#define	RANDOM_FORTUNA_DEFPOOLSIZE 1		/* The default pool size/length for a (re)seed */
 #define	RANDOM_FORTUNA_MAX_READ (1 << 20)	/* Max bytes from AES before rekeying */
 #define	RANDOM_FORTUNA_BLOCKS_PER_KEY (1 << 16)	/* Max blocks from AES before rekeying */
 CTASSERT(RANDOM_FORTUNA_BLOCKS_PER_KEY * RANDOM_BLOCKSIZE ==
@@ -84,7 +81,7 @@ CTASSERT(RANDOM_FORTUNA_BLOCKS_PER_KEY * RANDOM_BLOCKSIZE ==
  * Making RANDOM_FORTUNA_DEFPOOLSIZE too large will mean a long time between reseeds,
  * and too small may compromise initial security but get faster reseeds.
  */
-#define	RANDOM_FORTUNA_MINPOOLSIZE 1
+#define	RANDOM_FORTUNA_MINPOOLSIZE 16
 #define	RANDOM_FORTUNA_MAXPOOLSIZE INT_MAX 
 CTASSERT(RANDOM_FORTUNA_MINPOOLSIZE <= RANDOM_FORTUNA_DEFPOOLSIZE);
 CTASSERT(RANDOM_FORTUNA_DEFPOOLSIZE <= RANDOM_FORTUNA_MAXPOOLSIZE);

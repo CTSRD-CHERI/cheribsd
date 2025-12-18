@@ -29,22 +29,17 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <sys/socket.h>
+#include <ssp/ssp.h>
 #include "libc_private.h"
 
 __weak_reference(__sys_recvfrom, __recvfrom);
 
-#pragma weak recvfrom
-ssize_t
-recvfrom(int s, void *buf, size_t len, int flags,
+ssize_t __weak_symbol
+__ssp_real(recvfrom)(int s, void *buf, size_t len, int flags,
     struct sockaddr * __restrict from, socklen_t * __restrict fromlen)
 {
-
-	return (((ssize_t (*)(int, void *, size_t, int,
-	    struct sockaddr *, socklen_t *))
-	    __libc_interposing[INTERPOS_recvfrom])(s, buf, len, flags,
-	   from, fromlen));
+	return (INTERPOS_SYS(recvfrom, s, buf, len, flags, from, fromlen));
 }

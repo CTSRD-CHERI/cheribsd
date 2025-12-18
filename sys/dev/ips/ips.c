@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -270,7 +269,7 @@ static int ips_diskdev_init(ips_softc_t *sc)
 			ips_diskdev_statename(sc->drives[i].state));
 		if(sc->drives[i].state == IPS_LD_OKAY ||
 		   sc->drives[i].state == IPS_LD_DEGRADED){
-			sc->diskdev[i] = device_add_child(sc->dev, NULL, -1);
+			sc->diskdev[i] = device_add_child(sc->dev, NULL, DEVICE_UNIT_ANY);
 			device_set_ivars(sc->diskdev[i],(void *)(uintptr_t) i);
 		}
 	}

@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/jail.h>
 #include <sys/linker.h>
@@ -738,6 +737,12 @@ jailparam_export(struct jailparam *jp)
 	int i, nval, ival;
 	char valbuf[INET6_ADDRSTRLEN];
 
+	if (jp->jp_value == NULL) {
+		snprintf(jail_errmsg, JAIL_ERRMSGLEN,
+		    "parameter %s was not imported", jp->jp_name);
+		errno = EINVAL;
+		return (NULL);
+	}
 	if ((jp->jp_ctltype & CTLTYPE) == CTLTYPE_STRING) {
 		value = strdup(jp->jp_value);
 		if (value == NULL)

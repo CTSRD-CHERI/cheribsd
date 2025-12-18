@@ -62,7 +62,7 @@ uintcap_t cheri_revoke_sealed(uintcap_t);
  * This is almost certainly a sufficiently subtle point that this is not
  * entirely the right answer, though I hope it's not entirely wrong, either.
  */
-static __always_inline inline uintcap_t
+static __always_inline uintcap_t
 cheri_revoke_cap(uintcap_t c)
 {
 #ifndef CHERI_CAPREVOKE_CLEARTAGS
@@ -93,12 +93,13 @@ struct vm_cheri_revoke_cookie {
 
 int vm_cheri_revoke_cookie_init(struct vm_map *map,
     struct vm_cheri_revoke_cookie *baked);
-void vm_cheri_revoke_cookie_rele(struct vm_cheri_revoke_cookie *cookie);
 
 void vm_cheri_revoke_info_page(struct vm_map *map, struct sysentvec *,
     struct cheri_revoke_info_page * __capability *);
 
-int vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *, int);
+int vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *);
+void vm_cheri_revoke_pass_async(struct vmspace *,
+    const struct vm_cheri_revoke_cookie *);
 
 void vm_cheri_assert_consistent_clg(struct vm_map *map);
 
@@ -114,6 +115,8 @@ void vm_cheri_revoke_publish_epochs(
     struct cheri_revoke_info_page * __capability,
     const struct cheri_revoke_epochs *);
 
+/*  Revoke a single capability if needed */
+void vm_cheri_revoke_cap(const struct vm_cheri_revoke_cookie *, uintcap_t *);
 
 /***************************** KERNEL MD LAYER ******************************/
 
@@ -163,5 +166,5 @@ enum vm_cheri_revoke_fault_res vm_cheri_revoke_fault_visit(
 #endif
 #define CHERI_REVOKE_STATS_BUMP(st, ctr) CHERI_REVOKE_STATS_INC(st, ctr, 1)
 
-#endif
-#endif
+#endif /* CHERI_CAPREVOKE */
+#endif /* !_VM_CHERI_REVOKE_ */

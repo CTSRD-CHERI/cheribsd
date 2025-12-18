@@ -28,12 +28,13 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <string.h>
 #include <wchar.h>
+#include <ssp/ssp.h>
 
 wchar_t *
-wmempcpy(wchar_t *__restrict dst, const wchar_t *__restrict src, size_t len)
+__ssp_real(wmempcpy)(wchar_t *__restrict dst, const wchar_t *__restrict src,
+    size_t len)
 {
 	return (wmemcpy(dst, src, len) + len);
 }

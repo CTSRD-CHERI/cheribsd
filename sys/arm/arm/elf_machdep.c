@@ -25,7 +25,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -86,7 +85,7 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_maxssiz	= NULL,
 	.sv_flags	=
 			  SV_ASLR | SV_SHP | SV_TIMEKEEP | SV_RNG_SEED_VER |
-			  SV_ABI_FREEBSD | SV_ILP32,
+			  SV_ABI_FREEBSD | SV_ILP32 | SV_SIGSYS,
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = syscallnames,
@@ -122,10 +121,9 @@ SYSINIT(elf32, SI_SUB_EXEC, SI_ORDER_FIRST,
 
 static bool
 elf32_arm_abi_supported(const struct image_params *imgp,
+    const Elf32_Ehdr *hdr, const Elf32_Phdr *phdr __unused,
     const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
 {
-	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
-
 	/*
 	 * When configured for EABI, FreeBSD supports EABI vesions 4 and 5.
 	 */
@@ -185,7 +183,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
     int type, int local, elf_lookup_fn lookup)
 {
 	Elf_Addr *where;
-	Elf_Addr addr;
+	uintptr_t addr;
 	Elf_Addr addend;
 	Elf_Word rtype, symidx;
 	const Elf_Rel *rel;

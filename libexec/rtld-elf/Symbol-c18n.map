@@ -1,11 +1,24 @@
 FBSDprivate_1.0 {
+    r_debug_comparts_state;
+    _compart_size;
+    _rtld_tramp_reflect;
     _rtld_thread_start_init;
     _rtld_thread_start;
     _rtld_thr_exit;
     _rtld_sighandler_init;
     _rtld_sighandler;
+    _rtld_siginvoke;
+    _rtld_sigaction;
     _rtld_setjmp;
     _rtld_longjmp;
-    _rtld_safebox_code;
-    _rtld_sandbox_code;
+    _rtld_unw_getcontext;
+    _rtld_unw_setcontext;
+    _rtld_unw_getsealer;
+};
+
+FBSD_1.0 {
+    dl_c18n_get_trusted_stack;
+    dl_c18n_unwind_trusted_stack;
+    dl_c18n_is_trampoline;
+    dl_c18n_pop_trusted_stack;
 };

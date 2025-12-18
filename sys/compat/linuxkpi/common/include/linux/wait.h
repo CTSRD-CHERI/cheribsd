@@ -110,10 +110,10 @@ extern wait_queue_func_t default_wake_function;
 	wait_queue_head_t name = {					\
 		.task_list = LINUX_LIST_HEAD_INIT(name.task_list),	\
 	};								\
-	MTX_SYSINIT(name, &(name).lock.m, spin_lock_name("wqhead"), MTX_DEF)
+	MTX_SYSINIT(name, &(name).lock, spin_lock_name("wqhead"), MTX_DEF)
 
 #define	init_waitqueue_head(wqh) do {					\
-	mtx_init(&(wqh)->lock.m, spin_lock_name("wqhead"),		\
+	mtx_init(&(wqh)->lock, spin_lock_name("wqhead"),		\
 	    NULL, MTX_DEF | MTX_NEW | MTX_NOWITNESS);			\
 	INIT_LIST_HEAD(&(wqh)->task_list);				\
 } while (0)

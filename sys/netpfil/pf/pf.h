@@ -66,14 +66,37 @@ enum	{ PF_PEER_SRC, PF_PEER_DST, PF_PEER_BOTH };
  * Note about PFTM_*: real indices into pf_rule.timeout[] come before
  * PFTM_MAX, special cases afterwards. See pf_state_expires().
  */
-enum	{ PFTM_TCP_FIRST_PACKET, PFTM_TCP_OPENING, PFTM_TCP_ESTABLISHED,
-	  PFTM_TCP_CLOSING, PFTM_TCP_FIN_WAIT, PFTM_TCP_CLOSED,
-	  PFTM_UDP_FIRST_PACKET, PFTM_UDP_SINGLE, PFTM_UDP_MULTIPLE,
-	  PFTM_ICMP_FIRST_PACKET, PFTM_ICMP_ERROR_REPLY,
-	  PFTM_OTHER_FIRST_PACKET, PFTM_OTHER_SINGLE,
-	  PFTM_OTHER_MULTIPLE, PFTM_FRAG, PFTM_INTERVAL,
-	  PFTM_ADAPTIVE_START, PFTM_ADAPTIVE_END, PFTM_SRC_NODE,
-	  PFTM_TS_DIFF, PFTM_MAX, PFTM_PURGE, PFTM_UNLINKED };
+enum	{
+	PFTM_TCP_FIRST_PACKET	= 0,
+	PFTM_TCP_OPENING	= 1,
+	PFTM_TCP_ESTABLISHED	= 2,
+	PFTM_TCP_CLOSING	= 3,
+	PFTM_TCP_FIN_WAIT	= 4,
+	PFTM_TCP_CLOSED		= 5,
+	PFTM_UDP_FIRST_PACKET	= 6,
+	PFTM_UDP_SINGLE		= 7,
+	PFTM_UDP_MULTIPLE	= 8,
+	PFTM_ICMP_FIRST_PACKET	= 9,
+	PFTM_ICMP_ERROR_REPLY	= 10,
+	PFTM_OTHER_FIRST_PACKET	= 11,
+	PFTM_OTHER_SINGLE	= 12,
+	PFTM_OTHER_MULTIPLE	= 13,
+	PFTM_FRAG		= 14,
+	PFTM_INTERVAL		= 15,
+	PFTM_ADAPTIVE_START	= 16,
+	PFTM_ADAPTIVE_END	= 17,
+	PFTM_SRC_NODE		= 18,
+	PFTM_TS_DIFF		= 19,
+	PFTM_OLD_MAX		= 20, /* Legacy limit, for binary compatibility with old kernels. */
+	PFTM_SCTP_FIRST_PACKET	= 20,
+	PFTM_SCTP_OPENING	= 21,
+	PFTM_SCTP_ESTABLISHED	= 22,
+	PFTM_SCTP_CLOSING	= 23,
+	PFTM_SCTP_CLOSED	= 24,
+	PFTM_MAX		= 25,
+	PFTM_PURGE		= 26,
+	PFTM_UNLINKED		= 27,
+};
 
 /* PFTM default values */
 #define PFTM_TCP_FIRST_PACKET_VAL	120	/* First TCP packet */
@@ -106,6 +129,7 @@ enum	{ PF_ADDR_ADDRMASK, PF_ADDR_NOROUTE, PF_ADDR_DYNIFTL,
 	  PF_ADDR_RANGE };
 #define PF_POOL_TYPEMASK	0x0f
 #define PF_POOL_STICKYADDR	0x20
+#define PF_POOL_ENDPI		0x40
 #define	PF_WSCALE_FLAG		0x80
 #define	PF_WSCALE_MASK		0x0f
 
@@ -113,6 +137,7 @@ enum	{ PF_ADDR_ADDRMASK, PF_ADDR_NOROUTE, PF_ADDR_DYNIFTL,
 #define	PF_LOG_ALL		0x02
 #define	PF_LOG_SOCKET_LOOKUP	0x04
 #define	PF_LOG_FORCE		0x08
+#define	PF_LOG_MATCHES		0x10
 
 /* Reasons code for passing/dropping a packet */
 #define PFRES_MATCH	0		/* Explicit match of a rule */
@@ -466,8 +491,8 @@ struct pf_rule {
 #define PF_SKIP_AF		2
 #define PF_SKIP_PROTO		3
 #define PF_SKIP_SRC_ADDR	4
-#define PF_SKIP_SRC_PORT	5
-#define PF_SKIP_DST_ADDR	6
+#define PF_SKIP_DST_ADDR	5
+#define PF_SKIP_SRC_PORT	6
 #define PF_SKIP_DST_PORT	7
 #define PF_SKIP_COUNT		8
 	union pf_rule_ptr	 skip[PF_SKIP_COUNT];
@@ -497,7 +522,7 @@ struct pf_rule {
 	pf_osfp_t		 os_fingerprint;
 
 	int			 rtableid;
-	u_int32_t		 timeout[PFTM_MAX];
+	u_int32_t		 timeout[PFTM_OLD_MAX];
 	u_int32_t		 max_states;
 	u_int32_t		 max_src_nodes;
 	u_int32_t		 max_src_states;
@@ -591,6 +616,7 @@ struct pf_rule {
 #define	PFRULE_SET_TOS		0x00002000
 #define	PFRULE_IFBOUND		0x00010000 /* if-bound */
 #define	PFRULE_STATESLOPPY	0x00020000 /* sloppy state tracking */
+#define	PFRULE_PFLOW		0x00040000
 
 #ifdef _KERNEL
 #define	PFRULE_REFS		0x0080	/* rule has references */
@@ -603,7 +629,7 @@ struct pf_rule {
 /* pf_state->state_flags, pf_rule_actions->flags, pf_krule->scrub_flags */
 #define	PFSTATE_ALLOWOPTS	0x0001
 #define	PFSTATE_SLOPPY		0x0002
-/*  was	PFSTATE_PFLOW		0x0004 */
+#define	PFSTATE_PFLOW		0x0004
 #define	PFSTATE_NOSYNC		0x0008
 #define	PFSTATE_ACK		0x0010
 #define	PFSTATE_NODF		0x0020

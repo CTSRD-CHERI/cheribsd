@@ -34,6 +34,12 @@ tags = ['functional', 'acl', 'posix-sa']
 tests = ['atime_003_pos', 'root_relatime_on']
 tags = ['functional', 'atime']
 
+[tests/functional/block_cloning:Linux]
+tests = ['block_cloning_ficlone', 'block_cloning_ficlonerange',
+    'block_cloning_ficlonerange_partial', 'block_cloning_disabled_ficlone',
+    'block_cloning_disabled_ficlonerange']
+tags = ['functional', 'block_cloning']
+
 [tests/functional/chattr:Linux]
 tests = ['chattr_001_pos', 'chattr_002_neg']
 tags = ['functional', 'chattr']
@@ -71,6 +77,13 @@ tests = ['zpool_expand_001_pos', 'zpool_expand_002_pos',
     'zpool_expand_003_neg', 'zpool_expand_004_pos', 'zpool_expand_005_pos']
 tags = ['functional', 'cli_root', 'zpool_expand']
 
+[tests/functional/cli_root/zpool_import:Linux]
+tests = ['zpool_import_hostid_changed',
+    'zpool_import_hostid_changed_unclean_export',
+    'zpool_import_hostid_changed_cachefile',
+    'zpool_import_hostid_changed_cachefile_unclean_export']
+tags = ['functional', 'cli_root', 'zpool_import']
+
 [tests/functional/cli_root/zpool_reopen:Linux]
 tests = ['zpool_reopen_001_pos', 'zpool_reopen_002_pos',
     'zpool_reopen_003_pos', 'zpool_reopen_004_pos', 'zpool_reopen_005_pos',
@@ -89,9 +102,14 @@ tags = ['functional', 'compression']
 tests = ['devices_001_pos', 'devices_002_neg', 'devices_003_pos']
 tags = ['functional', 'devices']
 
+[tests/functional/direct:Linux]
+tests = ['dio_write_verify']
+tags = ['functional', 'direct']
+
 [tests/functional/events:Linux]
 tests = ['events_001_pos', 'events_002_pos', 'zed_rc_filter', 'zed_fd_spill',
-    'zed_cksum_reported', 'zed_cksum_config', 'zed_io_config']
+    'zed_cksum_reported', 'zed_cksum_config', 'zed_io_config',
+    'zed_slow_io', 'zed_slow_io_many_vdevs', 'zed_diagnose_multiple']
 tags = ['functional', 'events']
 
 [tests/functional/fadvise:Linux]
@@ -104,9 +122,10 @@ tags = ['functional', 'fallocate']
 
 [tests/functional/fault:Linux]
 tests = ['auto_offline_001_pos', 'auto_online_001_pos', 'auto_online_002_pos',
-    'auto_replace_001_pos', 'auto_spare_001_pos', 'auto_spare_002_pos',
-    'auto_spare_multiple', 'auto_spare_ashift', 'auto_spare_shared',
-    'decrypt_fault', 'decompress_fault', 'scrub_after_resilver',
+    'auto_replace_001_pos', 'auto_replace_002_pos', 'auto_spare_001_pos',
+    'auto_spare_002_pos', 'auto_spare_multiple', 'auto_spare_ashift',
+    'auto_spare_shared', 'decrypt_fault', 'decompress_fault',
+    'fault_limits', 'scrub_after_resilver', 'suspend_resume_single',
     'zpool_status_-s']
 tags = ['functional', 'fault']
 
@@ -124,6 +143,10 @@ pre =
 post =
 tags = ['functional', 'largest_pool']
 
+[tests/functional/longname:Linux]
+tests = ['longname_001_pos', 'longname_002_pos', 'longname_003_pos']
+tags = ['functional', 'longname']
+
 [tests/functional/mmap:Linux]
 tests = ['mmap_libaio_001_pos', 'mmap_sync_001_pos']
 tags = ['functional', 'mmap']
@@ -132,7 +155,7 @@ tags = ['functional', 'mmap']
 tests = ['mmp_on_thread', 'mmp_on_uberblocks', 'mmp_on_off', 'mmp_interval',
     'mmp_active_import', 'mmp_inactive_import', 'mmp_exported_import',
     'mmp_write_uberblocks', 'mmp_reset_interval', 'multihost_history',
-    'mmp_on_zdb', 'mmp_write_distribution', 'mmp_hostid']
+    'mmp_on_zdb', 'mmp_write_distribution', 'mmp_hostid', 'mmp_write_slow_disk']
 tags = ['functional', 'mmp']
 
 [tests/functional/mount:Linux]
@@ -168,7 +191,7 @@ tests = ['renameat2_noreplace', 'renameat2_exchange', 'renameat2_whiteout']
 tags = ['functional', 'renameat2']
 
 [tests/functional/rsend:Linux]
-tests = ['send_realloc_dnode_size', 'send_encrypted_files']
+tests = ['send_realloc_dnode_size', 'send_encrypted_files', 'send-c_longname']
 tags = ['functional', 'rsend']
 
 [tests/functional/simd:Linux]
@@ -187,7 +210,7 @@ tests = ['tmpfile_001_pos', 'tmpfile_002_pos', 'tmpfile_003_pos',
 tags = ['functional', 'tmpfile']
 
 [tests/functional/upgrade:Linux]
-tests = ['upgrade_projectquota_001_pos']
+tests = ['upgrade_projectquota_001_pos', 'upgrade_projectquota_002_pos']
 tags = ['functional', 'upgrade']
 
 [tests/functional/user_namespace:Linux]

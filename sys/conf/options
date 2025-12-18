@@ -100,19 +100,18 @@ COMPAT_FREEBSD10	opt_global.h
 COMPAT_FREEBSD11	opt_global.h
 COMPAT_FREEBSD12	opt_global.h
 COMPAT_FREEBSD13	opt_global.h
+COMPAT_FREEBSD14	opt_global.h
 COMPAT_LINUXKPI	opt_dontuse.h
 COMPILING_LINT	opt_global.h
 CY_PCI_FASTINTR
 DEADLKRES	opt_watchdog.h
 EXPERIMENTAL	opt_global.h
 DIRECTIO
-FILEMON		opt_dontuse.h
 FFCLOCK
 FULL_PREEMPTION	opt_sched.h
 GZIO		opt_gzio.h
 IMGACT_BINMISC		opt_dontuse.h
 IPI_PREEMPTION	opt_sched.h
-GEOM_BDE	opt_geom.h
 GEOM_CACHE	opt_geom.h
 GEOM_CONCAT	opt_geom.h
 GEOM_ELI	opt_geom.h
@@ -145,6 +144,7 @@ GEOM_ZERO	opt_geom.h
 IFLIB		opt_iflib.h
 KDTRACE_HOOKS	opt_global.h
 KDTRACE_FRAME	opt_kdtrace.h
+KDTRACE_NO_MIB_SDT	opt_global.h
 KN_HASHSIZE	opt_kqueue.h
 KSTACK_MAX_PAGES
 KSTACK_PAGES
@@ -156,6 +156,7 @@ MAC		opt_global.h
 MAC_BIBA	opt_dontuse.h
 MAC_BSDEXTENDED	opt_dontuse.h
 MAC_DDB		opt_dontuse.h
+MAC_DEBUG	opt_mac.h
 MAC_IFOFF	opt_dontuse.h
 MAC_IPACL	opt_dontuse.h
 MAC_LOMAC	opt_dontuse.h
@@ -169,7 +170,9 @@ MAC_SEEOTHERUIDS	opt_dontuse.h
 MAC_STATIC	opt_mac.h
 MAC_STUB	opt_dontuse.h
 MAC_TEST	opt_dontuse.h
+MAC_GRANTBYLABEL	opt_dontuse.h
 MAC_VERIEXEC	opt_dontuse.h
+MAC_VERIEXEC_DEBUG	opt_mac.h
 MAC_VERIEXEC_SHA1	opt_dontuse.h
 MAC_VERIEXEC_SHA256	opt_dontuse.h
 MAC_VERIEXEC_SHA384	opt_dontuse.h
@@ -183,7 +186,6 @@ MFI_DEBUG	opt_mfi.h
 MFI_DECODE_LOG	opt_mfi.h
 MPROF_BUFFERS	opt_mprof.h
 MPROF_HASH_SIZE	opt_mprof.h
-NEW_PCIB	opt_global.h
 NO_ADAPTIVE_MUTEXES	opt_adaptive_mutexes.h
 NO_ADAPTIVE_RWLOCKS
 NO_ADAPTIVE_SX
@@ -204,6 +206,7 @@ SCHED_STATS	opt_sched.h
 SCHED_ULE	opt_sched.h
 SLEEPQUEUE_PROFILING
 SLHCI_DEBUG	opt_slhci.h
+SOCKET_HHOOK	opt_global.h
 STACK		opt_stack.h
 SUIDDIR
 MSGMNB		opt_sysvipc.h
@@ -227,15 +230,16 @@ SYSVMSG		opt_sysvipc.h
 SYSVSEM		opt_sysvipc.h
 SYSVSHM		opt_sysvipc.h
 SW_WATCHDOG	opt_watchdog.h
-TCPHPTS         opt_inet.h
+TCPHPTS
 TCP_REQUEST_TRK opt_global.h
 TCP_ACCOUNTING	opt_global.h
+TCP_BBR		opt_inet.h
+TCP_RACK	opt_inet.h
 #
 # TCP SaD Detection is an experimental Sack attack Detection (SaD)
 # algorithm that uses "normal" behaviour with SACK's to detect
 # a possible attack. It is strictly experimental at this point.
 #
-TCP_SAD_DETECTION opt_inet.h
 TURNSTILE_PROFILING
 UMTX_PROFILING
 UMTX_CHAINS	opt_global.h
@@ -278,6 +282,7 @@ TMPFS		opt_dontuse.h
 UDF		opt_dontuse.h
 UNIONFS		opt_dontuse.h
 ZFS		opt_dontuse.h
+P9FS		opt_dontuse.h
 
 # Pseudofs debugging
 PSEUDOFS_TRACE	opt_pseudofs.h
@@ -418,13 +423,11 @@ ISP_DEFAULT_ROLES	opt_isp.h
 ISP_INTERNAL_TARGET	opt_isp.h
 ISP_FCTAPE_OFF		opt_isp.h
 
-# Options used only in dev/iscsi
-ISCSI_INITIATOR_DEBUG	opt_iscsi_initiator.h
-
 # Net stuff.
 ACCEPT_FILTER_DATA
 ACCEPT_FILTER_DNS
 ACCEPT_FILTER_HTTP
+ACCEPT_FILTER_TLS
 ALTQ			opt_global.h
 ALTQ_CBQ		opt_altq.h
 ALTQ_CDNR		opt_altq.h
@@ -465,6 +468,7 @@ IPFIREWALL_PMOD		opt_ipfw.h
 IPSEC			opt_ipsec.h
 IPSEC_DEBUG		opt_ipsec.h
 IPSEC_SUPPORT		opt_ipsec.h
+IPSEC_OFFLOAD		opt_ipsec.h
 IPSTEALTH
 KERN_TLS
 KRPC
@@ -474,7 +478,7 @@ MBUF_PROFILING
 MBUF_STRESS_TEST
 MROUTING		opt_mrouting.h
 NFSLOCKD
-NETLINK			opt_netlink.h
+NETLINK			opt_global.h
 PF_DEFAULT_TO_DROP	opt_pf.h
 ROUTE_MPATH		opt_route.h
 ROUTETABLES		opt_route.h
@@ -629,7 +633,6 @@ VM_KMEM_SIZE_SCALE	opt_vm.h
 VM_KMEM_SIZE_MAX	opt_vm.h
 VM_NRESERVLEVEL		opt_vm.h
 VM_LEVEL_0_ORDER	opt_vm.h
-NO_SWAPPING		opt_vm.h
 MALLOC_MAKE_FAILURES	opt_vm.h
 MALLOC_PROFILE		opt_vm.h
 MALLOC_DEBUG_MAXZONES	opt_vm.h
@@ -816,7 +819,6 @@ ATH_TXBUF		opt_ath.h
 ATH_RXBUF		opt_ath.h
 ATH_DIAGAPI		opt_ath.h
 ATH_TX99_DIAG		opt_ath.h
-ATH_ENABLE_11N		opt_ath.h
 ATH_ENABLE_DFS		opt_ath.h
 ATH_EEPROM_FIRMWARE	opt_ath.h
 ATH_ENABLE_RADIOTAP_VENDOR_EXT	opt_ath.h
@@ -893,7 +895,6 @@ DCONS_FORCE_GDB		opt_dcons.h
 # HWPMC options
 HWPMC_DEBUG		opt_global.h
 HWPMC_HOOKS
-HWPMC_MIPS_BACKTRACE 	opt_hwpmc_hooks.h
 
 # 802.11 support layer
 IEEE80211_DEBUG		opt_wlan.h
@@ -1002,7 +1003,6 @@ EKCD		opt_ekcd.h
 
 # NVME options
 NVME_USE_NVD	opt_nvme.h
-NVME_2X_RESET	opt_nvme.h
 
 # amdsbwd options
 AMDSBWD_DEBUG	opt_amdsbwd.h

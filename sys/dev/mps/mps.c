@@ -1127,7 +1127,7 @@ mps_get_iocfacts(struct mps_softc *sc, MPI2_IOC_FACTS_REPLY *facts)
 {
 	MPI2_DEFAULT_REPLY *reply;
 	MPI2_IOC_FACTS_REQUEST request;
-	int error, req_sz, reply_sz;
+	int error, req_sz, reply_sz, retry = 0;
 
 	MPS_FUNCTRACE(sc);
 	mps_dprint(sc, MPS_INIT, "%s entered\n", __func__);
@@ -1136,10 +1136,21 @@ mps_get_iocfacts(struct mps_softc *sc, MPI2_IOC_FACTS_REPLY *facts)
 	reply_sz = sizeof(MPI2_IOC_FACTS_REPLY);
 	reply = (MPI2_DEFAULT_REPLY *)facts;
 
+	/*
+	 * Retry sending the initialization sequence. Sometimes, especially with
+	 * older firmware, the initialization process fails. Retrying allows the
+	 * error to clear in the firmware.
+	 */
 	bzero(&request, req_sz);
 	request.Function = MPI2_FUNCTION_IOC_FACTS;
-	error = mps_request_sync(sc, &request, reply, req_sz, reply_sz, 5);
-	mps_dprint(sc, MPS_INIT, "%s exit error= %d\n", __func__, error);
+	while (retry < 5) {
+		error = mps_request_sync(sc, &request, reply, req_sz, reply_sz, 5);
+		if (error == 0)
+			break;
+		mps_dprint(sc, MPS_FAULT, "%s failed retry %d\n", __func__, retry);
+		DELAY(1000);
+                retry++;
+	}
 
 	return (error);
 }
@@ -1149,7 +1160,7 @@ mps_send_iocinit(struct mps_softc *sc)
 {
 	MPI2_IOC_INIT_REQUEST	init;
 	MPI2_DEFAULT_REPLY	reply;
-	int req_sz, reply_sz, error;
+	int req_sz, reply_sz, error, retry = 0;
 	struct timeval now;
 	uint64_t time_in_msec;
 
@@ -1193,10 +1204,21 @@ mps_send_iocinit(struct mps_softc *sc)
 	time_in_msec = (now.tv_sec * 1000 + now.tv_usec/1000);
 	init.TimeStamp.High = htole32((time_in_msec >> 32) & 0xFFFFFFFF);
 	init.TimeStamp.Low = htole32(time_in_msec & 0xFFFFFFFF);
-
-	error = mps_request_sync(sc, &init, &reply, req_sz, reply_sz, 5);
-	if ((reply.IOCStatus & MPI2_IOCSTATUS_MASK) != MPI2_IOCSTATUS_SUCCESS)
-		error = ENXIO;
+	/*
+	 * Retry sending the initialization sequence. Sometimes, especially with
+	 * older firmware, the initialization process fails. Retrying allows the
+	 * error to clear in the firmware.
+	 */
+	while (retry < 5) {
+		error = mps_request_sync(sc, &init, &reply, req_sz, reply_sz, 5);
+		if ((reply.IOCStatus & MPI2_IOCSTATUS_MASK) != MPI2_IOCSTATUS_SUCCESS)
+			error = ENXIO;
+                if (error == 0)
+                        break;
+                mps_dprint(sc, MPS_FAULT, "%s failed retry %d\n", __func__, retry);
+		DELAY(1000);
+                retry++;
+        }
 
 	mps_dprint(sc, MPS_INIT, "IOCInit status= 0x%x\n", reply.IOCStatus);
 	mps_dprint(sc, MPS_INIT, "%s exit\n", __func__);
@@ -1431,7 +1453,8 @@ mps_alloc_requests(struct mps_softc *sc)
 	rsize = sc->reqframesz * sc->num_chains;
 	bus_dma_template_clone(&t, sc->req_dmat);
 	BUS_DMA_TEMPLATE_FILL(&t, BD_MAXSIZE(rsize), BD_MAXSEGSIZE(rsize),
-	    BD_NSEGMENTS(howmany(rsize, PAGE_SIZE)));
+	    BD_NSEGMENTS(howmany(rsize, PAGE_SIZE)),
+	    BD_BOUNDARY(BUS_SPACE_MAXSIZE_32BIT+1));
 	if (bus_dma_template_tag(&t, &sc->chain_dmat)) {
 		mps_dprint(sc, MPS_ERROR, "Cannot allocate chain DMA tag\n");
 		return (ENOMEM);
@@ -1473,7 +1496,8 @@ mps_alloc_requests(struct mps_softc *sc)
 	BUS_DMA_TEMPLATE_FILL(&t, BD_MAXSIZE(BUS_SPACE_MAXSIZE_32BIT),
 	    BD_NSEGMENTS(nsegs), BD_MAXSEGSIZE(BUS_SPACE_MAXSIZE_24BIT),
 	    BD_FLAGS(BUS_DMA_ALLOCNOW), BD_LOCKFUNC(busdma_lock_mutex),
-	    BD_LOCKFUNCARG(&sc->mps_mtx));
+	    BD_LOCKFUNCARG(&sc->mps_mtx),
+	    BD_BOUNDARY(BUS_SPACE_MAXSIZE_32BIT+1));
         if (bus_dma_template_tag(&t, &sc->buffer_dmat)) {
 		mps_dprint(sc, MPS_ERROR, "Cannot allocate buffer DMA tag\n");
 		return (ENOMEM);
@@ -1719,7 +1743,7 @@ mps_setup_sysctl(struct mps_softc *sc)
 
 	SYSCTL_ADD_STRING(sysctl_ctx, SYSCTL_CHILDREN(sysctl_tree),
 	    OID_AUTO, "msg_version", CTLFLAG_RD, sc->msg_version,
-	    strlen(sc->msg_version), "message interface version");
+	    strlen(sc->msg_version), "message interface version (deprecated)");
 
 	SYSCTL_ADD_INT(sysctl_ctx, SYSCTL_CHILDREN(sysctl_tree),
 	    OID_AUTO, "io_cmds_active", CTLFLAG_RD,

@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #ifndef WITHOUT_CAPSICUM
 #include <sys/capsicum.h>
@@ -100,6 +99,10 @@ int guest_ncpus;
 uint16_t cpu_cores, cpu_sockets, cpu_threads;
 
 int raw_stdio = 0;
+
+#ifdef BHYVE_SNAPSHOT
+char *restore_file;
+#endif
 
 static const int BSP = 0;
 
@@ -410,7 +413,8 @@ fbsdrun_addcpu(int vcpuid)
 
 	CPU_SET_ATOMIC(vcpuid, &cpumask);
 
-	vm_suspend_cpu(vi->vcpu);
+	error = vm_suspend_cpu(vi->vcpu);
+	assert(error == 0);
 
 	error = pthread_create(&thr, NULL, fbsdrun_start_thread, vi);
 	assert(error == 0);
@@ -424,7 +428,7 @@ fbsdrun_deletecpu(int vcpu)
 
 	pthread_mutex_lock(&resetcpu_mtx);
 	if (!CPU_ISSET(vcpu, &cpumask)) {
-		fprintf(stderr, "Attempting to delete unknown cpu %d\n", vcpu);
+		EPRINTLN("Attempting to delete unknown cpu %d", vcpu);
 		exit(4);
 	}
 
@@ -488,7 +492,7 @@ vm_loop(struct vmctx *ctx, struct vcpu *vcpu)
 			exit(4);
 		}
 	}
-	fprintf(stderr, "vm_run error %d, errno %d\n", error, errno);
+	EPRINTLN("vm_run error %d, errno %d", error, errno);
 }
 
 static int
@@ -521,12 +525,7 @@ do_open(const char *vmname)
 
 	reinit = false;
 
-#ifdef __amd64__
-	romboot = lpc_bootrom() != NULL;
-#else
-	romboot = true;
-#endif
-
+	romboot = bootrom_boot();
 	error = vm_create(vmname);
 	if (error) {
 		if (errno == EEXIST) {
@@ -590,6 +589,7 @@ bhyve_parse_config_option(const char *option)
 	if (path == NULL)
 		err(4, "Failed to allocate memory");
 	set_config_value(path, value + 1);
+	free(path);
 	return (true);
 }
 
@@ -657,10 +657,7 @@ main(int argc, char *argv[])
 	size_t memsize;
 	const char *value, *vmname;
 #ifdef BHYVE_SNAPSHOT
-	char *restore_file;
 	struct restore_state rstate;
-
-	restore_file = NULL;
 #endif
 
 	bhyve_init_config();
@@ -759,13 +756,13 @@ main(int argc, char *argv[])
 		exit(4);
 
 	if (qemu_fwcfg_init(ctx) != 0) {
-		fprintf(stderr, "qemu fwcfg initialization error");
+		fprintf(stderr, "qemu fwcfg initialization error\n");
 		exit(4);
 	}
 
 	if (qemu_fwcfg_add_file("opt/bhyve/hw.ncpu", sizeof(guest_ncpus),
 	    &guest_ncpus) != 0) {
-		fprintf(stderr, "Could not add qemu fwcfg opt/bhyve/hw.ncpu");
+		fprintf(stderr, "Could not add qemu fwcfg opt/bhyve/hw.ncpu\n");
 		exit(4);
 	}
 
@@ -773,11 +770,12 @@ main(int argc, char *argv[])
 	 * Exit if a device emulation finds an error in its initialization
 	 */
 	if (init_pci(ctx) != 0) {
-		perror("device emulation initialization error");
+		EPRINTLN("Device emulation initialization error: %s",
+		    strerror(errno));
 		exit(4);
 	}
 	if (init_tpm(ctx) != 0) {
-		fprintf(stderr, "Failed to init TPM device");
+		EPRINTLN("Failed to init TPM device");
 		exit(4);
 	}
 
@@ -800,33 +798,33 @@ main(int argc, char *argv[])
 
 #ifdef BHYVE_SNAPSHOT
 	if (restore_file != NULL) {
-		fprintf(stdout, "Pausing pci devs...\r\n");
+		FPRINTLN(stdout, "Pausing pci devs...");
 		if (vm_pause_devices() != 0) {
-			fprintf(stderr, "Failed to pause PCI device state.\n");
+			EPRINTLN("Failed to pause PCI device state.");
 			exit(1);
 		}
 
-		fprintf(stdout, "Restoring vm mem...\r\n");
+		FPRINTLN(stdout, "Restoring vm mem...");
 		if (restore_vm_mem(ctx, &rstate) != 0) {
-			fprintf(stderr, "Failed to restore VM memory.\n");
+			EPRINTLN("Failed to restore VM memory.");
 			exit(1);
 		}
 
-		fprintf(stdout, "Restoring pci devs...\r\n");
+		FPRINTLN(stdout, "Restoring pci devs...");
 		if (vm_restore_devices(&rstate) != 0) {
-			fprintf(stderr, "Failed to restore PCI device state.\n");
+			EPRINTLN("Failed to restore PCI device state.");
 			exit(1);
 		}
 
-		fprintf(stdout, "Restoring kernel structs...\r\n");
+		FPRINTLN(stdout, "Restoring kernel structs...");
 		if (vm_restore_kern_structs(ctx, &rstate) != 0) {
-			fprintf(stderr, "Failed to restore kernel structs.\n");
+			EPRINTLN("Failed to restore kernel structs.");
 			exit(1);
 		}
 
-		fprintf(stdout, "Resuming pci devs...\r\n");
+		FPRINTLN(stdout, "Resuming pci devs...");
 		if (vm_resume_devices() != 0) {
-			fprintf(stderr, "Failed to resume PCI device state.\n");
+			EPRINTLN("Failed to resume PCI device state.");
 			exit(1);
 		}
 	}
@@ -841,9 +839,6 @@ main(int argc, char *argv[])
 	setproctitle("%s", vmname);
 
 #ifdef BHYVE_SNAPSHOT
-	/* initialize mutex/cond variables */
-	init_snapshot();
-
 	/*
 	 * checkpointing thread for communication with bhyvectl
 	 */

@@ -266,7 +266,7 @@ check_pkt_coalesce(struct sge_qset *qs)
 	if (cxgb_tx_coalesce_enable_start > COALESCE_START_MAX)
 		cxgb_tx_coalesce_enable_start = COALESCE_START_MAX;
 	if (cxgb_tx_coalesce_enable_stop < COALESCE_STOP_MIN)
-		cxgb_tx_coalesce_enable_start = COALESCE_STOP_MIN;
+		cxgb_tx_coalesce_enable_stop = COALESCE_STOP_MIN;
 	/*
 	 * if the hardware transmit queue is more than 1/8 full
 	 * we mark it as coalescing - we drop back from coalescing
@@ -553,9 +553,7 @@ t3_sge_prep(adapter_t *adap, struct sge_params *p)
 	nqsets *= adap->params.nports;
 
 	fl_q_size = min(nmbclusters/(3*nqsets), FL_Q_SIZE);
-
-	while (!powerof2(fl_q_size))
-		fl_q_size--;
+	fl_q_size = rounddown_pow_of_two(fl_q_size);
 
 	use_16k = cxgb_use_16k_clusters != -1 ? cxgb_use_16k_clusters :
 	    is_offload(adap);
@@ -567,8 +565,7 @@ t3_sge_prep(adapter_t *adap, struct sge_params *p)
 		jumbo_q_size = min(nmbjumbo9/(3*nqsets), JUMBO_Q_SIZE);
 		jumbo_buf_size = MJUM9BYTES;
 	}
-	while (!powerof2(jumbo_q_size))
-		jumbo_q_size--;
+	jumbo_q_size = rounddown_pow_of_two(jumbo_q_size);
 
 	if (fl_q_size < (FL_Q_SIZE / 4) || jumbo_q_size < (JUMBO_Q_SIZE / 2))
 		device_printf(adap->dev,
@@ -1838,7 +1835,7 @@ check_desc_avail(adapter_t *adap, struct sge_txq *q,
 	 * the control queue is only used for binding qsets which happens
 	 * at init time so we are guaranteed enough descriptors
 	 */
-	if (__predict_false(mbufq_len(&q->sendq))) {
+	if (__predict_false(!mbufq_empty(&q->sendq))) {
 addq_exit:	(void )mbufq_enqueue(&q->sendq, m);
 		return 1;
 	}
@@ -1954,7 +1951,7 @@ again:	reclaim_completed_tx_imm(q);
 		}
 		q->in_use++;
 	}
-	if (mbufq_len(&q->sendq)) {
+	if (!mbufq_empty(&q->sendq)) {
 		setbit(&qs->txq_stopped, TXQ_CTRL);
 
 		if (should_restart_tx(q) &&
@@ -2422,11 +2419,8 @@ t3_sge_alloc_qset(adapter_t *sc, u_int id, int nports, int irq_vec_idx,
 	q->port = pi;
 	q->adap = sc;
 
-	if ((q->txq[TXQ_ETH].txq_mr = buf_ring_alloc(cxgb_txq_buf_ring_size,
-	    M_DEVBUF, M_WAITOK, &q->lock)) == NULL) {
-		device_printf(sc->dev, "failed to allocate mbuf ring\n");
-		goto err;
-	}
+	q->txq[TXQ_ETH].txq_mr = buf_ring_alloc(cxgb_txq_buf_ring_size,
+	    M_DEVBUF, M_WAITOK, &q->lock);
 	if ((q->txq[TXQ_ETH].txq_ifq = malloc(sizeof(struct ifaltq), M_DEVBUF,
 	    M_NOWAIT | M_ZERO)) == NULL) {
 		device_printf(sc->dev, "failed to allocate ifq\n");

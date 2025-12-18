@@ -30,6 +30,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/elf_common.h>
+
 #include <machine/asm.h>
 #include <machine/armreg.h>
 
@@ -95,6 +97,7 @@
 ENTRY(arm_smccc_\insn)
 #ifdef __CHERI_PURE_CAPABILITY__
 	save_registers
+	str	PTR(9), [PTRN(sp), #-PTR_WIDTH]!
 #endif
 #if __has_feature(capabilities)
 	reset_ddc_el0
@@ -104,13 +107,16 @@ ENTRY(arm_smccc_\insn)
 	restore_ddc_el0
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
+	ldr	PTR(9), [PTRN(sp)], #PTR_WIDTH
 	restore_registers
-#endif
+	ldr	PTR(4), [PTR(9)]
+#else
 	ldr	PTR(4), [PTRN(sp)]
+#endif
 	cbz	x4, 1f
 	stp	PTR(0), PTR(1), [PTR(4), #(2 * PTR_WIDTH) * 0]
 	stp	PTR(2), PTR(3), [PTR(4), #(2 * PTR_WIDTH) * 1]
-1:	ret
+1:	RETURN
 END(arm_smccc_\insn)
 .endm
 
@@ -154,14 +160,16 @@ ENTRY(arm_smccc_1_2_\insn)
 #ifdef __CHERI_PURE_CAPABILITY__
 	restore_registers
 #endif
-	ret
-END(arm_smccc_1_2\insn)
+	RETURN
+END(arm_smccc_1_2_\insn)
 .endm
 /* int arm_smccc_1_2_*(const struct arm_smccc_1_2_regs *args,
  *     struct arm_smccc_1_2_regs *res)
  */
 arm_smccc_1_2	hvc
 arm_smccc_1_2	smc
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)
 // CHERI CHANGES START
 // {
 //   "updated": 20230509,

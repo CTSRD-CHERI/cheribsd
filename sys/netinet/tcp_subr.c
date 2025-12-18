@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)tcp_subr.c	8.2 (Berkeley) 5/24/95
  */
 
 #include <sys/cdefs.h>
@@ -141,68 +139,14 @@ VNET_DEFINE(int, tcp_mssdflt) = TCP_MSS;
 VNET_DEFINE(int, tcp_v6mssdflt) = TCP6_MSS;
 #endif
 
-#ifdef TCP_SAD_DETECTION
-/*  Sack attack detection thresholds and such */
-SYSCTL_NODE(_net_inet_tcp, OID_AUTO, sack_attack,
-    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
-    "Sack Attack detection thresholds");
-int32_t tcp_force_detection = 0;
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, force_detection,
-    CTLFLAG_RW,
-    &tcp_force_detection, 0,
-    "Do we force detection even if the INP has it off?");
-int32_t tcp_sad_limit = 10000;
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, limit,
-    CTLFLAG_RW,
-    &tcp_sad_limit, 10000,
-    "If SaD is enabled, what is the limit to sendmap entries (0 = unlimited)?");
-int32_t tcp_sack_to_ack_thresh = 700;	/* 70 % */
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, sack_to_ack_thresh,
-    CTLFLAG_RW,
-    &tcp_sack_to_ack_thresh, 700,
-    "Percentage of sacks to acks we must see above (10.1 percent is 101)?");
-int32_t tcp_sack_to_move_thresh = 600;	/* 60 % */
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, move_thresh,
-    CTLFLAG_RW,
-    &tcp_sack_to_move_thresh, 600,
-    "Percentage of sack moves we must see above (10.1 percent is 101)");
-int32_t tcp_restoral_thresh = 450;	/* 45 % (sack:2:ack -25%) (mv:ratio -15%) **/
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, restore_thresh,
-    CTLFLAG_RW,
-    &tcp_restoral_thresh, 450,
-    "Percentage of sack to ack percentage we must see below to restore(10.1 percent is 101)");
-int32_t tcp_sad_decay_val = 800;
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, decay_per,
-    CTLFLAG_RW,
-    &tcp_sad_decay_val, 800,
-    "The decay percentage (10.1 percent equals 101 )");
-int32_t tcp_map_minimum = 500;
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, nummaps,
-    CTLFLAG_RW,
-    &tcp_map_minimum, 500,
-    "Number of Map enteries before we start detection");
-int32_t tcp_sad_pacing_interval = 2000;
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, sad_pacing_int,
-    CTLFLAG_RW,
-    &tcp_sad_pacing_interval, 2000,
-    "What is the minimum pacing interval for a classified attacker?");
-
-int32_t tcp_sad_low_pps = 100;
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, sad_low_pps,
-    CTLFLAG_RW,
-    &tcp_sad_low_pps, 100,
-    "What is the input pps that below which we do not decay?");
-#endif
-uint32_t tcp_ack_war_time_window = 1000;
+VNET_DEFINE(uint32_t, tcp_ack_war_time_window) = 1000;
 SYSCTL_UINT(_net_inet_tcp, OID_AUTO, ack_war_timewindow,
-    CTLFLAG_RW,
-    &tcp_ack_war_time_window, 1000,
-   "If the tcp_stack does ack-war prevention how many milliseconds are in its time window?");
-uint32_t tcp_ack_war_cnt = 5;
-SYSCTL_UINT(_net_inet_tcp, OID_AUTO, ack_war_cnt,
-    CTLFLAG_RW,
-    &tcp_ack_war_cnt, 5,
-   "If the tcp_stack does ack-war prevention how many acks can be sent in its time window?");
+    CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(tcp_ack_war_time_window), 0,
+   "Time interval in ms used to limit the number (ack_war_cnt) of challenge ACKs sent per TCP connection");
+VNET_DEFINE(uint32_t, tcp_ack_war_cnt) = 5;
+SYSCTL_UINT(_net_inet_tcp, OID_AUTO, ack_war_cnt, CTLFLAG_VNET | CTLFLAG_RW,
+    &VNET_NAME(tcp_ack_war_cnt), 0,
+   "Maximum number of challenge ACKs sent per TCP connection during the time interval (ack_war_timewindow)");
 
 struct rwlock tcp_function_lock;
 
@@ -289,11 +233,19 @@ SYSCTL_INT(_net_inet_tcp, OID_AUTO, ts_offset_per_conn, CTLFLAG_VNET | CTLFLAG_R
 static volatile uint32_t number_of_tcp_connections_pacing = 0;
 static uint32_t shadow_num_connections = 0;
 static counter_u64_t tcp_pacing_failures;
+static counter_u64_t tcp_dgp_failures;
+static uint32_t shadow_tcp_pacing_dgp = 0;
+static volatile uint32_t number_of_dgp_connections = 0;
 
 static int tcp_pacing_limit = 10000;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, pacing_limit, CTLFLAG_RW,
     &tcp_pacing_limit, 1000,
     "If the TCP stack does pacing, is there a limit (-1 = no, 0 = no pacing N = number of connections)");
+
+static int tcp_dgp_limit = -1;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, dgp_limit, CTLFLAG_RW,
+    &tcp_dgp_limit, -1,
+    "If the TCP stack does DGP, is there a limit (-1 = no, 0 = no dgp N = number of connections)");
 
 SYSCTL_UINT(_net_inet_tcp, OID_AUTO, pacing_count, CTLFLAG_RD,
     &shadow_num_connections, 0, "Number of TCP connections being paced");
@@ -301,12 +253,24 @@ SYSCTL_UINT(_net_inet_tcp, OID_AUTO, pacing_count, CTLFLAG_RD,
 SYSCTL_COUNTER_U64(_net_inet_tcp, OID_AUTO, pacing_failures, CTLFLAG_RD,
     &tcp_pacing_failures, "Number of times we failed to enable pacing to avoid exceeding the limit");
 
+SYSCTL_COUNTER_U64(_net_inet_tcp, OID_AUTO, dgp_failures, CTLFLAG_RD,
+    &tcp_dgp_failures, "Number of times we failed to enable dgp to avoid exceeding the limit");
+
 static int	tcp_log_debug = 0;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, log_debug, CTLFLAG_RW,
     &tcp_log_debug, 0, "Log errors caused by incoming TCP segments");
 
-static int	tcp_tcbhashsize;
-SYSCTL_INT(_net_inet_tcp, OID_AUTO, tcbhashsize, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+/*
+ * Target size of TCP PCB hash tables. Must be a power of two.
+ *
+ * Note that this can be overridden by the kernel environment
+ * variable net.inet.tcp.tcbhashsize
+ */
+#ifndef TCBHASHSIZE
+#define TCBHASHSIZE	0
+#endif
+static int	tcp_tcbhashsize = TCBHASHSIZE;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, tcbhashsize, CTLFLAG_RDTUN,
     &tcp_tcbhashsize, 0, "Size of TCP control-block hashtable");
 
 static int	do_tcpdrain = 1;
@@ -393,6 +357,7 @@ static struct tcp_function_block tcp_def_funcblk = {
 	.tfb_tcp_fb_init = tcp_default_fb_init,
 	.tfb_tcp_fb_fini = tcp_default_fb_fini,
 	.tfb_switch_failed = tcp_default_switch_failed,
+	.tfb_flags = TCP_FUNC_DEFAULT_OK,
 };
 
 static int tcp_fb_cnt = 0;
@@ -428,23 +393,25 @@ static struct tcp_function_block *
 find_tcp_functions_locked(struct tcp_function_set *fs)
 {
 	struct tcp_function *f;
-	struct tcp_function_block *blk=NULL;
+	struct tcp_function_block *blk = NULL;
 
+	rw_assert(&tcp_function_lock, RA_LOCKED);
 	TAILQ_FOREACH(f, &t_functions, tf_next) {
 		if (strcmp(f->tf_name, fs->function_set_name) == 0) {
 			blk = f->tf_fb;
 			break;
 		}
 	}
-	return(blk);
+	return (blk);
 }
 
 static struct tcp_function_block *
 find_tcp_fb_locked(struct tcp_function_block *blk, struct tcp_function **s)
 {
-	struct tcp_function_block *rblk=NULL;
+	struct tcp_function_block *rblk = NULL;
 	struct tcp_function *f;
 
+	rw_assert(&tcp_function_lock, RA_LOCKED);
 	TAILQ_FOREACH(f, &t_functions, tf_next) {
 		if (f->tf_fb == blk) {
 			rblk = blk;
@@ -467,7 +434,7 @@ find_and_ref_tcp_functions(struct tcp_function_set *fs)
 	if (blk)
 		refcount_acquire(&blk->tfb_refcnt);
 	rw_runlock(&tcp_function_lock);
-	return(blk);
+	return (blk);
 }
 
 struct tcp_function_block *
@@ -480,7 +447,7 @@ find_and_ref_tcp_fb(struct tcp_function_block *blk)
 	if (rblk)
 		refcount_acquire(&rblk->tfb_refcnt);
 	rw_runlock(&tcp_function_lock);
-	return(rblk);
+	return (rblk);
 }
 
 /* Find a matching alias for the given tcp_function_block. */
@@ -535,6 +502,9 @@ tcp_switch_back_to_default(struct tcpcb *tp)
 	KASSERT(tp->t_fb != &tcp_def_funcblk,
 	    ("%s: called by the built-in default stack", __func__));
 
+	if (tp->t_fb->tfb_tcp_timer_stop_all != NULL)
+		tp->t_fb->tfb_tcp_timer_stop_all(tp);
+
 	/*
 	 * Now, we'll find a new function block to use.
 	 * Start by trying the current user-selected
@@ -547,8 +517,7 @@ tcp_switch_back_to_default(struct tcpcb *tp)
 		tfb = NULL;
 	}
 	/* Does the stack accept this connection? */
-	if (tfb != NULL && tfb->tfb_tcp_handoff_ok != NULL &&
-	    (*tfb->tfb_tcp_handoff_ok)(tp)) {
+	if (tfb != NULL && (*tfb->tfb_tcp_handoff_ok)(tp)) {
 		refcount_release(&tfb->tfb_refcnt);
 		tfb = NULL;
 	}
@@ -582,11 +551,9 @@ tcp_switch_back_to_default(struct tcpcb *tp)
 		/* there always should be a default */
 		panic("Can't refer to tcp_def_funcblk");
 	}
-	if (tfb->tfb_tcp_handoff_ok != NULL) {
-		if ((*tfb->tfb_tcp_handoff_ok) (tp)) {
-			/* The default stack cannot say no */
-			panic("Default stack rejects a new session?");
-		}
+	if ((*tfb->tfb_tcp_handoff_ok)(tp)) {
+		/* The default stack cannot say no */
+		panic("Default stack rejects a new session?");
 	}
 	if (tfb->tfb_tcp_fb_init != NULL &&
 	    (*tfb->tfb_tcp_fb_init)(tp, &ptr)) {
@@ -681,7 +648,7 @@ out:
 static int
 sysctl_net_inet_default_tcp_functions(SYSCTL_HANDLER_ARGS)
 {
-	int error=ENOENT;
+	int error = ENOENT;
 	struct tcp_function_set fs;
 	struct tcp_function_block *blk;
 
@@ -699,13 +666,17 @@ sysctl_net_inet_default_tcp_functions(SYSCTL_HANDLER_ARGS)
 
 	/* Check for error or no change */
 	if (error != 0 || req->newptr == NULL)
-		return(error);
+		return (error);
 
 	rw_wlock(&tcp_function_lock);
 	blk = find_tcp_functions_locked(&fs);
 	if ((blk == NULL) ||
 	    (blk->tfb_flags & TCP_FUNC_BEING_REMOVED)) {
 		error = ENOENT;
+		goto done;
+	}
+	if ((blk->tfb_flags & TCP_FUNC_DEFAULT_OK) == 0) {
+		error = EINVAL;
 		goto done;
 	}
 	V_tcp_func_set_ptr = blk;
@@ -1065,7 +1036,7 @@ tcp_default_fb_init(struct tcpcb *tp, void **ptr)
 	/* We don't use the pointer */
 	*ptr = NULL;
 
-	KASSERT(tp->t_state >= 0 && tp->t_state < TCPS_TIME_WAIT,
+	KASSERT(tp->t_state < TCPS_TIME_WAIT,
 	    ("%s: connection %p in unexpected state %d", __func__, tp,
 	    tp->t_state));
 
@@ -1152,16 +1123,6 @@ tcp_default_fb_fini(struct tcpcb *tp, int tcb_is_purged)
 	return;
 }
 
-/*
- * Target size of TCP PCB hash tables. Must be a power of two.
- *
- * Note that this can be overridden by the kernel environment
- * variable net.inet.tcp.tcbhashsize
- */
-#ifndef TCBHASHSIZE
-#define TCBHASHSIZE	0
-#endif
-
 MALLOC_DEFINE(M_TCPLOG, "tcplog", "TCP address and flags print buffers");
 MALLOC_DEFINE(M_TCPFUNCTIONS, "tcpfunc", "TCP function set memory");
 
@@ -1214,80 +1175,83 @@ int
 register_tcp_functions_as_names(struct tcp_function_block *blk, int wait,
     const char *names[], int *num_names)
 {
-	struct tcp_function *n;
+	struct tcp_function *f[TCP_FUNCTION_NAME_NUM_MAX];
 	struct tcp_function_set fs;
-	int error, i;
+	int error, i, num_registered;
 
-	KASSERT(names != NULL && *num_names > 0,
-	    ("%s: Called with 0-length name list", __func__));
 	KASSERT(names != NULL, ("%s: Called with NULL name list", __func__));
+	KASSERT(*num_names > 0,
+	    ("%s: Called with non-positive length of name list", __func__));
 	KASSERT(rw_initialized(&tcp_function_lock),
 	    ("%s: called too early", __func__));
 
+	if (*num_names > TCP_FUNCTION_NAME_NUM_MAX) {
+		/* Too many names. */
+		*num_names = 0;
+		return (E2BIG);
+	}
 	if ((blk->tfb_tcp_output == NULL) ||
 	    (blk->tfb_tcp_do_segment == NULL) ||
 	    (blk->tfb_tcp_ctloutput == NULL) ||
+	    (blk->tfb_tcp_handoff_ok == NULL) ||
 	    (strlen(blk->tfb_tcp_block_name) == 0)) {
-		/*
-		 * These functions are required and you
-		 * need a name.
-		 */
+		/* These functions are required and a name is needed. */
 		*num_names = 0;
 		return (EINVAL);
 	}
 
+	for (i = 0; i < *num_names; i++) {
+		f[i] = malloc(sizeof(struct tcp_function), M_TCPFUNCTIONS, wait);
+		if (f[i] == NULL) {
+			while (--i >= 0)
+				free(f[i], M_TCPFUNCTIONS);
+			*num_names = 0;
+			return (ENOMEM);
+		}
+	}
+
+	num_registered = 0;
+	rw_wlock(&tcp_function_lock);
+	if (find_tcp_fb_locked(blk, NULL) != NULL) {
+		/* A TCP function block can only be registered once. */
+		error = EALREADY;
+		goto cleanup;
+	}
 	if (blk->tfb_flags & TCP_FUNC_BEING_REMOVED) {
-		*num_names = 0;
-		return (EINVAL);
+		error = EINVAL;
+		goto cleanup;
 	}
-
 	refcount_init(&blk->tfb_refcnt, 0);
 	blk->tfb_id = atomic_fetchadd_int(&next_tcp_stack_id, 1);
 	for (i = 0; i < *num_names; i++) {
-		n = malloc(sizeof(struct tcp_function), M_TCPFUNCTIONS, wait);
-		if (n == NULL) {
-			error = ENOMEM;
-			goto cleanup;
-		}
-		n->tf_fb = blk;
-
 		(void)strlcpy(fs.function_set_name, names[i],
 		    sizeof(fs.function_set_name));
-		rw_wlock(&tcp_function_lock);
 		if (find_tcp_functions_locked(&fs) != NULL) {
 			/* Duplicate name space not allowed */
-			rw_wunlock(&tcp_function_lock);
-			free(n, M_TCPFUNCTIONS);
 			error = EALREADY;
 			goto cleanup;
 		}
-		(void)strlcpy(n->tf_name, names[i], sizeof(n->tf_name));
-		TAILQ_INSERT_TAIL(&t_functions, n, tf_next);
+		f[i]->tf_fb = blk;
+		(void)strlcpy(f[i]->tf_name, names[i], sizeof(f[i]->tf_name));
+		TAILQ_INSERT_TAIL(&t_functions, f[i], tf_next);
 		tcp_fb_cnt++;
-		rw_wunlock(&tcp_function_lock);
-	}
-	return(0);
-
-cleanup:
-	/*
-	 * Deregister the names we just added. Because registration failed
-	 * for names[i], we don't need to deregister that name.
-	 */
-	*num_names = i;
-	rw_wlock(&tcp_function_lock);
-	while (--i >= 0) {
-		TAILQ_FOREACH(n, &t_functions, tf_next) {
-			if (!strncmp(n->tf_name, names[i],
-			    TCP_FUNCTION_NAME_LEN_MAX)) {
-				TAILQ_REMOVE(&t_functions, n, tf_next);
-				tcp_fb_cnt--;
-				n->tf_fb = NULL;
-				free(n, M_TCPFUNCTIONS);
-				break;
-			}
-		}
+		num_registered++;
 	}
 	rw_wunlock(&tcp_function_lock);
+	return (0);
+
+cleanup:
+	/* Remove the entries just added. */
+	for (i = 0; i < *num_names; i++) {
+		if (i < num_registered) {
+			TAILQ_REMOVE(&t_functions, f[i], tf_next);
+			tcp_fb_cnt--;
+		}
+		f[i]->tf_fb = NULL;
+		free(f[i], M_TCPFUNCTIONS);
+	}
+	rw_wunlock(&tcp_function_lock);
+	*num_names = num_registered;
 	return (error);
 }
 
@@ -1501,6 +1465,7 @@ tcp_vnet_init(void *arg __unused)
 	VNET_PCPUSTAT_ALLOC(tcpstat, M_WAITOK);
 
 	V_tcp_msl = TCPTV_MSL;
+	arc4rand(&V_ts_offset_secret, sizeof(V_ts_offset_secret), 0);
 }
 VNET_SYSINIT(tcp_vnet_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_FOURTH,
     tcp_vnet_init, NULL);
@@ -1508,7 +1473,6 @@ VNET_SYSINIT(tcp_vnet_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_FOURTH,
 static void
 tcp_init(void *arg __unused)
 {
-	const char *tcbhash_tuneable;
 	int hashsize;
 
 	tcp_reass_global_init();
@@ -1539,7 +1503,6 @@ tcp_init(void *arg __unused)
 	/* Initialize the TCP logging data. */
 	tcp_log_init();
 #endif
-	arc4rand(&V_ts_offset_secret, sizeof(V_ts_offset_secret), 0);
 
 	if (tcp_soreceive_stream) {
 #ifdef INET
@@ -1572,13 +1535,12 @@ tcp_init(void *arg __unused)
 	tcp_uncomp_total = counter_u64_alloc(M_WAITOK);
 	tcp_bad_csums = counter_u64_alloc(M_WAITOK);
 	tcp_pacing_failures = counter_u64_alloc(M_WAITOK);
+	tcp_dgp_failures = counter_u64_alloc(M_WAITOK);
 #ifdef TCPPCAP
 	tcp_pcap_init();
 #endif
 
-	hashsize = TCBHASHSIZE;
-	tcbhash_tuneable = "net.inet.tcp.tcbhashsize";
-	TUNABLE_INT_FETCH(tcbhash_tuneable, &hashsize);
+	hashsize = tcp_tcbhashsize;
 	if (hashsize == 0) {
 		/*
 		 * Auto tune the hash size based on maxsockets.
@@ -1595,7 +1557,7 @@ tcp_init(void *arg __unused)
 			hashsize = 512;
 		if (bootverbose)
 			printf("%s: %s auto tuned to %d\n", __func__,
-			    tcbhash_tuneable, hashsize);
+			    "net.inet.tcp.tcbhashsize", hashsize);
 	}
 	/*
 	 * We require a hashsize to be a power of two.
@@ -1784,6 +1746,7 @@ tcpip_maketemplate(struct inpcb *inp)
  *
  * NOTE: If m != NULL, then th must point to *inside* the mbuf.
  */
+
 void
 tcp_respond(struct tcpcb *tp, void *ipgen, struct tcphdr *th, struct mbuf *m,
     tcp_seq ack, tcp_seq seq, uint16_t flags)
@@ -2217,12 +2180,53 @@ tcp_respond(struct tcpcb *tp, void *ipgen, struct tcphdr *th, struct mbuf *m,
 }
 
 /*
+ * Send a challenge ack (no data, no SACK option), but not more than
+ * V_tcp_ack_war_cnt per V_tcp_ack_war_time_window (per TCP connection).
+ */
+void
+tcp_send_challenge_ack(struct tcpcb *tp, struct tcphdr *th, struct mbuf *m)
+{
+	sbintime_t now;
+	bool send_challenge_ack;
+
+	if (V_tcp_ack_war_time_window == 0 || V_tcp_ack_war_cnt == 0) {
+		/* ACK war protection is disabled. */
+		send_challenge_ack = true;
+	} else {
+		/* Start new epoch, if the previous one is already over. */
+		now = getsbinuptime();
+		if (tp->t_challenge_ack_end < now) {
+			tp->t_challenge_ack_cnt = 0;
+			tp->t_challenge_ack_end = now +
+			    V_tcp_ack_war_time_window * SBT_1MS;
+		}
+		/*
+		 * Send a challenge ACK, if less than tcp_ack_war_cnt have been
+		 * sent in the current epoch.
+		 */
+		if (tp->t_challenge_ack_cnt < V_tcp_ack_war_cnt) {
+			send_challenge_ack = true;
+			tp->t_challenge_ack_cnt++;
+		} else {
+			send_challenge_ack = false;
+		}
+	}
+	if (send_challenge_ack) {
+		tcp_respond(tp, mtod(m, void *), th, m, tp->rcv_nxt,
+		    tp->snd_nxt, TH_ACK);
+		tp->last_ack_sent = tp->rcv_nxt;
+	}
+}
+
+/*
  * Create a new TCP control block, making an empty reassembly queue and hooking
  * it to the argument protocol control block.  The `inp' parameter must have
  * come from the zone allocator set up by tcpcbstor declaration.
+ * The caller can provide a pointer to a tcpcb of the listener to inherit the
+ * TCP function block from the listener.
  */
 struct tcpcb *
-tcp_newtcpcb(struct inpcb *inp)
+tcp_newtcpcb(struct inpcb *inp, struct tcpcb *listening_tcb)
 {
 	struct tcpcb *tp = intotcpcb(inp);
 #ifdef INET6
@@ -2237,17 +2241,38 @@ tcp_newtcpcb(struct inpcb *inp)
 	bzero(&tp->t_start_zero, t_zero_size);
 
 	/* Initialise cc_var struct for this tcpcb. */
-	tp->t_ccv.type = IPPROTO_TCP;
-	tp->t_ccv.ccvc.tcp = tp;
+	tp->t_ccv.tp = tp;
 	rw_rlock(&tcp_function_lock);
-	tp->t_fb = V_tcp_func_set_ptr;
+	if (listening_tcb != NULL) {
+		INP_LOCK_ASSERT(tptoinpcb(listening_tcb));
+		KASSERT(listening_tcb->t_fb != NULL,
+		    ("tcp_newtcpcb: listening_tcb->t_fb is NULL"));
+		if (listening_tcb->t_fb->tfb_flags & TCP_FUNC_BEING_REMOVED) {
+			rw_runlock(&tcp_function_lock);
+			return (NULL);
+		}
+		tp->t_fb = listening_tcb->t_fb;
+	} else {
+		tp->t_fb = V_tcp_func_set_ptr;
+	}
 	refcount_acquire(&tp->t_fb->tfb_refcnt);
+	KASSERT((tp->t_fb->tfb_flags & TCP_FUNC_BEING_REMOVED) == 0,
+	    ("tcp_newtcpcb: using TFB being removed"));
 	rw_runlock(&tcp_function_lock);
-	/*
-	 * Use the current system default CC algorithm.
-	 */
-	cc_attach(tp, CC_DEFAULT_ALGO());
-
+	CC_LIST_RLOCK();
+	if (listening_tcb != NULL) {
+		if (CC_ALGO(listening_tcb)->flags & CC_MODULE_BEING_REMOVED) {
+			CC_LIST_RUNLOCK();
+			if (tp->t_fb->tfb_tcp_fb_fini)
+				(*tp->t_fb->tfb_tcp_fb_fini)(tp, 1);
+			refcount_release(&tp->t_fb->tfb_refcnt);
+			return (NULL);
+		}
+		CC_ALGO(tp) = CC_ALGO(listening_tcb);
+	} else
+		CC_ALGO(tp) = CC_DEFAULT_ALGO();
+	cc_refer(CC_ALGO(tp));
+	CC_LIST_RUNLOCK();
 	if (CC_ALGO(tp)->cb_init != NULL)
 		if (CC_ALGO(tp)->cb_init(&tp->t_ccv, NULL) > 0) {
 			cc_detach(tp);
@@ -2259,6 +2284,10 @@ tcp_newtcpcb(struct inpcb *inp)
 
 #ifdef TCP_HHOOK
 	if (khelp_init_osd(HELPER_CLASS_TCP, &tp->t_osd)) {
+		if (CC_ALGO(tp)->cb_destroy != NULL)
+			CC_ALGO(tp)->cb_destroy(&tp->t_ccv);
+		CC_DATA(tp) = NULL;
+		cc_detach(tp);
 		if (tp->t_fb->tfb_tcp_fb_fini)
 			(*tp->t_fb->tfb_tcp_fb_fini)(tp, 1);
 		refcount_release(&tp->t_fb->tfb_refcnt);
@@ -2277,7 +2306,11 @@ tcp_newtcpcb(struct inpcb *inp)
 	/* All mbuf queue/ack compress flags should be off */
 	tcp_lro_features_off(tp);
 
-	callout_init_rw(&tp->t_callout, &inp->inp_lock, CALLOUT_RETURNUNLOCKED);
+	tp->t_hpts_cpu = HPTS_CPU_NONE;
+	tp->t_lro_cpu = HPTS_CPU_NONE;
+
+	callout_init_rw(&tp->t_callout, &inp->inp_lock,
+	    CALLOUT_TRYLOCK | CALLOUT_RETURNUNLOCKED);
 	for (int i = 0; i < TT_N; i++)
 		tp->t_timers[i] = SBT_MAX;
 
@@ -2319,9 +2352,6 @@ tcp_newtcpcb(struct inpcb *inp)
 	 * which may match an IPv4-mapped IPv6 address.
 	 */
 	inp->inp_ip_ttl = V_ip_defttl;
-#ifdef TCPHPTS
-	tcp_hpts_init(tp);
-#endif
 #ifdef TCPPCAP
 	/*
 	 * Init the TCP PCAP queues.
@@ -2335,6 +2365,13 @@ tcp_newtcpcb(struct inpcb *inp)
 	tp->t_pacing_rate = -1;
 	if (tp->t_fb->tfb_tcp_fb_init) {
 		if ((*tp->t_fb->tfb_tcp_fb_init)(tp, &tp->t_fb_ptr)) {
+			if (CC_ALGO(tp)->cb_destroy != NULL)
+				CC_ALGO(tp)->cb_destroy(&tp->t_ccv);
+			CC_DATA(tp) = NULL;
+			cc_detach(tp);
+#ifdef TCP_HHOOK
+			khelp_destroy_osd(&tp->t_osd);
+#endif
 			refcount_release(&tp->t_fb->tfb_refcnt);
 			return (NULL);
 		}
@@ -2386,11 +2423,8 @@ tcp_discardcb(struct tcpcb *tp)
 #endif
 
 	INP_WLOCK_ASSERT(inp);
-
-	tcp_timer_stop(tp);
-	if (tp->t_fb->tfb_tcp_timer_stop_all) {
-		tp->t_fb->tfb_tcp_timer_stop_all(tp);
-	}
+	MPASS(!callout_active(&tp->t_callout));
+	MPASS(TAILQ_EMPTY(&tp->snd_holes));
 
 	/* free the reassembly queue, if any */
 	tcp_reass_flush(tp);
@@ -2400,9 +2434,6 @@ tcp_discardcb(struct tcpcb *tp)
 	if (tp->t_flags & TF_TOE)
 		tcp_offload_detach(tp);
 #endif
-
-	tcp_free_sackholes(tp);
-
 #ifdef TCPPCAP
 	/* Free the TCP PCAP queues. */
 	tcp_pcap_drain(&(tp->t_inpkts));
@@ -2530,14 +2561,15 @@ tcp_close(struct tcpcb *tp)
 		tcp_fastopen_decrement_counter(tp->t_tfo_pending);
 		tp->t_tfo_pending = NULL;
 	}
-#ifdef TCPHPTS
-	tcp_hpts_remove(tp);
-#endif
+	tcp_timer_stop(tp);
+	if (tp->t_fb->tfb_tcp_timer_stop_all != NULL)
+		tp->t_fb->tfb_tcp_timer_stop_all(tp);
 	in_pcbdrop(inp);
 	TCPSTAT_INC(tcps_closed);
 	if (tp->t_state != TCPS_CLOSED)
 		tcp_state_change(tp, TCPS_CLOSED);
 	KASSERT(inp->inp_socket != NULL, ("tcp_close: inp_socket NULL"));
+	tcp_free_sackholes(tp);
 	soisdisconnected(so);
 	if (inp->inp_flags & INP_SOCKREF) {
 		inp->inp_flags &= ~INP_SOCKREF;
@@ -3277,7 +3309,7 @@ tcp_drop_syn_sent(struct inpcb *inp, int errno)
 	if (tp->t_state != TCPS_SYN_SENT)
 		return (inp);
 
-	if (IS_FASTOPEN(tp->t_flags))
+	if (tp->t_flags & TF_FASTOPEN)
 		tcp_fastopen_disable_path(tp);
 
 	tp = tcp_drop(tp, errno);
@@ -3316,8 +3348,19 @@ tcp_mtudisc(struct inpcb *inp, int mtuoffer)
 	so = inp->inp_socket;
 	SOCKBUF_LOCK(&so->so_snd);
 	/* If the mss is larger than the socket buffer, decrease the mss. */
-	if (so->so_snd.sb_hiwat < tp->t_maxseg)
+	if (so->so_snd.sb_hiwat < tp->t_maxseg) {
 		tp->t_maxseg = so->so_snd.sb_hiwat;
+		if (tp->t_maxseg < V_tcp_mssdflt) {
+			/*
+			 * The MSS is so small we should not process incoming
+			 * SACK's since we are subject to attack in such a
+			 * case.
+			 */
+			tp->t_flags2 |= TF2_PROC_SACK_PROHIBIT;
+		} else {
+			tp->t_flags2 &= ~TF2_PROC_SACK_PROHIBIT;
+		}
+	}
 	SOCKBUF_UNLOCK(&so->so_snd);
 
 	TCPSTAT_INC(tcps_mturesent);
@@ -3374,6 +3417,9 @@ tcp_maxmtu(struct in_conninfo *inc, struct tcp_ifcap *cap)
 				cap->tsomax = ifp->if_hw_tsomax;
 				cap->tsomaxsegcount = ifp->if_hw_tsomaxsegcount;
 				cap->tsomaxsegsize = ifp->if_hw_tsomaxsegsize;
+				/* XXXKIB IFCAP2_IPSEC_OFFLOAD_TSO */
+				cap->ipsec_tso =  (ifp->if_capenable2 &
+				    IFCAP2_BIT(IFCAP2_IPSEC_OFFLOAD)) != 0;
 			}
 		}
 	}
@@ -3413,6 +3459,7 @@ tcp_maxmtu6(struct in_conninfo *inc, struct tcp_ifcap *cap)
 				cap->tsomax = ifp->if_hw_tsomax;
 				cap->tsomaxsegcount = ifp->if_hw_tsomaxsegcount;
 				cap->tsomaxsegsize = ifp->if_hw_tsomaxsegsize;
+				cap->ipsec_tso = false; /* XXXKIB */
 			}
 		}
 	}
@@ -3450,8 +3497,19 @@ tcp6_use_min_mtu(struct tcpcb *tp)
 
 		opt = inp->in6p_outputopts;
 		if (opt != NULL && opt->ip6po_minmtu == IP6PO_MINMTU_ALL &&
-		    tp->t_maxseg > TCP6_MSS)
+		    tp->t_maxseg > TCP6_MSS) {
 			tp->t_maxseg = TCP6_MSS;
+			if (tp->t_maxseg < V_tcp_mssdflt) {
+				/*
+				 * The MSS is so small we should not process incoming
+				 * SACK's since we are subject to attack in such a
+				 * case.
+				 */
+				tp->t_flags2 |= TF2_PROC_SACK_PROHIBIT;
+			} else {
+				tp->t_flags2 &= ~TF2_PROC_SACK_PROHIBIT;
+			}
+		}
 	}
 }
 #endif /* INET6 */
@@ -3503,7 +3561,6 @@ tcp_maxseg(const struct tcpcb *tp)
 		if (tp->t_flags & TF_SACK_PERMIT)
 			optlen += PADTCPOLEN(TCPOLEN_SACK_PERMITTED);
 	}
-#undef PAD
 	optlen = min(optlen, TCP_MAXOLEN);
 	return (tp->t_maxseg - optlen);
 }
@@ -3525,7 +3582,6 @@ tcp_fixed_maxseg(const struct tcpcb *tp)
 	 * for cc modules to figure out what the modulo of the
 	 * cwnd should be.
 	 */
-#define	PAD(len)	((((len) / 4) + !!((len) % 4)) * 4)
 	if (TCPS_HAVEESTABLISHED(tp->t_state)) {
 		if (tp->t_flags & TF_RCVD_TSTMP)
 			optlen = TCPOLEN_TSTAMP_APPA;
@@ -3533,23 +3589,22 @@ tcp_fixed_maxseg(const struct tcpcb *tp)
 			optlen = 0;
 #if defined(IPSEC_SUPPORT) || defined(TCP_SIGNATURE)
 		if (tp->t_flags & TF_SIGNATURE)
-			optlen += PAD(TCPOLEN_SIGNATURE);
+			optlen += PADTCPOLEN(TCPOLEN_SIGNATURE);
 #endif
 	} else {
 		if (tp->t_flags & TF_REQ_TSTMP)
 			optlen = TCPOLEN_TSTAMP_APPA;
 		else
-			optlen = PAD(TCPOLEN_MAXSEG);
+			optlen = PADTCPOLEN(TCPOLEN_MAXSEG);
 		if (tp->t_flags & TF_REQ_SCALE)
-			optlen += PAD(TCPOLEN_WINDOW);
+			optlen += PADTCPOLEN(TCPOLEN_WINDOW);
 #if defined(IPSEC_SUPPORT) || defined(TCP_SIGNATURE)
 		if (tp->t_flags & TF_SIGNATURE)
-			optlen += PAD(TCPOLEN_SIGNATURE);
+			optlen += PADTCPOLEN(TCPOLEN_SIGNATURE);
 #endif
 		if (tp->t_flags & TF_SACK_PERMIT)
-			optlen += PAD(TCPOLEN_SACK_PERMITTED);
+			optlen += PADTCPOLEN(TCPOLEN_SACK_PERMITTED);
 	}
-#undef PAD
 	optlen = min(optlen, TCP_MAXOLEN);
 	return (tp->t_maxseg - optlen);
 }
@@ -3976,13 +4031,6 @@ tcp_inptoxtp(const struct inpcb *inp, struct xtcpcb *xt)
 
 	xt->xt_len = sizeof(struct xtcpcb);
 	in_pcbtoxinpcb(inp, &xt->xt_inp);
-	/*
-	 * TCP doesn't use inp_ppcb pointer, we embed inpcb into tcpcb.
-	 * Fixup the pointer that in_pcbtoxinpcb() has set.  When printing
-	 * TCP netstat(1) used to use this pointer, so this fixup needs to
-	 * stay for stable/14.
-	 */
-	xt->xt_inp.inp_ppcb = (uintptr_t)tp;
 }
 
 void
@@ -4027,6 +4075,43 @@ tcp_can_enable_pacing(void)
 		counter_u64_add(tcp_pacing_failures, 1);
 		return (0);
 	}
+}
+
+int
+tcp_incr_dgp_pacing_cnt(void)
+{
+	if ((tcp_dgp_limit == -1) ||
+	    (tcp_dgp_limit > number_of_dgp_connections)) {
+		atomic_fetchadd_int(&number_of_dgp_connections, 1);
+		shadow_tcp_pacing_dgp = number_of_dgp_connections;
+		return (1);
+	} else {
+		counter_u64_add(tcp_dgp_failures, 1);
+		return (0);
+	}
+}
+
+static uint8_t tcp_dgp_warning = 0;
+
+void
+tcp_dec_dgp_pacing_cnt(void)
+{
+	uint32_t ret;
+
+	ret = atomic_fetchadd_int(&number_of_dgp_connections, -1);
+	shadow_tcp_pacing_dgp = number_of_dgp_connections;
+	KASSERT(ret != 0, ("number_of_dgp_connections -1 would cause wrap?"));
+	if (ret == 0) {
+		if (tcp_dgp_limit != -1) {
+			printf("Warning all DGP is now disabled, count decrements invalidly!\n");
+			tcp_dgp_limit = 0;
+			tcp_dgp_warning = 1;
+		} else if (tcp_dgp_warning == 0) {
+			printf("Warning DGP pacing is invalid, invalid decrement\n");
+			tcp_dgp_warning = 1;
+		}
+	}
+
 }
 
 static uint8_t tcp_pacing_warning = 0;
@@ -4206,19 +4291,19 @@ tcp_change_time_units(struct tcpcb *tp, int granularity)
 			uint32_t val, frac;
 
 			val = USEC_2_TICKS(tp->t_rttvar);
-			frac = tp->t_srtt % (HPTS_USEC_IN_SEC / hz);
+			frac = tp->t_rttvar % (HPTS_USEC_IN_SEC / hz);
 			tp->t_rttvar = val <<  TCP_RTTVAR_SHIFT;
 			/*
 			 * frac is the fractional part here is left
 			 * over from converting to hz and shifting.
-			 * We need to convert this to the 5 bit
+			 * We need to convert this to the 4 bit
 			 * remainder.
 			 */
 			if (frac) {
 				if (hz == 1000) {
-					frac = (((uint64_t)frac *  (uint64_t)TCP_RTT_SCALE) / (uint64_t)HPTS_USEC_IN_MSEC);
+					frac = (((uint64_t)frac *  (uint64_t)TCP_RTTVAR_SCALE) / (uint64_t)HPTS_USEC_IN_MSEC);
 				} else {
-					frac = (((uint64_t)frac * (uint64_t)(hz) * (uint64_t)TCP_RTT_SCALE) /(uint64_t)HPTS_USEC_IN_SEC);
+					frac = (((uint64_t)frac * (uint64_t)(hz) * (uint64_t)TCP_RTTVAR_SCALE) /(uint64_t)HPTS_USEC_IN_SEC);
 				}
 				tp->t_rttvar += frac;
 			}
@@ -4320,9 +4405,7 @@ tcp_req_log_req_info(struct tcpcb *tp, struct tcp_sendfile_track *req,
 		struct timeval tv;
 
 		memset(&log.u_bbr, 0, sizeof(log.u_bbr));
-#ifdef TCPHPTS
 		log.u_bbr.inhpts = tcp_in_hpts(tp);
-#endif
 		log.u_bbr.flex8 = val;
 		log.u_bbr.rttProp = req->timestamp;
 		log.u_bbr.delRate = req->start;
@@ -4376,7 +4459,7 @@ tcp_req_check_for_stale_entries(struct tcpcb *tp, uint64_t ts, int rm_oldest)
 	uint64_t time_delta, oldest_delta;
 	int i, oldest, oldest_set = 0, cnt_rm = 0;
 
-	for(i = 0; i < MAX_TCP_TRK_REQ; i++) {
+	for (i = 0; i < MAX_TCP_TRK_REQ; i++) {
 		ent = &tp->t_tcpreq_info[i];
 		if (ent->flags != TCP_TRK_TRACK_FLG_USED) {
 			/*
@@ -4419,15 +4502,15 @@ tcp_req_check_for_stale_entries(struct tcpcb *tp, uint64_t ts, int rm_oldest)
 int
 tcp_req_check_for_comp(struct tcpcb *tp, tcp_seq ack_point)
 {
-	int i, ret=0;
+	int i, ret = 0;
 	struct tcp_sendfile_track *ent;
 
 	/* Clean up any old closed end requests that are now completed */
 	if (tp->t_tcpreq_req == 0)
-		return(0);
+		return (0);
 	if (tp->t_tcpreq_closed == 0)
-		return(0);
-	for(i = 0; i < MAX_TCP_TRK_REQ; i++) {
+		return (0);
+	for (i = 0; i < MAX_TCP_TRK_REQ; i++) {
 		ent = &tp->t_tcpreq_info[i];
 		/* Skip empty ones */
 		if (ent->flags == TCP_TRK_TRACK_FLG_EMPTY)
@@ -4450,11 +4533,11 @@ int
 tcp_req_is_entry_comp(struct tcpcb *tp, struct tcp_sendfile_track *ent, tcp_seq ack_point)
 {
 	if (tp->t_tcpreq_req == 0)
-		return(-1);
+		return (-1);
 	if (tp->t_tcpreq_closed == 0)
-		return(-1);
+		return (-1);
 	if (ent->flags == TCP_TRK_TRACK_FLG_EMPTY)
-		return(-1);
+		return (-1);
 	if (SEQ_GEQ(ack_point, ent->end_seq)) {
 		return (1);
 	}
@@ -4476,7 +4559,7 @@ tcp_req_find_a_req_that_is_completed_by(struct tcpcb *tp, tcp_seq th_ack, int *i
 		/* none open */
 		return (NULL);
 	}
-	for(i = 0; i < MAX_TCP_TRK_REQ; i++) {
+	for (i = 0; i < MAX_TCP_TRK_REQ; i++) {
 		ent = &tp->t_tcpreq_info[i];
 		if (ent->flags == TCP_TRK_TRACK_FLG_EMPTY)
 			continue;
@@ -4500,7 +4583,7 @@ tcp_req_find_req_for_seq(struct tcpcb *tp, tcp_seq seq)
 		/* none open */
 		return (NULL);
 	}
-	for(i = 0; i < MAX_TCP_TRK_REQ; i++) {
+	for (i = 0; i < MAX_TCP_TRK_REQ; i++) {
 		ent = &tp->t_tcpreq_info[i];
 		tcp_req_log_req_info(tp, ent, i, TCP_TRK_REQ_LOG_SEARCH,
 				      (uint64_t)seq, 0);
@@ -4548,9 +4631,9 @@ tcp_req_alloc_req_full(struct tcpcb *tp, struct tcp_snd_req *req, uint64_t ts, i
 		    (tp->t_tcpreq_req >= MAX_TCP_TRK_REQ));
 	/* Check to see if this is a duplicate of one not started */
 	if (tp->t_tcpreq_req) {
-		for(i = 0, allocated = 0; i < MAX_TCP_TRK_REQ; i++) {
+		for (i = 0, allocated = 0; i < MAX_TCP_TRK_REQ; i++) {
 			fil = &tp->t_tcpreq_info[i];
-			if (fil->flags != TCP_TRK_TRACK_FLG_USED)
+			if ((fil->flags & TCP_TRK_TRACK_FLG_USED) == 0)
 				continue;
 			if ((fil->timestamp == req->timestamp) &&
 			    (fil->start == req->start) &&
@@ -4563,25 +4646,26 @@ tcp_req_alloc_req_full(struct tcpcb *tp, struct tcp_snd_req *req, uint64_t ts, i
 				 * a 4xx of some sort and its going to age
 				 * out, lets not duplicate it.
 				 */
-				return(fil);
+				return (fil);
 			}
 		}
 	}
 	/* Ok if there is no room at the inn we are in trouble */
 	if (tp->t_tcpreq_req >= MAX_TCP_TRK_REQ) {
 		tcp_trace_point(tp, TCP_TP_REQ_LOG_FAIL);
-		for(i = 0; i < MAX_TCP_TRK_REQ; i++) {
+		for (i = 0; i < MAX_TCP_TRK_REQ; i++) {
 			tcp_req_log_req_info(tp, &tp->t_tcpreq_info[i],
 			    i, TCP_TRK_REQ_LOG_ALLOCFAIL, 0, 0);
 		}
 		return (NULL);
 	}
-	for(i = 0, allocated = 0; i < MAX_TCP_TRK_REQ; i++) {
+	for (i = 0, allocated = 0; i < MAX_TCP_TRK_REQ; i++) {
 		fil = &tp->t_tcpreq_info[i];
 		if (fil->flags == TCP_TRK_TRACK_FLG_EMPTY) {
 			allocated = 1;
 			fil->flags = TCP_TRK_TRACK_FLG_USED;
 			fil->timestamp = req->timestamp;
+			fil->playout_ms = req->playout_ms;
 			fil->localtime = ts;
 			fil->start = req->start;
 			if (req->flags & TCP_LOG_HTTPD_RANGE_END) {
@@ -4598,7 +4682,10 @@ tcp_req_alloc_req_full(struct tcpcb *tp, struct tcp_snd_req *req, uint64_t ts, i
 			fil->sbcc_at_s = tptosocket(tp)->so_snd.sb_ccc;
 			fil->start_seq = tp->snd_una +
 			    tptosocket(tp)->so_snd.sb_ccc;
-			fil->end_seq = (fil->start_seq + ((uint32_t)(fil->end - fil->start)));
+			if (req->flags & TCP_LOG_HTTPD_RANGE_END)
+				fil->end_seq = (fil->start_seq + ((uint32_t)(fil->end - fil->start)));
+			else
+				fil->end_seq = 0;
 			if (tptosocket(tp)->so_snd.sb_tls_info) {
 				/*
 				 * This session is doing TLS. Take a swag guess
@@ -4681,6 +4768,33 @@ tcp_get_srtt(struct tcpcb *tp, int granularity)
 		srtt = srtt >> TCP_RTT_SHIFT;
 
 	return (srtt);
+}
+
+void
+tcp_account_for_send(struct tcpcb *tp, uint32_t len, uint8_t is_rxt,
+    uint8_t is_tlp, bool hw_tls)
+{
+
+	if (is_tlp) {
+		tp->t_sndtlppack++;
+		tp->t_sndtlpbyte += len;
+	}
+	/* To get total bytes sent you must add t_snd_rxt_bytes to t_sndbytes */
+	if (is_rxt)
+		tp->t_snd_rxt_bytes += len;
+	else
+		tp->t_sndbytes += len;
+
+#ifdef KERN_TLS
+	if (hw_tls && is_rxt && len != 0) {
+		uint64_t rexmit_percent;
+
+		rexmit_percent = (1000ULL * tp->t_snd_rxt_bytes) /
+		    (10ULL * (tp->t_snd_rxt_bytes + tp->t_sndbytes));
+		if (rexmit_percent > ktls_ifnet_max_rexmit_pct)
+			ktls_disable_ifnet(tp);
+	}
+#endif
 }
 // CHERI CHANGES START
 // {

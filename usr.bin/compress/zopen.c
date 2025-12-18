@@ -33,9 +33,6 @@
  * SUCH DAMAGE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)zopen.c	8.1 (Berkeley) 6/27/93";
-#endif /* LIBC_SCCS and not lint */
 
 #include <sys/cdefs.h>
 /*-
@@ -623,7 +620,8 @@ getcode(struct s_zstate *zs)
 	}
 
 	/* High order bits. */
-	gcode |= (*bp & rmask[bits]) << r_off;
+	if (bits > 0)
+		gcode |= (*bp & rmask[bits]) << r_off;
 	roffset += n_bits;
 
 	return (gcode);

@@ -1,5 +1,3 @@
-#	from @(#)Makefile.inc	8.2 (Berkeley) 7/14/94
-
 .PATH: ${LIBC_SRCTOP}/db/btree
 
 SRCS+=	bt_close.c bt_conv.c bt_debug.c bt_delete.c bt_get.c bt_open.c \

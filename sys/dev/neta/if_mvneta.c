@@ -26,7 +26,7 @@
  */
 
 #include "opt_platform.h"
-#include <sys/cdefs.h>
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/endian.h>
@@ -63,7 +63,7 @@
 #include <sys/rman.h>
 #include <machine/resource.h>
 
-#include <dev/extres/clk/clk.h>
+#include <dev/clk/clk.h>
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -612,11 +612,6 @@ mvneta_attach(device_t self)
 
 	/* Allocate network interface */
 	ifp = sc->ifp = if_alloc(IFT_ETHER);
-	if (ifp == NULL) {
-		device_printf(self, "if_alloc() failed\n");
-		mvneta_detach(self);
-		return (ENOMEM);
-	}
 	if_initname(ifp, device_get_name(self), device_get_unit(self));
 
 	/*
@@ -806,7 +801,7 @@ mvneta_attach(device_t self)
 		if (mvneta_has_switch(self)) {
 			if (bootverbose)
 				device_printf(self, "This device is attached to a switch\n");
-			child = device_add_child(sc->dev, "mdio", -1);
+			child = device_add_child(sc->dev, "mdio", DEVICE_UNIT_ANY);
 			if (child == NULL) {
 				ether_ifdetach(sc->ifp);
 				mvneta_detach(self);
@@ -3005,8 +3000,6 @@ mvneta_rx_queue(struct mvneta_softc *sc, int q, int npkt)
 	struct mvneta_rx_desc *r;
 	struct mvneta_buf *rxbuf;
 	struct mbuf *m;
-	struct lro_ctrl *lro;
-	struct lro_entry *queued;
 	void *pktbuf;
 	int i, pktlen, processed, ndma;
 
@@ -3120,11 +3113,7 @@ rx_lro:
 	/*
 	 * Flush any outstanding LRO work
 	 */
-	lro = &rx->lro;
-	while (__predict_false((queued = LIST_FIRST(&lro->lro_active)) != NULL)) {
-		LIST_REMOVE(LIST_FIRST((&lro->lro_active)), next);
-		tcp_lro_flush(lro, queued);
-	}
+	tcp_lro_flush_all(&rx->lro);
 }
 
 STATIC void

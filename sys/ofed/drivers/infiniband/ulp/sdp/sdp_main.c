@@ -62,7 +62,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#include <sys/cdefs.h>
+
 #include <sys/param.h>
 #include <sys/eventhandler.h>
 #include <sys/kernel.h>
@@ -187,56 +187,38 @@ sdp_pcbfree(struct sdp_sock *ssk)
 	uma_zfree(sdp_zone, ssk);
 }
 
-/*
- * Common routines to return a socket address.
- */
-static struct sockaddr *
-sdp_sockaddr(in_port_t port, struct in_addr *addr_p)
+static int
+sdp_getsockaddr(struct socket *so, struct sockaddr *sa)
 {
-	struct sockaddr_in *sin;
+	struct sdp_sock *ssk = sdp_sk(so);
 
-	sin = malloc(sizeof *sin, M_SONAME,
-		M_WAITOK | M_ZERO);
-	sin->sin_family = AF_INET;
-	sin->sin_len = sizeof(*sin);
-	sin->sin_addr = *addr_p;
-	sin->sin_port = port;
+	SDP_RLOCK(ssk);
+	*(struct sockaddr_in *)sa = (struct sockaddr_in ){
+		.sin_family = AF_INET,
+		.sin_len = sizeof(struct sockaddr_in),
+		.sin_addr.s_addr = ssk->laddr,
+		.sin_port = ssk->lport,
+	};
+	SDP_RUNLOCK(ssk);
 
-	return (struct sockaddr *)sin;
+	return (0);
 }
 
 static int
-sdp_getsockaddr(struct socket *so, struct sockaddr **nam)
+sdp_getpeeraddr(struct socket *so, struct sockaddr *sa)
 {
-	struct sdp_sock *ssk;
-	struct in_addr addr;
-	in_port_t port;
+	struct sdp_sock *ssk = sdp_sk(so);
 
-	ssk = sdp_sk(so);
 	SDP_RLOCK(ssk);
-	port = ssk->lport;
-	addr.s_addr = ssk->laddr;
+	*(struct sockaddr_in *)sa = (struct sockaddr_in ){
+		.sin_family = AF_INET,
+		.sin_len = sizeof(struct sockaddr_in),
+		.sin_addr.s_addr = ssk->faddr,
+		.sin_port = ssk->fport,
+	};
 	SDP_RUNLOCK(ssk);
 
-	*nam = sdp_sockaddr(port, &addr);
-	return 0;
-}
-
-static int
-sdp_getpeeraddr(struct socket *so, struct sockaddr **nam)
-{
-	struct sdp_sock *ssk;
-	struct in_addr addr;
-	in_port_t port;
-
-	ssk = sdp_sk(so);
-	SDP_RLOCK(ssk);
-	port = ssk->fport;
-	addr.s_addr = ssk->faddr;
-	SDP_RUNLOCK(ssk);
-
-	*nam = sdp_sockaddr(port, &addr);
-	return 0;
+	return (0);
 }
 
 #if 0
@@ -776,56 +758,79 @@ out:
  * are fully initialized.
  */
 static int
-sdp_accept(struct socket *so, struct sockaddr **nam)
+sdp_accept(struct socket *so, struct sockaddr *sa)
 {
 	struct sdp_sock *ssk = NULL;
-	struct in_addr addr;
-	in_port_t port;
 	int error;
 
 	if (so->so_state & SS_ISDISCONNECTED)
 		return (ECONNABORTED);
 
-	port = 0;
-	addr.s_addr = 0;
 	error = 0;
 	ssk = sdp_sk(so);
 	SDP_WLOCK(ssk);
-	if (ssk->flags & (SDP_TIMEWAIT | SDP_DROPPED)) {
+	if (ssk->flags & (SDP_TIMEWAIT | SDP_DROPPED))
 		error = ECONNABORTED;
-		goto out;
-	}
-	port = ssk->fport;
-	addr.s_addr = ssk->faddr;
-out:
+	else
+		*(struct sockaddr_in *)sa = (struct sockaddr_in ){
+			.sin_family = AF_INET,
+			.sin_len = sizeof(struct sockaddr_in),
+			.sin_addr.s_addr = ssk->faddr,
+			.sin_port = ssk->fport,
+		};
 	SDP_WUNLOCK(ssk);
-	if (error == 0)
-		*nam = sdp_sockaddr(port, &addr);
-	return error;
+
+	return (error);
 }
 
 /*
  * Mark the connection as being incapable of further output.
  */
 static int
-sdp_shutdown(struct socket *so)
+sdp_shutdown(struct socket *so, enum shutdown_how how)
 {
+	struct sdp_sock *ssk = sdp_sk(so);
 	int error = 0;
-	struct sdp_sock *ssk;
 
-	ssk = sdp_sk(so);
-	SDP_WLOCK(ssk);
-	if (ssk->flags & (SDP_TIMEWAIT | SDP_DROPPED)) {
-		error = ECONNRESET;
-		goto out;
+	SOCK_LOCK(so);
+	if ((so->so_state &
+	    (SS_ISCONNECTED | SS_ISCONNECTING | SS_ISDISCONNECTING)) == 0) {
+		SOCK_UNLOCK(so);
+		return (ENOTCONN);
 	}
-	socantsendmore(so);
-	sdp_usrclosed(ssk);
-	if (!(ssk->flags & SDP_DROPPED))
-		sdp_output_disconnect(ssk);
+	if (SOLISTENING(so)) {
+		if (how != SHUT_WR) {
+			so->so_error = ECONNABORTED;
+			solisten_wakeup(so);	/* unlocks so */
+		} else
+			SOCK_UNLOCK(so);
+		return (0);
+	}
+	SOCK_UNLOCK(so);
 
-out:
-	SDP_WUNLOCK(ssk);
+	switch (how) {
+	case SHUT_RD:
+		socantrcvmore(so);
+		sbrelease(so, SO_RCV);
+		break;
+	case SHUT_RDWR:
+		socantrcvmore(so);
+		sbrelease(so, SO_RCV);
+		/* FALLTHROUGH */
+	case SHUT_WR:
+		SDP_WLOCK(ssk);
+		if (ssk->flags & (SDP_TIMEWAIT | SDP_DROPPED)) {
+			SDP_WUNLOCK(ssk);
+			error = ECONNRESET;
+			break;
+		}
+		socantsendmore(so);
+		sdp_usrclosed(ssk);
+		if (!(ssk->flags & SDP_DROPPED))
+			sdp_output_disconnect(ssk);
+		SDP_WUNLOCK(ssk);
+	}
+	wakeup(&so->so_timeo);
 
 	return (error);
 }

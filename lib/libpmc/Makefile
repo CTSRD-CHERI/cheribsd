@@ -1,4 +1,3 @@
-
 # XXX: not at all purecap clean, but we need the headers...
 MK_WERROR=	no
 
@@ -65,6 +64,7 @@ MAN+=	pmclog.3
 MAN+=	pmc.soft.3
 
 # PMC-dependent manual pages
+MAN+=	pmc.amd.3
 MAN+=	pmc.atom.3
 MAN+=	pmc.atomsilvermont.3
 MAN+=	pmc.cmn-600.3
@@ -79,8 +79,6 @@ MAN+=	pmc.haswellxeon.3
 MAN+=	pmc.iaf.3
 MAN+=	pmc.ivybridge.3
 MAN+=	pmc.ivybridgexeon.3
-MAN+=	pmc.k7.3
-MAN+=	pmc.k8.3
 MAN+=	pmc.sandybridge.3
 MAN+=	pmc.sandybridgeuc.3
 MAN+=	pmc.sandybridgexeon.3
@@ -115,5 +113,9 @@ MLINKS+= \
 	pmclog.3 pmclog_close.3 \
 	pmclog.3 pmclog_feed.3 \
 	pmclog.3 pmclog_read.3
+
+# Class aliases
+MLINKS+= \
+	pmc.amd.3 pmc.k8.3
 
 .include <bsd.lib.mk>

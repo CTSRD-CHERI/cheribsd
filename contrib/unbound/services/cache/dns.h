@@ -164,6 +164,15 @@ struct dns_msg* tomsg(struct module_env* env, struct query_info* q,
 	struct reply_info* r, struct regional* region, time_t now,
 	int allow_expired, struct regional* scratch);
 
+/**
+ * Deep copy a dns_msg to a region.
+ * @param origin: the dns_msg to copy.
+ * @param region: the region to copy all the data to.
+ * @return the new dns_msg or NULL on malloc error.
+ */
+struct dns_msg* dns_msg_deepcopy_region(struct dns_msg* origin,
+	struct regional* region);
+
 /** 
  * Find cached message 
  * @param env: module environment with the DNS cache.
@@ -193,10 +202,11 @@ struct dns_msg* dns_cache_lookup(struct module_env* env,
  * @param qclass: which class to look in.
  * @param region: where to store new dp info.
  * @param dp: delegation point to fill missing entries.
+ * @param flags: rrset flags, or 0.
  * @return false on alloc failure.
  */
 int cache_fill_missing(struct module_env* env, uint16_t qclass, 
-	struct regional* region, struct delegpt* dp);
+	struct regional* region, struct delegpt* dp, uint32_t flags);
 
 /**
  * Utility, create new, unpacked data structure for cache response.

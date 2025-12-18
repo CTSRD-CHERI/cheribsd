@@ -1,9 +1,12 @@
-// RUN: %clangxx_msan -std=c++11 -O0 %s -o %t && %run %t
+// RUN: %clangxx_msan -fno-sanitize-memory-param-retval -std=c++11 -O0 %s -o %t && %run %t
 //
 // Test that va_arg shadow from a signal handler does not leak outside.
 
 // Reported deadly signal due to stack-overflow
-// XFAIL: netbsd
+// XFAIL: target={{.*netbsd.*}}
+
+// VarArg implementation on LoongArch isn't supported yet.
+// UNSUPPORTED: target=loongarch{{.*}}
 
 #include <signal.h>
 #include <stdarg.h>

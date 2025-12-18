@@ -1103,7 +1103,8 @@ static int
 hn_ifmedia_upd(if_t ifp __unused)
 {
 
-	return EOPNOTSUPP;
+	/* Ignore since autoselect is the only defined and valid media */
+	return (0);
 }
 
 static void
@@ -1261,60 +1262,21 @@ hn_ifaddr_event(void *arg, if_t ifp)
 }
 
 static int
-hn_xpnt_vf_iocsetcaps(struct hn_softc *sc, struct ifreq *ifr)
+hn_xpnt_vf_iocsetcaps(struct hn_softc *sc, struct ifreq *ifr __unused)
 {
 	if_t ifp, vf_ifp;
-	uint64_t tmp;
-	int error;
 
 	HN_LOCK_ASSERT(sc);
 	ifp = sc->hn_ifp;
 	vf_ifp = sc->hn_vf_ifp;
 
 	/*
-	 * Fix up requested capabilities w/ supported capabilities,
-	 * since the supported capabilities could have been changed.
+	 * Just sync up with VF's enabled capabilities.
 	 */
-	ifr->ifr_reqcap &= if_getcapabilities(ifp);
-	/* Pass SIOCSIFCAP to VF. */
-	error = ifhwioctl(SIOCSIFCAP, vf_ifp, (caddr_t)ifr, curthread);
+	if_setcapenable(ifp, if_getcapenable(vf_ifp));
+	if_sethwassist(ifp, if_gethwassist(vf_ifp));
 
-	/*
-	 * NOTE:
-	 * The error will be propagated to the callers, however, it
-	 * is _not_ useful here.
-	 */
-
-	/*
-	 * Merge VF's enabled capabilities.
-	 */
-	if_setcapenable(ifp, if_getcapenable(vf_ifp) & if_getcapabilities(ifp));
-
-	tmp = if_gethwassist(vf_ifp) & HN_CSUM_IP_HWASSIST(sc);
-	if (if_getcapenable(ifp) & IFCAP_TXCSUM)
-		if_sethwassistbits(ifp, tmp, 0);
-	else
-		if_sethwassistbits(ifp, 0, tmp);
-
-	tmp = if_gethwassist(vf_ifp) & HN_CSUM_IP6_HWASSIST(sc);
-	if (if_getcapenable(ifp) & IFCAP_TXCSUM_IPV6)
-		if_sethwassistbits(ifp, tmp, 0);
-	else
-		if_sethwassistbits(ifp, 0, tmp);
-
-	tmp = if_gethwassist(vf_ifp) & CSUM_IP_TSO;
-	if (if_getcapenable(ifp) & IFCAP_TSO4)
-		if_sethwassistbits(ifp, tmp, 0);
-	else
-		if_sethwassistbits(ifp, 0, tmp);
-
-	tmp = if_gethwassist(vf_ifp) & CSUM_IP6_TSO;
-	if (if_getcapenable(ifp) & IFCAP_TSO6)
-		if_sethwassistbits(ifp, tmp, 0);
-	else
-		if_sethwassistbits(ifp, 0, tmp);
-
-	return (error);
+	return (0);
 }
 
 static int
@@ -1698,6 +1660,8 @@ hn_xpnt_vf_setready(struct hn_softc *sc)
 	sc->hn_saved_tsomax = if_gethwtsomax(ifp);
 	sc->hn_saved_tsosegcnt = if_gethwtsomaxsegcount(ifp);
 	sc->hn_saved_tsosegsz = if_gethwtsomaxsegsize(ifp);
+	sc->hn_saved_capenable = if_getcapenable(ifp);
+	sc->hn_saved_hwassist = if_gethwassist(ifp);
 
 	/*
 	 * Intersect supported/enabled capabilities.
@@ -2017,18 +1981,14 @@ hn_ifnet_detevent(void *xsc, if_t ifp)
 			 * The VF was ready; restore some settings.
 			 */
 			if_setcapabilities(ifp, sc->hn_saved_caps);
-			/*
-			 * NOTE:
-			 * There is _no_ need to fixup if_capenable and
-			 * if_hwassist, since the if_capabilities before
-			 * restoration was an intersection of the VF's
-			 * if_capabilites and the synthetic device's
-			 * if_capabilites.
-			 */
+
 			if_sethwtsomax(ifp, sc->hn_saved_tsomax);
 			if_sethwtsomaxsegcount(sc->hn_ifp,
 			    sc->hn_saved_tsosegcnt);
 			if_sethwtsomaxsegsize(ifp, sc->hn_saved_tsosegsz);
+
+			if_setcapenable(ifp, sc->hn_saved_capenable);
+			if_sethwassist(ifp, sc->hn_saved_hwassist);
 		}
 
 		if (sc->hn_flags & HN_FLAG_SYNTH_ATTACHED) {
@@ -2564,7 +2524,7 @@ hn_detach(device_t dev)
 				hn_stop(sc, true);
 			/*
 			 * NOTE:
-			 * hn_stop() only suspends data, so managment
+			 * hn_stop() only suspends data, so management
 			 * stuffs have to be suspended manually here.
 			 */
 			hn_suspend_mgmt(sc);
@@ -3303,7 +3263,7 @@ hn_txpkt(if_t ifp, struct hn_tx_ring *txr, struct hn_txdesc *txd)
 	int error, send_failed = 0, has_bpf;
 
 again:
-	has_bpf = bpf_peers_present(if_getbpf(ifp));
+	has_bpf = bpf_peers_present_if(ifp);
 	if (has_bpf) {
 		/*
 		 * Make sure that this txd and any aggregated txds are not
@@ -5171,7 +5131,7 @@ hn_destroy_rx_data(struct hn_softc *sc)
 
 	if (sc->hn_rxbuf != NULL) {
 		if ((sc->hn_flags & HN_FLAG_RXBUF_REF) == 0)
-			contigfree(sc->hn_rxbuf, HN_RXBUF_SIZE, M_DEVBUF);
+			free(sc->hn_rxbuf, M_DEVBUF);
 		else
 			device_printf(sc->hn_dev, "RXBUF is referenced\n");
 		sc->hn_rxbuf = NULL;
@@ -5186,8 +5146,7 @@ hn_destroy_rx_data(struct hn_softc *sc)
 		if (rxr->hn_br == NULL)
 			continue;
 		if ((rxr->hn_rx_flags & HN_RX_FLAG_BR_REF) == 0) {
-			contigfree(rxr->hn_br, HN_TXBR_SIZE + HN_RXBR_SIZE,
-			    M_DEVBUF);
+			free(rxr->hn_br, M_DEVBUF);
 		} else {
 			device_printf(sc->hn_dev,
 			    "%dth channel bufring is referenced", i);
@@ -5689,7 +5648,7 @@ hn_destroy_tx_data(struct hn_softc *sc)
 
 	if (sc->hn_chim != NULL) {
 		if ((sc->hn_flags & HN_FLAG_CHIM_REF) == 0) {
-			contigfree(sc->hn_chim, HN_CHIM_SIZE, M_DEVBUF);
+			free(sc->hn_chim, M_DEVBUF);
 		} else {
 			device_printf(sc->hn_dev,
 			    "chimney sending buffer is referenced");
@@ -6013,7 +5972,7 @@ hn_transmit(if_t ifp, struct mbuf *m)
 			omcast = (m->m_flags & M_MCAST) != 0;
 
 			if (sc->hn_xvf_flags & HN_XVFFLAG_ACCBPF) {
-				if (bpf_peers_present(if_getbpf(ifp))) {
+				if (bpf_peers_present_if(ifp)) {
 					m_bpf = m_copypacket(m, M_NOWAIT);
 					if (m_bpf == NULL) {
 						/*

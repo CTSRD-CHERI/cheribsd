@@ -1,6 +1,6 @@
-
 .PATH: ${SRCTOP}/contrib/ntp/libparse
 
+PACKAGE=ntp
 LIB=	parse
 INTERNALLIB=
 

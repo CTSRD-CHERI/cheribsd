@@ -44,11 +44,14 @@
  */
 #include <stdlib.h>
 
-#include <sys/cdefs.h>
+#include <sys/types.h>
 
 __BEGIN_DECLS
+#if !defined(__GLIBC__) || \
+    (defined(__GLIBC__) && (!__GLIBC_PREREQ(2, 38) || !defined(_GNU_SOURCE)))
 size_t strlcpy(char *dst, const char *src, size_t siz);
 size_t strlcat(char *dst, const char *src, size_t siz);
+#endif
 char *strnstr(const char *str, const char *find, size_t str_len);
 void strmode(mode_t mode, char *str);
 

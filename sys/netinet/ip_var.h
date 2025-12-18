@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)ip_var.h	8.2 (Berkeley) 1/9/95
  */
 
 #ifndef _NETINET_IP_VAR_H_
@@ -138,15 +136,19 @@ struct	ipstat {
 
 #include <sys/counter.h>
 #include <net/vnet.h>
+#include <netinet/in_kdtrace.h>
 
 VNET_PCPUSTAT_DECLARE(struct ipstat, ipstat);
 /*
  * In-kernel consumers can use these accessor macros directly to update
  * stats.
  */
-#define	IPSTAT_ADD(name, val)	\
-    VNET_PCPUSTAT_ADD(struct ipstat, ipstat, name, (val))
-#define	IPSTAT_SUB(name, val)	IPSTAT_ADD(name, -(val))
+#define IPSTAT_ADD(name, val)                                          \
+	do {                                                           \
+		MIB_SDT_PROBE1(ip, count, name, (val));                \
+		VNET_PCPUSTAT_ADD(struct ipstat, ipstat, name, (val)); \
+	} while (0)
+#define IPSTAT_SUB(name, val) IPSTAT_ADD(name, -(val))
 #define	IPSTAT_INC(name)	IPSTAT_ADD(name, 1)
 #define	IPSTAT_DEC(name)	IPSTAT_SUB(name, 1)
 
@@ -154,11 +156,19 @@ VNET_PCPUSTAT_DECLARE(struct ipstat, ipstat);
  * Kernel module consumers must use this accessor macro.
  */
 void	kmod_ipstat_inc(int statnum);
-#define	KMOD_IPSTAT_INC(name)	\
-    kmod_ipstat_inc(offsetof(struct ipstat, name) / sizeof(uint64_t))
-void	kmod_ipstat_dec(int statnum);
-#define	KMOD_IPSTAT_DEC(name)	\
-    kmod_ipstat_dec(offsetof(struct ipstat, name) / sizeof(uint64_t))
+#define KMOD_IPSTAT_INC(name)                                          \
+	do {                                                           \
+		MIB_SDT_PROBE1(ip, count, name, 1);                    \
+		kmod_ipstat_inc(                                       \
+		    offsetof(struct ipstat, name) / sizeof(uint64_t)); \
+	} while (0)
+void kmod_ipstat_dec(int statnum);
+#define KMOD_IPSTAT_DEC(name)                                          \
+	do {                                                           \
+		MIB_SDT_PROBE1(ip, count, name, -1);                   \
+		kmod_ipstat_dec(                                       \
+		    offsetof(struct ipstat, name) / sizeof(uint64_t)); \
+	} while (0)
 
 /* flags passed to ip_output as last parameter */
 #define	IP_FORWARDING		0x1		/* most of ip header exists */
@@ -326,6 +336,21 @@ extern void	(*ip_divert_ptr)(struct mbuf *m, bool incoming);
 extern int	(*ng_ipfw_input_p)(struct mbuf **, struct ip_fw_args *, bool);
 extern int	(*ip_dn_ctl_ptr)(struct sockopt *);
 extern int	(*ip_dn_io_ptr)(struct mbuf **, struct ip_fw_args *);
+
+/* pf specific mtag for divert(4) support */
+__enum_uint8_decl(pf_mtag_dir) {
+	PF_DIVERT_MTAG_DIR_IN = 1,
+	PF_DIVERT_MTAG_DIR_OUT = 2
+};
+struct pf_divert_mtag {
+	__enum_uint8(pf_mtag_dir) idir;		/* initial pkt direction */
+	union {
+		__enum_uint8(pf_mtag_dir) ndir;	/* new dir after re-enter */
+		uint16_t port;			/* initial divert(4) port */
+	};
+};
+#define MTAG_PF_DIVERT	1262273569
+
 #endif /* _KERNEL */
 
 #endif /* !_NETINET_IP_VAR_H_ */

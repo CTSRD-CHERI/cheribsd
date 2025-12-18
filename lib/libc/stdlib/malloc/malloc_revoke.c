@@ -33,6 +33,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 /*
  * Do-nothing stub for malloc implementations that don't support
  * revocation.

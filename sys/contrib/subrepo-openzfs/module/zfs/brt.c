@@ -28,6 +28,7 @@
 #include <sys/spa_impl.h>
 #include <sys/zio.h>
 #include <sys/brt.h>
+#include <sys/brt_impl.h>
 #include <sys/ddt.h>
 #include <sys/bitmap.h>
 #include <sys/zap.h>
@@ -156,10 +157,8 @@
  * (copying the file content to the new dataset and removing the source file).
  * In that case Block Cloning will only be used briefly, because the BRT entries
  * will be removed when the source is removed.
- * Note: currently it is not possible to clone blocks between encrypted
- * datasets, even if those datasets use the same encryption key (this includes
- * snapshots of encrypted datasets). Cloning blocks between datasets that use
- * the same keys should be possible and should be implemented in the future.
+ * Block Cloning across encrypted datasets is supported as long as both
+ * datasets share the same master key (e.g. snapshots and clones)
  *
  * Block Cloning flow through ZFS layers.
  *
@@ -174,7 +173,7 @@
  *	                size_t len, unsigned int flags);
  *
  * Even though offsets and length represent bytes, they have to be
- * block-aligned or we will return the EXDEV error so the upper layer can
+ * block-aligned or we will return an error so the upper layer can
  * fallback to the generic mechanism that will just copy the data.
  * Using copy_file_range(2) will call OS-independent zfs_clone_range() function.
  * This function was implemented based on zfs_write(), but instead of writing
@@ -192,9 +191,9 @@
  * Some special cases to consider and how we address them:
  * - The block we want to clone may have been created within the same
  *   transaction group that we are trying to clone. Such block has no BP
- *   allocated yet, so cannot be immediately cloned. We return EXDEV.
+ *   allocated yet, so cannot be immediately cloned. We return EAGAIN.
  * - The block we want to clone may have been modified within the same
- *   transaction group. We return EXDEV.
+ *   transaction group. We return EAGAIN.
  * - A block may be cloned multiple times during one transaction group (that's
  *   why pending list is actually a tree and not an append-only list - this
  *   way we can figure out faster if this block is cloned for the first time
@@ -234,177 +233,14 @@
  * destination dataset is mounted and its ZIL replayed.
  * To address this situation we leverage zil_claim() mechanism where ZFS will
  * parse all the ZILs on pool import. When we come across TX_CLONE_RANGE
- * entries, we will bump reference counters for their BPs in the BRT and then
- * on mount and ZIL replay we will just attach BPs to the file without
- * bumping reference counters.
- * Note it is still possible that after zil_claim() we never mount the
- * destination, so we never replay its ZIL and we destroy it. This way we would
- * end up with leaked references in BRT. We address that too as ZFS gives us
- * a chance to clean this up on dataset destroy (see zil_free_clone_range()).
+ * entries, we will bump reference counters for their BPs in the BRT.  Then
+ * on mount and ZIL replay we bump the reference counters once more, while the
+ * first references are dropped during ZIL destroy by zil_free_clone_range().
+ * It is possible that after zil_claim() we never mount the destination, so
+ * we never replay its ZIL and just destroy it.  In this case the only taken
+ * references will be dropped by zil_free_clone_range(), since the cloning is
+ * not going to ever take place.
  */
-
-/*
- * BRT - Block Reference Table.
- */
-#define	BRT_OBJECT_VDEV_PREFIX	"com.fudosecurity:brt:vdev:"
-
-/*
- * We divide each VDEV into 16MB chunks. Each chunk is represented in memory
- * by a 16bit counter, thus 1TB VDEV requires 128kB of memory: (1TB / 16MB) * 2B
- * Each element in this array represents how many BRT entries do we have in this
- * chunk of storage. We always load this entire array into memory and update as
- * needed. By having it in memory we can quickly tell (during zio_free()) if
- * there are any BRT entries that we might need to update.
- *
- * This value cannot be larger than 16MB, at least as long as we support
- * 512 byte block sizes. With 512 byte block size we can have exactly
- * 32768 blocks in 16MB. In 32MB we could have 65536 blocks, which is one too
- * many for a 16bit counter.
- */
-#define	BRT_RANGESIZE	(16 * 1024 * 1024)
-_Static_assert(BRT_RANGESIZE / SPA_MINBLOCKSIZE <= UINT16_MAX,
-	"BRT_RANGESIZE is too large.");
-/*
- * We don't want to update the whole structure every time. Maintain bitmap
- * of dirty blocks within the regions, so that a single bit represents a
- * block size of entcounts. For example if we have a 1PB vdev then all
- * entcounts take 128MB of memory ((64TB / 16MB) * 2B). We can divide this
- * 128MB array of entcounts into 32kB disk blocks, as we don't want to update
- * the whole 128MB on disk when we have updated only a single entcount.
- * We maintain a bitmap where each 32kB disk block within 128MB entcounts array
- * is represented by a single bit. This gives us 4096 bits. A set bit in the
- * bitmap means that we had a change in at least one of the 16384 entcounts
- * that reside on a 32kB disk block (32kB / sizeof (uint16_t)).
- */
-#define	BRT_BLOCKSIZE	(32 * 1024)
-#define	BRT_RANGESIZE_TO_NBLOCKS(size)					\
-	(((size) - 1) / BRT_BLOCKSIZE / sizeof (uint16_t) + 1)
-
-#define	BRT_LITTLE_ENDIAN	0
-#define	BRT_BIG_ENDIAN		1
-#ifdef _ZFS_LITTLE_ENDIAN
-#define	BRT_NATIVE_BYTEORDER		BRT_LITTLE_ENDIAN
-#define	BRT_NON_NATIVE_BYTEORDER	BRT_BIG_ENDIAN
-#else
-#define	BRT_NATIVE_BYTEORDER		BRT_BIG_ENDIAN
-#define	BRT_NON_NATIVE_BYTEORDER	BRT_LITTLE_ENDIAN
-#endif
-
-typedef struct brt_vdev_phys {
-	uint64_t	bvp_mos_entries;
-	uint64_t	bvp_size;
-	uint64_t	bvp_byteorder;
-	uint64_t	bvp_totalcount;
-	uint64_t	bvp_rangesize;
-	uint64_t	bvp_usedspace;
-	uint64_t	bvp_savedspace;
-} brt_vdev_phys_t;
-
-typedef struct brt_vdev {
-	/*
-	 * VDEV id.
-	 */
-	uint64_t	bv_vdevid;
-	/*
-	 * Is the structure initiated?
-	 * (bv_entcount and bv_bitmap are allocated?)
-	 */
-	boolean_t	bv_initiated;
-	/*
-	 * Object number in the MOS for the entcount array and brt_vdev_phys.
-	 */
-	uint64_t	bv_mos_brtvdev;
-	/*
-	 * Object number in the MOS for the entries table.
-	 */
-	uint64_t	bv_mos_entries;
-	/*
-	 * Entries to sync.
-	 */
-	avl_tree_t	bv_tree;
-	/*
-	 * Does the bv_entcount[] array needs byte swapping?
-	 */
-	boolean_t	bv_need_byteswap;
-	/*
-	 * Number of entries in the bv_entcount[] array.
-	 */
-	uint64_t	bv_size;
-	/*
-	 * This is the array with BRT entry count per BRT_RANGESIZE.
-	 */
-	uint16_t	*bv_entcount;
-	/*
-	 * Sum of all bv_entcount[]s.
-	 */
-	uint64_t	bv_totalcount;
-	/*
-	 * Space on disk occupied by cloned blocks (without compression).
-	 */
-	uint64_t	bv_usedspace;
-	/*
-	 * How much additional space would be occupied without block cloning.
-	 */
-	uint64_t	bv_savedspace;
-	/*
-	 * brt_vdev_phys needs updating on disk.
-	 */
-	boolean_t	bv_meta_dirty;
-	/*
-	 * bv_entcount[] needs updating on disk.
-	 */
-	boolean_t	bv_entcount_dirty;
-	/*
-	 * bv_entcount[] potentially can be a bit too big to sychronize it all
-	 * when we just changed few entcounts. The fields below allow us to
-	 * track updates to bv_entcount[] array since the last sync.
-	 * A single bit in the bv_bitmap represents as many entcounts as can
-	 * fit into a single BRT_BLOCKSIZE.
-	 * For example we have 65536 entcounts in the bv_entcount array
-	 * (so the whole array is 128kB). We updated bv_entcount[2] and
-	 * bv_entcount[5]. In that case only first bit in the bv_bitmap will
-	 * be set and we will write only first BRT_BLOCKSIZE out of 128kB.
-	 */
-	ulong_t		*bv_bitmap;
-	uint64_t	bv_nblocks;
-} brt_vdev_t;
-
-/*
- * In-core brt
- */
-typedef struct brt {
-	krwlock_t	brt_lock;
-	spa_t		*brt_spa;
-#define	brt_mos		brt_spa->spa_meta_objset
-	uint64_t	brt_rangesize;
-	uint64_t	brt_usedspace;
-	uint64_t	brt_savedspace;
-	avl_tree_t	brt_pending_tree[TXG_SIZE];
-	kmutex_t	brt_pending_lock[TXG_SIZE];
-	/* Sum of all entries across all bv_trees. */
-	uint64_t	brt_nentries;
-	brt_vdev_t	*brt_vdevs;
-	uint64_t	brt_nvdevs;
-} brt_t;
-
-/* Size of bre_offset / sizeof (uint64_t). */
-#define	BRT_KEY_WORDS	(1)
-
-/*
- * In-core brt entry.
- * On-disk we use bre_offset as the key and bre_refcount as the value.
- */
-typedef struct brt_entry {
-	uint64_t	bre_offset;
-	uint64_t	bre_refcount;
-	avl_node_t	bre_node;
-} brt_entry_t;
-
-typedef struct brt_pending_entry {
-	blkptr_t	bpe_bp;
-	int		bpe_count;
-	avl_node_t	bpe_node;
-} brt_pending_entry_t;
 
 static kmem_cache_t *brt_entry_cache;
 static kmem_cache_t *brt_pending_entry_cache;
@@ -412,7 +248,7 @@ static kmem_cache_t *brt_pending_entry_cache;
 /*
  * Enable/disable prefetching of BRT entries that we are going to modify.
  */
-int zfs_brt_prefetch = 1;
+static int brt_zap_prefetch = 1;
 
 #ifdef ZFS_DEBUG
 #define	BRT_DEBUG(...)	do {						\
@@ -424,8 +260,8 @@ int zfs_brt_prefetch = 1;
 #define	BRT_DEBUG(...)	do { } while (0)
 #endif
 
-int brt_zap_leaf_blockshift = 12;
-int brt_zap_indirect_blockshift = 12;
+static int brt_zap_default_bs = 12;
+static int brt_zap_default_ibs = 12;
 
 static kstat_t	*brt_ksp;
 
@@ -506,7 +342,7 @@ brt_vdev_entcount_get(const brt_vdev_t *brtvd, uint64_t idx)
 
 	ASSERT3U(idx, <, brtvd->bv_size);
 
-	if (brtvd->bv_need_byteswap) {
+	if (unlikely(brtvd->bv_need_byteswap)) {
 		return (BSWAP_16(brtvd->bv_entcount[idx]));
 	} else {
 		return (brtvd->bv_entcount[idx]);
@@ -519,7 +355,7 @@ brt_vdev_entcount_set(brt_vdev_t *brtvd, uint64_t idx, uint16_t entcnt)
 
 	ASSERT3U(idx, <, brtvd->bv_size);
 
-	if (brtvd->bv_need_byteswap) {
+	if (unlikely(brtvd->bv_need_byteswap)) {
 		brtvd->bv_entcount[idx] = BSWAP_16(entcnt);
 	} else {
 		brtvd->bv_entcount[idx] = entcnt;
@@ -554,55 +390,39 @@ brt_vdev_entcount_dec(brt_vdev_t *brtvd, uint64_t idx)
 
 #ifdef ZFS_DEBUG
 static void
-brt_vdev_dump(brt_t *brt)
+brt_vdev_dump(brt_vdev_t *brtvd)
 {
-	brt_vdev_t *brtvd;
-	uint64_t vdevid;
+	uint64_t idx;
 
-	if ((zfs_flags & ZFS_DEBUG_BRT) == 0) {
-		return;
-	}
-
-	if (brt->brt_nvdevs == 0) {
-		zfs_dbgmsg("BRT empty");
-		return;
-	}
-
-	zfs_dbgmsg("BRT vdev dump:");
-	for (vdevid = 0; vdevid < brt->brt_nvdevs; vdevid++) {
-		uint64_t idx;
-
-		brtvd = &brt->brt_vdevs[vdevid];
-		zfs_dbgmsg("  vdevid=%llu/%llu meta_dirty=%d entcount_dirty=%d "
-		    "size=%llu totalcount=%llu nblocks=%llu bitmapsize=%zu\n",
-		    (u_longlong_t)vdevid, (u_longlong_t)brtvd->bv_vdevid,
-		    brtvd->bv_meta_dirty, brtvd->bv_entcount_dirty,
-		    (u_longlong_t)brtvd->bv_size,
-		    (u_longlong_t)brtvd->bv_totalcount,
-		    (u_longlong_t)brtvd->bv_nblocks,
-		    (size_t)BT_SIZEOFMAP(brtvd->bv_nblocks));
-		if (brtvd->bv_totalcount > 0) {
-			zfs_dbgmsg("    entcounts:");
-			for (idx = 0; idx < brtvd->bv_size; idx++) {
-				if (brt_vdev_entcount_get(brtvd, idx) > 0) {
-					zfs_dbgmsg("      [%04llu] %hu",
-					    (u_longlong_t)idx,
-					    brt_vdev_entcount_get(brtvd, idx));
-				}
+	zfs_dbgmsg("  BRT vdevid=%llu meta_dirty=%d entcount_dirty=%d "
+	    "size=%llu totalcount=%llu nblocks=%llu bitmapsize=%zu\n",
+	    (u_longlong_t)brtvd->bv_vdevid,
+	    brtvd->bv_meta_dirty, brtvd->bv_entcount_dirty,
+	    (u_longlong_t)brtvd->bv_size,
+	    (u_longlong_t)brtvd->bv_totalcount,
+	    (u_longlong_t)brtvd->bv_nblocks,
+	    (size_t)BT_SIZEOFMAP(brtvd->bv_nblocks));
+	if (brtvd->bv_totalcount > 0) {
+		zfs_dbgmsg("    entcounts:");
+		for (idx = 0; idx < brtvd->bv_size; idx++) {
+			uint16_t entcnt = brt_vdev_entcount_get(brtvd, idx);
+			if (entcnt > 0) {
+				zfs_dbgmsg("      [%04llu] %hu",
+				    (u_longlong_t)idx, entcnt);
 			}
 		}
-		if (brtvd->bv_entcount_dirty) {
-			char *bitmap;
+	}
+	if (brtvd->bv_entcount_dirty) {
+		char *bitmap;
 
-			bitmap = kmem_alloc(brtvd->bv_nblocks + 1, KM_SLEEP);
-			for (idx = 0; idx < brtvd->bv_nblocks; idx++) {
-				bitmap[idx] =
-				    BT_TEST(brtvd->bv_bitmap, idx) ? 'x' : '.';
-			}
-			bitmap[idx] = '\0';
-			zfs_dbgmsg("    bitmap: %s", bitmap);
-			kmem_free(bitmap, brtvd->bv_nblocks + 1);
+		bitmap = kmem_alloc(brtvd->bv_nblocks + 1, KM_SLEEP);
+		for (idx = 0; idx < brtvd->bv_nblocks; idx++) {
+			bitmap[idx] =
+			    BT_TEST(brtvd->bv_bitmap, idx) ? 'x' : '.';
 		}
+		bitmap[idx] = '\0';
+		zfs_dbgmsg("    dirty: %s", bitmap);
+		kmem_free(bitmap, brtvd->bv_nblocks + 1);
 	}
 }
 #endif
@@ -638,8 +458,7 @@ brt_vdev_create(brt_t *brt, brt_vdev_t *brtvd, dmu_tx_t *tx)
 
 	brtvd->bv_mos_entries = zap_create_flags(brt->brt_mos, 0,
 	    ZAP_FLAG_HASH64 | ZAP_FLAG_UINT64_KEY, DMU_OTN_ZAP_METADATA,
-	    brt_zap_leaf_blockshift, brt_zap_indirect_blockshift, DMU_OT_NONE,
-	    0, tx);
+	    brt_zap_default_bs, brt_zap_default_ibs, DMU_OT_NONE, 0, tx);
 	VERIFY(brtvd->bv_mos_entries != 0);
 	BRT_DEBUG("MOS entries created, object=%llu",
 	    (u_longlong_t)brtvd->bv_mos_entries);
@@ -680,7 +499,7 @@ brt_vdev_realloc(brt_t *brt, brt_vdev_t *brtvd)
 	size = (vdev_get_min_asize(vd) - 1) / brt->brt_rangesize + 1;
 	spa_config_exit(brt->brt_spa, SCL_VDEV, FTAG);
 
-	entcount = kmem_zalloc(sizeof (entcount[0]) * size, KM_SLEEP);
+	entcount = vmem_zalloc(sizeof (entcount[0]) * size, KM_SLEEP);
 	nblocks = BRT_RANGESIZE_TO_NBLOCKS(size);
 	bitmap = kmem_zalloc(BT_SIZEOFMAP(nblocks), KM_SLEEP);
 
@@ -709,7 +528,7 @@ brt_vdev_realloc(brt_t *brt, brt_vdev_t *brtvd)
 		    sizeof (entcount[0]) * MIN(size, brtvd->bv_size));
 		memcpy(bitmap, brtvd->bv_bitmap, MIN(BT_SIZEOFMAP(nblocks),
 		    BT_SIZEOFMAP(brtvd->bv_nblocks)));
-		kmem_free(brtvd->bv_entcount,
+		vmem_free(brtvd->bv_entcount,
 		    sizeof (entcount[0]) * brtvd->bv_size);
 		kmem_free(brtvd->bv_bitmap, BT_SIZEOFMAP(brtvd->bv_nblocks));
 	}
@@ -792,7 +611,7 @@ brt_vdev_dealloc(brt_t *brt, brt_vdev_t *brtvd)
 	ASSERT(RW_WRITE_HELD(&brt->brt_lock));
 	ASSERT(brtvd->bv_initiated);
 
-	kmem_free(brtvd->bv_entcount, sizeof (uint16_t) * brtvd->bv_size);
+	vmem_free(brtvd->bv_entcount, sizeof (uint16_t) * brtvd->bv_size);
 	brtvd->bv_entcount = NULL;
 	kmem_free(brtvd->bv_bitmap, BT_SIZEOFMAP(brtvd->bv_nblocks));
 	brtvd->bv_bitmap = NULL;
@@ -931,7 +750,8 @@ brt_vdev_addref(brt_t *brt, brt_vdev_t *brtvd, const brt_entry_t *bre,
 	BT_SET(brtvd->bv_bitmap, idx);
 
 #ifdef ZFS_DEBUG
-	brt_vdev_dump(brt);
+	if (zfs_flags & ZFS_DEBUG_BRT)
+		brt_vdev_dump(brtvd);
 #endif
 }
 
@@ -967,7 +787,8 @@ brt_vdev_decref(brt_t *brt, brt_vdev_t *brtvd, const brt_entry_t *bre,
 	BT_SET(brtvd->bv_bitmap, idx);
 
 #ifdef ZFS_DEBUG
-	brt_vdev_dump(brt);
+	if (zfs_flags & ZFS_DEBUG_BRT)
+		brt_vdev_dump(brtvd);
 #endif
 }
 
@@ -1079,7 +900,6 @@ static int
 brt_entry_lookup(brt_t *brt, brt_vdev_t *brtvd, brt_entry_t *bre)
 {
 	uint64_t mos_entries;
-	uint64_t one, physsize;
 	int error;
 
 	ASSERT(RW_LOCK_HELD(&brt->brt_lock));
@@ -1097,21 +917,8 @@ brt_entry_lookup(brt_t *brt, brt_vdev_t *brtvd, brt_entry_t *bre)
 
 	brt_unlock(brt);
 
-	error = zap_length_uint64(brt->brt_mos, mos_entries, &bre->bre_offset,
-	    BRT_KEY_WORDS, &one, &physsize);
-	if (error == 0) {
-		ASSERT3U(one, ==, 1);
-		ASSERT3U(physsize, ==, sizeof (bre->bre_refcount));
-
-		error = zap_lookup_uint64(brt->brt_mos, mos_entries,
-		    &bre->bre_offset, BRT_KEY_WORDS, 1,
-		    sizeof (bre->bre_refcount), &bre->bre_refcount);
-		BRT_DEBUG("ZAP lookup: object=%llu vdev=%llu offset=%llu "
-		    "count=%llu error=%d", (u_longlong_t)mos_entries,
-		    (u_longlong_t)brtvd->bv_vdevid,
-		    (u_longlong_t)bre->bre_offset,
-		    error == 0 ? (u_longlong_t)bre->bre_refcount : 0, error);
-	}
+	error = zap_lookup_uint64(brt->brt_mos, mos_entries, &bre->bre_offset,
+	    BRT_KEY_WORDS, 1, sizeof (bre->bre_refcount), &bre->bre_refcount);
 
 	brt_wlock(brt);
 
@@ -1133,50 +940,8 @@ brt_entry_prefetch(brt_t *brt, uint64_t vdevid, brt_entry_t *bre)
 	if (mos_entries == 0)
 		return;
 
-	BRT_DEBUG("ZAP prefetch: object=%llu vdev=%llu offset=%llu",
-	    (u_longlong_t)mos_entries, (u_longlong_t)vdevid,
-	    (u_longlong_t)bre->bre_offset);
 	(void) zap_prefetch_uint64(brt->brt_mos, mos_entries,
 	    (uint64_t *)&bre->bre_offset, BRT_KEY_WORDS);
-}
-
-static int
-brt_entry_update(brt_t *brt, brt_vdev_t *brtvd, brt_entry_t *bre, dmu_tx_t *tx)
-{
-	int error;
-
-	ASSERT(RW_LOCK_HELD(&brt->brt_lock));
-	ASSERT(brtvd->bv_mos_entries != 0);
-	ASSERT(bre->bre_refcount > 0);
-
-	error = zap_update_uint64(brt->brt_mos, brtvd->bv_mos_entries,
-	    (uint64_t *)&bre->bre_offset, BRT_KEY_WORDS, 1,
-	    sizeof (bre->bre_refcount), &bre->bre_refcount, tx);
-	BRT_DEBUG("ZAP update: object=%llu vdev=%llu offset=%llu count=%llu "
-	    "error=%d", (u_longlong_t)brtvd->bv_mos_entries,
-	    (u_longlong_t)brtvd->bv_vdevid, (u_longlong_t)bre->bre_offset,
-	    (u_longlong_t)bre->bre_refcount, error);
-
-	return (error);
-}
-
-static int
-brt_entry_remove(brt_t *brt, brt_vdev_t *brtvd, brt_entry_t *bre, dmu_tx_t *tx)
-{
-	int error;
-
-	ASSERT(RW_LOCK_HELD(&brt->brt_lock));
-	ASSERT(brtvd->bv_mos_entries != 0);
-	ASSERT0(bre->bre_refcount);
-
-	error = zap_remove_uint64(brt->brt_mos, brtvd->bv_mos_entries,
-	    (uint64_t *)&bre->bre_offset, BRT_KEY_WORDS, tx);
-	BRT_DEBUG("ZAP remove: object=%llu vdev=%llu offset=%llu count=%llu "
-	    "error=%d", (u_longlong_t)brtvd->bv_mos_entries,
-	    (u_longlong_t)brtvd->bv_vdevid, (u_longlong_t)bre->bre_offset,
-	    (u_longlong_t)bre->bre_refcount, error);
-
-	return (error);
 }
 
 /*
@@ -1544,6 +1309,37 @@ out:
 	return (B_FALSE);
 }
 
+uint64_t
+brt_entry_get_refcount(spa_t *spa, const blkptr_t *bp)
+{
+	brt_t *brt = spa->spa_brt;
+	brt_vdev_t *brtvd;
+	brt_entry_t bre_search, *bre;
+	uint64_t vdevid, refcnt;
+	int error;
+
+	brt_entry_fill(bp, &bre_search, &vdevid);
+
+	brt_rlock(brt);
+
+	brtvd = brt_vdev(brt, vdevid);
+	ASSERT(brtvd != NULL);
+
+	bre = avl_find(&brtvd->bv_tree, &bre_search, NULL);
+	if (bre == NULL) {
+		error = brt_entry_lookup(brt, brtvd, &bre_search);
+		ASSERT(error == 0 || error == ENOENT);
+		if (error == ENOENT)
+			refcnt = 0;
+		else
+			refcnt = bre_search.bre_refcount;
+	} else
+		refcnt = bre->bre_refcount;
+
+	brt_unlock(brt);
+	return (refcnt);
+}
+
 static void
 brt_prefetch(brt_t *brt, const blkptr_t *bp)
 {
@@ -1552,7 +1348,7 @@ brt_prefetch(brt_t *brt, const blkptr_t *bp)
 
 	ASSERT(bp != NULL);
 
-	if (!zfs_brt_prefetch)
+	if (!brt_zap_prefetch)
 		return;
 
 	brt_entry_fill(bp, &bre, &vdevid);
@@ -1567,13 +1363,13 @@ brt_pending_entry_compare(const void *x1, const void *x2)
 	const blkptr_t *bp1 = &bpe1->bpe_bp, *bp2 = &bpe2->bpe_bp;
 	int cmp;
 
-	cmp = TREE_CMP(BP_PHYSICAL_BIRTH(bp1), BP_PHYSICAL_BIRTH(bp2));
+	cmp = TREE_CMP(DVA_GET_VDEV(&bp1->blk_dva[0]),
+	    DVA_GET_VDEV(&bp2->blk_dva[0]));
 	if (cmp == 0) {
-		cmp = TREE_CMP(DVA_GET_VDEV(&bp1->blk_dva[0]),
-		    DVA_GET_VDEV(&bp2->blk_dva[0]));
-		if (cmp == 0) {
-			cmp = TREE_CMP(DVA_GET_OFFSET(&bp1->blk_dva[0]),
-			    DVA_GET_OFFSET(&bp2->blk_dva[0]));
+		cmp = TREE_CMP(DVA_GET_OFFSET(&bp1->blk_dva[0]),
+		    DVA_GET_OFFSET(&bp2->blk_dva[0]));
+		if (unlikely(cmp == 0)) {
+			cmp = TREE_CMP(BP_GET_BIRTH(bp1), BP_GET_BIRTH(bp2));
 		}
 	}
 
@@ -1618,10 +1414,10 @@ brt_pending_add(spa_t *spa, const blkptr_t *bp, dmu_tx_t *tx)
 		kmem_cache_free(brt_pending_entry_cache, newbpe);
 	} else {
 		ASSERT(bpe == NULL);
-	}
 
-	/* Prefetch BRT entry, as we will need it in the syncing context. */
-	brt_prefetch(brt, bp);
+		/* Prefetch BRT entry for the syncing context. */
+		brt_prefetch(brt, bp);
+	}
 }
 
 void
@@ -1661,25 +1457,22 @@ brt_pending_remove(spa_t *spa, const blkptr_t *bp, dmu_tx_t *tx)
 void
 brt_pending_apply(spa_t *spa, uint64_t txg)
 {
-	brt_t *brt;
+	brt_t *brt = spa->spa_brt;
 	brt_pending_entry_t *bpe;
 	avl_tree_t *pending_tree;
-	kmutex_t *pending_lock;
 	void *c;
 
 	ASSERT3U(txg, !=, 0);
 
-	brt = spa->spa_brt;
+	/*
+	 * We are in syncing context, so no other brt_pending_tree accesses
+	 * are possible for the TXG. Don't need to acquire brt_pending_lock.
+	 */
 	pending_tree = &brt->brt_pending_tree[txg & TXG_MASK];
-	pending_lock = &brt->brt_pending_lock[txg & TXG_MASK];
-
-	mutex_enter(pending_lock);
 
 	c = NULL;
 	while ((bpe = avl_destroy_nodes(pending_tree, &c)) != NULL) {
 		boolean_t added_to_ddt;
-
-		mutex_exit(pending_lock);
 
 		for (int i = 0; i < bpe->bpe_count; i++) {
 			/*
@@ -1698,31 +1491,20 @@ brt_pending_apply(spa_t *spa, uint64_t txg)
 		}
 
 		kmem_cache_free(brt_pending_entry_cache, bpe);
-		mutex_enter(pending_lock);
 	}
-
-	mutex_exit(pending_lock);
 }
 
 static void
-brt_sync_entry(brt_t *brt, brt_vdev_t *brtvd, brt_entry_t *bre, dmu_tx_t *tx)
+brt_sync_entry(dnode_t *dn, brt_entry_t *bre, dmu_tx_t *tx)
 {
-
-	ASSERT(RW_WRITE_HELD(&brt->brt_lock));
-	ASSERT(brtvd->bv_mos_entries != 0);
-
 	if (bre->bre_refcount == 0) {
-		int error;
-
-		error = brt_entry_remove(brt, brtvd, bre, tx);
-		ASSERT(error == 0 || error == ENOENT);
-		/*
-		 * If error == ENOENT then zfs_clone_range() was done from a
-		 * removed (but opened) file (open(), unlink()).
-		 */
-		ASSERT(brt_entry_lookup(brt, brtvd, bre) == ENOENT);
+		int error = zap_remove_uint64_by_dnode(dn, &bre->bre_offset,
+		    BRT_KEY_WORDS, tx);
+		VERIFY(error == 0 || error == ENOENT);
 	} else {
-		VERIFY0(brt_entry_update(brt, brtvd, bre, tx));
+		VERIFY0(zap_update_uint64_by_dnode(dn, &bre->bre_offset,
+		    BRT_KEY_WORDS, 1, sizeof (bre->bre_refcount),
+		    &bre->bre_refcount, tx));
 	}
 }
 
@@ -1731,6 +1513,7 @@ brt_sync_table(brt_t *brt, dmu_tx_t *tx)
 {
 	brt_vdev_t *brtvd;
 	brt_entry_t *bre;
+	dnode_t *dn;
 	uint64_t vdevid;
 	void *c;
 
@@ -1754,13 +1537,18 @@ brt_sync_table(brt_t *brt, dmu_tx_t *tx)
 		if (brtvd->bv_mos_brtvdev == 0)
 			brt_vdev_create(brt, brtvd, tx);
 
+		VERIFY0(dnode_hold(brt->brt_mos, brtvd->bv_mos_entries,
+		    FTAG, &dn));
+
 		c = NULL;
 		while ((bre = avl_destroy_nodes(&brtvd->bv_tree, &c)) != NULL) {
-			brt_sync_entry(brt, brtvd, bre, tx);
+			brt_sync_entry(dn, bre, tx);
 			brt_entry_free(bre);
 			ASSERT(brt->brt_nentries > 0);
 			brt->brt_nentries--;
 		}
+
+		dnode_rele(dn, FTAG);
 
 		brt_vdev_sync(brt, brtvd, tx);
 
@@ -1876,9 +1664,10 @@ brt_unload(spa_t *spa)
 }
 
 /* BEGIN CSTYLED */
-ZFS_MODULE_PARAM(zfs_brt, zfs_brt_, prefetch, INT, ZMOD_RW,
-    "Enable prefetching of BRT entries");
-#ifdef ZFS_BRT_DEBUG
-ZFS_MODULE_PARAM(zfs_brt, zfs_brt_, debug, INT, ZMOD_RW, "BRT debug");
-#endif
+ZFS_MODULE_PARAM(zfs_brt, , brt_zap_prefetch, INT, ZMOD_RW,
+	"Enable prefetching of BRT ZAP entries");
+ZFS_MODULE_PARAM(zfs_brt, , brt_zap_default_bs, UINT, ZMOD_RW,
+	"BRT ZAP leaf blockshift");
+ZFS_MODULE_PARAM(zfs_brt, , brt_zap_default_ibs, UINT, ZMOD_RW,
+	"BRT ZAP indirect blockshift");
 /* END CSTYLED */

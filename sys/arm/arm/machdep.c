@@ -49,7 +49,6 @@
 #include "opt_platform.h"
 #include "opt_sched.h"
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/bus.h>
@@ -134,6 +133,14 @@ vm_offset_t abtstack;
 static delay_func *delay_impl;
 static void *delay_arg;
 #endif
+
+#if defined(SOCDEV_PA)
+#if !defined(SOCDEV_VA)
+#error SOCDEV_PA defined, but not SOCDEV_VA
+#endif
+uintptr_t socdev_va = SOCDEV_VA;
+#endif
+
 
 struct kva_md_info kmi;
 /*
@@ -307,7 +314,7 @@ spinlock_enter(void)
 
 	td = curthread;
 	if (td->td_md.md_spinlock_count == 0) {
-		cspr = disable_interrupts(PSR_I | PSR_F);
+		cspr = disable_interrupts(PSR_I);
 		td->td_md.md_spinlock_count = 1;
 		td->td_md.md_saved_cspr = cspr;
 		critical_enter();
@@ -544,7 +551,7 @@ initarm(struct arm_boot_params *abp)
 
 	/* Establish static device mappings. */
 	err_devmap = platform_devmap_init();
-	devmap_bootstrap(0, NULL);
+	devmap_bootstrap();
 	vm_max_kernel_address = platform_lastaddr();
 
 	/*

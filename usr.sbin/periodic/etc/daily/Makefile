@@ -1,4 +1,3 @@
-
 .include <src.opts.mk>
 
 PACKAGE=	periodic
@@ -44,8 +43,11 @@ CONFS+=	130.clean-msgs
 .endif
 
 .if ${MK_NTP} != "no"
-CONFS+=	480.status-ntpd \
-	480.leapfile-ntpd
+CONFGROUPS+=	NTP
+NTP+=		480.status-ntpd \
+		480.leapfile-ntpd
+NTPMODE=	${BINMODE}
+NTPPACKAGE=	ntp
 .endif
 
 .if ${MK_SENDMAIL} != "no"
@@ -60,7 +62,8 @@ SENDMAILPACKAGE=	sendmail
 .if ${MK_ZFS} != "no"
 CONFS+=	223.backup-zfs \
 	404.status-zfs \
-	800.scrub-zfs
+	800.scrub-zfs  \
+	801.trim-zfs
 .endif
 
 .include <bsd.prog.mk>

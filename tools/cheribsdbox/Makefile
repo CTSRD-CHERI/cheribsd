@@ -70,6 +70,8 @@ CRUNCH_SHLIBS+=	-lm
 # libz is needed by libprivatessh so we might as well link dynamically
 CRUNCH_SHLIBS+=	-lz
 
+# diff
+CRUNCH_LIBS+=		${CRUNCH_OBJTOP}/lib/libdiff/libdiff.a
 
 # grep/tar/xz
 CRUNCH_LIBS+=	-llzma
@@ -83,10 +85,6 @@ CRUNCH_LIBS+=	-lsysdecode
 CRUNCH_LIBS+=	-l80211
 CRUNCH_LIBS+=		${CRUNCH_OBJTOP}/lib/libifconfig/libifconfig.a
 CRUNCH_BUILDOPTS+=	CRUNCH_CFLAGS+=-I${CRUNCH_OBJTOP}/lib/libifconfig
-# ld.lld: error: could not determine size of cap reloc against local object nla_p_donemsg
-# >>> defined in libifconfig_carp.c (libifconfig_carp.o:(.rodata+0xE76D0)
-LD_FATAL_WARNINGS=no
-
 # needed by fetch:
 CRUNCH_LIBS+= -lfetch
 # devinfo
@@ -381,7 +379,7 @@ CRUNCH_LIBS+=	${LIBNETBSD}
 
 CRUNCH_SRCDIRS+= libexec
 CRUNCH_PROGS_libexec+=	getty
-# from sshd: usr/libexec/sftp-server
+# from sshd: usr/libexec/sftp-server usr/libexec/sshd-session
 
 
 ##### sshd, ssh, scp: #####
@@ -395,7 +393,7 @@ CRUNCH_SRCDIRS+= secure/usr.bin
 CRUNCH_PROGS_secure/usr.bin+=	scp sftp ssh ssh-keygen
 
 CRUNCH_SRCDIRS+= secure/libexec
-CRUNCH_PROGS_secure/libexec+=	sftp-server
+CRUNCH_PROGS_secure/libexec+=	sftp-server sshd-session
 
 # Disable all optional SSH features to make sshd,scp,ssh as small as possible
 DISABLE_OPTIONAL_SSH_FEATURES+=	\
@@ -413,6 +411,7 @@ CRUNCH_BUILDOPTS_scp+=${DISABLE_OPTIONAL_SSH_FEATURES}
 CRUNCH_BUILDOPTS_ssh+=${DISABLE_OPTIONAL_SSH_FEATURES}
 CRUNCH_BUILDOPTS_ssh-keygen+=${DISABLE_OPTIONAL_SSH_FEATURES}
 CRUNCH_BUILDOPTS_sftp-server+=${DISABLE_OPTIONAL_SSH_FEATURES}
+CRUNCH_BUILDOPTS_sshd-session+=${DISABLE_OPTIONAL_SSH_FEATURES}
 
 
 ### END programs ####

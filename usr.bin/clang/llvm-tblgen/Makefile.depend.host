@@ -2,6 +2,8 @@
 
 DIRDEPS = \
 	lib/clang/libllvmminimal \
+	lib/ncurses/tinfo \
+	usr.bin/clang/llvm-min-tblgen \
 
 
 .include <dirdeps.mk>

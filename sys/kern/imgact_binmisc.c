@@ -24,7 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/ctype.h>
 #include <sys/exec.h>
@@ -657,7 +656,7 @@ imgact_binmisc_exec(struct image_params *imgp)
 		if (imgp->args->fname != NULL) {
 			fname = imgp->args->fname;
 		} else {
-			/* Use the fdescfs(5) path for fexecve(2). */
+			/* Use the fdescfs(4) path for fexecve(2). */
 			sname = sbuf_new_auto();
 			sbuf_printf(sname, "/dev/fd/%d", imgp->args->fd);
 			sbuf_finish(sname);

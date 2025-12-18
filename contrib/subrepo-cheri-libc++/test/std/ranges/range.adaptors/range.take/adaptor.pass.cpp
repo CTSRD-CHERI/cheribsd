@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
-// UNSUPPORTED: libcpp-has-no-incomplete-ranges
 
 // std::views::take
 
@@ -180,6 +179,27 @@ constexpr bool test() {
     assert(result.size() == 3);
   }
 
+#if TEST_STD_VER >= 23
+  // `views::take(repeat_view, n)` returns a `repeat_view` when `repeat_view` models `sized_range`.
+  {
+    auto repeat                                = std::ranges::repeat_view<int, int>(1, 8);
+    using Result                               = std::ranges::repeat_view<int, int>;
+    std::same_as<Result> decltype(auto) result = repeat | std::views::take(3);
+    static_assert(std::ranges::sized_range<Result>);
+    assert(result.size() == 3);
+    assert(*result.begin() == 1);
+  }
+
+  // `views::take(repeat_view, n)` returns a `repeat_view` when `repeat_view` doesn't model `sized_range`.
+  {
+    auto repeat  = std::ranges::repeat_view<int>(1);
+    using Result = std::ranges::repeat_view<int, std::ranges::range_difference_t<decltype(repeat)>>;
+    std::same_as<Result> decltype(auto) result = repeat | std::views::take(3);
+    assert(result.size() == 3);
+    assert(*result.begin() == 1);
+  }
+#endif
+
   // When the size of the input range `s` is shorter than `n`, only `s` elements are taken.
   {
     test_small_range(std::span(buf));
@@ -193,6 +213,19 @@ constexpr bool test() {
   {
     struct X { };
     [[maybe_unused]] auto partial = std::views::take(X{});
+  }
+
+  // Test when `subrange<Iter>` is not well formed
+  {
+    int input[] = {1, 2, 3};
+    using Iter  = cpp20_input_iterator<int*>;
+    using Sent  = sentinel_wrapper<Iter>;
+    std::ranges::subrange r{Iter{input}, Sent{Iter{input + 3}}};
+    auto tv = std::views::take(std::move(r), 1);
+    auto it                  = tv.begin();
+    assert(*it == 1);
+    ++it;
+    assert(it == tv.end());
   }
 
   return true;

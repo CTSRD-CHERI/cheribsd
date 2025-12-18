@@ -60,7 +60,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/module.h>
 #include <sys/systm.h>
@@ -396,6 +395,9 @@ fuse_vnop_do_lseek(struct vnode *vp, struct thread *td, struct ucred *cred,
 	err = fdisp_wait_answ(&fdi);
 	if (err == ENOSYS) {
 		fsess_set_notimpl(mp, FUSE_LSEEK);
+	} else if (err == ENXIO) {
+		/* Note: ENXIO means "no more hole/data regions until EOF" */
+		fsess_set_impl(mp, FUSE_LSEEK);
 	} else if (err == 0) {
 		fsess_set_impl(mp, FUSE_LSEEK);
 		flso = fdi.answ;
@@ -779,6 +781,7 @@ static int
 fuse_vnop_close(struct vop_close_args *ap)
 {
 	struct vnode *vp = ap->a_vp;
+	struct mount *mp = vnode_mount(vp);
 	struct ucred *cred = ap->a_cred;
 	int fflag = ap->a_fflag;
 	struct thread *td = ap->a_td;
@@ -794,12 +797,30 @@ fuse_vnop_close(struct vop_close_args *ap)
 		return 0;
 
 	err = fuse_flush(vp, cred, pid, fflag);
-	if (err == 0 && (fvdat->flag & FN_ATIMECHANGE)) {
+	if (err == 0 && (fvdat->flag & FN_ATIMECHANGE) && !vfs_isrdonly(mp)) {
 		struct vattr vap;
+		struct fuse_data *data;
+		int dataflags;
+		int access_e = 0;
 
-		VATTR_NULL(&vap);
-		vap.va_atime = fvdat->cached_attrs.va_atime;
-		err = fuse_internal_setattr(vp, &vap, td, NULL);
+		data = fuse_get_mpdata(mp);
+		dataflags = data->dataflags;
+		if (dataflags & FSESS_DEFAULT_PERMISSIONS) {
+			struct vattr va;
+
+			fuse_internal_getattr(vp, &va, cred, td);
+			access_e = vaccess(vp->v_type, va.va_mode, va.va_uid,
+			    va.va_gid, VWRITE, cred);
+		}
+		if (access_e == 0) {
+			VATTR_NULL(&vap);
+			vap.va_atime = fvdat->cached_attrs.va_atime;
+			/*
+			 * Ignore errors setting when setting atime.  That
+			 * should not cause close(2) to fail.
+			 */
+			fuse_internal_setattr(vp, &vap, td, NULL);
+		}
 	}
 	/* TODO: close the file handle, if we're sure it's no longer used */
 	if ((fvdat->flag & FN_SIZECHANGE) != 0) {
@@ -842,7 +863,8 @@ fuse_vnop_copy_file_range(struct vop_copy_file_range_args *ap)
 	pid_t pid;
 	int err;
 
-	if (mp != vnode_mount(outvp))
+	err = ENOSYS;
+	if (mp == NULL || mp != vnode_mount(outvp))
 		goto fallback;
 
 	if (incred->cr_uid != outcred->cr_uid)
@@ -851,6 +873,7 @@ fuse_vnop_copy_file_range(struct vop_copy_file_range_args *ap)
 	if (incred->cr_groups[0] != outcred->cr_groups[0])
 		goto fallback;
 
+	/* Caller busied mp, mnt_data can be safely accessed. */
 	if (fsess_not_impl(mp, FUSE_COPY_FILE_RANGE))
 		goto fallback;
 
@@ -860,23 +883,11 @@ fuse_vnop_copy_file_range(struct vop_copy_file_range_args *ap)
 		td = ap->a_fsizetd;
 	pid = td->td_proc->p_pid;
 
-	/* Lock both vnodes, avoiding risk of deadlock. */
-	do {
-		err = vn_lock(outvp, LK_EXCLUSIVE);
-		if (invp == outvp)
-			break;
-		if (err == 0) {
-			err = vn_lock(invp, LK_SHARED | LK_NOWAIT);
-			if (err == 0)
-				break;
-			VOP_UNLOCK(outvp);
-			err = vn_lock(invp, LK_SHARED);
-			if (err == 0)
-				VOP_UNLOCK(invp);
-		}
-	} while (err == 0);
-	if (err != 0)
-		return (err);
+	vn_lock_pair(invp, false, LK_SHARED, outvp, false, LK_EXCLUSIVE);
+	if (invp->v_data == NULL || outvp->v_data == NULL) {
+		err = EBADF;
+		goto unlock;
+	}
 
 	err = fuse_filehandle_getrw(invp, FREAD, &infufh, incred, pid);
 	if (err)
@@ -898,6 +909,7 @@ fuse_vnop_copy_file_range(struct vop_copy_file_range_args *ap)
 	if (err)
 		goto unlock;
 
+	vnode_pager_clean_sync(invp);
 	err = fuse_inval_buf_range(outvp, outfilesize, *ap->a_outoffp,
 		*ap->a_outoffp + io.uio_resid);
 	if (err)
@@ -935,13 +947,9 @@ unlock:
 		VOP_UNLOCK(invp);
 	VOP_UNLOCK(outvp);
 
-	if (err == ENOSYS) {
+	if (err == ENOSYS)
 		fsess_set_notimpl(mp, FUSE_COPY_FILE_RANGE);
 fallback:
-		err = vn_generic_copy_file_range(ap->a_invp, ap->a_inoffp,
-		    ap->a_outvp, ap->a_outoffp, ap->a_lenp, ap->a_flags,
-		    ap->a_incred, ap->a_outcred, ap->a_fsizetd);
-	}
 
 	/*
 	 * No need to call vn_rlimit_fsizex_res before return, since the uio is
@@ -1749,6 +1757,9 @@ fuse_vnop_pathconf(struct vop_pathconf_args *ap)
 {
 	struct vnode *vp = ap->a_vp;
 	struct mount *mp;
+	struct fuse_filehandle *fufh;
+	int err;
+	bool closefufh = false;
 
 	switch (ap->a_name) {
 	case _PC_FILESIZEBITS:
@@ -1778,22 +1789,44 @@ fuse_vnop_pathconf(struct vop_pathconf_args *ap)
 		    !fsess_not_impl(mp, FUSE_LSEEK)) {
 			off_t offset = 0;
 
-			/* Issue a FUSE_LSEEK to find out if it's implemented */
-			fuse_vnop_do_lseek(vp, curthread, curthread->td_ucred,
-			    curthread->td_proc->p_pid, &offset, SEEK_DATA);
+			/*
+			 * Issue a FUSE_LSEEK to find out if it's supported.
+			 * Use SEEK_DATA instead of SEEK_HOLE, because the
+			 * latter generally requires sequential scans of file
+			 * metadata, which can be slow.
+			 */
+			err = fuse_vnop_do_lseek(vp, curthread,
+			    curthread->td_ucred, curthread->td_proc->p_pid,
+			    &offset, SEEK_DATA);
+			if (err == EBADF) {
+				/*
+				 * pathconf() doesn't necessarily open the
+				 * file.  So we may need to do it here.
+				 */
+				err = fuse_filehandle_open(vp, FREAD, &fufh,
+				    curthread, curthread->td_ucred);
+				if (err == 0) {
+					closefufh = true;
+					err = fuse_vnop_do_lseek(vp, curthread,
+					    curthread->td_ucred,
+					    curthread->td_proc->p_pid, &offset,
+					    SEEK_DATA);
+				}
+				if (closefufh)
+					fuse_filehandle_close(vp, fufh,
+					    curthread, curthread->td_ucred);
+			}
+
 		}
 
 		if (fsess_is_impl(mp, FUSE_LSEEK)) {
 			*ap->a_retval = 1;
 			return (0);
-		} else {
-			/*
-			 * Probably FUSE_LSEEK is not implemented.  It might
-			 * be, if the FUSE_LSEEK above returned an error like
-			 * EACCES, but in that case we can't tell, so it's
-			 * safest to report EINVAL anyway.
-			 */
+		} else if (fsess_not_impl(mp, FUSE_LSEEK)) {
+			/* FUSE_LSEEK is not implemented */
 			return (EINVAL);
+		} else {
+			return (err);
 		}
 	default:
 		return (vop_stdpathconf(ap));
@@ -1986,6 +2019,13 @@ fuse_vnop_readlink(struct vop_readlink_args *ap)
 	fdisp_init(&fdi, 0);
 	err = fdisp_simple_putget_vp(&fdi, FUSE_READLINK, vp, curthread, cred);
 	if (err) {
+		goto out;
+	}
+	if (strnlen(fdi.answ, fdi.iosize) + 1 < fdi.iosize) {
+		struct fuse_data *data = fuse_get_mpdata(vnode_mount(vp));
+		fuse_warn(data, FSESS_WARN_READLINK_EMBEDDED_NUL,
+				"Returned an embedded NUL from FUSE_READLINK.");
+		err = EIO;
 		goto out;
 	}
 	if (((char *)fdi.answ)[0] == '/' &&
@@ -2236,19 +2276,15 @@ fuse_vnop_setattr(struct vop_setattr_args *ap)
 					return (err2);
 				if (vap->va_uid != old_va.va_uid)
 					return err;
-				else
-					accmode |= VADMIN;
 				drop_suid = true;
-			} else
-				accmode |= VADMIN;
-		} else
-			accmode |= VADMIN;
+			}
+		}
+		accmode |= VADMIN;
 	}
 	if (vap->va_gid != (gid_t)VNOVAL) {
 		if (checkperm && priv_check_cred(cred, PRIV_VFS_CHOWN))
 			drop_suid = true;
-		if (checkperm && !groupmember(vap->va_gid, cred))
-		{
+		if (checkperm && !groupmember(vap->va_gid, cred)) {
 			/*
 			 * Non-root users may only chgrp to one of their own
 			 * groups 
@@ -2262,11 +2298,9 @@ fuse_vnop_setattr(struct vop_setattr_args *ap)
 					return (err2);
 				if (vap->va_gid != old_va.va_gid)
 					return err;
-				accmode |= VADMIN;
-			} else
-				accmode |= VADMIN;
-		} else
-			accmode |= VADMIN;
+			}
+		}
+		accmode |= VADMIN;
 	}
 	if (vap->va_size != VNOVAL) {
 		switch (vp->v_type) {
@@ -3041,8 +3075,8 @@ fuse_vnop_deallocate(struct vop_deallocate_args *ap)
 			    false);
 	}
 
-out:
 	fdisp_destroy(&fdi);
+out:
 	if (closefufh)
 		fuse_filehandle_close(vp, fufh, curthread, cred);
 

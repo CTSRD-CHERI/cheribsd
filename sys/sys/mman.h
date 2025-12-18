@@ -27,12 +27,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)mman.h	8.2 (Berkeley) 1/9/95
  */
 
 #ifndef _SYS_MMAN_H_
-#define _SYS_MMAN_H_
+#define	_SYS_MMAN_H_
 
 #include <sys/cdefs.h>
 #include <sys/_types.h>
@@ -41,10 +39,10 @@
 /*
  * Inheritance for minherit()
  */
-#define INHERIT_SHARE	0
-#define INHERIT_COPY	1
-#define INHERIT_NONE	2
-#define INHERIT_ZERO	3
+#define	INHERIT_SHARE	0
+#define	INHERIT_COPY	1
+#define	INHERIT_NONE	2
+#define	INHERIT_ZERO	3
 #endif
 
 /*
@@ -54,8 +52,11 @@
 #define	PROT_READ	0x01	/* pages can be read */
 #define	PROT_WRITE	0x02	/* pages can be written */
 #define	PROT_EXEC	0x04	/* pages can be executed */
+#define	PROT_CAP	0x08	/* capabilities can be read/written */
+#define	PROT_NO_CAP	0x10	/* honor PROT_CAP absense */
 #if __BSD_VISIBLE
-#define	_PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC)
+#define	_PROT_CAP	(PROT_CAP | PROT_NO_CAP)
+#define	_PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC | _PROT_CAP)
 #define	PROT_EXTRACT(prot)	((prot) & _PROT_ALL)
 
 #define	_PROT_MAX_SHIFT	16
@@ -120,28 +121,12 @@
 #define	MAP_ALIGNED_SUPER	MAP_ALIGNED(1) /* align on a superpage */
 
 /*
- * CHERI specific flags and alignment constraints.
- *
- * MAP_CHERI_NOSETBOUNDS (requires MAP_FIXED) returns addr unchanged
- * after successful mapping.  CheriABI only.  Reuses MAP_RESERVED0020.
- *
- * MAP_ALIGNED_CHERI returns memory aligned appropriately for the requested
- * length or fails.  Passing an under-rounded length fails.
- *
- * MAP_ALIGNED_CHERI_SEAL returns memory aligned to allow sealing given the
- * requested length or fails.  Passing an under-rounded length fails.
- */
-#define	MAP_CHERI_NOSETBOUNDS	0x0020		/* Don't alter addr */
-#define	MAP_ALIGNED_CHERI	MAP_ALIGNED(2)	/* align for CHERI data */
-#define	MAP_ALIGNED_CHERI_SEAL	MAP_ALIGNED(3)	/* align for sealing on CHERI */
-
-/*
  * Flags provided to shm_rename
  */
 /* Don't overwrite dest, if it exists */
-#define SHM_RENAME_NOREPLACE	(1 << 0)
+#define	SHM_RENAME_NOREPLACE	(1 << 0)
 /* Atomically swap src and dest */
-#define SHM_RENAME_EXCHANGE	(1 << 1)
+#define	SHM_RENAME_EXCHANGE	(1 << 1)
 
 #endif /* __BSD_VISIBLE */
 
@@ -149,21 +134,21 @@
 /*
  * Process memory locking
  */
-#define MCL_CURRENT	0x0001	/* Lock only current memory */
-#define MCL_FUTURE	0x0002	/* Lock all future memory as well */
+#define	MCL_CURRENT	0x0001	/* Lock only current memory */
+#define	MCL_FUTURE	0x0002	/* Lock all future memory as well */
 #endif
 
 /*
  * Error return from mmap()
  */
-#define MAP_FAILED	((void *)-1)
+#define	MAP_FAILED	((void *)-1)
 
 /*
  * msync() flags
  */
 #define	MS_SYNC		0x0000	/* msync synchronously */
-#define MS_ASYNC	0x0001	/* return immediately */
-#define MS_INVALIDATE	0x0002	/* invalidate all cached data */
+#define	MS_ASYNC	0x0001	/* return immediately */
+#define	MS_INVALIDATE	0x0002	/* invalidate all cached data */
 #define	MS_PAGEOUT	0x0004
 
 /*
@@ -197,7 +182,9 @@
 #define	MINCORE_REFERENCED_OTHER 0x8 /* Page has been referenced */
 #define	MINCORE_MODIFIED_OTHER	0x10 /* Page has been modified */
 #define	MINCORE_SUPER		0x60 /* Page is a "super" page */
-#define	MINCORE_PSIND(i)	(((i) << 5) & MINCORE_SUPER) /* Page size */
+#define	MINCORE_PSIND_SHIFT	5
+#define	MINCORE_PSIND(i)	(((i) << MINCORE_PSIND_SHIFT) & MINCORE_SUPER)
+				     /* Page size */
 #define	MINCORE_CAPSTORE	0x80 /* Page monitored for capabilities */
 
 /*
@@ -335,6 +322,7 @@ void	shm_drop(struct shmfd *shmfd);
 int	shm_dotruncate(struct shmfd *shmfd, off_t length);
 bool	shm_largepage(struct shmfd *shmfd);
 void	shm_remove_prison(struct prison *pr);
+int	shm_get_path(struct vm_object *obj, char *path, size_t sz);
 
 extern struct fileops shm_ops;
 

@@ -49,8 +49,8 @@ static __inline void
 __mbk(void)
 {
 
-	__asm __volatile("lock; addl $0,%%fs:%0"
-	    : "+m" (*(u_int *)__OFFSETOF_MONITORBUF) : : "memory", "cc");
+	__asm __volatile("lock; addl $0,%%fs:%c0"
+	    : : "i" (__OFFSETOF_MONITORBUF) : "memory", "cc");
 }
 
 static __inline void
@@ -91,7 +91,7 @@ __mbu(void)
  */
 
 /*
- * Always use lock prefixes.  The result is slighly less optimal for
+ * Always use lock prefixes.  The result is slightly less optimal for
  * UP systems, but it matters less now, and sometimes UP is emulated
  * over SMP.
  *
@@ -865,6 +865,10 @@ atomic_swap_long(volatile u_long *p, u_long v)
 	atomic_swap_int((volatile u_int *)(p), (u_int)(v))
 #define	atomic_readandclear_ptr(p) \
 	atomic_readandclear_int((volatile u_int *)(p))
+#define	atomic_testandclear_ptr(p, val) \
+	atomic_testandclear_int((volatile u_int *)(p), (val))
+#define	atomic_testandset_ptr(p, val) \
+	atomic_testandset_int((volatile u_int *)(p), (val))
 
 #endif /* !WANT_FUNCTIONS */
 

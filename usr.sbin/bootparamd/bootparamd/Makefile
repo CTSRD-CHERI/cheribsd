@@ -1,5 +1,3 @@
-#	from: @(#)Makefile	5.8 (Berkeley) 7/28/90
-
 .include <src.opts.mk>
 
 PROG=	bootparamd

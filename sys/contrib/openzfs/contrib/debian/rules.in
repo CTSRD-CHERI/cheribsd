@@ -56,6 +56,12 @@ override_dh_auto_configure:
 		sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' "$$i" > "$${i%%.in}" ; \
 	done
 
+	ln -s '$(CURDIR)/etc/init.d/zfs-import' '$(CURDIR)/debian/openzfs-zfsutils.zfs-import.init'
+	ln -s '$(CURDIR)/etc/init.d/zfs-load-key' '$(CURDIR)/debian/openzfs-zfsutils.zfs-load-key.init'
+	ln -s '$(CURDIR)/etc/init.d/zfs-mount' '$(CURDIR)/debian/openzfs-zfsutils.zfs-mount.init'
+	ln -s '$(CURDIR)/etc/init.d/zfs-share' '$(CURDIR)/debian/openzfs-zfsutils.zfs-share.init'
+	ln -s '$(CURDIR)/etc/init.d/zfs-zed' '$(CURDIR)/debian/openzfs-zfs-zed.zfs-zed.init'
+
 override_dh_gencontrol:
 	dh_gencontrol -- -Vlinux:Recommends="linux-libc-dev (<< $(LINUX_NEXT)~), linux-libc-dev (>= $(LINUX_MIN)~),"
 
@@ -71,10 +77,6 @@ override_dh_auto_install:
 	@# Install the utilities.
 	$(MAKE) install DESTDIR='$(CURDIR)/debian/tmp'
 
-	# Use upstream's bash completion
-	install -D -t '$(CURDIR)/debian/tmp/usr/share/bash-completion/completions/' \
-		'$(CURDIR)/contrib/bash_completion.d/zfs'
-
 	# Move from bin_dir to /usr/sbin
 	# Remove suffix (.py) as per policy 10.4 - Scripts
 	# https://www.debian.org/doc/debian-policy/ch-files.html#s-scripts
@@ -86,11 +88,11 @@ override_dh_auto_install:
 
 	@# Zed has dependencies outside of the system root.
 	mv '$(CURDIR)/debian/tmp/sbin/zed' '$(CURDIR)/debian/tmp/usr/sbin/zed'
+	sed -i 's|ExecStart=/sbin/|ExecStart=/usr/sbin/|g' '$(CURDIR)/debian/tmp/lib/systemd/system/zfs-zed.service'
 
 	@# Install the DKMS source.
 	@# We only want the files needed to build the modules
 	install -D -t '$(CURDIR)/debian/tmp/usr/src/$(NAME)-$(DEB_VERSION_UPSTREAM)/scripts' \
-		'$(CURDIR)/scripts/enum-extract.pl' \
 		'$(CURDIR)/scripts/dkms.postbuild'
 	$(foreach file,$(DKMSFILES),mv '$(CURDIR)/$(NAME)-$(DEB_VERSION_UPSTREAM)/$(file)' '$(CURDIR)/debian/tmp/usr/src/$(NAME)-$(DEB_VERSION_UPSTREAM)' || exit 1;)
 
@@ -136,7 +138,6 @@ override_dh_auto_install:
 
 	chmod a-x '$(CURDIR)/debian/tmp/etc/zfs/zfs-functions'
 	chmod a-x '$(CURDIR)/debian/tmp/etc/default/zfs'
-	chmod a-x '$(CURDIR)/debian/tmp/usr/share/bash-completion/completions/zfs'
 
 override_dh_python3:
 	dh_python3 -p openzfs-python3-pyzfs

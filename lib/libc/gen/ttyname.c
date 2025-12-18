@@ -29,8 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__SCCSID("@(#)ttyname.c	8.2 (Berkeley) 1/27/94");
 #include "namespace.h"
 #include <sys/types.h>
 #include <sys/ioctl.h>
@@ -44,6 +42,7 @@ __SCCSID("@(#)ttyname.c	8.2 (Berkeley) 1/27/94");
 #include <paths.h>
 #include <errno.h>
 #include "reentrant.h"
+#include <ssp/ssp.h>
 #include "un-namespace.h"
 
 #include "libc_private.h"
@@ -55,7 +54,7 @@ static thread_key_t	ttyname_key;
 static int		ttyname_keycreated = 0;
 
 int
-ttyname_r(int fd, char *buf, size_t len)
+__ssp_real(ttyname_r)(int fd, char *buf, size_t len)
 {
 	size_t used;
 

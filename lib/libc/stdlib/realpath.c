@@ -28,24 +28,16 @@
  * SUCH DAMAGE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)realpath.c	8.1 (Berkeley) 2/16/94";
-#endif /* LIBC_SCCS and not lint */
-#include <sys/cdefs.h>
-#include "namespace.h"
 #include <sys/param.h>
 #include <sys/stat.h>
 
 #include <errno.h>
+#include <fcntl.h>
+#include <libsys.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include "un-namespace.h"
-#include "libc_private.h"
-
-extern int __realpathat(int fd, const char *path, char *buf, size_t size,
-    int flags);
+#include <ssp/ssp.h>
 
 /*
  * Find the real name of path, by removing all ".", ".." and symlink
@@ -149,13 +141,14 @@ realpath1(const char *path, char *resolved)
 				return (NULL);
 			}
 			slen = readlink(resolved, symlink, sizeof(symlink));
-			if (slen <= 0 || slen >= (ssize_t)sizeof(symlink)) {
-				if (slen < 0)
-					; /* keep errno from readlink(2) call */
-				else if (slen == 0)
-					errno = ENOENT;
-				else
-					errno = ENAMETOOLONG;
+			if (slen < 0)
+				return (NULL);
+			if (slen == 0) {
+				errno = ENOENT;
+				return (NULL);
+			}
+			if ((size_t)slen >= sizeof(symlink)) {
+				errno = ENAMETOOLONG;
 				return (NULL);
 			}
 			symlink[slen] = '\0';
@@ -176,7 +169,7 @@ realpath1(const char *path, char *resolved)
 			 */
 			if (p != NULL) {
 				if (symlink[slen - 1] != '/') {
-					if (slen + 1 >= (ssize_t)sizeof(symlink)) {
+					if ((size_t)slen + 1 >= sizeof(symlink)) {
 						errno = ENAMETOOLONG;
 						return (NULL);
 					}
@@ -207,7 +200,7 @@ realpath1(const char *path, char *resolved)
 }
 
 char *
-realpath(const char * __restrict path, char * __restrict resolved)
+__ssp_real(realpath)(const char * __restrict path, char * __restrict resolved)
 {
 	char *m, *res;
 
@@ -226,9 +219,8 @@ realpath(const char * __restrict path, char * __restrict resolved)
 		if (resolved == NULL)
 			return (NULL);
 	}
-	if (__getosreldate() >= 1300080) {
-		if (__realpathat(AT_FDCWD, path, resolved, PATH_MAX, 0) == 0)
-			return (resolved);
+	if (__sys___realpathat(AT_FDCWD, path, resolved, PATH_MAX, 0) == 0) {
+		return (resolved);
 	}
 	res = realpath1(path, resolved);
 	if (res == NULL)

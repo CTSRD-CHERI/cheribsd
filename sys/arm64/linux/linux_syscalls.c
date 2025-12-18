@@ -5,7 +5,6 @@
  */
 
 const char *linux_syscallnames[] = {
-#define	nosys	linux_nosys
 	"#0",			/* 0 = linux_io_setup */
 	"#1",			/* 1 = linux_io_destroy */
 	"#2",			/* 2 = linux_io_submit */
@@ -70,9 +69,9 @@ const char *linux_syscallnames[] = {
 	"linux_getdents64",			/* 61 = linux_getdents64 */
 	"linux_lseek",			/* 62 = linux_lseek */
 	"read",			/* 63 = read */
-	"write",			/* 64 = write */
+	"linux_write",			/* 64 = linux_write */
 	"readv",			/* 65 = readv */
-	"writev",			/* 66 = writev */
+	"linux_writev",			/* 66 = linux_writev */
 	"linux_pread",			/* 67 = linux_pread */
 	"linux_pwrite",			/* 68 = linux_pwrite */
 	"linux_preadv",			/* 69 = linux_preadv */
@@ -449,5 +448,14 @@ const char *linux_syscallnames[] = {
 	"linux_process_madvise",			/* 440 = linux_process_madvise */
 	"linux_epoll_pwait2",			/* 441 = linux_epoll_pwait2 */
 	"linux_mount_setattr",			/* 442 = linux_mount_setattr */
-	"#443",			/* 443 = nosys */
+	"linux_quotactl_fd",			/* 443 = linux_quotactl_fd */
+	"linux_landlock_create_ruleset",			/* 444 = linux_landlock_create_ruleset */
+	"linux_landlock_add_rule",			/* 445 = linux_landlock_add_rule */
+	"linux_landlock_restrict_self",			/* 446 = linux_landlock_restrict_self */
+	"linux_memfd_secret",			/* 447 = linux_memfd_secret */
+	"linux_process_mrelease",			/* 448 = linux_process_mrelease */
+	"linux_futex_waitv",			/* 449 = linux_futex_waitv */
+	"linux_set_mempolicy_home_node",			/* 450 = linux_set_mempolicy_home_node */
+	"linux_cachestat",			/* 451 = linux_cachestat */
+	"linux_fchmodat2",			/* 452 = linux_fchmodat2 */
 };

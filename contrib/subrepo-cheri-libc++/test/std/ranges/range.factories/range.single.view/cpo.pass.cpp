@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
-// UNSUPPORTED: libcpp-has-no-incomplete-ranges
 
 // std::views::single
 
@@ -20,9 +19,10 @@
 
 // Can't invoke without arguments.
 static_assert(!std::is_invocable_v<decltype((std::views::single))>);
-// Can't invoke with a move-only type.
-static_assert(!std::is_invocable_v<decltype((std::views::single)), MoveOnly>);
-
+#if _LIBCPP_STD_VER >= 23
+// Can invoke with a move-only type.
+static_assert(std::is_invocable_v<decltype((std::views::single)), MoveOnly>);
+#endif
 constexpr bool test() {
   // Lvalue.
   {

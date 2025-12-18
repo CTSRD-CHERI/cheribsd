@@ -1,5 +1,5 @@
 #! /usr/bin/env perl
-# Copyright 2014-2020 The OpenSSL Project Authors. All Rights Reserved.
+# Copyright 2014-2023 The OpenSSL Project Authors. All Rights Reserved.
 #
 # Licensed under the Apache License 2.0 (the "License").  You may not use
 # this file except in compliance with the License.  You can obtain a copy
@@ -60,9 +60,9 @@ open OUT,"| \"$^X\" $xlate $flavour \"$output\""
     or die "can't call $xlate: $!";
 *STDOUT=*OUT;
 
-$Xi="x0";	# argument block
-$Htbl="x1";
-$inp="x2";
+$Xi="PTR(0)";	# argument block
+$Htbl="PTR(1)";
+$inp="PTR(2)";
 $len="x3";
 
 $inc="x12";
@@ -77,7 +77,10 @@ $code=<<___;
 
 #if __ARM_MAX_ARCH__>=7
 ___
-$code.=".arch	armv8-a+crypto\n.text\n"	if ($flavour =~ /64/);
+$code.=<<___					if ($flavour =~ /64/);
+.arch_extension	crypto
+.text
+___
 $code.=<<___					if ($flavour !~ /64/);
 .fpu	neon
 #ifdef __thumb2__
@@ -107,7 +110,12 @@ $code.=<<___;
 .type	gcm_init_v8,%function
 .align	4
 gcm_init_v8:
-	vld1.64		{$t1},[x1]		@ load input H
+___
+$code.=<<___	if ($flavour =~ /64/);
+	AARCH64_VALID_CALL_TARGET
+___
+$code.=<<___;
+	vld1.64		{$t1},[PTR(1)]		@ load input H
 	vmov.i8		$xC2,#0xe1
 	vshl.i64	$xC2,$xC2,#57		@ 0xc2.0
 	vext.8		$IN,$t1,$t1,#8
@@ -122,7 +130,7 @@ gcm_init_v8:
 	vand		$t0,$t0,$t1
 	vorr		$IN,$IN,$t2		@ H<<<=1
 	veor		$H,$IN,$t0		@ twisted H
-	vst1.64		{$H},[x0],#16		@ store Htable[0]
+	vst1.64		{$H},[PTR(0)],#16	@ store Htable[0]
 
 	@ calculate H^2
 	vext.8		$t0,$H,$H,#8		@ Karatsuba pre-processing
@@ -149,7 +157,7 @@ gcm_init_v8:
 	vext.8		$t1,$H2,$H2,#8		@ Karatsuba pre-processing
 	veor		$t1,$t1,$H2
 	vext.8		$Hhl,$t0,$t1,#8		@ pack Karatsuba pre-processed
-	vst1.64		{$Hhl-$H2},[x0],#32	@ store Htable[1..2]
+	vst1.64		{$Hhl-$H2},[PTR(0)],#32	@ store Htable[1..2]
 ___
 if ($flavour =~ /64/) {
 my ($t3,$Yl,$Ym,$Yh) = map("q$_",(4..7));
@@ -195,7 +203,7 @@ $code.=<<___;
 	veor		$t0,$t0,$H
 	 veor		$t1,$t1,$H2
 	vext.8		$Hhl,$t0,$t1,#8		@ pack Karatsuba pre-processed
-	vst1.64		{$H-$H2},[x0]		@ store Htable[3..5]
+	vst1.64		{$H-$H2},[PTR(0)]	@ store Htable[3..5]
 ___
 }
 $code.=<<___;
@@ -214,6 +222,11 @@ $code.=<<___;
 .type	gcm_gmult_v8,%function
 .align	4
 gcm_gmult_v8:
+___
+$code.=<<___	if ($flavour =~ /64/);
+	AARCH64_VALID_CALL_TARGET
+___
+$code.=<<___;
 	vld1.64		{$t1},[$Xi]		@ load Xi
 	vmov.i8		$xC2,#0xe1
 	vld1.64		{$H-$Hhl},[$Htbl]	@ load twisted H, ...
@@ -268,6 +281,7 @@ $code.=<<___;
 gcm_ghash_v8:
 ___
 $code.=<<___	if ($flavour =~ /64/);
+	AARCH64_VALID_CALL_TARGET
 	cmp		$len,#64
 	b.hs		.Lgcm_ghash_v8_4x
 ___
@@ -743,6 +757,9 @@ if ($flavour =~ /64/) {			######## 64-bit code
 	m/l\.p64/o and s/\.16b/\.1d/go;		# 2nd and 3rd pmull arguments
 	s/\.[uisp]?64//o and s/\.16b/\.2d/go;
 	s/\.[42]([sd])\[([0-3])\]/\.$1\[$2\]/o;
+
+	# Switch preprocessor checks to aarch64 versions.
+	s/__ARME([BL])__/__AARCH64E$1__/go;
 
 	print $_,"\n";
     }

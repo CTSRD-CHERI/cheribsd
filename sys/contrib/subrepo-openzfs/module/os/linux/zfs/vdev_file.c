@@ -242,7 +242,7 @@ vdev_file_io_start(zio_t *zio)
 	vdev_t *vd = zio->io_vd;
 	vdev_file_t *vf = vd->vdev_tsd;
 
-	if (zio->io_type == ZIO_TYPE_IOCTL) {
+	if (zio->io_type == ZIO_TYPE_FLUSH) {
 		/* XXPOLICY */
 		if (!vdev_readable(vd)) {
 			zio->io_error = SET_ERROR(ENXIO);
@@ -250,44 +250,33 @@ vdev_file_io_start(zio_t *zio)
 			return;
 		}
 
-		switch (zio->io_cmd) {
-		case DKIOCFLUSHWRITECACHE:
-
-			if (zfs_nocacheflush)
-				break;
-
-			/*
-			 * We cannot safely call vfs_fsync() when PF_FSTRANS
-			 * is set in the current context.  Filesystems like
-			 * XFS include sanity checks to verify it is not
-			 * already set, see xfs_vm_writepage().  Therefore
-			 * the sync must be dispatched to a different context.
-			 */
-			if (__spl_pf_fstrans_check()) {
-				VERIFY3U(taskq_dispatch(vdev_file_taskq,
-				    vdev_file_io_fsync, zio, TQ_SLEEP), !=,
-				    TASKQID_INVALID);
-				return;
-			}
-
-			zio->io_error = zfs_file_fsync(vf->vf_file,
-			    O_SYNC | O_DSYNC);
-			break;
-		default:
-			zio->io_error = SET_ERROR(ENOTSUP);
+		if (zfs_nocacheflush) {
+			zio_execute(zio);
+			return;
 		}
+
+		/*
+		 * We cannot safely call vfs_fsync() when PF_FSTRANS
+		 * is set in the current context.  Filesystems like
+		 * XFS include sanity checks to verify it is not
+		 * already set, see xfs_vm_writepage().  Therefore
+		 * the sync must be dispatched to a different context.
+		 */
+		if (__spl_pf_fstrans_check()) {
+			VERIFY3U(taskq_dispatch(vdev_file_taskq,
+			    vdev_file_io_fsync, zio, TQ_SLEEP), !=,
+			    TASKQID_INVALID);
+			return;
+		}
+
+		zio->io_error = zfs_file_fsync(vf->vf_file, O_SYNC | O_DSYNC);
 
 		zio_execute(zio);
 		return;
 	} else if (zio->io_type == ZIO_TYPE_TRIM) {
-		int mode = 0;
-
 		ASSERT3U(zio->io_size, !=, 0);
-#ifdef __linux__
-		mode = FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE;
-#endif
-		zio->io_error = zfs_file_fallocate(vf->vf_file,
-		    mode, zio->io_offset, zio->io_size);
+		zio->io_error = zfs_file_deallocate(vf->vf_file,
+		    zio->io_offset, zio->io_size);
 		zio_execute(zio);
 		return;
 	}

@@ -517,8 +517,9 @@ mmp_write_uberblock(spa_t *spa)
 
 	zio_t *zio  = zio_null(mmp->mmp_zio_root, spa, NULL, NULL, NULL, flags);
 	abd_t *ub_abd = abd_alloc_for_io(VDEV_UBERBLOCK_SIZE(vd), B_TRUE);
-	abd_zero(ub_abd, VDEV_UBERBLOCK_SIZE(vd));
 	abd_copy_from_buf(ub_abd, ub, sizeof (uberblock_t));
+	abd_zero_off(ub_abd, sizeof (uberblock_t),
+	    VDEV_UBERBLOCK_SIZE(vd) - sizeof (uberblock_t));
 
 	mmp->mmp_seq++;
 	mmp->mmp_kstat_id++;
@@ -663,12 +664,13 @@ mmp_thread(void *arg)
 		    (gethrtime() - mmp->mmp_last_write) > mmp_fail_ns) {
 			zfs_dbgmsg("MMP suspending pool '%s': gethrtime %llu "
 			    "mmp_last_write %llu mmp_interval %llu "
-			    "mmp_fail_intervals %llu mmp_fail_ns %llu",
+			    "mmp_fail_intervals %llu mmp_fail_ns %llu txg %llu",
 			    spa_name(spa), (u_longlong_t)gethrtime(),
 			    (u_longlong_t)mmp->mmp_last_write,
 			    (u_longlong_t)mmp_interval,
 			    (u_longlong_t)mmp_fail_intervals,
-			    (u_longlong_t)mmp_fail_ns);
+			    (u_longlong_t)mmp_fail_ns,
+			    (u_longlong_t)spa->spa_uberblock.ub_txg);
 			cmn_err(CE_WARN, "MMP writes to pool '%s' have not "
 			    "succeeded in over %llu ms; suspending pool. "
 			    "Hrtime %llu",

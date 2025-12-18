@@ -44,7 +44,7 @@
  * not include the padding.
  */
 
-#ifndef LOCORE
+#if !defined(LOCORE) && !defined(__ASSEMBLER__)
 typedef struct {
 	u_int32_t	n_namesz;	/* Length of name. */
 	u_int32_t	n_descsz;	/* Length of descriptor. */
@@ -112,7 +112,7 @@ typedef Elf_Note Elf_Nhdr;
  * The header for GNU-style hash sections.
  */
 
-#ifndef LOCORE
+#if !defined(LOCORE) && !defined(__ASSEMBLER__)
 typedef struct {
 	u_int32_t	gh_nbuckets;	/* Number of hash buckets. */
 	u_int32_t	gh_symndx;	/* First visible symbol in .dynsym. */
@@ -533,6 +533,8 @@ typedef struct {
 #define	PT_PHDR		6	/* Location of program header itself. */
 #define	PT_TLS		7	/* Thread local storage segment */
 #define	PT_LOOS		0x60000000	/* First OS-specific. */
+#define	PT_C18N_NAME	0x64331380	/* Sub-object compartment. */
+#define	PT_CHERI_PCC	0x64348450	/* CHERI PCC bounds. */
 #define	PT_SUNW_UNWIND	0x6464e550	/* amd64 UNWIND program header */
 #define	PT_GNU_EH_FRAME	0x6474e550
 #define	PT_GNU_STACK	0x6474e551
@@ -630,6 +632,8 @@ typedef struct {
 #define	DT_SUNW_FILTER		0x6000000f	/* symbol filter name */
 #define	DT_SUNW_CAP		0x60000010	/* hardware/software */
 #define	DT_SUNW_ASLR		0x60000023	/* ASLR control */
+#define	DT_C18N_STRTAB		0x64331380	/* Compartment string table */
+#define	DT_C18N_STRTABSZ	0x64331381	/* Compartment string table size */
 #define	DT_HIOS		0x6ffff000	/* Last OS-specific */
 
 /*
@@ -816,10 +820,14 @@ typedef struct {
 #define	NT_FREEBSD_FCTL_WXNEEDED	0x00000008
 #define	NT_FREEBSD_FCTL_LA48		0x00000010
 #define	NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE	0x00000020 /* was ASG_DISABLE */
+#define	NT_FREEBSD_FCTL_CHERI_C18N_DISABLE	0x20000000
+#define	NT_FREEBSD_FCTL_CHERI_C18N_ENABLE	0x40000000
 #define	NT_FREEBSD_FCTL_CHERI_REVOKE_ENABLE	0x80000000
 
 #define NT_FREEBSD_FCTL_CHERI_REVOKE_MASK \
     (NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE | NT_FREEBSD_FCTL_CHERI_REVOKE_ENABLE)
+#define	NT_FREEBSD_FCTL_CHERI_C18N_MASK	\
+    (NT_FREEBSD_FCTL_CHERI_C18N_DISABLE | NT_FREEBSD_FCTL_CHERI_C18N_ENABLE)
 
 /* Values for n_type.  Used in core files. */
 #define	NT_PRSTATUS	1	/* Process status. */
@@ -843,6 +851,7 @@ typedef struct {
 #define	NT_X86_XSTATE	0x202	/* x86 XSAVE extended state. */
 #define	NT_ARM_VFP	0x400	/* ARM VFP registers */
 #define	NT_ARM_TLS	0x401	/* ARM TLS register */
+#define	NT_ARM_SVE	0x405	/* ARM SVE registers */
 #define	NT_ARM_ADDR_MASK	0x406	/* arm64 address mask (e.g. for TBI) */
 
 /* GNU note types. */
@@ -902,6 +911,9 @@ typedef struct {
 #define	STV_EXPORTED	0x4
 #define	STV_SINGLETON	0x5
 #define	STV_ELIMINATE	0x6
+
+/* Architecture specific data - st_other */
+#define	STO_AARCH64_VARIANT_PCS 0x80
 
 /* Special symbol table indexes. */
 #define	STN_UNDEF	0	/* Undefined symbol index. */
@@ -1007,10 +1019,11 @@ typedef struct {
 #define	AT_KPRELOAD	34	/* Base of vdso, preloaded by rtld */
 #define	AT_USRSTACKBASE	35	/* Top of user stack */
 #define	AT_USRSTACKLIM	36	/* Grow limit of user stack */
-#define	AT_CAPC		37	/* Number of entries in capability vector */
-#define	AT_CAPV		38	/* Capability vector passed to coexecvec(2) */
+#define	AT_CHERI_C18N	37	/* Compartment info block */
+#define	AT_CAPC		38	/* Number of entries in capability vector */
+#define	AT_CAPV		39	/* Capability vector passed to coexecvec(2) */
 
-#define	AT_COUNT	39	/* Count of defined aux entry types. */
+#define	AT_COUNT	40	/* Count of defined aux entry types. */
 
 /*
  * Relocation types.
@@ -1090,6 +1103,8 @@ typedef struct {
 #define	R_MORELLO_IRELATIVE	59396
 #define	R_MORELLO_TLSDESC	59397
 #define	R_MORELLO_TLS_TPREL128	59398
+#define	R_MORELLO_FUNC_RELATIVE	59400
+#define	R_AARCH64_FUNC_RELATIVE	59401
 
 #if __has_feature(capabilities)
 #define	MORELLO_FRAG_EXECUTABLE	0x4
@@ -1547,6 +1562,9 @@ typedef struct {
 
 #define	ELF_BSDF_SIGFASTBLK	0x0001	/* Kernel supports fast sigblock */
 #define	ELF_BSDF_VMNOOVERCOMMIT	0x0002
+#define	ELF_BSDF_CHERI_C18N_FPTR	0x8000000
+#define	ELF_BSDF_CHERI_C18N	0x10000000
+#define	ELF_BSDF_CHERI_REVOKE_ASYNC	0x20000000	/* Async revocation */
 #define	ELF_BSDF_CHERI_REVOKE_EVERY_FREE	0x40000000
 #define	ELF_BSDF_CHERI_REVOKE	0x80000000	/* Process should quarantine */
 

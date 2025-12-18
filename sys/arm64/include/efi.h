@@ -44,7 +44,11 @@
 #define	EFI_TIME_UNLOCK()
 #define	EFI_TIME_OWNED()
 
+#ifdef __CHERI_PURE_CAPABILITY__
 #define	EFI_RT_HANDLE_FAULTS_DEFAULT	0
+#else
+#define	EFI_RT_HANDLE_FAULTS_DEFAULT	1
+#endif
 #endif
 
 struct efirt_callinfo {

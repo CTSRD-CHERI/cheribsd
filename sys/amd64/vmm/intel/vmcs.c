@@ -29,7 +29,6 @@
 #include "opt_bhyve_snapshot.h"
 #include "opt_ddb.h"
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/sysctl.h>
 #include <sys/systm.h>
@@ -120,10 +119,13 @@ vmcs_field_encoding(int ident)
 		return (VMCS_GUEST_PDPTE3);
 	case VM_REG_GUEST_ENTRY_INST_LENGTH:
 		return (VMCS_ENTRY_INST_LENGTH);
+	case VM_REG_GUEST_FS_BASE:
+		return (VMCS_GUEST_FS_BASE);
+	case VM_REG_GUEST_GS_BASE:
+		return (VMCS_GUEST_GS_BASE);
 	default:
 		return (-1);
 	}
-
 }
 
 static int

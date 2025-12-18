@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/linker_set.h>
 #include <sys/stat.h>
@@ -118,7 +117,6 @@ static FILE *dbg;
 #else
 #define DPRINTF(format, arg...)
 #endif
-#define WPRINTF(format, arg...) printf(format, ##arg)
 
 #define AHCI_PORT_IDENT 20 + 1
 
@@ -128,6 +126,7 @@ struct ahci_ioreq {
 	STAILQ_ENTRY(ahci_ioreq) io_flist;
 	TAILQ_ENTRY(ahci_ioreq) io_blist;
 	uint8_t *cfis;
+	uint8_t *dsm;
 	uint32_t len;
 	uint32_t done;
 	int slot;
@@ -215,6 +214,8 @@ struct pci_ahci_softc {
 };
 #define	ahci_ctx(sc)	((sc)->asc_pi->pi_vmctx)
 
+static void ahci_handle_next_trim(struct ahci_port *p, int slot, uint8_t *cfis,
+    uint8_t *buf, uint32_t len, uint32_t done);
 static void ahci_handle_port(struct ahci_port *p);
 
 static inline void lba_to_msf(uint8_t *buf, int lba)
@@ -343,7 +344,7 @@ ahci_write_fis(struct ahci_port *p, enum sata_fis_type ft, uint8_t *fis)
 		irq = (fis[1] & (1 << 6)) ? AHCI_P_IX_PS : 0;
 		break;
 	default:
-		WPRINTF("unsupported fis type %d", ft);
+		EPRINTLN("unsupported fis type %d", ft);
 		return;
 	}
 	if (fis[2] & ATA_S_ERROR) {
@@ -783,7 +784,7 @@ ahci_handle_flush(struct ahci_port *p, int slot, uint8_t *cfis)
 	assert(err == 0);
 }
 
-static inline void
+static inline unsigned int
 read_prdt(struct ahci_port *p, int slot, uint8_t *cfis, void *buf,
     unsigned int size)
 {
@@ -810,20 +811,18 @@ read_prdt(struct ahci_port *p, int slot, uint8_t *cfis, void *buf,
 		to += sublen;
 		prdt++;
 	}
+	return (size - len);
 }
 
 static void
-ahci_handle_dsm_trim(struct ahci_port *p, int slot, uint8_t *cfis, uint32_t done)
+ahci_handle_dsm_trim(struct ahci_port *p, int slot, uint8_t *cfis)
 {
-	struct ahci_ioreq *aior;
-	struct blockif_req *breq;
-	uint8_t *entry;
-	uint64_t elba;
-	uint32_t len, elen;
-	int err, first, ncq;
-	uint8_t buf[512];
+	uint32_t len;
+	int ncq;
+	uint8_t *buf;
+	unsigned int nread;
 
-	first = (done == 0);
+	buf = NULL;
 	if (cfis[2] == ATA_DATA_SET_MANAGEMENT) {
 		len = (uint16_t)cfis[13] << 8 | cfis[12];
 		len *= 512;
@@ -833,36 +832,84 @@ ahci_handle_dsm_trim(struct ahci_port *p, int slot, uint8_t *cfis, uint32_t done
 		len *= 512;
 		ncq = 1;
 	}
-	read_prdt(p, slot, cfis, buf, sizeof(buf));
 
-next:
-	entry = &buf[done];
-	elba = ((uint64_t)entry[5] << 40) |
-		((uint64_t)entry[4] << 32) |
-		((uint64_t)entry[3] << 24) |
-		((uint64_t)entry[2] << 16) |
-		((uint64_t)entry[1] << 8) |
-		entry[0];
-	elen = (uint16_t)entry[7] << 8 | entry[6];
-	done += 8;
-	if (elen == 0) {
-		if (done >= len) {
-			if (ncq) {
-				if (first)
-					ahci_write_fis_d2h_ncq(p, slot);
-				ahci_write_fis_sdb(p, slot, cfis,
-				    ATA_S_READY | ATA_S_DSC);
-			} else {
-				ahci_write_fis_d2h(p, slot, cfis,
-				    ATA_S_READY | ATA_S_DSC);
-			}
+	/* Support for only a single block is advertised via IDENTIFY. */
+	if (len > 512) {
+		goto invalid_command;
+	}
+
+	buf = malloc(len);
+	nread = read_prdt(p, slot, cfis, buf, len);
+	if (nread != len) {
+		goto invalid_command;
+	}
+	ahci_handle_next_trim(p, slot, cfis, buf, len, 0);
+	return;
+
+invalid_command:
+	free(buf);
+	if (ncq) {
+		ahci_write_fis_d2h_ncq(p, slot);
+		ahci_write_fis_sdb(p, slot, cfis,
+		    (ATA_E_ABORT << 8) | ATA_S_READY | ATA_S_ERROR);
+	} else {
+		ahci_write_fis_d2h(p, slot, cfis,
+		    (ATA_E_ABORT << 8) | ATA_S_READY | ATA_S_ERROR);
+	}
+}
+
+static void
+ahci_handle_next_trim(struct ahci_port *p, int slot, uint8_t *cfis,
+    uint8_t *buf, uint32_t len, uint32_t done)
+{
+	struct ahci_ioreq *aior;
+	struct blockif_req *breq;
+	uint8_t *entry;
+	uint64_t elba;
+	uint32_t elen;
+	int err;
+	bool first, ncq;
+
+	first = (done == 0);
+	if (cfis[2] == ATA_DATA_SET_MANAGEMENT) {
+		ncq = false;
+	} else { /* ATA_SEND_FPDMA_QUEUED */
+		ncq = true;
+	}
+
+	/* Find the next range to TRIM. */
+	while (done < len) {
+		entry = &buf[done];
+		elba = ((uint64_t)entry[5] << 40) |
+		    ((uint64_t)entry[4] << 32) |
+		    ((uint64_t)entry[3] << 24) |
+		    ((uint64_t)entry[2] << 16) |
+		    ((uint64_t)entry[1] << 8) |
+		    entry[0];
+		elen = (uint16_t)entry[7] << 8 | entry[6];
+		done += 8;
+		if (elen != 0)
+			break;
+	}
+
+	/* All remaining ranges were empty. */
+	if (done == len) {
+		free(buf);
+		if (ncq) {
+			if (first)
+				ahci_write_fis_d2h_ncq(p, slot);
+			ahci_write_fis_sdb(p, slot, cfis,
+			    ATA_S_READY | ATA_S_DSC);
+		} else {
+			ahci_write_fis_d2h(p, slot, cfis,
+			    ATA_S_READY | ATA_S_DSC);
+		}
+		if (!first) {
 			p->pending &= ~(1 << slot);
 			ahci_check_stopped(p);
-			if (!first)
-				ahci_handle_port(p);
-			return;
+			ahci_handle_port(p);
 		}
-		goto next;
+		return;
 	}
 
 	/*
@@ -875,6 +922,7 @@ next:
 	aior->slot = slot;
 	aior->len = len;
 	aior->done = done;
+	aior->dsm = buf;
 	aior->more = (len != done);
 
 	breq = &aior->io_req;
@@ -1752,7 +1800,7 @@ ahci_handle_cmd(struct ahci_port *p, int slot, uint8_t *cfis)
 	case ATA_DATA_SET_MANAGEMENT:
 		if (cfis[11] == 0 && cfis[3] == ATA_DSM_TRIM &&
 		    cfis[13] == 0 && cfis[12] == 1) {
-			ahci_handle_dsm_trim(p, slot, cfis, 0);
+			ahci_handle_dsm_trim(p, slot, cfis);
 			break;
 		}
 		ahci_write_fis_d2h(p, slot, cfis,
@@ -1762,7 +1810,7 @@ ahci_handle_cmd(struct ahci_port *p, int slot, uint8_t *cfis)
 		if ((cfis[13] & 0x1f) == ATA_SFPDMA_DSM &&
 		    cfis[17] == 0 && cfis[16] == ATA_DSM_TRIM &&
 		    cfis[11] == 0 && cfis[3] == 1) {
-			ahci_handle_dsm_trim(p, slot, cfis, 0);
+			ahci_handle_dsm_trim(p, slot, cfis);
 			break;
 		}
 		ahci_write_fis_d2h(p, slot, cfis,
@@ -1802,7 +1850,7 @@ ahci_handle_cmd(struct ahci_port *p, int slot, uint8_t *cfis)
 			handle_packet_cmd(p, slot, cfis);
 		break;
 	default:
-		WPRINTF("Unsupported cmd:%02x", cfis[2]);
+		EPRINTLN("Unsupported cmd:%02x", cfis[2]);
 		ahci_write_fis_d2h(p, slot, cfis,
 		    (ATA_E_ABORT << 8) | ATA_S_READY | ATA_S_ERROR);
 		break;
@@ -1847,7 +1895,7 @@ ahci_handle_slot(struct ahci_port *p, int slot)
 #endif
 
 	if (cfis[0] != FIS_TYPE_REGH2D) {
-		WPRINTF("Not a H2D FIS:%02x", cfis[0]);
+		EPRINTLN("Not a H2D FIS:%02x", cfis[0]);
 		return;
 	}
 
@@ -1900,12 +1948,12 @@ ata_ioreq_cb(struct blockif_req *br, int err)
 	struct ahci_port *p;
 	struct pci_ahci_softc *sc;
 	uint32_t tfd;
-	uint8_t *cfis;
-	int slot, ncq, dsm;
+	uint8_t *cfis, *dsm;
+	int slot, ncq;
 
 	DPRINTF("%s %d", __func__, err);
 
-	ncq = dsm = 0;
+	ncq = 0;
 	aior = br->br_param;
 	p = aior->io_pr;
 	cfis = aior->cfis;
@@ -1917,10 +1965,8 @@ ata_ioreq_cb(struct blockif_req *br, int err)
 	    cfis[2] == ATA_READ_FPDMA_QUEUED ||
 	    cfis[2] == ATA_SEND_FPDMA_QUEUED)
 		ncq = 1;
-	if (cfis[2] == ATA_DATA_SET_MANAGEMENT ||
-	    (cfis[2] == ATA_SEND_FPDMA_QUEUED &&
-	     (cfis[13] & 0x1f) == ATA_SFPDMA_DSM))
-		dsm = 1;
+	dsm = aior->dsm;
+	aior->dsm = NULL;
 
 	pthread_mutex_lock(&sc->mtx);
 
@@ -1938,8 +1984,9 @@ ata_ioreq_cb(struct blockif_req *br, int err)
 		hdr->prdbc = aior->done;
 
 	if (!err && aior->more) {
-		if (dsm)
-			ahci_handle_dsm_trim(p, slot, cfis, aior->done);
+		if (dsm != NULL)
+			ahci_handle_next_trim(p, slot, cfis, dsm,
+			    aior->len, aior->done);
 		else
 			ahci_handle_rw(p, slot, cfis, aior->done);
 		goto out;
@@ -1961,6 +2008,7 @@ ata_ioreq_cb(struct blockif_req *br, int err)
 
 	ahci_check_stopped(p);
 	ahci_handle_port(p);
+	free(dsm);
 out:
 	pthread_mutex_unlock(&sc->mtx);
 	DPRINTF("%s exit", __func__);
@@ -2134,7 +2182,7 @@ pci_ahci_port_write(struct pci_ahci_softc *sc, uint64_t offset, uint64_t value)
 	case AHCI_P_TFD:
 	case AHCI_P_SIG:
 	case AHCI_P_SSTS:
-		WPRINTF("pci_ahci_port: read only registers 0x%"PRIx64"", offset);
+		EPRINTLN("pci_ahci_port: read only registers 0x%"PRIx64"", offset);
 		break;
 	case AHCI_P_SCTL:
 		p->sctl = value;
@@ -2209,7 +2257,7 @@ pci_ahci_write(struct pci_devinst *pi, int baridx, uint64_t offset, int size,
 	else if (offset < (uint64_t)AHCI_OFFSET + sc->ports * AHCI_STEP)
 		pci_ahci_port_write(sc, offset, value);
 	else
-		WPRINTF("pci_ahci: unknown i/o write offset 0x%"PRIx64"", offset);
+		EPRINTLN("pci_ahci: unknown i/o write offset 0x%"PRIx64"", offset);
 
 	pthread_mutex_unlock(&sc->mtx);
 }
@@ -2307,7 +2355,7 @@ pci_ahci_read(struct pci_devinst *pi, int baridx, uint64_t regoff, int size)
 		value = pci_ahci_port_read(sc, offset);
 	else {
 		value = 0;
-		WPRINTF("pci_ahci: unknown i/o read offset 0x%"PRIx64"",
+		EPRINTLN("pci_ahci: unknown i/o read offset 0x%"PRIx64"",
 		    regoff);
 	}
 	value >>= 8 * (regoff & 0x3);
@@ -2611,7 +2659,7 @@ pci_ahci_snapshot(struct vm_snapshot_meta *meta)
 		/* Mostly for restore; save is ensured by the lines above. */
 		if (((bctx == NULL) && (port->bctx != NULL)) ||
 		    ((bctx != NULL) && (port->bctx == NULL))) {
-			fprintf(stderr, "%s: ports not matching\r\n", __func__);
+			EPRINTLN("%s: ports not matching", __func__);
 			ret = EINVAL;
 			goto done;
 		}
@@ -2620,9 +2668,8 @@ pci_ahci_snapshot(struct vm_snapshot_meta *meta)
 			continue;
 
 		if (port->port != i) {
-			fprintf(stderr, "%s: ports not matching: "
-					"actual: %d expected: %d\r\n",
-					__func__, port->port, i);
+			EPRINTLN("%s: ports not matching: "
+			    "actual: %d expected: %d", __func__, port->port, i);
 			ret = EINVAL;
 			goto done;
 		}

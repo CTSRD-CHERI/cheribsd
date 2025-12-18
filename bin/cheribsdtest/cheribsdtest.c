@@ -40,6 +40,7 @@
 #include <sys/auxv.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
 #include <sys/ucontext.h>
@@ -262,7 +263,7 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		return;
 
 	if (ctp->ct_check_skip != NULL) {
-		skip_reason = ctp->ct_check_skip(ctp->ct_name);
+		skip_reason = ctp->ct_check_skip(ctp);
 		if (skip_reason != NULL) {
 			if (xo_get_style(NULL) == XO_STYLE_XML) {
 				xo_attr("message", "%s", skip_reason);
@@ -666,7 +667,7 @@ mk_exec_args(const struct cheri_test *ctp)
 	char const **exec_args;
 	int argc = 0, error;
 
-	execpath = malloc(MAXPATHLEN);
+	execpath = malloc(PATH_MAX);
 	if (execpath == NULL)
 		err(EX_OSERR, "malloc");
 	exec_args = calloc(5, sizeof(*exec_args));
@@ -683,7 +684,7 @@ mk_exec_args(const struct cheri_test *ctp)
 	 * AT_EXECPATH or add some sort of execve_self(3) implemented
 	 * by rtld for dynamic binaries and libc for static.
 	 */
-	error = elf_aux_info(AT_EXECPATH, execpath, MAXPATHLEN);
+	error = elf_aux_info(AT_EXECPATH, execpath, PATH_MAX);
 	if (error != 0)
 		errx(EX_OSERR, "elf_aux_info: %s", strerror(error));
 	exec_args[argc++] = execpath;
@@ -756,6 +757,44 @@ cheribsdtest_spawn_child(enum spawn_child_mode mode)
 	if (mode != SC_MODE_POSIX_SPAWN && pid == 0)
 		execve(exec_args[0], exec_args, NULL);
 	return (pid);
+}
+
+static const char *
+_cheribsdtest_get_helper_path(const struct cheri_test *ctp)
+{
+	static char helper_path[PATH_MAX];
+	const char *prefix = "/usr/libexec";
+
+	if (ctp == NULL)
+		return (NULL);
+
+	snprintf(helper_path, sizeof(helper_path), "%s/%s%s", prefix,
+	    ctp->ct_name, PROG_SUFFIX);
+
+	return (helper_path);
+}
+
+const char *
+cheribsdtest_get_helper_path(void)
+{
+	return (_cheribsdtest_get_helper_path(running_test));
+}
+
+const char *
+cheribsdtest_skip_no_helper(const struct cheri_test *ctp)
+{
+	struct stat sb;
+	const char *path;
+
+	/*
+	 * We want to skip if the file doesn't exist, but run and fail
+	 * of it does and there's something wrong with it (e.g., it's not
+	 * executable).
+	 */
+	path = _cheribsdtest_get_helper_path(ctp);
+	if (path != NULL && stat(path, &sb) != 0)
+		return ("couldn't stat helper");
+	return (NULL);
 }
 
 __noinline void *

@@ -55,7 +55,7 @@
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
-#include <dev/extres/clk/clk.h>
+#include <dev/clk/clk.h>
 
 #include <arm/ti/ti_sysc.h>
 #include <arm/ti/ti_pruss.h>
@@ -184,9 +184,6 @@ ti_pruss_irq_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 	sc = dev->si_drv1;
 
 	irqs = malloc(sizeof(struct ctl), M_DEVBUF, M_WAITOK);
-	if (!irqs)
-	    return (ENOMEM);
-
 	irqs->cnt = sc->tstamps.ctl.cnt;
 	irqs->idx = sc->tstamps.ctl.idx;
 

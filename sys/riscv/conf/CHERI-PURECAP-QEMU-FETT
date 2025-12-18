@@ -1,0 +1,7 @@
+#NO_UNIVERSE
+
+include "CHERI-QEMU"
+include "std.CHERI-PURECAP"
+makeoptions	NO_MODULES=yes
+
+ident CHERI-PURECAP-QEMU-FETT

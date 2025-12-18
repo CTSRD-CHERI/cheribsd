@@ -18,16 +18,23 @@
 */
 
 /* PORT_TO_C89 means the code should work even if the underlying
-   compiler and library support only C89.  SUPPORT_C89 means the
-   tzcode library should support C89 callers in addition to the usual
-   support for C99-and-later callers.  These macros are obsolescent,
-   and the plan is to remove them along with any code needed only when
-   they are nonzero.  */
+   compiler and library support only C89 plus C99's 'long long'
+   and perhaps a few other extensions to C89.
+
+   This macro is obsolescent, and the plan is to remove it along with
+   associated code.  A good time to do that might be in the year 2029
+   because RHEL 7 (whose GCC defaults to C89) extended life cycle
+   support (ELS) is scheduled to end on 2028-06-30.  */
 #ifndef PORT_TO_C89
 # define PORT_TO_C89 0
 #endif
+
+/* SUPPORT_C89 means the tzcode library should support C89 callers
+   in addition to the usual support for C99-and-later callers.
+   This defaults to 1 as POSIX requires, even though that can trigger
+   latent bugs in callers.  */
 #ifndef SUPPORT_C89
-# define SUPPORT_C89 0
+# define SUPPORT_C89 1
 #endif
 
 #ifndef __STDC_VERSION__
@@ -65,14 +72,8 @@
 ** You can override these in your C compiler options, e.g. '-DHAVE_GETTEXT=1'.
 */
 
-#ifndef HAVE_DECL_ASCTIME_R
-# define HAVE_DECL_ASCTIME_R 1
-#endif
-
 #if !defined HAVE__GENERIC && defined __has_extension
-# if __has_extension(c_generic_selections)
-#  define HAVE__GENERIC 1
-# else
+# if !__has_extension(c_generic_selections)
 #  define HAVE__GENERIC 0
 # endif
 #endif
@@ -233,6 +234,31 @@
 #if HAVE_UNISTD_H
 # include <unistd.h> /* for R_OK, and other POSIX goodness */
 #endif /* HAVE_UNISTD_H */
+
+/* SUPPORT_POSIX2008 means the tzcode library should support
+   POSIX.1-2017-and-earlier callers in addition to the usual support for
+   POSIX.1-2024-and-later callers; however, this can be
+   incompatible with POSIX.1-2024-and-later callers.
+   This macro is obsolescent, and the plan is to remove it
+   along with any code needed only when it is nonzero.
+   A good time to do that might be in the year 2034.
+   This macro's name is SUPPORT_POSIX2008 because _POSIX_VERSION == 200809
+   in POSIX.1-2017, a minor revision of POSIX.1-2008.  */
+#ifndef SUPPORT_POSIX2008
+# if defined _POSIX_VERSION && _POSIX_VERSION <= 200809
+#  define SUPPORT_POSIX2008 1
+# else
+#  define SUPPORT_POSIX2008 0
+# endif
+#endif
+
+#ifndef HAVE_DECL_ASCTIME_R
+# if SUPPORT_POSIX2008
+#  define HAVE_DECL_ASCTIME_R 1
+# else
+#  define HAVE_DECL_ASCTIME_R 0
+# endif
+#endif
 
 #ifndef HAVE_STRFTIME_L
 # if _POSIX_VERSION < 200809
@@ -458,14 +484,6 @@ typedef unsigned long uintmax_t;
 # define ckd_mul(r, a, b) __builtin_mul_overflow(a, b, r)
 #endif
 
-#if 3 <= __GNUC__
-# define ATTRIBUTE_MALLOC __attribute__((malloc))
-# define ATTRIBUTE_FORMAT(spec) __attribute__((format spec))
-#else
-# define ATTRIBUTE_MALLOC /* empty */
-# define ATTRIBUTE_FORMAT(spec) /* empty */
-#endif
-
 #if (defined __has_c_attribute \
      && (202311 <= __STDC_VERSION__ || !defined __STRICT_ANSI__))
 # define HAVE___HAS_C_ATTRIBUTE true
@@ -533,24 +551,27 @@ typedef unsigned long uintmax_t;
 # endif
 #endif
 #ifndef ATTRIBUTE_REPRODUCIBLE
-# if 3 <= __GNUC__
-#  define ATTRIBUTE_REPRODUCIBLE __attribute__((pure))
-# else
-#  define ATTRIBUTE_REPRODUCIBLE /* empty */
-# endif
+# define ATTRIBUTE_REPRODUCIBLE /* empty */
 #endif
 
-#if HAVE___HAS_C_ATTRIBUTE
-# if __has_c_attribute(unsequenced)
-#  define ATTRIBUTE_UNSEQUENCED [[unsequenced]]
-# endif
+/* GCC attributes that are useful in tzcode.
+   __attribute__((pure)) is stricter than [[reproducible]],
+   so the latter is an adequate substitute in non-GCC C23 platforms.  */
+#if __GNUC__ < 3
+# define ATTRIBUTE_FORMAT(spec) /* empty */
+# define ATTRIBUTE_PURE ATTRIBUTE_REPRODUCIBLE
+#else
+# define ATTRIBUTE_FORMAT(spec) __attribute__((format spec))
+# define ATTRIBUTE_PURE __attribute__((pure))
 #endif
-#ifndef ATTRIBUTE_UNSEQUENCED
-# if 3 <= __GNUC__
-#  define ATTRIBUTE_UNSEQUENCED __attribute__((const))
-# else
-#  define ATTRIBUTE_UNSEQUENCED /* empty */
-# endif
+
+/* Avoid GCC bug 114833 <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=114833>.
+   Remove this macro and its uses when the bug is fixed in a GCC release,
+   because only the latest GCC matters for $(GCC_DEBUG_FLAGS).  */
+#ifdef GCC_LINT
+# define ATTRIBUTE_PURE_114833 ATTRIBUTE_PURE
+#else
+# define ATTRIBUTE_PURE_114833 /* empty */
 #endif
 
 #if (__STDC_VERSION__ < 199901 && !defined restrict \
@@ -602,12 +623,8 @@ typedef time_tz tz_time_t;
 
 # undef  asctime
 # define asctime tz_asctime
-# undef  asctime_r
-# define asctime_r tz_asctime_r
 # undef  ctime
 # define ctime tz_ctime
-# undef  ctime_r
-# define ctime_r tz_ctime_r
 # undef  difftime
 # define difftime tz_difftime
 # undef  gmtime
@@ -654,6 +671,12 @@ typedef time_tz tz_time_t;
 # define tzfree tz_tzfree
 # undef  tzset
 # define tzset tz_tzset
+# if SUPPORT_POSIX2008
+#  undef  asctime_r
+#  define asctime_r tz_asctime_r
+#  undef  ctime_r
+#  define ctime_r tz_ctime_r
+# endif
 # if HAVE_STRFTIME_L
 #  undef  strftime_l
 #  define strftime_l tz_strftime_l
@@ -679,10 +702,12 @@ typedef time_tz tz_time_t;
 #  define DEPRECATED_IN_C23 ATTRIBUTE_DEPRECATED
 # endif
 DEPRECATED_IN_C23 char *asctime(struct tm const *);
-char *asctime_r(struct tm const *restrict, char *restrict);
 DEPRECATED_IN_C23 char *ctime(time_t const *);
+#if SUPPORT_POSIX2008
+char *asctime_r(struct tm const *restrict, char *restrict);
 char *ctime_r(time_t const *, char *);
-ATTRIBUTE_UNSEQUENCED double difftime(time_t, time_t);
+#endif
+double difftime(time_t, time_t);
 size_t strftime(char *restrict, size_t, char const *restrict,
 		struct tm const *restrict);
 # if HAVE_STRFTIME_L
@@ -713,7 +738,7 @@ void tzset(void);
 time_t timegm(struct tm *);
 #endif
 
-#if !HAVE_DECL_ASCTIME_R && !defined asctime_r
+#if !HAVE_DECL_ASCTIME_R && !defined asctime_r && SUPPORT_POSIX2008
 extern char *asctime_r(struct tm const *restrict, char *restrict);
 #endif
 
@@ -759,7 +784,7 @@ struct tm *offtime_r(time_t const *, long, struct tm *);
 time_t timelocal(struct tm *);
 # endif
 # if TZ_TIME_T || !defined timeoff
-time_t timeoff(struct tm *, long);
+#  define EXTERN_TIMEOFF
 # endif
 # if TZ_TIME_T || !defined time2posix
 time_t time2posix(time_t);
@@ -771,7 +796,8 @@ time_t posix2time(time_t);
 
 /* Infer TM_ZONE on systems where this information is known, but suppress
    guessing if NO_TM_ZONE is defined.  Similarly for TM_GMTOFF.  */
-#if (defined __GLIBC__ \
+#if (200809 < _POSIX_VERSION \
+     || defined __GLIBC__ \
      || defined __tm_zone /* musl */ \
      || defined __FreeBSD__ || defined __NetBSD__ || defined __OpenBSD__ \
      || (defined __APPLE__ && defined __MACH__))
@@ -800,10 +826,10 @@ timezone_t tzalloc(char const *);
 void tzfree(timezone_t);
 # if STD_INSPIRED
 #  if TZ_TIME_T || !defined posix2time_z
-ATTRIBUTE_REPRODUCIBLE time_t posix2time_z(timezone_t, time_t);
+ATTRIBUTE_PURE time_t posix2time_z(timezone_t, time_t);
 #  endif
 #  if TZ_TIME_T || !defined time2posix_z
-ATTRIBUTE_REPRODUCIBLE time_t time2posix_z(timezone_t, time_t);
+ATTRIBUTE_PURE time_t time2posix_z(timezone_t, time_t);
 #  endif
 # endif
 #endif
@@ -901,6 +927,19 @@ static_assert(! TYPE_SIGNED(time_t) || ! SIGNED_PADDING_CHECK_NEEDED
 # define UNINIT_TRAP 0
 #endif
 
+/* localtime.c sometimes needs access to timeoff if it is not already public.
+   tz_private_timeoff should be used only by localtime.c.  */
+#if (!defined EXTERN_TIMEOFF \
+     && defined TM_GMTOFF && (200809 < _POSIX_VERSION || ! UNINIT_TRAP))
+# ifndef timeoff
+#  define timeoff tz_private_timeoff
+# endif
+# define EXTERN_TIMEOFF
+#endif
+#ifdef EXTERN_TIMEOFF
+time_t timeoff(struct tm *, long);
+#endif
+
 #ifdef DEBUG
 # undef unreachable
 # define unreachable() abort()
@@ -959,6 +998,19 @@ enum {
 #define DAYSPERREPEAT		((int_fast32_t) 400 * 365 + 100 - 4 + 1)
 #define SECSPERREPEAT		((int_fast64_t) DAYSPERREPEAT * SECSPERDAY)
 #define AVGSECSPERYEAR		(SECSPERREPEAT / YEARSPERREPEAT)
+
+/* How many years to generate (in zic.c) or search through (in localtime.c).
+   This is two years larger than the obvious 400, to avoid edge cases.
+   E.g., suppose a rule applies from 2012 on with transitions
+   in March and September, plus one-off transitions in November 2013,
+   and suppose the rule cannot be expressed as a proleptic TZ string.
+   If zic looked only at the last 400 years, it would set max_year=2413,
+   with the intent that the 400 years 2014 through 2413 will be repeated.
+   The last transition listed in the tzfile would be in 2413-09,
+   less than 400 years after the last one-off transition in 2013-11.
+   Two years is not overkill for localtime.c, as a one-year bump
+   would mishandle 2023d's America/Ciudad_Juarez for November 2422.  */
+enum { years_of_observations = YEARSPERREPEAT + 2 };
 
 enum {
   TM_SUNDAY,

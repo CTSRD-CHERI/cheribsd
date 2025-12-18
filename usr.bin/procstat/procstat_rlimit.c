@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -48,7 +47,7 @@
 static struct {
 	const char *name;
 	const char *suffix;
-} rlimit_param[15] = {
+} rlimit_param[] = {
 	{"cputime",          "sec"},
 	{"filesize",         "B  "},
 	{"datasize",         "B  "},
@@ -64,11 +63,11 @@ static struct {
 	{"swapuse",          "B  "},
 	{"kqueues",          "   "},
 	{"umtxp",            "   "},
+	{"pipebuf",          "B  "},
 };
 
-#if RLIM_NLIMITS > 15
-#error "Resource limits have grown. Add new entries to rlimit_param[]."
-#endif
+_Static_assert(nitems(rlimit_param) == RLIM_NLIMITS,
+    "Resource limits have grown. Add new entries to rlimit_param[].");
 
 static const char *
 humanize_rlimit(int indx, rlim_t limit)

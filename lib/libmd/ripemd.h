@@ -62,7 +62,6 @@
 #ifndef HEADER_RIPEMD_H
 #define HEADER_RIPEMD_H
 
-#include <sys/cdefs.h>
 #include <sys/types.h>		/* XXX switch to machine/ansi.h and __ types */
 
 #define RIPEMD160_CBLOCK	64
@@ -110,13 +109,10 @@ __BEGIN_DECLS
 #ifndef RIPEMD160_Data
 #define RIPEMD160_Data		_libmd_RIPEMD160_Data
 #endif
-
 #ifndef RIPEMD160_Transform
-#define RIPEMD160_Transform	_libmd_RIPEMD160_Transform
+#define RIPEMD160_Transform		_libmd_RIPEMD160_Transform
 #endif
-#ifndef RMD160_version
-#define RMD160_version		_libmd_RMD160_version
-#endif
+
 #ifndef ripemd160_block
 #define ripemd160_block		_libmd_ripemd160_block
 #endif

@@ -31,7 +31,6 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-/*$FreeBSD$*/
 
 #ifndef IRDMA_UMAIN_H
 #define IRDMA_UMAIN_H
@@ -97,7 +96,6 @@ struct irdma_cq_buf {
 	LIST_ENTRY(irdma_cq_buf) list;
 	struct irdma_cq_uk cq;
 	struct verbs_mr vmr;
-	size_t buf_size;
 };
 
 extern pthread_mutex_t sigusr1_wait_mutex;
@@ -107,11 +105,6 @@ struct verbs_cq {
 		struct ibv_cq cq;
 		struct ibv_cq_ex cq_ex;
 	};
-};
-
-struct irdma_cmpl_gen {
-	LIST_ENTRY(irdma_cmpl_gen) list;
-	struct irdma_cq_poll_info cpi;
 };
 
 struct irdma_ucq {
@@ -130,7 +123,6 @@ struct irdma_ucq {
 	struct list_head resize_list;
 	/* for extended CQ completion fields */
 	struct irdma_cq_poll_info cur_cqe;
-	struct list_head_cmpl cmpl_generated;
 };
 
 struct irdma_uqp {
@@ -149,8 +141,6 @@ struct irdma_uqp {
 	struct ibv_recv_wr *pend_rx_wr;
 	struct irdma_qp_uk qp;
 	enum ibv_qp_type qp_type;
-	struct irdma_sge *recv_sges;
-	pthread_t flush_thread;
 };
 
 /* irdma_uverbs.c */
@@ -207,5 +197,4 @@ void irdma_async_event(struct ibv_context *context,
 void irdma_set_hw_attrs(struct irdma_hw_attrs *attrs);
 void *irdma_mmap(int fd, off_t offset);
 void irdma_munmap(void *map);
-void *irdma_flush_thread(void *arg);
 #endif /* IRDMA_UMAIN_H */

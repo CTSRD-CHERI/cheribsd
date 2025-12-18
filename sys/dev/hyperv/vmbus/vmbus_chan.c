@@ -26,7 +26,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/callout.h>
@@ -342,8 +341,7 @@ vmbus_chan_open(struct vmbus_channel *chan, int txbr_size, int rxbr_size,
 	 * Allocate the TX+RX bufrings.
 	 */
 	KASSERT(chan->ch_bufring == NULL, ("bufrings are allocated"));
-	chan->ch_bufring_size = txbr_size + rxbr_size;
-	chan->ch_bufring = contigmalloc(chan->ch_bufring_size, M_DEVBUF,
+	chan->ch_bufring = contigmalloc(txbr_size + rxbr_size, M_DEVBUF,
 	    M_WAITOK | M_ZERO, 0ul, ~0ul, PAGE_SIZE, 0);
 	if (chan->ch_bufring == NULL) {
 		vmbus_chan_printf(chan, "bufring allocation failed\n");
@@ -369,8 +367,7 @@ vmbus_chan_open(struct vmbus_channel *chan, int txbr_size, int rxbr_size,
 			    "leak %d bytes memory\n", chan->ch_id,
 			    txbr_size + rxbr_size);
 		} else {
-			contigfree(chan->ch_bufring, chan->ch_bufring_size,
-			    M_DEVBUF);
+			free(chan->ch_bufring, M_DEVBUF);
 		}
 		chan->ch_bufring = NULL;
 	}
@@ -940,7 +937,7 @@ disconnect:
 	 * Destroy the TX+RX bufrings.
 	 */
 	if (chan->ch_bufring != NULL) {
-		contigfree(chan->ch_bufring, chan->ch_bufring_size, M_DEVBUF);
+		free(chan->ch_bufring, M_DEVBUF);
 		chan->ch_bufring = NULL;
 	}
 	return (error);
@@ -1195,6 +1192,7 @@ vmbus_chan_recv(struct vmbus_channel *chan, void *data, int *dlen0,
 {
 	struct vmbus_chanpkt_hdr pkt;
 	int error, dlen, hlen;
+	boolean_t sig_event;
 
 	error = vmbus_rxbr_peek(&chan->ch_rxbr, &pkt, sizeof(pkt));
 	if (error)
@@ -1225,8 +1223,11 @@ vmbus_chan_recv(struct vmbus_channel *chan, void *data, int *dlen0,
 	*dlen0 = dlen;
 
 	/* Skip packet header */
-	error = vmbus_rxbr_read(&chan->ch_rxbr, data, dlen, hlen);
+	error = vmbus_rxbr_read(&chan->ch_rxbr, data, dlen, hlen, &sig_event);
 	KASSERT(!error, ("vmbus_rxbr_read failed"));
+
+	if (!error && sig_event)
+		vmbus_chan_signal_rx(chan);
 
 	return (0);
 }
@@ -1236,6 +1237,7 @@ vmbus_chan_recv_pkt(struct vmbus_channel *chan,
     struct vmbus_chanpkt_hdr *pkt, int *pktlen0)
 {
 	int error, pktlen, pkt_hlen;
+	boolean_t sig_event;
 
 	pkt_hlen = sizeof(*pkt);
 	error = vmbus_rxbr_peek(&chan->ch_rxbr, pkt, pkt_hlen);
@@ -1267,8 +1269,11 @@ vmbus_chan_recv_pkt(struct vmbus_channel *chan,
 	 * by the above vmbus_rxbr_peek().
 	 */
 	error = vmbus_rxbr_read(&chan->ch_rxbr, pkt + 1,
-	    pktlen - pkt_hlen, pkt_hlen);
+	    pktlen - pkt_hlen, pkt_hlen, &sig_event);
 	KASSERT(!error, ("vmbus_rxbr_read failed"));
+
+	if (!error && sig_event)
+		vmbus_chan_signal_rx(chan);
 
 	return (0);
 }
@@ -1662,7 +1667,7 @@ vmbus_chan_free(struct vmbus_channel *chan)
 	KASSERT(chan->ch_poll_intvl == 0, ("chan%u: polling is activated",
 	    chan->ch_id));
 
-	contigfree(chan->ch_monprm, sizeof(struct hyperv_mon_param), M_DEVBUF);
+	free(chan->ch_monprm, M_DEVBUF);
 	mtx_destroy(&chan->ch_subchan_lock);
 	sx_destroy(&chan->ch_orphan_lock);
 	vmbus_rxbr_deinit(&chan->ch_rxbr);

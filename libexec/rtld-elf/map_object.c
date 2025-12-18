@@ -51,7 +51,7 @@
 
 #include "debug.h"
 #include "rtld.h"
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#ifdef CHERI_LIB_C18N
 #include "rtld_c18n.h"
 #endif
 
@@ -76,7 +76,8 @@ phdr_in_zero_page(const Elf_Ehdr *hdr)
  * for the shared object.  Returns NULL on failure.
  */
 Obj_Entry *
-map_object(int fd, const char *path, const struct stat *sb, const char* main_path)
+map_object(int fd, const char *path, const struct stat *sb, bool ismain,
+    const char *main_path)
 {
     Obj_Entry *obj;
     Elf_Ehdr *hdr;
@@ -111,17 +112,11 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 #ifndef __CHERI_PURE_CAPABILITY__
     Elf_Word stack_flags;
 #endif
-    Elf_Addr relro_page;
-    size_t relro_size;
     caddr_t note_start;
     caddr_t note_end;
     char *note_map;
     size_t note_map_len;
     Elf_Addr text_end;
-#ifdef __CHERI_PURE_CAPABILITY__
-    Elf_Addr text_rodata_start_offset = 0;
-    Elf_Addr text_rodata_end_offset = 0;
-#endif
 
     hdr = get_elf_header(fd, path, sb, main_path, &phdr);
     if (hdr == NULL)
@@ -136,8 +131,6 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     nsegs = -1;
     phdyn = phinterp = phtls = NULL;
     phdr_vaddr = 0;
-    relro_page = 0;
-    relro_size = 0;
     note_start = 0;
     note_end = 0;
     note_map = NULL;
@@ -161,16 +154,6 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 		    path, nsegs);
 		goto error;
 	    }
-#ifdef __CHERI_PURE_CAPABILITY__
-	    if (!(segs[nsegs]->p_flags & PF_W)) {
-		Elf_Addr start_addr = segs[nsegs]->p_vaddr;
-		text_rodata_start_offset = rtld_min(start_addr, text_rodata_start_offset);
-		text_rodata_end_offset = rtld_max(start_addr + segs[nsegs]->p_memsz, text_rodata_end_offset);
-		dbg("%s: processing readonly PT_LOAD[%d], new text/rodata start "
-		    " = %zx text/rodata end = %zx", path, nsegs,
-		    (size_t)text_rodata_start_offset, (size_t)text_rodata_end_offset);
-	    }
-#endif
 	    if ((segs[nsegs]->p_flags & PF_X) == PF_X) {
 		text_end = MAX(text_end,
 		    rtld_round_page(segs[nsegs]->p_vaddr +
@@ -199,18 +182,6 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	    }
 #else
 	    stack_flags = phdr->p_flags;
-#endif
-	    break;
-
-	case PT_GNU_RELRO:
-	    relro_page = phdr->p_vaddr;
-	    relro_size = phdr->p_memsz;
-#ifdef __CHERI_PURE_CAPABILITY__
-	    text_rodata_start_offset = rtld_min(phdr->p_vaddr, text_rodata_start_offset);
-	    text_rodata_end_offset = rtld_max(phdr->p_vaddr + phdr->p_memsz, text_rodata_end_offset);
-	    dbg("%s: Adding PT_GNU_RELRO, new text/rodata start "
-		" = %zx text/rodata end = %zx", path,
-		(size_t)text_rodata_start_offset, (size_t)text_rodata_end_offset);
 #endif
 	    break;
 
@@ -278,9 +249,6 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	    base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL), base_flags);
     mapbase = mmap(base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL),
 	base_flags, -1, 0);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    mapbase = cheri_clearperm(mapbase, CHERI_PERM_EXECUTIVE);
-#endif
     if (mapbase == MAP_FAILED) {
 	_rtld_error("%s: mmap of entire address space failed: %s",
 	  path, rtld_strerror(errno));
@@ -304,12 +272,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	data_vlimit = rtld_round_page(segs[i]->p_vaddr + segs[i]->p_filesz);
 	data_addr = mapbase + (data_vaddr - base_vaddr);
 	data_prot = convert_prot(segs[i]->p_flags);
-	/*
-	 * Set MAP_CHERI_NOSETBOUNDS to avoid the need for a precisely
-	 * representable region. We already have a valid capability and only
-	 * want to check if mapping from the file (MAP_ANON for bss) succeeded.
-	 */
-	data_flags = convert_flags(segs[i]->p_flags) | MAP_FIXED | MAP_CHERI_NOSETBOUNDS;
+	data_flags = convert_flags(segs[i]->p_flags) | MAP_FIXED;
 	dbg("Mapping %s PT_LOAD(%d) with flags 0x%x at %p", path, i,
 	    segs[i]->p_flags, data_addr, data_vlimit);
 
@@ -384,24 +347,10 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	rtld_fdprintf(STDERR_FILENO, "%s: nonzero vaddrbase %zd may be broken "
 	    "for CheriABI", path, obj->vaddrbase);
     }
-    obj->text_rodata_start_offset = text_rodata_start_offset;
-    obj->text_rodata_end_offset = text_rodata_end_offset;
-    /*
-     * Note: no csetbounds yet since we also need to include .cap_table (which
-     * is part of the r/w section). Bounds are set after .dynamic is read.
-     */
     obj->text_rodata_cap = obj->relocbase;
     fix_obj_mapping_cap_permissions(obj, path);
 #endif
     obj->dynamic = (const Elf_Dyn *)(obj->relocbase + phdyn->p_vaddr);
-    if (hdr->e_entry != 0) {
-#ifdef __CHERI_PURE_CAPABILITY__
-	obj->entry = (const void*)(obj->text_rodata_cap + hdr->e_entry);
-	dbg("\tentry for %s: %-#p", path, obj->entry);
-#else
-	obj->entry = (const void*)(obj->relocbase + hdr->e_entry);
-#endif
-    }
     if (phdr_vaddr != 0) {
 	obj->phdr = (const Elf_Phdr *)(obj->relocbase + phdr_vaddr);
     } else {
@@ -418,20 +367,34 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     if (phinterp != NULL)
 	obj->interp = (const char *)(obj->relocbase + phinterp->p_vaddr);
     if (phtls != NULL) {
-	tls_dtv_generation++;
-	obj->tlsindex = ++tls_max_index;
+	if (ismain)
+	    obj->tlsindex = 1;
+	else {
+	    tls_dtv_generation++;
+	    obj->tlsindex = ++tls_max_index;
+	}
 	obj->tlssize = phtls->p_memsz;
 	obj->tlsalign = phtls->p_align;
 	obj->tlspoffset = phtls->p_offset;
 	obj->tlsinitsize = phtls->p_filesz;
 	obj->tlsinit = mapbase + phtls->p_vaddr;
     }
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI_PURE_CAPABILITY__
+    if (!create_pcc_caps(obj, path)) {
+	obj_free(obj);
+	goto error1;
+    }
+#else
     obj->stack_flags = stack_flags;
 #endif
-    obj->relro_page = obj->relocbase + rtld_trunc_page(relro_page);
-    obj->relro_size = rtld_trunc_page(relro_page + relro_size) -
-      rtld_trunc_page(relro_page);
+    if (hdr->e_entry != 0) {
+#ifdef __CHERI_PURE_CAPABILITY__
+	obj->entry = (const void *)pcc_cap(obj, hdr->e_entry);
+	dbg("\tentry for %s: %-#p", path, obj->entry);
+#else
+	obj->entry = (const void *)(obj->relocbase + hdr->e_entry);
+#endif
+    }
     if (note_start < note_end)
 	digest_notes(obj, (const Elf_Note *)note_start, (const Elf_Note *)note_end);
     if (note_map != NULL)
@@ -584,10 +547,20 @@ obj_free(Obj_Entry *obj)
 	free(obj->origin_path);
     if (obj->z_origin)
 	free(__DECONST(void*, obj->rpath));
+    if (obj->plts)
+	free(obj->plts);
     if (obj->priv)
 	free(obj->priv);
     if (obj->path)
 	free(obj->path);
+#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CHERI_LIB_C18N
+    if (obj->comparts)
+	free(obj->comparts);
+#endif
+    if (obj->pcc_caps)
+	free(obj->pcc_caps);
+#endif
     if (obj->phdr_alloc)
 	free(__DECONST(void *, obj->phdr));
     free(obj);

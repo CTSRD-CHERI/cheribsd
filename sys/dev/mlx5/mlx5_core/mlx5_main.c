@@ -26,6 +26,7 @@
 
 #include "opt_rss.h"
 #include "opt_ratelimit.h"
+#include "opt_ipsec.h"
 
 #include <linux/kmod.h>
 #include <linux/module.h>
@@ -52,8 +53,12 @@
 #include <dev/mlx5/mlx5_core/diag_cnt.h>
 #ifdef PCI_IOV
 #include <sys/nv.h>
+#include <sys/socket.h>
 #include <dev/pci/pci_iov.h>
 #include <sys/iov_schema.h>
+#include <sys/iov.h>
+#include <net/if.h>
+#include <net/if_vlan_var.h>
 #endif
 
 static const char mlx5_version[] = "Mellanox Core driver "
@@ -63,6 +68,9 @@ MODULE_LICENSE("Dual BSD/GPL");
 MODULE_DEPEND(mlx5, linuxkpi, 1, 1, 1);
 MODULE_DEPEND(mlx5, mlxfw, 1, 1, 1);
 MODULE_DEPEND(mlx5, firmware, 1, 1, 1);
+#ifdef IPSEC_OFFLOAD
+MODULE_DEPEND(mlx5, ipsec, 1, 1, 1);
+#endif
 MODULE_VERSION(mlx5, 1);
 
 SYSCTL_NODE(_hw, OID_AUTO, mlx5, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
@@ -225,6 +233,7 @@ static void mlx5_set_driver_version(struct mlx5_core_dev *dev)
 
 #ifdef PCI_IOV
 static const char iov_mac_addr_name[] = "mac-addr";
+static const char iov_vlan_name[] = "vlan";
 static const char iov_node_guid_name[] = "node-guid";
 static const char iov_port_guid_name[] = "port-guid";
 #endif
@@ -557,6 +566,19 @@ static int handle_hca_cap_atomic(struct mlx5_core_dev *dev)
 
 	kfree(set_ctx);
 	return err;
+}
+
+static int handle_hca_cap_2(struct mlx5_core_dev *dev)
+{
+	int err;
+
+	if (MLX5_CAP_GEN_MAX(dev, hca_cap_2)) {
+		err = mlx5_core_get_caps(dev, MLX5_CAP_GENERAL_2);
+		if (err)
+			return err;
+	}
+
+	return 0;
 }
 
 static int set_hca_ctrl(struct mlx5_core_dev *dev)
@@ -1139,6 +1161,12 @@ static int mlx5_load_one(struct mlx5_core_dev *dev, struct mlx5_priv *priv,
 		goto reclaim_boot_pages;
 	}
 
+	err = handle_hca_cap_2(dev);
+	if (err) {
+		mlx5_core_err(dev, "handle_hca_cap_2 failed\n");
+		goto reclaim_boot_pages;
+	}
+
 	err = mlx5_satisfy_startup_pages(dev, 0);
 	if (err) {
 		mlx5_core_err(dev, "failed to allocate init pages\n");
@@ -1185,7 +1213,7 @@ static int mlx5_load_one(struct mlx5_core_dev *dev, struct mlx5_priv *priv,
 		goto err_stop_eqs;
 	}
 
-	err = mlx5_init_fs(dev);
+	err = mlx5_fs_core_init(dev);
 	if (err) {
 		mlx5_core_err(dev, "flow steering init %d\n", err);
 		goto err_free_comp_eqs;
@@ -1303,7 +1331,7 @@ static int mlx5_unload_one(struct mlx5_core_dev *dev, struct mlx5_priv *priv,
 	mlx5_diag_cnt_cleanup(dev);
 	mlx5_fpga_device_stop(dev);
 	mlx5_mpfs_destroy(dev);
-	mlx5_cleanup_fs(dev);
+	mlx5_fs_core_cleanup(dev);
 	mlx5_wait_for_reclaim_vfs_pages(dev);
 	free_comp_eqs(dev);
 	mlx5_stop_eqs(dev);
@@ -1670,10 +1698,16 @@ static int init_one(struct pci_dev *pdev,
 
 	mlx5_pagealloc_init(dev);
 
+	err = mlx5_fs_core_alloc(dev);
+	if (err) {
+		mlx5_core_err(dev, "Failed to alloc flow steering\n");
+		goto clean_health;
+	}
+
 	err = mlx5_load_one(dev, priv, true);
 	if (err) {
 		mlx5_core_err(dev, "mlx5_load_one failed %d\n", err);
-		goto clean_health;
+		goto clean_fs;
 	}
 
 	mlx5_fwdump_prep(dev);
@@ -1695,12 +1729,16 @@ static int init_one(struct pci_dev *pdev,
 			vf_schema = pci_iov_schema_alloc_node();
 			pci_iov_schema_add_unicast_mac(vf_schema,
 			    iov_mac_addr_name, 0, NULL);
+			pci_iov_schema_add_vlan(vf_schema,
+			    iov_vlan_name, 0, 0);
 			pci_iov_schema_add_uint64(vf_schema, iov_node_guid_name,
 			    0, 0);
 			pci_iov_schema_add_uint64(vf_schema, iov_port_guid_name,
 			    0, 0);
 			err = pci_iov_attach(bsddev, pf_schema, vf_schema);
-			if (err != 0) {
+			if (err == 0) {
+				dev->iov_pf = true;
+			} else {
 				device_printf(bsddev,
 			    "Failed to initialize SR-IOV support, error %d\n",
 				    err);
@@ -1715,6 +1753,8 @@ static int init_one(struct pci_dev *pdev,
 	pci_save_state(pdev);
 	return 0;
 
+clean_fs:
+	mlx5_fs_core_free(dev);
 clean_health:
 	mlx5_pagealloc_cleanup(dev);
 	mlx5_health_cleanup(dev);
@@ -1734,8 +1774,11 @@ static void remove_one(struct pci_dev *pdev)
 	struct mlx5_priv *priv = &dev->priv;
 
 #ifdef PCI_IOV
-	pci_iov_detach(pdev->dev.bsddev);
-	mlx5_eswitch_disable_sriov(priv->eswitch);
+	if (dev->iov_pf) {
+		pci_iov_detach(pdev->dev.bsddev);
+		mlx5_eswitch_disable_sriov(priv->eswitch);
+		dev->iov_pf = false;
+	}
 #endif
 
 	if (mlx5_unload_one(dev, priv, true)) {
@@ -1743,6 +1786,7 @@ static void remove_one(struct pci_dev *pdev)
 		    (long long)(dev->priv.fw_pages * MLX5_ADAPTER_PAGE_SIZE));
 	}
 
+	mlx5_fs_core_free(dev);
 	mlx5_pagealloc_cleanup(dev);
 	mlx5_health_cleanup(dev);
 	mlx5_fwdump_clean(dev);
@@ -1922,6 +1966,25 @@ mlx5_iov_add_vf(device_t dev, uint16_t vfnum, const nvlist_t *vf_config)
 		if (error != 0) {
 			mlx5_core_err(core_dev,
 			    "setting MAC for VF %d failed, error %d\n",
+			    vfnum + 1, error);
+		}
+	}
+
+	if (nvlist_exists_number(vf_config, iov_vlan_name)) {
+		uint16_t vlan = nvlist_get_number(vf_config, iov_vlan_name);
+
+		if (vlan == DOT1Q_VID_NULL)
+			error = ENOTSUP;
+		else {
+			if (vlan == VF_VLAN_TRUNK)
+				vlan = DOT1Q_VID_NULL;
+
+			error = -mlx5_eswitch_set_vport_vlan(priv->eswitch,
+			    vfnum + 1, vlan, 0);
+		}
+		if (error != 0) {
+			mlx5_core_err(core_dev,
+			    "setting VLAN for VF %d failed, error %d\n",
 			    vfnum + 1, error);
 		}
 	}

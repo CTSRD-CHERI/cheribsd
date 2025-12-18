@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)paths.h	8.1 (Berkeley) 6/2/93
  */
 
 #ifndef _PATHS_H_
@@ -69,7 +67,6 @@
 #define	_PATH_FIRMWARE	"/usr/share/firmware"
 #define	_PATH_FTPUSERS	"/etc/ftpusers"
 #define	_PATH_FWMEM	"/dev/fwmem"
-#define	_PATH_GBDE	"/sbin/gbde"
 #define	_PATH_GELI	"/sbin/geli"
 #define	_PATH_HALT	"/sbin/halt"
 #ifdef COMPAT_libcompat
@@ -98,6 +95,7 @@
 #define	_PATH_SENDMAIL	"/usr/sbin/sendmail"
 #define	_PATH_SHELLS	"/etc/shells"
 #define	_PATH_TTY	"/dev/tty"
+#define	_PATH_TUNEFS	"/sbin/tunefs"
 #define	_PATH_UNIX	"don't use _PATH_UNIX"
 #define	_PATH_UFSSUSPEND	"/dev/ufssuspend"
 #define	_PATH_VI	"/usr/bin/vi"
@@ -147,6 +145,8 @@ __END_DECLS
 #define	_PATH_REBOOT	"/rescue/reboot"
 #undef	_PATH_RM
 #define	_PATH_RM	"/rescue/rm"
+#undef	_PATH_TUNEFS
+#define	_PATH_TUNEFS	"/rescue/tunefs"
 #undef	_PATH_VI
 #define	_PATH_VI	"/rescue/vi"
 #undef	_PATH_WALL

@@ -637,8 +637,8 @@ retry:
 
 		l1p = smmu_pmap_l1(pmap, va);
 		l2p = smmu_pmap_l2(pmap, va);
-		cpu_dcache_wb_range((vm_pointer_t)l1p, sizeof(pd_entry_t));
-		cpu_dcache_wb_range((vm_pointer_t)l2p, sizeof(pd_entry_t));
+		cpu_dcache_wb_range(l1p, sizeof(pd_entry_t));
+		cpu_dcache_wb_range(l2p, sizeof(pd_entry_t));
 
 		goto retry;
 	}
@@ -649,7 +649,7 @@ retry:
 	/* New mapping */
 	smmu_pmap_store(l3, new_l3);
 
-	cpu_dcache_wb_range((vm_pointer_t)l3, sizeof(pt_entry_t));
+	cpu_dcache_wb_range(l3, sizeof(pt_entry_t));
 
 	smmu_pmap_resident_count_inc(pmap, 1);
 	dsb(ishst);
@@ -686,7 +686,7 @@ pmap_gpu_remove(struct smmu_pmap *pmap, vm_offset_t va)
 
 	smmu_pmap_resident_count_dec(pmap, 1);
 	smmu_pmap_clear(pte);
-	cpu_dcache_wb_range((vm_pointer_t)pte, sizeof(pt_entry_t));
+	cpu_dcache_wb_range(pte, sizeof(pt_entry_t));
 	rc = KERN_SUCCESS;
 
 out:
@@ -713,7 +713,7 @@ smmu_pmap_enter(struct smmu_pmap *pmap, vm_offset_t va, vm_paddr_t pa,
 	KASSERT(va < VM_MAXUSER_ADDRESS, ("wrong address space"));
 
 	va = trunc_page(va);
-	new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT |
+	new_l3 = (pt_entry_t)(pa | ATTR_AF | ATTR_SH(ATTR_SH_IS) |
 	    ATTR_S1_IDX(VM_MEMATTR_DEVICE) | IOMMU_L3_PAGE);
 	if ((prot & VM_PROT_WRITE) == 0)
 		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);

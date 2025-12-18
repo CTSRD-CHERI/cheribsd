@@ -1,6 +1,6 @@
 #NO_UNIVERSE
 
 include "CHERI-SPIKE"
-include "../../conf/std.nodebug"
+include "std.nodebug"
 
 ident CHERI-SPIKE-NODEBUG

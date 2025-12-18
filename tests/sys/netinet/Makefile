@@ -1,4 +1,3 @@
-
 PACKAGE=	tests
 
 TESTSDIR=	${TESTSBASE}/sys/netinet
@@ -7,11 +6,13 @@ BINDIR=		${TESTSDIR}
 TESTS_SUBDIRS+=	libalias
 
 ATF_TESTS_C=	ip_reass_test \
+		ip6_v4mapped_test \
 		so_reuseport_lb_test \
 		socket_afinet \
-		tcp6_v4mapped_bind_test \
 		tcp_connect_port_test \
-		tcp_md5_getsockopt
+		tcp_implied_connect \
+		tcp_md5_getsockopt \
+		udp_io
 
 ATF_TESTS_SH=	arp \
 		carp \
@@ -24,9 +25,17 @@ ATF_TESTS_SH=	arp \
 		redirect
 
 ATF_TESTS_PYTEST+=	carp.py
+ATF_TESTS_PYTEST+=	igmp.py
 
-TEST_METADATA.divert+=	required_programs="python"
-TEST_METADATA.forward+=	required_programs="python"
+# Some of the arp tests look for log messages in the dmesg buffer, so run them
+# serially to avoid problems with interleaved output.
+TEST_METADATA.arp+=	is_exclusive="true"
+TEST_METADATA.divert+=	required_programs="python"	\
+			execenv="jail"			\
+			execenv_jail_params="vnet allow.raw_sockets"
+TEST_METADATA.forward+=	required_programs="python"	\
+			execenv="jail"			\
+			execenv_jail_params="vnet allow.raw_sockets"
 TEST_METADATA.output+=	required_programs="python"
 TEST_METADATA.redirect+= required_programs="python"
 TEST_METADATA.tcp6_v4mapped_bind_test+=	is_exclusive="true"

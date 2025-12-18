@@ -51,7 +51,7 @@
  *                        xnb0
  *                        xnb1
  */
-#include <sys/cdefs.h>
+
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -622,7 +622,7 @@ xenbusb_nop_confighook_cb(void *arg __unused)
 /*--------------------------- Public Functions -------------------------------*/
 /*--------- API comments for these methods can be found in xenbusb.h ---------*/
 void
-xenbusb_identify(driver_t *driver __unused, device_t parent)
+xenbusb_identify(driver_t *driver, device_t parent)
 {
 	/*
 	 * A single instance of each bus type for which we have a driver
@@ -716,7 +716,7 @@ xenbusb_add_device(device_t dev, const char *type, const char *id)
 		xbs->xbs_connecting_children++;
 		mtx_unlock(&xbs->xbs_lock);
 
-		child = device_add_child(dev, NULL, -1);
+		child = device_add_child(dev, NULL, DEVICE_UNIT_ANY);
 		ivars->xd_dev = child;
 		device_set_ivars(child, ivars);
 	}

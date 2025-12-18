@@ -65,40 +65,6 @@ METHOD int search_symbol {
 };
 
 #
-# Lookup a symbol by index rather than name.  If the symbol is not
-# found then return ENOENT, otherwise zero.
-#
-# Useful for processing relocations.
-#
-METHOD int symidx_address {
-	linker_file_t	file;
-	unsigned long	index;
-	int		deps;
-	ptraddr_t	*address;
-};
-
-CODE {
-	#ifdef __CHERI_PURE_CAPABILITY__
-};
-HEADER {
-	#ifdef __CHERI_PURE_CAPABILITY__
-};
-
-METHOD int symidx_capability {
-	linker_file_t	file;
-	unsigned long	index;
-	int		deps;
-	uintcap_t	*cap;
-};
-
-CODE {
-	#endif
-};
-HEADER {
-	#endif
-};
-
-#
 # Call the callback with each specified function defined in the file.
 # Stop and return the error if the callback returns an error.
 #
@@ -150,6 +116,29 @@ METHOD int ctf_get {
 };
 
 #
+# Look up a CTF type in the file's CTF section
+# and return CTF info in the linker CTF structure.
+# Return ENOENT if typename is not found, otherwise zero.
+#
+METHOD int ctf_lookup_typename {
+  linker_file_t file;
+  linker_ctf_t *lc;
+  const char *typename;
+};
+
+#
+# Lookup a symbol in the file's symbol table and the file's CTF info.
+# Return ENOENT if either the symbol or its CTF
+# data is not loaded, otherwise return zero.
+#
+METHOD int lookup_debug_symbol_ctf {
+  linker_file_t file;
+  const char *name;
+  c_linker_sym_t *sym;
+  linker_ctf_t *lc;
+};
+
+#
 # Get the symbol table, returning it in **symtab.  Return the 
 # number of symbols, otherwise zero.
 #
@@ -188,6 +177,15 @@ STATICMETHOD int link_preload {
 METHOD int link_preload_finish {
     linker_file_t	file;
 };
+
+#ifdef VIMAGE
+#
+# Propagate system tunable values to all vnets.
+#
+METHOD void propagate_vnets {
+	linker_file_t	file;
+};
+#endif
 # CHERI CHANGES START
 # {
 #   "updated": 20230509,

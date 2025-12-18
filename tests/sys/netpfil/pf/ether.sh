@@ -286,7 +286,7 @@ captive_body()
 
 	# Run the echo server only on the gw, so we know we've redirectly
 	# correctly if we get an echo message.
-	jexec gw /usr/sbin/inetd $(atf_get_srcdir)/echo_inetd.conf
+	jexec gw /usr/sbin/inetd -p ${PWD}/echo_inetd.pid $(atf_get_srcdir)/echo_inetd.conf
 
 	# Confirm that we're getting redirected
 	atf_check -s exit:0 -o match:"^foo$" -x "echo foo | nc -N 198.51.100.2 7"
@@ -304,7 +304,7 @@ captive_body()
 	atf_check -s exit:1 -x "echo foo | nc -N 198.51.100.2 7"
 
 	# Start a server in srv
-	jexec srv /usr/sbin/inetd $(atf_get_srcdir)/echo_inetd.conf
+	jexec srv /usr/sbin/inetd -p ${PWD}/echo_inetd.pid $(atf_get_srcdir)/echo_inetd.conf
 
 	# And now we can talk to that one.
 	atf_check -s exit:0 -o match:"^foo$" -x "echo foo | nc -N 198.51.100.2 7"
@@ -362,8 +362,8 @@ captive_long_body()
 	# ICMP should still work, because we don't redirect it.
 	atf_check -s exit:0 -o ignore ping -c 1 -t 1 198.51.100.2
 
-	jexec gw /usr/sbin/inetd -p gw.pid $(atf_get_srcdir)/echo_inetd.conf
-	jexec srv /usr/sbin/inetd -p srv.pid $(atf_get_srcdir)/daytime_inetd.conf
+	jexec gw /usr/sbin/inetd -p ${PWD}/gw.pid $(atf_get_srcdir)/echo_inetd.conf
+	jexec srv /usr/sbin/inetd -p ${PWD}/srv.pid $(atf_get_srcdir)/daytime_inetd.conf
 
 	echo foo | nc -N 198.51.100.2 13
 
@@ -415,7 +415,7 @@ dummynet_body()
 	# Sanity check
 	atf_check -s exit:0 -o ignore ping -i .1 -c 3 -s 1200 192.0.2.2
 
-	jexec alcatraz dnctl pipe 1 config bw 30Byte/s
+	jexec alcatraz dnctl pipe 1 config bw 300Byte/s
 	jexec alcatraz pfctl -e
 	pft_set_rules alcatraz \
 		"ether pass in dnpipe 1"
@@ -430,14 +430,14 @@ dummynet_body()
 	ping -i .1 -c 5 -s 1200 192.0.2.2
 
 	# We should now be hitting the limits and get this packet dropped.
-	atf_check -s exit:2 -o ignore ping -c 1 -s 1200 192.0.2.2
+	atf_check -s exit:2 -o ignore ping -c 1 -t 1 -s 1200 192.0.2.2
 
 	# We can now also dummynet outbound traffic!
 	pft_set_rules alcatraz \
 		"ether pass out dnpipe 1"
 
 	# We should still be hitting the limits and get this packet dropped.
-	atf_check -s exit:2 -o ignore ping -c 1 -s 1200 192.0.2.2
+	atf_check -s exit:2 -o ignore ping -c 1 -t 1 -s 1200 192.0.2.2
 }
 
 dummynet_cleanup()

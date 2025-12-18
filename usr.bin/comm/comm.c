@@ -32,19 +32,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char copyright[] =
-"@(#) Copyright (c) 1989, 1993, 1994\n\
-	The Regents of the University of California.  All rights reserved.\n";
-#endif
-
-#if 0
-#ifndef lint
-static char sccsid[] = "From: @(#)comm.c	8.4 (Berkeley) 5/4/95";
-#endif
-#endif
-
-#include <sys/cdefs.h>
 #include <err.h>
 #include <limits.h>
 #include <locale.h>
@@ -142,12 +129,12 @@ main(int argc, char *argv[])
 
 		/* if one file done, display the rest of the other file */
 		if (n1 < 0) {
-			if (n2 >= 0 && col2 != NULL)
+			if (n2 >= 0)
 				show(fp2, argv[1], col2, &line2, &line2len);
 			break;
 		}
 		if (n2 < 0) {
-			if (n1 >= 0 && col1 != NULL)
+			if (n1 >= 0)
 				show(fp1, argv[0], col1, &line1, &line1len);
 			break;
 		}
@@ -185,6 +172,8 @@ main(int argc, char *argv[])
 				(void)printf("%s%s\n", col2, line2);
 		}
 	}
+	if (ferror(stdout) != 0 || fflush(stdout) != 0)
+		err(1, "stdout");
 	exit(0);
 }
 
@@ -217,10 +206,12 @@ show(FILE *fp, const char *fn, const char *offset, char **bufp, size_t *buflenp)
 	ssize_t n;
 
 	do {
-		(void)printf("%s%s\n", offset, *bufp);
+		/* offset is NULL when draining fp, not printing */
+		if (offset != NULL)
+			(void)printf("%s%s\n", offset, *bufp);
 		if ((n = getline(bufp, buflenp, fp)) < 0)
 			break;
-		if (n > 0 && (*bufp)[n - 1] == '\n')
+		if (n > 0 && offset != NULL && (*bufp)[n - 1] == '\n')
 			(*bufp)[n - 1] = '\0';
 	} while (1);
 	if (ferror(fp))

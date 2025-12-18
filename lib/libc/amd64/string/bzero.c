@@ -2,8 +2,9 @@
  * Public domain.
  */
 
-#include <sys/cdefs.h>
 #include <string.h>
+
+#undef bzero	/* _FORTIFY_SOURCE */
 
 void
 bzero(void *b, size_t len)

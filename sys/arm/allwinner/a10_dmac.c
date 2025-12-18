@@ -29,7 +29,6 @@
  * Allwinner A10/A20 DMA controller
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -46,7 +45,7 @@
 #include <dev/ofw/ofw_bus_subr.h>
 
 #include <arm/allwinner/a10_dmac.h>
-#include <dev/extres/clk/clk.h>
+#include <dev/clk/clk.h>
 
 #include "sunxi_dma_if.h"
 

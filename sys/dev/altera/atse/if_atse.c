@@ -580,7 +580,7 @@ atse_get_eth_address(struct atse_softc *sc)
 	sc->atse_eth_addr[4] = atse_ethernet_option_bits[8];
 	sc->atse_eth_addr[5] = atse_ethernet_option_bits[9];
 
-	/* Handle factory default ethernet addresss: 00:07:ed:ff:ed:15 */
+	/* Handle factory default ethernet address: 00:07:ed:ff:ed:15 */
 	if (sc->atse_eth_addr[0] == 0x00 && sc->atse_eth_addr[1] == 0x07 &&
 	    sc->atse_eth_addr[2] == 0xed && sc->atse_eth_addr[3] == 0xff &&
 	    sc->atse_eth_addr[4] == 0xed && sc->atse_eth_addr[5] == 0x15) {
@@ -1372,11 +1372,6 @@ atse_attach(device_t dev)
 
 	/* Setup interface. */
 	ifp = sc->atse_ifp = if_alloc(IFT_ETHER);
-	if (ifp == NULL) {
-		device_printf(dev, "if_alloc() failed\n");
-		error = ENOSPC;
-		goto err;
-	}
 	if_setsoftc(ifp, sc);
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	if_setflags(ifp, IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);

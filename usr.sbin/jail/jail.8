@@ -23,32 +23,45 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd March 12, 2023
+.Dd September 19, 2024
 .Dt JAIL 8
 .Os
 .Sh NAME
 .Nm jail
 .Nd "manage system jails"
 .Sh SYNOPSIS
+.Ss From Configuration File
 .Nm
+.Op Fl cm
+.Op Fl Cdqv
+.Op Fl f Ar conf_file
+.Op Fl p Ar limit
+.Op Ar jail
+.Nm
+.Op Fl r
+.Op Fl Cqv
+.Op Fl f Ar conf_file
+.Op Fl p Ar limit
+.Op Cm * | Ar jail ...
+.Ss Without Configuration File
+.Nm
+.Op Fl cm
 .Op Fl dhilqv
 .Op Fl J Ar jid_file
 .Op Fl u Ar username
 .Op Fl U Ar username
-.Op Fl cmr
 .Ar param Ns = Ns Ar value ...
 .Op Cm command Ns = Ns Ar command ...
 .Nm
-.Op Fl dqv
-.Op Fl f Ar conf_file
-.Op Fl p Ar limit
-.Op Fl cmr
-.Op Ar jail
-.Nm
-.Op Fl qv
-.Op Fl f Ar conf_file
 .Op Fl rR
+.Op Fl qv
 .Op Cm * | Ar jail ...
+.Ss Show Parameters
+.Nm
+.Op Fl f Ar conf_file
+.Fl e
+.Ar separator
+.Ss Backward Compatibility
 .Nm
 .Op Fl dhilqv
 .Op Fl J Ar jid_file
@@ -58,10 +71,6 @@
 .Op Fl s Ar securelevel
 .Ar path hostname ip Ns Op Cm \&, Ns Ar ...
 .Ar command ...
-.Nm
-.Op Fl f Ar conf_file
-.Fl e
-.Ar separator
 .Sh DESCRIPTION
 The
 .Nm
@@ -135,10 +144,9 @@ jail if it does exist.
 .Pp
 Other available options are:
 .Bl -tag -width indent
-.It Fl d
-Allow making changes to a dying jail, equivalent to the
-.Va allow.dying
-parameter.
+.It Fl C
+Clean up after an already-removed jail, running commands and operations
+that are typically run following jail removal.
 .It Fl f Ar conf_file
 Use configuration file
 .Ar conf_file
@@ -206,6 +214,17 @@ parameter.
 .It Fl v
 Print a message on every operation, such as running commands and
 mounting filesystems.
+.It Fl d
+This is deprecated and is equivalent to the
+.Va allow.dying
+parameter, which is also deprecated.
+It used to allow making changes to a
+.Va dying
+jail.
+Now such jails are always replaced when a new jail is created with the same
+.Va jid
+or
+.Va name .
 .El
 .Pp
 If no arguments are given after the options, the operation (except
@@ -238,10 +257,10 @@ would apply to jails with names like
 and
 .Dq foo.bar.baz .
 .Pp
-A jail may be specified with parameters directly on the command line.
-In this case, the
-.Xr jail.conf 5
-file will not be used.
+A jail may also be specified via parameters directly on the command line in
+.Dq name=value
+form, ignoring the contents of
+.Xr jail.conf 5 .
 For backward compatibility, the command line may also have four fixed
 parameters, without names:
 .Ar path ,
@@ -249,11 +268,6 @@ parameters, without names:
 .Ar ip ,
 and
 .Ar command .
-This mode will always create a new jail, and the
-.Fl c
-and
-.Fl m
-options do not apply (and must not be present).
 .Ss Jail Parameters
 Parameters in the
 .Xr jail.conf 5
@@ -570,8 +584,9 @@ If the
 MIB entry is zero, this will be restricted to the root user.
 .It Va allow.socket_af
 Sockets within a jail are normally restricted to IPv4, IPv6, local
-(UNIX), and route.  This allows access to other protocol stacks that
-have not had jail functionality added to them.
+(UNIX), and route.
+This allows access to other protocol stacks that have not had jail
+functionality added to them.
 .It Va allow.mlock
 Locking or unlocking physical pages in memory are normally not available
 within a jail.
@@ -638,6 +653,21 @@ sysctl.
 The super-user will be disabled automatically if its parent system has it
 disabled.
 The super-user is enabled by default.
+.It Va allow.extattr
+Allow privileged process in the jail to manipulate filesystem extended
+attributes in the system namespace.
+.It Va allow.adjtime
+Allow privileged process in the jail to slowly adjusting global operating system
+time.
+For example through utilities like
+.Xr ntpd 8 .
+.It Va allow.settime
+Allow privileged process in the jail to set global operating system data
+and time.
+For example through utilities like
+.Xr date 1 .
+This permission includes also
+.Va allow.adjtime .
 .El
 .El
 .Pp
@@ -664,7 +694,7 @@ and only when
 .Va enforce_statfs
 is set to a value lower than 2.
 .It Va allow.mount.fusefs
-privileged users inside the jail will be able to mount and unmount 
+privileged users inside the jail will be able to mount and unmount
 fuse-based file systems.
 This permission is effective only together with
 .Va allow.mount
@@ -720,7 +750,7 @@ and only when
 .Va enforce_statfs
 is set to a value lower than 2.
 See
-.Xr zfs 8
+.Xr zfs-jail 8
 for information on how to configure the ZFS filesystem to operate from
 within a jail.
 .It Va allow.vmm
@@ -757,7 +787,15 @@ the jail cannot perform any sysvmsg-related system calls.
 .It Va sysvsem, sysvshm
 Allow access to SYSV IPC semaphore and shared memory primitives, in the
 same manner as
-.Va sysvmsg.
+.Va sysvmsg .
+.It Va zfs.mount_snapshot
+When set to 1, jailed users may access the contents of ZFS snapshots
+under the filesystem's
+.Pa .zfs
+directory.
+If
+.Va allow.mount.zfs
+is set, the snapshots may also be mounted.
 .El
 .Pp
 There are pseudo-parameters that are not passed to the kernel, but are
@@ -835,8 +873,13 @@ are set to the target login's default values.
 is set to the target login.
 .Ev TERM
 is imported from the current environment.
+.Ev PATH
+is set to "/bin:/usr/bin".
 The environment variables from the login class capability database for the
 target login are also set.
+If a user is specified (as with
+.Va exec.jail_user ) ,
+commands are run from that (possibly jailed) user's directory.
 .It Va exec.jail_user
 The user to run commands as, when running in the jail environment.
 The default is to run the commands as the current user.
@@ -903,6 +946,15 @@ may also be specified, in the form
 .It Va vnet.interface
 A network interface to give to a vnet-enabled jail after is it created.
 The interface will automatically be released when the jail is removed.
+.It Va zfs.dataset
+A list of ZFS datasets to be attached to the jail.
+This requires
+.Va allow.mount.zfs
+to be set.
+See 
+.Xr zfs-jail 8
+for information on how to configure a ZFS dataset to be operated from
+within a jail.
 .It Va ip_hostname
 Resolve the
 .Va host.hostname
@@ -927,7 +979,7 @@ An
 format file containing filesystems to mount before creating a jail.
 .It Va mount.devfs
 Mount a
-.Xr devfs 5
+.Xr devfs 4
 filesystem on the chrooted
 .Pa /dev
 directory, and apply the ruleset in the
@@ -936,20 +988,25 @@ parameter (or a default of ruleset 4: devfsrules_jail)
 to restrict the devices visible inside the jail.
 .It Va mount.fdescfs
 Mount a
-.Xr fdescfs 5
+.Xr fdescfs 4
 filesystem on the chrooted
 .Pa /dev/fd
 directory.
 .It Va mount.procfs
 Mount a
-.Xr procfs 5
+.Xr procfs 4
 filesystem on the chrooted
 .Pa /proc
 directory.
 .It Va allow.dying
-Allow making changes to a
+This is deprecated and has no effect.
+It used to allow making changes to a
 .Va dying
 jail.
+Now such jails are always replaced when a new jail is created with the same
+.Va jid
+or
+.Va name .
 .It Va depend
 Specify a jail (or jails) that this jail depends on.
 When this jail is to be created, any jail(s) it depends on must already exist.
@@ -1376,6 +1433,7 @@ appears relative to its creator's own
 This is by virtue of the child jail being created in the chrooted
 environment of the first jail.
 .Sh SEE ALSO
+.Xr date 1 ,
 .Xr killall 1 ,
 .Xr lsvfs 1 ,
 .Xr newaliases 1 ,
@@ -1383,14 +1441,17 @@ environment of the first jail.
 .Xr pkill 1 ,
 .Xr ps 1 ,
 .Xr quota 1 ,
+.Xr adjtime 2 ,
+.Xr clock_settime 2 ,
 .Xr jail_set 2 ,
+.Xr ntp_adjtime 2 ,
+.Xr devfs 4 ,
+.Xr fdescfs 4 ,
+.Xr linprocfs 4 ,
+.Xr linsysfs 4 ,
+.Xr procfs 4 ,
 .Xr vmm 4 ,
-.Xr devfs 5 ,
-.Xr fdescfs 5 ,
 .Xr jail.conf 5 ,
-.Xr linprocfs 5 ,
-.Xr linsysfs 5 ,
-.Xr procfs 5 ,
 .Xr rc.conf 5 ,
 .Xr sysctl.conf 5 ,
 .Xr bsdconfig 8 ,
@@ -1404,13 +1465,16 @@ environment of the first jail.
 .Xr mount 8 ,
 .Xr mountd 8 ,
 .Xr nfsd 8 ,
+.Xr ntpd 8 ,
 .Xr reboot 8 ,
 .Xr rpcbind 8 ,
 .Xr sendmail 8 ,
 .Xr shutdown 8 ,
 .Xr sysctl 8 ,
 .Xr syslogd 8 ,
-.Xr umount 8
+.Xr umount 8 ,
+.Xr zfs-jail 8 ,
+.Xr extattr 9
 .Sh HISTORY
 The
 .Nm

@@ -981,15 +981,9 @@ void
 sched_lend_user_prio_cond(struct thread *td, u_char prio)
 {
 
-	if (td->td_lend_user_pri != prio)
-		goto lend;
-	if (td->td_user_pri != min(prio, td->td_base_user_pri))
-		goto lend;
-	if (td->td_priority != td->td_user_pri)
-		goto lend;
-	return;
+	if (td->td_lend_user_pri == prio)
+		return;
 
-lend:
 	thread_lock(td);
 	sched_lend_user_prio(td, prio);
 	thread_unlock(td);
@@ -1004,8 +998,6 @@ sched_sleep(struct thread *td, int pri)
 	td_get_sched(td)->ts_slptime = 0;
 	if (pri != 0 && PRI_BASE(td->td_pri_class) == PRI_TIMESHARE)
 		sched_prio(td, pri);
-	if (TD_IS_SUSPENDED(td) || pri >= PSOCK)
-		td->td_flags |= TDF_CANSWAP;
 }
 
 void
@@ -1041,9 +1033,8 @@ sched_switch(struct thread *td, int flags)
 	} else {
 		if (TD_IS_RUNNING(td)) {
 			/* Put us back on the run queue. */
-			sched_add(td, preempted ?
-			    SRQ_HOLDTD|SRQ_OURSELF|SRQ_YIELDING|SRQ_PREEMPTED :
-			    SRQ_HOLDTD|SRQ_OURSELF|SRQ_YIELDING);
+			sched_add(td, SRQ_HOLDTD | SRQ_OURSELF | SRQ_YIELDING |
+			    (preempted ? SRQ_PREEMPTED : 0));
 		}
 	}
 
@@ -1144,7 +1135,6 @@ sched_wakeup(struct thread *td, int srqflags)
 
 	THREAD_LOCK_ASSERT(td, MA_OWNED);
 	ts = td_get_sched(td);
-	td->td_flags &= ~TDF_CANSWAP;
 	if (ts->ts_slptime > 1) {
 		updatepri(td);
 		resetpriority(td);

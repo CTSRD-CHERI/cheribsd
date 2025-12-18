@@ -17,7 +17,7 @@
 //   Returns: If x.ok() == true and y.ok() == true, returns a value m in the range
 //   [months{0}, months{11}] satisfying y + m == x.
 //   Otherwise the value returned is unspecified.
-//   [Example: January - February == months{11}. —end example]
+//   [Example: January - February == months{11}. -end example]
 
 #include <chrono>
 #include <type_traits>
@@ -58,12 +58,11 @@ int main(int, char**)
     for (unsigned i = 1; i <= 12; ++i)
     {
         month m1   = m - months{i};
-        // months off = m - month {i};
+        assert(m1.ok());
         int exp = 6 - i;
         if (exp < 1)
             exp += 12;
         assert(static_cast<unsigned>(m1) == static_cast<unsigned>(exp));
-        // assert(off.count()            == static_cast<unsigned>(exp));
     }
 
   return 0;

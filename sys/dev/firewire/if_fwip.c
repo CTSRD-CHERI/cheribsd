@@ -153,8 +153,6 @@ fwip_attach(device_t dev)
 	fwip = ((struct fwip_softc *)device_get_softc(dev));
 	unit = device_get_unit(dev);
 	ifp = fwip->fw_softc.fwip_ifp = if_alloc(IFT_IEEE1394);
-	if (ifp == NULL)
-		return (ENOSPC);
 
 	mtx_init(&fwip->mtx, "fwip", NULL, MTX_DEF);
 	/* XXX */
@@ -199,7 +197,7 @@ fwip_attach(device_t dev)
 	splx(s);
 
 	FWIPDEBUG(ifp, "interface created\n");
-	return 0;
+	return (0);
 }
 
 static void
@@ -306,13 +304,9 @@ fwip_init(void *arg)
 		xferq->psize = MCLBYTES;
 		xferq->queued = 0;
 		xferq->buf = NULL;
-		xferq->bulkxfer = (struct fw_bulkxfer *) malloc(
+		xferq->bulkxfer = malloc(
 			sizeof(struct fw_bulkxfer) * xferq->bnchunk,
 							M_FWIP, M_WAITOK);
-		if (xferq->bulkxfer == NULL) {
-			printf("if_fwip: malloc failed\n");
-			return;
-		}
 		STAILQ_INIT(&xferq->stvalid);
 		STAILQ_INIT(&xferq->stfree);
 		STAILQ_INIT(&xferq->stdma);
@@ -780,7 +774,7 @@ fwip_stream_input(struct fw_xferq *xferq)
 		 * Record the sender ID for possible BPF usage.
 		 */
 		src = ntohl(p[1]) >> 16;
-		if (bpf_peers_present(if_getbpf(ifp))) {
+		if (bpf_peers_present_if(ifp)) {
 			mtag = m_tag_alloc(MTAG_FIREWIRE,
 			    MTAG_FIREWIRE_SENDER_EUID,
 			    2*sizeof(uint32_t), M_NOWAIT);
@@ -880,7 +874,7 @@ fwip_unicast_input(struct fw_xfer *xfer)
 		goto done;
 	}
 
-	if (bpf_peers_present(if_getbpf(ifp))) {
+	if (bpf_peers_present_if(ifp)) {
 		/*
 		 * Record the sender ID for possible BPF usage.
 		 */

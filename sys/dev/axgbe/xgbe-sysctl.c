@@ -29,7 +29,6 @@
  * Arpan Palit <Arpan.Palit@amd.com>
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/sysctl.h>
 #include <sys/sbuf.h>
@@ -243,22 +242,6 @@ exit_bad_op(void)
 
 	printf("SYSCTL: bad command line option (s)\n");
 	return(-EINVAL);
-}
-
-static inline unsigned
-fls_long(unsigned long l)
-{
-
-	if (sizeof(l) == 4)
-		return (fls(l));
-	return (fls64(l));
-}
-
-static inline __attribute__((const))
-unsigned long __rounddown_pow_of_two(unsigned long n)
-{
-
-	return (1UL << (fls_long(n) - 1));
 }
 
 static inline int
@@ -1050,12 +1033,12 @@ sysctl_ringparam_handler(SYSCTL_HANDLER_ARGS)
 			return (-EINVAL);
 		}
 
-		rx = __rounddown_pow_of_two(sys_op->rx_pending);
+		rx = rounddown_pow_of_two(sys_op->rx_pending);
 		if (rx != sys_op->rx_pending)
 			axgbe_printf(1,	"rx ring param rounded to power of 2: %u\n",
 			    rx);
 
-		tx = __rounddown_pow_of_two(sys_op->tx_pending);
+		tx = rounddown_pow_of_two(sys_op->tx_pending);
 		if (tx != sys_op->tx_pending)
 			axgbe_printf(1, "tx ring param rounded to power of 2: %u\n",
 			    tx);
@@ -1608,6 +1591,10 @@ axgbe_sysctl_init(struct xgbe_prv_data *pdata)
 	pdata->sysctl_xgmac_reg = 0;
 	pdata->sysctl_xpcs_mmd = 1;
 	pdata->sysctl_xpcs_reg = 0;
+	pdata->link_workaround = 1;
+	pdata->tx_pause = 1;
+	pdata->rx_pause = 1;
+	pdata->enable_rss = 1;
 
 	SYSCTL_ADD_UINT(clist, top, OID_AUTO, "axgbe_debug_level", CTLFLAG_RWTUN,
 	    &pdata->debug_level, 0, "axgbe log level -- higher is verbose");
@@ -1619,6 +1606,18 @@ axgbe_sysctl_init(struct xgbe_prv_data *pdata)
 	SYSCTL_ADD_UINT(clist, top, OID_AUTO, "link_workaround",
 	    CTLFLAG_RWTUN, &pdata->link_workaround, 0,
 	    "enable the workaround for link issue in coming up");
+
+	SYSCTL_ADD_UINT(clist, top, OID_AUTO, "rss_enabled",
+		CTLFLAG_RDTUN, &pdata->enable_rss, 1,
+		"shows the RSS feature state (1 - enable, 0 - disable)");
+
+	SYSCTL_ADD_UINT(clist, top, OID_AUTO, "tx_pause",
+		CTLFLAG_RDTUN, &pdata->tx_pause, 1,
+		"shows the Flow Control TX pause feature state (1 - enable, 0 - disable)");
+
+	SYSCTL_ADD_UINT(clist, top, OID_AUTO, "rx_pause",
+		CTLFLAG_RDTUN, &pdata->rx_pause, 1,
+		"shows the Flow Control RX pause feature state (1 - enable, 0 - disable)");
 
 	SYSCTL_ADD_PROC(clist, top, OID_AUTO, "xgmac_register",
 	    CTLTYPE_STRING | CTLFLAG_RWTUN | CTLFLAG_MPSAFE,

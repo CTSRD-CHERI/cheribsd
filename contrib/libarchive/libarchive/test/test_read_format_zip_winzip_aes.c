@@ -24,7 +24,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "test.h"
-__FBSDID("$FreeBSD$");
 
 static void
 test_winzip_aes(const char *refname, int need_libz)
@@ -39,7 +38,7 @@ test_winzip_aes(const char *refname, int need_libz)
 	assertEqualIntA(a, ARCHIVE_OK, archive_write_add_filter_none(a));
 	if (ARCHIVE_OK != archive_write_set_options(a,
 				"zip:encryption=aes256")) {
-		skipping("This system does not have cryptographic liberary");
+		skipping("This system does not have cryptographic library");
 		archive_write_free(a);
 		return;
 	}

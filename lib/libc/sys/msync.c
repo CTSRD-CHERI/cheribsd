@@ -29,7 +29,6 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/fcntl.h>
 #include <sys/mman.h>
@@ -41,7 +40,5 @@ __weak_reference(__sys_msync, __msync);
 int
 msync(void *addr, size_t len, int flags)
 {
-
-	return (((int (*)(void *, size_t, int))
-	    __libc_interposing[INTERPOS_msync])(addr, len, flags));
+	return (INTERPOS_SYS(msync, addr, len, flags));
 }

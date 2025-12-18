@@ -1,0 +1,9 @@
+{
+    "compartments": {
+	"io": {
+	    "files": [
+		"gz*.*o"
+            ]
+        }
+    }
+}

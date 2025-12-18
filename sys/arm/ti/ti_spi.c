@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  *
  */
-#include <sys/cdefs.h>
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -263,7 +263,7 @@ ti_spi_attach(device_t dev)
 	ti_spi_printr(dev);
 #endif
 
-	device_add_child(dev, "spibus", -1);
+	device_add_child(dev, "spibus", DEVICE_UNIT_ANY);
 
 	return (bus_generic_attach(dev));
 }

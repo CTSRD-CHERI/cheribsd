@@ -67,6 +67,7 @@
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
+#include <vm/uma.h>
 #include <vm/vm_map.h>
 #include <vm/vm_object.h>
 
@@ -2565,7 +2566,8 @@ do_lock_pp(struct thread *td, struct umutex * __capability m, uint32_t flags,
 	struct umtx_pi *pi;
 	uint32_t ceiling;
 	uint32_t owner, id;
-	int error, pri, old_inherited_pri, su, rv;
+	int error, pri, old_inherited_pri, new_pri, rv;
+	bool su;
 
 	id = td->td_tid;
 	uq = td->td_umtxq;
@@ -2594,21 +2596,23 @@ do_lock_pp(struct thread *td, struct umutex * __capability m, uint32_t flags,
 			error = EINVAL;
 			goto out;
 		}
+		new_pri = PRI_MIN_REALTIME + ceiling;
 
-		mtx_lock(&umtx_lock);
-		if (UPRI(td) < PRI_MIN_REALTIME + ceiling) {
-			mtx_unlock(&umtx_lock);
+		if (td->td_base_user_pri < new_pri) {
 			error = EINVAL;
 			goto out;
 		}
-		if (su && PRI_MIN_REALTIME + ceiling < uq->uq_inherited_pri) {
-			uq->uq_inherited_pri = PRI_MIN_REALTIME + ceiling;
-			thread_lock(td);
-			if (uq->uq_inherited_pri < UPRI(td))
-				sched_lend_user_prio(td, uq->uq_inherited_pri);
-			thread_unlock(td);
+		if (su) {
+			mtx_lock(&umtx_lock);
+			if (new_pri < uq->uq_inherited_pri) {
+				uq->uq_inherited_pri = new_pri;
+				thread_lock(td);
+				if (new_pri < UPRI(td))
+					sched_lend_user_prio(td, new_pri);
+				thread_unlock(td);
+			}
+			mtx_unlock(&umtx_lock);
 		}
-		mtx_unlock(&umtx_lock);
 
 		rv = casueword32(&m->m_owner, UMUTEX_CONTESTED, &owner,
 		    id | UMUTEX_CONTESTED);
@@ -2730,7 +2734,8 @@ do_unlock_pp(struct thread *td, struct umutex * __capability m, uint32_t flags,
 	struct umtx_q *uq, *uq2;
 	struct umtx_pi *pi;
 	uint32_t id, owner, rceiling;
-	int error, pri, new_inherited_pri, su;
+	int error, pri, new_inherited_pri;
+	bool su;
 
 	id = td->td_tid;
 	uq = td->td_umtxq;
@@ -2785,7 +2790,7 @@ do_unlock_pp(struct thread *td, struct umutex * __capability m, uint32_t flags,
 		error = EFAULT;
 	else {
 		mtx_lock(&umtx_lock);
-		if (su != 0)
+		if (su || new_inherited_pri == PRI_MAX)
 			uq->uq_inherited_pri = new_inherited_pri;
 		pri = PRI_MAX;
 		TAILQ_FOREACH(pi, &uq->uq_pi_contested, pi_link) {
@@ -3006,7 +3011,14 @@ do_cv_wait(struct thread *td, struct ucond * __capability cv,
 	 */
 	error = fueword32(&cv->c_has_waiters, &hasw);
 	if (error == 0 && hasw == 0)
-		suword32(&cv->c_has_waiters, 1);
+		error = suword32(&cv->c_has_waiters, 1);
+	if (error != 0) {
+		umtxq_lock(&uq->uq_key);
+		umtxq_remove(uq);
+		umtxq_unbusy(&uq->uq_key);
+		error = EFAULT;
+		goto out;
+	}
 
 	umtxq_unbusy_unlocked(&uq->uq_key);
 
@@ -3036,7 +3048,9 @@ do_cv_wait(struct thread *td, struct ucond * __capability cv,
 			umtxq_remove(uq);
 			if (oldlen == 1) {
 				umtxq_unlock(&uq->uq_key);
-				suword32(&cv->c_has_waiters, 0);
+				if (suword32(&cv->c_has_waiters, 0) != 0 &&
+				    error == 0)
+					error = EFAULT;
 				umtxq_lock(&uq->uq_key);
 			}
 		}
@@ -3044,7 +3058,7 @@ do_cv_wait(struct thread *td, struct ucond * __capability cv,
 		if (error == ERESTART)
 			error = EINTR;
 	}
-
+out:
 	umtxq_unlock(&uq->uq_key);
 	umtx_key_release(&uq->uq_key);
 	return (error);
@@ -3222,12 +3236,14 @@ sleep:
 		 */
 		rv = fueword32(&rwlock->rw_blocked_readers,
 		    &blocked_readers);
+		if (rv == 0)
+			rv = suword32(&rwlock->rw_blocked_readers,
+			    blocked_readers + 1);
 		if (rv == -1) {
 			umtxq_unbusy_unlocked(&uq->uq_key);
 			error = EFAULT;
 			break;
 		}
-		suword32(&rwlock->rw_blocked_readers, blocked_readers+1);
 
 		while (state & wrflags) {
 			umtxq_lock(&uq->uq_key);
@@ -3252,12 +3268,14 @@ sleep:
 		/* decrease read waiter count, and may clear read contention bit */
 		rv = fueword32(&rwlock->rw_blocked_readers,
 		    &blocked_readers);
+		if (rv == 0)
+			rv = suword32(&rwlock->rw_blocked_readers,
+			    blocked_readers - 1);
 		if (rv == -1) {
 			umtxq_unbusy_unlocked(&uq->uq_key);
 			error = EFAULT;
 			break;
 		}
-		suword32(&rwlock->rw_blocked_readers, blocked_readers-1);
 		if (blocked_readers == 1) {
 			rv = fueword32(&rwlock->rw_state, &state);
 			if (rv == -1) {
@@ -3407,12 +3425,14 @@ do_rw_wrlock(struct thread *td, struct urwlock * __capability rwlock,
 sleep:
 		rv = fueword32(&rwlock->rw_blocked_writers,
 		    &blocked_writers);
+		if (rv == 0)
+			rv = suword32(&rwlock->rw_blocked_writers,
+			    blocked_writers + 1);
 		if (rv == -1) {
 			umtxq_unbusy_unlocked(&uq->uq_key);
 			error = EFAULT;
 			break;
 		}
-		suword32(&rwlock->rw_blocked_writers, blocked_writers + 1);
 
 		while ((state & URWLOCK_WRITE_OWNER) ||
 		    URWLOCK_READER_COUNT(state) != 0) {
@@ -3437,12 +3457,14 @@ sleep:
 
 		rv = fueword32(&rwlock->rw_blocked_writers,
 		    &blocked_writers);
+		if (rv == 0)
+			rv = suword32(&rwlock->rw_blocked_writers,
+			    blocked_writers - 1);
 		if (rv == -1) {
 			umtxq_unbusy_unlocked(&uq->uq_key);
 			error = EFAULT;
 			break;
 		}
-		suword32(&rwlock->rw_blocked_writers, blocked_writers-1);
 		if (blocked_writers == 1) {
 			rv = fueword32(&rwlock->rw_state, &state);
 			if (rv == -1) {
@@ -3621,7 +3643,7 @@ again:
 		rv1 = fueword32(&sem->_count, &count);
 	if (rv == -1 || rv1 == -1 || count != 0 || (rv == 1 && count1 == 0)) {
 		if (rv == 0)
-			suword32(&sem->_has_waiters, 0);
+			rv = suword32(&sem->_has_waiters, 0);
 		umtxq_lock(&uq->uq_key);
 		umtxq_unbusy(&uq->uq_key);
 		umtxq_remove(uq);
@@ -4323,8 +4345,7 @@ __umtx_op_sem2_wake(struct thread *td, struct _umtx_op_args *uap,
 #define	USHM_OBJ_UMTX(o)						\
     ((struct umtx_shm_obj_list *)(&(o)->umtx_data))
 
-#define	USHMF_REG_LINKED	0x0001
-#define	USHMF_OBJ_LINKED	0x0002
+#define	USHMF_LINKED		0x0001
 struct umtx_shm_reg {
 	TAILQ_ENTRY(umtx_shm_reg) ushm_reg_link;
 	LIST_ENTRY(umtx_shm_reg) ushm_obj_link;
@@ -4365,8 +4386,17 @@ umtx_shm_reg_delfree_tq(void *context __unused, int pending __unused)
 static struct task umtx_shm_reg_delfree_task =
     TASK_INITIALIZER(0, umtx_shm_reg_delfree_tq, NULL);
 
-static struct umtx_shm_reg *
-umtx_shm_find_reg_locked(const struct umtx_key *key)
+/*
+ * Returns 0 if a SHM with the passed key is found in the registry, in which
+ * case it is returned through 'oreg'.  Otherwise, returns an error among ESRCH
+ * (no corresponding SHM; ESRCH was chosen for compatibility, ENOENT would have
+ * been preferable) or EOVERFLOW (there is a corresponding SHM, but reference
+ * count would overflow, so can't return it), in which case '*oreg' is left
+ * unchanged.
+ */
+static int
+umtx_shm_find_reg_locked(const struct umtx_key *key,
+    struct umtx_shm_reg **const oreg)
 {
 	struct umtx_shm_reg *reg;
 	struct umtx_shm_reg_head *reg_head;
@@ -4382,26 +4412,38 @@ umtx_shm_find_reg_locked(const struct umtx_key *key)
 		    reg->ushm_key.info.shared.offset ==
 		    key->info.shared.offset) {
 			KASSERT(reg->ushm_key.type == TYPE_SHM, ("TYPE_USHM"));
-			KASSERT(reg->ushm_refcnt > 0,
+			KASSERT(reg->ushm_refcnt != 0,
 			    ("reg %p refcnt 0 onlist", reg));
-			KASSERT((reg->ushm_flags & USHMF_REG_LINKED) != 0,
+			KASSERT((reg->ushm_flags & USHMF_LINKED) != 0,
 			    ("reg %p not linked", reg));
+			/*
+			 * Don't let overflow happen, just deny a new reference
+			 * (this is additional protection against some reference
+			 * count leak, which is known not to be the case at the
+			 * time of this writing).
+			 */
+			if (__predict_false(reg->ushm_refcnt == UINT_MAX))
+				return (EOVERFLOW);
 			reg->ushm_refcnt++;
-			return (reg);
+			*oreg = reg;
+			return (0);
 		}
 	}
-	return (NULL);
+	return (ESRCH);
 }
 
-static struct umtx_shm_reg *
-umtx_shm_find_reg(const struct umtx_key *key)
+/*
+ * Calls umtx_shm_find_reg_unlocked() under the 'umtx_shm_lock'.
+ */
+static int
+umtx_shm_find_reg(const struct umtx_key *key, struct umtx_shm_reg **const oreg)
 {
-	struct umtx_shm_reg *reg;
+	int error;
 
 	mtx_lock(&umtx_shm_lock);
-	reg = umtx_shm_find_reg_locked(key);
+	error = umtx_shm_find_reg_locked(key, oreg);
 	mtx_unlock(&umtx_shm_lock);
-	return (reg);
+	return (error);
 }
 
 static void
@@ -4415,42 +4457,49 @@ umtx_shm_free_reg(struct umtx_shm_reg *reg)
 }
 
 static bool
-umtx_shm_unref_reg_locked(struct umtx_shm_reg *reg, bool force)
+umtx_shm_unref_reg_locked(struct umtx_shm_reg *reg, bool linked_ref)
 {
-	bool res;
-
 	mtx_assert(&umtx_shm_lock, MA_OWNED);
-	KASSERT(reg->ushm_refcnt > 0, ("ushm_reg %p refcnt 0", reg));
-	reg->ushm_refcnt--;
-	res = reg->ushm_refcnt == 0;
-	if (res || force) {
-		if ((reg->ushm_flags & USHMF_REG_LINKED) != 0) {
-			TAILQ_REMOVE(&umtx_shm_registry[reg->ushm_key.hash],
-			    reg, ushm_reg_link);
-			reg->ushm_flags &= ~USHMF_REG_LINKED;
-		}
-		if ((reg->ushm_flags & USHMF_OBJ_LINKED) != 0) {
-			LIST_REMOVE(reg, ushm_obj_link);
-			reg->ushm_flags &= ~USHMF_OBJ_LINKED;
-		}
+	KASSERT(reg->ushm_refcnt != 0, ("ushm_reg %p refcnt 0", reg));
+
+	if (linked_ref) {
+		if ((reg->ushm_flags & USHMF_LINKED) == 0)
+			/*
+			 * The reference tied to USHMF_LINKED has already been
+			 * released concurrently.
+			 */
+			return (false);
+
+		TAILQ_REMOVE(&umtx_shm_registry[reg->ushm_key.hash], reg,
+		    ushm_reg_link);
+		LIST_REMOVE(reg, ushm_obj_link);
+		reg->ushm_flags &= ~USHMF_LINKED;
 	}
-	return (res);
+
+	reg->ushm_refcnt--;
+	return (reg->ushm_refcnt == 0);
 }
 
 static void
-umtx_shm_unref_reg(struct umtx_shm_reg *reg, bool force)
+umtx_shm_unref_reg(struct umtx_shm_reg *reg, bool linked_ref)
 {
 	vm_object_t object;
 	bool dofree;
 
-	if (force) {
+	if (linked_ref) {
+		/*
+		 * Note: This may be executed multiple times on the same
+		 * shared-memory VM object in presence of concurrent callers
+		 * because 'umtx_shm_lock' is not held all along in umtx_shm()
+		 * and here.
+		 */
 		object = reg->ushm_obj->shm_object;
 		VM_OBJECT_WLOCK(object);
 		vm_object_set_flag(object, OBJ_UMTXDEAD);
 		VM_OBJECT_WUNLOCK(object);
 	}
 	mtx_lock(&umtx_shm_lock);
-	dofree = umtx_shm_unref_reg_locked(reg, force);
+	dofree = umtx_shm_unref_reg_locked(reg, linked_ref);
 	mtx_unlock(&umtx_shm_lock);
 	if (dofree)
 		umtx_shm_free_reg(reg);
@@ -4494,16 +4543,22 @@ umtx_shm_create_reg(struct thread *td, const struct umtx_key *key,
 	struct ucred *cred;
 	int error;
 
-	reg = umtx_shm_find_reg(key);
-	if (reg != NULL) {
-		*res = reg;
-		return (0);
+	error = umtx_shm_find_reg(key, res);
+	if (error != ESRCH) {
+		/*
+		 * Either no error occured, and '*res' was filled, or EOVERFLOW
+		 * was returned, indicating a reference count limit, and we
+		 * won't create a duplicate registration.  In both cases, we are
+		 * done.
+		 */
+		return (error);
 	}
+	/* No entry, we will create one. */
+
 	cred = td->td_ucred;
 	if (!chgumtxcnt(cred->cr_ruidinfo, 1, lim_cur(td, RLIMIT_UMTXP)))
 		return (ENOMEM);
 	reg = uma_zalloc(umtx_shm_reg_zone, M_WAITOK | M_ZERO);
-	reg->ushm_refcnt = 1;
 	bcopy(key, &reg->ushm_key, sizeof(*key));
 	reg->ushm_obj = shm_alloc(td->td_ucred, O_RDWR, false);
 	reg->ushm_cred = crhold(cred);
@@ -4513,18 +4568,32 @@ umtx_shm_create_reg(struct thread *td, const struct umtx_key *key,
 		return (error);
 	}
 	mtx_lock(&umtx_shm_lock);
-	reg1 = umtx_shm_find_reg_locked(key);
-	if (reg1 != NULL) {
+	/* Re-lookup as 'umtx_shm_lock' has been temporarily released. */
+	error = umtx_shm_find_reg_locked(key, &reg1);
+	switch (error) {
+	case 0:
 		mtx_unlock(&umtx_shm_lock);
 		umtx_shm_free_reg(reg);
 		*res = reg1;
 		return (0);
+	case ESRCH:
+		break;
+	default:
+		mtx_unlock(&umtx_shm_lock);
+		umtx_shm_free_reg(reg);
+		return (error);
 	}
-	reg->ushm_refcnt++;
 	TAILQ_INSERT_TAIL(&umtx_shm_registry[key->hash], reg, ushm_reg_link);
 	LIST_INSERT_HEAD(USHM_OBJ_UMTX(key->info.shared.object), reg,
 	    ushm_obj_link);
-	reg->ushm_flags = USHMF_REG_LINKED | USHMF_OBJ_LINKED;
+	reg->ushm_flags = USHMF_LINKED;
+	/*
+	 * This is one reference for the registry and the list of shared
+	 * mutexes referenced by the VM object containing the lock pointer, and
+	 * another for the caller, which it will free after use.  So, one of
+	 * these is tied to the presence of USHMF_LINKED.
+	 */
+	reg->ushm_refcnt = 2;
 	mtx_unlock(&umtx_shm_lock);
 	*res = reg;
 	return (0);
@@ -4583,13 +4652,9 @@ umtx_shm(struct thread *td, void * __capability addr, u_int flags)
 	if (error != 0)
 		return (error);
 	KASSERT(key.shared == 1, ("non-shared key"));
-	if ((flags & UMTX_SHM_CREAT) != 0) {
-		error = umtx_shm_create_reg(td, &key, &reg);
-	} else {
-		reg = umtx_shm_find_reg(&key);
-		if (reg == NULL)
-			error = ESRCH;
-	}
+	error = (flags & UMTX_SHM_CREAT) != 0 ?
+	    umtx_shm_create_reg(td, &key, &reg) :
+	    umtx_shm_find_reg(&key, &reg);
 	umtx_key_release(&key);
 	if (error != 0)
 		return (error);

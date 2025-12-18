@@ -29,7 +29,6 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <signal.h>
 #include "libc_private.h"
@@ -41,7 +40,5 @@ __weak_reference(sigprocmask, __libc_sigprocmask);
 int
 sigprocmask(int how, const sigset_t *set, sigset_t *oset)
 {
-
-	return (((int (*)(int, const sigset_t *, sigset_t *))
-	    __libc_interposing[INTERPOS_sigprocmask])(how, set, oset));
+	return (INTERPOS_SYS(sigprocmask, how, set, oset));
 }

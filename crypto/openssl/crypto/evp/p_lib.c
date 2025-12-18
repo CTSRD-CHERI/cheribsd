@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2023 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -717,6 +717,7 @@ static void detect_foreign_key(EVP_PKEY *pkey)
 {
     switch (pkey->type) {
     case EVP_PKEY_RSA:
+    case EVP_PKEY_RSA_PSS:
         pkey->foreign = pkey->pkey.rsa != NULL
                         && ossl_rsa_is_foreign(pkey->pkey.rsa);
         break;
@@ -1075,6 +1076,7 @@ int EVP_PKEY_can_sign(const EVP_PKEY *pkey)
     if (pkey->keymgmt == NULL) {
         switch (EVP_PKEY_get_base_id(pkey)) {
         case EVP_PKEY_RSA:
+        case EVP_PKEY_RSA_PSS:
             return 1;
 # ifndef OPENSSL_NO_DSA
         case EVP_PKEY_DSA:
@@ -1199,7 +1201,7 @@ int EVP_PKEY_print_public(BIO *out, const EVP_PKEY *pkey,
 int EVP_PKEY_print_private(BIO *out, const EVP_PKEY *pkey,
                            int indent, ASN1_PCTX *pctx)
 {
-    return print_pkey(pkey, out, indent, EVP_PKEY_KEYPAIR, NULL,
+    return print_pkey(pkey, out, indent, EVP_PKEY_PRIVATE_KEY, NULL,
                       (pkey->ameth != NULL ? pkey->ameth->priv_print : NULL),
                       pctx);
 }
@@ -1900,7 +1902,15 @@ void *evp_pkey_export_to_provider(EVP_PKEY *pk, OSSL_LIB_CTX *libctx,
              * If |tmp_keymgmt| is present in the operation cache, it means
              * that export doesn't need to be redone.  In that case, we take
              * token copies of the cached pointers, to have token success
-             * values to return.
+             * values to return. It is possible (e.g. in a no-cached-fetch
+             * build), for op->keymgmt to be a different pointer to tmp_keymgmt
+             * even though the name/provider must be the same. In other words
+             * the keymgmt instance may be different but still equivalent, i.e.
+             * same algorithm/provider instance - but we make the simplifying
+             * assumption that the keydata can be used with either keymgmt
+             * instance. Not doing so introduces significant complexity and
+             * probably requires refactoring - since we would have to ripple
+             * the change in keymgmt instance up the call chain.
              */
             if (op != NULL && op->keymgmt != NULL) {
                 keydata = op->keydata;

@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <dev/ic/ns16550.h>
 
@@ -84,7 +83,6 @@ static struct {
 struct uart_ns16550_softc {
 	struct uart_softc *backend;
 
-	pthread_mutex_t mtx;	/* protects all softc elements */
 	uint8_t	data;		/* Data register (R/W) */
 	uint8_t ier;		/* Interrupt enable register (R/W) */
 	uint8_t lcr;		/* Line control register (R/W) */
@@ -205,14 +203,14 @@ uart_drain(int fd __unused, enum ev_type ev, void *arg)
 	 * to take out the softc lock to protect against concurrent
 	 * access from a vCPU i/o exit
 	 */
-	pthread_mutex_lock(&sc->mtx);
+	uart_softc_lock(sc->backend);
 
 	loopback = (sc->mcr & MCR_LOOPBACK) != 0;
 	uart_rxfifo_drain(sc->backend, loopback);
 	if (!loopback)
 		uart_toggle_intr(sc);
 
-	pthread_mutex_unlock(&sc->mtx);
+	uart_softc_unlock(sc->backend);
 }
 
 void
@@ -221,7 +219,7 @@ uart_ns16550_write(struct uart_ns16550_softc *sc, int offset, uint8_t value)
 	int fifosz;
 	uint8_t msr;
 
-	pthread_mutex_lock(&sc->mtx);
+	uart_softc_lock(sc->backend);
 
 	/*
 	 * Take care of the special case DLAB accesses first
@@ -330,7 +328,7 @@ uart_ns16550_write(struct uart_ns16550_softc *sc, int offset, uint8_t value)
 
 done:
 	uart_toggle_intr(sc);
-	pthread_mutex_unlock(&sc->mtx);
+	uart_softc_unlock(sc->backend);
 }
 
 uint8_t
@@ -338,7 +336,7 @@ uart_ns16550_read(struct uart_ns16550_softc *sc, int offset)
 {
 	uint8_t iir, intr_reason, reg;
 
-	pthread_mutex_lock(&sc->mtx);
+	uart_softc_lock(sc->backend);
 
 	/*
 	 * Take care of the special case DLAB accesses first
@@ -415,7 +413,7 @@ uart_ns16550_read(struct uart_ns16550_softc *sc, int offset)
 
 done:
 	uart_toggle_intr(sc);
-	pthread_mutex_unlock(&sc->mtx);
+	uart_softc_unlock(sc->backend);
 
 	return (reg);
 }
@@ -446,8 +444,6 @@ uart_ns16550_init(uart_intr_func_t intr_assert, uart_intr_func_t intr_deassert,
 	sc->intr_assert = intr_assert;
 	sc->intr_deassert = intr_deassert;
 	sc->backend = uart_init();
-
-	pthread_mutex_init(&sc->mtx, NULL);
 
 	uart_reset(sc);
 

@@ -75,6 +75,10 @@ struct wireless_dev;		/* net/cfg80211.h */
 
 #define	NET_NAME_UNKNOWN	0
 
+enum net_addr_assign_type {
+	NET_ADDR_RANDOM,
+};
+
 enum netdev_tx {
 	NETDEV_TX_OK		= 0,
 };
@@ -93,6 +97,10 @@ struct netdev_hw_addr_list {
 enum net_device_reg_state {
 	NETREG_DUMMY		= 1,
 	NETREG_REGISTERED,
+};
+
+enum tc_setup_type {
+	TC_SETUP_MAX_DUMMY,
 };
 
 struct net_device_ops {
@@ -122,6 +130,7 @@ struct net_device {
 		unsigned long		tx_errors;
 		unsigned long		tx_packets;
 	} stats;
+	enum net_addr_assign_type	addr_assign_type;
 	enum net_device_reg_state	reg_state;
 	const struct ethtool_ops	*ethtool_ops;
 	const struct net_device_ops	*netdev_ops;
@@ -230,7 +239,7 @@ void linuxkpi_netif_napi_add(struct net_device *, struct napi_struct *,
 void linuxkpi_netif_napi_del(struct napi_struct *);
 bool linuxkpi_napi_schedule_prep(struct napi_struct *);
 void linuxkpi___napi_schedule(struct napi_struct *);
-void linuxkpi_napi_schedule(struct napi_struct *);
+bool linuxkpi_napi_schedule(struct napi_struct *);
 void linuxkpi_napi_reschedule(struct napi_struct *);
 bool linuxkpi_napi_complete_done(struct napi_struct *, int);
 bool linuxkpi_napi_complete(struct napi_struct *);
@@ -270,6 +279,13 @@ netif_napi_add_tx(struct net_device *dev, struct napi_struct *napi,
 {
 
 	netif_napi_add(dev, napi, napi_poll);
+}
+
+static inline bool
+napi_is_scheduled(struct napi_struct *napi)
+{
+
+	return (test_bit(LKPI_NAPI_FLAG_IS_SCHEDULED, &napi->state));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -450,6 +466,8 @@ void linuxkpi_free_netdev(struct net_device *);
 
 #define	alloc_netdev(_l, _n, _f, _func)						\
 	linuxkpi_alloc_netdev(_l, _n, _f, _func)
+#define	alloc_netdev_dummy(_l)							\
+	linuxkpi_alloc_netdev(_l, "dummy", NET_NAME_UNKNOWN, NULL)
 #define	free_netdev(_n)								\
 	linuxkpi_free_netdev(_n)
 

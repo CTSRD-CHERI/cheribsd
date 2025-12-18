@@ -1,4 +1,3 @@
-
 .include <src.opts.mk>
 
 TESTSDIR=	${TESTSBASE}/sys/capsicum
@@ -14,11 +13,16 @@ CFLAGS+=	-I${SRCTOP}/tests
 
 GTESTS+=	capsicum-test
 GTESTS_WRAPPER_SH.capsicum-test=	functional
+# This test script runs the same test suite twice, once as root and once as an
+# unprivileged user.  Serialize them since some tests access global namespaces,
+# e.g., mqueuefs, and can trample on each other.
+TEST_METADATA.functional+=	is_exclusive="true"
 
 SRCS.capsicum-test+=	\
 	capsicum-test-main.cc \
 	capsicum-test.cc \
 	capability-fd.cc \
+	copy_file_range.cc \
 	fexecve.cc \
 	procdesc.cc \
 	capmode.cc \

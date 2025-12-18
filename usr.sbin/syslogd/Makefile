@@ -1,5 +1,3 @@
-#	@(#)Makefile	8.1 (Berkeley) 6/6/93
-
 .include <src.opts.mk>
 
 .PATH: ${SRCTOP}/usr.bin/wall
@@ -32,7 +30,10 @@ FTPPACKAGE=	ftpd
 .endif
 
 .if ${MK_LPR} != "no"
-SYSLOGD_D+=	lpr.conf
+CONFGROUPS+=	LP
+LP+=		lpr.conf
+LPDIR=		/etc/syslog.d
+LPPACKAGE=	lp
 .endif
 
 .if ${MK_PPP} != "no"
@@ -43,5 +44,8 @@ PPPPACKAGE=	ppp
 .endif
 
 CFLAGS+= -I${SRCTOP}/usr.bin/wall
+
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.prog.mk>

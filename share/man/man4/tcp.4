@@ -31,9 +31,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     From: @(#)tcp.4	8.1 (Berkeley) 6/5/93
-.\"
-.Dd June 29, 2023
+.Dd August 3, 2024
 .Dt TCP 4
 .Os
 .Sh NAME
@@ -174,7 +172,7 @@ socket option set.
 .Pp
 In addition to the facilities defined in RFC7413, this implementation supports a
 pre-shared key (PSK) mode of operation in which the TFO server requires the
-client to be in posession of a shared secret in order for the client to be able
+client to be in possession of a shared secret in order for the client to be able
 to successfully open TFO connections with the server.
 This is useful, for example, in environments where TFO servers are exposed to
 both internal and external clients and only wish to allow TFO connections from
@@ -382,7 +380,7 @@ Changes NUMA affinity filtering for an established TCP listen
 socket.
 This option takes a single integer argument which specifies
 the NUMA domain to filter on for this listen socket.
-The argument can also have the follwing special values:
+The argument can also have the following special values:
 .Bl -tag -width "Dv TCP_REUSPORT_LB_NUMA"
 .It Dv TCP_REUSPORT_LB_NUMA_NODOM
 Remove NUMA filtering for this listen socket.
@@ -434,6 +432,17 @@ branch of the
 MIB, which can also be read or modified with
 .Xr sysctl 8 .
 .Bl -tag -width ".Va v6pmtud_blackhole_mss"
+.It Va ack_war_timewindow , ack_war_cnt
+The challenge ACK throttling algorithm defined in RFC 5961 limits
+the number of challenge ACKs sent per TCP connection to
+.Va ack_war_cnt
+during the time interval specified in milliseconds by
+.Va ack_war_timewindow .
+Setting
+.Va ack_war_timewindow
+or
+.Va ack_war_cnt
+to zero disables challenge ACK throttling.
 .It Va always_keepalive
 Assume that
 .Dv SO_KEEPALIVE
@@ -466,13 +475,6 @@ See
 Maximum amount of time, in milliseconds, before a delayed ACK is sent.
 .It Va delayed_ack
 Delay ACK to try and piggyback it onto a data packet or another ACK.
-.It Va do_lrd
-Enable Lost Retransmission Detection for SACK-enabled sessions, disabled by
-default.
-Under severe congestion, a retransmission can be lost which then leads to a
-mandatory Retransmission Timeout (RTO), followed by slow-start.
-LRD will try to resend the repeatedly lost packet, preventing the time-consuming
-RTO and performance reducing slow-start.
 .It Va do_prr
 Perform SACK loss recovery using the Proportional Rate Reduction (PRR) algorithm
 described in RFC6937.
@@ -480,12 +482,6 @@ This improves the effectiveness of retransmissions particular in environments
 with ACK thinning or burst loss events, as chances to run out of the ACK clock
 are reduced, preventing lengthy and performance reducing RTO based loss recovery
 (default is true).
-.It Va do_prr_conservative
-While doing Proportional Rate Reduction, remain strictly in a packet conserving
-mode, sending only one new packet for each ACK received.
-Helpful when a misconfigured token bucket traffic policer causes persistent
-high losses leading to RTO, but reduces PRR effectiveness in more common settings
-(default is false).
 .It Va do_tcpdrain
 Flush packets in the
 .Tn TCP
@@ -626,11 +622,6 @@ Defaults to 60 seconds.
 List of available TCP function blocks (TCP stacks).
 .It Va functions_default
 The default TCP function block (TCP stack).
-.It Va functions_inherit_listen_socket_stack
-Determines whether to inherit listen socket's TCP stack or use the current
-system default TCP stack, as defined by
-.Va functions_default .
-Default is true.
 .It Va hostcache
 The TCP host cache is used to cache connection details and metrics to
 improve future performance of connections between the same hosts.
@@ -677,7 +668,7 @@ cache.
 Time in seconds between pruning expired host cache entries.
 Defaults to 300 (5 minutes).
 .It Va hostcache.purge
-Expire all entires on next pruning of host cache entries.
+Expire all entries on next pruning of host cache entries.
 Any non-zero setting will be reset to zero, once the purge
 is running.
 .Bl -tag -compact
@@ -713,6 +704,9 @@ Use criteria defined in RFC793 instead of RFC5961 for accepting RST segments.
 Default is false.
 .It Va insecure_syn
 Use criteria defined in RFC793 instead of RFC5961 for accepting SYN segments.
+Default is false.
+.It Va insecure_ack
+Use criteria defined in RFC793 for validating SEG.ACK.
 Default is false.
 .It Va isn_reseed_interval
 The interval (in seconds) specifying how often the secret data used in
@@ -909,6 +903,13 @@ Global number of TCP SACK holes currently allocated.
 .It Va sack.globalmaxholes
 Maximum number of SACK holes per system, across all connections.
 Defaults to 65536.
+.It Va sack.lrd
+Enable Lost Retransmission Detection for SACK-enabled sessions, enabled by
+default.
+Under severe congestion, a retransmission can be lost which then leads to a
+mandatory Retransmission Timeout (RTO), followed by slow-start.
+LRD will try to resend the repeatedly lost packet, preventing the time-consuming
+RTO and performance reducing slow-start or purge of the SACK scoreboard.
 .It Va sack.maxholes
 Maximum number of SACK holes per connection.
 Defaults to 128.
@@ -1082,6 +1083,13 @@ when trying to use a TCP function block that is not available;
 .%A "D. Black"
 .%T "The Addition of Explicit Congestion Notification (ECN) to IP"
 .%O "RFC 3168"
+.Re
+.Rs
+.%A "A. Ramaiah"
+.%A "R. Stewart"
+.%A "M. Dalal"
+.%T "Improving TCP's Robustness to Blind In-Window Attacks"
+.%O "RFC 5961"
 .Re
 .Sh HISTORY
 The

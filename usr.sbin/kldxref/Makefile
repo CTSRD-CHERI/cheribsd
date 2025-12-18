@@ -1,25 +1,32 @@
-
-.include <src.opts.mk>
-
 PACKAGE=	runtime
 PROG=	kldxref
 MAN=	kldxref.8
-SRCS=	kldxref.c ef.c ef_obj.c
+SRCS=	kldxref.c
+
+CFLAGS+=-I${SRCTOP}/lib/libkldelf
 
 WARNS?=	2
 
-.if exists(ef_${MACHINE_CPUARCH}.c)
-SRCS+=	ef_${MACHINE_CPUARCH}.c
-.else
-SRCS+=	ef_nop.c
-.endif
+LIBADD=	elf
 
-.if ${MACHINE_CPU:Mcheri}
-.if ${MACHINE_ABI:Mpurecap}
-CFLAGS+=	-DKLD_COMPAT_FREEBSD64
+.if defined(BOOTSTRAPPING)
+#
+# XXX: Fix libprivatelibkldelf.a linker set issue before removing this block
+#
+.PATH: ${SRCTOP}/lib/libkldelf
+KLDELF_SRCS=	ef.c \
+		ef_obj.c \
+		elf.c \
+		ef_aarch64.c \
+		ef_arm.c \
+		ef_amd64.c \
+		ef_i386.c \
+		ef_mips.c \
+		ef_powerpc.c \
+		ef_riscv.c
+SRCS+=	${KLDELF_SRCS}
 .else
-CFLAGS+=	-DKLD_COMPAT_CHERIABI
-.endif
+LIBADD+=	kldelf
 .endif
 
 .include <bsd.prog.mk>

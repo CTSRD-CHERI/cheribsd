@@ -1,6 +1,6 @@
 #NO_UNIVERSE
 
 include "GFE"
-include "../../conf/std.nodebug"
+include "std.nodebug"
 
 ident GFE-NODEBUG

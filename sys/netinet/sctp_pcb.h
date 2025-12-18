@@ -130,7 +130,7 @@ struct sctp_block_entry {
 };
 
 struct sctp_timewait {
-	uint32_t tv_sec_at_expire;	/* the seconds from boot to expire */
+	time_t tv_sec_at_expire;	/* the seconds from boot to expire */
 	uint32_t v_tag;		/* the vtag that can not be reused */
 	uint16_t lport;		/* the local port used in vtag */
 	uint16_t rport;		/* the remote port used in vtag */
@@ -263,8 +263,8 @@ struct sctp_base_info {
  * access /dev/random.
  */
 struct sctp_pcb {
-	unsigned int time_of_secret_change;	/* number of seconds from
-						 * timeval.tv_sec */
+	time_t time_of_secret_change;	/* number of seconds from
+					 * timeval.tv_sec */
 	uint32_t secret_key[SCTP_HOW_MANY_SECRETS][SCTP_NUMBER_OF_SECRETS];
 	unsigned int size_of_a_cookie;
 
@@ -506,9 +506,6 @@ sctp_add_addr_to_vrf(uint32_t vrfid,
     void *ifa, struct sockaddr *addr, uint32_t ifa_flags,
     int dynamic_add);
 
-void sctp_update_ifn_mtu(uint32_t ifn_index, uint32_t mtu);
-
-void sctp_free_ifn(struct sctp_ifn *sctp_ifnp);
 void sctp_free_ifa(struct sctp_ifa *sctp_ifap);
 
 void

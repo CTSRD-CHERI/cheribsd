@@ -26,7 +26,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/condvar.h>
 #include <sys/conf.h>
@@ -165,17 +164,17 @@ ctl_ha_close(struct ha_softc *softc)
 		report = 1;
 	}
 	if (so) {
-		SOCKBUF_LOCK(&so->so_rcv);
+		SOCK_RECVBUF_LOCK(so);
 		soupcall_clear(so, SO_RCV);
 		while (softc->ha_receiving) {
 			wakeup(&softc->ha_receiving);
-			msleep(&softc->ha_receiving, SOCKBUF_MTX(&so->so_rcv),
+			msleep(&softc->ha_receiving, SOCK_RECVBUF_MTX(so),
 			    0, "ha_rx exit", 0);
 		}
-		SOCKBUF_UNLOCK(&so->so_rcv);
-		SOCKBUF_LOCK(&so->so_snd);
+		SOCK_RECVBUF_UNLOCK(so);
+		SOCK_SENDBUF_LOCK(so);
 		soupcall_clear(so, SO_SND);
-		SOCKBUF_UNLOCK(&so->so_snd);
+		SOCK_SENDBUF_UNLOCK(so);
 		softc->ha_so = NULL;
 		if (softc->ha_connect)
 			pause("reconnect", hz / 2);
@@ -219,7 +218,7 @@ ctl_ha_rx_thread(void *arg)
 			next = wire_hdr.length;
 		else
 			next = sizeof(wire_hdr);
-		SOCKBUF_LOCK(&so->so_rcv);
+		SOCK_RECVBUF_LOCK(so);
 		while (sbavail(&so->so_rcv) < next || softc->ha_disconnect) {
 			if (softc->ha_connected == 0 || softc->ha_disconnect ||
 			    so->so_error ||
@@ -227,10 +226,10 @@ ctl_ha_rx_thread(void *arg)
 				goto errout;
 			}
 			so->so_rcv.sb_lowat = next;
-			msleep(&softc->ha_receiving, SOCKBUF_MTX(&so->so_rcv),
+			msleep(&softc->ha_receiving, SOCK_RECVBUF_MTX(so),
 			    0, "-", 0);
 		}
-		SOCKBUF_UNLOCK(&so->so_rcv);
+		SOCK_RECVBUF_UNLOCK(so);
 
 		if (wire_hdr.length == 0) {
 			IOVEC_INIT_OBJ(&iov, wire_hdr);
@@ -246,7 +245,7 @@ ctl_ha_rx_thread(void *arg)
 			if (error != 0) {
 				printf("%s: header receive error %d\n",
 				    __func__, error);
-				SOCKBUF_LOCK(&so->so_rcv);
+				SOCK_RECVBUF_LOCK(so);
 				goto errout;
 			}
 		} else {
@@ -259,7 +258,7 @@ ctl_ha_rx_thread(void *arg)
 errout:
 	softc->ha_receiving = 0;
 	wakeup(&softc->ha_receiving);
-	SOCKBUF_UNLOCK(&so->so_rcv);
+	SOCK_RECVBUF_UNLOCK(so);
 	ctl_ha_conn_wake(softc);
 	kthread_exit();
 }
@@ -280,13 +279,13 @@ ctl_ha_send(struct ha_softc *softc)
 				break;
 			}
 		}
-		SOCKBUF_LOCK(&so->so_snd);
+		SOCK_SENDBUF_LOCK(so);
 		if (sbspace(&so->so_snd) < softc->ha_sending->m_pkthdr.len) {
 			so->so_snd.sb_lowat = softc->ha_sending->m_pkthdr.len;
-			SOCKBUF_UNLOCK(&so->so_snd);
+			SOCK_SENDBUF_UNLOCK(so);
 			break;
 		}
-		SOCKBUF_UNLOCK(&so->so_snd);
+		SOCK_SENDBUF_UNLOCK(so);
 		error = sosend(softc->ha_so, NULL, NULL, softc->ha_sending,
 		    NULL, MSG_DONTWAIT, curthread);
 		softc->ha_sending = NULL;
@@ -309,14 +308,14 @@ ctl_ha_sock_setup(struct ha_softc *softc)
 	if (error)
 		printf("%s: soreserve failed %d\n", __func__, error);
 
-	SOCKBUF_LOCK(&so->so_rcv);
+	SOCK_RECVBUF_LOCK(so);
 	so->so_rcv.sb_lowat = sizeof(struct ha_msg_wire);
 	soupcall_set(so, SO_RCV, ctl_ha_rupcall, softc);
-	SOCKBUF_UNLOCK(&so->so_rcv);
-	SOCKBUF_LOCK(&so->so_snd);
+	SOCK_RECVBUF_UNLOCK(so);
+	SOCK_SENDBUF_LOCK(so);
 	so->so_snd.sb_lowat = sizeof(struct ha_msg_wire);
 	soupcall_set(so, SO_SND, ctl_ha_supcall, softc);
-	SOCKBUF_UNLOCK(&so->so_snd);
+	SOCK_SENDBUF_UNLOCK(so);
 
 	bzero(&opt, sizeof(struct sockopt));
 	opt.sopt_dir = SOPT_SET;
@@ -397,7 +396,7 @@ static int
 ctl_ha_accept(struct ha_softc *softc)
 {
 	struct socket *lso, *so;
-	struct sockaddr *sap;
+	struct sockaddr_in sin = { .sin_len = sizeof(sin) };
 	int error;
 
 	lso = softc->ha_lso;
@@ -410,16 +409,11 @@ ctl_ha_accept(struct ha_softc *softc)
 		goto out;
 	}
 
-	sap = NULL;
-	error = soaccept(so, &sap);
+	error = soaccept(so, (struct sockaddr *)&sin);
 	if (error != 0) {
 		printf("%s: soaccept() error %d\n", __func__, error);
-		if (sap != NULL)
-			free(sap, M_SONAME);
 		goto out;
 	}
-	if (sap != NULL)
-		free(sap, M_SONAME);
 	softc->ha_so = so;
 	ctl_ha_sock_setup(softc);
 	return (0);
@@ -908,13 +902,16 @@ ctl_ha_msg_shutdown(struct ctl_softc *ctl_softc)
 {
 	struct ha_softc *softc = &ha_softc;
 
+	if (SCHEDULER_STOPPED())
+		return;
+
 	/* Disconnect and shutdown threads. */
 	mtx_lock(&softc->ha_lock);
 	if (softc->ha_shutdown < 2) {
 		softc->ha_shutdown = 1;
 		softc->ha_wakeup = 1;
 		wakeup(&softc->ha_wakeup);
-		while (softc->ha_shutdown < 2 && !SCHEDULER_STOPPED()) {
+		while (softc->ha_shutdown < 2) {
 			msleep(&softc->ha_wakeup, &softc->ha_lock, 0,
 			    "shutdown", hz);
 		}

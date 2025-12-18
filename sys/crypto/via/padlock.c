@@ -24,7 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -36,6 +35,7 @@
 #if defined(__amd64__) || defined(__i386__)
 #include <machine/cpufunc.h>
 #include <machine/cputypes.h>
+#include <machine/fpu.h>
 #include <machine/md_var.h>
 #include <machine/specialreg.h>
 #endif
@@ -62,8 +62,7 @@ static int padlock_probesession(device_t, const struct crypto_session_params *);
 static int padlock_newsession(device_t, crypto_session_t cses,
     const struct crypto_session_params *);
 static void padlock_freesession(device_t, crypto_session_t cses);
-static void padlock_freesession_one(struct padlock_softc *sc,
-    struct padlock_session *ses);
+static void padlock_freesession_one(struct padlock_session *ses);
 static int padlock_process(device_t, struct cryptop *crp, int hint __unused);
 
 MALLOC_DEFINE(M_PADLOCK, "padlock_data", "PadLock Data");
@@ -80,31 +79,14 @@ padlock_identify(driver_t *drv, device_t parent)
 static int
 padlock_probe(device_t dev)
 {
-	char capp[256];
-
 #if defined(__amd64__) || defined(__i386__)
 	/* If there is no AES support, we has nothing to do here. */
 	if (!(via_feature_xcrypt & VIA_HAS_AES)) {
 		device_printf(dev, "No ACE support.\n");
 		return (EINVAL);
 	}
-	strlcpy(capp, "AES-CBC", sizeof(capp));
-#if 0
-	strlcat(capp, ",AES-EBC", sizeof(capp));
-	strlcat(capp, ",AES-CFB", sizeof(capp));
-	strlcat(capp, ",AES-OFB", sizeof(capp));
-#endif
-	if (via_feature_xcrypt & VIA_HAS_SHA) {
-		strlcat(capp, ",SHA1", sizeof(capp));
-		strlcat(capp, ",SHA256", sizeof(capp));
-	}
-#if 0
-	if (via_feature_xcrypt & VIA_HAS_AESCTR)
-		strlcat(capp, ",AES-CTR", sizeof(capp));
-	if (via_feature_xcrypt & VIA_HAS_MM)
-		strlcat(capp, ",RSA", sizeof(capp));
-#endif
-	device_set_desc_copy(dev, capp);
+	device_set_descf(dev, "AES-CBC%s",
+	    (via_feature_xcrypt & VIA_HAS_SHA) ? ",SHA1,SHA256" : "");
 	return (0);
 #else
 	return (EINVAL);
@@ -177,28 +159,25 @@ static int
 padlock_newsession(device_t dev, crypto_session_t cses,
     const struct crypto_session_params *csp)
 {
-	struct padlock_softc *sc = device_get_softc(dev);
-	struct padlock_session *ses = NULL;
+	struct padlock_session *ses;
 	struct thread *td;
 	int error;
 
 	ses = crypto_get_driver_session(cses);
-	ses->ses_fpu_ctx = fpu_kern_alloc_ctx(FPU_KERN_NORMAL);
 
 	error = padlock_cipher_setup(ses, csp);
 	if (error != 0) {
-		padlock_freesession_one(sc, ses);
+		padlock_freesession_one(ses);
 		return (error);
 	}
 
 	if (csp->csp_mode == CSP_MODE_ETA) {
 		td = curthread;
-		fpu_kern_enter(td, ses->ses_fpu_ctx, FPU_KERN_NORMAL |
-		    FPU_KERN_KTHR);
+		fpu_kern_enter(td, NULL, FPU_KERN_NORMAL | FPU_KERN_NOCTX);
 		error = padlock_hash_setup(ses, csp);
-		fpu_kern_leave(td, ses->ses_fpu_ctx);
+		fpu_kern_leave(td, NULL);
 		if (error != 0) {
-			padlock_freesession_one(sc, ses);
+			padlock_freesession_one(ses);
 			return (error);
 		}
 	}
@@ -207,21 +186,19 @@ padlock_newsession(device_t dev, crypto_session_t cses,
 }
 
 static void
-padlock_freesession_one(struct padlock_softc *sc, struct padlock_session *ses)
+padlock_freesession_one(struct padlock_session *ses)
 {
 
 	padlock_hash_free(ses);
-	fpu_kern_free_ctx(ses->ses_fpu_ctx);
 }
 
 static void
 padlock_freesession(device_t dev, crypto_session_t cses)
 {
-	struct padlock_softc *sc = device_get_softc(dev);
 	struct padlock_session *ses;
 
 	ses = crypto_get_driver_session(cses);
-	padlock_freesession_one(sc, ses);
+	padlock_freesession_one(ses);
 }
 
 static int

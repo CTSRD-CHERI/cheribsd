@@ -24,7 +24,6 @@
  */
 
 #include "archive_platform.h"
-__FBSDID("$FreeBSD$");
 
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
@@ -115,6 +114,30 @@ __FBSDID("$FreeBSD$");
 #define kAttributes		0x15
 #define kEncodedHeader		0x17
 #define kDummy			0x19
+
+// Check that some windows file attribute constants are defined.
+// Reference: https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants
+#ifndef FILE_ATTRIBUTE_READONLY
+#define FILE_ATTRIBUTE_READONLY 0x00000001
+#endif
+
+#ifndef FILE_ATTRIBUTE_HIDDEN
+#define FILE_ATTRIBUTE_HIDDEN 0x00000002
+#endif
+
+#ifndef FILE_ATTRIBUTE_SYSTEM
+#define FILE_ATTRIBUTE_SYSTEM 0x00000004
+#endif
+
+#ifndef FILE_ATTRIBUTE_DIRECTORY
+#define FILE_ATTRIBUTE_DIRECTORY 0x00000010
+#endif
+
+// This value is defined in 7zip with the comment "trick for Unix".
+//
+// 7z archives created on unix have this bit set in the high 16 bits of
+// the attr field along with the unix permissions.
+#define FILE_ATTRIBUTE_UNIX_EXTENSION 0x8000
 
 struct _7z_digests {
 	unsigned char	*defineds;
@@ -739,6 +762,35 @@ archive_read_format_7zip_read_header(struct archive_read *a,
 		archive_entry_set_size(entry, 0);
 	}
 
+	// These attributes are supported by the windows implementation of archive_write_disk.
+	const int supported_attrs = FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM;
+
+	if (zip_entry->attr & supported_attrs) {
+		char *fflags_text, *ptr;
+		/* allocate for ",rdonly,hidden,system" */
+		fflags_text = malloc(22 * sizeof(*fflags_text));
+		if (fflags_text != NULL) {
+			ptr = fflags_text; 
+			if (zip_entry->attr & FILE_ATTRIBUTE_READONLY) {
+				strcpy(ptr, ",rdonly");
+				ptr = ptr + 7;
+			}
+			if (zip_entry->attr & FILE_ATTRIBUTE_HIDDEN) {
+				strcpy(ptr, ",hidden");
+				ptr = ptr + 7;
+			}
+			if (zip_entry->attr & FILE_ATTRIBUTE_SYSTEM) {
+				strcpy(ptr, ",system");
+				ptr = ptr + 7;
+			}
+			if (ptr > fflags_text) {
+				archive_entry_copy_fflags_text(entry,
+				    fflags_text + 1);
+			}
+			free(fflags_text);
+		}
+	}
+
 	/* If there's no body, force read_data() to return EOF immediately. */
 	if (zip->entry_bytes_remaining < 1)
 		zip->end_of_entry = 1;
@@ -781,9 +833,20 @@ archive_read_format_7zip_read_header(struct archive_read *a,
 			zip_entry->mode |= AE_IFREG;
 			archive_entry_set_mode(entry, zip_entry->mode);
 		} else {
+			struct archive_string_conv* utf8_conv;
+
 			symname[symsize] = '\0';
-			archive_entry_copy_symlink(entry,
-			    (const char *)symname);
+
+			/* Symbolic links are embedded as UTF-8 strings */
+			utf8_conv = archive_string_conversion_from_charset(&a->archive,
+			    "UTF-8", 1);
+			if (utf8_conv == NULL) {
+				free(symname);
+				return ARCHIVE_FATAL;
+			}
+
+			archive_entry_copy_symlink_l(entry, (const char*)symname, symsize,
+			    utf8_conv);
 		}
 		free(symname);
 		archive_entry_set_size(entry, 0);
@@ -823,10 +886,9 @@ archive_read_format_7zip_read_data(struct archive_read *a,
 	if (zip->end_of_entry)
 		return (ARCHIVE_EOF);
 
-	const uint64_t max_read_size = 16 * 1024 * 1024;  // Don't try to read more than 16 MB at a time
-	size_t bytes_to_read = max_read_size;
+	size_t bytes_to_read = 16 * 1024 * 1024;  // Don't try to read more than 16 MB at a time
 	if ((uint64_t)bytes_to_read > zip->entry_bytes_remaining) {
-		bytes_to_read = zip->entry_bytes_remaining;
+		bytes_to_read = (size_t)zip->entry_bytes_remaining;
 	}
 	bytes = read_stream(a, buff, bytes_to_read, 0);
 	if (bytes < 0)
@@ -1009,8 +1071,8 @@ ppmd_read(void *p)
 		 */
 		ssize_t bytes_avail = 0;
 		const uint8_t* data = __archive_read_ahead(a,
-		    zip->ppstream.stream_in+1, &bytes_avail);
-		if(bytes_avail < zip->ppstream.stream_in+1) {
+		    (size_t)zip->ppstream.stream_in+1, &bytes_avail);
+		if(data == NULL || bytes_avail < zip->ppstream.stream_in+1) {
 			archive_set_error(&a->archive,
 			    ARCHIVE_ERRNO_FILE_FORMAT,
 			    "Truncated 7z file data");
@@ -1333,6 +1395,7 @@ init_decompression(struct archive_read *a, struct _7zip *zip,
 	case _7Z_IA64:
 	case _7Z_ARM:
 	case _7Z_ARMTHUMB:
+	case _7Z_ARM64:
 	case _7Z_SPARC:
 	case _7Z_DELTA:
 		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
@@ -1712,6 +1775,10 @@ free_decompression(struct archive_read *a, struct _7zip *zip)
 		zip->stream_valid = 0;
 	}
 #endif
+#ifdef HAVE_ZSTD_H
+	if (zip->zstdstream_valid)
+		ZSTD_freeDStream(zip->zstd_dstream);
+#endif
 	if (zip->ppmd7_valid) {
 		__archive_ppmd7_functions.Ppmd7_Free(
 			&zip->ppmd7_context);
@@ -1982,6 +2049,8 @@ read_Folder(struct archive_read *a, struct _7z_folder *f)
 			if (parse_7zip_uint64(
 			    a, &(f->coders[i].propertiesSize)) < 0)
 				return (-1);
+			if (UMAX_ENTRY < f->coders[i].propertiesSize)
+				return (-1);
 			if ((p = header_bytes(
 			    a, (size_t)f->coders[i].propertiesSize)) == NULL)
 				return (-1);
@@ -2251,7 +2320,7 @@ read_SubStreamsInfo(struct archive_read *a, struct _7z_substream_info *ss,
 	usizes = ss->unpackSizes;
 	for (i = 0; i < numFolders; i++) {
 		unsigned pack;
-		uint64_t sum;
+		uint64_t size, sum;
 
 		if (f[i].numUnpackStreams == 0)
 			continue;
@@ -2261,10 +2330,15 @@ read_SubStreamsInfo(struct archive_read *a, struct _7z_substream_info *ss,
 			for (pack = 1; pack < f[i].numUnpackStreams; pack++) {
 				if (parse_7zip_uint64(a, usizes) < 0)
 					return (-1);
+				if (*usizes > UINT64_MAX - sum)
+					return (-1);
 				sum += *usizes++;
 			}
 		}
-		*usizes++ = folder_uncompressed_size(&f[i]) - sum;
+		size = folder_uncompressed_size(&f[i]);
+		if (size < sum)
+			return (-1);
+		*usizes++ = size - sum;
 	}
 
 	if (type == kSize) {
@@ -2358,6 +2432,8 @@ read_StreamsInfo(struct archive_read *a, struct _7z_stream_info *si)
 		packPos = si->pi.pos;
 		for (i = 0; i < si->pi.numPackStreams; i++) {
 			si->pi.positions[i] = packPos;
+			if (packPos > UINT64_MAX - si->pi.sizes[i])
+				return (-1);
 			packPos += si->pi.sizes[i];
 			if (packPos > zip->header_offset)
 				return (-1);
@@ -2379,6 +2455,10 @@ read_StreamsInfo(struct archive_read *a, struct _7z_stream_info *si)
 		f = si->ci.folders;
 		for (i = 0; i < si->ci.numFolders; i++) {
 			f[i].packIndex = packIndex;
+			if (f[i].numPackedStreams > UINT32_MAX)
+				return (-1);
+			if (packIndex > UINT32_MAX - (uint32_t)f[i].numPackedStreams)
+				return (-1);
 			packIndex += (uint32_t)f[i].numPackedStreams;
 			if (packIndex > si->pi.numPackStreams)
 				return (-1);
@@ -2666,6 +2746,28 @@ read_Header(struct archive_read *a, struct _7z_header_info *h,
 			entries[i].flg |= HAS_STREAM;
 		/* The high 16 bits of attributes is a posix file mode. */
 		entries[i].mode = entries[i].attr >> 16;
+
+		if (!(entries[i].attr & FILE_ATTRIBUTE_UNIX_EXTENSION)) {
+			// Only windows permissions specified for this entry. Translate to
+			// reasonable corresponding unix permissions.
+
+			if (entries[i].attr & FILE_ATTRIBUTE_DIRECTORY) {
+				if (entries[i].attr & FILE_ATTRIBUTE_READONLY) {
+					// Read-only directory.
+					entries[i].mode = AE_IFDIR | 0555;
+				} else {
+					// Read-write directory.
+					entries[i].mode = AE_IFDIR | 0755;
+				}
+			} else if (entries[i].attr & FILE_ATTRIBUTE_READONLY) {
+				// Readonly file.
+				entries[i].mode = AE_IFREG | 0444;
+			} else {
+				// Assume read-write file.
+				entries[i].mode = AE_IFREG | 0644;
+			}
+		}
+
 		if (entries[i].flg & HAS_STREAM) {
 			if ((size_t)sindex >= si->ss.unpack_streams)
 				return (-1);
@@ -2706,7 +2808,7 @@ read_Header(struct archive_read *a, struct _7z_header_info *h,
 			}
 			entries[i].ssIndex = -1;
 		}
-		if (entries[i].attr & 0x01)
+		if (entries[i].attr & FILE_ATTRIBUTE_READONLY)
 			entries[i].mode &= ~0222;/* Read only. */
 
 		if ((entries[i].flg & HAS_STREAM) == 0 && indexInFolder == 0) {
@@ -2921,7 +3023,7 @@ slurp_central_directory(struct archive_read *a, struct _7zip *zip,
 	/* CRC check. */
 	if (crc32(0, (const unsigned char *)p + 12, 20)
 	    != archive_le32dec(p + 8)) {
-#ifdef DONT_FAIL_ON_CRC_ERROR
+#ifndef DONT_FAIL_ON_CRC_ERROR
 		archive_set_error(&a->archive, -1, "Header CRC error");
 		return (ARCHIVE_FATAL);
 #endif
@@ -2973,8 +3075,8 @@ slurp_central_directory(struct archive_read *a, struct _7zip *zip,
 
 		/* Check the EncodedHeader CRC.*/
 		if (r == 0 && zip->header_crc32 != next_header_crc) {
-			archive_set_error(&a->archive, -1,
 #ifndef DONT_FAIL_ON_CRC_ERROR
+			archive_set_error(&a->archive, -1,
 			    "Damaged 7-Zip archive");
 			r = -1;
 #endif
@@ -3063,7 +3165,7 @@ get_uncompressed_data(struct archive_read *a, const void **buff, size_t size,
 		/* Copy mode. */
 
 		*buff = __archive_read_ahead(a, minimum, &bytes_avail);
-		if (bytes_avail <= 0) {
+		if (*buff == NULL) {
 			archive_set_error(&a->archive,
 			    ARCHIVE_ERRNO_FILE_FORMAT,
 			    "Truncated 7-Zip file data");
@@ -3369,7 +3471,7 @@ read_stream(struct archive_read *a, const void **buff, size_t size,
 	/*
 	 * Skip the bytes we already has skipped in skip_stream().
 	 */
-	while (skip_bytes) {
+	while (1) {
 		ssize_t skipped;
 
 		if (zip->uncompressed_buffer_bytes_remaining == 0) {
@@ -3389,6 +3491,10 @@ read_stream(struct archive_read *a, const void **buff, size_t size,
 				return (ARCHIVE_FATAL);
 			}
 		}
+
+		if (!skip_bytes)
+			break;
+
 		skipped = get_uncompressed_data(
 			a, buff, (size_t)skip_bytes, 0);
 		if (skipped < 0)

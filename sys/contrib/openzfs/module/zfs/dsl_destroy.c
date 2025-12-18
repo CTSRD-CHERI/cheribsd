@@ -132,10 +132,11 @@ process_old_cb(void *arg, const blkptr_t *bp, boolean_t bp_freed, dmu_tx_t *tx)
 
 	ASSERT(!BP_IS_HOLE(bp));
 
-	if (bp->blk_birth <= dsl_dataset_phys(poa->ds)->ds_prev_snap_txg) {
+	if (BP_GET_LOGICAL_BIRTH(bp) <=
+	    dsl_dataset_phys(poa->ds)->ds_prev_snap_txg) {
 		dsl_deadlist_insert(&poa->ds->ds_deadlist, bp, bp_freed, tx);
 		if (poa->ds_prev && !poa->after_branch_point &&
-		    bp->blk_birth >
+		    BP_GET_LOGICAL_BIRTH(bp) >
 		    dsl_dataset_phys(poa->ds_prev)->ds_prev_snap_txg) {
 			dsl_dataset_phys(poa->ds_prev)->ds_unique_bytes +=
 			    bp_get_dsize_sync(dp->dp_spa, bp);
@@ -215,7 +216,7 @@ dsl_dir_remove_clones_key_impl(dsl_dir_t *dd, uint64_t mintxg, dmu_tx_t *tx,
 		return;
 
 	zap_cursor_t *zc = kmem_alloc(sizeof (zap_cursor_t), KM_SLEEP);
-	zap_attribute_t *za = kmem_alloc(sizeof (zap_attribute_t), KM_SLEEP);
+	zap_attribute_t *za = zap_attribute_alloc();
 
 	for (zap_cursor_init(zc, mos, dsl_dir_phys(dd)->dd_clones);
 	    zap_cursor_retrieve(zc, za) == 0;
@@ -241,7 +242,7 @@ dsl_dir_remove_clones_key_impl(dsl_dir_t *dd, uint64_t mintxg, dmu_tx_t *tx,
 	}
 	zap_cursor_fini(zc);
 
-	kmem_free(za, sizeof (zap_attribute_t));
+	zap_attribute_free(za);
 	kmem_free(zc, sizeof (zap_cursor_t));
 }
 
@@ -313,7 +314,8 @@ dsl_destroy_snapshot_sync_impl(dsl_dataset_t *ds, boolean_t defer, dmu_tx_t *tx)
 
 	ASSERT(RRW_WRITE_HELD(&dp->dp_config_rwlock));
 	rrw_enter(&ds->ds_bp_rwlock, RW_READER, FTAG);
-	ASSERT3U(dsl_dataset_phys(ds)->ds_bp.blk_birth, <=, tx->tx_txg);
+	ASSERT3U(BP_GET_LOGICAL_BIRTH(&dsl_dataset_phys(ds)->ds_bp), <=,
+	    tx->tx_txg);
 	rrw_exit(&ds->ds_bp_rwlock, FTAG);
 	ASSERT(zfs_refcount_is_zero(&ds->ds_longholds));
 
@@ -727,7 +729,7 @@ kill_blkptr(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 		dsl_free(ka->tx->tx_pool, ka->tx->tx_txg, bp);
 	} else {
 		ASSERT(zilog == NULL);
-		ASSERT3U(bp->blk_birth, >,
+		ASSERT3U(BP_GET_LOGICAL_BIRTH(bp), >,
 		    dsl_dataset_phys(ka->ds)->ds_prev_snap_txg);
 		(void) dsl_dataset_block_kill(ka->ds, bp, tx, B_FALSE);
 	}
@@ -1017,7 +1019,8 @@ dsl_destroy_head_sync_impl(dsl_dataset_t *ds, dmu_tx_t *tx)
 	ASSERT(ds->ds_prev == NULL ||
 	    dsl_dataset_phys(ds->ds_prev)->ds_next_snap_obj != ds->ds_object);
 	rrw_enter(&ds->ds_bp_rwlock, RW_READER, FTAG);
-	ASSERT3U(dsl_dataset_phys(ds)->ds_bp.blk_birth, <=, tx->tx_txg);
+	ASSERT3U(BP_GET_LOGICAL_BIRTH(&dsl_dataset_phys(ds)->ds_bp), <=,
+	    tx->tx_txg);
 	rrw_exit(&ds->ds_bp_rwlock, FTAG);
 	ASSERT(RRW_WRITE_HELD(&dp->dp_config_rwlock));
 
@@ -1125,6 +1128,16 @@ dsl_destroy_head_sync_impl(dsl_dataset_t *ds, dmu_tx_t *tx)
 		while ((dbn = avl_destroy_nodes(&ds->ds_bookmarks, &cookie)) !=
 		    NULL) {
 			if (dbn->dbn_phys.zbm_redaction_obj != 0) {
+				dnode_t *rl;
+				VERIFY0(dnode_hold(mos,
+				    dbn->dbn_phys.zbm_redaction_obj, FTAG,
+				    &rl));
+				if (rl->dn_have_spill) {
+					spa_feature_decr(dmu_objset_spa(mos),
+					    SPA_FEATURE_REDACTION_LIST_SPILL,
+					    tx);
+				}
+				dnode_rele(rl, FTAG);
 				VERIFY0(dmu_object_free(mos,
 				    dbn->dbn_phys.zbm_redaction_obj, tx));
 				spa_feature_decr(dmu_objset_spa(mos),

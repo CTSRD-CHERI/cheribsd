@@ -1,5 +1,3 @@
-#	@(#)Makefile	8.1 (Berkeley) 6/12/93
-
 .include <src.opts.mk>
 
 PROG=	netstat
@@ -55,10 +53,6 @@ CFLAGS+=-DPF
 BINGRP=	kmem
 BINMODE=2555
 LIBADD=	kvm memstat xo util
-
-# ld.lld: error: could not determine size of cap reloc against local object nla_p_donemsg
-# >>> defined in route_netlink.c (route_netlink.o:(.rodata+0xDAC0))
-LD_FATAL_WARNINGS=no
 
 .if ${MK_NETGRAPH_SUPPORT} != "no"
 SRCS+=	netgraph.c

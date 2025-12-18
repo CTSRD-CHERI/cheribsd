@@ -1,6 +1,6 @@
-# $Id: Makefile,v 1.199 2023/06/20 17:27:20 sjg Exp $
+# $Id: Makefile,v 1.224 2024/07/13 05:27:35 sjg Exp $
 #
-# $NetBSD: Makefile,v 1.339 2023/06/20 09:25:34 rillig Exp $
+# $NetBSD: Makefile,v 1.350 2024/07/07 09:37:00 rillig Exp $
 #
 # Unit tests for make(1)
 #
@@ -219,7 +219,7 @@ TESTS+=		hanoi-include
 TESTS+=		impsrc
 TESTS+=		include-main
 TESTS+=		job-flags
-#TESTS+=		job-output-long-lines
+TESTS+=		job-output-long-lines
 TESTS+=		job-output-null
 TESTS+=		jobs-empty-commands
 TESTS+=		jobs-empty-commands-error
@@ -251,7 +251,7 @@ TESTS+=		opt-debug-graph1
 TESTS+=		opt-debug-graph2
 TESTS+=		opt-debug-graph3
 TESTS+=		opt-debug-hash
-#TESTS+=		opt-debug-jobs
+TESTS+=		opt-debug-jobs
 TESTS+=		opt-debug-lint
 TESTS+=		opt-debug-loud
 TESTS+=		opt-debug-meta
@@ -403,6 +403,7 @@ TESTS+=		varmod-to-lower
 TESTS+=		varmod-to-many-words
 TESTS+=		varmod-to-one-word
 TESTS+=		varmod-to-separator
+TESTS+=		varmod-to-title
 TESTS+=		varmod-to-upper
 TESTS+=		varmod-undefined
 TESTS+=		varmod-unique
@@ -470,12 +471,43 @@ _shell := ${.SHELL:tA:T}
 .if ${_shell} == "dash" 
 # dash fails -x output
 BROKEN_TESTS+= opt-debug-x-trace
-.elif ${_shell} == "ksh"
-BROKEN_TESTS+= sh-flags
+.elif ${_shell:N*ksh*} == ""
+BROKEN_TESTS+= \
+	deptgt-silent-jobs \
+	job-flags \
+	job-output-long-lines \
+	opt-debug-x-trace \
+	sh-flags \
+	var-op-shell \
+
+.if ${_shell:Nmksh} == ""
+# more broken that pdksh
+BROKEN_TESTS+= \
+	opt-jobs-no-action \
+	sh-errctl \
+	sh-leading-hyphen \
+
+.endif
+.endif
+
+.if ${UTC_1:Uno} == ""
+# this will not work if UTC_1 is set empty
+BROKEN_TESTS+= varmod-localtime
 .endif
 
 .if ${.MAKE.OS:NDarwin} == ""
 BROKEN_TESTS+= shell-ksh
+.endif
+
+.if ${.MAKE.OS:NIRIX*} == ""
+BROKEN_TESTS+= \
+	cmd-interrupt \
+	deptgt-interrupt \
+	job-output-null \
+	opt-chdir \
+	opt-debug-x-trace \
+	sh-leading-hyphen \
+
 .endif
 
 .if ${.MAKE.OS} == "SCO_SV"
@@ -553,6 +585,9 @@ SED_CMDS.directive-include-guard= \
 	-e '/^ParseDependency/d' \
 	-e '/^ParseEOF:/d'
 SED_CMDS.export=	-e '/^[^=_A-Za-z0-9]*=/d'
+.if ${.MAKE.OS:NCygwin} == ""
+SED_CMDS.export+=	-e '/^WINDIR=/d' -e '/^SYSTEMROOT=/d'
+.endif
 SED_CMDS.export-all=	${SED_CMDS.export}
 SED_CMDS.export-env=	${SED_CMDS.export}
 SED_CMDS.cmdline=	-e 's,uid${.MAKE.UID}/,,'
@@ -577,7 +612,7 @@ SED_CMDS.meta-ignore= -e 's,\(\.meta:\) [1-9][0-9]*:,\1 <line>:,'
 SED_CMDS.opt-debug-graph1=	${STD_SED_CMDS.dg1}
 SED_CMDS.opt-debug-graph2=	${STD_SED_CMDS.dg2}
 SED_CMDS.opt-debug-graph3=	${STD_SED_CMDS.dg3}
-SED_CMDS.opt-debug-hash=	-e 's,\(numEntries\)=[1-9][0-9],\1=<entries>,'
+SED_CMDS.opt-debug-hash=	-e 's,\(entries\)=[1-9][0-9],\1=<entries>,'
 SED_CMDS.opt-debug-jobs=	-e 's,([0-9][0-9]*),(<pid>),'
 SED_CMDS.opt-debug-jobs+=	-e 's,pid [0-9][0-9]*,pid <pid>,'
 SED_CMDS.opt-debug-jobs+=	-e 's,Process [0-9][0-9]*,Process <pid>,'
@@ -605,6 +640,7 @@ SED_CMDS.var-op-shell+=		${STD_SED_CMDS.shell}
 SED_CMDS.var-op-shell+=		-e '/command/s,No such.*,not found,'
 SED_CMDS.var-op-shell+=		${STD_SED_CMDS.white-space}
 SED_CMDS.vardebug+=		-e 's,${.SHELL},</path/to/shell>,'
+SED_CMDS.varmod-mtime+=		-e "s,\(.*\)': .*,\1': <ENOENT>,"
 SED_CMDS.varmod-subst-regex+=	${STD_SED_CMDS.regex}
 SED_CMDS.varparse-errors+=	${STD_SED_CMDS.timestamp}
 SED_CMDS.varname-dot-make-meta-ignore_filter+= ${SED_CMDS.meta-ignore}
@@ -634,8 +670,9 @@ unexport-env.rawout: export.mk
 
 # In tests that use the debugging option -dd, ignore debugging output that is
 # only logged in -DCLEANUP mode.
-STD_SED_CMDS.dd=		-e '/^OpenDirs_Done:/d'
-STD_SED_CMDS.dd+=		-e '/^CachedDir /d'
+STD_SED_CMDS.dd=	-e '/^OpenDirs_Done:/d'
+STD_SED_CMDS.dd+=	-e '/^CachedDir /d'
+STD_SED_CMDS.dd+=	-e 's,  ${DEFSYSPATH:U/usr/share/mk} ,  <defsyspath> ,'
 
 # Omit details such as process IDs from the output of the -dg1 option.
 STD_SED_CMDS.dg1=	-e '/\#.* \.$$/d'
@@ -644,6 +681,7 @@ STD_SED_CMDS.dg1+=	-e '/^\#.*\/mk/d'
 STD_SED_CMDS.dg1+=	-e 's,  ${DEFSYSPATH:U/usr/share/mk}$$,  <defsyspath>,'
 STD_SED_CMDS.dg1+=	-e 's,^\(\.MAKE *=\) .*,\1 <details omitted>,'
 STD_SED_CMDS.dg1+=	-e 's,^\(\.MAKE\.[A-Z_]* *=\) .*,\1 <details omitted>,'
+STD_SED_CMDS.dg1+=	-e 's,^\(\.MAKE\.JOBS\.C *=\) .*,\1 <details omitted>,'
 STD_SED_CMDS.dg1+=	-e 's,^\(MACHINE[_ARCH]* *=\) .*,\1 <details omitted>,'
 STD_SED_CMDS.dg1+=	-e 's,^\(MAKE *=\) .*,\1 <details omitted>,'
 STD_SED_CMDS.dg1+=	-e 's,^\(\.SHELL *=\) .*,\1 <details omitted>,'
@@ -728,11 +766,11 @@ all: ${OUTFILES}
 CLEANFILES=		*.rawout *.out *.status *.tmp *.core *.tmp
 CLEANFILES+=		obj*.[och] lib*.a	# posix1.mk
 CLEANFILES+=		issue* .[ab]*		# suffixes.mk
-CLEANDIRS=		dir dummy		# posix1.mk
+CLEANDIRS=		dir dummy *.tmp		# posix1.mk
 
 clean:
-	rm -f ${CLEANFILES}
 	rm -rf ${CLEANDIRS}
+	rm -f ${CLEANFILES}
 
 TEST_MAKE?=	${.MAKE}
 TOOL_SED?=	sed
@@ -740,12 +778,10 @@ TOOL_TR?=	tr
 TOOL_DIFF?=	diff
 DIFF_FLAGS?=	-u
 
-.if defined(.PARSEDIR)
 # ensure consistent results from sort(1)
 LC_ALL=		C
 LANG=		C
 .export LANG LC_ALL
-.endif
 
 .if ${.MAKE.MODE:Unormal:Mmeta} != ""
 # we don't need the noise
@@ -792,7 +828,7 @@ LIMIT_RESOURCES?=	:
 # Postprocess the test output to make the output platform-independent.
 #
 # Replace anything after 'stopped in' with unit-tests
-_SED_CMDS+=	-e '/stopped/s, /.*, unit-tests,'
+_SED_CMDS+=	-e '/stopped/s, in /.*, in unit-tests,'
 # Allow the test files to be placed anywhere.
 _SED_CMDS+=	-e 's,\(\.PARSEDIR}\) = `'"/[^']*'"',\1 = <some-dir>,'
 _SED_CMDS+=	-e 's,\(\.INCLUDEDFROMDIR}\) = `'"/[^']*'"',\1 = <some-dir>,'
@@ -808,6 +844,7 @@ _SED_CMDS+=	-e 's,${.OBJDIR},<curdir>,g' -e 's,${.OBJDIR:tA},<curdir>,g'
 _SED_CMDS+=	-e 's,^${TEST_MAKE:T:S,.,\\.,g}[][0-9]*:,make:,'
 _SED_CMDS+=	-e 's,${TEST_MAKE:S,.,\\.,g},make,'
 _SED_CMDS+=	-e 's,^usage: ${TEST_MAKE:T:S,.,\\.,g} ,usage: make ,'
+_SED_CMDS+=	-e 's,${TEST_MAKE:T:S,.,\\.,g}\(\[[1-9][0-9]*\]:\),make\1,'
 _SED_CMDS+=	-e 's,<curdir>/,,g'
 _SED_CMDS+=	-e 's,${UNIT_TESTS:S,.,\\.,g}/,,g'
 _SED_CMDS+=	-e '/MAKE_VERSION/d'
@@ -817,8 +854,10 @@ _SED_CMDS+=	-e '/EGREP=/d'
 .if ${.MAKE.OS:N*BSD} != ""
 _SED_CMDS+=	-e 's,\(Error code\) 255,\1 1,'
 .endif
-.if ${.SHELL:T} == "ksh"
+.if ${_shell:N*ksh*} == ""
 _SED_CMDS+=	-e '/^set [+-]v/d'
+SED_CMDS.opt-debug-jobs+= -e 's,Command: ksh -v,Command: <shell>,'
+SED_CMDS.opt-debug-jobs+= -e 's,Command: <shell> -v,Command: <shell>,'
 .endif
 _SED_CMDS+=	-e '/EGREP=/d'
 
@@ -849,6 +888,11 @@ test:	${OUTFILES} .PHONY
 	  echo "Failed tests: $${failed}" ; false ; \
 	else \
 	  echo "All tests passed" ; \
+	  lua=${LUA:Ulua} ; \
+	  have_lua=$$("$$lua" -e 'print "yes"' 2>&1) ; \
+	  if [ "$$have_lua" = "yes" -a -s ${.CURDIR}/check-expect.lua ]; then \
+	    (cd ${.CURDIR} && "$$lua" ./check-expect.lua *.mk); \
+	  fi; \
 	fi
 
 accept:

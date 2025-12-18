@@ -29,12 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#if 0
-#ifndef lint
-static const char sccsid[] = "@(#)dir.c	8.8 (Berkeley) 4/28/95";
-#endif /* not lint */
-#endif
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -258,7 +252,7 @@ fsck_readdir(struct inodesc *idesc)
 	dp = (struct direct *)(bp->b_un.b_buf + idesc->id_loc);
 	/*
 	 * Only need to check current entry if it is the first in the
-	 * the block, as later entries will have been checked in the
+	 * block, as later entries will have been checked in the
 	 * previous call to this function.
 	 */
 	if (idesc->id_loc % DIRBLKSIZ != 0 || dircheck(idesc, bp, dp) != 0) {

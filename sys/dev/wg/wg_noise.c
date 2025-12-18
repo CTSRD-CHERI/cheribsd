@@ -61,7 +61,7 @@ struct noise_index {
 };
 
 struct noise_keypair {
-	struct noise_index		 kp_index;
+	struct noise_index		 kp_index __subobject_use_container_bounds;
 	u_int				 kp_refcnt;
 	bool				 kp_can_send;
 	bool				 kp_is_initiator;
@@ -93,7 +93,7 @@ enum noise_handshake_state {
 };
 
 struct noise_remote {
-	struct noise_index		 r_index;
+	struct noise_index		 r_index __subobject_use_container_bounds;
 
 	CK_LIST_ENTRY(noise_remote) 	 r_entry;
 	bool				 r_entry_inserted;
@@ -281,6 +281,7 @@ noise_local_keys(struct noise_local *l, uint8_t public[NOISE_PUBLIC_KEY_LEN],
 static void
 noise_precompute_ss(struct noise_local *l, struct noise_remote *r)
 {
+	rw_assert(&l->l_identity_lock, RA_LOCKED);
 	rw_wlock(&r->r_handshake_lock);
 	if (!l->l_has_identity ||
 	    !curve25519(r->r_ss, l->l_private, r->r_public))
@@ -302,7 +303,10 @@ noise_remote_alloc(struct noise_local *l, void *arg,
 	r->r_handshake_state = HANDSHAKE_DEAD;
 	r->r_last_sent = TIMER_RESET;
 	r->r_last_init_recv = TIMER_RESET;
+
+	rw_rlock(&l->l_identity_lock);
 	noise_precompute_ss(l, r);
+	rw_runlock(&l->l_identity_lock);
 
 	refcount_init(&r->r_refcnt, 1);
 	r->r_local = noise_local_ref(l);

@@ -31,7 +31,7 @@ endif()
 # required for the link to go through. We remove sanitizers from the
 # configuration checks to avoid spurious link errors.
 
-llvm_check_compiler_linker_flag(C "-nostdlib++" CXX_SUPPORTS_NOSTDLIBXX_FLAG)
+llvm_check_compiler_linker_flag(CXX "-nostdlib++" CXX_SUPPORTS_NOSTDLIBXX_FLAG)
 if (CXX_SUPPORTS_NOSTDLIBXX_FLAG)
   set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nostdlib++")
 else()
@@ -85,7 +85,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -Werror=unknown-pragmas")
   check_c_source_compiles("
 #pragma comment(lib, \"c\")
-int main() { return 0; }
+int main(void) { return 0; }
 " C_SUPPORTS_COMMENT_LIB_PRAGMA)
   cmake_pop_check_state()
 endif()
@@ -111,3 +111,5 @@ else()
   check_library_exists(dl dladdr "" LIBUNWIND_HAS_DL_LIB)
   check_library_exists(pthread pthread_once "" LIBUNWIND_HAS_PTHREAD_LIB)
 endif()
+
+check_symbol_exists(dl_c18n_is_trampoline link.h LIBUNWIND_HAS_CHERI_LIB_C18N)

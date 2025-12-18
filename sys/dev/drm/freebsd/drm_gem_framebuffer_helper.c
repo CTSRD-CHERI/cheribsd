@@ -88,7 +88,7 @@ drm_gem_fb_destroy(struct drm_framebuffer *drm_fb)
 		bo = fb->planes[i];
 		if (bo != NULL) {
 			pmap_qremove(fb->planes_vbase[i], bo->npages);
-			vmem_free(kmem_arena, fb->planes_vbase[i], bo->size);
+			vmem_free(kernel_arena, fb->planes_vbase[i], bo->size);
 			drm_gem_object_put_unlocked(&bo->gem_obj);
 		}
 	}
@@ -136,7 +136,7 @@ drm_gem_fb_alloc(struct drm_device *drm,
 	drm_helper_mode_fill_fb_struct(drm, &fb->drm_fb, mode_cmd);
 	for (i = 0; i < fb->nplanes; i++) {
 		fb->planes[i] = planes[i];
-		rv = vmem_alloc(kmem_arena, planes[i]->size,
+		rv = vmem_alloc(kernel_arena, planes[i]->size,
 		    M_WAITOK | M_BESTFIT, &fb->planes_vbase[i]);
 		if (rv != 0)
 			return (ENOMEM);

@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	From: @(#)if_loop.c	8.1 (Berkeley) 6/10/93
  */
 
 /*
@@ -87,11 +85,6 @@ disc_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 
 	sc = malloc(sizeof(struct disc_softc), M_DISC, M_WAITOK | M_ZERO);
 	ifp = sc->sc_ifp = if_alloc(IFT_LOOP);
-	if (ifp == NULL) {
-		free(sc, M_DISC);
-		return (ENOSPC);
-	}
-
 	ifp->if_softc = sc;
 	if_initname(ifp, discname, unit);
 	ifp->if_mtu = DSMTU;
@@ -182,7 +175,7 @@ discoutput(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	M_ASSERTPKTHDR(m);
 
 	/* BPF writes need to be handled specially. */
-	if (dst->sa_family == AF_UNSPEC)
+	if (dst->sa_family == AF_UNSPEC || dst->sa_family == pseudo_AF_HDRCMPLT)
 		bcopy(dst->sa_data, &af, sizeof(af));
 	else
 		af = RO_GET_FAMILY(ro, dst);

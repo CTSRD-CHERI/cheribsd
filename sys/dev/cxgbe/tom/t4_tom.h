@@ -73,8 +73,10 @@ enum {
 	TPF_KTLS           = (1 << 11), /* send TLS records from KTLS */
 	TPF_INITIALIZED    = (1 << 12), /* init_toepcb has been called */
 	TPF_TLS_RECEIVE	   = (1 << 13), /* should receive TLS records */
-	TPF_TLS_RX_QUIESCED = (1 << 14), /* RX quiesced for TLS RX startup */
-	TPF_WAITING_FOR_FINAL = (1<< 15), /* waiting for wakeup on final CPL */
+	TPF_TLS_RX_QUIESCING = (1 << 14), /* RX quiesced for TLS RX startup */
+	TPF_TLS_RX_QUIESCED = (1 << 15), /* RX quiesced for TLS RX startup */
+	TPF_WAITING_FOR_FINAL = (1<< 16), /* waiting for wakeup on final CPL */
+	TPF_IN_TOEP_LIST   = (1 << 17),	/* toep is in the main td->toep_list */
 };
 
 enum {
@@ -85,6 +87,8 @@ enum {
 	DDP_BUF1_ACTIVE	= (1 << 4),	/* buffer 1 in use (not invalidated) */
 	DDP_TASK_ACTIVE = (1 << 5),	/* requeue task is queued / running */
 	DDP_DEAD	= (1 << 6),	/* toepcb is shutting down */
+	DDP_AIO		= (1 << 7),	/* DDP used for AIO, not so_rcv */
+	DDP_RCVBUF	= (1 << 8),	/* DDP used for so_rcv, not AIO */
 };
 
 struct bio;
@@ -156,32 +160,58 @@ TAILQ_HEAD(pagesetq, pageset);
 
 #define	PS_PPODS_WRITTEN	0x0001	/* Page pods written to the card. */
 
-struct ddp_buffer {
-	struct pageset *ps;
-
-	struct kaiocb *job;
-	int cancel_pending;
+struct ddp_rcv_buffer {
+	TAILQ_ENTRY(ddp_rcv_buffer) link;
+	void	*buf;
+	struct ppod_reservation prsv;
+	size_t	len;
+	u_int	refs;
 };
 
+struct ddp_buffer {
+	union {
+		/* DDP_AIO fields */
+		struct {
+			struct pageset *ps;
+			struct kaiocb *job;
+			int	cancel_pending;
+		};
+
+		/* DDP_RCVBUF fields */
+		struct {
+			struct ddp_rcv_buffer *drb;
+			uint32_t placed;
+		};
+	};
+};
+
+/*
+ * (a) - DDP_AIO only
+ * (r) - DDP_RCVBUF only
+ */
 struct ddp_pcb {
+	struct mtx lock;
 	u_int flags;
+	int active_id;	/* the currently active DDP buffer */
 	struct ddp_buffer db[2];
-	TAILQ_HEAD(, pageset) cached_pagesets;
-	TAILQ_HEAD(, kaiocb) aiojobq;
-	u_int waiting_count;
+	union {
+		TAILQ_HEAD(, pageset) cached_pagesets;	/* (a) */
+		TAILQ_HEAD(, ddp_rcv_buffer) cached_buffers; /* (r) */
+	};
+	TAILQ_HEAD(, kaiocb) aiojobq;		/* (a) */
+	u_int waiting_count;			/* (a) */
 	u_int active_count;
 	u_int cached_count;
-	int active_id;	/* the currently active DDP buffer */
 	struct task requeue_task;
-	struct kaiocb *queueing;
-	struct mtx lock;
+	struct kaiocb *queueing;		/* (a) */
+	struct mtx cache_lock;			/* (r) */
 };
 
 struct toepcb {
 	struct tom_data *td;
 	struct inpcb *inp;	/* backpointer to host stack's PCB */
 	u_int flags;		/* miscellaneous flags */
-	TAILQ_ENTRY(toepcb) link; /* toep_list */
+	TAILQ_ENTRY(toepcb) link; /* toep_list or stranded_toep_list */
 	int refcount;
 	struct vnet *vnet;
 	struct vi_info *vi;	/* virtual interface */
@@ -191,6 +221,7 @@ struct toepcb {
 	struct l2t_entry *l2te;	/* L2 table entry used by this connection */
 	struct clip_entry *ce;	/* CLIP table entry used by this tid */
 	int tid;		/* Connection identifier */
+	int incarnation;	/* sc->incarnation when toepcb was allocated */
 
 	/* tx credit handling */
 	u_int tx_total;		/* total tx WR credits (in 16B units) */
@@ -230,6 +261,8 @@ ulp_mode(struct toepcb *toep)
 #define	DDP_LOCK(toep)		mtx_lock(&(toep)->ddp.lock)
 #define	DDP_UNLOCK(toep)	mtx_unlock(&(toep)->ddp.lock)
 #define	DDP_ASSERT_LOCKED(toep)	mtx_assert(&(toep)->ddp.lock, MA_OWNED)
+#define	DDP_CACHE_LOCK(toep)	mtx_lock(&(toep)->ddp.cache_lock)
+#define	DDP_CACHE_UNLOCK(toep)	mtx_unlock(&(toep)->ddp.cache_lock)
 
 /*
  * Compressed state for embryonic connections for a listener.
@@ -238,6 +271,7 @@ struct synq_entry {
 	struct listen_ctx *lctx;	/* backpointer to listen ctx */
 	struct mbuf *syn;
 	int flags;			/* same as toepcb's tp_flags */
+	TAILQ_ENTRY(synq_entry) link;	/* synqe_list */
 	volatile int ok_to_respond;
 	volatile u_int refcnt;
 	int tid;
@@ -246,6 +280,7 @@ struct synq_entry {
 	uint32_t ts;
 	uint32_t rss_hash;
 	__be16 tcp_opt; /* from cpl_pass_establish */
+	int incarnation;
 	struct toepcb *toep;
 
 	struct conn_params params;
@@ -253,13 +288,14 @@ struct synq_entry {
 
 /* listen_ctx flags */
 #define LCTX_RPL_PENDING 1	/* waiting for a CPL_PASS_OPEN_RPL */
+#define LCTX_SETUP_IN_HW 2	/* stid entry is setup in hardware */
 
 struct listen_ctx {
 	LIST_ENTRY(listen_ctx) link;	/* listen hash linkage */
 	volatile int refcount;
 	int stid;
-	struct stid_region stid_region;
 	int flags;
+	bool isipv6;
 	struct inpcb *inp;		/* listening socket's inp */
 	struct vnet *vnet;
 	struct sge_wrq *ctrlq;
@@ -298,6 +334,12 @@ struct tom_data {
 	/* toepcb's associated with this TOE device */
 	struct mtx toep_list_lock;
 	TAILQ_HEAD(, toepcb) toep_list;
+	TAILQ_HEAD(, synq_entry) synqe_list;
+	/* List of tids left stranded because hw stopped abruptly. */
+	TAILQ_HEAD(, toepcb) stranded_atids;
+	TAILQ_HEAD(, toepcb) stranded_tids;
+	TAILQ_HEAD(, synq_entry) stranded_synqe;
+	struct task cleanup_stranded_tids;
 
 	struct mtx lctx_hash_lock;
 	LIST_HEAD(, listen_ctx) *listen_hash;
@@ -437,13 +479,14 @@ __be32 calc_options2(struct vi_info *, struct conn_params *);
 uint64_t select_ntuple(struct vi_info *, struct l2t_entry *);
 int negative_advice(int);
 int add_tid_to_history(struct adapter *, u_int);
+void t4_pcb_detach(struct toedev *, struct tcpcb *);
 
 /* t4_connect.c */
 void t4_init_connect_cpl_handlers(void);
 void t4_uninit_connect_cpl_handlers(void);
 int t4_connect(struct toedev *, struct socket *, struct nhop_object *,
     struct sockaddr *);
-void act_open_failure_cleanup(struct adapter *, u_int, u_int);
+void act_open_failure_cleanup(struct adapter *, struct toepcb *, u_int);
 
 /* t4_listen.c */
 void t4_init_listen_cpl_handlers(void);
@@ -458,7 +501,11 @@ int do_abort_req_synqe(struct sge_iq *, const struct rss_header *,
 int do_abort_rpl_synqe(struct sge_iq *, const struct rss_header *,
     struct mbuf *);
 void t4_offload_socket(struct toedev *, void *, struct socket *);
-void synack_failure_cleanup(struct adapter *, int);
+void synack_failure_cleanup(struct adapter *, struct synq_entry *);
+int alloc_stid_tab(struct adapter *);
+void free_stid_tab(struct adapter *);
+void stop_stid_tab(struct adapter *);
+void restart_stid_tab(struct adapter *);
 
 /* t4_cpl_io.c */
 void aiotx_init_toep(struct toepcb *);
@@ -501,13 +548,11 @@ int t4_write_page_pods_for_buf(struct adapter *, struct toepcb *,
 int t4_write_page_pods_for_sgl(struct adapter *, struct toepcb *,
     struct ppod_reservation *, struct ctl_sg_entry *, int, int, struct mbufq *);
 void t4_free_page_pods(struct ppod_reservation *);
-int t4_soreceive_ddp(struct socket *, struct sockaddr **, struct uio *,
-    struct mbuf **, struct mbuf **, int *);
 int t4_aio_queue_ddp(struct socket *, struct kaiocb *);
+int t4_enable_ddp_rcv(struct socket *, struct toepcb *);
 void t4_ddp_mod_load(void);
 void t4_ddp_mod_unload(void);
 void ddp_assert_empty(struct toepcb *);
-void ddp_init_toep(struct toepcb *);
 void ddp_uninit_toep(struct toepcb *);
 void ddp_queue_toep(struct toepcb *);
 void release_ddp_resources(struct toepcb *toep);

@@ -297,7 +297,7 @@ sort_list_add(struct sort_list *l, struct bwstring *str)
 		size_t indx = l->count;
 
 		if ((l->list == NULL) || (indx >= l->size)) {
-			size_t newsize = (l->size + 1) + 1024;
+			size_t newsize = (l->size + 1) * 2;
 
 			l->list = sort_realloc(l->list,
 			    sizeof(struct sort_list_item*) * newsize);

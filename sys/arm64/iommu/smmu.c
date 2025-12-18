@@ -90,7 +90,6 @@
 #include "opt_platform.h"
 #include "opt_acpi.h"
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/bitstring.h>
 #include <sys/bus.h>
@@ -308,15 +307,6 @@ smmu_write_ack(struct smmu_softc *sc, uint32_t reg,
 	}
 
 	return (0);
-}
-
-static inline int
-ilog2(long x)
-{
-
-	KASSERT(x > 0 && powerof2(x), ("%s: invalid arg %ld", __func__, x));
-
-	return (flsl(x) - 1);
 }
 
 static int
@@ -857,7 +847,6 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_domain *domain)
 		return (ENXIO);
 	}
 
-	cd->size = size;
 	cd->paddr = vtophys(cd->vaddr);
 
 	ptr = cd->vaddr;
@@ -971,10 +960,6 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 	sz = strtab->num_l1_entries * sizeof(struct l1_desc);
 
 	strtab->l1 = malloc(sz, M_SMMU, M_WAITOK | M_ZERO);
-	if (strtab->l1 == NULL) {
-		contigfree(strtab->vaddr, l1size, M_SMMU);
-		return (ENOMEM);
-	}
 
 	reg = STRTAB_BASE_CFG_FMT_2LVL;
 	reg |= size << STRTAB_BASE_CFG_LOG2SIZE_S;
@@ -1024,7 +1009,6 @@ smmu_init_l1_entry(struct smmu_softc *sc, int sid)
 	size = 1 << (STRTAB_SPLIT + ilog2(STRTAB_STE_DWORDS) + 3);
 
 	l1_desc->span = STRTAB_SPLIT + 1;
-	l1_desc->size = size;
 	l1_desc->va = contigmalloc(size, M_SMMU,
 	    M_WAITOK | M_ZERO,	/* flags */
 	    0,			/* low */
@@ -1067,7 +1051,7 @@ smmu_deinit_l1_entry(struct smmu_softc *sc, int sid)
 	*addr = 0;
 
 	l1_desc = &strtab->l1[sid >> STRTAB_SPLIT];
-	contigfree(l1_desc->va, l1_desc->size, M_SMMU);
+	free(l1_desc->va, M_SMMU);
 }
 
 static int
@@ -1775,7 +1759,7 @@ smmu_domain_free(device_t dev, struct iommu_domain *iodom)
 	smmu_tlbi_asid(sc, domain->asid);
 	smmu_asid_free(sc, domain->asid);
 
-	contigfree(cd->vaddr, cd->size, M_SMMU);
+	free(cd->vaddr, M_SMMU);
 	free(cd, M_SMMU);
 
 	free(domain, M_SMMU);

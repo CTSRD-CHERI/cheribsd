@@ -1,4 +1,3 @@
-/* @(#)s_finite.c 5.1 93/09/24 */
 /*
  * ====================================================
  * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -10,7 +9,6 @@
  * ====================================================
  */
 
-#include <sys/cdefs.h>
 /*
  * finite(x) returns 1 is x is finite, else 0;
  * no branching!

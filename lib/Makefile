@@ -1,5 +1,3 @@
-#	@(#)Makefile	8.1 (Berkeley) 6/4/93
-
 .include <src.opts.mk>
 
 # The SUBDIR_BOOTSTRAP list is a small set of libraries which are used by many
@@ -19,9 +17,11 @@ SUBDIR_BOOTSTRAP= \
 	cheri-libc++ \
 	cheri-libc++experimental \
 	libcxxrt \
+	libdiff \
 	libelf \
 	libssp \
 	libssp_nonshared \
+	libsys \
 	msun
 
 # The main list; please keep these sorted alphabetically.
@@ -42,7 +42,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libbsdstat \
 	libbsm \
 	libbz2 \
-	libc_nosyscalls \
 	libcalendar \
 	libcam \
 	libcapsicum \
@@ -69,6 +68,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libiscsiutil \
 	libjail \
 	libkiconv \
+	libkldelf \
 	libkvm \
 	liblua \
 	liblzma \
@@ -80,6 +80,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	lib80211 \
 	${_libnetmap} \
 	libnv \
+	libnvmf \
 	libopenbsd \
 	libpam \
 	libpathconv \
@@ -115,7 +116,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 
 .if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
 .if !defined(COMPAT_LIBCOMPAT) || ${COMPAT_LIBCOMPAT} == "64CB"
-SUBDIR+=	libc_c18n libthr_c18n
+SUBDIR+=	c18n
 .endif
 .endif
 
@@ -138,9 +139,10 @@ SUBDIR_DEPEND_libbsnmp= ${_libnetgraph}
 SUBDIR_DEPEND_cheri-libc++:= libcxxrt
 # libssp_nonshared doesn't need to be linked into libc on every arch, but it is
 # small enough to build that this bit of serialization is likely insignificant.
-SUBDIR_DEPEND_libc= libcompiler_rt libssp_nonshared
+SUBDIR_DEPEND_libc= libsys libcompiler_rt libssp_nonshared
 SUBDIR_DEPEND_libcam= libsbuf
 SUBDIR_DEPEND_libcasper= libnv
+SUBDIR_DEPEND_libcrypt= libmd
 SUBDIR_DEPEND_libdevstat= libkvm
 SUBDIR_DEPEND_libdpv= libfigpar ncurses libutil
 SUBDIR_DEPEND_libedit= ncurses
@@ -153,6 +155,8 @@ SUBDIR_DEPEND_libpjdlog= libutil
 SUBDIR_DEPEND_libprocstat= libkvm libutil
 SUBDIR_DEPEND_libradius= libmd
 SUBDIR_DEPEND_libsmb= libkiconv
+# See comment above about libssp_nonshared
+SUBDIR_DEPEND_libsys= libcompiler_rt libssp_nonshared
 SUBDIR_DEPEND_libtacplus= libmd
 SUBDIR_DEPEND_libulog= libmd
 SUBDIR_DEPEND_libunbound= ${_libldns}
@@ -162,23 +166,12 @@ SUBDIR_DEPEND_libpcap= ofed
 .endif
 SUBDIR_DEPEND_nss_tacplus= libtacplus
 
-.if !defined(COMPAT_LIBCOMPAT)
-SUBDIR+=	flua
-SUBDIR_DEPEND_flua=	libjail
-.endif
-
 # NB: keep these sorted by MK_* knobs
 
 SUBDIR.${MK_BEARSSL}+=	libbearssl libsecureboot
 SUBDIR.${MK_BLACKLIST}+=libblacklist
 SUBDIR.${MK_BLUETOOTH}+=libbluetooth libsdp
 SUBDIR.${MK_BSNMP}+=	libbsnmp
-
-.if ${MACHINE_CPU:Mcheri}
-# XXX: should build on all architectures, but only needed for CHERI
-# right now and broken on amd64.
-SUBDIR+=	libsyscalls
-.endif
 
 .if ${MACHINE_ABI:Mpurecap} && ${MK_CHERI_CAPREVOKE} == "yes"
 SUBDIR+=	libcheri_caprevoke
@@ -215,7 +208,8 @@ SUBDIR.${MK_LDNS}+=	libldns
 SUBDIR.${MK_STATS}+=	libstats
 
 # The libraries under libclang_rt can only be built by clang.
-.if ${COMPILER_TYPE} == "clang" && !${MACHINE_ABI:Mpurecap}
+.if ${COMPILER_TYPE} == "clang" && ${MK_CLANG} != "no" && \
+    !${MACHINE_ABI:Mpurecap}
 _libclang_rt=	libclang_rt
 .elif (${MK_ASAN} != "no" || ${MK_UBSAN} != "no") && make(all)
 .error Requested build with sanitizers but cannot build runtime libraries!

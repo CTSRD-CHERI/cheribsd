@@ -1,6 +1,6 @@
-
 .include <src.opts.mk>
 
+PACKAGE=	ntp
 FILESDIR=	${SHAREDIR}/doc/ntp/pic
 
 .if ${MK_HTML} != "no"

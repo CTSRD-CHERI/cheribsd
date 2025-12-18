@@ -4,10 +4,6 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
-#if !defined(lint)
-static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-2000 Darren Reed";
-static const char rcsid[] = "@(#)$Id$";
-#endif
 
 #include "ipf.h"
 
@@ -689,7 +685,7 @@ emitGroup(int num, int dir, void *v, frentry_t *fr, char *group,
 	if (n) {
 		/*
 		 * Calculate the indentation interval upto the last common
-		 * common comparison being made.
+		 * comparison being made.
 		 */
 		for (i = 0, in = 1; i < FRC_MAX; i++) {
 			if (n[i].c != m[i].c)

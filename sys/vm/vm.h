@@ -28,10 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)vm.h	8.2 (Berkeley) 12/13/93
- *	@(#)vm_prot.h	8.1 (Berkeley) 6/11/93
- *	@(#)vm_inherit.h	8.1 (Berkeley) 6/11/93
- *
  * Copyright (c) 1987, 1990 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -80,9 +76,11 @@ typedef u_char vm_prot_t;	/* protection codes */
 #define	VM_PROT_EXECUTE		((vm_prot_t) 0x04)
 #define	VM_PROT_READ_CAP	((vm_prot_t) 0x08)
 #define	VM_PROT_WRITE_CAP	((vm_prot_t) 0x10)
-#define	VM_PROT_COPY		((vm_prot_t) 0x20)	/* copy-on-read */
-#define	VM_PROT_PRIV_FLAG	((vm_prot_t) 0x40)
+#define	VM_PROT_NO_IMPLY_CAP	((vm_prot_t) 0x20)
+#define	VM_PROT_COPY		((vm_prot_t) 0x40)	/* copy-on-read */
+#define	VM_PROT_PRIV_FLAG	((vm_prot_t) 0x80)
 #define	VM_PROT_FAULT_LOOKUP	VM_PROT_PRIV_FLAG
+#define	VM_PROT_NO_PROMOTE	VM_PROT_PRIV_FLAG
 #define	VM_PROT_QUICK_NOFAULT	VM_PROT_PRIV_FLAG	/* same to save bits */
 
 #define	VM_PROT_RWX		(VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE)
@@ -90,11 +88,20 @@ typedef u_char vm_prot_t;	/* protection codes */
 #define	VM_PROT_DEFAULT		VM_PROT_RWX
 #define	VM_PROT_CAP		(VM_PROT_READ_CAP|VM_PROT_WRITE_CAP)
 #define	VM_PROT_RW_CAP		(VM_PROT_RW|VM_PROT_CAP)
-#define	VM_PROT_ALL		(VM_PROT_RWX|VM_PROT_CAP)
+#define	VM_PROT_ALL		(VM_PROT_RWX|VM_PROT_CAP|VM_PROT_NO_IMPLY_CAP)
 
-#define	VM_PROT_ADD_CAP(prot)						\
-	((prot) | (((prot) & VM_PROT_READ) != 0 ? VM_PROT_READ_CAP : 0) | \
-	    (((prot) & VM_PROT_WRITE) != 0 ? VM_PROT_WRITE_CAP : 0))
+#define	VM_PROT_ADD_CAP(prot)	 __extension__ ({			\
+	vm_prot_t cp, p;						\
+									\
+	cp = p = (prot);						\
+	if ((p & (VM_PROT_CAP | VM_PROT_NO_IMPLY_CAP)) == 0) {		\
+		if ((p & VM_PROT_READ) != 0)				\
+			cp |= VM_PROT_READ_CAP;				\
+		if ((p & VM_PROT_WRITE) != 0)				\
+			cp |= VM_PROT_WRITE_CAP;			\
+	}								\
+	cp |= VM_PROT_NO_IMPLY_CAP;					\
+})
 
 #define	VM_PROT_EXTRACT(prot)	((prot) & VM_PROT_ALL)
 
@@ -175,6 +182,12 @@ struct kva_md_info {
 #define	SWAP_RESERVE_RLIMIT_ON		(1 << 1)
 #define	SWAP_RESERVE_ALLOW_NONWIRED	(1 << 2)
 
+#ifdef NUMA
+#define	__numa_used
+#else
+#define	__numa_used	__unused
+#endif
+
 #ifdef _KERNEL
 struct ucred;
 
@@ -184,7 +197,6 @@ bool swap_reserve_by_cred(vm_ooffset_t incr, struct ucred *cred);
 void swap_reserve_force(vm_ooffset_t incr);
 void swap_release(vm_ooffset_t decr);
 void swap_release_by_cred(vm_ooffset_t decr, struct ucred *cred);
-void swapper(void);
 
 extern struct kva_md_info	kmi;
 #define VA_IS_CLEANMAP(va)					\

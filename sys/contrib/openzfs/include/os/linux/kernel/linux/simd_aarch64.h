@@ -56,24 +56,20 @@
 #include <asm/elf.h>
 #include <asm/hwcap.h>
 #include <linux/version.h>
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)
 #include <asm/sysreg.h>
-#else
-#define	sys_reg(op0, op1, crn, crm, op2) ( \
-	((op0) << Op0_shift) | \
-	((op1) << Op1_shift) | \
-	((crn) << CRn_shift) | \
-	((crm) << CRm_shift) | \
-	((op2) << Op2_shift))
-#endif
 
 #define	ID_AA64PFR0_EL1		sys_reg(3, 0, 0, 1, 0)
 #define	ID_AA64ISAR0_EL1	sys_reg(3, 0, 0, 6, 0)
 
+#if (defined(HAVE_KERNEL_NEON) && defined(CONFIG_KERNEL_MODE_NEON))
 #define	kfpu_allowed()		1
 #define	kfpu_begin()		kernel_neon_begin()
 #define	kfpu_end()		kernel_neon_end()
+#else
+#define	kfpu_allowed()		0
+#define	kfpu_begin()		do {} while (0)
+#define	kfpu_end()		do {} while (0)
+#endif
 #define	kfpu_init()		(0)
 #define	kfpu_fini()		do {} while (0)
 

@@ -58,7 +58,7 @@ typedef struct link_map {
 	caddr_t		l_base;			/* Base Address of library */
 	const char	*l_name;		/* Absolute Path to Library */
 	const void	*l_ld;			/* Pointer to .dynamic in memory */
-	struct link_map	*l_next, *l_prev;	/* linked list of of mapped libs */
+	struct link_map	*l_next, *l_prev;	/* linked list of mapped libs */
 	caddr_t		l_addr;			/* Load Offset of library */
 	const char	*l_refname;		/* object we are filtering for */
 } Link_map;
@@ -74,6 +74,14 @@ struct r_debug {
 		RT_DELETE			/* removing a shared library */
 	}		r_state;
 	void		*r_ldbase;		/* Base address of rtld */
+#if defined(IN_RTLD) && defined(CHERI_LIB_C18N)
+	enum {
+		RCT_CONSISTENT,			/* vector is stable */
+		RCT_ADD,			/* adding a compartment */
+	}		r_comparts_state;
+	int		r_comparts_size;
+	void		*r_comparts;		/* struct compart [] */
+#endif
 };
 
 #define	R_DEBUG_VERSION		1
@@ -101,6 +109,14 @@ extern int dl_iterate_phdr(__dl_iterate_hdr_callback, void *);
 int _rtld_addr_phdr(const void *, struct dl_phdr_info *);
 int _rtld_get_stack_prot(void);
 int _rtld_is_dlopened(void *);
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(__aarch64__)
+#include <machine/c18n.h>
+void *dl_c18n_get_trusted_stack(uintptr_t);
+void dl_c18n_unwind_trusted_stack(void *, void *);
+int dl_c18n_is_trampoline(uintptr_t, void *);
+void *dl_c18n_pop_trusted_stack(struct dl_c18n_compart_state *, void *);
+#endif
 
 #ifdef __ARM_EABI__
 void * dl_unwind_find_exidx(const void *, int *);

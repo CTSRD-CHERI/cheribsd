@@ -1,0 +1,9 @@
+{
+    "compartments": {
+	"jemalloc": {
+	    "files": [
+		"jemalloc_*.*o"
+	    ]
+	}
+    }
+}

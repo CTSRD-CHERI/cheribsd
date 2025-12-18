@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <err.h>
 #include <errno.h>
 #include <netdb.h>
 
@@ -43,12 +42,12 @@ nl_init_socket(struct snl_state *ss)
 	if (modfind("netlink") == -1 && errno == ENOENT) {
 		/* Try to load */
 		if (kldload("netlink") == -1)
-			err(1, "netlink is not loaded and load attempt failed");
+			xo_err(1, "netlink is not loaded and load attempt failed");
 		if (snl_init(ss, NETLINK_ROUTE))
 			return;
 	}
 
-	err(1, "unable to open netlink socket");
+	xo_err(1, "unable to open netlink socket");
 }
 
 static bool
@@ -63,7 +62,7 @@ get_link_info(struct snl_state *ss, uint32_t ifindex,
 	struct ifinfomsg *ifmsg = snl_reserve_msg_object(&nw, struct ifinfomsg);
 	if (ifmsg != NULL)
 		ifmsg->ifi_index = ifindex;
-	if (!snl_finalize_msg(&nw) || !snl_send_message(ss, hdr))
+	if (! (hdr = snl_finalize_msg(&nw)) || !snl_send_message(ss, hdr))
 		return (false);
 
 	hdr = snl_read_reply(ss, hdr->nlmsg_seq);
@@ -116,7 +115,7 @@ guess_ifindex(struct snl_state *ss, uint32_t fibnum, struct in_addr addr)
 	snl_add_msg_attr_ip(&nw, RTA_DST, (struct sockaddr *)&dst);
 	snl_add_msg_attr_u32(&nw, RTA_TABLE, fibnum);
 
-	if (!snl_finalize_msg(&nw) || !snl_send_message(ss, hdr))
+	if (! (hdr = snl_finalize_msg(&nw)) || !snl_send_message(ss, hdr))
 		return (0);
 
 	hdr = snl_read_reply(ss, hdr->nlmsg_seq);
@@ -148,7 +147,7 @@ guess_ifindex(struct snl_state *ss, uint32_t fibnum, struct in_addr addr)
 	snl_add_msg_attr_u32(&nw, NHAF_TABLE, fibnum);
 	snl_end_attr_nested(&nw, off);
 
-	if (!snl_finalize_msg(&nw) || !snl_send_message(ss, hdr))
+	if (! (hdr = snl_finalize_msg(&nw)) || !snl_send_message(ss, hdr))
 		return (0);
 
 	hdr = snl_read_reply(ss, hdr->nlmsg_seq);
@@ -281,10 +280,11 @@ print_entries_nl(uint32_t ifindex, struct in_addr addr)
 	struct ndmsg *ndmsg = snl_reserve_msg_object(&nw, struct ndmsg);
 	if (ndmsg != NULL) {
 		ndmsg->ndm_family = AF_INET;
+		/* let kernel filter results by interface if provided */
 		ndmsg->ndm_ifindex = ifindex;
 	}
 
-	if (!snl_finalize_msg(&nw) || !snl_send_message(&ss_req, hdr)) {
+	if (! (hdr = snl_finalize_msg(&nw)) || !snl_send_message(&ss_req, hdr)) {
 		snl_free(&ss_req);
 		return (0);
 	}
@@ -296,6 +296,7 @@ print_entries_nl(uint32_t ifindex, struct in_addr addr)
 
 	while ((hdr = snl_read_reply_multi(&ss_req, nlmsg_seq, &e)) != NULL) {
 		struct snl_parsed_neigh neigh = {};
+		struct sockaddr_in *neighaddr;
 
 		if (!snl_parse_nlmsg(&ss_req, hdr, &snl_rtm_neigh_parser, &neigh))
 			continue;
@@ -306,6 +307,12 @@ print_entries_nl(uint32_t ifindex, struct in_addr addr)
 			if (!get_link_info(&ss_cmd, neigh.nda_ifindex, &link))
 				continue;
 		}
+
+		/* filter results based on host if provided */
+		neighaddr = (struct sockaddr_in *)neigh.nda_dst;
+		if (addr.s_addr &&
+		    (addr.s_addr != neighaddr->sin_addr.s_addr))
+			continue;
 
 		print_entry(&neigh, &link);
 		count++;
@@ -347,7 +354,7 @@ delete_nl(uint32_t ifindex, char *host)
 	}
 	snl_add_msg_attr_ip(&nw, NDA_DST, (struct sockaddr *)dst);
 
-	if (!snl_finalize_msg(&nw) || !snl_send_message(&ss, hdr)) {
+	if (! (hdr = snl_finalize_msg(&nw)) || !snl_send_message(&ss, hdr)) {
 		snl_free(&ss);
 		return (1);
 	}
@@ -377,13 +384,10 @@ set_nl(uint32_t ifindex, struct sockaddr_in *dst, struct sockaddr_dl *sdl, char 
 
 	ifindex = fix_ifindex(&ss, ifindex, dst->sin_addr);
 	if (ifindex == 0) {
-		xo_warnx("delete: cannot locate %s", host);
+		xo_warnx("set: cannot locate %s", host);
 		snl_free(&ss);
 		return (0);
 	}
-
-	if (opts.expire_time != 0)
-		opts.flags &= ~RTF_STATIC;
 
 	snl_init_writer(&ss, &nw);
 	struct nlmsghdr *hdr = snl_create_msg_request(&nw, RTM_NEWNEIGH);
@@ -394,11 +398,12 @@ set_nl(uint32_t ifindex, struct sockaddr_in *dst, struct sockaddr_dl *sdl, char 
 
 		ndmsg->ndm_family = AF_INET;
 		ndmsg->ndm_ifindex = ifindex;
-		ndmsg->ndm_state = (opts.flags & RTF_STATIC) ? NUD_PERMANENT : NUD_NONE;
+		ndmsg->ndm_state = (opts.expire_time == 0) ? \
+		    NUD_PERMANENT : NUD_NONE;
 
 		if (opts.flags & RTF_ANNOUNCE)
 			nl_flags |= NTF_PROXY;
-		if (opts.flags & RTF_STATIC)
+		if (opts.expire_time == 0)
 			nl_flags |= NTF_STICKY;
 		ndmsg->ndm_flags = nl_flags;
 	}
@@ -414,7 +419,7 @@ set_nl(uint32_t ifindex, struct sockaddr_in *dst, struct sockaddr_dl *sdl, char 
 		snl_end_attr_nested(&nw, off);
 	}
 
-	if (!snl_finalize_msg(&nw) || !snl_send_message(&ss, hdr)) {
+	if (! (hdr = snl_finalize_msg(&nw)) || !snl_send_message(&ss, hdr)) {
 		snl_free(&ss);
 		return (1);
 	}

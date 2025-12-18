@@ -25,7 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
@@ -151,8 +150,8 @@ listhooks(int argc __unused, char *argv[] __unused)
 	u_int nhooks, i;
 
 	plh.pio_nhooks = 0;
-	if (ioctl(dev, PFILIOC_LISTHEADS, &plh) != 0)
-		err(1, "ioctl(PFILIOC_LISTHEADS)");
+	if (ioctl(dev, PFILIOC_LISTHOOKS, &plh) != 0)
+		err(1, "ioctl(PFILIOC_LISTHOOKS)");
 retry:
 	plh.pio_hooks = calloc(plh.pio_nhooks, sizeof(struct pfilioc_hook));
 	if (plh.pio_hooks == NULL)

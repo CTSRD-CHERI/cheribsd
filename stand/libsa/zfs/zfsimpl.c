@@ -24,7 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 /*
  *	Stand-alone ZFS file reader.
  */
@@ -113,23 +112,18 @@ typedef struct indirect_vsd {
 static vdev_list_t zfs_vdevs;
 
 /*
- * List of ZFS features supported for read
+ * List of supported read-incompatible ZFS features.  Do not add here features
+ * marked as ZFEATURE_FLAG_READONLY_COMPAT, they are irrelevant for read-only!
  */
 static const char *features_for_read[] = {
 	"com.datto:bookmark_v2",
 	"com.datto:encryption",
-	"com.datto:resilver_defer",
 	"com.delphix:bookmark_written",
 	"com.delphix:device_removal",
 	"com.delphix:embedded_data",
 	"com.delphix:extensible_dataset",
 	"com.delphix:head_errlog",
 	"com.delphix:hole_birth",
-	"com.delphix:obsolete_counts",
-	"com.delphix:spacemap_histogram",
-	"com.delphix:spacemap_v2",
-	"com.delphix:zpool_checkpoint",
-	"com.intel:allocation_classes",
 	"com.joyent:multi_vdev_crash_dump",
 	"com.klarasystems:vdev_zaps_v2",
 	"org.freebsd:zstd_compress",
@@ -138,7 +132,6 @@ static const char *features_for_read[] = {
 	"org.illumos:skein",
 	"org.open-zfs:large_blocks",
 	"org.openzfs:blake3",
-	"org.zfsonlinux:allocation_classes",
 	"org.zfsonlinux:large_dnode",
 	NULL
 };
@@ -1688,14 +1681,14 @@ static int
 vdev_write_bootenv_impl(vdev_t *vdev, vdev_boot_envblock_t *be)
 {
 	vdev_t *kid;
-	int rv = 0, rc;
+	int rv = 0, err;
 
 	STAILQ_FOREACH(kid, &vdev->v_children, v_childlink) {
 		if (kid->v_state != VDEV_STATE_HEALTHY)
 			continue;
-		rc = vdev_write_bootenv_impl(kid, be);
-		if (rv == 0)
-			rv = rc;
+		err = vdev_write_bootenv_impl(kid, be);
+		if (err != 0)
+			rv = err;
 	}
 
 	/*
@@ -1705,12 +1698,12 @@ vdev_write_bootenv_impl(vdev_t *vdev, vdev_boot_envblock_t *be)
 		return (rv);
 
 	for (int l = 0; l < VDEV_LABELS; l++) {
-		rc = vdev_label_write(vdev, l, be,
+		err = vdev_label_write(vdev, l, be,
 		    offsetof(vdev_label_t, vl_be));
-		if (rc != 0) {
+		if (err != 0) {
 			printf("failed to write bootenv to %s label %d: %d\n",
-			    vdev->v_name ? vdev->v_name : "unknown", l, rc);
-			rv = rc;
+			    vdev->v_name ? vdev->v_name : "unknown", l, err);
+			rv = err;
 		}
 	}
 	return (rv);

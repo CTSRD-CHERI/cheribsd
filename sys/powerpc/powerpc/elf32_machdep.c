@@ -122,7 +122,7 @@ struct sysentvec elf32_freebsd_sysvec = {
 #endif
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_ABI_FREEBSD | SV_ILP32 | SV_SHP | SV_ASLR |
-			    SV_TIMEKEEP | SV_RNG_SEED_VER,
+			    SV_TIMEKEEP | SV_RNG_SEED_VER | SV_SIGSYS,
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_shared_page_base = FREEBSD32_SHAREDPAGE,
@@ -236,7 +236,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 {
 	Elf_Addr *where;
 	Elf_Half *hwhere;
-	Elf_Addr addr;
+	uintptr_t addr;
 	Elf_Addr addend, val;
 	Elf_Word rtype, symidx;
 	const Elf_Rela *rela;

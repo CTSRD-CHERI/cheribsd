@@ -33,7 +33,8 @@
  *     under sponsorship from the FreeBSD Foundation.
  * Copyright (c) 2021 Allan Jude
  * Copyright (c) 2021 Toomas Soome <tsoome@me.com>
- * Copyright (c) 2023, Klara Inc.
+ * Copyright (c) 2023, 2024, Klara Inc.
+ * Copyright (c) 2023, Rob Norris <robn@despairlabs.com>
  */
 
 #include <stdio.h>
@@ -47,6 +48,7 @@
 #include <sys/spa_impl.h>
 #include <sys/dmu.h>
 #include <sys/zap.h>
+#include <sys/zap_impl.h>
 #include <sys/fs/zfs.h>
 #include <sys/zfs_znode.h>
 #include <sys/zfs_sa.h>
@@ -73,48 +75,27 @@
 #include <sys/arc.h>
 #include <sys/arc_impl.h>
 #include <sys/ddt.h>
+#include <sys/ddt_impl.h>
 #include <sys/zfeature.h>
 #include <sys/abd.h>
 #include <sys/blkptr.h>
 #include <sys/dsl_crypt.h>
 #include <sys/dsl_scan.h>
 #include <sys/btree.h>
+#include <sys/brt.h>
+#include <sys/brt_impl.h>
 #include <zfs_comutil.h>
 #include <sys/zstd/zstd.h>
+#include <sys/backtrace.h>
 
 #include <libnvpair.h>
 #include <libzutil.h>
+#include <libzfs_core.h>
+
+#include <libzdb.h>
 
 #include "zdb.h"
 
-#define	ZDB_COMPRESS_NAME(idx) ((idx) < ZIO_COMPRESS_FUNCTIONS ?	\
-	zio_compress_table[(idx)].ci_name : "UNKNOWN")
-#define	ZDB_CHECKSUM_NAME(idx) ((idx) < ZIO_CHECKSUM_FUNCTIONS ?	\
-	zio_checksum_table[(idx)].ci_name : "UNKNOWN")
-#define	ZDB_OT_TYPE(idx) ((idx) < DMU_OT_NUMTYPES ? (idx) :		\
-	(idx) == DMU_OTN_ZAP_DATA || (idx) == DMU_OTN_ZAP_METADATA ?	\
-	DMU_OT_ZAP_OTHER : \
-	(idx) == DMU_OTN_UINT64_DATA || (idx) == DMU_OTN_UINT64_METADATA ? \
-	DMU_OT_UINT64_OTHER : DMU_OT_NUMTYPES)
-
-/* Some platforms require part of inode IDs to be remapped */
-#ifdef __APPLE__
-#define	ZDB_MAP_OBJECT_ID(obj) INO_XNUTOZFS(obj, 2)
-#else
-#define	ZDB_MAP_OBJECT_ID(obj) (obj)
-#endif
-
-static const char *
-zdb_ot_name(dmu_object_type_t type)
-{
-	if (type < DMU_OT_NUMTYPES)
-		return (dmu_ot[type].ot_name);
-	else if ((type & DMU_OT_NEWTYPE) &&
-	    ((type & DMU_OT_BYTESWAP_MASK) < DMU_BSWAP_NUMFUNCS))
-		return (dmu_ot_byteswap[type & DMU_OT_BYTESWAP_MASK].ob_name);
-	else
-		return ("UNKNOWN");
-}
 
 extern int reference_tracking_enable;
 extern int zfs_recover;
@@ -132,39 +113,19 @@ typedef void object_viewer_t(objset_t *, uint64_t, void *data, size_t size);
 static uint64_t *zopt_metaslab = NULL;
 static unsigned zopt_metaslab_args = 0;
 
-typedef struct zopt_object_range {
-	uint64_t zor_obj_start;
-	uint64_t zor_obj_end;
-	uint64_t zor_flags;
-} zopt_object_range_t;
 
 static zopt_object_range_t *zopt_object_ranges = NULL;
 static unsigned zopt_object_args = 0;
 
 static int flagbits[256];
 
-#define	ZOR_FLAG_PLAIN_FILE	0x0001
-#define	ZOR_FLAG_DIRECTORY	0x0002
-#define	ZOR_FLAG_SPACE_MAP	0x0004
-#define	ZOR_FLAG_ZAP		0x0008
-#define	ZOR_FLAG_ALL_TYPES	-1
-#define	ZOR_SUPPORTED_FLAGS	(ZOR_FLAG_PLAIN_FILE	| \
-				ZOR_FLAG_DIRECTORY	| \
-				ZOR_FLAG_SPACE_MAP	| \
-				ZOR_FLAG_ZAP)
-
-#define	ZDB_FLAG_CHECKSUM	0x0001
-#define	ZDB_FLAG_DECOMPRESS	0x0002
-#define	ZDB_FLAG_BSWAP		0x0004
-#define	ZDB_FLAG_GBH		0x0008
-#define	ZDB_FLAG_INDIRECT	0x0010
-#define	ZDB_FLAG_RAW		0x0020
-#define	ZDB_FLAG_PRINT_BLKPTR	0x0040
-#define	ZDB_FLAG_VERBOSE	0x0080
 
 static uint64_t max_inflight_bytes = 256 * 1024 * 1024; /* 256MB */
 static int leaked_objects = 0;
 static range_tree_t *mos_refd_objs;
+static spa_t *spa;
+static objset_t *os;
+static boolean_t kernel_init_done;
 
 static void snprintf_blkptr_compact(char *, size_t, const blkptr_t *,
     boolean_t);
@@ -173,64 +134,10 @@ static void mos_obj_refd_multiple(uint64_t);
 static int dump_bpobj_cb(void *arg, const blkptr_t *bp, boolean_t free,
     dmu_tx_t *tx);
 
-typedef struct sublivelist_verify {
-	/* FREE's that haven't yet matched to an ALLOC, in one sub-livelist */
-	zfs_btree_t sv_pair;
 
-	/* ALLOC's without a matching FREE, accumulates across sub-livelists */
-	zfs_btree_t sv_leftover;
-} sublivelist_verify_t;
-
-static int
-livelist_compare(const void *larg, const void *rarg)
-{
-	const blkptr_t *l = larg;
-	const blkptr_t *r = rarg;
-
-	/* Sort them according to dva[0] */
-	uint64_t l_dva0_vdev, r_dva0_vdev;
-	l_dva0_vdev = DVA_GET_VDEV(&l->blk_dva[0]);
-	r_dva0_vdev = DVA_GET_VDEV(&r->blk_dva[0]);
-	if (l_dva0_vdev < r_dva0_vdev)
-		return (-1);
-	else if (l_dva0_vdev > r_dva0_vdev)
-		return (+1);
-
-	/* if vdevs are equal, sort by offsets. */
-	uint64_t l_dva0_offset;
-	uint64_t r_dva0_offset;
-	l_dva0_offset = DVA_GET_OFFSET(&l->blk_dva[0]);
-	r_dva0_offset = DVA_GET_OFFSET(&r->blk_dva[0]);
-	if (l_dva0_offset < r_dva0_offset) {
-		return (-1);
-	} else if (l_dva0_offset > r_dva0_offset) {
-		return (+1);
-	}
-
-	/*
-	 * Since we're storing blkptrs without cancelling FREE/ALLOC pairs,
-	 * it's possible the offsets are equal. In that case, sort by txg
-	 */
-	if (l->blk_birth < r->blk_birth) {
-		return (-1);
-	} else if (l->blk_birth > r->blk_birth) {
-		return (+1);
-	}
-	return (0);
-}
-
-typedef struct sublivelist_verify_block {
-	dva_t svb_dva;
-
-	/*
-	 * We need this to check if the block marked as allocated
-	 * in the livelist was freed (and potentially reallocated)
-	 * in the metaslab spacemaps at a later TXG.
-	 */
-	uint64_t svb_allocated_txg;
-} sublivelist_verify_block_t;
 
 static void zdb_print_blkptr(const blkptr_t *bp, int flags);
+static void zdb_exit(int reason);
 
 typedef struct sublivelist_verify_block_refcnt {
 	/* block pointer entry in livelist being verified */
@@ -299,7 +206,8 @@ sublivelist_verify_blkptr(void *arg, const blkptr_t *bp, boolean_t free,
 					break;
 				sublivelist_verify_block_t svb = {
 				    .svb_dva = bp->blk_dva[i],
-				    .svb_allocated_txg = bp->blk_birth
+				    .svb_allocated_txg =
+				    BP_GET_LOGICAL_BIRTH(bp)
 				};
 
 				if (zfs_btree_find(&sv->sv_leftover, &svb,
@@ -898,6 +806,8 @@ usage(void)
 	    "don't print label contents\n");
 	(void) fprintf(stderr, "        -t --txg=INTEGER             "
 	    "highest txg to use when searching for uberblocks\n");
+	(void) fprintf(stderr, "        -T --brt-stats               "
+	    "BRT statistics\n");
 	(void) fprintf(stderr, "        -u --uberblock               "
 	    "uberblock\n");
 	(void) fprintf(stderr, "        -U --cachefile=PATH          "
@@ -915,17 +825,40 @@ usage(void)
 	(void) fprintf(stderr, "Specify an option more than once (e.g. -bb) "
 	    "to make only that option verbose\n");
 	(void) fprintf(stderr, "Default is to dump everything non-verbosely\n");
-	exit(1);
+	zdb_exit(1);
 }
 
 static void
 dump_debug_buffer(void)
 {
-	if (dump_opt['G']) {
-		(void) printf("\n");
-		(void) fflush(stdout);
-		zfs_dbgmsg_print("zdb");
-	}
+	ssize_t ret __attribute__((unused));
+
+	if (!dump_opt['G'])
+		return;
+	/*
+	 * We use write() instead of printf() so that this function
+	 * is safe to call from a signal handler.
+	 */
+	ret = write(STDERR_FILENO, "\n", 1);
+	zfs_dbgmsg_print(STDERR_FILENO, "zdb");
+}
+
+static void sig_handler(int signo)
+{
+	struct sigaction action;
+
+	libspl_backtrace(STDERR_FILENO);
+	dump_debug_buffer();
+
+	/*
+	 * Restore default action and re-raise signal so SIGSEGV and
+	 * SIGABRT can trigger a core dump.
+	 */
+	action.sa_handler = SIG_DFL;
+	sigemptyset(&action.sa_mask);
+	action.sa_flags = 0;
+	(void) sigaction(signo, &action, NULL);
+	raise(signo);
 }
 
 /*
@@ -946,7 +879,7 @@ fatal(const char *fmt, ...)
 
 	dump_debug_buffer();
 
-	exit(1);
+	zdb_exit(1);
 }
 
 static void
@@ -996,6 +929,15 @@ zdb_nicenum(uint64_t num, char *buf, size_t buflen)
 		(void) snprintf(buf, buflen, "%llu", (longlong_t)num);
 	else
 		nicenum(num, buf, buflen);
+}
+
+static void
+zdb_nicebytes(uint64_t bytes, char *buf, size_t buflen)
+{
+	if (dump_opt['P'])
+		(void) snprintf(buf, buflen, "%llu", (longlong_t)bytes);
+	else
+		zfs_nicebytes(bytes, buf, buflen);
 }
 
 static const char histo_stars[] = "****************************************";
@@ -1175,7 +1117,7 @@ dump_zap(objset_t *os, uint64_t object, void *data, size_t size)
 {
 	(void) data, (void) size;
 	zap_cursor_t zc;
-	zap_attribute_t attr;
+	zap_attribute_t *attrp = zap_attribute_long_alloc();
 	void *prop;
 	unsigned i;
 
@@ -1183,36 +1125,58 @@ dump_zap(objset_t *os, uint64_t object, void *data, size_t size)
 	(void) printf("\n");
 
 	for (zap_cursor_init(&zc, os, object);
-	    zap_cursor_retrieve(&zc, &attr) == 0;
+	    zap_cursor_retrieve(&zc, attrp) == 0;
 	    zap_cursor_advance(&zc)) {
-		(void) printf("\t\t%s = ", attr.za_name);
-		if (attr.za_num_integers == 0) {
+		boolean_t key64 =
+		    !!(zap_getflags(zc.zc_zap) & ZAP_FLAG_UINT64_KEY);
+
+		if (key64)
+			(void) printf("\t\t0x%010" PRIu64 "x = ",
+			    *(uint64_t *)attrp->za_name);
+		else
+			(void) printf("\t\t%s = ", attrp->za_name);
+
+		if (attrp->za_num_integers == 0) {
 			(void) printf("\n");
 			continue;
 		}
-		prop = umem_zalloc(attr.za_num_integers *
-		    attr.za_integer_length, UMEM_NOFAIL);
-		(void) zap_lookup(os, object, attr.za_name,
-		    attr.za_integer_length, attr.za_num_integers, prop);
-		if (attr.za_integer_length == 1) {
-			if (strcmp(attr.za_name,
+		prop = umem_zalloc(attrp->za_num_integers *
+		    attrp->za_integer_length, UMEM_NOFAIL);
+
+		if (key64)
+			(void) zap_lookup_uint64(os, object,
+			    (const uint64_t *)attrp->za_name, 1,
+			    attrp->za_integer_length, attrp->za_num_integers,
+			    prop);
+		else
+			(void) zap_lookup(os, object, attrp->za_name,
+			    attrp->za_integer_length, attrp->za_num_integers,
+			    prop);
+
+		if (attrp->za_integer_length == 1 && !key64) {
+			if (strcmp(attrp->za_name,
 			    DSL_CRYPTO_KEY_MASTER_KEY) == 0 ||
-			    strcmp(attr.za_name,
+			    strcmp(attrp->za_name,
 			    DSL_CRYPTO_KEY_HMAC_KEY) == 0 ||
-			    strcmp(attr.za_name, DSL_CRYPTO_KEY_IV) == 0 ||
-			    strcmp(attr.za_name, DSL_CRYPTO_KEY_MAC) == 0 ||
-			    strcmp(attr.za_name, DMU_POOL_CHECKSUM_SALT) == 0) {
+			    strcmp(attrp->za_name, DSL_CRYPTO_KEY_IV) == 0 ||
+			    strcmp(attrp->za_name, DSL_CRYPTO_KEY_MAC) == 0 ||
+			    strcmp(attrp->za_name,
+			    DMU_POOL_CHECKSUM_SALT) == 0) {
 				uint8_t *u8 = prop;
 
-				for (i = 0; i < attr.za_num_integers; i++) {
+				for (i = 0; i < attrp->za_num_integers; i++) {
 					(void) printf("%02x", u8[i]);
 				}
 			} else {
 				(void) printf("%s", (char *)prop);
 			}
 		} else {
-			for (i = 0; i < attr.za_num_integers; i++) {
-				switch (attr.za_integer_length) {
+			for (i = 0; i < attrp->za_num_integers; i++) {
+				switch (attrp->za_integer_length) {
+				case 1:
+					(void) printf("%u ",
+					    ((uint8_t *)prop)[i]);
+					break;
 				case 2:
 					(void) printf("%u ",
 					    ((uint16_t *)prop)[i]);
@@ -1229,9 +1193,11 @@ dump_zap(objset_t *os, uint64_t object, void *data, size_t size)
 			}
 		}
 		(void) printf("\n");
-		umem_free(prop, attr.za_num_integers * attr.za_integer_length);
+		umem_free(prop,
+		    attrp->za_num_integers * attrp->za_integer_length);
 	}
 	zap_cursor_fini(&zc);
+	zap_attribute_free(attrp);
 }
 
 static void
@@ -1332,26 +1298,27 @@ dump_sa_attrs(objset_t *os, uint64_t object, void *data, size_t size)
 {
 	(void) data, (void) size;
 	zap_cursor_t zc;
-	zap_attribute_t attr;
+	zap_attribute_t *attrp = zap_attribute_alloc();
 
 	dump_zap_stats(os, object);
 	(void) printf("\n");
 
 	for (zap_cursor_init(&zc, os, object);
-	    zap_cursor_retrieve(&zc, &attr) == 0;
+	    zap_cursor_retrieve(&zc, attrp) == 0;
 	    zap_cursor_advance(&zc)) {
-		(void) printf("\t\t%s = ", attr.za_name);
-		if (attr.za_num_integers == 0) {
+		(void) printf("\t\t%s = ", attrp->za_name);
+		if (attrp->za_num_integers == 0) {
 			(void) printf("\n");
 			continue;
 		}
 		(void) printf(" %llx : [%d:%d:%d]\n",
-		    (u_longlong_t)attr.za_first_integer,
-		    (int)ATTR_LENGTH(attr.za_first_integer),
-		    (int)ATTR_BSWAP(attr.za_first_integer),
-		    (int)ATTR_NUM(attr.za_first_integer));
+		    (u_longlong_t)attrp->za_first_integer,
+		    (int)ATTR_LENGTH(attrp->za_first_integer),
+		    (int)ATTR_BSWAP(attrp->za_first_integer),
+		    (int)ATTR_NUM(attrp->za_first_integer));
 	}
 	zap_cursor_fini(&zc);
+	zap_attribute_free(attrp);
 }
 
 static void
@@ -1359,7 +1326,7 @@ dump_sa_layouts(objset_t *os, uint64_t object, void *data, size_t size)
 {
 	(void) data, (void) size;
 	zap_cursor_t zc;
-	zap_attribute_t attr;
+	zap_attribute_t *attrp = zap_attribute_alloc();
 	uint16_t *layout_attrs;
 	unsigned i;
 
@@ -1367,29 +1334,30 @@ dump_sa_layouts(objset_t *os, uint64_t object, void *data, size_t size)
 	(void) printf("\n");
 
 	for (zap_cursor_init(&zc, os, object);
-	    zap_cursor_retrieve(&zc, &attr) == 0;
+	    zap_cursor_retrieve(&zc, attrp) == 0;
 	    zap_cursor_advance(&zc)) {
-		(void) printf("\t\t%s = [", attr.za_name);
-		if (attr.za_num_integers == 0) {
+		(void) printf("\t\t%s = [", attrp->za_name);
+		if (attrp->za_num_integers == 0) {
 			(void) printf("\n");
 			continue;
 		}
 
-		VERIFY(attr.za_integer_length == 2);
-		layout_attrs = umem_zalloc(attr.za_num_integers *
-		    attr.za_integer_length, UMEM_NOFAIL);
+		VERIFY(attrp->za_integer_length == 2);
+		layout_attrs = umem_zalloc(attrp->za_num_integers *
+		    attrp->za_integer_length, UMEM_NOFAIL);
 
-		VERIFY(zap_lookup(os, object, attr.za_name,
-		    attr.za_integer_length,
-		    attr.za_num_integers, layout_attrs) == 0);
+		VERIFY(zap_lookup(os, object, attrp->za_name,
+		    attrp->za_integer_length,
+		    attrp->za_num_integers, layout_attrs) == 0);
 
-		for (i = 0; i != attr.za_num_integers; i++)
+		for (i = 0; i != attrp->za_num_integers; i++)
 			(void) printf(" %d ", (int)layout_attrs[i]);
 		(void) printf("]\n");
 		umem_free(layout_attrs,
-		    attr.za_num_integers * attr.za_integer_length);
+		    attrp->za_num_integers * attrp->za_integer_length);
 	}
 	zap_cursor_fini(&zc);
+	zap_attribute_free(attrp);
 }
 
 static void
@@ -1397,7 +1365,7 @@ dump_zpldir(objset_t *os, uint64_t object, void *data, size_t size)
 {
 	(void) data, (void) size;
 	zap_cursor_t zc;
-	zap_attribute_t attr;
+	zap_attribute_t *attrp = zap_attribute_long_alloc();
 	const char *typenames[] = {
 		/* 0 */ "not specified",
 		/* 1 */ "FIFO",
@@ -1421,13 +1389,14 @@ dump_zpldir(objset_t *os, uint64_t object, void *data, size_t size)
 	(void) printf("\n");
 
 	for (zap_cursor_init(&zc, os, object);
-	    zap_cursor_retrieve(&zc, &attr) == 0;
+	    zap_cursor_retrieve(&zc, attrp) == 0;
 	    zap_cursor_advance(&zc)) {
 		(void) printf("\t\t%s = %lld (type: %s)\n",
-		    attr.za_name, ZFS_DIRENT_OBJ(attr.za_first_integer),
-		    typenames[ZFS_DIRENT_TYPE(attr.za_first_integer)]);
+		    attrp->za_name, ZFS_DIRENT_OBJ(attrp->za_first_integer),
+		    typenames[ZFS_DIRENT_TYPE(attrp->za_first_integer)]);
 	}
 	zap_cursor_fini(&zc);
+	zap_attribute_free(attrp);
 }
 
 static int
@@ -1951,23 +1920,25 @@ dump_log_spacemaps(spa_t *spa)
 }
 
 static void
-dump_dde(const ddt_t *ddt, const ddt_entry_t *dde, uint64_t index)
+dump_ddt_entry(const ddt_t *ddt, const ddt_lightweight_entry_t *ddlwe,
+    uint64_t index)
 {
-	const ddt_phys_t *ddp = dde->dde_phys;
-	const ddt_key_t *ddk = &dde->dde_key;
-	const char *types[4] = { "ditto", "single", "double", "triple" };
+	const ddt_key_t *ddk = &ddlwe->ddlwe_key;
 	char blkbuf[BP_SPRINTF_LEN];
 	blkptr_t blk;
 	int p;
 
-	for (p = 0; p < DDT_PHYS_TYPES; p++, ddp++) {
-		if (ddp->ddp_phys_birth == 0)
+	for (p = 0; p < DDT_NPHYS(ddt); p++) {
+		const ddt_univ_phys_t *ddp = &ddlwe->ddlwe_phys;
+		ddt_phys_variant_t v = DDT_PHYS_VARIANT(ddt, p);
+
+		if (ddt_phys_birth(ddp, v) == 0)
 			continue;
-		ddt_bp_create(ddt->ddt_checksum, ddk, ddp, &blk);
+		ddt_bp_create(ddt->ddt_checksum, ddk, ddp, v, &blk);
 		snprintf_blkptr(blkbuf, sizeof (blkbuf), &blk);
-		(void) printf("index %llx refcnt %llu %s %s\n",
-		    (u_longlong_t)index, (u_longlong_t)ddp->ddp_refcnt,
-		    types[p], blkbuf);
+		(void) printf("index %llx refcnt %llu phys %d %s\n",
+		    (u_longlong_t)index, (u_longlong_t)ddt_phys_refcnt(ddp, v),
+		    p, blkbuf);
 	}
 }
 
@@ -1994,10 +1965,36 @@ dump_dedup_ratio(const ddt_stat_t *dds)
 }
 
 static void
-dump_ddt(ddt_t *ddt, enum ddt_type type, enum ddt_class class)
+dump_ddt_log(ddt_t *ddt)
+{
+	for (int n = 0; n < 2; n++) {
+		ddt_log_t *ddl = &ddt->ddt_log[n];
+
+		uint64_t count = avl_numnodes(&ddl->ddl_tree);
+		if (count == 0)
+			continue;
+
+		printf(DMU_POOL_DDT_LOG ": %" PRIu64 " log entries\n",
+		    zio_checksum_table[ddt->ddt_checksum].ci_name, n, count);
+
+		if (dump_opt['D'] < 4)
+			continue;
+
+		ddt_lightweight_entry_t ddlwe;
+		uint64_t index = 0;
+		for (ddt_log_entry_t *ddle = avl_first(&ddl->ddl_tree);
+		    ddle; ddle = AVL_NEXT(&ddl->ddl_tree, ddle)) {
+			DDT_LOG_ENTRY_TO_LIGHTWEIGHT(ddt, ddle, &ddlwe);
+			dump_ddt_entry(ddt, &ddlwe, index++);
+		}
+	}
+}
+
+static void
+dump_ddt(ddt_t *ddt, ddt_type_t type, ddt_class_t class)
 {
 	char name[DDT_NAMELEN];
-	ddt_entry_t dde;
+	ddt_lightweight_entry_t ddlwe;
 	uint64_t walk = 0;
 	dmu_object_info_t doi;
 	uint64_t count, dspace, mspace;
@@ -2022,8 +2019,8 @@ dump_ddt(ddt_t *ddt, enum ddt_type type, enum ddt_class class)
 	(void) printf("%s: %llu entries, size %llu on disk, %llu in core\n",
 	    name,
 	    (u_longlong_t)count,
-	    (u_longlong_t)(dspace / count),
-	    (u_longlong_t)(mspace / count));
+	    (u_longlong_t)dspace,
+	    (u_longlong_t)mspace);
 
 	if (dump_opt['D'] < 3)
 		return;
@@ -2038,8 +2035,8 @@ dump_ddt(ddt_t *ddt, enum ddt_type type, enum ddt_class class)
 
 	(void) printf("%s contents:\n\n", name);
 
-	while ((error = ddt_object_walk(ddt, type, class, &walk, &dde)) == 0)
-		dump_dde(ddt, &dde, walk);
+	while ((error = ddt_object_walk(ddt, type, class, &walk, &ddlwe)) == 0)
+		dump_ddt_entry(ddt, &ddlwe, walk);
 
 	ASSERT3U(error, ==, ENOENT);
 
@@ -2054,12 +2051,15 @@ dump_all_ddts(spa_t *spa)
 
 	for (enum zio_checksum c = 0; c < ZIO_CHECKSUM_FUNCTIONS; c++) {
 		ddt_t *ddt = spa->spa_ddt[c];
-		for (enum ddt_type type = 0; type < DDT_TYPES; type++) {
-			for (enum ddt_class class = 0; class < DDT_CLASSES;
+		if (!ddt || ddt->ddt_version == DDT_VERSION_UNCONFIGURED)
+			continue;
+		for (ddt_type_t type = 0; type < DDT_TYPES; type++) {
+			for (ddt_class_t class = 0; class < DDT_CLASSES;
 			    class++) {
 				dump_ddt(ddt, type, class);
 			}
 		}
+		dump_ddt_log(ddt);
 	}
 
 	ddt_get_dedup_stats(spa, &dds_total);
@@ -2078,6 +2078,109 @@ dump_all_ddts(spa_t *spa)
 	}
 
 	dump_dedup_ratio(&dds_total);
+
+	/*
+	 * Dump a histogram of unique class entry age
+	 */
+	if (dump_opt['D'] == 3 && getenv("ZDB_DDT_UNIQUE_AGE_HIST") != NULL) {
+		ddt_age_histo_t histogram;
+
+		(void) printf("DDT walk unique, building age histogram...\n");
+		ddt_prune_walk(spa, 0, &histogram);
+
+		/*
+		 * print out histogram for unique entry class birth
+		 */
+		if (histogram.dah_entries > 0) {
+			(void) printf("%5s  %9s  %4s\n",
+			    "age", "blocks", "amnt");
+			(void) printf("%5s  %9s  %4s\n",
+			    "-----", "---------", "----");
+			for (int i = 0; i < HIST_BINS; i++) {
+				(void) printf("%5d  %9d %4d%%\n", 1 << i,
+				    (int)histogram.dah_age_histo[i],
+				    (int)((histogram.dah_age_histo[i] * 100) /
+				    histogram.dah_entries));
+			}
+		}
+	}
+}
+
+static void
+dump_brt(spa_t *spa)
+{
+	if (!spa_feature_is_enabled(spa, SPA_FEATURE_BLOCK_CLONING)) {
+		printf("BRT: unsupported on this pool\n");
+		return;
+	}
+
+	if (!spa_feature_is_active(spa, SPA_FEATURE_BLOCK_CLONING)) {
+		printf("BRT: empty\n");
+		return;
+	}
+
+	brt_t *brt = spa->spa_brt;
+	VERIFY(brt);
+
+	char count[32], used[32], saved[32];
+	zdb_nicebytes(brt_get_used(spa), used, sizeof (used));
+	zdb_nicebytes(brt_get_saved(spa), saved, sizeof (saved));
+	uint64_t ratio = brt_get_ratio(spa);
+	printf("BRT: used %s; saved %s; ratio %llu.%02llux\n", used, saved,
+	    (u_longlong_t)(ratio / 100), (u_longlong_t)(ratio % 100));
+
+	if (dump_opt['T'] < 2)
+		return;
+
+	for (uint64_t vdevid = 0; vdevid < brt->brt_nvdevs; vdevid++) {
+		brt_vdev_t *brtvd = &brt->brt_vdevs[vdevid];
+		if (brtvd == NULL)
+			continue;
+
+		if (!brtvd->bv_initiated) {
+			printf("BRT: vdev %" PRIu64 ": empty\n", vdevid);
+			continue;
+		}
+
+		zdb_nicenum(brtvd->bv_totalcount, count, sizeof (count));
+		zdb_nicebytes(brtvd->bv_usedspace, used, sizeof (used));
+		zdb_nicebytes(brtvd->bv_savedspace, saved, sizeof (saved));
+		printf("BRT: vdev %" PRIu64 ": refcnt %s; used %s; saved %s\n",
+		    vdevid, count, used, saved);
+	}
+
+	if (dump_opt['T'] < 3)
+		return;
+
+	char dva[64];
+	printf("\n%-16s %-10s\n", "DVA", "REFCNT");
+
+	for (uint64_t vdevid = 0; vdevid < brt->brt_nvdevs; vdevid++) {
+		brt_vdev_t *brtvd = &brt->brt_vdevs[vdevid];
+		if (brtvd == NULL || !brtvd->bv_initiated)
+			continue;
+
+		zap_cursor_t zc;
+		zap_attribute_t *za = zap_attribute_alloc();
+		for (zap_cursor_init(&zc, brt->brt_mos, brtvd->bv_mos_entries);
+		    zap_cursor_retrieve(&zc, za) == 0;
+		    zap_cursor_advance(&zc)) {
+			uint64_t refcnt;
+			VERIFY0(zap_lookup_uint64(brt->brt_mos,
+			    brtvd->bv_mos_entries,
+			    (const uint64_t *)za->za_name, 1,
+			    za->za_integer_length, za->za_num_integers,
+			    &refcnt));
+
+			uint64_t offset = *(const uint64_t *)za->za_name;
+
+			snprintf(dva, sizeof (dva), "%" PRIu64 ":%llx", vdevid,
+			    (u_longlong_t)offset);
+			printf("%-16s %-10llu\n", dva, (u_longlong_t)refcnt);
+		}
+		zap_cursor_fini(&zc);
+		zap_attribute_free(za);
+	}
 }
 
 static void
@@ -2276,7 +2379,7 @@ static void
 snprintf_zstd_header(spa_t *spa, char *blkbuf, size_t buflen,
     const blkptr_t *bp)
 {
-	abd_t *pabd;
+	static abd_t *pabd = NULL;
 	void *buf;
 	zio_t *zio;
 	zfs_zstdhdr_t zstd_hdr;
@@ -2292,7 +2395,7 @@ snprintf_zstd_header(spa_t *spa, char *blkbuf, size_t buflen,
 		buf = malloc(SPA_MAXBLOCKSIZE);
 		if (buf == NULL) {
 			(void) fprintf(stderr, "out of memory\n");
-			exit(1);
+			zdb_exit(1);
 		}
 		decode_embedded_bp_compressed(bp, buf);
 		memcpy(&zstd_hdr, buf, sizeof (zstd_hdr));
@@ -2307,7 +2410,8 @@ snprintf_zstd_header(spa_t *spa, char *blkbuf, size_t buflen,
 		return;
 	}
 
-	pabd = abd_alloc_for_io(SPA_MAXBLOCKSIZE, B_FALSE);
+	if (!pabd)
+		pabd = abd_alloc_for_io(SPA_MAXBLOCKSIZE, B_FALSE);
 	zio = zio_root(spa, NULL, NULL, 0);
 
 	/* Decrypt but don't decompress so we can read the compression header */
@@ -2356,7 +2460,7 @@ snprintf_blkptr_compact(char *blkbuf, size_t buflen, const blkptr_t *bp,
 		    (int)BPE_GET_ETYPE(bp),
 		    (u_longlong_t)BPE_GET_LSIZE(bp),
 		    (u_longlong_t)BPE_GET_PSIZE(bp),
-		    (u_longlong_t)bp->blk_birth);
+		    (u_longlong_t)BP_GET_LOGICAL_BIRTH(bp));
 		return;
 	}
 
@@ -2374,7 +2478,7 @@ snprintf_blkptr_compact(char *blkbuf, size_t buflen, const blkptr_t *bp,
 		    buflen - strlen(blkbuf),
 		    "%llxL B=%llu",
 		    (u_longlong_t)BP_GET_LSIZE(bp),
-		    (u_longlong_t)bp->blk_birth);
+		    (u_longlong_t)BP_GET_LOGICAL_BIRTH(bp));
 	} else {
 		(void) snprintf(blkbuf + strlen(blkbuf),
 		    buflen - strlen(blkbuf),
@@ -2382,8 +2486,8 @@ snprintf_blkptr_compact(char *blkbuf, size_t buflen, const blkptr_t *bp,
 		    (u_longlong_t)BP_GET_LSIZE(bp),
 		    (u_longlong_t)BP_GET_PSIZE(bp),
 		    (u_longlong_t)BP_GET_FILL(bp),
-		    (u_longlong_t)bp->blk_birth,
-		    (u_longlong_t)BP_PHYSICAL_BIRTH(bp));
+		    (u_longlong_t)BP_GET_LOGICAL_BIRTH(bp),
+		    (u_longlong_t)BP_GET_BIRTH(bp));
 		if (bp_freed)
 			(void) snprintf(blkbuf + strlen(blkbuf),
 			    buflen - strlen(blkbuf), " %s", "FREE");
@@ -2433,7 +2537,7 @@ visit_indirect(spa_t *spa, const dnode_phys_t *dnp,
 {
 	int err = 0;
 
-	if (bp->blk_birth == 0)
+	if (BP_GET_LOGICAL_BIRTH(bp) == 0)
 		return (0);
 
 	print_indirect(spa, bp, zb, dnp);
@@ -2621,7 +2725,7 @@ dump_bptree_cb(void *arg, const blkptr_t *bp, dmu_tx_t *tx)
 	(void) arg, (void) tx;
 	char blkbuf[BP_SPRINTF_LEN];
 
-	if (bp->blk_birth != 0) {
+	if (BP_GET_LOGICAL_BIRTH(bp) != 0) {
 		snprintf_blkptr(blkbuf, sizeof (blkbuf), bp);
 		(void) printf("\t%s\n", blkbuf);
 	}
@@ -2662,7 +2766,7 @@ dump_bpobj_cb(void *arg, const blkptr_t *bp, boolean_t bp_freed, dmu_tx_t *tx)
 	(void) arg, (void) tx;
 	char blkbuf[BP_SPRINTF_LEN];
 
-	ASSERT(bp->blk_birth != 0);
+	ASSERT(BP_GET_LOGICAL_BIRTH(bp) != 0);
 	snprintf_blkptr_compact(blkbuf, sizeof (blkbuf), bp, bp_freed);
 	(void) printf("\t%s\n", blkbuf);
 	return (0);
@@ -2857,28 +2961,30 @@ static void
 dump_bookmarks(objset_t *os, int verbosity)
 {
 	zap_cursor_t zc;
-	zap_attribute_t attr;
+	zap_attribute_t *attrp;
 	dsl_dataset_t *ds = dmu_objset_ds(os);
 	dsl_pool_t *dp = spa_get_dsl(os->os_spa);
 	objset_t *mos = os->os_spa->spa_meta_objset;
 	if (verbosity < 4)
 		return;
+	attrp = zap_attribute_alloc();
 	dsl_pool_config_enter(dp, FTAG);
 
 	for (zap_cursor_init(&zc, mos, ds->ds_bookmarks_obj);
-	    zap_cursor_retrieve(&zc, &attr) == 0;
+	    zap_cursor_retrieve(&zc, attrp) == 0;
 	    zap_cursor_advance(&zc)) {
 		char osname[ZFS_MAX_DATASET_NAME_LEN];
 		char buf[ZFS_MAX_DATASET_NAME_LEN];
 		int len;
 		dmu_objset_name(os, osname);
 		len = snprintf(buf, sizeof (buf), "%s#%s", osname,
-		    attr.za_name);
+		    attrp->za_name);
 		VERIFY3S(len, <, ZFS_MAX_DATASET_NAME_LEN);
 		(void) dump_bookmark(dp, buf, verbosity >= 5, verbosity >= 6);
 	}
 	zap_cursor_fini(&zc);
 	dsl_pool_config_exit(dp, FTAG);
+	zap_attribute_free(attrp);
 }
 
 static void
@@ -3244,6 +3350,59 @@ fuid_table_destroy(void)
 		zfs_fuid_table_destroy(&idx_tree, &domain_tree);
 		fuid_table_loaded = B_FALSE;
 	}
+}
+
+/*
+ * Clean up DDT internal state. ddt_lookup() adds entries to ddt_tree, which on
+ * a live pool are normally cleaned up during ddt_sync(). We can't do that (and
+ * wouldn't want to anyway), but if we don't clean up the presence of stuff on
+ * ddt_tree will trip asserts in ddt_table_free(). So, we clean up ourselves.
+ *
+ * Note that this is not a particularly efficient way to do this, but
+ * ddt_remove() is the only public method that can do the work we need, and it
+ * requires the right locks and etc to do the job. This is only ever called
+ * during zdb shutdown so efficiency is not especially important.
+ */
+static void
+zdb_ddt_cleanup(spa_t *spa)
+{
+	for (enum zio_checksum c = 0; c < ZIO_CHECKSUM_FUNCTIONS; c++) {
+		ddt_t *ddt = spa->spa_ddt[c];
+		if (!ddt)
+			continue;
+
+		spa_config_enter(spa, SCL_CONFIG, FTAG, RW_READER);
+		ddt_enter(ddt);
+		ddt_entry_t *dde = avl_first(&ddt->ddt_tree), *next;
+		while (dde) {
+			next = AVL_NEXT(&ddt->ddt_tree, dde);
+			dde->dde_io = NULL;
+			ddt_remove(ddt, dde);
+			dde = next;
+		}
+		ddt_exit(ddt);
+		spa_config_exit(spa, SCL_CONFIG, FTAG);
+	}
+}
+
+static void
+zdb_exit(int reason)
+{
+	if (spa != NULL)
+		zdb_ddt_cleanup(spa);
+
+	if (os != NULL) {
+		close_objset(os, FTAG);
+	} else if (spa != NULL) {
+		spa_close(spa, FTAG);
+	}
+
+	fuid_table_destroy();
+
+	if (kernel_init_done)
+		kernel_fini();
+
+	exit(reason);
 }
 
 /*
@@ -4107,6 +4266,10 @@ dump_uberblock(uberblock_t *ub, const char *header, const char *footer)
 	(void) printf("\ttimestamp = %llu UTC = %s",
 	    (u_longlong_t)ub->ub_timestamp, ctime(&timestamp));
 
+	char blkbuf[BP_SPRINTF_LEN];
+	snprintf_blkptr(blkbuf, sizeof (blkbuf), &ub->ub_rootbp);
+	(void) printf("\tbp = %s\n", blkbuf);
+
 	(void) printf("\tmmp_magic = %016llx\n",
 	    (u_longlong_t)ub->ub_mmp_magic);
 	if (MMP_VALID(ub)) {
@@ -4133,6 +4296,11 @@ dump_uberblock(uberblock_t *ub, const char *header, const char *footer)
 	}
 	(void) printf("\tcheckpoint_txg = %llu\n",
 	    (u_longlong_t)ub->ub_checkpoint_txg);
+
+	(void) printf("\traidz_reflow state=%u off=%llu\n",
+	    (int)RRSS_GET_STATE(ub),
+	    (u_longlong_t)RRSS_GET_OFFSET(ub));
+
 	(void) printf("%s", footer ? footer : "");
 }
 
@@ -4171,32 +4339,32 @@ dump_cachefile(const char *cachefile)
 	if ((fd = open64(cachefile, O_RDONLY)) < 0) {
 		(void) printf("cannot open '%s': %s\n", cachefile,
 		    strerror(errno));
-		exit(1);
+		zdb_exit(1);
 	}
 
 	if (fstat64(fd, &statbuf) != 0) {
 		(void) printf("failed to stat '%s': %s\n", cachefile,
 		    strerror(errno));
-		exit(1);
+		zdb_exit(1);
 	}
 
 	if ((buf = malloc(statbuf.st_size)) == NULL) {
 		(void) fprintf(stderr, "failed to allocate %llu bytes\n",
 		    (u_longlong_t)statbuf.st_size);
-		exit(1);
+		zdb_exit(1);
 	}
 
 	if (read(fd, buf, statbuf.st_size) != statbuf.st_size) {
 		(void) fprintf(stderr, "failed to read %llu bytes\n",
 		    (u_longlong_t)statbuf.st_size);
-		exit(1);
+		zdb_exit(1);
 	}
 
 	(void) close(fd);
 
 	if (nvlist_unpack(buf, statbuf.st_size, &config, 0) != 0) {
 		(void) fprintf(stderr, "failed to unpack nvlist\n");
-		exit(1);
+		zdb_exit(1);
 	}
 
 	free(buf);
@@ -4529,7 +4697,6 @@ dump_l2arc_log_blocks(int fd, const l2arc_dev_hdr_phys_t *l2dhdr,
 	l2arc_log_blk_phys_t this_lb;
 	uint64_t asize;
 	l2arc_log_blkptr_t lbps[2];
-	abd_t *abd;
 	zio_cksum_t cksum;
 	int failed = 0;
 	l2arc_dev_t dev;
@@ -4583,19 +4750,24 @@ dump_l2arc_log_blocks(int fd, const l2arc_dev_hdr_phys_t *l2dhdr,
 		switch (L2BLK_GET_COMPRESS((&lbps[0])->lbp_prop)) {
 		case ZIO_COMPRESS_OFF:
 			break;
-		default:
-			abd = abd_alloc_for_io(asize, B_TRUE);
+		default: {
+			abd_t *abd = abd_alloc_linear(asize, B_TRUE);
 			abd_copy_from_buf_off(abd, &this_lb, 0, asize);
-			if (zio_decompress_data(L2BLK_GET_COMPRESS(
-			    (&lbps[0])->lbp_prop), abd, &this_lb,
-			    asize, sizeof (this_lb), NULL) != 0) {
+			abd_t dabd;
+			abd_get_from_buf_struct(&dabd, &this_lb,
+			    sizeof (this_lb));
+			int err = zio_decompress_data(L2BLK_GET_COMPRESS(
+			    (&lbps[0])->lbp_prop), abd, &dabd,
+			    asize, sizeof (this_lb), NULL);
+			abd_free(&dabd);
+			abd_free(abd);
+			if (err != 0) {
 				(void) printf("L2ARC block decompression "
 				    "failed\n");
-				abd_free(abd);
 				goto out;
 			}
-			abd_free(abd);
 			break;
+		}
 		}
 
 		if (this_lb.lb_magic == BSWAP_64(L2ARC_LOG_BLK_MAGIC))
@@ -5112,14 +5284,14 @@ dump_label(const char *dev)
 
 	if ((fd = open64(path, O_RDONLY)) < 0) {
 		(void) printf("cannot open '%s': %s\n", path, strerror(errno));
-		exit(1);
+		zdb_exit(1);
 	}
 
 	if (fstat64_blk(fd, &statbuf) != 0) {
 		(void) printf("failed to stat '%s': %s\n", path,
 		    strerror(errno));
 		(void) close(fd);
-		exit(1);
+		zdb_exit(1);
 	}
 
 	if (S_ISBLK(statbuf.st_mode) && zfs_dev_flush(fd) != 0)
@@ -5132,7 +5304,7 @@ dump_label(const char *dev)
 	    sizeof (cksum_record_t), offsetof(cksum_record_t, link));
 
 	psize = statbuf.st_size;
-	psize = P2ALIGN(psize, (uint64_t)sizeof (vdev_label_t));
+	psize = P2ALIGN_TYPED(psize, sizeof (vdev_label_t), uint64_t);
 	ashift = SPA_MINBLOCKSHIFT;
 
 	/*
@@ -5178,7 +5350,7 @@ dump_label(const char *dev)
 			if (nvlist_size(config, &size, NV_ENCODE_XDR) != 0)
 				size = buflen;
 
-			/* If the device is a cache device clear the header. */
+			/* If the device is a cache device read the header. */
 			if (!read_l2arc_header) {
 				if (nvlist_lookup_uint64(config,
 				    ZPOOL_CONFIG_POOL_STATE, &l2cache) == 0 &&
@@ -5292,8 +5464,18 @@ dump_one_objset(const char *dsname, void *arg)
 	    avl_first(&dmu_objset_ds(os)->ds_bookmarks); dbn != NULL;
 	    dbn = AVL_NEXT(&dmu_objset_ds(os)->ds_bookmarks, dbn)) {
 		mos_obj_refd(dbn->dbn_phys.zbm_redaction_obj);
-		if (dbn->dbn_phys.zbm_redaction_obj != 0)
-			global_feature_count[SPA_FEATURE_REDACTION_BOOKMARKS]++;
+		if (dbn->dbn_phys.zbm_redaction_obj != 0) {
+			global_feature_count[
+			    SPA_FEATURE_REDACTION_BOOKMARKS]++;
+			objset_t *mos = os->os_spa->spa_meta_objset;
+			dnode_t *rl;
+			VERIFY0(dnode_hold(mos,
+			    dbn->dbn_phys.zbm_redaction_obj, FTAG, &rl));
+			if (rl->dn_have_spill) {
+				global_feature_count[
+				    SPA_FEATURE_REDACTION_LIST_SPILL]++;
+			}
+		}
 		if (dbn->dbn_phys.zbm_flags & ZBM_FLAG_HAS_FBN)
 			global_feature_count[SPA_FEATURE_BOOKMARK_WRITTEN]++;
 	}
@@ -5342,12 +5524,20 @@ static const char *zdb_ot_extname[] = {
 #define	ZB_TOTAL	DN_MAX_LEVELS
 #define	SPA_MAX_FOR_16M	(SPA_MAXBLOCKSHIFT+1)
 
+typedef struct zdb_brt_entry {
+	dva_t		zbre_dva;
+	uint64_t	zbre_refcount;
+	avl_node_t	zbre_node;
+} zdb_brt_entry_t;
+
 typedef struct zdb_cb {
 	zdb_blkstats_t	zcb_type[ZB_TOTAL + 1][ZDB_OT_TOTAL + 1];
 	uint64_t	zcb_removing_size;
 	uint64_t	zcb_checkpoint_size;
 	uint64_t	zcb_dedup_asize;
 	uint64_t	zcb_dedup_blocks;
+	uint64_t	zcb_clone_asize;
+	uint64_t	zcb_clone_blocks;
 	uint64_t	zcb_psize_count[SPA_MAX_FOR_16M];
 	uint64_t	zcb_lsize_count[SPA_MAX_FOR_16M];
 	uint64_t	zcb_asize_count[SPA_MAX_FOR_16M];
@@ -5368,6 +5558,8 @@ typedef struct zdb_cb {
 	int		zcb_haderrors;
 	spa_t		*zcb_spa;
 	uint32_t	**zcb_vd_obsolete_counts;
+	avl_tree_t	zcb_brt;
+	boolean_t	zcb_brt_is_active;
 } zdb_cb_t;
 
 /* test if two DVA offsets from same vdev are within the same metaslab */
@@ -5550,7 +5742,6 @@ static void
 zdb_count_block(zdb_cb_t *zcb, zilog_t *zilog, const blkptr_t *bp,
     dmu_object_type_t type)
 {
-	uint64_t refcnt = 0;
 	int i;
 
 	ASSERT(type < ZDB_OT_TOTAL);
@@ -5558,8 +5749,167 @@ zdb_count_block(zdb_cb_t *zcb, zilog_t *zilog, const blkptr_t *bp,
 	if (zilog && zil_bp_tree_add(zilog, bp) != 0)
 		return;
 
+	/*
+	 * This flag controls if we will issue a claim for the block while
+	 * counting it, to ensure that all blocks are referenced in space maps.
+	 * We don't issue claims if we're not doing leak tracking, because it's
+	 * expensive if the user isn't interested. We also don't claim the
+	 * second or later occurences of cloned or dedup'd blocks, because we
+	 * already claimed them the first time.
+	 */
+	boolean_t do_claim = !dump_opt['L'];
+
 	spa_config_enter(zcb->zcb_spa, SCL_CONFIG, FTAG, RW_READER);
 
+	blkptr_t tempbp;
+	if (BP_GET_DEDUP(bp)) {
+		/*
+		 * Dedup'd blocks are special. We need to count them, so we can
+		 * later uncount them when reporting leaked space, and we must
+		 * only claim them once.
+		 *
+		 * We use the existing dedup system to track what we've seen.
+		 * The first time we see a block, we do a ddt_lookup() to see
+		 * if it exists in the DDT. If we're doing leak tracking, we
+		 * claim the block at this time.
+		 *
+		 * Each time we see a block, we reduce the refcount in the
+		 * entry by one, and add to the size and count of dedup'd
+		 * blocks to report at the end.
+		 */
+
+		ddt_t *ddt = ddt_select(zcb->zcb_spa, bp);
+
+		ddt_enter(ddt);
+
+		/*
+		 * Find the block. This will create the entry in memory, but
+		 * we'll know if that happened by its refcount.
+		 */
+		ddt_entry_t *dde = ddt_lookup(ddt, bp);
+
+		/*
+		 * ddt_lookup() can return NULL if this block didn't exist
+		 * in the DDT and creating it would take the DDT over its
+		 * quota. Since we got the block from disk, it must exist in
+		 * the DDT, so this can't happen. However, when unique entries
+		 * are pruned, the dedup bit can be set with no corresponding
+		 * entry in the DDT.
+		 */
+		if (dde == NULL) {
+			ddt_exit(ddt);
+			goto skipped;
+		}
+
+		/* Get the phys for this variant */
+		ddt_phys_variant_t v = ddt_phys_select(ddt, dde, bp);
+
+		/*
+		 * This entry may have multiple sets of DVAs. We must claim
+		 * each set the first time we see them in a real block on disk,
+		 * or count them on subsequent occurences. We don't have a
+		 * convenient way to track the first time we see each variant,
+		 * so we repurpose dde_io as a set of "seen" flag bits. We can
+		 * do this safely in zdb because it never writes, so it will
+		 * never have a writing zio for this block in that pointer.
+		 */
+		boolean_t seen = !!(((uintptr_t)dde->dde_io) & (1 << v));
+		if (!seen)
+			dde->dde_io =
+			    (void *)(((uintptr_t)dde->dde_io) | (1 << v));
+
+		/* Consume a reference for this block. */
+		if (ddt_phys_total_refcnt(ddt, dde->dde_phys) > 0)
+			ddt_phys_decref(dde->dde_phys, v);
+
+		/*
+		 * If this entry has a single flat phys, it may have been
+		 * extended with additional DVAs at some time in its life.
+		 * This block might be from before it was fully extended, and
+		 * so have fewer DVAs.
+		 *
+		 * If this is the first time we've seen this block, and we
+		 * claimed it as-is, then we would miss the claim on some
+		 * number of DVAs, which would then be seen as leaked.
+		 *
+		 * In all cases, if we've had fewer DVAs, then the asize would
+		 * be too small, and would lead to the pool apparently using
+		 * more space than allocated.
+		 *
+		 * To handle this, we copy the canonical set of DVAs from the
+		 * entry back to the block pointer before we claim it.
+		 */
+		if (v == DDT_PHYS_FLAT) {
+			ASSERT3U(BP_GET_BIRTH(bp), ==,
+			    ddt_phys_birth(dde->dde_phys, v));
+			tempbp = *bp;
+			ddt_bp_fill(dde->dde_phys, v, &tempbp,
+			    BP_GET_BIRTH(bp));
+			bp = &tempbp;
+		}
+
+		if (seen) {
+			/*
+			 * The second or later time we see this block,
+			 * it's a duplicate and we count it.
+			 */
+			zcb->zcb_dedup_asize += BP_GET_ASIZE(bp);
+			zcb->zcb_dedup_blocks++;
+
+			/* Already claimed, don't do it again. */
+			do_claim = B_FALSE;
+		}
+
+		ddt_exit(ddt);
+	} else if (zcb->zcb_brt_is_active &&
+	    brt_maybe_exists(zcb->zcb_spa, bp)) {
+		/*
+		 * Cloned blocks are special. We need to count them, so we can
+		 * later uncount them when reporting leaked space, and we must
+		 * only claim them once.
+		 *
+		 * To do this, we keep our own in-memory BRT. For each block
+		 * we haven't seen before, we look it up in the real BRT and
+		 * if its there, we note it and its refcount then proceed as
+		 * normal. If we see the block again, we count it as a clone
+		 * and then give it no further consideration.
+		 */
+		zdb_brt_entry_t zbre_search, *zbre;
+		avl_index_t where;
+
+		zbre_search.zbre_dva = bp->blk_dva[0];
+		zbre = avl_find(&zcb->zcb_brt, &zbre_search, &where);
+		if (zbre == NULL) {
+			/* Not seen before; track it */
+			uint64_t refcnt =
+			    brt_entry_get_refcount(zcb->zcb_spa, bp);
+			if (refcnt > 0) {
+				zbre = umem_zalloc(sizeof (zdb_brt_entry_t),
+				    UMEM_NOFAIL);
+				zbre->zbre_dva = bp->blk_dva[0];
+				zbre->zbre_refcount = refcnt;
+				avl_insert(&zcb->zcb_brt, zbre, where);
+			}
+		} else  {
+			/*
+			 * Second or later occurrence, count it and take a
+			 * refcount.
+			 */
+			zcb->zcb_clone_asize += BP_GET_ASIZE(bp);
+			zcb->zcb_clone_blocks++;
+
+			zbre->zbre_refcount--;
+			if (zbre->zbre_refcount == 0) {
+				avl_remove(&zcb->zcb_brt, zbre);
+				umem_free(zbre, sizeof (zdb_brt_entry_t));
+			}
+
+			/* Already claimed, don't do it again. */
+			do_claim = B_FALSE;
+		}
+	}
+
+skipped:
 	for (i = 0; i < 4; i++) {
 		int l = (i < 2) ? BP_GET_LEVEL(bp) : ZB_TOTAL;
 		int t = (i & 1) ? type : ZDB_OT_TOTAL;
@@ -5662,32 +6012,12 @@ zdb_count_block(zdb_cb_t *zcb, zilog_t *zilog, const blkptr_t *bp,
 	zcb->zcb_asize_len[bin] += BP_GET_ASIZE(bp);
 	zcb->zcb_asize_total += BP_GET_ASIZE(bp);
 
-	if (dump_opt['L'])
+	if (!do_claim)
 		return;
 
-	if (BP_GET_DEDUP(bp)) {
-		ddt_t *ddt;
-		ddt_entry_t *dde;
-
-		ddt = ddt_select(zcb->zcb_spa, bp);
-		ddt_enter(ddt);
-		dde = ddt_lookup(ddt, bp, B_FALSE);
-
-		if (dde == NULL) {
-			refcnt = 0;
-		} else {
-			ddt_phys_t *ddp = ddt_phys_select(dde, bp);
-			ddt_phys_decref(ddp);
-			refcnt = ddp->ddp_refcnt;
-			if (ddt_phys_total_refcnt(dde) == 0)
-				ddt_remove(ddt, dde);
-		}
-		ddt_exit(ddt);
-	}
-
-	VERIFY3U(zio_wait(zio_claim(NULL, zcb->zcb_spa,
-	    refcnt ? 0 : spa_min_claim_txg(zcb->zcb_spa),
-	    bp, NULL, NULL, ZIO_FLAG_CANFAIL)), ==, 0);
+	VERIFY0(zio_wait(zio_claim(NULL, zcb->zcb_spa,
+	    spa_min_claim_txg(zcb->zcb_spa), bp, NULL, NULL,
+	    ZIO_FLAG_CANFAIL)));
 }
 
 static void
@@ -5740,7 +6070,7 @@ zdb_blkptr_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 	if (zb->zb_level == ZB_DNODE_LEVEL)
 		return (0);
 
-	if (dump_opt['b'] >= 5 && bp->blk_birth > 0) {
+	if (dump_opt['b'] >= 5 && BP_GET_LOGICAL_BIRTH(bp) > 0) {
 		char blkbuf[BP_SPRINTF_LEN];
 		snprintf_blkptr(blkbuf, sizeof (blkbuf), bp);
 		(void) printf("objset %llu object %llu "
@@ -5996,47 +6326,6 @@ zdb_load_obsolete_counts(vdev_t *vd)
 		space_map_close(prev_obsolete_sm);
 	}
 	return (counts);
-}
-
-static void
-zdb_ddt_leak_init(spa_t *spa, zdb_cb_t *zcb)
-{
-	ddt_bookmark_t ddb = {0};
-	ddt_entry_t dde;
-	int error;
-	int p;
-
-	ASSERT(!dump_opt['L']);
-
-	while ((error = ddt_walk(spa, &ddb, &dde)) == 0) {
-		blkptr_t blk;
-		ddt_phys_t *ddp = dde.dde_phys;
-
-		if (ddb.ddb_class == DDT_CLASS_UNIQUE)
-			return;
-
-		ASSERT(ddt_phys_total_refcnt(&dde) > 1);
-
-		for (p = 0; p < DDT_PHYS_TYPES; p++, ddp++) {
-			if (ddp->ddp_phys_birth == 0)
-				continue;
-			ddt_bp_create(ddb.ddb_checksum,
-			    &dde.dde_key, ddp, &blk);
-			if (p == DDT_PHYS_DITTO) {
-				zdb_count_block(zcb, NULL, &blk, ZDB_OT_DITTO);
-			} else {
-				zcb->zcb_dedup_asize +=
-				    BP_GET_ASIZE(&blk) * (ddp->ddp_refcnt - 1);
-				zcb->zcb_dedup_blocks++;
-			}
-		}
-		ddt_t *ddt = spa->spa_ddt[ddb.ddb_checksum];
-		ddt_enter(ddt);
-		VERIFY(ddt_lookup(ddt, &blk, B_TRUE) != NULL);
-		ddt_exit(ddt);
-	}
-
-	ASSERT(error == ENOENT);
 }
 
 typedef struct checkpoint_sm_exclude_entry_arg {
@@ -6422,10 +6711,6 @@ zdb_leak_init(spa_t *spa, zdb_cb_t *zcb)
 		(void) bpobj_iterate_nofree(&dp->dp_obsolete_bpobj,
 		    increment_indirect_mapping_cb, zcb, NULL);
 	}
-
-	spa_config_enter(spa, SCL_CONFIG, FTAG, RW_READER);
-	zdb_ddt_leak_init(spa, zcb);
-	spa_config_exit(spa, SCL_CONFIG, FTAG);
 }
 
 static boolean_t
@@ -6586,18 +6871,19 @@ iterate_deleted_livelists(spa_t *spa, ll_iter_t func, void *arg)
 	ASSERT0(err);
 
 	zap_cursor_t zc;
-	zap_attribute_t attr;
+	zap_attribute_t *attrp = zap_attribute_alloc();
 	dsl_deadlist_t ll;
 	/* NULL out os prior to dsl_deadlist_open in case it's garbage */
 	ll.dl_os = NULL;
 	for (zap_cursor_init(&zc, mos, zap_obj);
-	    zap_cursor_retrieve(&zc, &attr) == 0;
+	    zap_cursor_retrieve(&zc, attrp) == 0;
 	    (void) zap_cursor_advance(&zc)) {
-		dsl_deadlist_open(&ll, mos, attr.za_first_integer);
+		dsl_deadlist_open(&ll, mos, attrp->za_first_integer);
 		func(&ll, arg);
 		dsl_deadlist_close(&ll);
 	}
 	zap_cursor_fini(&zc);
+	zap_attribute_free(attrp);
 }
 
 static int
@@ -6665,6 +6951,20 @@ deleted_livelists_dump_mos(spa_t *spa)
 }
 
 static int
+zdb_brt_entry_compare(const void *zcn1, const void *zcn2)
+{
+	const dva_t *dva1 = &((const zdb_brt_entry_t *)zcn1)->zbre_dva;
+	const dva_t *dva2 = &((const zdb_brt_entry_t *)zcn2)->zbre_dva;
+	int cmp;
+
+	cmp = TREE_CMP(DVA_GET_VDEV(dva1), DVA_GET_VDEV(dva2));
+	if (cmp == 0)
+		cmp = TREE_CMP(DVA_GET_OFFSET(dva1), DVA_GET_OFFSET(dva2));
+
+	return (cmp);
+}
+
+static int
 dump_block_stats(spa_t *spa)
 {
 	zdb_cb_t *zcb;
@@ -6676,7 +6976,16 @@ dump_block_stats(spa_t *spa)
 	int e, c, err;
 	bp_embedded_type_t i;
 
+	ddt_prefetch_all(spa);
+
 	zcb = umem_zalloc(sizeof (zdb_cb_t), UMEM_NOFAIL);
+
+	if (spa_feature_is_active(spa, SPA_FEATURE_BLOCK_CLONING)) {
+		avl_create(&zcb->zcb_brt, zdb_brt_entry_compare,
+		    sizeof (zdb_brt_entry_t),
+		    offsetof(zdb_brt_entry_t, zbre_node));
+		zcb->zcb_brt_is_active = B_TRUE;
+	}
 
 	(void) printf("\nTraversing all blocks %s%s%s%s%s...\n\n",
 	    (dump_opt['c'] || !dump_opt['L']) ? "to verify " : "",
@@ -6779,7 +7088,8 @@ dump_block_stats(spa_t *spa)
 	    metaslab_class_get_alloc(spa_special_class(spa)) +
 	    metaslab_class_get_alloc(spa_dedup_class(spa)) +
 	    get_unflushed_alloc_space(spa);
-	total_found = tzb->zb_asize - zcb->zcb_dedup_asize +
+	total_found =
+	    tzb->zb_asize - zcb->zcb_dedup_asize - zcb->zcb_clone_asize +
 	    zcb->zcb_removing_size + zcb->zcb_checkpoint_size;
 
 	if (total_found == total_alloc && !dump_opt['L']) {
@@ -6792,7 +7102,6 @@ dump_block_stats(spa_t *spa)
 		    (u_longlong_t)total_alloc,
 		    (dump_opt['L']) ? "unreachable" : "leaked",
 		    (longlong_t)(total_alloc - total_found));
-		leaks = B_TRUE;
 	}
 
 	if (tzb->zb_count == 0) {
@@ -6820,6 +7129,9 @@ dump_block_stats(spa_t *spa)
 	    "bp deduped:", (u_longlong_t)zcb->zcb_dedup_asize,
 	    (u_longlong_t)zcb->zcb_dedup_blocks,
 	    (double)zcb->zcb_dedup_asize / tzb->zb_asize + 1.0);
+	(void) printf("\t%-16s %14llu    count: %6llu\n",
+	    "bp cloned:", (u_longlong_t)zcb->zcb_clone_asize,
+	    (u_longlong_t)zcb->zcb_clone_blocks);
 	(void) printf("\t%-16s %14llu     used: %5.2f%%\n", "Normal class:",
 	    (u_longlong_t)norm_alloc, 100.0 * norm_alloc / norm_space);
 
@@ -7051,6 +7363,7 @@ dump_block_stats(spa_t *spa)
 }
 
 typedef struct zdb_ddt_entry {
+	/* key must be first for ddt_key_compare */
 	ddt_key_t	zdde_key;
 	uint64_t	zdde_ref_blocks;
 	uint64_t	zdde_ref_lsize;
@@ -7111,7 +7424,7 @@ dump_simulated_ddt(spa_t *spa)
 	ddt_histogram_t ddh_total = {{{0}}};
 	ddt_stat_t dds_total = {0};
 
-	avl_create(&t, ddt_entry_compare,
+	avl_create(&t, ddt_key_compare,
 	    sizeof (zdb_ddt_entry_t), offsetof(zdb_ddt_entry_t, zdde_node));
 
 	spa_config_enter(spa, SCL_CONFIG, FTAG, RW_READER);
@@ -7122,29 +7435,27 @@ dump_simulated_ddt(spa_t *spa)
 	spa_config_exit(spa, SCL_CONFIG, FTAG);
 
 	while ((zdde = avl_destroy_nodes(&t, &cookie)) != NULL) {
-		ddt_stat_t dds;
 		uint64_t refcnt = zdde->zdde_ref_blocks;
 		ASSERT(refcnt != 0);
 
-		dds.dds_blocks = zdde->zdde_ref_blocks / refcnt;
-		dds.dds_lsize = zdde->zdde_ref_lsize / refcnt;
-		dds.dds_psize = zdde->zdde_ref_psize / refcnt;
-		dds.dds_dsize = zdde->zdde_ref_dsize / refcnt;
+		ddt_stat_t *dds = &ddh_total.ddh_stat[highbit64(refcnt) - 1];
 
-		dds.dds_ref_blocks = zdde->zdde_ref_blocks;
-		dds.dds_ref_lsize = zdde->zdde_ref_lsize;
-		dds.dds_ref_psize = zdde->zdde_ref_psize;
-		dds.dds_ref_dsize = zdde->zdde_ref_dsize;
+		dds->dds_blocks += zdde->zdde_ref_blocks / refcnt;
+		dds->dds_lsize += zdde->zdde_ref_lsize / refcnt;
+		dds->dds_psize += zdde->zdde_ref_psize / refcnt;
+		dds->dds_dsize += zdde->zdde_ref_dsize / refcnt;
 
-		ddt_stat_add(&ddh_total.ddh_stat[highbit64(refcnt) - 1],
-		    &dds, 0);
+		dds->dds_ref_blocks += zdde->zdde_ref_blocks;
+		dds->dds_ref_lsize += zdde->zdde_ref_lsize;
+		dds->dds_ref_psize += zdde->zdde_ref_psize;
+		dds->dds_ref_dsize += zdde->zdde_ref_dsize;
 
 		umem_free(zdde, sizeof (*zdde));
 	}
 
 	avl_destroy(&t);
 
-	ddt_histogram_stat(&dds_total, &ddh_total);
+	ddt_histogram_total(&dds_total, &ddh_total);
 
 	(void) printf("Simulated DDT histogram:\n");
 
@@ -7786,13 +8097,14 @@ static void
 errorlog_count_refd(objset_t *mos, uint64_t errlog)
 {
 	zap_cursor_t zc;
-	zap_attribute_t za;
+	zap_attribute_t *za = zap_attribute_alloc();
 	for (zap_cursor_init(&zc, mos, errlog);
-	    zap_cursor_retrieve(&zc, &za) == 0;
+	    zap_cursor_retrieve(&zc, za) == 0;
 	    zap_cursor_advance(&zc)) {
-		mos_obj_refd(za.za_first_integer);
+		mos_obj_refd(za->za_first_integer);
 	}
 	zap_cursor_fini(&zc);
+	zap_attribute_free(za);
 }
 
 static int
@@ -7872,12 +8184,37 @@ dump_mos_leaks(spa_t *spa)
 
 	mos_leak_vdev(spa->spa_root_vdev);
 
-	for (uint64_t class = 0; class < DDT_CLASSES; class++) {
-		for (uint64_t type = 0; type < DDT_TYPES; type++) {
-			for (uint64_t cksum = 0;
-			    cksum < ZIO_CHECKSUM_FUNCTIONS; cksum++) {
-				ddt_t *ddt = spa->spa_ddt[cksum];
+	for (uint64_t c = 0; c < ZIO_CHECKSUM_FUNCTIONS; c++) {
+		ddt_t *ddt = spa->spa_ddt[c];
+		if (!ddt || ddt->ddt_version == DDT_VERSION_UNCONFIGURED)
+			continue;
+
+		/* DDT store objects */
+		for (ddt_type_t type = 0; type < DDT_TYPES; type++) {
+			for (ddt_class_t class = 0; class < DDT_CLASSES;
+			    class++) {
 				mos_obj_refd(ddt->ddt_object[type][class]);
+			}
+		}
+
+		/* FDT container */
+		if (ddt->ddt_version == DDT_VERSION_FDT)
+			mos_obj_refd(ddt->ddt_dir_object);
+
+		/* FDT log objects */
+		if (ddt->ddt_flags & DDT_FLAG_LOG) {
+			mos_obj_refd(ddt->ddt_log[0].ddl_object);
+			mos_obj_refd(ddt->ddt_log[1].ddl_object);
+		}
+	}
+
+	if (spa->spa_brt != NULL) {
+		brt_t *brt = spa->spa_brt;
+		for (uint64_t vdevid = 0; vdevid < brt->brt_nvdevs; vdevid++) {
+			brt_vdev_t *brtvd = &brt->brt_vdevs[vdevid];
+			if (brtvd != NULL && brtvd->bv_initiated) {
+				mos_obj_refd(brtvd->bv_mos_brtvdev);
+				mos_obj_refd(brtvd->bv_mos_entries);
 			}
 		}
 	}
@@ -8018,6 +8355,9 @@ dump_zpool(spa_t *spa)
 	if (dump_opt['D'])
 		dump_all_ddts(spa);
 
+	if (dump_opt['T'])
+		dump_brt(spa);
+
 	if (dump_opt['d'] > 2 || dump_opt['m'])
 		dump_metaslabs(spa);
 	if (dump_opt['M'])
@@ -8060,6 +8400,7 @@ dump_zpool(spa_t *spa)
 		for (spa_feature_t f = 0; f < SPA_FEATURES; f++)
 			global_feature_count[f] = UINT64_MAX;
 		global_feature_count[SPA_FEATURE_REDACTION_BOOKMARKS] = 0;
+		global_feature_count[SPA_FEATURE_REDACTION_LIST_SPILL] = 0;
 		global_feature_count[SPA_FEATURE_BOOKMARK_WRITTEN] = 0;
 		global_feature_count[SPA_FEATURE_LIVELIST] = 0;
 
@@ -8127,7 +8468,7 @@ dump_zpool(spa_t *spa)
 
 	if (rc != 0) {
 		dump_debug_buffer();
-		exit(rc);
+		zdb_exit(rc);
 	}
 }
 
@@ -8196,7 +8537,7 @@ zdb_dump_block(char *label, void *buf, uint64_t size, int flags)
 
 	(void) printf("\n%s\n%6s   %s  0123456789abcdef\n", label, "", hdr);
 
-#ifdef _LITTLE_ENDIAN
+#ifdef _ZFS_LITTLE_ENDIAN
 	/* correct the endianness */
 	do_bswap = !do_bswap;
 #endif
@@ -8310,11 +8651,54 @@ zdb_parse_block_sizes(char *sizes, uint64_t *lsize, uint64_t *psize)
 #define	ZIO_COMPRESS_MASK(alg)	(1ULL << (ZIO_COMPRESS_##alg))
 
 static boolean_t
+try_decompress_block(abd_t *pabd, uint64_t lsize, uint64_t psize,
+    int flags, int cfunc, void *lbuf, void *lbuf2)
+{
+	if (flags & ZDB_FLAG_VERBOSE) {
+		(void) fprintf(stderr,
+		    "Trying %05llx -> %05llx (%s)\n",
+		    (u_longlong_t)psize,
+		    (u_longlong_t)lsize,
+		    zio_compress_table[cfunc].ci_name);
+	}
+
+	/*
+	 * We set lbuf to all zeros and lbuf2 to all
+	 * ones, then decompress to both buffers and
+	 * compare their contents. This way we can
+	 * know if decompression filled exactly to
+	 * lsize or if it left some bytes unwritten.
+	 */
+
+	memset(lbuf, 0x00, lsize);
+	memset(lbuf2, 0xff, lsize);
+
+	abd_t labd, labd2;
+	abd_get_from_buf_struct(&labd, lbuf, lsize);
+	abd_get_from_buf_struct(&labd2, lbuf2, lsize);
+
+	boolean_t ret = B_FALSE;
+	if (zio_decompress_data(cfunc, pabd,
+	    &labd, psize, lsize, NULL) == 0 &&
+	    zio_decompress_data(cfunc, pabd,
+	    &labd2, psize, lsize, NULL) == 0 &&
+	    memcmp(lbuf, lbuf2, lsize) == 0)
+		ret = B_TRUE;
+
+	abd_free(&labd2);
+	abd_free(&labd);
+
+	return (ret);
+}
+
+static uint64_t
 zdb_decompress_block(abd_t *pabd, void *buf, void *lbuf, uint64_t lsize,
     uint64_t psize, int flags)
 {
 	(void) buf;
-	boolean_t exceeded = B_FALSE;
+	uint64_t orig_lsize = lsize;
+	boolean_t tryzle = ((getenv("ZDB_NO_ZLE") == NULL));
+	boolean_t found = B_FALSE;
 	/*
 	 * We don't know how the data was compressed, so just try
 	 * every decompress function at every inflated blocksize.
@@ -8325,10 +8709,18 @@ zdb_decompress_block(abd_t *pabd, void *buf, void *lbuf, uint64_t lsize,
 	uint64_t maxlsize = SPA_MAXBLOCKSIZE;
 	uint64_t mask = ZIO_COMPRESS_MASK(ON) | ZIO_COMPRESS_MASK(OFF) |
 	    ZIO_COMPRESS_MASK(INHERIT) | ZIO_COMPRESS_MASK(EMPTY) |
-	    (getenv("ZDB_NO_ZLE") ? ZIO_COMPRESS_MASK(ZLE) : 0);
+	    ZIO_COMPRESS_MASK(ZLE);
 	*cfuncp++ = ZIO_COMPRESS_LZ4;
 	*cfuncp++ = ZIO_COMPRESS_LZJB;
 	mask |= ZIO_COMPRESS_MASK(LZ4) | ZIO_COMPRESS_MASK(LZJB);
+	/*
+	 * Every gzip level has the same decompressor, no need to
+	 * run it 9 times per bruteforce attempt.
+	 */
+	mask |= ZIO_COMPRESS_MASK(GZIP_2) | ZIO_COMPRESS_MASK(GZIP_3);
+	mask |= ZIO_COMPRESS_MASK(GZIP_4) | ZIO_COMPRESS_MASK(GZIP_5);
+	mask |= ZIO_COMPRESS_MASK(GZIP_6) | ZIO_COMPRESS_MASK(GZIP_7);
+	mask |= ZIO_COMPRESS_MASK(GZIP_8) | ZIO_COMPRESS_MASK(GZIP_9);
 	for (int c = 0; c < ZIO_COMPRESS_FUNCTIONS; c++)
 		if (((1ULL << c) & mask) == 0)
 			*cfuncp++ = c;
@@ -8344,46 +8736,38 @@ zdb_decompress_block(abd_t *pabd, void *buf, void *lbuf, uint64_t lsize,
 		lsize += SPA_MINBLOCKSIZE;
 	else
 		maxlsize = lsize;
+
 	for (; lsize <= maxlsize; lsize += SPA_MINBLOCKSIZE) {
 		for (cfuncp = cfuncs; *cfuncp; cfuncp++) {
-			if (flags & ZDB_FLAG_VERBOSE) {
-				(void) fprintf(stderr,
-				    "Trying %05llx -> %05llx (%s)\n",
-				    (u_longlong_t)psize,
-				    (u_longlong_t)lsize,
-				    zio_compress_table[*cfuncp].\
-				    ci_name);
-			}
-
-			/*
-			 * We randomize lbuf2, and decompress to both
-			 * lbuf and lbuf2. This way, we will know if
-			 * decompression fill exactly to lsize.
-			 */
-			VERIFY0(random_get_pseudo_bytes(lbuf2, lsize));
-
-			if (zio_decompress_data(*cfuncp, pabd,
-			    lbuf, psize, lsize, NULL) == 0 &&
-			    zio_decompress_data(*cfuncp, pabd,
-			    lbuf2, psize, lsize, NULL) == 0 &&
-			    memcmp(lbuf, lbuf2, lsize) == 0)
+			if (try_decompress_block(pabd, lsize, psize, flags,
+			    *cfuncp, lbuf, lbuf2)) {
+				found = B_TRUE;
 				break;
+			}
 		}
 		if (*cfuncp != 0)
 			break;
 	}
+	if (!found && tryzle) {
+		for (lsize = orig_lsize; lsize <= maxlsize;
+		    lsize += SPA_MINBLOCKSIZE) {
+			if (try_decompress_block(pabd, lsize, psize, flags,
+			    ZIO_COMPRESS_ZLE, lbuf, lbuf2)) {
+				*cfuncp = ZIO_COMPRESS_ZLE;
+				found = B_TRUE;
+				break;
+			}
+		}
+	}
 	umem_free(lbuf2, SPA_MAXBLOCKSIZE);
 
-	if (lsize > maxlsize) {
-		exceeded = B_TRUE;
-	}
 	if (*cfuncp == ZIO_COMPRESS_ZLE) {
 		printf("\nZLE decompression was selected. If you "
 		    "suspect the results are wrong,\ntry avoiding ZLE "
 		    "by setting and exporting ZDB_NO_ZLE=\"true\"\n");
 	}
 
-	return (exceeded);
+	return (lsize > maxlsize ? -1 : lsize);
 }
 
 /*
@@ -8420,7 +8804,7 @@ zdb_read_block(char *thing, spa_t *spa)
 	void *lbuf, *buf;
 	char *s, *p, *dup, *flagstr, *sizes, *tmp = NULL;
 	const char *vdev, *errmsg = NULL;
-	int i, error;
+	int i, len, error;
 	boolean_t borrowed = B_FALSE, found = B_FALSE;
 
 	dup = strdup(thing);
@@ -8448,7 +8832,8 @@ zdb_read_block(char *thing, spa_t *spa)
 	for (s = strtok_r(flagstr, ":", &tmp);
 	    s != NULL;
 	    s = strtok_r(NULL, ":", &tmp)) {
-		for (i = 0; i < strlen(flagstr); i++) {
+		len = strlen(flagstr);
+		for (i = 0; i < len; i++) {
 			int bit = flagbits[(uchar_t)flagstr[i]];
 
 			if (bit == 0) {
@@ -8562,9 +8947,9 @@ zdb_read_block(char *thing, spa_t *spa)
 	uint64_t orig_lsize = lsize;
 	buf = lbuf;
 	if (flags & ZDB_FLAG_DECOMPRESS) {
-		boolean_t failed = zdb_decompress_block(pabd, buf, lbuf,
+		lsize = zdb_decompress_block(pabd, buf, lbuf,
 		    lsize, psize, flags);
-		if (failed) {
+		if (lsize == -1) {
 			(void) printf("Decompress of %s failed\n", thing);
 			goto out;
 		}
@@ -8585,11 +8970,11 @@ zdb_read_block(char *thing, spa_t *spa)
 			abd_return_buf_copy(pabd, buf, lsize);
 			borrowed = B_FALSE;
 			buf = lbuf;
-			boolean_t failed = zdb_decompress_block(pabd, buf,
+			lsize = zdb_decompress_block(pabd, buf,
 			    lbuf, lsize, psize, flags);
 			b = (const blkptr_t *)(void *)
 			    ((uintptr_t)buf + (uintptr_t)blkptr_offset);
-			if (failed || zfs_blkptr_verify(spa, b,
+			if (lsize == -1 || zfs_blkptr_verify(spa, b,
 			    BLK_CONFIG_NEEDED, BLK_VERIFY_LOG) == B_FALSE) {
 				printf("invalid block pointer at this DVA\n");
 				goto out;
@@ -8630,8 +9015,6 @@ zdb_read_block(char *thing, spa_t *spa)
 			BP_SET_CHECKSUM(bp, ck);
 			spa_config_enter(spa, SCL_STATE, FTAG, RW_READER);
 			czio = zio_root(spa, NULL, NULL, ZIO_FLAG_CANFAIL);
-			czio->io_bp = bp;
-
 			if (vd == vd->vdev_top) {
 				zio_nowait(zio_read(czio, spa, bp, pabd, psize,
 				    NULL, NULL,
@@ -8650,7 +9033,8 @@ zdb_read_block(char *thing, spa_t *spa)
 			}
 			error = zio_wait(czio);
 			if (error == 0 || error == ECKSUM) {
-				zio_t *ck_zio = zio_root(spa, NULL, NULL, 0);
+				zio_t *ck_zio = zio_null(NULL, spa, NULL,
+				    NULL, NULL, 0);
 				ck_zio->io_offset =
 				    DVA_GET_OFFSET(&bp->blk_dva[0]);
 				ck_zio->io_bp = bp;
@@ -8698,18 +9082,18 @@ zdb_embedded_block(char *thing)
 	    words + 12, words + 13, words + 14, words + 15);
 	if (err != 16) {
 		(void) fprintf(stderr, "invalid input format\n");
-		exit(1);
+		zdb_exit(1);
 	}
 	ASSERT3U(BPE_GET_LSIZE(&bp), <=, SPA_MAXBLOCKSIZE);
 	buf = malloc(SPA_MAXBLOCKSIZE);
 	if (buf == NULL) {
 		(void) fprintf(stderr, "out of memory\n");
-		exit(1);
+		zdb_exit(1);
 	}
 	err = decode_embedded_bp(&bp, buf, BPE_GET_LSIZE(&bp));
 	if (err != 0) {
 		(void) fprintf(stderr, "decode failed: %u\n", err);
-		exit(1);
+		zdb_exit(1);
 	}
 	zdb_dump_block_raw(buf, BPE_GET_LSIZE(&bp), 0);
 	free(buf);
@@ -8719,25 +9103,37 @@ zdb_embedded_block(char *thing)
 static boolean_t
 zdb_numeric(char *str)
 {
-	int i = 0;
+	int i = 0, len;
 
-	if (strlen(str) == 0)
+	len = strlen(str);
+	if (len == 0)
 		return (B_FALSE);
 	if (strncmp(str, "0x", 2) == 0 || strncmp(str, "0X", 2) == 0)
 		i = 2;
-	for (; i < strlen(str); i++) {
+	for (; i < len; i++) {
 		if (!isxdigit(str[i]))
 			return (B_FALSE);
 	}
 	return (B_TRUE);
 }
 
+static int
+dummy_get_file_info(dmu_object_type_t bonustype, const void *data,
+    zfs_file_info_t *zoi)
+{
+	(void) data, (void) zoi;
+
+	if (bonustype != DMU_OT_ZNODE && bonustype != DMU_OT_SA)
+		return (ENOENT);
+
+	(void) fprintf(stderr, "dummy_get_file_info: not implemented");
+	abort();
+}
+
 int
 main(int argc, char **argv)
 {
 	int c;
-	spa_t *spa = NULL;
-	objset_t *os = NULL;
 	int dump_all = 1;
 	int verbose = 0;
 	int error = 0;
@@ -8753,8 +9149,29 @@ main(int argc, char **argv)
 	char *spa_config_path_env, *objset_str;
 	boolean_t target_is_spa = B_TRUE, dataset_lookup = B_FALSE;
 	nvlist_t *cfg = NULL;
+	struct sigaction action;
+	boolean_t force_import = B_FALSE;
+	boolean_t config_path_console = B_FALSE;
+	char pbuf[MAXPATHLEN];
 
 	dprintf_setup(&argc, argv);
+
+	/*
+	 * Set up signal handlers, so if we crash due to bad on-disk data we
+	 * can get more info. Unlike ztest, we don't bail out if we can't set
+	 * up signal handlers, because zdb is very useful without them.
+	 */
+	action.sa_handler = sig_handler;
+	sigemptyset(&action.sa_mask);
+	action.sa_flags = 0;
+	if (sigaction(SIGSEGV, &action, NULL) < 0) {
+		(void) fprintf(stderr, "zdb: cannot catch SIGSEGV: %s\n",
+		    strerror(errno));
+	}
+	if (sigaction(SIGABRT, &action, NULL) < 0) {
+		(void) fprintf(stderr, "zdb: cannot catch SIGABRT: %s\n",
+		    strerror(errno));
+	}
 
 	/*
 	 * If there is an environment variable SPA_CONFIG_PATH it overrides
@@ -8804,6 +9221,7 @@ main(int argc, char **argv)
 		{"io-stats",		no_argument,		NULL, 's'},
 		{"simulate-dedup",	no_argument,		NULL, 'S'},
 		{"txg",			required_argument,	NULL, 't'},
+		{"brt-stats",		no_argument,		NULL, 'T'},
 		{"uberblock",		no_argument,		NULL, 'u'},
 		{"cachefile",		required_argument,	NULL, 'U'},
 		{"verbose",		no_argument,		NULL, 'v'},
@@ -8817,7 +9235,7 @@ main(int argc, char **argv)
 	};
 
 	while ((c = getopt_long(argc, argv,
-	    "AbBcCdDeEFGhiI:kK:lLmMNo:Op:PqrRsSt:uU:vVx:XYyZ",
+	    "AbBcCdDeEFGhiI:kK:lLmMNo:Op:PqrRsSt:TuU:vVx:XYyZ",
 	    long_options, NULL)) != -1) {
 		switch (c) {
 		case 'b':
@@ -8839,6 +9257,7 @@ main(int argc, char **argv)
 		case 'R':
 		case 's':
 		case 'S':
+		case 'T':
 		case 'u':
 		case 'y':
 		case 'Z':
@@ -8904,6 +9323,7 @@ main(int argc, char **argv)
 			}
 			break;
 		case 'U':
+			config_path_console = B_TRUE;
 			spa_config_path = optarg;
 			if (spa_config_path[0] != '/') {
 				(void) fprintf(stderr,
@@ -8963,8 +9383,6 @@ main(int argc, char **argv)
 	 */
 	spa_mode_readable_spacemaps = B_TRUE;
 
-	kernel_init(SPA_MODE_READ);
-
 	if (dump_all)
 		verbose = MAX(verbose, 1);
 
@@ -8983,38 +9401,74 @@ main(int argc, char **argv)
 	if (argc < 2 && dump_opt['R'])
 		usage();
 
+	target = argv[0];
+
+	/*
+	 * Automate cachefile
+	 */
+	if (!spa_config_path_env && !config_path_console && target &&
+	    libzfs_core_init() == 0) {
+		char *pname = strdup(target);
+		const char *value;
+		nvlist_t *pnvl = NULL;
+		nvlist_t *vnvl = NULL;
+
+		if (strpbrk(pname, "/@") != NULL)
+			*strpbrk(pname, "/@") = '\0';
+
+		if (pname && lzc_get_props(pname, &pnvl) == 0) {
+			if (nvlist_lookup_nvlist(pnvl, "cachefile",
+			    &vnvl) == 0) {
+				value = fnvlist_lookup_string(vnvl,
+				    ZPROP_VALUE);
+			} else {
+				value = "-";
+			}
+			strlcpy(pbuf, value, sizeof (pbuf));
+			if (pbuf[0] != '\0') {
+				if (pbuf[0] == '/') {
+					if (access(pbuf, F_OK) == 0)
+						spa_config_path = pbuf;
+					else
+						force_import = B_TRUE;
+				} else if ((strcmp(pbuf, "-") == 0 &&
+				    access(ZPOOL_CACHE, F_OK) != 0) ||
+				    strcmp(pbuf, "none") == 0) {
+					force_import = B_TRUE;
+				}
+			}
+			nvlist_free(vnvl);
+		}
+
+		free(pname);
+		nvlist_free(pnvl);
+		libzfs_core_fini();
+	}
+
+	dmu_objset_register_type(DMU_OST_ZFS, dummy_get_file_info);
+	kernel_init(SPA_MODE_READ);
+	kernel_init_done = B_TRUE;
+
 	if (dump_opt['E']) {
 		if (argc != 1)
 			usage();
 		zdb_embedded_block(argv[0]);
-		return (0);
+		error = 0;
+		goto fini;
 	}
 
 	if (argc < 1) {
 		if (!dump_opt['e'] && dump_opt['C']) {
 			dump_cachefile(spa_config_path);
-			return (0);
+			error = 0;
+			goto fini;
 		}
 		usage();
 	}
 
-	if (dump_opt['l'])
-		return (dump_label(argv[0]));
-
-	if (dump_opt['O']) {
-		if (argc != 2)
-			usage();
-		dump_opt['v'] = verbose + 3;
-		return (dump_path(argv[0], argv[1], NULL));
-	}
-	if (dump_opt['r']) {
-		target_is_spa = B_FALSE;
-		if (argc != 3)
-			usage();
-		dump_opt['v'] = verbose;
-		error = dump_path(argv[0], argv[1], &object);
-		if (error != 0)
-			fatal("internal error: %s", strerror(error));
+	if (dump_opt['l']) {
+		error = dump_label(argv[0]);
+		goto fini;
 	}
 
 	if (dump_opt['X'] || dump_opt['F'])
@@ -9031,7 +9485,6 @@ main(int argc, char **argv)
 		fatal("internal error: %s", strerror(ENOMEM));
 
 	error = 0;
-	target = argv[0];
 
 	if (strpbrk(target, "/@") != NULL) {
 		size_t targetlen;
@@ -9070,14 +9523,23 @@ main(int argc, char **argv)
 		} else if (objset_str && !zdb_numeric(objset_str + 1) &&
 		    dump_opt['N']) {
 			printf("Supply a numeric objset ID with -N\n");
-			exit(1);
+			error = 1;
+			goto fini;
 		}
 	} else {
 		target_pool = target;
 	}
 
-	if (dump_opt['e']) {
+	if (dump_opt['e'] || force_import) {
 		importargs_t args = { 0 };
+
+		/*
+		 * If path is not provided, search in /dev
+		 */
+		if (searchdirs == NULL) {
+			searchdirs = umem_alloc(sizeof (char *), UMEM_NOFAIL);
+			searchdirs[nsearch++] = (char *)ZFS_DEVDIR;
+		}
 
 		args.paths = nsearch;
 		args.path = searchdirs;
@@ -9115,6 +9577,30 @@ main(int argc, char **argv)
 	if (searchdirs != NULL) {
 		umem_free(searchdirs, nsearch * sizeof (char *));
 		searchdirs = NULL;
+	}
+
+	/*
+	 * We need to make sure to process -O option or call
+	 * dump_path after the -e option has been processed,
+	 * which imports the pool to the namespace if it's
+	 * not in the cachefile.
+	 */
+	if (dump_opt['O']) {
+		if (argc != 2)
+			usage();
+		dump_opt['v'] = verbose + 3;
+		error = dump_path(argv[0], argv[1], NULL);
+		goto fini;
+	}
+
+	if (dump_opt['r']) {
+		target_is_spa = B_FALSE;
+		if (argc != 3)
+			usage();
+		dump_opt['v'] = verbose;
+		error = dump_path(argv[0], argv[1], &object);
+		if (error != 0)
+			fatal("internal error: %s", strerror(error));
 	}
 
 	/*
@@ -9192,7 +9678,7 @@ main(int argc, char **argv)
 				fatal("can't dump '%s': %s", target,
 				    strerror(error));
 			}
-			return (error);
+			goto fini;
 		} else {
 			target_pool = strdup(target);
 			if (strpbrk(target, "/@") != NULL)
@@ -9322,9 +9808,13 @@ retry_lookup:
 			free(checkpoint_target);
 	}
 
+fini:
+	if (spa != NULL)
+		zdb_ddt_cleanup(spa);
+
 	if (os != NULL) {
 		close_objset(os, FTAG);
-	} else {
+	} else if (spa != NULL) {
 		spa_close(spa, FTAG);
 	}
 
@@ -9332,7 +9822,8 @@ retry_lookup:
 
 	dump_debug_buffer();
 
-	kernel_fini();
+	if (kernel_init_done)
+		kernel_fini();
 
 	return (error);
 }

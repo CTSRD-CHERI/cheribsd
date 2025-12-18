@@ -35,8 +35,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	from: @(#)param.h	5.8 (Berkeley) 6/28/91
  */
 
 #ifndef _ARM_INCLUDE_PARAM_H_
@@ -57,11 +55,7 @@
 #define	MACHINE		"arm"
 #endif
 #ifndef MACHINE_ARCH
-#if __ARM_ARCH >= 7
 #define	MACHINE_ARCH	"armv7"
-#else
-#define	MACHINE_ARCH	"armv6"
-#endif
 #endif
 
 #ifdef SMP

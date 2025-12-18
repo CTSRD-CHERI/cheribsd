@@ -24,7 +24,6 @@
  *
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -169,7 +168,7 @@ mv_spi_attach(device_t dev)
 
 	mtx_init(&sc->sc_mtx, "mv_spi", NULL, MTX_DEF);
 
-	device_add_child(dev, "spibus", -1);
+	device_add_child(dev, "spibus", DEVICE_UNIT_ANY);
 
 	/* Probe and attach the spibus when interrupts are available. */
 	return (bus_delayed_attach_children(dev));

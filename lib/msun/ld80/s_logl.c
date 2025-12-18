@@ -26,7 +26,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 /**
  * Implementation of the natural logarithm of x for Intel 80-bit format.
  *
@@ -445,7 +444,7 @@ struct ld {
 #endif
 
 #ifdef STRUCT_RETURN
-static inline __always_inline void
+static __always_inline void
 k_logl(long double x, struct ld *rp)
 #else
 long double

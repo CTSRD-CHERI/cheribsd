@@ -35,6 +35,7 @@
 #include <sys/consio.h>
 #include <sys/ioctl.h>
 #include <sys/kbio.h>
+#include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/wait.h>
 #include <assert.h>
@@ -319,7 +320,7 @@ static int32_t const	x[] =
 /* Right GUI                    E7 */ E0PREFIX|0x5C  /* E0 DC */
 };
 
-#define xsize	((int32_t)(sizeof(x)/sizeof(x[0])))
+#define xsize	(int32_t)nitems(x)
 
 /*
  * Get a max HID keycode (aligned)
@@ -338,7 +339,7 @@ kbd_maxkey(void)
 int32_t
 kbd_process_keys(bthid_session_p s)
 {
-	bitstr_t	diff[bitstr_size(xsize)];
+	bitstr_t	bit_decl(diff, xsize);
 	int32_t		f1, f2, i;
 
 	assert(s != NULL);
@@ -437,7 +438,7 @@ kbd_write(bitstr_t *m, int32_t fb, int32_t make, int32_t fd)
 	int32_t	i, *b, *eob, n, buf[64];
 
 	b = buf;
-	eob = b + sizeof(buf)/sizeof(buf[0]);
+	eob = b + nitems(buf);
 	i = fb;
 
 	while (i < xsize) {

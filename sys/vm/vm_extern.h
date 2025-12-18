@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)vm_extern.h	8.2 (Berkeley) 1/12/94
  */
 
 #ifndef _VM_EXTERN_H_
@@ -49,6 +47,7 @@ struct domainset;
 
 /* These operate on kernel virtual addresses only. */
 vm_pointer_t kva_alloc(vm_size_t);
+vm_pointer_t kva_alloc_aligned(vm_size_t, vm_size_t);
 void kva_free(vm_pointer_t, vm_size_t);
 
 /* These operate on pageable virtual addresses. */
@@ -84,8 +83,8 @@ void kmem_init(vm_pointer_t, vm_pointer_t);
 void kmem_init_zero_region(void);
 void kmeminit(void);
 
-int kernacc(void *, int, int);
-int useracc(void * __capability, int, int);
+bool kernacc(void *, int, int);
+bool useracc(void * __capability, int, int);
 #if __has_feature(capabilities)
 bool vm_cap_allows_prot(const void * __capability, vm_prot_t);
 #endif
@@ -136,8 +135,6 @@ struct sf_buf *vm_imgact_map_page(vm_object_t object, vm_ooffset_t offset);
 void vm_imgact_unmap_page(struct sf_buf *sf);
 void vm_thread_dispose(struct thread *td);
 int vm_thread_new(struct thread *td, int pages);
-void vm_thread_stack_back(struct domainset *ds, vm_offset_t kaddr,
-    vm_page_t ma[], int npages, int req_class);
 u_int vm_active_count(void);
 u_int vm_inactive_count(void);
 u_int vm_laundry_count(void);

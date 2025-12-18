@@ -33,6 +33,8 @@
 #include "opt_kstack_pages.h"
 #include "opt_sched.h"
 
+#include <sys/elf_common.h>
+
 #include <machine/asm.h>
 #include <machine/armreg.h>
 .macro clear_step_flag pcbflags, tmp
@@ -54,6 +56,27 @@
 .endm
 
 /*
+ * Lower 32 bits of CONTEXTIDR_EL1 are PID
+ * Upper 32 bits are reserved for future use e.g. TID
+ */
+.macro pid_in_context_idr
+#ifdef __CHERI_PURE_CAPABILITY__
+		adrp	c9, :got:arm64_pid_in_contextidr
+	ldr	c9, [c9, :got_lo12:arm64_pid_in_contextidr]
+	ldrb	w10, [c9]
+#else
+	adrp	x9, arm64_pid_in_contextidr
+	ldrb	w10, [x9, :lo12:arm64_pid_in_contextidr]
+#endif
+	cbz	w10, 998f
+	ldr	PTR(9), [PTR(1), #TD_PROC]
+	/* PID is always 0 or positive, do not sign extend */
+	ldr	w10, [PTR(9), #P_PID]
+	msr	contextidr_el1, x10
+998:
+.endm
+
+/*
  * void cpu_throw(struct thread *old, struct thread *new)
  */
 ENTRY(cpu_throw)
@@ -64,7 +87,10 @@ ENTRY(cpu_throw)
 	ldr	PTR(4), [PTR(0), #TD_PCB]
 	ldr	w5, [PTR(4), #PCB_FLAGS]
 	clear_step_flag w5, x6
+
 1:
+	/* debug/trace: set CONTEXTIDR_EL1 to current PID, if enabled */
+	pid_in_context_idr
 
 #ifdef VFP
 	/* Backup the new thread pointer around a call to C code */
@@ -122,7 +148,7 @@ ENTRY(cpu_throw)
 	ldp	PTR(27), PTR(28), [PTR(4), #PCB_REGS + (PCB_X19 + 8) * PTR_WIDTH]
 	ldp	PTR(29), PTRN(lr), [PTR(4), #PCB_REGS + (PCB_X19 + 10) * PTR_WIDTH]
 
-	ret
+	RETURN
 END(cpu_throw)
 
 /*
@@ -174,10 +200,11 @@ ENTRY(cpu_switch)
 	mov	PTR(20), PTR(1)
 	mov	PTR(21), PTR(2)
 
+	/* debug/trace: set CONTEXTIDR_EL1 to current PID, if enabled */
+	pid_in_context_idr
+
 #ifdef VFP
-	/* Load the pcb address */
-	mov	PTR(1), PTR(4)
-	bl	vfp_save_state
+	bl	vfp_save_state_switch
 	mov	PTR(0), PTR(20)
 #else
 	mov	PTR(0), PTR(1)
@@ -245,7 +272,7 @@ ENTRY(cpu_switch)
 	ldp	PTR(27), PTR(28), [PTR(4), #PCB_REGS + (PCB_X19 + 8) * PTR_WIDTH]
 	ldp	PTR(29), PTRN(lr), [PTR(4), #PCB_REGS + (PCB_X19 + 10) * PTR_WIDTH]
 
-	ret
+	RETURN
 END(cpu_switch)
 
 ENTRY(fork_trampoline)
@@ -338,17 +365,15 @@ ENTRY(savectx)
 	stp	x5, x6, [x0, #PCB_SP]
 #endif
 
-	/* Store the VFP registers */
 #ifdef VFP
-	mov	PTR(28), PTRN(lr)
-	mov	PTR(1), PTR(0)		/* move pcb to the correct register */
-	mov	x0, xzr			/* td = NULL */
-	bl	vfp_save_state
-	mov	PTRN(lr), PTR(28)
-#endif
-
+	/* Store the VFP registers */
+	b	vfp_save_state_savectx
+#else
 	ret
+#endif
 END(savectx)
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)
 // CHERI CHANGES START
 // {
 //   "updated": 20230509,

@@ -35,8 +35,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)local.h	8.3 (Berkeley) 7/3/94
  */
 
 #ifndef _STDIO_LOCAL_H
@@ -80,7 +78,7 @@ extern int	__swsetup(FILE *);
 extern int	__sflags(const char *, int *);
 extern int	__ungetc(int, FILE *);
 extern wint_t	__ungetwc(wint_t, FILE *, locale_t);
-extern int	__vfprintf(FILE *, locale_t, const char *, __va_list);
+extern int	__vfprintf(FILE *, locale_t, int, const char *, __va_list);
 extern int	__vfscanf(FILE *, const char *, __va_list);
 extern int	__vfwprintf(FILE *, locale_t, const wchar_t *, __va_list);
 extern int	__vfwscanf(FILE * __restrict, locale_t, const wchar_t * __restrict,

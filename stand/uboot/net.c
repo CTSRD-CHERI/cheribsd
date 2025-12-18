@@ -25,7 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -101,7 +100,7 @@ static struct uboot_softc uboot_softc;
  * to obtain all this info again.
  */
 static void
-get_env_net_params()
+get_env_net_params(void)
 {
 	char *envstr;
 	in_addr_t rootaddr, serveraddr;

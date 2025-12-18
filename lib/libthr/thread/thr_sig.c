@@ -26,7 +26,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include "namespace.h"
 #include <sys/param.h>
 #include <sys/auxv.h>
@@ -70,11 +69,20 @@ static void handle_signal(struct sigaction *, int, siginfo_t *, ucontext_t *);
 static void check_deferred_signal(struct pthread *);
 static void check_suspend(struct pthread *);
 static void check_cancel(struct pthread *curthread, ucontext_t *ucp);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-__weak_reference(thr_sighandler, _thr_sighandler);
-void _thr_sighandler(int, siginfo_t *, void *);
-__weak_reference(thr_sighandler, _rtld_sighandler);
+#ifdef CHERI_LIB_C18N
+#pragma weak _thr_sighandler = thr_sighandler
+
+/*
+ * These weak symbols will always be resolved at runtime.
+ */
+#pragma weak _rtld_sighandler
 void _rtld_sighandler(int, siginfo_t *, void *);
+
+#pragma weak _rtld_sigaction
+int _rtld_sigaction(int, const struct sigaction *, struct sigaction *);
+
+#pragma weak _rtld_siginvoke
+void _rtld_siginvoke(int, siginfo_t *, void *, const struct sigaction *);
 #endif
 
 int	_sigtimedwait(const sigset_t *set, siginfo_t *info,
@@ -254,7 +262,6 @@ static void
 handle_signal(struct sigaction *actp, int sig, siginfo_t *info, ucontext_t *ucp)
 {
 	struct pthread *curthread = _get_curthread();
-	ucontext_t uc2;
 	__siginfohandler_t *sigfunc;
 	int cancel_point;
 	int cancel_async;
@@ -288,10 +295,14 @@ handle_signal(struct sigaction *actp, int sig, siginfo_t *info, ucontext_t *ucp)
 	if (!cancel_async)
 		curthread->cancel_enable = 0;
 
+#ifdef CHERI_LIB_C18N
+	(void)sigfunc;
+#else
 	/* restore correct mask before calling user handler */
 	__sys_sigprocmask(SIG_SETMASK, &actp->sa_mask, NULL);
 
 	sigfunc = actp->sa_sigaction;
+#endif
 
 	/*
 	 * We have already reset cancellation point flags, so if user's code
@@ -301,6 +312,9 @@ handle_signal(struct sigaction *actp, int sig, siginfo_t *info, ucontext_t *ucp)
 	 * so after setjmps() returns once more, the user code may need to
 	 * re-set cancel_enable flag by calling pthread_setcancelstate().
 	 */
+#ifdef CHERI_LIB_C18N
+	_rtld_siginvoke(sig, info, ucp, actp);
+#else
 	if ((actp->sa_flags & SA_SIGINFO) != 0) {
 		sigfunc(sig, info, ucp);
 	} else {
@@ -308,28 +322,18 @@ handle_signal(struct sigaction *actp, int sig, siginfo_t *info, ucontext_t *ucp)
 		    (struct sigcontext *)ucp, info->si_addr,
 		    (__sighandler_t *)sigfunc);
 	}
+#endif
 	err = errno;
 
 	curthread->in_sigsuspend = in_sigsuspend;
 	curthread->cancel_point = cancel_point;
 	curthread->cancel_enable = cancel_enable;
 
-	memcpy(&uc2, ucp, sizeof(uc2));
-	SIGDELSET(uc2.uc_sigmask, SIGCANCEL);
+	SIGDELSET(ucp->uc_sigmask, SIGCANCEL);
 
 	/* reschedule cancellation */
-	check_cancel(curthread, &uc2);
+	check_cancel(curthread, ucp);
 	errno = err;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	/*
-	 * Calling sigreturn outside of sigcode does not work with
-	 * compartmentalisation. Hence we set the user context and let the
-	 * function return back to sigcode, where sigreturn will be called.
-	 */
-	memcpy(ucp, &uc2, sizeof(*ucp));
-#else
-	syscall(SYS_sigreturn, &uc2);
-#endif
 }
 
 void
@@ -416,8 +420,10 @@ check_deferred_signal(struct pthread *curthread)
 	/* remove signal */
 	curthread->deferred_siginfo.si_signo = 0;
 	handle_signal(&act, info.si_signo, &info, uc);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#ifdef CHERI_LIB_C18N
 	setcontext(uc);
+#else
+	syscall(SYS_sigreturn, uc);
 #endif
 }
 
@@ -484,7 +490,11 @@ _thr_signal_init(int dlopened)
 		for (sig = 1; sig <= _SIG_MAXSIG; sig++) {
 			if (sig == SIGCANCEL)
 				continue;
+#ifdef CHERI_LIB_C18N
+			error = _rtld_sigaction(sig, NULL, &oact);
+#else
 			error = __sys_sigaction(sig, NULL, &oact);
+#endif
 			if (error == -1 || oact.sa_handler == SIG_DFL ||
 			    oact.sa_handler == SIG_IGN)
 				continue;
@@ -494,7 +504,9 @@ _thr_signal_init(int dlopened)
 			remove_thr_signals(&usa->sigact.sa_mask);
 			nact.sa_flags &= ~SA_NODEFER;
 			nact.sa_flags |= SA_SIGINFO;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#ifdef CHERI_LIB_C18N
+			/* XXX: Ignore sigaltstack for now */
+			nact.sa_flags &= ~SA_ONSTACK;
 			nact.sa_sigaction = _rtld_sighandler;
 #else
 			nact.sa_sigaction = thr_sighandler;
@@ -628,7 +640,9 @@ __thr_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 			remove_thr_signals(&usa->sigact.sa_mask);
 			newact.sa_flags &= ~SA_NODEFER;
 			newact.sa_flags |= SA_SIGINFO;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#ifdef CHERI_LIB_C18N
+			/* XXX: Ignore sigaltstack for now */
+			newact.sa_flags &= ~SA_ONSTACK;
 			newact.sa_sigaction = _rtld_sighandler;
 #else
 			newact.sa_sigaction = thr_sighandler;

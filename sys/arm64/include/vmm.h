@@ -89,6 +89,50 @@ enum vm_reg_name {
 	VM_REG_GUEST_TTBR1_EL1,
 	VM_REG_GUEST_TCR_EL1,
 	VM_REG_GUEST_TCR2_EL1,
+
+#if __has_feature(capabilities)
+	VM_REG_GUEST_C0,
+	VM_REG_GUEST_C1,
+	VM_REG_GUEST_C2,
+	VM_REG_GUEST_C3,
+	VM_REG_GUEST_C4,
+	VM_REG_GUEST_C5,
+	VM_REG_GUEST_C6,
+	VM_REG_GUEST_C7,
+	VM_REG_GUEST_C8,
+	VM_REG_GUEST_C9,
+	VM_REG_GUEST_C10,
+	VM_REG_GUEST_C11,
+	VM_REG_GUEST_C12,
+	VM_REG_GUEST_C13,
+	VM_REG_GUEST_C14,
+	VM_REG_GUEST_C15,
+	VM_REG_GUEST_C16,
+	VM_REG_GUEST_C17,
+	VM_REG_GUEST_C18,
+	VM_REG_GUEST_C19,
+	VM_REG_GUEST_C20,
+	VM_REG_GUEST_C21,
+	VM_REG_GUEST_C22,
+	VM_REG_GUEST_C23,
+	VM_REG_GUEST_C24,
+	VM_REG_GUEST_C25,
+	VM_REG_GUEST_C26,
+	VM_REG_GUEST_C27,
+	VM_REG_GUEST_C28,
+	VM_REG_GUEST_C29,
+	VM_REG_GUEST_C30,
+	VM_REG_GUEST_CSP,
+	VM_REG_GUEST_PCC,
+	VM_REG_GUEST_DDC,
+	VM_REG_GUEST_CTPIDR,
+	VM_REG_GUEST_RCSP,
+	VM_REG_GUEST_RDDC,
+	VM_REG_GUEST_RCTPIDR,
+	VM_REG_GUEST_CID,
+	VM_REG_GUEST_CCTLR,
+#endif
+
 	VM_REG_LAST
 };
 
@@ -102,14 +146,30 @@ enum vm_reg_name {
 #define	VM_INTINFO_HWEXCEPTION	(3 << 8)
 #define	VM_INTINFO_SWINTR	(4 << 8)
 
-#define VM_MAX_SUFFIXLEN 15
-
 #define VM_GUEST_BASE_IPA	0x80000000UL	/* Guest kernel start ipa */
 
+/*
+ * The VM name has to fit into the pathname length constraints of devfs,
+ * governed primarily by SPECNAMELEN.  The length is the total number of
+ * characters in the full path, relative to the mount point and not 
+ * including any leading '/' characters.
+ * A prefix and a suffix are added to the name specified by the user.
+ * The prefix is usually "vmm/" or "vmm.io/", but can be a few characters
+ * longer for future use.
+ * The suffix is a string that identifies a bootrom image or some similar
+ * image that is attached to the VM. A separator character gets added to
+ * the suffix automatically when generating the full path, so it must be
+ * accounted for, reducing the effective length by 1.
+ * The effective length of a VM name is 229 bytes for FreeBSD 13 and 37
+ * bytes for FreeBSD 12.  A minimum length is set for safety and supports
+ * a SPECNAMELEN as small as 32 on old systems.
+ */
+#define VM_MAX_PREFIXLEN 10
+#define VM_MAX_SUFFIXLEN 15
+#define VM_MAX_NAMELEN \
+    (SPECNAMELEN - VM_MAX_PREFIXLEN - VM_MAX_SUFFIXLEN - 1)
+
 #ifdef _KERNEL
-
-#define	VM_MAX_NAMELEN	32
-
 struct vm;
 struct vm_exception;
 struct vm_exit;
@@ -118,6 +178,9 @@ struct vm_object;
 struct vm_guest_paging;
 struct vm_vgic_descr;
 struct pmap;
+#if __has_feature(capabilities)
+struct vm_cheri_capability_tag;
+#endif
 
 struct vm_eventinfo {
 	void	*rptr;		/* rendezvous cookie */
@@ -127,6 +190,7 @@ struct vm_eventinfo {
 
 int vm_create(const char *name, struct vm **retvm);
 struct vcpu *vm_alloc_vcpu(struct vm *vm, int vcpuid);
+void vm_disable_vcpu_creation(struct vm *vm);
 void vm_slock_vcpus(struct vm *vm);
 void vm_unlock_vcpus(struct vm *vm);
 void vm_destroy(struct vm *vm);
@@ -161,6 +225,10 @@ void *vm_gpa_hold_global(struct vm *vm, vm_paddr_t gpa, size_t len,
     int prot, void **cookie);
 void vm_gpa_release(void *cookie);
 bool vm_mem_allocated(struct vcpu *vcpu, vm_paddr_t gpa);
+#if __has_feature(capabilities)
+int vm_get_cheri_capability_tag(struct vm *vm,
+    struct vm_cheri_capability_tag *vt);
+#endif
 
 int vm_gla2gpa_nofault(struct vcpu *vcpu, struct vm_guest_paging *paging,
     uint64_t gla, int prot, uint64_t *gpa, int *is_fault);
@@ -171,6 +239,10 @@ void vm_get_topology(struct vm *vm, uint16_t *sockets, uint16_t *cores,
 int vm_set_topology(struct vm *vm, uint16_t sockets, uint16_t cores,
     uint16_t threads, uint16_t maxcpus);
 int vm_get_register(struct vcpu *vcpu, int reg, uintcap_t *retval);
+#if __has_feature(capabilities)
+int vm_get_register_cheri_capability_tag(struct vcpu *vcpu, int reg,
+    uint8_t *tagp);
+#endif
 int vm_set_register(struct vcpu *vcpu, int reg, uintcap_t val);
 int vm_run(struct vcpu *vcpu);
 int vm_suspend(struct vm *vm, enum vm_suspend_how how);
@@ -197,13 +269,6 @@ void vm_exit_debug(struct vcpu *vcpu, uintcap_t pc);
 cpuset_t vm_active_cpus(struct vm *vm);
 cpuset_t vm_debug_cpus(struct vm *vm);
 cpuset_t vm_suspended_cpus(struct vm *vm);
-
-static __inline bool
-virt_enabled(void)
-{
-
-	return (has_hyp());
-}
 
 static __inline int
 vcpu_rendezvous_pending(struct vm_eventinfo *info)
@@ -293,10 +358,11 @@ struct vre {
  */
 enum vm_cap_type {
 	VM_CAP_HALT_EXIT,
-	VM_CAP_MTRAP_EXIT,
 	VM_CAP_PAUSE_EXIT,
 	VM_CAP_UNRESTRICTED_GUEST,
-	VM_CAP_BPT_EXIT,
+	VM_CAP_BRK_EXIT,
+	VM_CAP_SS_EXIT,
+	VM_CAP_MASK_HWINTR,
 	VM_CAP_MAX
 };
 
@@ -312,6 +378,7 @@ enum vm_exitcode {
 	VM_EXITCODE_SMCCC,
 	VM_EXITCODE_DEBUG,
 	VM_EXITCODE_BRK,
+	VM_EXITCODE_SS,
 	VM_EXITCODE_MAX
 };
 

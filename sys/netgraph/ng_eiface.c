@@ -257,7 +257,9 @@ ng_eiface_start2(node_p node, hook_p hook, void *arg1, int arg2)
 		 * freed.
 		 */
 		NG_OUTBOUND_THREAD_REF();
+		CURVNET_SET_QUIET(priv->node->nd_vnet);
 		NG_SEND_DATA_ONLY(error, priv->ether, m);
+		CURVNET_RESTORE();
 		NG_OUTBOUND_THREAD_UNREF();
 
 		/* Update stats */
@@ -386,12 +388,7 @@ ng_eiface_constructor(node_p node)
 
 	/* Allocate node and interface private structures */
 	priv = malloc(sizeof(*priv), M_NETGRAPH, M_WAITOK | M_ZERO);
-
 	ifp = priv->ifp = if_alloc(IFT_ETHER);
-	if (ifp == NULL) {
-		free(priv, M_NETGRAPH);
-		return (ENOSPC);
-	}
 
 	/* Link them together */
 	ifp->if_softc = priv;

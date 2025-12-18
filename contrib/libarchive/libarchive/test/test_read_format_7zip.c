@@ -23,7 +23,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "test.h"
-__FBSDID("$FreeBSD");
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
 #define	close		_close
@@ -61,7 +60,7 @@ test_copy(int use_open_fd)
 
 	/* Verify regular file1. */
 	assertEqualIntA(a, ARCHIVE_OK, archive_read_next_header(a, &ae));
-	assertEqualInt((AE_IFREG | 0666), archive_entry_mode(ae));
+	assertEqualInt((AE_IFREG | 0644), archive_entry_mode(ae));
 	assertEqualString("file1", archive_entry_pathname(ae));
 	assertEqualInt(86401, archive_entry_mtime(ae));
 	assertEqualInt(60, archive_entry_size(ae));
@@ -765,7 +764,7 @@ test_ppmd(void)
 
 	/* Verify regular file1. */
 	assertEqualIntA(a, ARCHIVE_OK, archive_read_next_header(a, &ae));
-	assertEqualInt((AE_IFREG | 0666), archive_entry_mode(ae));
+	assertEqualInt((AE_IFREG | 0644), archive_entry_mode(ae));
 	assertEqualString("ppmd_test.txt", archive_entry_pathname(ae));
 	assertEqualInt(1322464589, archive_entry_mtime(ae));
 	assertEqualInt(102400, archive_entry_size(ae));
@@ -1051,6 +1050,7 @@ test_arm_filter(const char *refname)
 
 	extract_reference_file(refname);
 
+	assertEqualInt(ARCHIVE_OK, archive_read_free(a));
 	assert((a = archive_read_new()) != NULL);
 	assertEqualIntA(a, ARCHIVE_OK, archive_read_support_filter_all(a));
 	assertEqualIntA(a, ARCHIVE_OK, archive_read_support_format_all(a));
@@ -1124,6 +1124,7 @@ test_arm64_filter(const char *refname)
 
 	extract_reference_file(refname);
 
+	assertEqualInt(ARCHIVE_OK, archive_read_free(a));
 	assert((a = archive_read_new()) != NULL);
 	assertEqualIntA(a, ARCHIVE_OK, archive_read_support_filter_all(a));
 	assertEqualIntA(a, ARCHIVE_OK, archive_read_support_format_all(a));
@@ -1179,6 +1180,124 @@ DEFINE_TEST(test_read_format_7zip_deflate_arm64)
 	} else {
 		test_arm64_filter("test_read_format_7zip_deflate_arm64.7z");
 	}
+
+	assertEqualInt(ARCHIVE_OK, archive_read_free(a));
+}
+
+DEFINE_TEST(test_read_format_7zip_win_attrib)
+{
+	struct archive *a;
+
+	assert((a = archive_read_new()) != NULL);
+
+	if (ARCHIVE_OK != archive_read_support_filter_lzma(a)) {
+		skipping(
+		    "7zip:lzma decoding is not supported on this platform");
+		assertEqualInt(ARCHIVE_OK, archive_read_free(a));
+		return;
+	}
+
+	assertEqualIntA(a, ARCHIVE_OK, archive_read_support_format_all(a));
+
+	// This archive has four files and four directories:
+	// * hidden directory
+	// * readonly directory
+	// * regular directory
+	// * system directory
+	// * regular "archive" file
+	// * hidden file
+	// * readonly file
+	// * system file
+	const char *refname = "test_read_format_7zip_win_attrib.7z";
+	extract_reference_file(refname);
+
+	assertEqualIntA(a, ARCHIVE_OK,
+		archive_read_open_filename(a, refname, 10240));
+
+	struct archive_entry *ae;
+
+	assertEqualIntA(a, ARCHIVE_OK, archive_read_next_header(a, &ae));
+	assertEqualString("hidden_dir/", archive_entry_pathname(ae));
+	assertEqualInt((AE_IFDIR | 0755), archive_entry_mode(ae));
+	assertEqualString("hidden", archive_entry_fflags_text(ae));
+
+	assertEqualIntA(a, ARCHIVE_OK, archive_read_next_header(a, &ae));
+	assertEqualString("readonly_dir/", archive_entry_pathname(ae));
+	assertEqualInt((AE_IFDIR | 0555), archive_entry_mode(ae));
+	assertEqualString("rdonly", archive_entry_fflags_text(ae));
+
+	assertEqualIntA(a, ARCHIVE_OK, archive_read_next_header(a, &ae));
+	assertEqualString("regular_dir/", archive_entry_pathname(ae));
+	assertEqualInt((AE_IFDIR | 0755), archive_entry_mode(ae));
+	assertEqualString(NULL, archive_entry_fflags_text(ae));
+
+	assertEqualIntA(a, ARCHIVE_OK, archive_read_next_header(a, &ae));
+	assertEqualString("system_dir/", archive_entry_pathname(ae));
+	assertEqualInt((AE_IFDIR | 0755), archive_entry_mode(ae));
+	assertEqualString("system", archive_entry_fflags_text(ae));
+
+	assertEqualIntA(a, ARCHIVE_OK, archive_read_next_header(a, &ae));
+	assertEqualString("archive_file.txt", archive_entry_pathname(ae));
+	assertEqualInt((AE_IFREG | 0644), archive_entry_mode(ae));
+	assertEqualString(NULL, archive_entry_fflags_text(ae));
+
+	assertEqualIntA(a, ARCHIVE_OK, archive_read_next_header(a, &ae));
+	assertEqualString("hidden_file.txt", archive_entry_pathname(ae));
+	assertEqualInt((AE_IFREG | 0644), archive_entry_mode(ae));
+	assertEqualString("hidden", archive_entry_fflags_text(ae));
+
+	assertEqualIntA(a, ARCHIVE_OK, archive_read_next_header(a, &ae));
+	assertEqualString("readonly_file.txt", archive_entry_pathname(ae));
+	assertEqualInt((AE_IFREG | 0444), archive_entry_mode(ae));
+	assertEqualString("rdonly", archive_entry_fflags_text(ae));
+
+	assertEqualIntA(a, ARCHIVE_OK, archive_read_next_header(a, &ae));
+	assertEqualString("system_file.txt", archive_entry_pathname(ae));
+	assertEqualInt((AE_IFREG | 0644), archive_entry_mode(ae));
+	assertEqualString("system", archive_entry_fflags_text(ae));
+
+
+	assertEqualInt(ARCHIVE_OK, archive_read_free(a));
+}
+
+DEFINE_TEST(test_read_format_7zip_extract_second)
+{
+	struct archive *a;
+	char buffer[256];
+
+	assert((a = archive_read_new()) != NULL);
+
+	if (ARCHIVE_OK != archive_read_support_filter_lzma(a)) {
+		skipping(
+		    "7zip:lzma decoding is not supported on this platform");
+		assertEqualInt(ARCHIVE_OK, archive_read_free(a));
+		return;
+	}
+
+	assertEqualIntA(a, ARCHIVE_OK, archive_read_support_format_all(a));
+
+	/*
+	 * The test archive has two files: first.txt which is a 65,536 file (the
+	 * size of the uncompressed buffer), and second.txt which has contents
+	 * we will validate. This test ensures we can skip first.txt and still
+	 * be able to read the contents of second.txt
+	 */
+	const char *refname = "test_read_format_7zip_extract_second.7z";
+	extract_reference_file(refname);
+
+	assertEqualIntA(a, ARCHIVE_OK,
+		archive_read_open_filename(a, refname, 10240));
+
+	struct archive_entry *ae;
+
+	assertEqualIntA(a, ARCHIVE_OK, archive_read_next_header(a, &ae));
+	assertEqualString("first.txt", archive_entry_pathname(ae));
+
+	assertEqualIntA(a, ARCHIVE_OK, archive_read_next_header(a, &ae));
+	assertEqualString("second.txt", archive_entry_pathname(ae));
+
+	assertEqualInt(23, archive_read_data(a, buffer, sizeof(buffer)));
+	assertEqualMem("This is from second.txt", buffer, 23);
 
 	assertEqualInt(ARCHIVE_OK, archive_read_free(a));
 }

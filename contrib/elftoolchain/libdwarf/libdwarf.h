@@ -40,6 +40,11 @@ typedef uint8_t		Dwarf_Small;
 typedef int64_t		Dwarf_Signed;
 typedef uint64_t	Dwarf_Addr;
 typedef void		*Dwarf_Ptr;
+#ifdef __CHERI_PURE_CAPABILITY__
+typedef uintptr_t	Dwarf_Uintptr;
+#else
+typedef uint64_t	Dwarf_Uintptr;
+#endif
 
 typedef struct _Dwarf_Abbrev	*Dwarf_Abbrev;
 typedef struct _Dwarf_Arange	*Dwarf_Arange;
@@ -109,9 +114,9 @@ typedef int (*Dwarf_Callback_Func_b)(char *_name, int _size,
 typedef Dwarf_Unsigned Dwarf_Tag;
 
 typedef struct {
-        Dwarf_Small	lr_atom;
-        Dwarf_Unsigned	lr_number;
-	Dwarf_Unsigned	lr_number2;
+	Dwarf_Small	lr_atom;
+	Dwarf_Unsigned	lr_number;
+	Dwarf_Uintptr	lr_number2;
 	Dwarf_Unsigned	lr_offset;
 } Dwarf_Loc;
 

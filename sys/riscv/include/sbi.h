@@ -49,6 +49,12 @@
 #define	SBI_IMPL_ID_KVM			3
 #define	SBI_IMPL_ID_RUSTSBI		4
 #define	SBI_IMPL_ID_DIOSIX		5
+#define	SBI_IMPL_ID_COFFER		6
+#define	SBI_IMPL_ID_XEN_PROJECT		7
+#define	SBI_IMPL_ID_POLARFIRE_HSS	8
+#define	SBI_IMPL_ID_COREBOOT		9
+#define	SBI_IMPL_ID_OREBOOT		10
+#define	SBI_IMPL_ID_BHYVE		11
 
 /* SBI Error Codes */
 #define	SBI_SUCCESS			0
@@ -159,11 +165,7 @@ sbi_call(uint64_t arg7, uint64_t arg6, uint64_t arg0, uint64_t arg1,
 	return (ret);
 }
 
-/* Base extension functions and variables. */
-extern u_long sbi_spec_version;
-extern u_long sbi_impl_id;
-extern u_long sbi_impl_version;
-
+/* Base extension functions. */
 static __inline long
 sbi_probe_extension(long id)
 {

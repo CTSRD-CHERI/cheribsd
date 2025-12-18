@@ -85,6 +85,10 @@
 #include <membership.h>
 #endif
 
+#ifndef nitems
+#define nitems(arr) (sizeof(arr) / sizeof((arr)[0]))
+#endif
+
 /*
  *
  * Windows support routines
@@ -121,6 +125,8 @@
 #define access _access
 #undef chdir
 #define chdir _chdir
+#undef chmod
+#define chmod _chmod
 #endif
 #ifndef fileno
 #define fileno _fileno
@@ -217,7 +223,8 @@ my_CreateSymbolicLinkA(const char *linkname, const char *target,
 	static BOOLEAN (WINAPI *f)(LPCSTR, LPCSTR, DWORD);
 	DWORD attrs;
 	static int set;
-	int ret, tmpflags, llen, tlen;
+	int ret, tmpflags;
+	size_t llen, tlen;
 	int flags = 0;
 	char *src, *tgt, *p;
 	if (!set) {
@@ -233,10 +240,10 @@ my_CreateSymbolicLinkA(const char *linkname, const char *target,
 	if (tlen == 0 || llen == 0)
 		return (0);
 
-	tgt = malloc((tlen + 1) * sizeof(char));
+	tgt = malloc(tlen + 1);
 	if (tgt == NULL)
 		return (0);
-	src = malloc((llen + 1) * sizeof(char));
+	src = malloc(llen + 1);
 	if (src == NULL) {
 		free(tgt);
 		return (0);
@@ -621,6 +628,21 @@ assertion_equal_int(const char *file, int line,
 	failure_start(file, line, "%s != %s", e1, e2);
 	logprintf("      %s=%lld (0x%llx, 0%llo)\n", e1, v1, v1, v1);
 	logprintf("      %s=%lld (0x%llx, 0%llo)\n", e2, v2, v2, v2);
+	failure_finish(extra);
+	return (0);
+}
+
+/* Verify two pointers are equal. */
+int
+assertion_equal_address(const char *file, int line,
+    const void *v1, const char *e1, const void *v2, const char *e2, void *extra)
+{
+	assertion_count(file, line);
+	if (v1 == v2)
+		return (1);
+	failure_start(file, line, "%s != %s", e1, e2);
+	logprintf("      %s=0x%llx\n", e1, (unsigned long long)(uintptr_t)v1);
+	logprintf("      %s=0x%llx\n", e2, (unsigned long long)(uintptr_t)v2);
 	failure_finish(extra);
 	return (0);
 }
@@ -1222,16 +1244,19 @@ assertion_file_contains_lines_any_order(const char *file, int line,
 	}
 	expected_count = i;
 	if (expected_count) {
-		expected = malloc(sizeof(char *) * expected_count);
+		expected = calloc(expected_count, sizeof(*expected));
 		if (expected == NULL) {
 			failure_start(pathname, line, "Can't allocate memory");
 			failure_finish(NULL);
-			free(expected);
-			free(buff);
-			return (0);
+			goto cleanup;
 		}
 		for (i = 0; lines[i] != NULL; ++i) {
 			expected[i] = strdup(lines[i]);
+			if (expected[i] == NULL) {
+				failure_start(pathname, line, "Can't allocate memory");
+				failure_finish(NULL);
+				goto cleanup;
+			}
 		}
 	}
 
@@ -1245,13 +1270,11 @@ assertion_file_contains_lines_any_order(const char *file, int line,
 		c = *p;
 	}
 	if (actual_count) {
-		actual = calloc(sizeof(char *), actual_count);
+		actual = calloc(actual_count, sizeof(char *));
 		if (actual == NULL) {
 			failure_start(pathname, line, "Can't allocate memory");
 			failure_finish(NULL);
-			free(expected);
-			free(buff);
-			return (0);
+			goto cleanup;
 		}
 		for (j = 0, p = buff; p < buff + buff_size;
 		    p += 1 + strlen(p)) {
@@ -1264,8 +1287,6 @@ assertion_file_contains_lines_any_order(const char *file, int line,
 
 	/* Erase matching lines from both lists */
 	for (i = 0; i < expected_count; ++i) {
-		if (expected[i] == NULL)
-			continue;
 		for (j = 0; j < actual_count; ++j) {
 			if (actual[j] == NULL)
 				continue;
@@ -1288,9 +1309,9 @@ assertion_file_contains_lines_any_order(const char *file, int line,
 			++actual_failure;
 	}
 	if (expected_failure == 0 && actual_failure == 0) {
-		free(buff);
-		free(expected);
 		free(actual);
+		free(expected);
+		free(buff);
 		return (1);
 	}
 	failure_start(file, line, "File doesn't match: %s", pathname);
@@ -1298,6 +1319,7 @@ assertion_file_contains_lines_any_order(const char *file, int line,
 		if (expected[i] != NULL) {
 			logprintf("  Expected but not present: %s\n", expected[i]);
 			free(expected[i]);
+			expected[i] = NULL;
 		}
 	}
 	for (j = 0; j < actual_count; ++j) {
@@ -1305,9 +1327,15 @@ assertion_file_contains_lines_any_order(const char *file, int line,
 			logprintf("  Present but not expected: %s\n", actual[j]);
 	}
 	failure_finish(NULL);
-	free(buff);
-	free(expected);
+cleanup:
 	free(actual);
+	if (expected != NULL) {
+		for (i = 0; i < expected_count; ++i)
+			if (expected[i] != NULL)
+				free(expected[i]);
+		free(expected);
+	}
+	free(buff);
 	return (0);
 }
 
@@ -1751,16 +1779,17 @@ is_symlink(const char *file, int line,
 	    FILE_FLAG_OPEN_REPARSE_POINT;
 
 	/* Replace slashes with backslashes in pathname */
-	pn = malloc((strlen(pathname) + 1) * sizeof(char));
-	p = pathname;
-	s = pn;
-	while(*p != '\0') {
-		if(*p == '/')
+	pn = malloc(strlen(pathname) + 1);
+	if (pn == NULL) {
+		failure_start(file, line, "Can't allocate memory");
+		failure_finish(NULL);
+		return (0);
+	}
+	for (p = pathname, s = pn; *p != '\0'; p++, s++) {
+		if (*p == '/')
 			*s = '\\';
 		else
 			*s = *p;
-		p++;
-		s++;
 	}
 	*s = '\0';
 
@@ -2068,8 +2097,8 @@ assertion_umask(const char *file, int line, int mask)
 
 /* Set times, report failures. */
 int
-assertion_utimes(const char *file, int line,
-    const char *pathname, long at, long at_nsec, long mt, long mt_nsec)
+assertion_utimes(const char *file, int line, const char *pathname,
+    time_t at, suseconds_t at_nsec, time_t mt, suseconds_t mt_nsec)
 {
 	int r;
 
@@ -2935,7 +2964,6 @@ setTestAcl(const char *path)
 	acl_permset_t permset;
 	const uid_t uid = 1;
 	uuid_t uuid;
-	int i;
 	const acl_perm_t acl_perms[] = {
 		ACL_READ_DATA,
 		ACL_WRITE_DATA,
@@ -2977,7 +3005,7 @@ setTestAcl(const char *path)
 	failure("acl_get_permset() error: %s", strerror(errno));
 	if (assertEqualInt(r, 0) == 0)
 		goto testacl_free;
-	for (i = 0; i < (int)(sizeof(acl_perms) / sizeof(acl_perms[0])); i++) {
+	for (size_t i = 0; i < nitems(acl_perms); i++) {
 		r = acl_add_perm(permset, acl_perms[i]);
 		failure("acl_add_perm() error: %s", strerror(errno));
 		if (assertEqualInt(r, 0) == 0)
@@ -3627,7 +3655,7 @@ test_run(int i, const char *tmpdir)
 static void
 usage(const char *program)
 {
-	static const int limit = sizeof(tests) / sizeof(tests[0]);
+	static const int limit = nitems(tests);
 	int i;
 
 	printf("Usage: %s [options] <test> <test> ...\n", program);
@@ -3859,12 +3887,13 @@ get_test_set(int *test_set, int limit, const char *test)
 int
 main(int argc, char **argv)
 {
-	static const int limit = sizeof(tests) / sizeof(tests[0]);
-	int test_set[sizeof(tests) / sizeof(tests[0])];
+	static const int limit = nitems(tests);
+	int test_set[nitems(tests)];
 	int i = 0, j = 0, tests_run = 0, tests_failed = 0, option;
-	int testprogdir_len;
+	size_t testprogdir_len;
+	size_t tmplen;
 #ifdef PROGRAM
-	int tmp2_len;
+	size_t tmp2_len;
 #endif
 	time_t now;
 	struct tm *tmptr;
@@ -3907,7 +3936,7 @@ main(int argc, char **argv)
 	 */
 	progname = p = argv[0];
 	testprogdir_len = strlen(progname) + 1;
-	if ((testprogdir = (char *)malloc(testprogdir_len)) == NULL)
+	if ((testprogdir = malloc(testprogdir_len)) == NULL)
 	{
 		fprintf(stderr, "ERROR: Out of memory.");
 		exit(1);
@@ -3935,7 +3964,7 @@ main(int argc, char **argv)
 #endif
 	{
 		/* Fixup path for relative directories. */
-		if ((testprogdir = (char *)realloc(testprogdir,
+		if ((testprogdir = realloc(testprogdir,
 			strlen(pwd) + 1 + strlen(testprogdir) + 1)) == NULL)
 		{
 			fprintf(stderr, "ERROR: Out of memory.");
@@ -3962,6 +3991,9 @@ main(int argc, char **argv)
 		tmp = getenv("TEMPDIR");
 	else
 		tmp = "/tmp";
+	tmplen = strlen(tmp);
+	while (tmplen > 0 && tmp[tmplen - 1] == '/')
+		tmplen--;
 
 	/* Allow -d to be controlled through the environment. */
 	if (getenv(ENVBASE "_DEBUG") != NULL)
@@ -4055,7 +4087,7 @@ main(int argc, char **argv)
 	if (testprogfile == NULL)
 	{
 		tmp2_len = strlen(testprogdir) + 1 + strlen(PROGRAM) + 1;
-		if ((tmp2 = (char *)malloc(tmp2_len)) == NULL)
+		if ((tmp2 = malloc(tmp2_len)) == NULL)
 		{
 			fprintf(stderr, "ERROR: Out of memory.");
 			exit(1);
@@ -4068,7 +4100,7 @@ main(int argc, char **argv)
 
 	{
 		char *testprg;
-		int testprg_len;
+		size_t testprg_len;
 #if defined(_WIN32) && !defined(__CYGWIN__)
 		/* Command.com sometimes rejects '/' separators. */
 		testprg = strdup(testprogfile);
@@ -4114,16 +4146,16 @@ main(int argc, char **argv)
 #endif
 		strftime(tmpdir_timestamp, sizeof(tmpdir_timestamp),
 		    "%Y-%m-%dT%H.%M.%S", tmptr);
-		if ((strlen(tmp) + 1 + strlen(progname) + 1 +
-		    strlen(tmpdir_timestamp) + 1 + 3) >
-		    (sizeof(tmpdir) / sizeof(char))) {
+		if (tmplen + 1 + strlen(progname) + 1 +
+		    strlen(tmpdir_timestamp) + 1 + 3 >=
+		    nitems(tmpdir)) {
 			fprintf(stderr,
 			    "ERROR: Temp directory pathname too long\n");
 			exit(1);
 		}
-		snprintf(tmpdir, sizeof(tmpdir), "%s/%s.%s-%03d", tmp,
-		    progname, tmpdir_timestamp, i);
-		if (assertMakeDir(tmpdir,0755))
+		snprintf(tmpdir, sizeof(tmpdir), "%.*s/%s.%s-%03d",
+		    (int)tmplen, tmp, progname, tmpdir_timestamp, i);
+		if (assertMakeDir(tmpdir, 0755))
 			break;
 		if (i >= 999) {
 			fprintf(stderr,
@@ -4175,7 +4207,6 @@ main(int argc, char **argv)
 				free(refdir_alloc);
 				free(testprogdir);
 				usage(progname);
-				return (1);
 			}
 			for (i = 0; i < test_num; i++) {
 				tests_run++;

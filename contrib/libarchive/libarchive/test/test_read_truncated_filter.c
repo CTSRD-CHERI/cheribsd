@@ -26,7 +26,6 @@
 
 #include "test.h"
 #include "test_utils.h"
-__FBSDID("$FreeBSD$");
 
 /*
  * Check that we generate an error message when reading a truncated
@@ -45,12 +44,12 @@ test_truncation(const char *compression,
 	int i, r, use_prog;
 
 	buffsize = 2000000;
-	assert(NULL != (buff = (char *)malloc(buffsize)));
+	assert(NULL != (buff = malloc(buffsize)));
 	if (buff == NULL)
 		return;
 
 	datasize = 10000;
-	assert(NULL != (data = (char *)malloc(datasize)));
+	assert(NULL != (data = malloc(datasize)));
 	if (data == NULL) {
 		free(buff);
 		return;

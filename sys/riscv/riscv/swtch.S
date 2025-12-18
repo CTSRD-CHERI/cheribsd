@@ -667,12 +667,21 @@ ENTRY(fork_trampoline)
 	 * Build a capability for 'csp' using 'sp' as an address
 	 * in the kernel DDC.
 	 *
-	 * XXX: Bounds?  Maybe could use TF_SIZE + 8 as length?
+	 * XXX: Bounds?  Maybe could use TF_SIZE + KF_SIZE as length?
 	 * A purecap kernel would have proper bounds on csp already.
 	 */
 	cspecialr ct0, ddc
 	csetaddr ct0, ct0, sp
 	cmove	csp, ct0
+#endif
+
+#ifndef __CHERI_PURE_CAPABILITY__
+	/*
+	 * Store our DDC on stack, we will load it back
+	 * on kernel mode trap.
+	 */
+	cspecialr ct0, ddc
+	csc	ct0, (TF_SIZE + KF_DDC)(csp)
 #endif
 
 	/*
@@ -725,7 +734,7 @@ ENTRY(fork_trampoline)
 	 * Store our pcpup on stack, we will load it back
 	 * on kernel mode trap.
 	 */
-	csc	ctp, (TF_SIZE)(csp)
+	csc	ctp, (TF_SIZE + KF_TP)(csp)
 	clc	ctp, (TF_TP)(csp)
 
 	/* Save kernel stack so we can use it doing a user trap */
@@ -781,7 +790,7 @@ ENTRY(fork_trampoline)
 	 * Store our pcpup on stack, we will load it back
 	 * on kernel mode trap.
 	 */
-	sd	tp, (TF_SIZE)(sp)
+	sd	tp, (TF_SIZE + KF_TP)(sp)
 	ld	tp, (TF_TP)(sp)
 
 	/* Save kernel stack so we can use it doing a user trap */

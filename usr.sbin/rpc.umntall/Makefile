@@ -1,5 +1,3 @@
-#	@(#)Makefile	8.4 (Berkeley) 6/22/95
-
 PACKAGE=	nfs
 
 PROG=	rpc.umntall

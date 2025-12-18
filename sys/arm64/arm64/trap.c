@@ -27,13 +27,13 @@
 
 #include "opt_ddb.h"
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/asan.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
+#include <sys/msan.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/ptrace.h>
@@ -196,7 +196,12 @@ cpu_fetch_syscall_args(struct thread *td)
 	}
 
 	if (__predict_false(sa->code >= p->p_sysent->sv_size))
-		sa->callp = &p->p_sysent->sv_table[0];
+		sa->callp = &nosys_sysent;
+#if __has_feature(capabilities) && !defined(CPU_CHERI_NO_SYSCALL_AUTHORIZE)
+	/* Constrain code that can originate system calls. */
+	else if (__predict_false(!cheri_syscall_authorize(td)))
+		sa->callp = &nosys_sysent;
+#endif
 	else
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
@@ -280,16 +285,27 @@ static void
 external_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
     uint64_t far, int lower)
 {
+	if (lower) {
+		call_trapsignal(td, SIGBUS, BUS_OBJERR,
+		    (void * __capability)(uintcap_t)far,
+		    ESR_ELx_EXCEPTION(frame->tf_esr));
+		userret(td, frame);
+		return;
+	}
 
 	/*
 	 * Try to handle synchronous external aborts caused by
 	 * bus_space_peek() and/or bus_space_poke() functions.
 	 */
-	if (!lower && test_bs_fault((uintcap_t)frame->tf_elr)) {
-#if __has_feature(capabilities)
-		trapframe_set_elr(frame,
-		    (uintcap_t)cheri_setaddress(cheri_getpcc(),
-		    (uint64_t)generic_bs_fault));
+	if (test_bs_fault((uintcap_t)frame->tf_elr)) {
+#if defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+		frame->tf_elr = cheri_setaddress(frame->tf_elr,
+		    (ptraddr_t)generic_bs_fault);
+#elif defined(__CHERI_PURE_CAPABILITY__)
+		trapframe_set_elr(frame, (uintptr_t)generic_bs_fault);
+#elif __has_feature(capabilities)
+		trapframe_set_elr(frame, cheri_setaddress(frame->tf_elr,
+		    (ptraddr_t)generic_bs_fault));
 #else
 		frame->tf_elr = (uint64_t)generic_bs_fault;
 #endif
@@ -298,7 +314,7 @@ external_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 
 	print_registers(frame);
 	print_gp_register("far", far);
-	panic("Unhandled EL%d external data abort", lower ? 0: 1);
+	panic("Unhandled external data abort");
 }
 
 #if __has_feature(capabilities)
@@ -313,9 +329,15 @@ cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		if (td->td_intr_nesting_level == 0 &&
 		    pcb->pcb_onfault != 0) {
 			frame->tf_x[0] = EPROT;
-			trapframe_set_elr(frame,
-			    (uintcap_t)cheri_setaddress(cheri_getpcc(),
+#if defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+			frame->tf_elr = cheri_setaddress(frame->tf_elr,
+			    pcb->pcb_onfault);
+#elif defined(__CHERI_PURE_CAPABILITY__)
+			trapframe_set_elr(frame, pcb->pcb_onfault);
+#else
+			trapframe_set_elr(frame, cheri_setaddress(frame->tf_elr,
 			    pcb->pcb_onfault));
+#endif
 			return;
 		}
 		print_registers(frame);
@@ -336,8 +358,21 @@ cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	}
 
 	colocation_trap_in_switcher(td, frame, "cap abort");
-	call_trapsignal(td, SIGPROT, cheri_esr_to_sicode(esr),
-	    (void * __capability)frame->tf_elr, ESR_ELx_EXCEPTION(esr));
+
+	/*
+	 * User accesses to invalid addresses in a compat64 process
+	 * raise SIGSEGV under a non-CHERI kernel via a non-capability
+	 * data abort.  With CHERI however, those accesses can raise a
+	 * capability abort if they are outside the bounds of the user
+	 * DDC.  Map those accesses to SIGSEGV instead of SIGPROT.
+	 */
+	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI) &&
+	    far > CHERI_CAP_USER_DATA_BASE + CHERI_CAP_USER_DATA_LENGTH)
+		call_trapsignal(td, SIGSEGV, SEGV_MAPERR,
+		    (void * __capability)(uintcap_t)far, ESR_ELx_EXCEPTION(esr));
+	else
+		call_trapsignal(td, SIGPROT, cheri_esr_to_sicode(esr),
+		    (void * __capability)frame->tf_elr, ESR_ELx_EXCEPTION(esr));
 	userret(td, frame);
 }
 #endif
@@ -379,6 +414,7 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	} else if (!ADDR_IS_CANONICAL(far)) {
 		/* We received a TBI/PAC/etc. fault from the kernel */
 		error = KERN_INVALID_ADDRESS;
+		pcb = td->td_pcb;
 		goto bad_far;
 	} else if (ADDR_IS_KERNEL(far)) {
 		/*
@@ -403,10 +439,18 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 				break;
 			}
 		}
-		intr_enable();
+		if (td->td_md.md_spinlock_count == 0 &&
+		    (frame->tf_spsr & PSR_DAIF_INTR) != PSR_DAIF_INTR) {
+			MPASS((frame->tf_spsr & PSR_DAIF_INTR) == 0);
+			intr_enable();
+		}
 		map = kernel_map;
 	} else {
-		intr_enable();
+		if (td->td_md.md_spinlock_count == 0 &&
+		    (frame->tf_spsr & PSR_DAIF_INTR) != PSR_DAIF_INTR) {
+			MPASS((frame->tf_spsr & PSR_DAIF_INTR) == 0);
+			intr_enable();
+		}
 		map = &td->td_proc->p_vmspace->vm_map;
 		if (map == NULL)
 			map = kernel_map;
@@ -442,8 +486,9 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		    td->td_md.md_spinlock_count);
 	}
 #endif
-	if (td->td_critnest != 0 || WITNESS_CHECK(WARN_SLEEPOK |
-	    WARN_GIANTOK, NULL, "Kernel page fault") != 0) {
+	if ((td->td_pflags & TDP_NOFAULTING) == 0 &&
+	    (td->td_critnest != 0 || WITNESS_CHECK(WARN_SLEEPOK |
+	    WARN_GIANTOK, NULL, "Kernel page fault") != 0)) {
 		print_registers(frame);
 		print_gp_register("far", far);
 		printf(" esr: 0x%.16lx\n", esr);
@@ -492,11 +537,14 @@ bad_far:
 		} else {
 			if (td->td_intr_nesting_level == 0 &&
 			    pcb->pcb_onfault != 0) {
-				frame->tf_x[0] = error;
-#if __has_feature(capabilities)
-				trapframe_set_elr(frame,
-				    (uintcap_t)cheri_setaddress(cheri_getpcc(),
-				    pcb->pcb_onfault));
+#if defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+				frame->tf_elr = cheri_setaddress(frame->tf_elr,
+				    pcb->pcb_onfault);
+#elif defined(__CHERI_PURE_CAPABILITY__)
+				trapframe_set_elr(frame, pcb->pcb_onfault);
+#elif __has_feature(capabilities)
+				trapframe_set_elr(frame, cheri_setaddress(
+				    frame->tf_elr, pcb->pcb_onfault));
 #else
 				frame->tf_elr = pcb->pcb_onfault;
 #endif
@@ -616,6 +664,8 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 	int dfsc;
 
 	kasan_mark(frame, sizeof(*frame), sizeof(*frame), 0);
+	kmsan_mark(frame, sizeof(*frame), KMSAN_STATE_INITED);
+
 	far = frame->tf_far;
 	/* Read the esr register to get the exception details */
 	esr = frame->tf_esr;
@@ -633,9 +683,16 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 	 * Enable debug exceptions if we aren't already handling one. They will
 	 * be masked again in the exception handler's epilogue.
 	 */
-	if (exception != EXCP_BRK && exception != EXCP_WATCHPT_EL1 &&
-	    exception != EXCP_SOFTSTP_EL1)
+	switch (exception) {
+	case EXCP_BRK:
+	case EXCP_BRKPT_EL1:
+	case EXCP_WATCHPT_EL1:
+	case EXCP_SOFTSTP_EL1:
+		break;
+	default:
 		dbg_enable();
+		break;
+	}
 
 	switch (exception) {
 	case EXCP_FP_SIMD:
@@ -680,6 +737,7 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 		panic("No debugger in kernel.");
 #endif
 		break;
+	case EXCP_BRKPT_EL1:
 	case EXCP_WATCHPT_EL1:
 	case EXCP_SOFTSTP_EL1:
 #ifdef KDB
@@ -701,6 +759,11 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 		print_gp_register("far", far);
 		panic("Undefined instruction: %08x",
 		    *(uint32_t * __capability)frame->tf_elr);
+		break;
+	case EXCP_BTI:
+		print_registers(frame);
+		print_gp_register("far", far);
+		panic("Branch Target exception");
 		break;
 	default:
 		print_registers(frame);
@@ -724,6 +787,8 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 	     get_pcpu(), READ_SPECIALREG(tpidr_el1)));
 
 	kasan_mark(frame, sizeof(*frame), sizeof(*frame), 0);
+	kmsan_mark(frame, sizeof(*frame), KMSAN_STATE_INITED);
+
 	far = frame->tf_far;
 	esr = frame->tf_esr;
 	exception = ESR_ELx_EXCEPTION(esr);
@@ -759,8 +824,10 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 #endif
 		break;
 	case EXCP_SVE:
-		call_trapsignal(td, SIGILL, ILL_ILLTRP,
-		    (void * __capability)frame->tf_elr, exception);
+		/* Returns true if this thread can use SVE */
+		if (!sve_restore_state(td))
+			call_trapsignal(td, SIGILL, ILL_ILLTRP,
+			    (void * __capability)frame->tf_elr, exception);
 		userret(td, frame);
 		break;
 	case EXCP_SVC32:
@@ -854,6 +921,11 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		    (void * __capability)frame->tf_elr, exception);
 		userret(td, frame);
 		break;
+	case EXCP_BTI:
+		call_trapsignal(td, SIGILL, ILL_ILLOPC,
+		    (void * __capability)frame->tf_elr, exception);
+		userret(td, frame);
+		break;
 	default:
 		colocation_trap_in_switcher(td, frame, "default");
 		call_trapsignal(td, SIGBUS, BUS_OBJERR,
@@ -862,7 +934,8 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		break;
 	}
 
-	KASSERT((td->td_pcb->pcb_fpflags & ~PCB_FP_USERMASK) == 0,
+	KASSERT(
+	    (td->td_pcb->pcb_fpflags & ~(PCB_FP_USERMASK|PCB_FP_SVEVALID)) == 0,
 	    ("Kernel VFP flags set while entering userspace"));
 	KASSERT(
 	    td->td_pcb->pcb_fpusaved == &td->td_pcb->pcb_fpustate,
@@ -878,6 +951,8 @@ do_serror(struct trapframe *frame)
 	uint64_t esr, far;
 
 	kasan_mark(frame, sizeof(*frame), sizeof(*frame), 0);
+	kmsan_mark(frame, sizeof(*frame), KMSAN_STATE_INITED);
+
 	far = frame->tf_far;
 	esr = frame->tf_esr;
 
@@ -893,6 +968,8 @@ unhandled_exception(struct trapframe *frame)
 	uint64_t esr, far;
 
 	kasan_mark(frame, sizeof(*frame), sizeof(*frame), 0);
+	kmsan_mark(frame, sizeof(*frame), KMSAN_STATE_INITED);
+
 	far = frame->tf_far;
 	esr = frame->tf_esr;
 

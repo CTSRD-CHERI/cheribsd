@@ -717,6 +717,8 @@ locate_hunk(LINENUM fuzz)
 		    || diff_type == UNI_DIFF)) {
 			say("Empty context always matches.\n");
 		}
+		if (first_guess == 0)	/* empty file */
+			return 1;
 		return (first_guess);
 	}
 	if (max_neg_offset >= first_guess)	/* do not try lines < 0 */
@@ -1083,7 +1085,7 @@ patch_match(LINENUM base, LINENUM offset, LINENUM fuzz)
 	LINENUM		pat_lines = pch_ptrn_lines() - fuzz;
 	const char	*ilineptr;
 	const char	*plineptr;
-	unsigned short	plinelen;
+	size_t		plinelen;
 
 	/* Patch does not match if we don't have any more context to use */
 	if (pline > pat_lines)

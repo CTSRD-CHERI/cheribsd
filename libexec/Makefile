@@ -1,5 +1,3 @@
-#	@(#)Makefile	8.1 (Berkeley) 6/4/93
-
 .include <src.opts.mk>
 
 .include <bsd.compat.pre.mk>
@@ -12,6 +10,7 @@ SUBDIR=	${_atf} \
 	flua \
 	getty \
 	${_hyperv} \
+	kgdb \
 	${_mail.local} \
 	${_makewhatis.local} \
 	${_mknetid} \
@@ -28,6 +27,7 @@ SUBDIR=	${_atf} \
 	${_rshd} \
 	${_rtld-elf} \
 	save-entropy \
+	${_nuageinit} \
 	${_smrsh} \
 	${_tests} \
 	${_tftp-proxy} \
@@ -85,20 +85,10 @@ _tftp-proxy=	tftp-proxy
 
 .if !defined(NO_PIC) && !defined(NO_RTLD)
 _rtld-elf=	rtld-elf rtld-elf-debug
-.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
-SUBDIR+=	rtld-elf-c18n rtld-elf64cb-c18n
-.endif
-# rtld.1 needs to be installed before the cross-dir MLINKS can work.
-SUBDIR_INSTALL_USE_DEPENDS=
-SUBDIR_DEPEND_rtld-elf-c18n=	rtld-elf
-SUBDIR_DEPEND_rtld-elf64cb-c18n=	rtld-elf
-SUBDIR_DEPEND_rtld-elf-debug=	rtld-elf
 .for LIBCOMPAT libcompat in ${_ALL_LIBCOMPATS_libcompats}
 SUBDIR.${MK_LIB${LIBCOMPAT}}+=	rtld-elf${libcompat}
-SUBDIR_DEPEND_rtld-elf${libcompat}=	rtld-elf
 .if exists(${.CURDIR}/rtld-elf${libcompat}-debug)
 SUBDIR.${MK_LIB${LIBCOMPAT}}+=	rtld-elf${libcompat}-debug
-SUBDIR_DEPEND_rtld-elf${libcompat}-debug=	rtld-elf
 .endif
 .endfor
 .endif
@@ -134,7 +124,12 @@ _tests=		tests
 .endif
 
 .if ${MACHINE_CPU:Mcheri}
-SUBDIR+=	malloc_is_revoking
+SUBDIR+=	malloc_early_constructor
+SUBDIR+=	malloc_revoke_enabled
+.endif
+
+.if ${MK_NUAGEINIT} != "no"
+_nuageinit=	nuageinit
 .endif
 
 .include <bsd.arch.inc.mk>

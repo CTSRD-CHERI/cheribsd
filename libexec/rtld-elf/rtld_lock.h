@@ -30,10 +30,6 @@
 
 #include <sys/cdefs.h>
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-#include <signal.h>
-#endif
-
 __BEGIN_DECLS
 
 #define	RTLI_VERSION_ONE	0x01
@@ -78,11 +74,6 @@ void _rtld_atfork_post(int *) __exported;
 
 #endif /* IN_RTLD || PTHREAD_KERNEL */
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-void _rtld_thread_start_init(void (*)(struct pthread *));
-void _rtld_sighandler_init(void (*)(int, siginfo_t *, void *));
-#endif
-
 #ifdef IN_RTLD
 
 struct rtld_lock;
@@ -91,7 +82,7 @@ typedef struct rtld_lock *rtld_lock_t;
 extern rtld_lock_t	rtld_bind_lock;
 extern rtld_lock_t	rtld_libc_lock;
 extern rtld_lock_t	rtld_phdr_lock;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#ifdef CHERI_LIB_C18N
 extern rtld_lock_t	rtld_tramp_lock;
 #endif
 

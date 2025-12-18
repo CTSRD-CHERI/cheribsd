@@ -28,6 +28,8 @@
 #ifndef _MACHINE_CHERIC_H_
 #define	_MACHINE_CHERIC_H_
 
+#include <machine/vmparam.h>
+
 #if __has_feature(capabilities) && defined(_KERNEL)
 /*
  * ERET in Morello does not use the LSB of the saved elr to set

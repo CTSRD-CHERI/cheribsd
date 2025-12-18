@@ -31,8 +31,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	from: @(#)vm_init.c	8.1 (Berkeley) 6/11/93
- *
  *
  * Copyright (c) 1987, 1990 Carnegie-Mellon University.
  * All rights reserved.
@@ -64,7 +62,6 @@
  *	Initialize the Virtual Memory subsystem.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/domainset.h>
 #include <sys/kernel.h>
@@ -105,8 +102,26 @@ long physmem;
 static void vm_mem_init(void *);
 SYSINIT(vm_mem, SI_SUB_VM, SI_ORDER_FIRST, vm_mem_init, NULL);
 
+#ifdef INVARIANTS
 /*
- *	vm_init initializes the virtual memory system.
+ * Ensure that pmap_init() correctly initialized pagesizes[].
+ */
+static void
+vm_check_pagesizes(void)
+{
+	int i;
+
+	KASSERT(pagesizes[0] == PAGE_SIZE, ("pagesizes[0] != PAGE_SIZE"));
+	for (i = 1; i < MAXPAGESIZES; i++) {
+		KASSERT((pagesizes[i - 1] != 0 &&
+		    pagesizes[i - 1] < pagesizes[i]) || pagesizes[i] == 0,
+		    ("pagesizes[%d ... %d] are misconfigured", i - 1, i));
+	}
+}
+#endif
+
+/*
+ *	vm_mem_init() initializes the virtual memory system.
  *	This is done only by the first cpu up.
  */
 static void
@@ -146,6 +161,10 @@ vm_mem_init(void *dummy)
 	kmem_init_zero_region();
 	pmap_init();
 	vm_pager_init();
+
+#ifdef INVARIANTS
+	vm_check_pagesizes();
+#endif
 }
 
 void

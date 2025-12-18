@@ -30,20 +30,7 @@
 
 #include <machine/asm.h>
 #include <machine/setjmp.h>
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-.weak _rtld_setjmp;
-LENTRY(_rtld_setjmp)
-	/* Should never be called */
-	RETURN
-LEND(_rtld_setjmp)
-
-.weak _rtld_longjmp;
-LENTRY(_rtld_longjmp)
-	/* Should never be called */
-	RETURN
-LEND(_rtld_longjmp)
-#endif
+#include <sys/elf_common.h>
 
 ENTRY(setjmp)
 	sub	REGN(sp), REGN(sp), #(REG_WIDTH * 2)
@@ -58,17 +45,19 @@ ENTRY(setjmp)
 	ldp	REG(0), REGN(lr), [REGN(sp)]
 	add	REGN(sp), REGN(sp), #(REG_WIDTH * 2)
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	/* Store Executive mode state */
-	str	REGN(lr), [REGN(sp), #-REG_WIDTH]!
-	bl	_rtld_setjmp
-	ldr	REGN(lr), [REGN(sp)], #REG_WIDTH
-#endif
-
 	/* Store the magic value and stack pointer */
 	ldr	x8, .Lmagic
 	mov	REG(9), REGN(sp)
 	stp	REG(8), REG(9), [REG(0)], #(REG_WIDTH * 2)
+#ifdef CHERI_LIB_C18N
+	/* Store the trusted stack pointer */
+	stp	c0, c30, [csp, #-0x20]!
+	mov	c0, c30
+	bl	dl_c18n_get_trusted_stack
+	ldp	c1, c30, [csp], #0x20
+	str	c0, [c1], #REG_WIDTH
+	mov	c0, c1
+#endif
 
 	/* Store the general purpose registers and lr */
 	stp	REG(19), REG(20), [REG(0)], #(REG_WIDTH * 2)
@@ -93,6 +82,20 @@ ENTRY(setjmp)
 END(setjmp)
 
 ENTRY(longjmp)
+#ifdef CHERI_LIB_C18N
+	/*
+	 * Preserve the arguments in callee-saved registers instead of pushing
+	 * them onto the stack because stack unwinding will switch the stack.
+	 */
+	mov	c19, c0
+	mov	c20, c1
+	/* Pass the target untrusted stack pointer and trusted stack pointer */
+	ldp	c0, c1, [c0, #(REG_WIDTH * 1)]
+	bl	dl_c18n_unwind_trusted_stack
+	mov	c0, c19
+	mov	c1, c20
+#endif
+
 	sub	REGN(sp), REGN(sp), #(REG_WIDTH * 4)
 	stp	REG(0), REGN(lr), [REGN(sp)]
 	str	REG(1), [REGN(sp), #(REG_WIDTH * 2)]
@@ -107,11 +110,6 @@ ENTRY(longjmp)
 	ldp	REG(0), REGN(lr), [REGN(sp)]
 	add	REGN(sp), REGN(sp), #(REG_WIDTH * 4)
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	/* Restore Executive mode state */
-	bl	_rtld_longjmp
-#endif
-
 	/* Check the magic value */
 	ldr	REG(8), [REG(0)], #(REG_WIDTH)
 	ldr	x9, .Lmagic
@@ -121,6 +119,10 @@ ENTRY(longjmp)
 	/* Restore the stack pointer */
 	ldr	REG(8), [REG(0)], #(REG_WIDTH)
 	mov	REGN(sp), REG(8)
+#ifdef CHERI_LIB_C18N
+	/* Skip the trusted stack pointer */
+	add	c0, c0, #REG_WIDTH
+#endif
 
 	/* Restore the general purpose registers and lr */
 	ldp	REG(19), REG(20), [REG(0)], #(REG_WIDTH * 2)
@@ -145,3 +147,5 @@ botch:
 	bl	_C_LABEL(longjmperror)
 	bl	_C_LABEL(abort)
 END(longjmp)
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

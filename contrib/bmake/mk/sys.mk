@@ -1,6 +1,8 @@
-# $Id: sys.mk,v 1.55 2023/05/10 19:23:26 sjg Exp $
+# SPDX-License-Identifier: BSD-2-Clause
 #
-#	@(#) Copyright (c) 2003-2009, Simon J. Gerraty
+# $Id: sys.mk,v 1.60 2024/02/17 17:26:57 sjg Exp $
+#
+#	@(#) Copyright (c) 2003-2023, Simon J. Gerraty
 #
 #	This file is provided in the hope that it will
 #	be of use.  There is absolutely NO WARRANTY.
@@ -14,6 +16,9 @@
 #
 
 # Avoid putting anything platform specific in here.
+
+# just in case we are an older bmake
+.MAKE.OS ?= ${HOST_OS}
 
 # _DEBUG_MAKE_FLAGS etc.
 .include <sys.debug.mk>
@@ -43,13 +48,24 @@ _TARGETS := ${.TARGETS}
 # Popular suffixes for C++
 CXX_SUFFIXES += .cc .cpp .cxx .C
 CXX_SUFFIXES := ${CXX_SUFFIXES:O:u}
+# and C++ Modules
+CCM_SUFFIXES += .ccm
+CCM_SUFFIXES := ${CCM_SUFFIXES:O:u}
+# precompiled modules
+PCM ?= .pcm
+
+SYS_MK ?= ${.PARSEDIR:tA}/${.PARSEFILE}
+SYS_MK := ${SYS_MK}
+
+# for systems that have an incompatible install
+INSTALL_SH ?= ${SYS_MK:H}/install-sh
 
 # find the OS specifics
 .if defined(SYS_OS_MK)
 .include <${SYS_OS_MK}>
 .else
 _sys_mk =
-.for x in ${HOST_OSTYPE} ${HOST_TARGET} ${HOST_OS} ${MACHINE} Generic
+.for x in ${HOST_TARGET} ${.MAKE.OS} ${.MAKE.OS:S,64,,} ${HOST_OSTYPE} ${MACHINE} Generic
 .if empty(_sys_mk)
 .-include <sys/$x.mk>
 _sys_mk := ${.MAKE.MAKEFILES:M*/$x.mk}
@@ -61,6 +77,9 @@ _sys_mk := sys/${_sys_mk:T}
 # might be an old style
 .-include <$x.sys.mk>
 _sys_mk := ${.MAKE.MAKEFILES:M*/$x.sys.mk:T}
+.endif
+.if !empty(_sys_mk) && ${MAKE_VERSION} >= 20220924
+.break
 .endif
 .endfor
 
@@ -116,7 +135,7 @@ MACHINE_ARCH = ${MACHINE_ARCH.${MACHINE}}
 .endif
 
 .ifndef ROOT_GROUP
-ROOT_GROUP != sed -n /:0:/s/:.*//p /etc/group
+ROOT_GROUP != sed -n '/:0:/{s/:.*//p;q;}' /etc/group
 .export ROOT_GROUP
 .endif
 
@@ -140,14 +159,8 @@ Mkdirs= Mkdirs() { \
 		mkdir $$d || exit $$?; \
 	done; }
 
-# this often helps with debugging
-.SUFFIXES:      .cpp-out
-
-.c.cpp-out:
-	@${COMPILE.c:N-c} -E ${.IMPSRC} | grep -v '^[ 	]*$$'
-
-${CXX_SUFFIXES:%=%.cpp-out}:
-	@${COMPILE.cc:N-c} -E ${.IMPSRC} | grep -v '^[ 	]*$$'
+# pick up generic suffix rules
+.include <suffixes.mk>
 
 # late customizations
 .-include <local.sys.mk>

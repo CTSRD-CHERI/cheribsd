@@ -11,8 +11,7 @@
 
 // ALLOW_RETRIES: 2
 
-// shared_mutex was introduced in macosx10.12
-// UNSUPPORTED: use_system_cxx_lib && target={{.+}}-apple-macosx10.{{9|10|11}}
+// UNSUPPORTED: availability-shared_mutex-missing
 
 // <shared_mutex>
 
@@ -20,11 +19,12 @@
 
 // bool try_lock_shared();
 
+#include <cassert>
+#include <chrono>
+#include <cstdlib>
 #include <shared_mutex>
 #include <thread>
 #include <vector>
-#include <cstdlib>
-#include <cassert>
 
 #include "make_test_thread.h"
 #include "test_macros.h"
@@ -38,12 +38,13 @@ typedef std::chrono::milliseconds ms;
 typedef std::chrono::nanoseconds ns;
 
 
-#if !defined(TEST_HAS_SANITIZERS) && !TEST_SLOW_HOST()
-static ms main_thread_sleep_duration = ms(750);
-static ms tolerance = ms(500);
+// Thread sanitizer causes more overhead and will sometimes cause this test
+// to fail. To prevent this we give Thread sanitizer more time to complete the
+// test.
+#if !defined(TEST_IS_EXECUTED_IN_A_SLOW_ENVIRONMENT)
+ms Tolerance = ms(200);
 #else
-static ms main_thread_sleep_duration = ms(250);
-static ms tolerance = ms(200);
+ms Tolerance = ms(200 * 5);
 #endif
 
 void f()
@@ -53,11 +54,11 @@ void f()
     assert(!m.try_lock_shared());
     assert(!m.try_lock_shared());
     while(!m.try_lock_shared())
-        ;
+        std::this_thread::yield();
     time_point t1 = Clock::now();
     m.unlock_shared();
-    ns d = t1 - t0 - main_thread_sleep_duration;
-    assert(d < tolerance);  // within 200ms (500ms on slow systems)
+    ns d = t1 - t0 - ms(250);
+    assert(d < Tolerance);  // within tolerance
 }
 
 
@@ -67,7 +68,7 @@ int main(int, char**)
     std::vector<std::thread> v;
     for (int i = 0; i < 5; ++i)
         v.push_back(support::make_test_thread(f));
-    std::this_thread::sleep_for(main_thread_sleep_duration);
+    std::this_thread::sleep_for(ms(250));
     m.unlock();
     for (auto& t : v)
         t.join();

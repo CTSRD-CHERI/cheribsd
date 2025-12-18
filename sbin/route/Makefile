@@ -1,5 +1,3 @@
-#	@(#)Makefile	8.1 (Berkeley) 6/5/93
-
 .include <src.opts.mk>
 
 PACKAGE=runtime
@@ -20,9 +18,6 @@ CFLAGS+= -I.
 
 .if ${MK_NETLINK_SUPPORT} != "no"
 SRCS+= route_netlink.c
-
-# ld.lld: error: could not determine size of cap reloc against local object nla_p_donemsg
-LD_FATAL_WARNINGS=no
 .else
 CFLAGS+=-DWITHOUT_NETLINK
 .endif

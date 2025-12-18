@@ -47,11 +47,14 @@ _get_curthread(void)
 {
 	struct pthread *thr;
 
-	__asm __volatile("movq %%fs:%1, %0" : "=r" (thr)
-	    : "m" (*(volatile u_long *)offsetof(struct tcb, tcb_thread)));
+	__asm __volatile("movq %%fs:%c1, %0" : "=r" (thr)
+	    : "i" (offsetof(struct tcb, tcb_thread)));
 	return (thr);
 }
 
-#define	HAS__UMTX_OP_ERR	1
+static __inline void
+_thr_resolve_machdep(void)
+{
+}
 
 #endif

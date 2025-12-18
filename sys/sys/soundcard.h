@@ -1400,8 +1400,9 @@ void seqbuf_dump(void);	/* This function must be provided by programs */
 	int i, l=(len); if (l>6)l=6;\
 	_SEQ_NEEDBUF(8);\
 	_seqbuf[_seqbufptr] = EV_SYSEX;\
-	for(i=0;i<l;i++)_seqbuf[_seqbufptr+i+1] = (buf)[i];\
-	for(i=l;i<6;i++)_seqbuf[_seqbufptr+i+1] = 0xff;\
+	_seqbuf[_seqbufptr+1] = (dev);\
+	for(i=0;i<l;i++)_seqbuf[_seqbufptr+i+2] = (buf)[i];\
+	for(i=l;i<6;i++)_seqbuf[_seqbufptr+i+2] = 0xff;\
 	_SEQ_ADVBUF(8);}
 
 #define SEQ_CHN_PRESSURE(dev, chn, pressure) \
@@ -1878,7 +1879,7 @@ typedef struct oss_audioinfo
 	int	card_number;
 	int	port_number;
 	int	mixer_dev;
-	int	real_device;	/* Obsolete field. Replaced by devnode */
+	int	legacy_device;	/* Obsolete field. Replaced by devnode */
 	int	enabled;	/* 1=enabled, 0=device not ready at this
 				   moment */
 	int	flags;		/* For internal use only - no practical
@@ -1925,7 +1926,9 @@ typedef struct oss_mixerinfo
    * as the default mixer.
    */
   int priority;
-  int filler[254];		/* Reserved */
+  oss_devnode_t devnode;
+  int legacy_device;
+  int filler[245];		/* Reserved */
 } oss_mixerinfo;
 
 typedef struct oss_midi_info

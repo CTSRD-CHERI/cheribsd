@@ -31,14 +31,6 @@ for use by the kmem caches.
 For the majority of systems and workloads only a small number of threads are
 required.
 .
-.It Sy spl_kmem_cache_reclaim Ns = Ns Sy 0 Pq uint
-When this is set it prevents Linux from being able to rapidly reclaim all the
-memory held by the kmem caches.
-This may be useful in circumstances where it's preferable that Linux
-reclaim memory from some other subsystem first.
-Setting this will increase the likelihood out of memory events on a memory
-constrained system.
-.
 .It Sy spl_kmem_cache_obj_per_slab Ns = Ns Sy 8 Pq uint
 The preferred number of objects per slab in the cache.
 In general, a larger value will increase the caches memory footprint
@@ -183,29 +175,8 @@ Increasing this value will
 result in a slower thread creation rate which may be preferable for some
 configurations.
 .
-.It Sy spl_max_show_tasks Ns = Ns Sy 512 Pq uint
-The maximum number of tasks per pending list in each taskq shown in
-.Pa /proc/spl/taskq{,-all} .
-Write
-.Sy 0
-to turn off the limit.
-The proc file will walk the lists with lock held,
-reading it could cause a lock-up if the list grow too large
-without limiting the output.
-"(truncated)" will be shown if the list is larger than the limit.
-.
-.It Sy spl_taskq_thread_timeout_ms Ns = Ns Sy 10000 Pq uint
-(Linux-only)
-How long a taskq has to have had no work before we tear it down.
-Previously, we would tear down a dynamic taskq worker as soon
-as we noticed it had no work, but it was observed that this led
-to a lot of churn in tearing down things we then immediately
-spawned anew.
-In practice, it seems any nonzero value will remove the vast
-majority of this churn, while the nontrivially larger value
-was chosen to help filter out the little remaining churn on
-a mostly idle system.
-Setting this value to
-.Sy 0
-will revert to the previous behavior.
+.It Sy spl_taskq_thread_timeout_ms Ns = Ns Sy 5000 Pq uint
+Minimum idle threads exit interval for dynamic taskqs.
+Smaller values allow idle threads exit more often and potentially be
+respawned again on demand, causing more churn.
 .El

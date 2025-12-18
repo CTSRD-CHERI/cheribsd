@@ -32,25 +32,34 @@
 #include <linux/page.h>
 
 static inline int
-set_memory_uc(unsigned long addr, int numpages)
+set_memory_uc(vm_pointer_t addr, int numpages)
 {
-	return (pmap_change_attr(addr, numpages, VM_MEMATTR_UNCACHEABLE));
+	vm_size_t len;
+
+	len = (vm_size_t)numpages << PAGE_SHIFT;
+	return (-pmap_change_attr(addr, len, VM_MEMATTR_UNCACHEABLE));
 }
 
 static inline int
-set_memory_wc(unsigned long addr, int numpages)
+set_memory_wc(vm_pointer_t addr, int numpages)
 {
 #ifdef VM_MEMATTR_WRITE_COMBINING
-	return (pmap_change_attr(addr, numpages, VM_MEMATTR_WRITE_COMBINING));
+	vm_size_t len;
+
+	len = (vm_size_t)numpages << PAGE_SHIFT;
+	return (-pmap_change_attr(addr, len, VM_MEMATTR_WRITE_COMBINING));
 #else
 	return (set_memory_uc(addr, numpages));
 #endif
 }
 
 static inline int
-set_memory_wb(unsigned long addr, int numpages)
+set_memory_wb(vm_pointer_t addr, int numpages)
 {
-	return (pmap_change_attr(addr, numpages, VM_MEMATTR_WRITE_BACK));
+	vm_size_t len;
+
+	len = (vm_size_t)numpages << PAGE_SHIFT;
+	return (-pmap_change_attr(addr, len, VM_MEMATTR_WRITE_BACK));
 }
 
 static inline int

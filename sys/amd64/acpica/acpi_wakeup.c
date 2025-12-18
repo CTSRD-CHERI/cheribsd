@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/eventhandler.h>
@@ -306,6 +305,7 @@ acpi_wakeup_machdep(struct acpi_softc *sc, int state, int sleep_result,
 		amd64_syscall_ret_flush_l1d_recalc();
 		hw_ssb_recalculate(true);
 		x86_rngds_mitg_recalculate(true);
+		zenbleed_check_and_apply(true);
 
 		AcpiSetFirmwareWakingVector(0, 0);
 	} else {
@@ -361,8 +361,7 @@ acpi_alloc_wakeup_handler(void **wakeaddr,
 	return;
 
 freepages:
-	if (*wakeaddr != NULL)
-		contigfree(*wakeaddr, PAGE_SIZE, M_DEVBUF);
+	free(*wakeaddr, M_DEVBUF);
 	for (i = 0; i < ACPI_WAKEPT_PAGES; i++) {
 		if (wakept_m[i] != NULL)
 			vm_page_free(wakept_m[i]);

@@ -29,18 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#if 0
-#ifndef lint
-static const char copyright[] =
-"@(#) Copyright (c) 1980, 1993\n\
-	The Regents of the University of California.  All rights reserved.\n";
-#endif /* not lint */
-
-#ifndef lint
-static char sccsid[] = "From: @(#)swapon.c	8.1 (Berkeley) 6/5/93";
-#endif /* not lint */
-#endif
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/disk.h>
@@ -475,20 +463,23 @@ main(int argc, char *argv[])
 	struct diocskerneldump_arg ndconf, *kdap;
 	struct addrinfo hints, *res;
 	const char *dev, *pubkeyfile, *server, *client, *gateway;
-	int ch, error, fd, cipher;
+	int ch, error, fd;
 	bool gzip, list, netdump, zstd, insert, rflag;
 	uint8_t ins_idx;
+#ifdef HAVE_CRYPTO
+	int cipher = KERNELDUMP_ENC_NONE;
+#endif
 
 	gzip = list = netdump = zstd = insert = rflag = false;
 	kdap = NULL;
 	pubkeyfile = NULL;
 	server = client = gateway = NULL;
 	ins_idx = KDA_APPEND;
-	cipher = KERNELDUMP_ENC_NONE;
 
 	while ((ch = getopt(argc, argv, "C:c:g:i:k:lrs:vZz")) != -1)
 		switch ((char)ch) {
 		case 'C':
+#ifdef HAVE_CRYPTO
 			if (strcasecmp(optarg, "chacha") == 0 ||
 			    strcasecmp(optarg, "chacha20") == 0)
 				cipher = KERNELDUMP_ENC_CHACHA20;
@@ -499,6 +490,11 @@ main(int argc, char *argv[])
 				errx(EX_USAGE, "Unrecognized cipher algorithm "
 				    "'%s'", optarg);
 			break;
+#else
+			errx(EX_USAGE,
+			    "Built without crypto support, -C is unhandled.");
+			break;
+#endif
 		case 'c':
 			client = optarg;
 			break;

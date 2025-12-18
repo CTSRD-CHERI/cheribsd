@@ -32,20 +32,16 @@
  * SUCH DAMAGE.
  */
 
-#if 0
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)strncpy.c	8.1 (Berkeley) 6/4/93";
-#endif /* LIBC_SCCS and not lint */
-#endif
-#include <sys/cdefs.h>
 #include <wchar.h>
+#include <ssp/ssp.h>
 
 /*
  * Copy src to dst, truncating or null-padding to always copy n bytes.
  * Return dst.
  */
 wchar_t *
-wcsncpy(wchar_t * __restrict dst, const wchar_t * __restrict src, size_t n)
+__ssp_real(wcsncpy)(wchar_t * __restrict dst, const wchar_t * __restrict src,
+    size_t n)
 {
 	if (n != 0) {
 		wchar_t *d = dst;

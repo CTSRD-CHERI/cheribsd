@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2018 Yubico AB. All rights reserved.
+ * Copyright (c) 2018-2023 Yubico AB. All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file.
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #include <fido.h>
@@ -36,7 +37,8 @@ prepare_cred(FILE *in_f, int type, int flags)
 		errx(1, "input error");
 
 	if (flags & FLAG_DEBUG) {
-		fprintf(stderr, "client data hash:\n");
+		fprintf(stderr, "client data%s:\n",
+			flags & FLAG_CD ? "" : " hash");
 		xxd(cdh.ptr, cdh.len);
 		fprintf(stderr, "relying party id: %s\n", rpid);
 		fprintf(stderr, "user name: %s\n", uname);
@@ -47,9 +49,13 @@ prepare_cred(FILE *in_f, int type, int flags)
 	if ((cred = fido_cred_new()) == NULL)
 		errx(1, "fido_cred_new");
 
-	if ((r = fido_cred_set_type(cred, type)) != FIDO_OK ||
-	    (r = fido_cred_set_clientdata_hash(cred, cdh.ptr,
-	    cdh.len)) != FIDO_OK ||
+
+	if (flags & FLAG_CD)
+		r = fido_cred_set_clientdata(cred, cdh.ptr, cdh.len);
+	else
+		r = fido_cred_set_clientdata_hash(cred, cdh.ptr, cdh.len);
+
+	if (r != FIDO_OK || (r = fido_cred_set_type(cred, type)) != FIDO_OK ||
 	    (r = fido_cred_set_rp(cred, rpid, NULL)) != FIDO_OK ||
 	    (r = fido_cred_set_user(cred, uid.ptr, uid.len, uname, NULL,
 	    NULL)) != FIDO_OK)
@@ -137,7 +143,7 @@ cred_make(int argc, char **argv)
 	fido_dev_t *dev = NULL;
 	fido_cred_t *cred = NULL;
 	char prompt[1024];
-	char pin[1024];
+	char pin[128];
 	char *in_path = NULL;
 	char *out_path = NULL;
 	FILE *in_f = NULL;
@@ -148,7 +154,7 @@ cred_make(int argc, char **argv)
 	int ch;
 	int r;
 
-	while ((ch = getopt(argc, argv, "bc:dhi:o:qruv")) != -1) {
+	while ((ch = getopt(argc, argv, "bc:dhi:o:qruvw")) != -1) {
 		switch (ch) {
 		case 'b':
 			flags |= FLAG_LARGEBLOB;
@@ -180,6 +186,9 @@ cred_make(int argc, char **argv)
 			break;
 		case 'v':
 			flags |= FLAG_UV;
+			break;
+		case 'w':
+			flags |= FLAG_CD;
 			break;
 		default:
 			usage();
@@ -221,6 +230,10 @@ cred_make(int argc, char **argv)
 			errx(1, "snprintf");
 		if (!readpassphrase(prompt, pin, sizeof(pin), RPP_ECHO_OFF))
 			errx(1, "readpassphrase");
+		if (strlen(pin) < 4 || strlen(pin) > 63) {
+			explicit_bzero(pin, sizeof(pin));
+			errx(1, "invalid PIN length");
+		}
 		r = fido_dev_make_cred(dev, cred, pin);
 	}
 

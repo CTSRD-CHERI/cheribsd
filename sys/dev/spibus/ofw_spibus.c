@@ -30,7 +30,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -69,7 +68,7 @@ ofw_spibus_probe(device_t dev)
 		return (ENXIO);
 	device_set_desc(dev, "OFW SPI bus");
 
-	return (BUS_PROBE_DEFAULT);
+	return (BUS_PROBE_DEFAULT + 1);
 }
 
 static int
@@ -149,7 +148,7 @@ ofw_spibus_attach(device_t dev)
 			free(dinfo, M_DEVBUF);
 			continue;
 		}
-		childdev = device_add_child(dev, NULL, -1);
+		childdev = device_add_child(dev, NULL, DEVICE_UNIT_ANY);
 
 		resource_list_init(&dinfo->opd_dinfo.rl);
 		ofw_bus_intr_to_rl(childdev, child,

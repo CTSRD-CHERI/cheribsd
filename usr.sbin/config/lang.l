@@ -28,8 +28,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)lang.l	8.1 (Berkeley) 6/6/93
  */
 
 #include <assert.h>
@@ -82,6 +80,7 @@ struct kt {
 	{ "nooption",	NOOPTION },
 	{ "nooptions",	NOOPTION },
 	{ "include",	INCLUDE },
+	{ "includeoptions", INCLUDEOPTIONS },
 	{ "files", 	FILES },
 	{ 0, 0 },
 };

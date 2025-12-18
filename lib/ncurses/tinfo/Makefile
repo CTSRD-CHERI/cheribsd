@@ -1,4 +1,3 @@
-
 PACKAGE=	clibs
 SHLIBDIR?=	/lib
 
@@ -54,6 +53,8 @@ HAVE_TERMIO_H=		0
 HAVE_VSSCANF=		1
 HAVE_STDINT_H=		1
 HEADER_STDBOOL=		1
+HAVE_STDNORETURN_H=	0
+ENABLE_SIGWINCH=	1
 # XXX amd64 1L and int
 ONEUL=			1U
 TYPEOF_CHTYPE=		uint32_t
@@ -74,6 +75,7 @@ GENHDRS=	\
 	hashsize.h \
 	init_keytry.h \
 	ncurses_def.h \
+	ncurses_dll.h \
 	nomacros.h \
 	parametrized.h \
 	term.h \
@@ -170,9 +172,8 @@ CWARNFLAGS.comp_parse.c= ${NO_WUNUSED_BUT_SET_VARIABLE}
 CWARNFLAGS.read_entry.c= ${NO_WUNUSED_BUT_SET_VARIABLE}
 
 # Installed
-HEADERS=	curses.h term.h termcap.h unctrl.h
-SRCHDRS=	ncurses_dll.h
-CLEANFILES+=	ncurses_dll.h
+HEADERS=	curses.h ncurses_dll.h term.h termcap.h unctrl.h
+SRCHDRS=
 
 INCS=		${HEADERS} ${SRCHDRS}
 INCSLINKS=	curses.h ${INCLUDEDIR}/ncurses.h
@@ -214,6 +215,14 @@ FILESGROUPS=	DOCS
 # Generated source
 .ORDER: names.c codes.c
 
+# Serialize the build just a little bit; there's nothing stopping the build from
+# proceeding before ncurses_dll.h and curses.h are actually generated on a clean
+# build since we have no dependency information to prevent it.
+.ORDER: ncurses_dll.h curses.h
+.for f in ${SRCS:M*.c}
+.ORDER: curses.h ${f}
+.endfor
+
 names.c: MKnames.awk
 	${AWK} -f ${NCURSES_DIR}/ncurses/tinfo/MKnames.awk bigstrings=${USE_BIG_STRINGS} ${NCURSES_DIR}/include/Caps > names.c
 
@@ -221,7 +230,8 @@ codes.c: MKcodes.awk
 	${AWK} -f ${NCURSES_DIR}/ncurses/tinfo/MKcodes.awk bigstrings=${USE_BIG_STRINGS} ${NCURSES_DIR}/include/Caps > codes.c
 
 lib_keyname.c: keys.list MKkeyname.awk
-	${AWK} -f ${NCURSES_DIR}/ncurses/base/MKkeyname.awk bigstrings=${USE_BIG_STRINGS} keys.list > lib_keyname.c
+	${AWK} -f ${NCURSES_DIR}/ncurses/base/MKkeyname.awk use_sigwinch=${ENABLE_SIGWINCH} \
+	    bigstrings=${USE_BIG_STRINGS} keys.list > lib_keyname.c
 
 unctrl.c: MKunctrl.awk
 	echo | ${AWK} -f ${NCURSES_DIR}/ncurses/base/MKunctrl.awk bigstrings=${USE_BIG_STRINGS} > unctrl.c
@@ -269,7 +279,7 @@ curses.h: curses.head MKkey_defs.sh Caps Caps-ncurses
 
 # Generated intermediate files
 keys.list: MKkeys_list.sh Caps Caps-ncurses
-	AWK=${AWK} sh ${NCURSES_DIR}/ncurses/tinfo/MKkeys_list.sh \
+	AWK=${AWK} USE_SIGWINCH=${ENABLE_SIGWINCH} sh ${NCURSES_DIR}/ncurses/tinfo/MKkeys_list.sh \
 	    ${NCURSES_DIR}/include/Caps ${NCURSES_DIR}/include/Caps-ncurses | LC_ALL=C sort > keys.list
 
 .if ${MK_DIRDEPS_BUILD} == "yes" && ${MACHINE} != "host"
@@ -332,6 +342,7 @@ curses.head: curses.h.in
 	    -e "/@BROKEN_LINKER@/s%%${BROKEN_LINKER}%" \
 	    -e "/@HAVE_VSSCANF@/s%%${HAVE_VSSCANF}%" \
 	    -e "/@HAVE_STDINT_H@/s%%${HAVE_STDINT_H}%" \
+	    -e "/@HAVE_STDNORETURN_H@/s%%${HAVE_STDNORETURN_H}%" \
 	    -e "/@NCURSES_CH_T@/s%%${NCURSES_CH_T}%" \
 	    -e "/@NCURSES_CONST@/s%%${NCURSES_CONST}%" \
 	    -e "/@NCURSES_EXT_COLORS@/s%%${NCURSES_EXT_COLORS}%" \
@@ -342,6 +353,7 @@ curses.head: curses.h.in
 	    -e "/@NCURSES_MBSTATE_T@/s%%${NCURSES_MBSTATE_T}%" \
 	    -e "/@NCURSES_MINOR@/s%%${NCURSES_MINOR}%" \
 	    -e "/@NCURSES_MOUSE_VERSION@/s%%${NCURSES_MOUSE_VERSION}%" \
+	    -e "/@NCURSES_XNAMES@/s%%${NCURSES_XNAMES}%" \
 	    -e "/@NCURSES_OK_WCHAR_T@/s%%${NCURSES_OK_WCHAR_T}%" \
 	    -e "/@NCURSES_OPAQUE@/s%%${NCURSES_OPAQUE}%" \
 	    -e "/@NCURSES_OPAQUE_FORM@/s%%${NCURSES_OPAQUE_FORM}%" \
@@ -367,6 +379,7 @@ curses.head: curses.h.in
 	    -e "s%@cf_cv_enable_lp64@%${ENABLE_LP64}%g" \
 	    -e "s%@cf_cv_enable_opaque@%${ENABLE_OPAQUE}%g" \
 	    -e "s%@cf_cv_enable_reentrant@%${ENABLE_REENTRANT}%g" \
+	    -e "s%@cf_cv_enable_sigwinch@%${ENABLE_SIGWINCH}%g" \
 	    -e "s%@cf_cv_header_stdbool_h@%${HEADER_STDBOOL}%g" \
 	    -e "s%@cf_cv_type_of_bool@%${TYPE_OF_BOOL}%g" \
 	    -e "s%@cf_cv_typeof_chtype@%${TYPEOF_CHTYPE}%g" \

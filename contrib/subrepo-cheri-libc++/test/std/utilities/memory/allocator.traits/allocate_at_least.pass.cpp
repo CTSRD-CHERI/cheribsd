@@ -16,6 +16,7 @@
 
 #include <cassert>
 #include <concepts>
+#include <cstddef>
 #include <memory>
 
 // check that std::allocation_result exists and isn't restricted to pointers
@@ -26,8 +27,8 @@ struct no_allocate_at_least {
   using value_type = T;
   T t;
 
-  constexpr T* allocate(size_t) { return &t; }
-  constexpr void deallocate(T*, size_t) {}
+  constexpr T* allocate(std::size_t) { return &t; }
+  constexpr void deallocate(T*, std::size_t) {}
 };
 
 template <class T>
@@ -36,9 +37,9 @@ struct has_allocate_at_least {
   T t1;
   T t2;
 
-  constexpr T* allocate(size_t) { return &t1; }
-  constexpr void deallocate(T*, size_t) {}
-  constexpr std::allocation_result<T*> allocate_at_least(size_t) {
+  constexpr T* allocate(std::size_t) { return &t1; }
+  constexpr void deallocate(T*, std::size_t) {}
+  constexpr std::allocation_result<T*> allocate_at_least(std::size_t) {
     return {&t2, 2};
   }
 };

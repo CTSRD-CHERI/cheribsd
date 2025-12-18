@@ -28,7 +28,6 @@
  * Generic OHCI driver based on AT91 OHCI
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -54,10 +53,10 @@
 #include <dev/usb/controller/ohci.h>
 #include <dev/usb/controller/ohcireg.h>
 
-#include <dev/extres/clk/clk.h>
-#include <dev/extres/hwreset/hwreset.h>
-#include <dev/extres/phy/phy.h>
-#include <dev/extres/phy/phy_usb.h>
+#include <dev/clk/clk.h>
+#include <dev/hwreset/hwreset.h>
+#include <dev/phy/phy.h>
+#include <dev/phy/phy_usb.h>
 
 #include "generic_usb_if.h"
 
@@ -142,7 +141,7 @@ generic_ohci_attach(device_t dev)
 		err = ENXIO;
 		goto error;
 	}
-	sc->ohci_sc.sc_bus.bdev = device_add_child(dev, "usbus", -1);
+	sc->ohci_sc.sc_bus.bdev = device_add_child(dev, "usbus", DEVICE_UNIT_ANY);
 	if (sc->ohci_sc.sc_bus.bdev == 0) {
 		err = ENXIO;
 		goto error;

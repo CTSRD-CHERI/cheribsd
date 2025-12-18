@@ -17,7 +17,6 @@
  *    are met.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bio.h>
@@ -88,12 +87,6 @@ physio(struct cdev *dev, struct uio *uio, int ioflag)
 		return (EFBIG);
 	}
 
-	/*
-	 * Keep the process UPAGES from being swapped.  Processes swapped
-	 * out while holding pbufs, used by swapper, may lead to deadlock.
-	 */
-	PHOLD(curproc);
-
 	bp = g_alloc_bio();
 	if (uio->uio_segflg != UIO_USERSPACE) {
 		pbuf = NULL;
@@ -117,14 +110,22 @@ physio(struct cdev *dev, struct uio *uio, int ioflag)
 #ifdef RACCT
 		if (racct_enable) {
 			PROC_LOCK(curproc);
-			if (uio->uio_rw == UIO_READ) {
+			switch (uio->uio_rw) {
+			case UIO_READ:
 				racct_add_force(curproc, RACCT_READBPS,
 				    uio->uio_iov[i].iov_len);
 				racct_add_force(curproc, RACCT_READIOPS, 1);
-			} else {
+				break;
+			case UIO_WRITE:
 				racct_add_force(curproc, RACCT_WRITEBPS,
 				    uio->uio_iov[i].iov_len);
 				racct_add_force(curproc, RACCT_WRITEIOPS, 1);
+				break;
+#if __has_feature(capabilities)
+			case UIO_READ_CAP:
+			case UIO_WRITE_CAP:
+				__assert_unreachable();
+#endif
 			}
 			PROC_UNLOCK(curproc);
 		}
@@ -132,12 +133,20 @@ physio(struct cdev *dev, struct uio *uio, int ioflag)
 
 		while (uio->uio_iov[i].iov_len) {
 			g_reset_bio(bp);
-			if (uio->uio_rw == UIO_READ) {
+			switch (uio->uio_rw) {
+			case UIO_READ:
 				bp->bio_cmd = BIO_READ;
 				curthread->td_ru.ru_inblock++;
-			} else {
+				break;
+			case UIO_WRITE:
 				bp->bio_cmd = BIO_WRITE;
 				curthread->td_ru.ru_oublock++;
+				break;
+#if __has_feature(capabilities)
+			case UIO_READ_CAP:
+			case UIO_WRITE_CAP:
+				__assert_unreachable();
+#endif
 			}
 			bp->bio_offset = uio->uio_offset;
 			base = uio->uio_iov[i].iov_base;
@@ -203,7 +212,6 @@ doerror:
 	else if (pages)
 		free(pages, M_DEVBUF);
 	g_destroy_bio(bp);
-	PRELE(curproc);
 	return (error);
 }
 // CHERI CHANGES START

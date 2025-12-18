@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
-// UNSUPPORTED: libcpp-has-no-incomplete-ranges
 
 // <algorithm>
 
@@ -58,7 +57,7 @@ static_assert(!HasStableSortR<UncheckedRange<int*, SentinelForNotWeaklyEqualityC
 static_assert(!HasStableSortR<UncheckedRange<int*>, BadComparator>);
 static_assert(!HasStableSortR<UncheckedRange<const int*>>); // Doesn't satisfy `sortable`.
 
-template <class Iter, class Sent, size_t N>
+template <class Iter, class Sent, std::size_t N>
 void test_one(std::array<int, N> input, std::array<int, N> expected) {
   { // (iterator, sentinel) overload.
     auto sorted = input;

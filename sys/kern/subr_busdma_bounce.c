@@ -76,6 +76,7 @@ struct bounce_zone {
 #ifdef dmat_domain
 	int		domain;
 #endif
+	sbintime_t	total_deferred_time;
 	bus_size_t	alignment;
 	bus_addr_t	lowaddr;
 	char		zoneid[8];
@@ -119,6 +120,7 @@ _bus_dmamap_reserve_pages(bus_dma_tag_t dmat, bus_dmamap_t map, int flags)
 			bz = dmat->bounce_zone;
 			STAILQ_INSERT_TAIL(&bz->bounce_map_waitinglist, map,
 			    links);
+			map->queued_time = sbinuptime();
 			mtx_unlock(&bounce_lock);
 			return (EINPROGRESS);
 		}
@@ -151,6 +153,22 @@ busdma_sysctl_tree_top(struct bounce_zone *bz)
 {
 
 	return (bz->sysctl_tree_top);
+}
+
+/*
+ * Returns true if the address falls within the tag's exclusion window, or
+ * fails to meet its alignment requirements.
+ */
+static bool
+addr_needs_bounce(bus_dma_tag_t dmat, bus_addr_t paddr)
+{
+
+	if (paddr > dmat_lowaddr(dmat) && paddr <= dmat_highaddr(dmat))
+		return (true);
+	if (!vm_addr_align_ok(paddr, dmat_alignment(dmat)))
+		return (true);
+
+	return (false);
 }
 
 static int
@@ -239,7 +257,10 @@ alloc_bounce_zone(bus_dma_tag_t dmat)
 	    "domain", CTLFLAG_RD, &bz->domain, 0,
 	    "memory domain");
 #endif
-
+	SYSCTL_ADD_SBINTIME_USEC(busdma_sysctl_tree(bz),
+	    SYSCTL_CHILDREN(busdma_sysctl_tree_top(bz)), OID_AUTO,
+	    "total_deferred_time", CTLFLAG_RD, &bz->total_deferred_time,
+	    "Cumulative time busdma requests are deferred (us)");
 	if (start_thread) {
 		if (kproc_create(busdma_thread, NULL, NULL, 0, 0, "busdma") !=
 		    0)
@@ -430,12 +451,83 @@ free_bounce_pages(bus_dma_tag_t dmat, bus_dmamap_t map)
 		wakeup(&bounce_map_callbacklist);
 }
 
+/*
+ * Add a single contiguous physical range to the segment list.
+ */
+static bus_size_t
+_bus_dmamap_addseg(bus_dma_tag_t dmat, bus_dmamap_t map, bus_addr_t curaddr,
+    bus_size_t sgsize, bus_dma_segment_t *segs, int *segp)
+{
+	int seg;
+
+	KASSERT(curaddr <= BUS_SPACE_MAXADDR,
+	    ("ds_addr %#jx > BUS_SPACE_MAXADDR %#jx; dmat %p fl %#x low %#jx "
+	    "hi %#jx",
+	    (uintmax_t)curaddr, (uintmax_t)BUS_SPACE_MAXADDR,
+	    dmat, dmat_bounce_flags(dmat), (uintmax_t)dmat_lowaddr(dmat),
+	    (uintmax_t)dmat_highaddr(dmat)));
+
+	/*
+	 * Make sure we don't cross any boundaries.
+	 */
+	if (!vm_addr_bound_ok(curaddr, sgsize, dmat_boundary(dmat)))
+		sgsize = roundup2(curaddr, dmat_boundary(dmat)) - curaddr;
+
+	/*
+	 * Insert chunk into a segment, coalescing with
+	 * previous segment if possible.
+	 */
+	seg = *segp;
+	if (seg == -1) {
+		seg = 0;
+		segs[seg].ds_addr = curaddr;
+		segs[seg].ds_len = sgsize;
+	} else {
+		if (curaddr == segs[seg].ds_addr + segs[seg].ds_len &&
+		    (segs[seg].ds_len + sgsize) <= dmat_maxsegsz(dmat) &&
+		    vm_addr_bound_ok(segs[seg].ds_addr,
+		    segs[seg].ds_len + sgsize, dmat_boundary(dmat)))
+			segs[seg].ds_len += sgsize;
+		else {
+			if (++seg >= dmat_nsegments(dmat))
+				return (0);
+			segs[seg].ds_addr = curaddr;
+			segs[seg].ds_len = sgsize;
+		}
+	}
+	*segp = seg;
+	return (sgsize);
+}
+
+/*
+ * Add a contiguous physical range to the segment list, respecting the tag's
+ * maximum segment size and splitting it into multiple segments as necessary.
+ */
+static bool
+_bus_dmamap_addsegs(bus_dma_tag_t dmat, bus_dmamap_t map, bus_addr_t curaddr,
+    bus_size_t sgsize, bus_dma_segment_t *segs, int *segp)
+{
+	bus_size_t done, todo;
+
+	while (sgsize > 0) {
+		todo = MIN(sgsize, dmat_maxsegsz(dmat));
+		done = _bus_dmamap_addseg(dmat, map, curaddr, todo, segs,
+		    segp);
+		if (done == 0)
+			return (false);
+		curaddr += done;
+		sgsize -= done;
+	}
+	return (true);
+}
+
 static void
 busdma_thread(void *dummy __unused)
 {
 	STAILQ_HEAD(, bus_dmamap) callbacklist;
 	bus_dma_tag_t dmat;
 	struct bus_dmamap *map, *nmap;
+	struct bounce_zone *bz;
 
 	thread_lock(curthread);
 	sched_class(curthread, PRI_ITHD);
@@ -452,8 +544,10 @@ busdma_thread(void *dummy __unused)
 
 		STAILQ_FOREACH_SAFE(map, &callbacklist, links, nmap) {
 			dmat = map->dmat;
+			bz = dmat->bounce_zone;
 			dmat_lockfunc(dmat)(dmat_lockfuncarg(dmat),
 			    BUS_DMA_LOCK);
+			bz->total_deferred_time += (sbinuptime() - map->queued_time);
 			bus_dmamap_load_mem(map->dmat, map, &map->mem,
 			    map->callback, map->callback_arg, BUS_DMA_WAITOK);
 			dmat_lockfunc(dmat)(dmat_lockfuncarg(dmat),

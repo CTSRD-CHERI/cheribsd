@@ -178,10 +178,10 @@ struct pmcstat_image {
 	 * Executables have pi_start and pi_end; these are zero
 	 * for shared libraries.
 	 */
-	uintfptr_t	pi_start;	/* start address (inclusive) */
-	uintfptr_t	pi_end;		/* end address (exclusive) */
-	uintfptr_t	pi_entry;	/* entry address */
-	uintfptr_t	pi_vaddr;	/* virtual address where loaded */
+	ptraddr_t	pi_start;	/* start address (inclusive) */
+	ptraddr_t	pi_end;		/* end address (exclusive) */
+	ptraddr_t	pi_entry;	/* entry address */
+	ptraddr_t	pi_vaddr;	/* virtual address where loaded */
 	int		pi_isdynamic;	/* whether a dynamic object */
 	int		pi_iskernelmodule;
 	pmcstat_interned_string pi_dynlinkerpath; /* path in .interp */
@@ -226,8 +226,8 @@ struct pmcstat_string {
  */
 struct pmcstat_pcmap {
 	TAILQ_ENTRY(pmcstat_pcmap) ppm_next;
-	uintfptr_t	ppm_lowpc;
-	uintfptr_t	ppm_highpc;
+	ptraddr_t	ppm_lowpc;
+	ptraddr_t	ppm_highpc;
 	struct pmcstat_image *ppm_image;
 };
 
@@ -247,7 +247,7 @@ struct pmcstat_process {
 	LIST_ENTRY(pmcstat_process) pp_next;	/* hash-next */
 	pid_t			pp_pid;		/* associated pid */
 	int			pp_isactive;	/* whether active */
-	uintfptr_t		pp_entryaddr;	/* entry address */
+	ptraddr_t		pp_entryaddr;	/* entry address */
 	TAILQ_HEAD(,pmcstat_pcmap) pp_map;	/* address range map */
 };
 extern LIST_HEAD(pmcstat_process_hash_list, pmcstat_process) pmcstat_process_hash[PMCSTAT_NHASH];
@@ -281,7 +281,7 @@ struct pmc_plugins {
 	/* sample processing */
 	void (*pl_process)(struct pmcstat_process *pp,
 	    struct pmcstat_pmcrecord *pmcr, uint32_t nsamples,
-	    uintfptr_t *cc, int usermode, uint32_t cpu);
+	    ptraddr_t *cc, int usermode, uint32_t cpu);
 
 	/* image */
 	void (*pl_initimage)(struct pmcstat_image *pi);
@@ -317,7 +317,7 @@ struct pmcstat_stats {
 __BEGIN_DECLS
 int pmcstat_symbol_compare(const void *a, const void *b);
 struct pmcstat_symbol *pmcstat_symbol_search(struct pmcstat_image *image,
-    uintfptr_t addr);
+    ptraddr_t addr);
 void pmcstat_image_add_symbols(struct pmcstat_image *image, Elf *e,
     Elf_Scn *scn, GElf_Shdr *sh);
 
@@ -339,7 +339,7 @@ void pmcstat_process_elf_exec(struct pmcstat_process *_pp,
     struct pmcstat_stats *pmcstat_stats);
 
 void pmcstat_image_link(struct pmcstat_process *_pp,
-    struct pmcstat_image *_i, uintfptr_t _lpc);
+    struct pmcstat_image *_i, ptraddr_t _lpc);
 
 void pmcstat_process_aout_exec(struct pmcstat_process *_pp,
     struct pmcstat_image *_image, uintptr_t _baseaddr);
@@ -350,7 +350,7 @@ void pmcstat_process_exec(struct pmcstat_process *_pp,
 void pmcstat_image_determine_type(struct pmcstat_image *_image, struct pmcstat_args *args);
 void pmcstat_image_get_aout_params(struct pmcstat_image *_image, struct pmcstat_args *args);
 struct pmcstat_pcmap *pmcstat_process_find_map(struct pmcstat_process *_p,
-    uintfptr_t _pc);
+    ptraddr_t _pc);
 void pmcstat_initialize_logging(struct pmcstat_process **pmcstat_kernproc,
     struct pmcstat_args *args, struct pmc_plugins *plugins,
     int *pmcstat_npmcs, int *pmcstat_mergepmc);

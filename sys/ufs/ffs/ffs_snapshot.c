@@ -31,8 +31,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)ffs_snapshot.c	8.11 (McKusick) 7/23/00
  */
 
 #include <sys/cdefs.h>
@@ -224,6 +222,15 @@ ffs_snapshot(struct mount *mp, char *snapfile)
 	ump = VFSTOUFS(mp);
 	fs = ump->um_fs;
 	sn = NULL;
+	/*
+	 * At the moment, filesystems using gjournal cannot support
+	 * taking snapshots.
+	 */
+	if ((mp->mnt_flag & MNT_GJOURNAL) != 0) {
+		vfs_mount_error(mp, "%s: Snapshots are not yet supported when "
+		    "using gjournal", fs->fs_fsmnt);
+		return (EOPNOTSUPP);
+	}
 	MNT_ILOCK(mp);
 	flag = mp->mnt_flag;
 	MNT_IUNLOCK(mp);

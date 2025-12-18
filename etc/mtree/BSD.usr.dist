@@ -36,9 +36,11 @@
     ..
     lib
         clang
-            16
+            19
                 include
                     cuda_wrappers
+                        bits
+                        ..
                     ..
                     fuzzer
                     ..
@@ -72,6 +74,10 @@
         engines-3
         ..
         flua
+            freebsd
+                sys
+                ..
+            ..
         ..
         i18n
         ..
@@ -83,8 +89,6 @@
         ..
     ..
     libdata
-        gcc
-        ..
         ldscripts
         ..
         pkgconfig
@@ -159,6 +163,8 @@
         ..
         hyperv
         ..
+        kgdb
+        ..
         lpr
             ru
             ..
@@ -180,6 +186,8 @@
         atf             tags=package=tests
         ..
         bhyve
+            gdb
+            ..
             kbdlayout
             ..
         ..
@@ -249,8 +257,6 @@
             BSD_daemon
             ..
             FreeBSD_version
-            ..
-            IPv6
             ..
             bhyve
             ..
@@ -353,6 +359,8 @@
             smbfs
                 print
                 ..
+            ..
+            sound
             ..
             sunrpc
                 dir

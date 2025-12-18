@@ -1,4 +1,3 @@
-
 # This file is included by libsa
 # It contains SRCS needed for loader
 
@@ -83,3 +82,6 @@ SRCS+= \
 	x509/x509_decoder.c \
 	x509/x509_minimal.c \
 
+# We want find_error_name().
+SRCS+= \
+	${BEARSSL_TOOLS}/errors.c \

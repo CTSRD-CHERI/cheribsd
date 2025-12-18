@@ -77,25 +77,35 @@ LDFLAGS+= -Wl,-zretpolineplt
 .endif
 # LLD sensibly defaults to -znoexecstack, so do the same for BFD
 LDFLAGS.bfd+= -Wl,-znoexecstack
+.if ${MK_BRANCH_PROTECTION} != "no"
+CFLAGS+=  -mbranch-protection=standard
+.if ${LINKER_FEATURES:Mbti-report} && defined(BTI_REPORT_ERROR)
+LDFLAGS+= -Wl,-zbti-report=error
+.endif
+.endif
+
+# Disable when bootstrapping as host may not support new relocations
+# TODO: Remove after the next release
+.if ${MACHINE_CPUARCH} == "aarch64" && ${MACHINE_CPU:Mcheri} && !defined(BOOTSTRAPPING)
+LDFLAGS+= -Wl,--local-caprelocs=elf
+
+.if ${MK_CHERI_CODEPTR_RELOCS} != "no" && ${COMPILER_FEATURES:Mmorello-codeptr-relocs}
+CFLAGS+=	-cheri-codeptr-relocs
+LDFLAGS+=	-cheri-codeptr-relocs
+.endif
+.endif
 
 # Initialize stack variables on function entry
-.if ${MK_INIT_ALL_ZERO} == "yes"
+.if ${OPT_INIT_ALL} != "none"
 .if ${COMPILER_FEATURES:Minit-all}
-CFLAGS+= -ftrivial-auto-var-init=zero
-CXXFLAGS+= -ftrivial-auto-var-init=zero
-.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} < 160000
+CFLAGS+= -ftrivial-auto-var-init=${OPT_INIT_ALL}
+CXXFLAGS+= -ftrivial-auto-var-init=${OPT_INIT_ALL}
+.if ${OPT_INIT_ALL} == "zero" && ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} < 160000
 CFLAGS+= -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
 CXXFLAGS+= -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
 .endif
 .else
-.warning InitAll (zeros) requested but not supported by compiler
-.endif
-.elif ${MK_INIT_ALL_PATTERN} == "yes"
-.if ${COMPILER_FEATURES:Minit-all}
-CFLAGS+= -ftrivial-auto-var-init=pattern
-CXXFLAGS+= -ftrivial-auto-var-init=pattern
-.else
-.warning InitAll (pattern) requested but not supported by compiler
+.warning INIT_ALL (${OPT_INIT_ALL}) requested but not supported by compiler
 .endif
 .endif
 
@@ -165,6 +175,14 @@ DEBUGMKDIR=
 PROG_FULL=	${PROG}
 .endif
 
+.if ${MK_COMPARTMENT_POLICY} != "no" && ${MACHINE_ABI:Mpurecap}
+.if !empty(COMPARTMENT_POLICY)
+COMPARTMENT_POLICY+=	${SYSROOT}/usr/lib/crt.json
+${PROG_FULL}:	${COMPARTMENT_POLICY}
+LDFLAGS+=	${COMPARTMENT_POLICY:S/^/-Wl,--compartment-policy=/}
+.endif
+.endif
+
 .if defined(PROG)
 PROGNAME?=	${PROG}
 
@@ -190,6 +208,9 @@ ${PROG_FULL}: ${OBJS}
 .endif
 .if ${MK_CTF} != "no"
 	${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ${OBJS}
+.endif
+.if defined(ELF_FEATURES)
+	${ELFCTL} -i -e ${ELF_FEATURES:ts,} ${.TARGET}
 .endif
 
 .else	# !defined(SRCS)

@@ -1,5 +1,3 @@
-#	@(#)Makefile	8.1 (Berkeley) 5/31/93
-#
 # C Shell with process control; VM/UNIX VAX Makefile
 # Bill Joy UC Berkeley; Jim Kulp IIASA, Austria
 #
@@ -15,6 +13,7 @@ ROOTPACKAGE=	csh
 ETC=	csh.cshrc csh.login csh.logout
 ROOT=	dot.cshrc dot.login
 ROOTDIR=	/root
+ROOTDIR_MODE=	0750
 ROOTNAME_dot.cshrc=	.cshrc
 ROOTNAME_dot.login=	.login
 TCSHDIR= ${SRCTOP}/contrib/tcsh
@@ -124,7 +123,7 @@ tc.defs.c: gethost
 DEPENDOBJS+= gethost
 gethost: gethost.c sh.err.h tc.const.h sh.h ${BUILD_TOOLS_META}
 	@rm -f ${.TARGET}
-	${CC:N${CCACHE_BIN}} -o gethost ${LDFLAGS} ${CFLAGS:C/-DHAVE_ICONV//} \
+	${HOST_CC:N${CCACHE_BIN}} -o gethost ${LDFLAGS} ${CFLAGS:C/-DHAVE_ICONV//} \
 	    ${TCSHDIR}/gethost.c
 .endif
 
@@ -159,14 +158,5 @@ tc.const.h: tc.const.c sh.char.h config.h config_f.h sh.types.h sh.err.h ${BUILD
 	    sed -e 's/Char \([a-zA-Z0-9_]*\)\(.*\)/extern Char \1[];/' | \
 	    sort >> ${.TARGET}
 	@echo '#endif /* _h_tc_const */' >> ${.TARGET}
-
-beforeinstallconfig:
-	rm -f ${DESTDIR}/.cshrc
-
-afterinstallconfig:
-	# XXX Set link mode explicitly via -m.  We cannot use LINKMODE for this
-	# link, as it would also apply to the tcsh link above.
-	${INSTALL_LINK} ${TAG_ARGS} -m ${CONFMODE} ${DESTDIR}/root/.cshrc \
-	    ${DESTDIR}/.cshrc
 
 .include <bsd.prog.mk>

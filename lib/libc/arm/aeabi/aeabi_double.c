@@ -27,7 +27,6 @@
  *
  */
 
-#include <sys/cdefs.h>
 #include "softfloat-for-gcc.h"
 #include "milieu.h"
 #include "softfloat.h"
@@ -55,7 +54,7 @@ float64 __aeabi_dsub_vfp(float64, float64);
 
 /*
  * Depending on the target these will:
- *  On armv6 with a vfp call the above function, or
+ *  On armv7 with a vfp call the above function, or
  *  Call the softfloat function in the 3rd argument.
  */
 int AEABI_FUNC2(dcmpeq, float64, float64_eq)

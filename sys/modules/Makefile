@@ -1,4 +1,3 @@
-
 SYSDIR?=${SRCTOP}/sys
 .include "${SYSDIR}/conf/kern.opts.mk"
 
@@ -20,6 +19,7 @@ SUBDIR=	\
 	accf_data \
 	accf_dns \
 	accf_http \
+	accf_tls \
 	acl_nfs4 \
 	acl_posix1e \
 	${_acpi} \
@@ -41,6 +41,7 @@ SUBDIR=	\
 	${_arcmsr} \
 	${_allwinner} \
 	${_armv8crypto} \
+	${_armv8_rng} \
 	${_asmc} \
 	ata \
 	ath \
@@ -99,6 +100,7 @@ SUBDIR=	\
 	${_dpdk_lpm4} \
 	${_dpdk_lpm6} \
 	${_dpms} \
+	dummymbuf \
 	dummynet \
 	${_dwwdt} \
 	${_e6000sw} \
@@ -153,6 +155,7 @@ SUBDIR=	\
 	if_edsc \
 	${_if_enc} \
 	if_epair \
+	${_genet} \
 	${_if_gif} \
 	${_if_gre} \
 	${_if_me} \
@@ -216,12 +219,14 @@ SUBDIR=	\
 	lindebugfs \
 	linuxkpi \
 	linuxkpi_hdmi \
+	linuxkpi_video \
 	linuxkpi_wlan \
 	${_lio} \
 	lpt \
 	${_mac_biba} \
 	${_mac_bsdextended} \
 	${_mac_ddb} \
+	${_mac_do} \
 	${_mac_ifoff} \
 	${_mac_ipacl} \
 	${_mac_lomac} \
@@ -289,9 +294,10 @@ SUBDIR=	\
 	nmdm \
 	nullfs \
 	${_ntb} \
-	${_nvd} \
+	nvd \
 	${_nvdimm} \
-	${_nvme} \
+	nvme \
+	nvmf \
 	${_nvram} \
 	oce \
 	${_ocs_fc} \
@@ -299,12 +305,14 @@ SUBDIR=	\
 	otus \
 	${_otusfw} \
 	ow \
+	p9fs \
 	${_padlock} \
 	${_padlock_rng} \
 	${_pchtherm} \
 	${_pcfclock} \
 	${_pf} \
 	${_pflog} \
+	${_pflow} \
 	${_pfsync} \
 	plip \
 	${_pms} \
@@ -339,7 +347,7 @@ SUBDIR=	\
 	${_rockchip} \
 	rtsx \
 	${_rtw88} \
-	${_rtw88fw} \
+	${_rtw89} \
 	rtwn \
 	rtwn_pci \
 	rtwn_usb \
@@ -386,7 +394,7 @@ SUBDIR=	\
 	${_ti} \
 	tmpfs \
 	${_toecore} \
-	${_tpm} \
+	tpm \
 	tws \
 	uart \
 	udf \
@@ -396,6 +404,7 @@ SUBDIR=	\
 	unionfs \
 	usb \
 	${_vesa} \
+	${_vf_i2c} \
 	virtio \
 	vge \
 	${_viawd} \
@@ -435,8 +444,7 @@ SUBDIR+=	dtrace
 SUBDIR+=	opensolaris
 .endif
 
-# Requires bus_space_read_8
-.if ${MACHINE_ARCH} != "i386"
+.if !${MACHINE_ABI:Mlong32}
 _bnxt=		bnxt
 .endif
 
@@ -483,7 +491,7 @@ _sctp=		sctp
 _if_stf=	if_stf
 .endif
 
-.if ${MK_INET_SUPPORT} != "no" || defined(ALL_MODULES)
+.if (${KERN_OPTS:MINET} && ${MK_INET_SUPPORT} != "no") || defined(ALL_MODULES)
 _if_me=		if_me
 _ipfw=		ipfw
 .if ${MK_INET6_SUPPORT} != "no" || defined(ALL_MODULES)
@@ -501,7 +509,7 @@ _ipfilter=	ipfilter
 .endif
 .endif
 
-.if ${MK_INET_SUPPORT} != "no" && ${KERN_OPTS:MFIB_ALGO}
+.if ${MK_INET_SUPPORT} != "no" && ${KERN_OPTS:MFIB_ALGO} && ${KERN_OPTS:MINET}
 _dpdk_lpm4=	dpdk_lpm4
 _fib_dxr=	fib_dxr
 .endif
@@ -567,14 +575,15 @@ _iwlwifi=	iwlwifi
 .if ${MK_SOURCELESS_UCODE} != "no"
 _iwlwififw=	iwlwififw
 .endif
-.if !${MACHINE_ABI:Mpurecap}
-_ossl=		ossl
-.endif
 _rtw88=		rtw88
-.if ${MK_SOURCELESS_UCODE} != "no"
-_rtw88fw=	rtw88fw
-.endif
+_rtw89=		rtw89
 _vmware=	vmware
+.endif
+
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
+    ${MACHINE_CPUARCH} == "i386" || ${MACHINE_ARCH} == "armv7" || \
+	${MACHINE_ARCH:Mpowerpc64*} != ""
+_ossl=		ossl
 .endif
 
 # MAC framework
@@ -584,6 +593,7 @@ _mac_bsdextended= mac_bsdextended
 .if ${KERN_OPTS:MDDB} || defined(ALL_MODULES)
 _mac_ddb=	mac_ddb
 .endif
+_mac_do=	mac_do
 _mac_ifoff=	mac_ifoff
 _mac_ipacl=	mac_ipacl
 _mac_lomac=	mac_lomac
@@ -615,6 +625,7 @@ _netgraph=	netgraph
 	${MK_INET6_SUPPORT} != "no")) || defined(ALL_MODULES)
 _pf=		pf
 _pflog=		pflog
+_pflow=		pflow
 .if ${MK_INET_SUPPORT} != "no"
 _pfsync=	pfsync
 .endif
@@ -641,6 +652,11 @@ _cxgbe=		cxgbe
 # This has only been tested on amd64 and arm64
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "aarch64"
 _mpi3mr=mpi3mr
+.endif
+
+# Specific to the Raspberry Pi.
+.if ${MACHINE_CPUARCH} == "aarch64"
+_genet=		genet
 .endif
 
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "aarch64" || \
@@ -688,10 +704,12 @@ _cxgb=		cxgb
 
 .if ${MACHINE_CPUARCH} == "aarch64"
 _armv8crypto=	armv8crypto
+_armv8_rng=	armv8_rng
 _dpaa2=		dpaa2
 _sff=		sff
 _em=		em
 _hyperv=  hyperv
+_vf_i2c=	vf_i2c
 
 .if !empty(OPT_FDT)
 _allwinner=	allwinner
@@ -799,8 +817,6 @@ _iwmfw=		iwmfw
 _iwnfw=		iwnfw
 .endif
 _nfe=		nfe
-_nvd=		nvd
-_nvme=		nvme
 _nvram=		nvram
 .if ${MK_CRYPT} != "no" || defined(ALL_MODULES)
 _padlock=	padlock
@@ -811,7 +827,6 @@ _pchtherm = pchtherm
 _s3=		s3
 _sdhci_acpi=	sdhci_acpi
 _superio=	superio
-_tpm=		tpm
 _vesa=		vesa
 _viawd=		viawd
 _vmd=		vmd
@@ -884,8 +899,6 @@ _cfi=		cfi
 _cpufreq=	cpufreq
 _exca=		exca
 _ffec=		ffec
-_nvd=		nvd
-_nvme=		nvme
 .endif
 
 .if ${MACHINE_ARCH:Mpowerpc64*} != ""
@@ -913,7 +926,7 @@ _malo=	malo
 # (e.g. we don't want purecap kernels penalised by not having accelerated
 # crypto just because we haven't ported the assembly).
 .if ${MACHINE_CPU:Mcheri}
-BROKEN_MODULES+=armv8crypto
+BROKEN_MODULES+=bnxt
 BROKEN_MODULES+=dpaa2
 BROKEN_MODULES+=ena
 BROKEN_MODULES+=linprocfs linux64 linux_common
@@ -932,10 +945,11 @@ SUBDIR:= ${SUBDIR:N${reject}}
 .if !defined(NO_XREF)
 .MAKEFLAGS+=	-DNO_XREF
 afterinstall: .PHONY
-	@if type kldxref >/dev/null 2>&1; then \
-		${ECHO} ${KLDXREF_CMD} ${DESTDIR}${KMODDIR}; \
-		${KLDXREF_CMD} ${DESTDIR}${KMODDIR}; \
-	fi
+	${KLDXREF_CMD} ${DESTDIR}${KMODDIR}
+.if defined(NO_ROOT) && defined(METALOG)
+	echo ".${DISTBASE}${KMODDIR}/linker.hints type=file mode=0644 uname=root gname=wheel" | \
+	    cat -l >> ${METALOG}
+.endif
 .endif
 
 SUBDIR:= ${SUBDIR:u:O}

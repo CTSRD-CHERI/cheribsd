@@ -1,6 +1,9 @@
 /badsend
 /btree_test
 /chg_usr_exec
+/clonefile
+/clone_mmap_cached
+/clone_mmap_write
 /devname2devid
 /dir_rd_update
 /draid
@@ -13,6 +16,7 @@
 /getversion
 /largest_file
 /libzfs_input_check
+/manipulate_user_buffer
 /mkbusy
 /mkfile
 /mkfiles

@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/jail.h>
 #include <sys/socket.h>
@@ -38,7 +37,6 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#include <err.h>
 #include <errno.h>
 #include <jail.h>
 #include <limits.h>
@@ -249,8 +247,9 @@ main(int argc, char **argv)
 	}
 	xo_close_list("jail");
 	xo_close_container("jail-information");
-	xo_finish();
-	return (0);
+	if (xo_finish() < 0)
+		xo_err(1, "stdout");
+	exit(0);
 }
 
 static int

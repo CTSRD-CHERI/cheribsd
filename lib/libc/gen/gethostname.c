@@ -29,16 +29,15 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__SCCSID("@(#)gethostname.c	8.1 (Berkeley) 6/4/93");
 #include <sys/param.h>
 #include <sys/sysctl.h>
 
 #include <errno.h>
 #include <unistd.h>
+#include <ssp/ssp.h>
 
 int
-gethostname(char *name, size_t namelen)
+__ssp_real(gethostname)(char *name, size_t namelen)
 {
 	int mib[2];
 

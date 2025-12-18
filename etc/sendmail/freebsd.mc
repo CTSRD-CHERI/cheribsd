@@ -46,9 +46,9 @@ divert(-1)
 #  and owner of the SSL certificates and keys in /etc/mail/certs to be usable
 #  by that user.
 #
+# Last updated: 2024-02-01
 
 divert(0)
-VERSIONID(`$FreeBSD$')
 OSTYPE(freebsd6)
 DOMAIN(generic)
 

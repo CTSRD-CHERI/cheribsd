@@ -26,9 +26,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     @(#)ps.1	8.3 (Berkeley) 4/18/94
-.\"
-.Dd April 25, 2023
+.Dd November 11, 2023
 .Dt PS 1
 .Os
 .Sh NAME
@@ -39,6 +37,7 @@
 .Op Fl -libxo
 .Op Fl aCcdefHhjlmrSTuvwXxZ
 .Op Fl O Ar fmt | Fl o Ar fmt
+.Op Fl D Ar up | down | both
 .Op Fl G Ar gid Ns Op , Ns Ar gid Ns Ar ...
 .Op Fl J Ar jid Ns Op , Ns Ar jid Ns Ar ...
 .Op Fl M Ar core
@@ -64,7 +63,7 @@ will also display processes that do not have controlling terminals.
 .Pp
 A different set of processes can be selected for display by using any
 combination of the
-.Fl a , G , J , p , T , t ,
+.Fl a , D , G , J , p , T , t ,
 and
 .Fl U
 options.
@@ -146,6 +145,18 @@ relative to each other.
 Note that this option has no effect if the
 .Dq command
 column is not the last column displayed.
+.It Fl D
+Expand the list of selected processes based on the process tree.
+.Dq UP
+will add the ancestor processes,
+.Dq DOWN
+will add the descendant processes, and
+.Dq BOTH
+will add both the ancestor and the descendant processes.
+.Fl D
+does not imply
+.Fl d ,
+but works well with it.
 .It Fl e
 Display the environment as well.
 .It Fl f
@@ -769,7 +780,7 @@ Display information on all system processes:
 .Xr strftime 3 ,
 .Xr xo_parse_args 3 ,
 .Xr mac 4 ,
-.Xr procfs 5 ,
+.Xr procfs 4 ,
 .Xr pstat 8 ,
 .Xr sysctl 8 ,
 .Xr mutex 9

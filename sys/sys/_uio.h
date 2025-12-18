@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)uio.h	8.5 (Berkeley) 2/22/94
  */
 
 #ifndef _SYS__UIO_H_
@@ -37,7 +35,14 @@
 #if __BSD_VISIBLE
 enum uio_rw {
 	UIO_READ,
-	UIO_WRITE
+	UIO_WRITE,
+#if __has_feature(capabilities)
+	UIO_READ_CAP,
+	UIO_WRITE_CAP
+#else
+	UIO_READ_CAP = UIO_READ,
+	UIO_WRITE_CAP = UIO_WRITE
+#endif
 };
 
 /* Segment flag values. */

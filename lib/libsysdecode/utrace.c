@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <dlfcn.h>
 #include <stdbool.h>
@@ -68,15 +67,47 @@ print_utrace_mrs(FILE *fp, void *p)
 	case UTRACE_MRS_QUARANTINE_INSERT:
 		fprintf(fp, "quarantine_insert(%p, %zu)", ut->p, ut->s);
 		break;
-	case UTRACE_MRS_MALLOC_REVOKE:
-		fprintf(fp, "malloc_revoke()");
+	case UTRACE_MRS_MALLOC_REVOKE_QUARANTINE_FORCE_FLUSH:
+		fprintf(fp, "malloc_revoke_quarantine_force_flush()");
 		break;
 	case UTRACE_MRS_QUARANTINE_FLUSH:
 		fprintf(fp, "quarantine_flush()");
 		break;
+	case UTRACE_MRS_QUARANTINE_FLUSH_DONE:
+		fprintf(fp, "quarantine_flush(%zu) done", ut->s);
+		break;
+	case UTRACE_MRS_QUARANTINE_REVOKE:
+		fprintf(fp, "quarantine_revoke()");
+		break;
+	case UTRACE_MRS_QUARANTINE_REVOKE_DONE:
+		fprintf(fp, "quarantine_revoke() done");
+		break;
 	default:
 		return (0);
 	}
+	return (1);
+}
+
+static int
+print_utrace_c18n(FILE *fp, void *p)
+{
+	struct utrace_c18n *ut = p;
+
+	switch (ut->event) {
+	case UTRACE_COMPARTMENT_ENTER:
+		fprintf(fp, "RTLD: c18n: %s -> %s at [%zu] %s (%02hhx)",
+		    ut->caller, ut->callee, ut->symnum, ut->symbol, ut->fsig);
+		break;
+	case UTRACE_COMPARTMENT_LEAVE:
+		fprintf(fp, "RTLD: c18n: %s <- %s at [%zu] %s (%02hhx)",
+		    ut->caller, ut->callee, ut->symnum, ut->symbol, ut->fsig);
+		break;
+	default:
+		return (0);
+	}
+	fprintf(fp, "\nnsp = %#p\nosp = %#p, previous = %#p\n"
+	    "fp = %#p, pc = %#p", ut->sp, ut->osp, ut->previous,
+	    ut->fp, ut->pc);
 	return (1);
 }
 #endif
@@ -192,16 +223,6 @@ print_utrace_rtld(FILE *fp, void *p)
 	case UTRACE_RTLD_ERROR:
 		fprintf(fp, "RTLD: error: %s\n", ut->name);
 		break;
-	case UTRACE_COMPARTMENT_ENTER:
-		fprintf(fp,
-		    "RTLD: c18n: enter %s from %s at [%zu] %s (%p)",
-		    ut->callee, ut->caller, ut->mapsize, ut->symbol, ut->handle);
-		break;
-	case UTRACE_COMPARTMENT_LEAVE:
-		fprintf(fp,
-		    "RTLD: c18n: leave %s to %s at [%zu] %s",
-		    ut->callee, ut->caller, ut->mapsize, ut->symbol);
-		break;
 
 	default:
 		return (0);
@@ -293,10 +314,15 @@ sysdecode_utrace(FILE *fp, void *p, size_t len)
 	static const char rtld_utrace_sig[RTLD_UTRACE_SIG_SZ] = RTLD_UTRACE_SIG;
 #ifdef __CHERI_PURE_CAPABILITY__
 	static const char mrs_utrace_sig[MRS_UTRACE_SIG_SZ] = MRS_UTRACE_SIG;
+	static const char c18n_utrace_sig[C18N_UTRACE_SIG_SZ] = C18N_UTRACE_SIG;
 
 	if (len == sizeof(struct utrace_mrs) && bcmp(p, mrs_utrace_sig,
 	    sizeof(mrs_utrace_sig)) == 0)
 		return (print_utrace_mrs(fp, p));
+
+	if (len == sizeof(struct utrace_c18n) && bcmp(p, c18n_utrace_sig,
+	    sizeof(c18n_utrace_sig)) == 0)
+		return (print_utrace_c18n(fp, p));
 #endif
 
 	if (len == sizeof(struct utrace_rtld) && bcmp(p, rtld_utrace_sig,

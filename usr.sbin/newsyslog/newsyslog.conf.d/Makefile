@@ -1,4 +1,3 @@
-
 .include <src.opts.mk>
 
 PACKAGE=	newsyslog
@@ -15,7 +14,10 @@ FTPDIR=		/etc/newsyslog.conf.d
 .endif
 
 .if ${MK_LPR} != "no"
-CONFS+=		lpr.conf
+CONFGROUPS+=	LP
+LP+=		lpr.conf
+LPPACKAGE=	lp
+LPDIR=		/etc/newsyslog.conf.d
 .endif
 
 .if ${MK_OFED} != "no"

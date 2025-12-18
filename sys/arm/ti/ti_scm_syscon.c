@@ -26,7 +26,6 @@
  */
 /* Based on sys/arm/ti/ti_sysc.c */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -47,7 +46,7 @@
 #include <dev/ofw/ofw_bus_subr.h>
 
 #include "syscon_if.h"
-#include <dev/extres/syscon/syscon.h>
+#include <dev/syscon/syscon.h>
 #include "clkdev_if.h"
 
 #include <arm/ti/ti_cpuid.h>

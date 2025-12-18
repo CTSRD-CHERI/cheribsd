@@ -25,7 +25,6 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/module.h>
@@ -179,7 +178,7 @@ adb_bus_enumerate(void *xdev)
 
 	for (i = 0; i < 16; i++) {
 		if (sc->devinfo[i].default_address) {
-			sc->children[i] = device_add_child(dev, NULL, -1);
+			sc->children[i] = device_add_child(dev, NULL, DEVICE_UNIT_ANY);
 			device_set_ivars(sc->children[i], &sc->devinfo[i]);
 		}
 	}

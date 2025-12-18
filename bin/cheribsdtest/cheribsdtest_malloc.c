@@ -42,38 +42,114 @@
 
 #include "cheribsdtest.h"
 
-static const char *
-skip_malloc_not_revoking(const char *name __unused)
+extern volatile void *eptr;
+volatile void *eptr;
+
+CHERIBSDTEST(malloc_double_free, "malloc aborts on double free",
+    .ct_flags = CT_FLAG_SIGEXIT,
+    .ct_signum = SIGABRT)
 {
-	if (malloc_is_revoking())
+	volatile void *ptr;
+
+	/* Externalize to prevent malloc() from being optimized away */
+	eptr = ptr = malloc(2);
+
+	free(__DEVOLATILE(void *, ptr));
+	free(__DEVOLATILE(void *, ptr));
+
+	cheribsdtest_failure_errx("malloc() did not abort");
+}
+
+static const char *
+skip_malloc_revocation_disabled(const struct cheri_test *ctp __unused)
+{
+	if (malloc_revoke_enabled())
 		return (NULL);
-	return ("malloc is not revoking");
+	return ("malloc quarantine disabled");
 }
 
 CHERIBSDTEST(malloc_revoke_basic,
     "verify that a free'd pointer is revoked by malloc_revoke",
-    .ct_check_skip = skip_malloc_not_revoking)
+    .ct_check_skip = skip_malloc_revocation_disabled)
 {
 	volatile void *ptr __unused;
 
-	ptr = malloc(1);
+	/*
+	 * Try to get the compiler to spill the pointer to memory.
+	 */
+	eptr = ptr = malloc(1);
 
 	free(__DEVOLATILE(void *, ptr));
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 	malloc_revoke();
-
-	/* XXX: ask kernel what the revocation method is? */
+#pragma GCC diagnostic pop
 	CHERIBSDTEST_VERIFY2(!cheri_gettag(ptr),
-	    "free'd pointer not revoked %#lp", ptr);
+	    "revoked ptr not revoked %#lp", ptr);
+	CHERIBSDTEST_VERIFY2(!cheri_gettag(eptr),
+	    "revoked eptr not revoked %#lp", eptr);
 
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(malloc_revoke_twice, "revoke twice back to back",
-    .ct_check_skip = skip_malloc_not_revoking)
+CHERIBSDTEST(malloc_revoke_quarantine_force_flush_basic,
+    "verify that a free'd pointer is revoked by malloc_revoke_quarantine_force_flush",
+    .ct_check_skip = skip_malloc_revocation_disabled)
 {
-	malloc_revoke();
-	malloc_revoke();
+	volatile void *ptr __unused;
+	int ret;
+
+	/*
+	 * Try to get the compiler to spill the pointer to memory.
+	 */
+	eptr = ptr = malloc(1);
+
+	free(__DEVOLATILE(void *, ptr));
+
+	CHERIBSDTEST_VERIFY2((ret = malloc_revoke_quarantine_force_flush()) == 0,
+	    "malloc_revoke_quarantine_force_flush returned %d", ret);
+	CHERIBSDTEST_VERIFY2(!cheri_gettag(ptr),
+	    "revoked ptr not revoked %#lp", ptr);
+	CHERIBSDTEST_VERIFY2(!cheri_gettag(eptr),
+	    "revoked eptr not revoked %#lp", eptr);
+
+	cheribsdtest_success();
+}
+
+extern volatile void *eptr1, *eptr2;
+volatile void *eptr1, *eptr2;
+
+CHERIBSDTEST(malloc_revoke_quarantine_force_flush_twice,
+    "flush the quarantine twice back to back",
+    .ct_check_skip = skip_malloc_revocation_disabled)
+{
+	volatile void *ptr1, *ptr2;
+	int ret;
+
+	/*
+	 * Try to get the compiler to spill the pointers to memory.
+	 */
+	eptr1 = ptr1 = malloc(1);
+	eptr2 = ptr2 = malloc(1);
+
+	free(__DEVOLATILE(void *, ptr1));
+
+	CHERIBSDTEST_VERIFY2((ret = malloc_revoke_quarantine_force_flush()) == 0,
+	    "malloc_revoke_quarantine_force_flush returned %d", ret);
+	CHERIBSDTEST_VERIFY2(!cheri_gettag(ptr1),
+	    "revoked ptr1 not revoked %#lp", ptr1);
+	CHERIBSDTEST_VERIFY2(!cheri_gettag(eptr1),
+	    "revoked eptr1 not revoked %#lp", eptr1);
+
+	free(__DEVOLATILE(void *, ptr2));
+
+	CHERIBSDTEST_VERIFY2((ret = malloc_revoke_quarantine_force_flush()) == 0,
+	    "malloc_revoke_quarantine_force_flush returned %d", ret);
+	CHERIBSDTEST_VERIFY2(!cheri_gettag(ptr2),
+	    "revoked ptr2 not revoked %#lp", ptr2);
+	CHERIBSDTEST_VERIFY2(!cheri_gettag(eptr2),
+	    "revoked eptr2 not revoked %#lp", eptr2);
 
 	cheribsdtest_success();
 }
@@ -183,14 +259,14 @@ CHERIBSDTEST(malloc_revocation_ctl_baseline,
     "A base binary reports revocation is enabled",
     .ct_check_skip = skip_need_cheri_revoke)
 {
-	malloc_revocation_ctl_common("malloc_is_revoking", true);
+	malloc_revocation_ctl_common("malloc_revoke_enabled", true);
 }
 
 CHERIBSDTEST(malloc_revocation_ctl_elfnote_disable,
     "A binary with elfnote disabling reports revocation is disable",
     .ct_check_skip = skip_need_cheri_revoke)
 {
-	malloc_revocation_ctl_common("malloc_is_revoking_elfnote_disable",
+	malloc_revocation_ctl_common("malloc_revoke_enabled_elfnote_disable",
 	    false);
 }
 
@@ -198,7 +274,7 @@ CHERIBSDTEST(malloc_revocation_ctl_elfnote_enable,
     "A binary with elfnote enabling reports revocation is enabled",
     .ct_check_skip = skip_need_cheri_revoke)
 {
-	malloc_revocation_ctl_common("malloc_is_revoking_elfnote_enable",
+	malloc_revocation_ctl_common("malloc_revoke_enabled_elfnote_enable",
 	    true);
 }
 
@@ -209,7 +285,7 @@ CHERIBSDTEST(malloc_revocation_ctl_elfnote_disable_protctl_enable,
 	int arg = PROC_CHERI_REVOKE_FORCE_ENABLE;
 
 	malloc_revocation_ctl_common_procctl(
-	    "malloc_is_revoking_elfnote_disable", true, &arg);
+	    "malloc_revoke_enabled_elfnote_disable", true, &arg);
 }
 
 CHERIBSDTEST(malloc_revocation_ctl_elfnote_enable_protctl_disable,
@@ -219,21 +295,21 @@ CHERIBSDTEST(malloc_revocation_ctl_elfnote_enable_protctl_disable,
 	int arg = PROC_CHERI_REVOKE_FORCE_DISABLE;
 
 	malloc_revocation_ctl_common_procctl(
-	    "malloc_is_revoking_elfnote_enable", false, &arg);
+	    "malloc_revoke_enabled_elfnote_enable", false, &arg);
 }
 
 CHERIBSDTEST(malloc_revocation_ctl_suid_baseline,
     "A suid binary reports revocation is enabled",
     .ct_check_skip = skip_need_cheri_revoke)
 {
-	malloc_revocation_ctl_common("malloc_is_revoking_suid", true);
+	malloc_revocation_ctl_common("malloc_revoke_enabled_suid", true);
 }
 
 CHERIBSDTEST(malloc_revocation_ctl_suid_elfnote_disable,
     "A suid binary with elfnote disabling reports revocation is disable",
     .ct_check_skip = skip_need_cheri_revoke)
 {
-	malloc_revocation_ctl_common("malloc_is_revoking_elfnote_disable",
+	malloc_revocation_ctl_common("malloc_revoke_enabled_elfnote_disable",
 	    false);
 }
 
@@ -241,7 +317,7 @@ CHERIBSDTEST(malloc_revocation_ctl_suid_elfnote_enable,
     "A suid binary with elfnote enabling reports revocation is enabled",
     .ct_check_skip = skip_need_cheri_revoke)
 {
-	malloc_revocation_ctl_common("malloc_is_revoking_elfnote_enable",
+	malloc_revocation_ctl_common("malloc_revoke_enabled_elfnote_enable",
 	    true);
 }
 
@@ -252,7 +328,7 @@ CHERIBSDTEST(malloc_revocation_ctl_suid_elfnote_disable_protctl_enable,
 	int arg = PROC_CHERI_REVOKE_FORCE_ENABLE;
 
 	malloc_revocation_ctl_common_procctl(
-	    "malloc_is_revoking_suid_elfnote_disable", false, &arg);
+	    "malloc_revoke_enabled_suid_elfnote_disable", false, &arg);
 }
 
 CHERIBSDTEST(malloc_revocation_ctl_suid_elfnote_enable_protctl_disable,
@@ -262,7 +338,34 @@ CHERIBSDTEST(malloc_revocation_ctl_suid_elfnote_enable_protctl_disable,
 	int arg = PROC_CHERI_REVOKE_FORCE_DISABLE;
 
 	malloc_revocation_ctl_common_procctl(
-	    "malloc_is_revoking_suid_elfnote_enable", true, &arg);
+	    "malloc_revoke_enabled_suid_elfnote_enable", true, &arg);
+}
+
+CHERIBSDTEST(malloc_early_constructor,
+    "invoke malloc in an early constructor",
+    .ct_check_skip = cheribsdtest_skip_no_helper)
+{
+	pid_t pid;
+	int res;
+	char *helper_path = strdup(cheribsdtest_get_helper_path());
+
+	pid = fork();
+	CHERIBSDTEST_VERIFY(pid >= 0);
+	if (pid == 0) {
+		char *argv[2];
+
+		argv[0] = helper_path;
+		argv[1] = NULL;
+		execve(argv[0], argv, NULL);
+		abort();
+	} else {
+		waitpid(pid, &res, 0);
+		if (WIFEXITED(res) && WEXITSTATUS(res) == 0)
+			cheribsdtest_success();
+		else
+			cheribsdtest_failure_errx("child %s exited improperly",
+			    helper_path);
+	}
 }
 
 static void

@@ -1,5 +1,4 @@
 
-/* @(#)e_asin.c 1.3 95/01/18 */
 /*
  * ====================================================
  * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -11,7 +10,6 @@
  * ====================================================
  */
 
-#include <sys/cdefs.h>
 /* asin(x)
  * Method :                  
  *	Since  asin(x) = x + x^3/6 + x^5*3/40 + x^7*15/336 + ...

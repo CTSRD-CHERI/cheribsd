@@ -1,5 +1,3 @@
-#	@(#)Makefile	8.3 (Berkeley) 5/8/95
-
 PACKAGE=runtime
 
 PROG=	df

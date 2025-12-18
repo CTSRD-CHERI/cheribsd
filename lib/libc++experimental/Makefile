@@ -1,5 +1,3 @@
-# $FreeBSD$
-
 .include <src.opts.mk>
 
 PACKAGE=	clibs
@@ -11,7 +9,7 @@ MK_PROFILE=	no
 
 .PATH:		${SRCDIR}/src/experimental
 
-SRCS+=		memory_resource.cpp
+SRCS+=		experimental/keep.cpp
 
 WARNS?=		0
 CXXFLAGS+=	${PICFLAG}

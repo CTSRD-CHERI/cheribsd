@@ -32,8 +32,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)kern_fork.c	8.6 (Berkeley) 4/8/94
  */
 
 #include <sys/cdefs.h>
@@ -512,7 +510,7 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	    P2_PROTMAX_ENABLE | P2_PROTMAX_DISABLE | P2_TRAPCAP |
 	    P2_STKGAP_DISABLE | P2_STKGAP_DISABLE_EXEC | P2_NO_NEW_PRIVS |
 	    P2_WXORX_DISABLE | P2_WXORX_ENABLE_EXEC | P2_CHERI_REVOKE_MASK |
-	    P2_NOCOLOCATE | P2_CHERI_OPPORTUNISTIC);
+	    P2_NOCOLOCATE | P2_CHERI_OPPORTUNISTIC | P2_CHERI_C18N_MASK);
 	p2->p_swtick = ticks;
 	if (p1->p_flag & P_PROFIL)
 		startprofclock(p2);
@@ -638,7 +636,6 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	LIST_INIT(&p2->p_orphans);
 
 	callout_init_mtx(&p2->p_itcallout, &p2->p_mtx, 0);
-	TAILQ_INIT(&p2->p_kqtim_stop);
 
 	/*
 	 * This begins the section where we must prevent the parent
@@ -1049,15 +1046,9 @@ fork1(struct thread *td, struct fork_req *fr)
 		}
 		proc_linkup(newproc, td2);
 	} else {
-		kmsan_thread_alloc(td2);
-		if (td2->td_kstack == 0 || td2->td_kstack_pages != pages) {
-			if (td2->td_kstack != 0)
-				vm_thread_dispose(td2);
-			if (!thread_alloc_stack(td2, pages)) {
-				error = ENOMEM;
-				goto fail2;
-			}
-		}
+		error = thread_recycle(td2, pages);
+		if (error != 0)
+			goto fail2;
 	}
 
 	if ((flags & RFMEM) == 0) {
@@ -1084,7 +1075,7 @@ fork1(struct thread *td, struct fork_req *fr)
 	 * XXX: This is ugly; when we copy resource usage, we need to bump
 	 *      per-cred resource counters.
 	 */
-	proc_set_cred_init(newproc, td->td_ucred);
+	newproc->p_ucred = crcowget(td->td_ucred);
 
 	/*
 	 * Initialize resource accounting for the child process.
@@ -1198,8 +1189,14 @@ fork_exit(void (*callout)(void *, struct trapframe *), void *arg,
 	}
 	mtx_assert(&Giant, MA_NOTOWNED);
 
+	/*
+	 * Now going to return to userland.
+	 */
+
 	if (p->p_sysent->sv_schedtail != NULL)
 		(p->p_sysent->sv_schedtail)(td);
+
+	userret(td, frame);
 }
 
 /*
@@ -1249,8 +1246,6 @@ fork_return(struct thread *td, struct trapframe *frame)
 	 */
 	if (!prison_isalive(td->td_ucred->cr_prison))
 		exit1(td, 0, SIGKILL);
-
-	userret(td, frame);
 
 #ifdef KTRACE
 	if (KTRPOINT(td, KTR_SYSRET))

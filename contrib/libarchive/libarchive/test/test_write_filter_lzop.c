@@ -25,8 +25,6 @@
  */
 
 #include "test.h"
-__FBSDID("$FreeBSD$");
-
 /*
  * A basic exercise of lzop reading and writing.
  */
@@ -54,10 +52,10 @@ DEFINE_TEST(test_write_filter_lzop)
 	}
 
 	buffsize = 2000000;
-	assert(NULL != (buff = (char *)malloc(buffsize)));
+	assert(NULL != (buff = malloc(buffsize)));
 
 	datasize = 10000;
-	assert(NULL != (data = (char *)calloc(1, datasize)));
+	assert(NULL != (data = calloc(datasize, 1)));
 	filecount = 10;
 
 	/*

@@ -73,8 +73,8 @@
 #define	SYS_vfork	66
 				/* 67 is obsolete vread */
 				/* 68 is obsolete vwrite */
-#define	SYS_sbrk	69
-#define	SYS_sstk	70
+				/* 69 is obsolete sbrk */
+				/* 70 is obsolete sstk */
 				/* 71 is old mmap */
 #define	SYS_freebsd11_vadvise	72
 #define	SYS_munmap	73
@@ -534,4 +534,10 @@
 #define	SYS_sched_getcpu	581
 #define	SYS_swapoff	582
 #define	SYS_kqueuex	583
-#define	SYS_MAXSYSCALL	584
+#define	SYS_membarrier	584
+#define	SYS_timerfd_create	585
+#define	SYS_timerfd_gettime	586
+#define	SYS_timerfd_settime	587
+#define	SYS_kcmp	588
+#define	SYS_getrlimitusage	589
+#define	SYS_MAXSYSCALL	590

@@ -51,9 +51,8 @@
 # o documentation for how to run the qemu images
 # o msdos mtools fallback
 # o special boot for !x86 !arm platforms
-# o qemu image for arm
 # o qemu image for aarch64
-# o qemu image for armv6/armv7
+# o qemu image for armv7
 # o easy support for different image / vm formats
 # o need to promote much of this to nanobsd.sh and friends
 # o uses old kludge to build image w/o ownership being right
@@ -293,9 +292,9 @@ create_diskimage_mbr ( ) (
 		# p1 is boot for uefi, p2 is boot for gpt, p3 is cfg, p4 is /
 		# and p5 is alt-root (after resize)
 		mkimg -a 2 ${fmtarg} ${bootmbr} -s gpt \
-			-p efi:=${NANO_WORLDDIR}/boot/efiboot.img \
+			-p efi/efiboot0:=${NANO_WORLDDIR}/boot/efiboot.img \
 			-p freebsd-boot:=${NANO_WORLDDIR}/boot/gptboot \
-			-p ${p3}:=${NANO_LOG}/_.p3 \
+			-p ${p3}/cfg:=${NANO_LOG}/_.p3 \
 			-p ${p4}:=${NANO_LOG}/_.p4 \
 			-o ${out}
 		;;
@@ -501,12 +500,6 @@ std_aarch64 ( ) {
 
 std_amd64 ( ) {
 	std_i386
-}
-
-std_arm ( ) {
-}
-
-std_armv6 ( ) {
 }
 
 std_armv7 ( ) {

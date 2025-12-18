@@ -5,9 +5,9 @@ kernel_linux_HEADERS = \
 	%D%/kernel/linux/compiler_compat.h \
 	%D%/kernel/linux/dcache_compat.h \
 	%D%/kernel/linux/kmap_compat.h \
+	%D%/kernel/linux/mm_compat.h \
 	%D%/kernel/linux/mod_compat.h \
 	%D%/kernel/linux/page_compat.h \
-	%D%/kernel/linux/percpu_compat.h \
 	%D%/kernel/linux/simd.h \
 	%D%/kernel/linux/simd_aarch64.h \
 	%D%/kernel/linux/simd_arm.h \
@@ -19,6 +19,8 @@ kernel_linux_HEADERS = \
 
 kernel_sysdir = $(kerneldir)/sys
 kernel_sys_HEADERS = \
+	%D%/zfs/sys/abd_os.h \
+	%D%/zfs/sys/abd_impl_os.h \
 	%D%/zfs/sys/policy.h \
 	%D%/zfs/sys/trace_acl.h \
 	%D%/zfs/sys/trace_arc.h \
@@ -46,6 +48,7 @@ kernel_sys_HEADERS = \
 
 kernel_spl_rpcdir = $(kerneldir)/spl/rpc
 kernel_spl_rpc_HEADERS = \
+	%D%/spl/rpc/types.h \
 	%D%/spl/rpc/xdr.h
 
 kernel_spl_sysdir = $(kerneldir)/spl/sys
@@ -61,7 +64,6 @@ kernel_spl_sys_HEADERS = \
 	%D%/spl/sys/ctype.h \
 	%D%/spl/sys/debug.h \
 	%D%/spl/sys/disp.h \
-	%D%/spl/sys/dkio.h \
 	%D%/spl/sys/errno.h \
 	%D%/spl/sys/fcntl.h \
 	%D%/spl/sys/file.h \

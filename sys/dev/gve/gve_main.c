@@ -31,10 +31,10 @@
 #include "gve.h"
 #include "gve_adminq.h"
 
-#define GVE_DRIVER_VERSION "GVE-FBSD-1.0.0\n"
-#define GVE_VERSION_MAJOR 0
-#define GVE_VERSION_MINOR 9
-#define GVE_VERSION_SUB	0
+#define GVE_DRIVER_VERSION "GVE-FBSD-1.0.1\n"
+#define GVE_VERSION_MAJOR 1
+#define GVE_VERSION_MINOR 0
+#define GVE_VERSION_SUB 1
 
 #define GVE_DEFAULT_RX_COPYBREAK 256
 
@@ -352,18 +352,13 @@ gve_get_counter(if_t ifp, ift_counter cnt)
 	}
 }
 
-static int
+static void
 gve_setup_ifnet(device_t dev, struct gve_priv *priv)
 {
 	int caps = 0;
 	if_t ifp;
 
 	ifp = priv->ifp = if_alloc(IFT_ETHER);
-	if (ifp == NULL) {
-		device_printf(priv->dev, "Failed to allocate ifnet struct\n");
-		return (ENXIO);
-	}
-
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	if_setsoftc(ifp, priv);
 	if_setdev(ifp, dev);
@@ -401,8 +396,6 @@ gve_setup_ifnet(device_t dev, struct gve_priv *priv)
 
 	ifmedia_add(&priv->media, IFM_ETHER | IFM_AUTO, 0, NULL);
 	ifmedia_set(&priv->media, IFM_ETHER | IFM_AUTO);
-
-	return (0);
 }
 
 static int
@@ -794,9 +787,7 @@ gve_attach(device_t dev)
 	if (err != 0)
 		goto abort;
 
-	err = gve_setup_ifnet(dev, priv);
-	if (err != 0)
-		goto abort;
+	gve_setup_ifnet(dev, priv);
 
 	priv->rx_copybreak = GVE_DEFAULT_RX_COPYBREAK;
 

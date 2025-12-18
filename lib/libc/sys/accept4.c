@@ -29,7 +29,6 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <sys/socket.h>
@@ -41,7 +40,5 @@ __weak_reference(__sys_accept4, __accept4);
 int
 accept4(int s, struct sockaddr *addr, socklen_t *addrlen, int flags)
 {
-
-	return (((int (*)(int, struct sockaddr *, socklen_t *, int))
-	    __libc_interposing[INTERPOS_accept4])(s, addr, addrlen, flags));
+	return (INTERPOS_SYS(accept4, s, addr, addrlen, flags));
 }

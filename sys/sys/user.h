@@ -29,8 +29,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)user.h	8.2 (Berkeley) 9/23/93
  */
 
 #ifndef _SYS_USER_H_
@@ -227,7 +225,7 @@ void fill_kinfo_proc(struct proc *, struct kinfo_proc *);
  *  Legacy PS_ flag.  This moved to p_flag but is maintained for
  *  compatibility.
  */
-#define	PS_INMEM	0x00001		/* Loaded into memory. */
+#define	PS_INMEM	0x00001		/* Loaded into memory, always true. */
 
 /* ki_sessflag values */
 #define	KI_CTTY		0x00000001	/* controlling tty vnode active */
@@ -264,6 +262,7 @@ struct user {
 #define	KF_TYPE_PROCDESC	11
 #define	KF_TYPE_DEV	12
 #define	KF_TYPE_EVENTFD	13
+#define	KF_TYPE_TIMERFD	14
 #define	KF_TYPE_UNKNOWN	255
 
 #define	KF_VTYPE_VNON	0
@@ -372,7 +371,7 @@ struct kinfo_file {
 				struct sockaddr_storage	kf_sa_peer;
 				/* Address of so_pcb. */
 				uint64_t	kf_sock_pcb;
-				/* Address of inp_ppcb. */
+				/* Obsolete! May be reused as a spare. */
 				uint64_t	kf_sock_inpcb;
 				/* Address of unp_conn. */
 				uint64_t	kf_sock_unpconn;
@@ -446,6 +445,11 @@ struct kinfo_file {
 				uint64_t	kf_eventfd_addr;
 			} kf_eventfd;
 			struct {
+				uint32_t	kf_timerfd_clockid;
+				uint32_t	kf_timerfd_flags;
+				uint64_t	kf_timerfd_addr;
+			} kf_timerfd;
+			struct {
 				uint64_t	kf_kqueue_addr;
 				int32_t		kf_kqueue_count;
 				int32_t		kf_kqueue_state;
@@ -505,6 +509,11 @@ struct kinfo_lockf {
 #define	KVME_PROT_EXEC		0x00000004
 #define	KVME_PROT_READ_CAP	0x00000020
 #define	KVME_PROT_WRITE_CAP	0x00000040
+#define	KVME_MAX_PROT_READ	0x00010000
+#define	KVME_MAX_PROT_WRITE	0x00020000
+#define	KVME_MAX_PROT_EXEC	0x00040000
+#define	KVME_MAX_PROT_READ_CAP	0x00200000
+#define	KVME_MAX_PROT_WRITE_CAP	0x00400000
 
 #define	KVME_FLAG_COW		0x00000001
 #define	KVME_FLAG_NEEDS_COPY	0x00000002
@@ -513,9 +522,11 @@ struct kinfo_lockf {
 #define	KVME_FLAG_GROWS_UP	0x00000010
 #define	KVME_FLAG_GROWS_DOWN	0x00000020
 #define	KVME_FLAG_USER_WIRED	0x00000040
-#define	KVME_FLAG_GUARD		0x00000080
-#define	KVME_FLAG_UNMAPPED	0x00000100
-#define	KVME_FLAG_HASCAP	0x00000200
+#define	KVME_FLAG_SYSVSHM	0x00000080
+#define	KVME_FLAG_POSIXSHM	0x00000100
+#define	KVME_FLAG_GUARD		0x01000000
+#define	KVME_FLAG_UNMAPPED	0x02000000
+#define	KVME_FLAG_HASCAP	0x04000000
 
 #if defined(__amd64__)
 #define	KINFO_OVMENTRY_SIZE	1168
@@ -580,6 +591,9 @@ struct kinfo_vmentry {
 #define	kve_vn_fsid	kve_type_spec._kve_vn_fsid
 #define	kve_obj		kve_type_spec._kve_obj
 
+#define	KVMO_FLAG_SYSVSHM	0x0001
+#define	KVMO_FLAG_POSIXSHM	0x0002
+
 /*
  * The "vm.objects" sysctl provides a list of all VM objects in the system
  * via an array of these entries.
@@ -601,9 +615,11 @@ struct kinfo_vmobject {
 		uint64_t _kvo_backing_obj;	/* Handle for the backing obj */
 	} kvo_type_spec;			/* Type-specific union */
 	uint64_t kvo_me;			/* Uniq handle for anon obj */
-	uint64_t _kvo_qspare[6];
+	uint64_t kvo_laundry;			/* Number of laundry pages. */
+	uint64_t _kvo_qspare[5];
 	uint32_t kvo_swapped;			/* Number of swapped pages */
-	uint32_t _kvo_ispare[7];
+	uint32_t kvo_flags;
+	uint32_t _kvo_ispare[6];
 	char	kvo_path[PATH_MAX];		/* Pathname, if any. */
 };
 #define	kvo_vn_fsid	kvo_type_spec._kvo_vn_fsid
@@ -617,7 +633,7 @@ struct kinfo_vmobject {
 #define	KKST_MAXLEN	1024
 
 #define	KKST_STATE_STACKOK	0		/* Stack is valid. */
-#define	KKST_STATE_SWAPPED	1		/* Stack swapped out. */
+#define	KKST_STATE_SWAPPED	1		/* Stack swapped out, obsolete. */
 #define	KKST_STATE_RUNNING	2		/* Stack ephemeral. */
 
 #if defined(__amd64__) || defined(__i386__)

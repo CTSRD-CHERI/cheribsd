@@ -36,12 +36,12 @@
 #include <xen/hypervisor.h>
 #include <contrib/xen/event_channel.h>
 
-/** Submit a port notification for delivery to a userland evtchn consumer */
-void evtchn_device_upcall(evtchn_port_t port);
-
 /* Macros for accessing event channel values */
-#define	EVTCHN_PTR(type, port) \
-	(HYPERVISOR_shared_info->evtchn_##type + ((port) / __LONG_BIT))
+#define	EVTCHN_PTR(type, port) ({ 					\
+	KASSERT(port < nitems(HYPERVISOR_shared_info->evtchn_##type) *	\
+	    sizeof(xen_ulong_t) * 8, ("Invalid event channel port"));	\
+	(HYPERVISOR_shared_info->evtchn_##type + ((port) / __LONG_BIT));\
+})
 #define	EVTCHN_BIT(port)	((port) & (__LONG_BIT - 1))
 #define	EVTCHN_MASK(port)	(1UL << EVTCHN_BIT(port))
 
@@ -57,7 +57,7 @@ static inline int
 evtchn_test_and_set_mask(evtchn_port_t port)
 {
 
-	return (atomic_testandset_long(EVTCHN_PTR(mask, port),
+	return (atomic_testandset_xen_ulong(EVTCHN_PTR(mask, port),
 	    EVTCHN_BIT(port)));
 }
 
@@ -70,7 +70,7 @@ static inline void
 evtchn_clear_port(evtchn_port_t port)
 {
 
-	atomic_clear_long(EVTCHN_PTR(pending, port), EVTCHN_MASK(port));
+	atomic_clear_xen_ulong(EVTCHN_PTR(pending, port), EVTCHN_MASK(port));
 }
 
 /**
@@ -82,7 +82,7 @@ static inline void
 evtchn_mask_port(evtchn_port_t port)
 {
 
-	atomic_set_long(EVTCHN_PTR(mask, port), EVTCHN_MASK(port));
+	atomic_set_xen_ulong(EVTCHN_PTR(mask, port), EVTCHN_MASK(port));
 }
 
 /**

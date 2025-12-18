@@ -25,9 +25,6 @@
  *
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/dmu.h>
 #include <sys/dmu_impl.h>
 #include <sys/dmu_recv.h>
@@ -53,26 +50,65 @@ int
 zfs_file_open(const char *path, int flags, int mode, zfs_file_t **fpp)
 {
 	struct thread *td;
-	int rc, fd;
+	struct vnode *vp;
+	struct file *fp;
+	struct nameidata nd;
+	int error;
 
 	td = curthread;
 	pwd_ensure_dirs();
-	/* 12.x doesn't take a const char * */
-	rc = kern_openat(td, AT_FDCWD, __DECONST(char *, path),
-	    UIO_SYSSPACE, flags, mode);
-	if (rc)
-		return (SET_ERROR(rc));
-	fd = td->td_retval[0];
-	td->td_retval[0] = 0;
-	if (fget(curthread, fd, &cap_no_rights, fpp))
-		kern_close(td, fd);
+
+	KASSERT((flags & (O_EXEC | O_PATH)) == 0,
+	    ("invalid flags: 0x%x", flags));
+	KASSERT((flags & O_ACCMODE) != O_ACCMODE,
+	    ("invalid flags: 0x%x", flags));
+	flags = FFLAGS(flags);
+
+	error = falloc_noinstall(td, &fp);
+	if (error != 0) {
+		return (error);
+	}
+	fp->f_flag = flags & FMASK;
+
+#if __FreeBSD_version >= 1400043
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, path);
+#else
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, path, td);
+#endif
+	error = vn_open(&nd, &flags, mode, fp);
+	if (error != 0) {
+		falloc_abort(td, fp);
+		return (SET_ERROR(error));
+	}
+	NDFREE_PNBUF(&nd);
+	vp = nd.ni_vp;
+	fp->f_vnode = vp;
+	if (fp->f_ops == &badfileops) {
+		finit_vnode(fp, flags, NULL, &vnops);
+	}
+	VOP_UNLOCK(vp);
+	if (vp->v_type != VREG) {
+		zfs_file_close(fp);
+		return (SET_ERROR(EACCES));
+	}
+
+	if (flags & O_TRUNC) {
+		error = fo_truncate(fp, 0, td->td_ucred, td);
+		if (error != 0) {
+			zfs_file_close(fp);
+			return (SET_ERROR(error));
+		}
+	}
+
+	*fpp = fp;
+
 	return (0);
 }
 
 void
 zfs_file_close(zfs_file_t *fp)
 {
-	fo_close(fp, curthread);
+	fdrop(fp, curthread);
 }
 
 static int
@@ -234,7 +270,7 @@ zfs_vop_fsync(vnode_t *vp)
 		goto drop;
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 	error = VOP_FSYNC(vp, MNT_WAIT, curthread);
-	VOP_UNLOCK1(vp);
+	VOP_UNLOCK(vp);
 	vn_finished_write(mp);
 drop:
 	return (SET_ERROR(error));
@@ -247,6 +283,32 @@ zfs_file_fsync(zfs_file_t *fp, int flags)
 		return (EINVAL);
 
 	return (zfs_vop_fsync(fp->f_vnode));
+}
+
+/*
+ * deallocate - zero and/or deallocate file storage
+ *
+ * fp - file pointer
+ * offset - offset to start zeroing or deallocating
+ * len - length to zero or deallocate
+ */
+int
+zfs_file_deallocate(zfs_file_t *fp, loff_t offset, loff_t len)
+{
+	int rc;
+#if __FreeBSD_version >= 1400029
+	struct thread *td;
+
+	td = curthread;
+	rc = fo_fspacectl(fp, SPACECTL_DEALLOC, &offset, &len, 0,
+	    td->td_ucred, td);
+#else
+	(void) fp, (void) offset, (void) len;
+	rc = EOPNOTSUPP;
+#endif
+	if (rc)
+		return (SET_ERROR(rc));
+	return (0);
 }
 
 zfs_file_t *
@@ -263,7 +325,7 @@ zfs_file_get(int fd)
 void
 zfs_file_put(zfs_file_t *fp)
 {
-	fdrop(fp, curthread);
+	zfs_file_close(fp);
 }
 
 loff_t
@@ -294,14 +356,6 @@ zfs_file_unlink(const char *fnamep)
 	zfs_uio_seg_t seg = UIO_SYSSPACE;
 	int rc;
 
-#if __FreeBSD_version >= 1300018
 	rc = kern_funlinkat(curthread, AT_FDCWD, fnamep, FD_NONE, seg, 0, 0);
-#elif __FreeBSD_version >= 1202504 || defined(AT_BENEATH)
-	rc = kern_unlinkat(curthread, AT_FDCWD, __DECONST(char *, fnamep),
-	    seg, 0, 0);
-#else
-	rc = kern_unlinkat(curthread, AT_FDCWD, __DECONST(char *, fnamep),
-	    seg, 0);
-#endif
 	return (SET_ERROR(rc));
 }

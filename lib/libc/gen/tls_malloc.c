@@ -151,7 +151,7 @@ static caddr_t	pagepool_start, pagepool_end;
 static SLIST_HEAD(, pagepool_header) curpp = SLIST_HEAD_INITIALIZER(curpp);
 
 #ifdef CAPREVOKE
-volatile const struct cheri_revoke_info *cri;
+static volatile const struct cheri_revoke_info *cri;
 
 static void paint_shadow(void *mem, size_t size);
 static void clear_shadow(void *mem, size_t size);
@@ -174,23 +174,8 @@ __morepages(int n)
 		caddr_t extra_start = __builtin_align_up(pagepool_start,
 		    pagesz);
 		size_t extra_bytes = pagepool_end - extra_start;
-#ifndef __CHERI_PURE_CAPABILITY__
 		if (munmap(extra_start, extra_bytes) != 0)
 			abort();
-#else
-		/*
-		 * In many cases we could safely unmap part of the end
-		 * (since there's only one pointer to the allocation in
-		 * pagepool_list to be updated), but we need to be careful
-		 * to avoid making the result unrepresentable.  For now,
-		 * just leak the virtual addresses and MAP_GUARD the
-		 * unused pages.
-		 */
-		if (mmap(extra_start, extra_bytes, PROT_NONE,
-		    MAP_FIXED | MAP_GUARD | MAP_CHERI_NOSETBOUNDS, -1, 0)
-		    == MAP_FAILED)
-			abort();
-#endif
 	}
 
 	if ((newpp = mmap(0, size, PROT_READ|PROT_WRITE, MAP_ANON, -1,
@@ -337,21 +322,6 @@ __tls_malloc(size_t nbytes)
 	op = SLIST_FIRST(bucketp);
 	SLIST_REMOVE_HEAD(bucketp, ov_next);
 	TLS_MALLOC_UNLOCK;
-	/*
-	 * XXXQEMU: Clear the overhead struct to remove any capability
-	 * permissions in ov_real_allocation.
-	 *
-	 * Based on a tag and permissions of ov_real_allocation, find_overhead()
-	 * determines if an allocation is aligned. The QEMU user mode for
-	 * CheriABI doesn't implement tagged memory and find_overhead() might
-	 * incorrectly assume the allocation is aligned because of a
-	 * non-cleared tag. Having the permissions cleared, find_overhead()
-	 * behaves as expected under the user mode.
-	 *
-	 * This is a workaround and should be reverted once the user mode
-	 * implements tagged memory.
-	 */
-	memset(op, 0, sizeof(*op));
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
 	return (op + 1);

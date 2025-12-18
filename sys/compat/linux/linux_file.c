@@ -40,12 +40,14 @@
 #include <sys/stat.h>
 #include <sys/sx.h>
 #include <sys/syscallsubr.h>
+#include <sys/sysproto.h>
 #include <sys/tty.h>
 #include <sys/unistd.h>
 #include <sys/vnode.h>
 
 #ifdef COMPAT_LINUX32
 #include <compat/freebsd32/freebsd32_misc.h>
+#include <compat/freebsd32/freebsd32_util.h>
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
 #else
@@ -102,7 +104,7 @@ linux_creat(struct thread *td, struct linux_creat_args *args)
 }
 #endif
 
-static int
+int
 linux_common_openflags(int l_flags)
 {
 	int bsd_flags;
@@ -635,8 +637,8 @@ linux_faccessat2(struct thread *td, struct linux_faccessat2_args *args)
 {
 	int flags, unsupported;
 
-	/* XXX. AT_SYMLINK_NOFOLLOW is not supported by kern_accessat */
-	unsupported = args->flags & ~(LINUX_AT_EACCESS | LINUX_AT_EMPTY_PATH);
+	unsupported = args->flags & ~(LINUX_AT_EACCESS | LINUX_AT_EMPTY_PATH  |
+	    LINUX_AT_SYMLINK_NOFOLLOW);
 	if (unsupported != 0) {
 		linux_msg(td, "faccessat2 unsupported flag 0x%x", unsupported);
 		return (EINVAL);
@@ -646,6 +648,8 @@ linux_faccessat2(struct thread *td, struct linux_faccessat2_args *args)
 	    AT_EACCESS;
 	flags |= (args->flags & LINUX_AT_EMPTY_PATH) == 0 ? 0 :
 	    AT_EMPTY_PATH;
+	flags |= (args->flags & LINUX_AT_SYMLINK_NOFOLLOW) == 0 ? 0 :
+	    AT_SYMLINK_NOFOLLOW;
 	return (linux_do_accessat(td, args->dfd, args->filename, args->amode,
 	    flags));
 }
@@ -1002,7 +1006,8 @@ linux_pwrite(struct thread *td, struct linux_pwrite_args *uap)
 	offset = uap->offset;
 #endif
 
-	return (kern_pwrite(td, uap->fd, uap->buf, uap->nbyte, offset));
+	return (linux_enobufs2eagain(td, uap->fd,
+	    kern_pwrite(td, uap->fd, uap->buf, uap->nbyte, offset)));
 }
 
 #define HALF_LONG_BITS ((sizeof(l_long) * NBBY / 2))
@@ -1030,14 +1035,14 @@ linux_preadv(struct thread *td, struct linux_preadv_args *uap)
 	if (offset < 0)
 		return (EINVAL);
 #ifdef COMPAT_LINUX32
-	error = linux32_copyinuio(PTRIN(uap->vec), uap->vlen, &auio);
+	error = freebsd32_copyinuio(PTRIN(uap->vec), uap->vlen, &auio);
 #else
 	error = copyinuio(uap->vec, uap->vlen, &auio);
 #endif
 	if (error != 0)
 		return (error);
 	error = kern_preadv(td, uap->fd, auio, offset);
-	free(auio, M_IOV);
+	freeuio(auio);
 	return (error);
 }
 
@@ -1057,15 +1062,15 @@ linux_pwritev(struct thread *td, struct linux_pwritev_args *uap)
 	if (offset < 0)
 		return (EINVAL);
 #ifdef COMPAT_LINUX32
-	error = linux32_copyinuio(PTRIN(uap->vec), uap->vlen, &auio);
+	error = freebsd32_copyinuio(PTRIN(uap->vec), uap->vlen, &auio);
 #else
 	error = copyinuio(uap->vec, uap->vlen, &auio);
 #endif
 	if (error != 0)
 		return (error);
 	error = kern_pwritev(td, uap->fd, auio, offset);
-	free(auio, M_IOV);
-	return (error);
+	freeuio(auio);
+	return (linux_enobufs2eagain(td, uap->fd, error));
 }
 
 int
@@ -1828,6 +1833,51 @@ linux_close_range(struct thread *td, struct linux_close_range_args *args)
 	if ((args->flags & LINUX_CLOSE_RANGE_CLOEXEC) != 0)
 		flags |= CLOSE_RANGE_CLOEXEC;
 	return (kern_close_range(td, flags, args->first, args->last));
+}
+
+int
+linux_enobufs2eagain(struct thread *td, int fd, int error)
+{
+	struct file *fp;
+
+	if (error != ENOBUFS)
+		return (error);
+	if (fget(td, fd, &cap_no_rights, &fp) != 0)
+		return (error);
+	if (fp->f_type == DTYPE_SOCKET && (fp->f_flag & FNONBLOCK) != 0)
+		error = EAGAIN;
+	fdrop(fp, td);
+	return (error);
+}
+
+int
+linux_write(struct thread *td, struct linux_write_args *args)
+{
+	struct write_args bargs = {
+		.fd	= args->fd,
+		.buf	= args->buf,
+		.nbyte	= args->nbyte,
+	};
+
+	return (linux_enobufs2eagain(td, args->fd, sys_write(td, &bargs)));
+}
+
+int
+linux_writev(struct thread *td, struct linux_writev_args *args)
+{
+	struct uio *auio;
+	int error;
+
+#ifdef COMPAT_LINUX32
+	error = freebsd32_copyinuio(PTRIN(args->iovp), args->iovcnt, &auio);
+#else
+	error = copyinuio(args->iovp, args->iovcnt, &auio);
+#endif
+	if (error != 0)
+		return (error);
+	error = kern_writev(td, args->fd, auio);
+	freeuio(auio);
+	return (linux_enobufs2eagain(td, args->fd, error));
 }
 // CHERI CHANGES START
 // {

@@ -25,7 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/bio.h>
 #include <sys/bitstring.h>
@@ -276,7 +275,7 @@ nvdimm_e820_identify(driver_t *driver, device_t parent)
 	if (smapbase == NULL)
 		return;
 
-	child = BUS_ADD_CHILD(parent, 0, driver->name, -1);
+	child = BUS_ADD_CHILD(parent, 0, driver->name, DEVICE_UNIT_ANY);
 	if (child == NULL)
 		device_printf(parent, "add %s child failed\n", driver->name);
 }

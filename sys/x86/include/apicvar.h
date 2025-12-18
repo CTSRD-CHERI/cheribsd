@@ -78,7 +78,12 @@
 #define	MAX_APIC_ID		0x800
 #define	APIC_ID_ALL		0xffffffff
 
-#define	IOAPIC_MAX_ID		xAPIC_MAX_APIC_ID
+/*
+ * The 0xff ID is used for broadcast IPIs for local APICs when not using
+ * x2APIC.  IPIs are not sent to I/O APICs so it's acceptable for an I/O APIC
+ * to use that ID.
+ */
+#define	IOAPIC_MAX_ID		0xff
 
 /* I/O Interrupts are used for external devices such as ISA, PCI, etc. */
 #define	APIC_IO_INTS	(IDT_IO_INTS + 16)
@@ -253,6 +258,7 @@ void	lapic_handle_intr(int vector, struct trapframe *frame);
 void	lapic_handle_timer(struct trapframe *frame);
 
 int	ioapic_get_rid(u_int apic_id, uint16_t *ridp);
+device_t ioapic_get_dev(u_int apic_id);
 
 extern int x2apic_mode;
 extern int lapic_eoi_suppression;

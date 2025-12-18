@@ -66,7 +66,7 @@
 #include "rtld.h"
 #include "rtld_machdep.h"
 #include "rtld_libc.h"
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#ifdef CHERI_LIB_C18N
 #include "rtld_c18n.h"
 #endif
 
@@ -248,7 +248,7 @@ thread_mask_clear(int mask)
 	lockinfo.thread_clr_flag(mask);
 }
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#ifdef CHERI_LIB_C18N
 #define	RTLD_LOCK_CNT	4
 #else
 #define	RTLD_LOCK_CNT	3
@@ -261,7 +261,7 @@ static struct rtld_lock {
 rtld_lock_t	rtld_bind_lock = &rtld_locks[0];
 rtld_lock_t	rtld_libc_lock = &rtld_locks[1];
 rtld_lock_t	rtld_phdr_lock = &rtld_locks[2];
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#ifdef CHERI_LIB_C18N
 rtld_lock_t	rtld_tramp_lock = &rtld_locks[3];
 #endif
 
@@ -410,7 +410,7 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 	SymLook req;
 	void *locks[RTLD_LOCK_CNT];
 	int flags, i, res;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#ifdef CHERI_LIB_C18N
 	struct RtldLockInfo tmplockinfo;
 #endif
 
@@ -425,18 +425,23 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 			if (res == 0)
 				lockinfo.rtli_version = pli->rtli_version;
 		}
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#ifdef CHERI_LIB_C18N
 		tmplockinfo = *pli;
-#define WRAP(_target, _valid, _reg_args, _mem_args, _ret_args)	\
-	_target = tramp_intern(NULL, &(struct tramp_data) {			\
-		.target = _target,						\
-		.defobj = obj,							\
-		.sig = (struct func_sig) {					\
-			.valid = _valid,					\
-			.reg_args = _reg_args, .mem_args = _mem_args,		\
-			.ret_args = _ret_args					\
-		}								\
-	})
+#define WRAP(_target, _valid, _reg_args, _mem_args, _ret_args)			\
+	do {									\
+		if (!C18N_FPTR_ENABLED)						\
+			_target = tramp_intern(NULL, RTLD_COMPART_ID,		\
+			    &(struct tramp_data) {				\
+				.target = _target,				\
+				.defobj = obj,					\
+				.sig = (struct func_sig) {			\
+					.valid = _valid,			\
+					.reg_args = _reg_args,			\
+					.mem_args = _mem_args,			\
+					.ret_args = _ret_args			\
+				}						\
+			});							\
+	} while (0)
 		WRAP(tmplockinfo.lock_create,		true, 0, false, ONE);
 		WRAP(tmplockinfo.lock_destroy,		true, 1, false, NONE);
 		WRAP(tmplockinfo.rlock_acquire,		true, 1, false, NONE);
@@ -515,6 +520,7 @@ _rtld_atfork_pre(int *locks)
 
 	if (locks == NULL)
 		return;
+	bzero(ls, sizeof(ls));
 
 	/*
 	 * Warning: this did not worked well with the rtld compat
@@ -524,7 +530,8 @@ _rtld_atfork_pre(int *locks)
 	 * _rtld_atfork_pre() must provide the working implementation
 	 * of the locks anyway, and libthr locks are fine.
 	 */
-	wlock_acquire(rtld_phdr_lock, &ls[0]);
+	if (ld_get_env_var(LD_NO_DL_ITERATE_PHDR_AFTER_FORK) == NULL)
+		wlock_acquire(rtld_phdr_lock, &ls[0]);
 	wlock_acquire(rtld_bind_lock, &ls[1]);
 
 	/* XXXKIB: I am really sorry for this. */
@@ -544,5 +551,6 @@ _rtld_atfork_post(int *locks)
 	ls[0].lockstate = locks[2];
 	ls[1].lockstate = locks[0];
 	lock_release(rtld_bind_lock, &ls[1]);
-	lock_release(rtld_phdr_lock, &ls[0]);
+	if (ld_get_env_var(LD_NO_DL_ITERATE_PHDR_AFTER_FORK) == NULL)
+		lock_release(rtld_phdr_lock, &ls[0]);
 }

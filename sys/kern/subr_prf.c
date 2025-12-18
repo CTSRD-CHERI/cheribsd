@@ -32,8 +32,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)subr_prf.c	8.3 (Berkeley) 1/21/94
  */
 
 #include <sys/cdefs.h>
@@ -392,7 +390,7 @@ log_console(struct uio *uio)
 		msglogstr(consbuffer, pri, /*filter_cr*/ 1);
 	}
 	msgbuftrigger = 1;
-	free(uio, M_IOV);
+	freeuio(uio);
 	free(consbuffer, M_TEMP);
 }
 
@@ -426,8 +424,10 @@ static void
 prf_putchar(int c, int flags, int pri)
 {
 
-	if (flags & TOLOG)
+	if (flags & TOLOG) {
 		msglogchar(c, pri);
+		msgbuftrigger = 1;
+	}
 
 	if (flags & TOCONS) {
 		if ((!KERNEL_PANICKED()) && (constty != NULL))
@@ -442,8 +442,10 @@ static void
 prf_putbuf(char *bufr, int flags, int pri)
 {
 
-	if (flags & TOLOG)
+	if (flags & TOLOG) {
 		msglogstr(bufr, pri, /*filter_cr*/1);
+		msgbuftrigger = 1;
+	}
 
 	if (flags & TOCONS) {
 		if ((!KERNEL_PANICKED()) && (constty != NULL))
@@ -662,9 +664,9 @@ kvprintf(char const *fmt, void (*func)(int, void*), void *arg, int radix, va_lis
 	char *d;
 	const char *p, *percent, *q;
 	u_char *up;
-	int ch, n;
+	int ch, n, sign;
 	uintmax_t num;
-	int base, lflag, qflag, tmp, width, ladjust, sharpflag, neg, sign, dot;
+	int base, lflag, qflag, tmp, width, ladjust, sharpflag, dot;
 	int cflag, hflag, jflag, tflag, zflag;
 	int bconv, dwidth, upper;
 	char padc;
@@ -695,7 +697,7 @@ kvprintf(char const *fmt, void (*func)(int, void*), void *arg, int radix, va_lis
 			PCHAR(ch);
 		}
 		percent = fmt - 1;
-		qflag = 0; lflag = 0; ladjust = 0; sharpflag = 0; neg = 0;
+		qflag = 0; lflag = 0; ladjust = 0; sharpflag = 0;
 		sign = 0; dot = 0; bconv = 0; dwidth = 0; upper = 0;
 		cflag = 0; hflag = 0; jflag = 0; tflag = 0; zflag = 0;
 reswitch:	switch (ch = (u_char)*fmt++) {
@@ -706,7 +708,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			sharpflag = 1;
 			goto reswitch;
 		case '+':
-			sign = 1;
+			sign = '+';
 			goto reswitch;
 		case '-':
 			ladjust = 1;
@@ -776,7 +778,6 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 		case 'd':
 		case 'i':
 			base = 10;
-			sign = 1;
 			goto handle_sign;
 		case 'h':
 			if (hflag) {
@@ -967,13 +968,20 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			goto reswitch;
 		case 'r':
 			base = radix;
-			if (sign)
+			if (sign) {
+				sign = 0;
 				goto handle_sign;
+			}
 			goto handle_nosign;
 		case 's':
 			p = va_arg(ap, char *);
 			if (p == NULL)
 				p = "(null)";
+#ifdef __CHERI_PURE_CAPABILITY__
+			else if (!cheri_can_access(p, CHERI_PERM_LOAD,
+			    (ptraddr_t)p, 1))
+				p = "(invalid)";
+#endif
 			if (!dot)
 				n = strlen (p);
 			else
@@ -1005,13 +1013,11 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			goto handle_nosign;
 		case 'y':
 			base = 16;
-			sign = 1;
 			goto handle_sign;
 		case 'z':
 			zflag = 1;
 			goto reswitch;
 handle_nosign:
-			sign = 0;
 			if (jflag)
 				num = va_arg(ap, uintmax_t);
 			else if (qflag)
@@ -1047,14 +1053,14 @@ handle_sign:
 			else if (hflag)
 				num = (short)va_arg(ap, int);
 			else if (cflag)
-				num = (char)va_arg(ap, int);
+				num = (signed char)va_arg(ap, int);
 			else
 				num = va_arg(ap, int);
-number:
-			if (sign && (intmax_t)num < 0) {
-				neg = 1;
+			if ((intmax_t)num < 0) {
+				sign = '-';
 				num = -(intmax_t)num;
 			}
+number:
 			p = ksprintn(nbuf, num, base, &n, upper);
 			tmp = 0;
 			if (sharpflag && num != 0) {
@@ -1063,7 +1069,7 @@ number:
 				else if (base == 16)
 					tmp += 2;
 			}
-			if (neg)
+			if (sign)
 				tmp++;
 
 			if (!ladjust && padc == '0')
@@ -1073,8 +1079,8 @@ number:
 			if (!ladjust)
 				while (width-- > 0)
 					PCHAR(' ');
-			if (neg)
-				PCHAR('-');
+			if (sign)
+				PCHAR(sign);
 			if (sharpflag && num != 0) {
 				if (base == 8) {
 					PCHAR('0');
@@ -1381,24 +1387,24 @@ sbuf_hexdump(struct sbuf *sb, const void *ptr, int length, const char *hdr,
 				if (k < length)
 					sbuf_printf(sb, "%c%02x", delim, cp[k]);
 				else
-					sbuf_printf(sb, "   ");
+					sbuf_cat(sb, "   ");
 			}
 		}
 
 		if ((flags & HD_OMIT_CHARS) == 0) {
-			sbuf_printf(sb, "  |");
+			sbuf_cat(sb, "  |");
 			for (j = 0; j < cols; j++) {
 				k = i + j;
 				if (k >= length)
-					sbuf_printf(sb, " ");
+					sbuf_putc(sb, ' ');
 				else if (cp[k] >= ' ' && cp[k] <= '~')
-					sbuf_printf(sb, "%c", cp[k]);
+					sbuf_putc(sb, cp[k]);
 				else
-					sbuf_printf(sb, ".");
+					sbuf_putc(sb, '.');
 			}
-			sbuf_printf(sb, "|");
+			sbuf_putc(sb, '|');
 		}
-		sbuf_printf(sb, "\n");
+		sbuf_putc(sb, '\n');
 	}
 }
 

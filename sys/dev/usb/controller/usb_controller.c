@@ -135,7 +135,6 @@ DRIVER_MODULE(usbus, octusb, usb_driver, 0, 0);
 
 /* Dual Mode Drivers */
 DRIVER_MODULE(usbus, dwcotg, usb_driver, 0, 0);
-DRIVER_MODULE(usbus, saf1761otg, usb_driver, 0, 0);
 
 /*------------------------------------------------------------------------*
  *	usb_probe
@@ -654,8 +653,8 @@ usb_bus_cleanup(struct usb_proc_msg *pm)
 
 	bus = ((struct usb_bus_msg *)pm)->bus;
 
-	while ((pd = LIST_FIRST(&bus->pd_cleanup_list)) != NULL) {
-		LIST_REMOVE(pd, pd_next);
+	while ((pd = SLIST_FIRST(&bus->pd_cleanup_list)) != NULL) {
+		SLIST_REMOVE(&bus->pd_cleanup_list, pd, usb_fs_privdata, pd_next);
 		USB_BUS_UNLOCK(bus);
 
 		usb_destroy_dev_sync(pd);
@@ -848,7 +847,7 @@ usb_attach_sub(device_t dev, struct usb_bus *bus)
 	bus->shutdown_msg[1].bus = bus;
 
 #if USB_HAVE_UGEN
-	LIST_INIT(&bus->pd_cleanup_list);
+	SLIST_INIT(&bus->pd_cleanup_list);
 	bus->cleanup_msg[0].hdr.pm_callback = &usb_bus_cleanup;
 	bus->cleanup_msg[0].bus = bus;
 	bus->cleanup_msg[1].hdr.pm_callback = &usb_bus_cleanup;

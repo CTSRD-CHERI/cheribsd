@@ -110,7 +110,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found_revoked);
 	} else if (cheri_gettag(cut) && ctp(crshadow, cut, perms, start, end)) {
 		void * __capability cscratch;
-		int stxr_status;
+		int stxr_status = 1;
 
 		uintcap_t cutr = cheri_revoke_cap(cut);
 
@@ -135,44 +135,35 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 		 * not true, tho', because we're storing via the direct
 		 * mapping of physical memory.
 		 */
-again:
-		/*
-		 * stxr returns 0 or 1, so use a value of 2
-		 * to indicate that it was not executed.
-		 */
-		stxr_status = 2;
 
 		__asm__ __volatile__ (
 #ifndef __CHERI_PURE_CAPABILITY__
 			"bx #4\n\t"
-			".arch_extension c64\n\t"
+			".code c64\n\t"
 #endif
-			"ldxr %[cscratch], [%[cutp]]\n\t"
+			"0: ldxr %[cscratch], [%[cutp]]\n\t"
 			"cmp %[cscratch], %[cut]\n\t"
 			"bne 1f\n\t"
 			"stxr %w[stxr_status], %[cutr], [%[cutp]]\n\t"
+			"cbnz %w[stxr_status], 0b\n\t"
 			"1:\n\t"
 #ifndef __CHERI_PURE_CAPABILITY__
 			"bx #4\n\t"
-			".arch_extension noc64\n\t"
-			".arch_extension a64c\n\t"
+			".code a64\n\t"
 #endif
-		  : [stxr_status] "=r" (stxr_status),
+		  : [stxr_status] "+&r" (stxr_status),
 		    [cscratch] "=&C" (cscratch), [cutr] "+C" (cutr)
 		  : [cut] "C" (cut), [cutp] "C" (cutp)
 		  : "memory");
 
 		/* stxr returns 0 on success */
-		if (__builtin_expect(stxr_status == 0, 1)) {
+		if (__predict_true(stxr_status == 0)) {
 			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 			/* Don't count a revoked cap as HASCAPS */
 		} else if (!cheri_gettag(cscratch)) {
 			/* Data; don't sweat it */
 		} else if (cheri_revoke_is_revoked(cscratch)) {
 			/* Revoked cap; don't worry about it */
-		} else if (__builtin_expect(stxr_status == 1, 1)) {
-			/* stxr returns 1 on failure */
-			goto again;
 		} else {
 			/*
 			 * An unexpected capability - stxr_status was neither 0
@@ -235,6 +226,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 	const uint8_t * __capability crshadow = crc->crshadow;
 
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
+	vm_pointer_t prev_onfault = curthread->td_pcb->pcb_onfault;
 	curthread->td_pcb->pcb_onfault = (vm_offset_t)vm_cheri_revoke_tlb_fault;
 	enable_user_memory_access();
 #endif
@@ -251,7 +243,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 out:
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
 	disable_user_memory_access();
-	curthread->td_pcb->pcb_onfault = 0;
+	curthread->td_pcb->pcb_onfault = prev_onfault;
 #endif
 	return (res);
 }
@@ -270,6 +262,7 @@ vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *crc, uintcap_t cut)
 			start = end = 0;
 
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
+		vm_pointer_t prev_onfault = curthread->td_pcb->pcb_onfault;
 		curthread->td_pcb->pcb_onfault =
 		    (vm_offset_t)vm_cheri_revoke_tlb_fault;
 		enable_user_memory_access();
@@ -278,7 +271,7 @@ vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *crc, uintcap_t cut)
 		    cheri_getperm(cut), start, end);
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
 		disable_user_memory_access();
-		curthread->td_pcb->pcb_onfault = 0;
+		curthread->td_pcb->pcb_onfault = prev_onfault;
 #endif
 		return (res);
 	}

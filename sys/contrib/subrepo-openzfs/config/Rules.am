@@ -10,7 +10,8 @@ AM_CPPFLAGS = \
 	-I$(top_srcdir)/include \
 	-I$(top_srcdir)/module/icp/include \
 	-I$(top_srcdir)/lib/libspl/include \
-	-I$(top_srcdir)/lib/libspl/include/os/@ac_system_l@
+	-I$(top_srcdir)/lib/libspl/include/os/@ac_system_l@ \
+	-I$(top_srcdir)/lib/libzpool/include
 
 AM_LIBTOOLFLAGS = --silent
 
@@ -21,7 +22,9 @@ AM_CFLAGS += $(IMPLICIT_FALLTHROUGH)
 AM_CFLAGS += $(DEBUG_CFLAGS)
 AM_CFLAGS += $(ASAN_CFLAGS)
 AM_CFLAGS += $(UBSAN_CFLAGS)
-AM_CFLAGS += $(CODE_COVERAGE_CFLAGS) $(NO_FORMAT_ZERO_LENGTH)
+AM_CFLAGS += $(CODE_COVERAGE_CFLAGS)
+AM_CFLAGS += $(NO_FORMAT_ZERO_LENGTH)
+AM_CFLAGS += $(NO_FORMAT_TRUNCATION)
 if BUILD_FREEBSD
 AM_CFLAGS += -fPIC -Werror -Wno-unknown-pragmas -Wno-enum-conversion
 AM_CFLAGS += -include $(top_srcdir)/include/os/freebsd/spl/sys/ccompile.h
@@ -33,6 +36,7 @@ AM_CPPFLAGS += -D_REENTRANT
 AM_CPPFLAGS += -D_FILE_OFFSET_BITS=64
 AM_CPPFLAGS += -D_LARGEFILE64_SOURCE
 AM_CPPFLAGS += -DLIBEXECDIR=\"$(libexecdir)\"
+AM_CPPFLAGS += -DZFSEXECDIR=\"$(zfsexecdir)\"
 AM_CPPFLAGS += -DRUNSTATEDIR=\"$(runstatedir)\"
 AM_CPPFLAGS += -DSBINDIR=\"$(sbindir)\"
 AM_CPPFLAGS += -DSYSCONFDIR=\"$(sysconfdir)\"
@@ -40,21 +44,6 @@ AM_CPPFLAGS += -DPKGDATADIR=\"$(pkgdatadir)\"
 AM_CPPFLAGS += $(DEBUG_CPPFLAGS)
 AM_CPPFLAGS += $(CODE_COVERAGE_CPPFLAGS)
 AM_CPPFLAGS += -DTEXT_DOMAIN=\"zfs-@ac_system_l@-user\"
-
-AM_CPPFLAGS_NOCHECK  = -D"strtok(...)=strtok(__VA_ARGS__) __attribute__((deprecated(\"Use strtok_r(3) instead!\")))"
-AM_CPPFLAGS_NOCHECK += -D"__xpg_basename(...)=__xpg_basename(__VA_ARGS__) __attribute__((deprecated(\"basename(3) is underspecified. Use zfs_basename() instead!\")))"
-AM_CPPFLAGS_NOCHECK += -D"basename(...)=basename(__VA_ARGS__) __attribute__((deprecated(\"basename(3) is underspecified. Use zfs_basename() instead!\")))"
-AM_CPPFLAGS_NOCHECK += -D"dirname(...)=dirname(__VA_ARGS__) __attribute__((deprecated(\"dirname(3) is underspecified. Use zfs_dirnamelen() instead!\")))"
-AM_CPPFLAGS_NOCHECK += -D"bcopy(...)=__attribute__((deprecated(\"bcopy(3) is deprecated. Use memcpy(3)/memmove(3) instead!\"))) bcopy(__VA_ARGS__)"
-AM_CPPFLAGS_NOCHECK += -D"bcmp(...)=__attribute__((deprecated(\"bcmp(3) is deprecated. Use memcmp(3) instead!\"))) bcmp(__VA_ARGS__)"
-AM_CPPFLAGS_NOCHECK += -D"bzero(...)=__attribute__((deprecated(\"bzero(3) is deprecated. Use memset(3) instead!\"))) bzero(__VA_ARGS__)"
-AM_CPPFLAGS_NOCHECK += -D"asctime(...)=__attribute__((deprecated(\"Use strftime(3) instead!\"))) asctime(__VA_ARGS__)"
-AM_CPPFLAGS_NOCHECK += -D"asctime_r(...)=__attribute__((deprecated(\"Use strftime(3) instead!\"))) asctime_r(__VA_ARGS__)"
-AM_CPPFLAGS_NOCHECK += -D"gmtime(...)=__attribute__((deprecated(\"gmtime(3) isn't thread-safe. Use gmtime_r(3) instead!\"))) gmtime(__VA_ARGS__)"
-AM_CPPFLAGS_NOCHECK += -D"localtime(...)=__attribute__((deprecated(\"localtime(3) isn't thread-safe. Use localtime_r(3) instead!\"))) localtime(__VA_ARGS__)"
-AM_CPPFLAGS_NOCHECK += -D"strncpy(...)=__attribute__((deprecated(\"strncpy(3) is deprecated. Use strlcpy(3) instead!\"))) strncpy(__VA_ARGS__)"
-
-AM_CPPFLAGS += $(AM_CPPFLAGS_NOCHECK)
 
 if ASAN_ENABLED
 AM_CPPFLAGS += -DZFS_ASAN_ENABLED
@@ -69,7 +58,7 @@ AM_LDFLAGS += $(ASAN_LDFLAGS)
 AM_LDFLAGS += $(UBSAN_LDFLAGS)
 
 if BUILD_FREEBSD
-AM_LDFLAGS += -fstack-protector-strong -shared
+AM_LDFLAGS += -fstack-protector-strong
 AM_LDFLAGS += -Wl,-x -Wl,--fatal-warnings -Wl,--warn-shared-textrel
 AM_LDFLAGS += -lm
 endif
@@ -82,4 +71,7 @@ KERNEL_CFLAGS       = $(FRAME_LARGER_THAN)
 LIBRARY_CFLAGS      = -no-suppress
 
 # Forcibly enable asserts/debugging for libzpool &al.
-FORCEDEBUG_CPPFLAGS = -DDEBUG -UNDEBUG -DZFS_DEBUG
+# Since ZFS_DEBUG can change shared data structures, all libzpool users must
+# be compiled with the same flags.
+# See https://github.com/openzfs/zfs/issues/16476
+LIBZPOOL_CPPFLAGS = -DDEBUG -UNDEBUG -DZFS_DEBUG

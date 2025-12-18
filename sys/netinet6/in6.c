@@ -58,8 +58,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)in.c	8.2 (Berkeley) 11/15/93
  */
 
 #include <sys/cdefs.h>
@@ -102,6 +100,7 @@
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
 #include <netinet/ip_carp.h>
+#include <netinet/icmp6.h>
 
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
@@ -125,8 +124,19 @@ _Static_assert(offsetof(struct in6_ifreq, ifr_ifru) ==
     offsetof(struct ifreq, ifr_ifru),
     "struct in6_ifreq and struct ifreq are not type punnable");
 
-VNET_DECLARE(int, icmp6_nodeinfo_oldmcprefix);
+VNET_DEFINE_STATIC(int, icmp6_nodeinfo_oldmcprefix) = 1;
 #define V_icmp6_nodeinfo_oldmcprefix	VNET(icmp6_nodeinfo_oldmcprefix)
+SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_NODEINFO_OLDMCPREFIX,
+    nodeinfo_oldmcprefix, CTLFLAG_VNET | CTLFLAG_RW,
+    &VNET_NAME(icmp6_nodeinfo_oldmcprefix), 0,
+    "Join old IPv6 NI group address in draft-ietf-ipngwg-icmp-name-lookup "
+    "for compatibility with KAME implementation");
+
+VNET_DEFINE_STATIC(int, nd6_useloopback) = 1;
+#define	V_nd6_useloopback	VNET(nd6_useloopback)
+SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_USELOOPBACK, nd6_useloopback,
+    CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(nd6_useloopback), 0,
+    "Create a loopback route when configuring an IPv6 address");
 
 /*
  * Definitions of some costant IP6 addresses.
@@ -1807,7 +1817,7 @@ in6_localip(struct in6_addr *in6)
 }
 
 /*
- * Like in6_localip(), but FIB-aware.
+ * Like in6_localip(), but FIB-aware and carp(4)-aware.
  */
 bool
 in6_localip_fib(struct in6_addr *in6, uint16_t fib)
@@ -1818,6 +1828,8 @@ in6_localip_fib(struct in6_addr *in6, uint16_t fib)
 	IN6_IFADDR_RLOCK(&in6_ifa_tracker);
 	CK_LIST_FOREACH(ia, IN6ADDR_HASH(in6), ia6_hash) {
 		if (IN6_ARE_ADDR_EQUAL(in6, &ia->ia_addr.sin6_addr) &&
+		    (ia->ia_ifa.ifa_carp == NULL ||
+		    carp_master_p(&ia->ia_ifa)) &&
 		    ia->ia_ifa.ifa_ifp->if_fib == fib) {
 			IN6_IFADDR_RUNLOCK(&in6_ifa_tracker);
 			return (true);
@@ -2679,20 +2691,6 @@ in6_sin6_2_sin_in_sock(struct sockaddr *nam)
 	sin6 = *(struct sockaddr_in6 *)nam;
 	sin_p = (struct sockaddr_in *)nam;
 	in6_sin6_2_sin(sin_p, &sin6);
-}
-
-/* Convert sockaddr_in into sockaddr_in6 in v4 mapped addr format. */
-void
-in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam)
-{
-	struct sockaddr_in *sin_p;
-	struct sockaddr_in6 *sin6_p;
-
-	sin6_p = malloc(sizeof *sin6_p, M_SONAME, M_WAITOK);
-	sin_p = (struct sockaddr_in *)*nam;
-	in6_sin_2_v4mapsin6(sin_p, sin6_p);
-	free(*nam, M_SONAME);
-	*nam = (struct sockaddr *)sin6_p;
 }
 
 /*

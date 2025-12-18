@@ -33,7 +33,6 @@
  * Chapter 14, Altera Cyclone V Device Handbook (CV-5V2 2014.07.22)
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -61,7 +60,7 @@
 #include <machine/cpu.h>
 #include <machine/intr.h>
 
-#include <dev/extres/clk/clk.h>
+#include <dev/clk/clk.h>
 
 #include <dev/mmc/host/dwmmc_reg.h>
 #include <dev/mmc/host/dwmmc_var.h>
@@ -486,7 +485,7 @@ dwmmc_card_task(void *arg, int pending __unused)
 			if (bootverbose)
 				device_printf(sc->dev, "Card inserted\n");
 
-			sc->child = device_add_child(sc->dev, "mmc", -1);
+			sc->child = device_add_child(sc->dev, "mmc", DEVICE_UNIT_ANY);
 			DWMMC_UNLOCK(sc);
 			if (sc->child) {
 				device_set_ivars(sc->child, sc);
@@ -879,7 +878,7 @@ dwmmc_update_ios(device_t brdev, device_t reqdev)
 	sc = device_get_softc(brdev);
 	ios = &sc->host.ios;
 
-	dprintf("Setting up clk %u bus_width %d, timming: %d\n",
+	dprintf("Setting up clk %u bus_width %d, timing: %d\n",
 		ios->clock, ios->bus_width, ios->timing);
 
 	switch (ios->power_mode) {

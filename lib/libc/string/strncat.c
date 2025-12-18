@@ -32,11 +32,9 @@
  * SUCH DAMAGE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)strncat.c	8.1 (Berkeley) 6/4/93";
-#endif /* LIBC_SCCS and not lint */
-#include <sys/cdefs.h>
 #include <string.h>
+
+#undef strncat	/* _FORTIFY_SOURCE */
 
 /*
  * Concatenate src on the end of dst.  At most strlen(dst)+n+1 bytes

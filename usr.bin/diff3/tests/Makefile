@@ -1,4 +1,3 @@
-
 PACKAGE=	tests
 
 ATF_TESTS_SH=	diff3_test
@@ -23,5 +22,7 @@ ${PACKAGE}FILES+=	\
 	long-ed.out \
 	long-A.out \
 	long-merge.out \
+	fbsdid1.txt \
+	fbsdid2.txt
 
 .include <bsd.test.mk>

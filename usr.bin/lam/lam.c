@@ -29,18 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char copyright[] =
-"@(#) Copyright (c) 1993\n\
-	The Regents of the University of California.  All rights reserved.\n";
-#endif /* not lint */
-
-#ifndef lint
-#if 0
-static char sccsid[] = "@(#)lam.c	8.1 (Berkeley) 6/6/93";
-#endif
-#endif /* not lint */
-#include <sys/cdefs.h>
 /*
  *	lam - laminate files
  *	Author:  John Kunze, UCB
@@ -55,6 +43,7 @@ static char sccsid[] = "@(#)lam.c	8.1 (Berkeley) 6/6/93";
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sysexits.h>
 #include <unistd.h>
 
 #define	MAXOFILES	20
@@ -224,6 +213,9 @@ gatherline(struct openfile *ip)
 	*p = '\0';
 	if (c == EOF) {
 		ip->eof = 1;
+		if (ferror(ip->fp)) {
+			err(EX_IOERR, NULL);
+		}
 		if (ip->fp == stdin)
 			fclose(stdin);
 		morefiles--;

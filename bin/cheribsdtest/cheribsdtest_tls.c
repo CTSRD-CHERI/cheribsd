@@ -38,6 +38,10 @@
 
 #include <cheri/cheri.h>
 
+#ifdef CHERIBSD_DYNAMIC_TESTS
+#include <cheribsdtest_dynamic.h>
+#include <dlfcn.h>
+#endif
 #include <string.h>
 
 #include "cheribsdtest.h"
@@ -115,3 +119,19 @@ CHERIBSDTEST(tls_align_4k, "Test alignment of TLS 4K array")
 		    "expected %d)", alignment, expected);
 	cheribsdtest_success();
 }
+
+#ifdef CHERIBSD_DYNAMIC_TESTS
+CHERIBSDTEST(tls_dlsym, "Test dlsym(3) for TLS matches direct reference")
+{
+	int *cheribsdtest_dynamic_tls_var_dlsym;
+
+	cheribsdtest_dynamic_tls_var_dlsym = dlsym(RTLD_DEFAULT,
+	    "cheribsdtest_dynamic_tls_var");
+	if (cheribsdtest_dynamic_tls_var_dlsym == NULL)
+		cheribsdtest_failure_errx("dlsym(3) failed: %s", dlerror());
+
+	CHERIBSDTEST_CHECK_EQ_PTR(cheribsdtest_dynamic_tls_var_dlsym,
+	    &cheribsdtest_dynamic_tls_var);
+	cheribsdtest_success();
+}
+#endif

@@ -31,7 +31,6 @@
  * Print information about system device configuration.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <err.h>
 #include <errno.h>
@@ -141,6 +140,8 @@ print_dev(struct devinfo_dev *dev)
 {
 
 	printf("%s", dev->dd_name[0] ? dev->dd_name : "unknown");
+	if (vflag && *dev->dd_desc)
+		printf(" <%s>", dev->dd_desc);
 	if (vflag && *dev->dd_pnpinfo)
 		printf(" pnpinfo %s", dev->dd_pnpinfo);
 	if (vflag && *dev->dd_location)

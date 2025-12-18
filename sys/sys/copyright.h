@@ -30,8 +30,8 @@
 /* Add a FreeBSD vendor copyright here - or via CFLAGS */
 #ifndef COPYRIGHT_Vendor
 #define	COPYRIGHT_Vendor \
-	"Copyright 2011-2024 University of Cambridge.\n" \
-	"Copyright 2012-2024 SRI International.\n"
+	"Copyright 2011-2025 University of Cambridge.\n" \
+	"Copyright 2012-2025 SRI International.\n"
 #endif
 
 /* FreeBSD */
@@ -46,5 +46,5 @@
 #define COPYRIGHT_UCB \
 	"Copyright (c) 1979, 1980, 1983, 1986, 1988, 1989, 1991, 1992, 1993, 1994\n\tThe Regents of the University of California. All rights reserved.\n"
 
-char copyright[] = COPYRIGHT_Vendor COPYRIGHT_FreeBSD COPYRIGHT_UCB;
-char trademark[] = TRADEMARK_Foundation;
+const char copyright[] = COPYRIGHT_Vendor COPYRIGHT_FreeBSD COPYRIGHT_UCB;
+const char trademark[] = TRADEMARK_Foundation;

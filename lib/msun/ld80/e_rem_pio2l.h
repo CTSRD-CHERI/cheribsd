@@ -1,4 +1,3 @@
-/* From: @(#)e_rem_pio2.c 1.4 95/01/18 */
 /*
  * ====================================================
  * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -13,7 +12,6 @@
  * Optimized by Bruce D. Evans.
  */
 
-#include <sys/cdefs.h>
 /* ld80 version of __ieee754_rem_pio2l(x,y)
  * 
  * return the remainder of x rem pi/2 in y[0]+y[1] 
@@ -68,7 +66,7 @@ pio2_2t =  6.36831716351095013979e-25L,	/*  0xc51701b839a25205.0p-144 */
 pio2_3t = -2.75299651904407171810e-37L;	/* -0xbb5bf6c7ddd660ce.0p-185 */
 #endif
 
-static inline __always_inline int
+static __always_inline int
 __ieee754_rem_pio2l(long double x, long double *y)
 {
 	union IEEEl2bits u,u1;

@@ -34,6 +34,7 @@
 #include <sys/dsl_bookmark.h>
 #include <zfs_namecheck.h>
 #include <sys/dmu_send.h>
+#include <sys/dbuf.h>
 
 static int
 dsl_bookmark_hold_ds(dsl_pool_t *dp, const char *fullname,
@@ -459,25 +460,42 @@ dsl_bookmark_create_sync_impl_snap(const char *bookmark, const char *snapshot,
 	    SPA_FEATURE_REDACTED_DATASETS, &dsnumsnaps, &dsredactsnaps);
 	if (redaction_list != NULL || bookmark_redacted) {
 		redaction_list_t *local_rl;
+		boolean_t spill = B_FALSE;
 		if (bookmark_redacted) {
 			redact_snaps = dsredactsnaps;
 			num_redact_snaps = dsnumsnaps;
 		}
+		int bonuslen = sizeof (redaction_list_phys_t) +
+		    num_redact_snaps * sizeof (uint64_t);
+		if (bonuslen > dmu_bonus_max())
+			spill = B_TRUE;
 		dbn->dbn_phys.zbm_redaction_obj = dmu_object_alloc(mos,
 		    DMU_OTN_UINT64_METADATA, SPA_OLD_MAXBLOCKSIZE,
-		    DMU_OTN_UINT64_METADATA, sizeof (redaction_list_phys_t) +
-		    num_redact_snaps * sizeof (uint64_t), tx);
+		    DMU_OTN_UINT64_METADATA, spill ? 0 : bonuslen, tx);
 		spa_feature_incr(dp->dp_spa,
 		    SPA_FEATURE_REDACTION_BOOKMARKS, tx);
+		if (spill) {
+			spa_feature_incr(dp->dp_spa,
+			    SPA_FEATURE_REDACTION_LIST_SPILL, tx);
+		}
 
 		VERIFY0(dsl_redaction_list_hold_obj(dp,
 		    dbn->dbn_phys.zbm_redaction_obj, tag, &local_rl));
 		dsl_redaction_list_long_hold(dp, local_rl, tag);
 
-		ASSERT3U((local_rl)->rl_dbuf->db_size, >=,
-		    sizeof (redaction_list_phys_t) + num_redact_snaps *
-		    sizeof (uint64_t));
-		dmu_buf_will_dirty(local_rl->rl_dbuf, tx);
+		if (!spill) {
+			ASSERT3U(local_rl->rl_bonus->db_size, >=, bonuslen);
+			dmu_buf_will_dirty(local_rl->rl_bonus, tx);
+		} else {
+			dmu_buf_t *db;
+			VERIFY0(dmu_spill_hold_by_bonus(local_rl->rl_bonus,
+			    DB_RF_MUST_SUCCEED, FTAG, &db));
+			dmu_buf_will_fill(db, tx, B_FALSE);
+			VERIFY0(dbuf_spill_set_blksz(db, P2ROUNDUP(bonuslen,
+			    SPA_MINBLOCKSIZE), tx));
+			local_rl->rl_phys = db->db_data;
+			local_rl->rl_dbuf = db;
+		}
 		memcpy(local_rl->rl_phys->rlp_snaps, redact_snaps,
 		    sizeof (uint64_t) * num_redact_snaps);
 		local_rl->rl_phys->rlp_num_snaps = num_redact_snaps;
@@ -636,11 +654,15 @@ dsl_bookmark_create_redacted_check(void *arg, dmu_tx_t *tx)
 	    SPA_FEATURE_REDACTION_BOOKMARKS))
 		return (SET_ERROR(ENOTSUP));
 	/*
-	 * If the list of redact snaps will not fit in the bonus buffer with
-	 * the furthest reached object and offset, fail.
+	 * If the list of redact snaps will not fit in the bonus buffer (or
+	 * spill block, with the REDACTION_LIST_SPILL feature) with the
+	 * furthest reached object and offset, fail.
 	 */
-	if (dbcra->dbcra_numsnaps > (dmu_bonus_max() -
-	    sizeof (redaction_list_phys_t)) / sizeof (uint64_t))
+	uint64_t snaplimit = ((spa_feature_is_enabled(dp->dp_spa,
+	    SPA_FEATURE_REDACTION_LIST_SPILL) ? spa_maxblocksize(dp->dp_spa) :
+	    dmu_bonus_max()) -
+	    sizeof (redaction_list_phys_t)) / sizeof (uint64_t);
+	if (dbcra->dbcra_numsnaps > snaplimit)
 		return (SET_ERROR(E2BIG));
 
 	if (dsl_bookmark_create_nvl_validate_pair(
@@ -848,13 +870,14 @@ dsl_bookmark_init_ds(dsl_dataset_t *ds)
 
 	int err = 0;
 	zap_cursor_t zc;
-	zap_attribute_t attr;
+	zap_attribute_t *attr;
 
+	attr = zap_attribute_alloc();
 	for (zap_cursor_init(&zc, mos, ds->ds_bookmarks_obj);
-	    (err = zap_cursor_retrieve(&zc, &attr)) == 0;
+	    (err = zap_cursor_retrieve(&zc, attr)) == 0;
 	    zap_cursor_advance(&zc)) {
 		dsl_bookmark_node_t *dbn =
-		    dsl_bookmark_node_alloc(attr.za_name);
+		    dsl_bookmark_node_alloc(attr->za_name);
 
 		err = dsl_bookmark_lookup_impl(ds,
 		    dbn->dbn_name, &dbn->dbn_phys);
@@ -866,6 +889,7 @@ dsl_bookmark_init_ds(dsl_dataset_t *ds)
 		avl_add(&ds->ds_bookmarks, dbn);
 	}
 	zap_cursor_fini(&zc);
+	zap_attribute_free(attr);
 	if (err == ENOENT)
 		err = 0;
 	return (err);
@@ -1040,6 +1064,14 @@ dsl_bookmark_destroy_sync_impl(dsl_dataset_t *ds, const char *name,
 	}
 
 	if (dbn->dbn_phys.zbm_redaction_obj != 0) {
+		dnode_t *rl;
+		VERIFY0(dnode_hold(mos,
+		    dbn->dbn_phys.zbm_redaction_obj, FTAG, &rl));
+		if (rl->dn_have_spill) {
+			spa_feature_decr(dmu_objset_spa(mos),
+			    SPA_FEATURE_REDACTION_LIST_SPILL, tx);
+		}
+		dnode_rele(rl, FTAG);
 		VERIFY0(dmu_object_free(mos,
 		    dbn->dbn_phys.zbm_redaction_obj, tx));
 		spa_feature_decr(dmu_objset_spa(mos),
@@ -1213,7 +1245,9 @@ redaction_list_evict_sync(void *rlu)
 void
 dsl_redaction_list_rele(redaction_list_t *rl, const void *tag)
 {
-	dmu_buf_rele(rl->rl_dbuf, tag);
+	if (rl->rl_bonus != rl->rl_dbuf)
+		dmu_buf_rele(rl->rl_dbuf, tag);
+	dmu_buf_rele(rl->rl_bonus, tag);
 }
 
 int
@@ -1221,7 +1255,7 @@ dsl_redaction_list_hold_obj(dsl_pool_t *dp, uint64_t rlobj, const void *tag,
     redaction_list_t **rlp)
 {
 	objset_t *mos = dp->dp_meta_objset;
-	dmu_buf_t *dbuf;
+	dmu_buf_t *dbuf, *spill_dbuf;
 	redaction_list_t *rl;
 	int err;
 
@@ -1236,13 +1270,18 @@ dsl_redaction_list_hold_obj(dsl_pool_t *dp, uint64_t rlobj, const void *tag,
 		redaction_list_t *winner = NULL;
 
 		rl = kmem_zalloc(sizeof (redaction_list_t), KM_SLEEP);
-		rl->rl_dbuf = dbuf;
+		rl->rl_bonus = dbuf;
+		if (dmu_spill_hold_existing(dbuf, tag, &spill_dbuf) == 0) {
+			rl->rl_dbuf = spill_dbuf;
+		} else {
+			rl->rl_dbuf = dbuf;
+		}
 		rl->rl_object = rlobj;
-		rl->rl_phys = dbuf->db_data;
+		rl->rl_phys = rl->rl_dbuf->db_data;
 		rl->rl_mos = dp->dp_meta_objset;
 		zfs_refcount_create(&rl->rl_longholds);
 		dmu_buf_init_user(&rl->rl_dbu, redaction_list_evict_sync, NULL,
-		    &rl->rl_dbuf);
+		    &rl->rl_bonus);
 		if ((winner = dmu_buf_set_user_ie(dbuf, &rl->rl_dbu)) != NULL) {
 			kmem_free(rl, sizeof (*rl));
 			rl = winner;
@@ -1483,7 +1522,8 @@ dsl_bookmark_block_killed(dsl_dataset_t *ds, const blkptr_t *bp, dmu_tx_t *tx)
 		 * If the block was live (referenced) at the time of this
 		 * bookmark, add its space to the bookmark's FBN.
 		 */
-		if (bp->blk_birth <= dbn->dbn_phys.zbm_creation_txg &&
+		if (BP_GET_LOGICAL_BIRTH(bp) <=
+		    dbn->dbn_phys.zbm_creation_txg &&
 		    (dbn->dbn_phys.zbm_flags & ZBM_FLAG_HAS_FBN)) {
 			mutex_enter(&dbn->dbn_lock);
 			dbn->dbn_phys.zbm_referenced_freed_before_next_snap +=

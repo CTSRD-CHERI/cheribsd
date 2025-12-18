@@ -171,6 +171,7 @@ struct fileops shm_ops = {
 	.fo_add_seals = shm_add_seals,
 	.fo_fallocate = shm_fallocate,
 	.fo_fspacectl = shm_fspacectl,
+	.fo_cmp = file_kcmp_generic,
 	.fo_flags = DFLAG_PASSABLE | DFLAG_SEEKABLE,
 };
 
@@ -183,6 +184,15 @@ static int largepage_reclaim_tries = 1;
 SYSCTL_INT(_vm_largepages, OID_AUTO, reclaim_tries,
     CTLFLAG_RWTUN, &largepage_reclaim_tries, 0,
     "Number of contig reclaims before giving up for default alloc policy");
+
+#define	shm_rangelock_unlock(shmfd, cookie)				\
+	rangelock_unlock(&(shmfd)->shm_rl, (cookie))
+#define	shm_rangelock_rlock(shmfd, start, end)				\
+	rangelock_rlock(&(shmfd)->shm_rl, (start), (end))
+#define	shm_rangelock_tryrlock(shmfd, start, end)			\
+	rangelock_tryrlock(&(shmfd)->shm_rl, (start), (end))
+#define	shm_rangelock_wlock(shmfd, start, end)				\
+	rangelock_wlock(&(shmfd)->shm_rl, (start), (end))
 
 static int
 uiomove_object_page(vm_object_t obj, size_t len, struct uio *uio)
@@ -458,10 +468,10 @@ shm_read(struct file *fp, struct uio *uio, struct ucred *active_cred,
 		return (error);
 #endif
 	foffset_lock_uio(fp, uio, flags);
-	rl_cookie = rangelock_rlock(&shmfd->shm_rl, uio->uio_offset,
-	    uio->uio_offset + uio->uio_resid, &shmfd->shm_mtx);
+	rl_cookie = shm_rangelock_rlock(shmfd, uio->uio_offset,
+	    uio->uio_offset + uio->uio_resid);
 	error = uiomove_object(shmfd->shm_object, shmfd->shm_size, uio);
-	rangelock_unlock(&shmfd->shm_rl, rl_cookie, &shmfd->shm_mtx);
+	shm_rangelock_unlock(shmfd, rl_cookie);
 	foffset_unlock_uio(fp, uio, flags);
 	return (error);
 }
@@ -499,13 +509,10 @@ shm_write(struct file *fp, struct uio *uio, struct ucred *active_cred,
 	} else {
 		size = uio->uio_offset + uio->uio_resid;
 	}
-	if ((flags & FOF_OFFSET) == 0) {
-		rl_cookie = rangelock_wlock(&shmfd->shm_rl, 0, OFF_MAX,
-		    &shmfd->shm_mtx);
-	} else {
-		rl_cookie = rangelock_wlock(&shmfd->shm_rl, uio->uio_offset,
-		    size, &shmfd->shm_mtx);
-	}
+	if ((flags & FOF_OFFSET) == 0)
+		rl_cookie = shm_rangelock_wlock(shmfd, 0, OFF_MAX);
+	else
+		rl_cookie = shm_rangelock_wlock(shmfd, uio->uio_offset, size);
 	if ((shmfd->shm_seals & F_SEAL_WRITE) != 0) {
 		error = EPERM;
 	} else {
@@ -518,7 +525,7 @@ shm_write(struct file *fp, struct uio *uio, struct ucred *active_cred,
 			error = uiomove_object(shmfd->shm_object,
 			    shmfd->shm_size, uio);
 	}
-	rangelock_unlock(&shmfd->shm_rl, rl_cookie, &shmfd->shm_mtx);
+	shm_rangelock_unlock(shmfd, rl_cookie);
 	foffset_unlock_uio(fp, uio, flags);
 	return (error);
 }
@@ -573,22 +580,20 @@ shm_ioctl(struct file *fp, u_long com, void *data, struct ucred *active_cred,
 		    conf->alloc_policy != SHM_LARGEPAGE_ALLOC_HARD)
 			return (EINVAL);
 
-		rl_cookie = rangelock_wlock(&shmfd->shm_rl, 0, OFF_MAX,
-		    &shmfd->shm_mtx);
+		rl_cookie = shm_rangelock_wlock(shmfd, 0, OFF_MAX);
 		shmfd->shm_lp_psind = conf->psind;
 		shmfd->shm_lp_alloc_policy = conf->alloc_policy;
 		shmfd->shm_object->un_pager.phys.data_val = conf->psind;
-		rangelock_unlock(&shmfd->shm_rl, rl_cookie, &shmfd->shm_mtx);
+		shm_rangelock_unlock(shmfd, rl_cookie);
 		return (0);
 	case FIOGSHMLPGCNF:
 		if (!shm_largepage(shmfd))
 			return (ENOTTY);
 		conf = data;
-		rl_cookie = rangelock_rlock(&shmfd->shm_rl, 0, OFF_MAX,
-		    &shmfd->shm_mtx);
+		rl_cookie = shm_rangelock_rlock(shmfd, 0, OFF_MAX);
 		conf->psind = shmfd->shm_lp_psind;
 		conf->alloc_policy = shmfd->shm_lp_alloc_policy;
-		rangelock_unlock(&shmfd->shm_rl, rl_cookie, &shmfd->shm_mtx);
+		shm_rangelock_unlock(shmfd, rl_cookie);
 		return (0);
 	default:
 		return (ENOTTY);
@@ -876,8 +881,9 @@ shm_dotruncate_largepage(struct shmfd *shmfd, off_t length, void *rl_cookie)
 			}
 			error = vm_page_reclaim_contig(aflags,
 			    pagesizes[psind] / PAGE_SIZE, 0, ~0,
-			    pagesizes[psind], 0) ? 0 :
-			    vm_wait_intr(object);
+			    pagesizes[psind], 0);
+			if (error == ENOMEM)
+				error = vm_wait_intr(object);
 			if (error != 0) {
 				VM_OBJECT_WLOCK(object);
 				return (error);
@@ -920,10 +926,9 @@ shm_dotruncate(struct shmfd *shmfd, off_t length)
 	void *rl_cookie;
 	int error;
 
-	rl_cookie = rangelock_wlock(&shmfd->shm_rl, 0, OFF_MAX,
-	    &shmfd->shm_mtx);
+	rl_cookie = shm_rangelock_wlock(shmfd, 0, OFF_MAX);
 	error = shm_dotruncate_cookie(shmfd, length, rl_cookie);
-	rangelock_unlock(&shmfd->shm_rl, rl_cookie, &shmfd->shm_mtx);
+	shm_rangelock_unlock(shmfd, rl_cookie);
 	return (error);
 }
 
@@ -943,20 +948,21 @@ shm_alloc(struct ucred *ucred, mode_t mode, bool largepage)
 	shmfd->shm_gid = ucred->cr_gid;
 	shmfd->shm_mode = mode;
 	if (largepage) {
-		shmfd->shm_object = phys_pager_allocate(NULL,
-		    &shm_largepage_phys_ops, NULL, shmfd->shm_size,
-		    VM_PROT_DEFAULT | VM_PROT_CAP, 0, ucred);
+		obj = phys_pager_allocate(NULL, &shm_largepage_phys_ops,
+		    NULL, shmfd->shm_size, VM_PROT_DEFAULT | VM_PROT_CAP, 0,
+		    ucred);
+		obj->un_pager.phys.phys_priv = shmfd;
 		shmfd->shm_lp_alloc_policy = SHM_LARGEPAGE_ALLOC_DEFAULT;
 	} else {
 		obj = vm_pager_allocate(shmfd_pager_type, NULL,
 		    shmfd->shm_size, VM_PROT_DEFAULT | VM_PROT_CAP, 0, ucred);
-		VM_OBJECT_WLOCK(obj);
 		obj->un_pager.swp.swp_priv = shmfd;
-		VM_OBJECT_WUNLOCK(obj);
-		shmfd->shm_object = obj;
 	}
-	KASSERT(shmfd->shm_object != NULL, ("shm_create: vm_pager_allocate"));
-	vm_object_set_flag(shmfd->shm_object, OBJ_HASCAP);
+	KASSERT(obj != NULL, ("shm_create: vm_pager_allocate"));
+	VM_OBJECT_WLOCK(obj);
+	vm_object_set_flag(obj, OBJ_POSIXSHM | OBJ_HASCAP);
+	VM_OBJECT_WUNLOCK(obj);
+	shmfd->shm_object = obj;
 	vfs_timestamp(&shmfd->shm_birthtime);
 	shmfd->shm_atime = shmfd->shm_mtime = shmfd->shm_ctime =
 	    shmfd->shm_birthtime;
@@ -992,11 +998,12 @@ shm_drop(struct shmfd *shmfd)
 		rangelock_destroy(&shmfd->shm_rl);
 		mtx_destroy(&shmfd->shm_mtx);
 		obj = shmfd->shm_object;
-		if (!shm_largepage(shmfd)) {
-			VM_OBJECT_WLOCK(obj);
+		VM_OBJECT_WLOCK(obj);
+		if (shm_largepage(shmfd))
+			obj->un_pager.phys.phys_priv = NULL;
+		else
 			obj->un_pager.swp.swp_priv = NULL;
-			VM_OBJECT_WUNLOCK(obj);
-		}
+		VM_OBJECT_WUNLOCK(obj);
 		vm_object_deallocate(obj);
 		free(shmfd, M_SHMFD);
 	}
@@ -1173,14 +1180,6 @@ kern_shm_open2(struct thread *td, const char * __capability userpath,
 	if ((shmflags & SHM_ALLOW_SEALING) != 0)
 		initial_seals &= ~F_SEAL_SEAL;
 
-#ifdef CAPABILITY_MODE
-	/*
-	 * shm_open(2) is only allowed for anonymous objects.
-	 */
-	if (IN_CAPABILITY_MODE(td) && (userpath != SHM_ANON))
-		return (ECAPMODE);
-#endif
-
 	AUDIT_ARG_FFLAGS(flags);
 	AUDIT_ARG_MODE(mode);
 
@@ -1205,6 +1204,28 @@ kern_shm_open2(struct thread *td, const char * __capability userpath,
 	if ((initial_seals & ~F_SEAL_SEAL) != 0)
 		return (EINVAL);
 
+	if (userpath != SHM_ANON) {
+		error = shm_copyin_path(td, userpath, &path);
+		if (error != 0)
+			return (error);
+
+#ifdef CAPABILITY_MODE
+		/*
+		 * shm_open(2) is only allowed for anonymous objects.
+		 */
+		if (CAP_TRACING(td))
+			ktrcapfail(CAPFAIL_NAMEI, path);
+		if (IN_CAPABILITY_MODE(td)) {
+			free(path, M_SHMFD);
+			return (ECAPMODE);
+		}
+#endif
+
+		AUDIT_ARG_UPATH1_CANON(path);
+	} else {
+		path = NULL;
+	}
+
 	pdp = td->td_proc->p_pd;
 	cmode = (mode & ~pdp->pd_cmask) & ACCESSPERMS;
 
@@ -1216,8 +1237,10 @@ kern_shm_open2(struct thread *td, const char * __capability userpath,
 	 * in sys_shm_open() to keep this implementation compliant.
 	 */
 	error = falloc_caps(td, &fp, &fd, flags & O_CLOEXEC, fcaps);
-	if (error)
+	if (error) {
+		free(path, M_SHMFD);
 		return (error);
+	}
 
 	/* A SHM_ANON path pointer creates an anonymous object. */
 	if (userpath == SHM_ANON) {
@@ -1231,14 +1254,6 @@ kern_shm_open2(struct thread *td, const char * __capability userpath,
 		shmfd->shm_seals = initial_seals;
 		shmfd->shm_flags = shmflags;
 	} else {
-		error = shm_copyin_path(td, userpath, &path);
-		if (error != 0) {
-			fdclose(td, fp, fd);
-			fdrop(fp, td);
-			return (error);
-		}
-
-		AUDIT_ARG_UPATH1_CANON(path);
 		fnv = fnv_32_str(path, FNV1_32_INIT);
 		sx_xlock(&shm_dict_lock);
 		shmfd = shm_lookup(path, fnv);
@@ -1263,8 +1278,7 @@ kern_shm_open2(struct thread *td, const char * __capability userpath,
 				error = ENOENT;
 			}
 		} else {
-			rl_cookie = rangelock_wlock(&shmfd->shm_rl, 0, OFF_MAX,
-			    &shmfd->shm_mtx);
+			rl_cookie = shm_rangelock_wlock(shmfd, 0, OFF_MAX);
 
 			/*
 			 * kern_shm_open() likely shouldn't ever error out on
@@ -1336,8 +1350,7 @@ kern_shm_open2(struct thread *td, const char * __capability userpath,
 				shmfd->shm_seals |= initial_seals;
 				shm_hold(shmfd);
 			}
-			rangelock_unlock(&shmfd->shm_rl, rl_cookie,
-			    &shmfd->shm_mtx);
+			shm_rangelock_unlock(shmfd, rl_cookie);
 		}
 		sx_xunlock(&shm_dict_lock);
 
@@ -1611,9 +1624,20 @@ shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_pointer_t *addr,
 	if (align == 0) {
 		align = pagesizes[shmfd->shm_lp_psind];
 	} else if (align == MAP_ALIGNED_SUPER) {
-		if (shmfd->shm_lp_psind != 1)
+		/*
+		 * MAP_ALIGNED_SUPER is only supported on superpage sizes,
+		 * i.e., [1, VM_NRESERVLEVEL].  shmfd->shm_lp_psind < 1 is
+		 * handled above.
+		 */
+		if (
+#if VM_NRESERVLEVEL > 0
+		    shmfd->shm_lp_psind > VM_NRESERVLEVEL
+#else
+		    shmfd->shm_lp_psind > 1
+#endif
+		    )
 			return (EINVAL);
-		align = pagesizes[1];
+		align = pagesizes[shmfd->shm_lp_psind];
 	} else {
 		align >>= MAP_ALIGNMENT_SHIFT;
 		align = 1ULL << align;
@@ -1707,7 +1731,7 @@ fail:
 int
 shm_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
     vm_offset_t max_addr, vm_size_t objsize,
-    vm_prot_t prot, vm_prot_t cap_maxprot, int flags,
+    vm_prot_t prot, vm_prot_t max_maxprot, int flags,
     vm_ooffset_t foff, struct thread *td)
 {
 	struct shmfd *shmfd;
@@ -1719,8 +1743,7 @@ shm_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 	shmfd = fp->f_data;
 	maxprot = VM_PROT_NONE;
 
-	rl_cookie = rangelock_rlock(&shmfd->shm_rl, 0, objsize,
-	    &shmfd->shm_mtx);
+	rl_cookie = shm_rangelock_rlock(shmfd, 0, objsize);
 	/* FREAD should always be set. */
 	if ((fp->f_flag & FREAD) != 0)
 		maxprot |= VM_PROT_EXECUTE | VM_PROT_READ;
@@ -1731,8 +1754,8 @@ shm_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 	 * writeable.
 	 */
 	if ((flags & MAP_SHARED) == 0) {
-		cap_maxprot |= VM_PROT_WRITE;
-		maxprot |= VM_PROT_WRITE;
+		if ((max_maxprot & VM_PROT_WRITE) != 0)
+			maxprot |= VM_PROT_WRITE;
 		writecnt = false;
 	} else {
 		if ((fp->f_flag & FWRITE) != 0 &&
@@ -1752,7 +1775,7 @@ shm_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 			goto out;
 		}
 	}
-	maxprot &= cap_maxprot;
+	maxprot &= max_maxprot;
 
 	prot = VM_PROT_ADD_CAP(prot);
 	maxprot = VM_PROT_ADD_CAP(prot);
@@ -1797,7 +1820,7 @@ shm_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 		vm_object_deallocate(shmfd->shm_object);
 	}
 out:
-	rangelock_unlock(&shmfd->shm_rl, rl_cookie, &shmfd->shm_mtx);
+	shm_rangelock_unlock(shmfd, rl_cookie);
 	return (error);
 }
 
@@ -1974,21 +1997,19 @@ shm_fill_kinfo_locked(struct shmfd *shmfd, struct kinfo_file *kif, bool list)
 	kif->kf_un.kf_file.kf_file_mode = S_IFREG | shmfd->shm_mode;
 	kif->kf_un.kf_file.kf_file_size = shmfd->shm_size;
 	if (shmfd->shm_path != NULL) {
-		if (shmfd->shm_path != NULL) {
-			path = shmfd->shm_path;
-			pr_path = curthread->td_ucred->cr_prison->pr_path;
-			if (strcmp(pr_path, "/") != 0) {
-				/* Return the jail-rooted pathname. */
-				pr_pathlen = strlen(pr_path);
-				visible = strncmp(path, pr_path, pr_pathlen)
-				    == 0 && path[pr_pathlen] == '/';
-				if (list && !visible)
-					return (EPERM);
-				if (visible)
-					path += pr_pathlen;
-			}
-			strlcpy(kif->kf_path, path, sizeof(kif->kf_path));
+		path = shmfd->shm_path;
+		pr_path = curthread->td_ucred->cr_prison->pr_path;
+		if (strcmp(pr_path, "/") != 0) {
+			/* Return the jail-rooted pathname. */
+			pr_pathlen = strlen(pr_path);
+			visible = strncmp(path, pr_path, pr_pathlen) == 0 &&
+			    path[pr_pathlen] == '/';
+			if (list && !visible)
+				return (EPERM);
+			if (visible)
+				path += pr_pathlen;
 		}
+		strlcpy(kif->kf_path, path, sizeof(kif->kf_path));
 	}
 	return (0);
 }
@@ -2015,8 +2036,7 @@ shm_add_seals(struct file *fp, int seals)
 
 	error = 0;
 	shmfd = fp->f_data;
-	rl_cookie = rangelock_wlock(&shmfd->shm_rl, 0, OFF_MAX,
-	    &shmfd->shm_mtx);
+	rl_cookie = shm_rangelock_wlock(shmfd, 0, OFF_MAX);
 
 	/* Even already-set seals should result in EPERM. */
 	if ((shmfd->shm_seals & F_SEAL_SEAL) != 0) {
@@ -2047,7 +2067,7 @@ shm_add_seals(struct file *fp, int seals)
 	}
 	shmfd->shm_seals |= nseals;
 out:
-	rangelock_unlock(&shmfd->shm_rl, rl_cookie, &shmfd->shm_mtx);
+	shm_rangelock_unlock(shmfd, rl_cookie);
 	return (error);
 }
 
@@ -2141,8 +2161,7 @@ shm_fspacectl(struct file *fp, int cmd, off_t *offset, off_t *length, int flags,
 	off = *offset;
 	len = *length;
 
-	rl_cookie = rangelock_wlock(&shmfd->shm_rl, off, off + len,
-	    &shmfd->shm_mtx);
+	rl_cookie = shm_rangelock_wlock(shmfd, off, off + len);
 	switch (cmd) {
 	case SPACECTL_DEALLOC:
 		if ((shmfd->shm_seals & F_SEAL_WRITE) != 0) {
@@ -2156,7 +2175,7 @@ shm_fspacectl(struct file *fp, int cmd, off_t *offset, off_t *length, int flags,
 	default:
 		__assert_unreachable();
 	}
-	rangelock_unlock(&shmfd->shm_rl, rl_cookie, &shmfd->shm_mtx);
+	shm_rangelock_unlock(shmfd, rl_cookie);
 	return (error);
 }
 
@@ -2183,11 +2202,10 @@ shm_fallocate(struct file *fp, off_t offset, off_t len, struct thread *td)
 	 * the shmfd is not necessarily a concern.  If other mechanisms are
 	 * added to grow a shmfd, this may need to be re-evaluated.
 	 */
-	rl_cookie = rangelock_wlock(&shmfd->shm_rl, offset, size,
-	    &shmfd->shm_mtx);
+	rl_cookie = shm_rangelock_wlock(shmfd, offset, size);
 	if (size > shmfd->shm_size)
 		error = shm_dotruncate_cookie(shmfd, size, rl_cookie);
-	rangelock_unlock(&shmfd->shm_rl, rl_cookie, &shmfd->shm_mtx);
+	shm_rangelock_unlock(shmfd, rl_cookie);
 	/* Translate to posix_fallocate(2) return value as needed. */
 	if (error == ENOMEM)
 		error = ENOSPC;
@@ -2259,6 +2277,37 @@ sys_shm_open2(struct thread *td, struct shm_open2_args *uap)
 
 	return (kern_shm_open2(td, uap->path, uap->flags, uap->mode,
 	    uap->shmflags, NULL, uap->name));
+}
+
+int
+shm_get_path(struct vm_object *obj, char *path, size_t sz)
+{
+	struct shmfd *shmfd;
+	int error;
+
+	error = 0;
+	shmfd = NULL;
+	sx_slock(&shm_dict_lock);
+	VM_OBJECT_RLOCK(obj);
+	if ((obj->flags & OBJ_POSIXSHM) == 0) {
+		error = EINVAL;
+	} else {
+		if (obj->type == shmfd_pager_type)
+			shmfd = obj->un_pager.swp.swp_priv;
+		else if (obj->type == OBJT_PHYS)
+			shmfd = obj->un_pager.phys.phys_priv;
+		if (shmfd == NULL) {
+			error = ENXIO;
+		} else {
+			strlcpy(path, shmfd->shm_path == NULL ? "anon" :
+			    shmfd->shm_path, sz);
+		}
+	}
+	if (error != 0)
+		path[0] = '\0';
+	VM_OBJECT_RUNLOCK(obj);
+	sx_sunlock(&shm_dict_lock);
+	return (error);
 }
 // CHERI CHANGES START
 // {

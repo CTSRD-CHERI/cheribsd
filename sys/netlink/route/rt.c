@@ -26,8 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include "opt_netlink.h"
-
 #include <sys/cdefs.h>
 #include "opt_inet.h"
 #include "opt_inet6.h"
@@ -477,6 +475,7 @@ struct nl_parsed_route {
 	uint32_t		rta_nh_id;
 	uint32_t		rta_weight;
 	uint32_t		rtax_mtu;
+	uint8_t			rtm_table;
 	uint8_t			rtm_family;
 	uint8_t			rtm_dst_len;
 	uint8_t			rtm_protocol;
@@ -509,6 +508,7 @@ static const struct nlfield_parser nlf_p_rtmsg[] = {
 	{ .off_in = _IN(rtm_dst_len), .off_out = _OUT(rtm_dst_len), .cb = nlf_get_u8 },
 	{ .off_in = _IN(rtm_protocol), .off_out = _OUT(rtm_protocol), .cb = nlf_get_u8 },
 	{ .off_in = _IN(rtm_type), .off_out = _OUT(rtm_type), .cb = nlf_get_u8 },
+	{ .off_in = _IN(rtm_table), .off_out = _OUT(rtm_table), .cb = nlf_get_u8 },
 	{ .off_in = _IN(rtm_flags), .off_out = _OUT(rtm_flags), .cb = nlf_get_u32 },
 };
 #undef _IN
@@ -558,9 +558,8 @@ dump_rtentry(struct rtentry *rt, void *_arg)
 	IF_DEBUG_LEVEL(LOG_DEBUG3) {
 		char rtbuf[INET6_ADDRSTRLEN + 5];
 		FIB_LOG(LOG_DEBUG3, wa->fibnum, wa->family,
-		    "Dump %s, offset %u, error %d",
-		    rt_print_buf(rt, rtbuf, sizeof(rtbuf)),
-		    wa->nw->offset, error);
+		    "Dump %s, error %d",
+		    rt_print_buf(rt, rtbuf, sizeof(rtbuf)), error);
 	}
 	wa->error = error;
 
@@ -580,7 +579,6 @@ dump_rtable_one(struct netlink_walkargs *wa, uint32_t fibnum, int family)
 
 	FIB_LOG(LOG_DEBUG2, fibnum, family, "End dump, iterated %d dumped %d",
 	    wa->count, wa->dumped);
-	NL_LOG(LOG_DEBUG2, "Current offset: %d", wa->nw->offset);
 }
 
 static int
@@ -752,9 +750,14 @@ finalize_nhop(struct nhop_object *nh, const struct sockaddr *dst, int *perror)
 
 		struct ifaddr *ifa = ifaof_ifpforaddr(gw_sa, nh->nh_ifp);
 		if (ifa == NULL) {
-			NL_LOG(LOG_DEBUG, "Unable to determine ifa, skipping");
-			*perror = EINVAL;
-			return (NULL);
+			/* Try link-level ifa. */
+			gw_sa = &nh->gw_sa;
+			ifa = ifaof_ifpforaddr(gw_sa, nh->nh_ifp);
+			if (ifa == NULL) {
+				NL_LOG(LOG_DEBUG, "Unable to determine ifa, skipping");
+				*perror = EINVAL;
+				return (NULL);
+			}
 		}
 		nhop_set_src(nh, ifa);
 	}
@@ -936,7 +939,10 @@ rtnl_handle_newroute(struct nlmsghdr *hdr, struct nlpcb *nlp,
 		return (EINVAL);
 	}
 
-	if (attrs.rta_table >= V_rt_numfibs) {
+	if (attrs.rtm_table > 0 && attrs.rta_table == 0) {
+		/* pre-2.6.19 Linux API compatibility */
+		attrs.rta_table = attrs.rtm_table;
+	} else if (attrs.rta_table >= V_rt_numfibs) {
 		NLMSG_REPORT_ERR_MSG(npt, "invalid fib");
 		return (EINVAL);
 	}

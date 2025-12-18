@@ -28,7 +28,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/queue.h>
 
@@ -140,14 +139,11 @@ open_shared(struct _citrus_iconv_shared * __restrict * __restrict rci,
 
 	/* initialize iconv handle */
 	len_convname = strlen(convname);
-	ci = malloc(sizeof(*ci) + len_convname + 1);
+	ci = calloc(1, sizeof(*ci) + len_convname + 1);
 	if (!ci) {
 		ret = errno;
 		goto err;
 	}
-	ci->ci_module = NULL;
-	ci->ci_ops = NULL;
-	ci->ci_closure = NULL;
 	ci->ci_convname = (void *)&ci[1];
 	memcpy(ci->ci_convname, convname, len_convname + 1);
 

@@ -27,7 +27,7 @@
 #include "file.h"
 
 #ifndef lint
-FILE_RCSID("@(#)$File: readelf.c,v 1.182 2022/07/31 16:01:01 christos Exp $")
+FILE_RCSID("@(#)$File: readelf.c,v 1.190 2023/07/27 19:39:06 christos Exp $")
 #endif
 
 #ifdef BUILTIN_ELF
@@ -42,30 +42,27 @@ FILE_RCSID("@(#)$File: readelf.c,v 1.182 2022/07/31 16:01:01 christos Exp $")
 #include "magic.h"
 
 #ifdef	ELFCORE
-private int dophn_core(struct magic_set *, int, int, int, off_t, int, size_t,
-    off_t, int, int *, uint16_t *);
+file_private int dophn_core(struct magic_set *, int, int, int, off_t, int,
+    size_t, off_t, int, int *, uint16_t *);
 #endif
-private int dophn_exec(struct magic_set *, int, int, int, off_t, int, size_t,
+file_private int dophn_exec(struct magic_set *, int, int, int, off_t, int,
+    size_t, off_t, int, int, int *, uint16_t *);
+file_private int doshn(struct magic_set *, int, int, int, off_t, int, size_t,
     off_t, int, int, int *, uint16_t *);
-private int doshn(struct magic_set *, int, int, int, off_t, int, size_t,
-    off_t, int, int, int *, uint16_t *);
-private size_t donote(struct magic_set *, void *, size_t, size_t, int,
+file_private size_t donote(struct magic_set *, void *, size_t, size_t, int,
     int, size_t, int *, uint16_t *, int, off_t, int, off_t, int);
 
 #define	ELF_ALIGN(a)	((((a) + align - 1) / align) * align)
 
 #define isquote(c) (strchr("'\"`", (c)) != NULL)
 
-private uint16_t getu16(int, uint16_t);
-private uint32_t getu32(int, uint32_t);
-private uint64_t getu64(int, uint64_t);
+file_private uint16_t getu16(int, uint16_t);
+file_private uint32_t getu32(int, uint32_t);
+file_private uint64_t getu64(int, uint64_t);
 
-#define MAX_PHNUM	128
-#define	MAX_SHNUM	32768
-#define MAX_SHSIZE	(64 * 1024 * 1024)
 #define SIZE_UNKNOWN	CAST(off_t, -1)
 
-private int
+file_private int
 toomany(struct magic_set *ms, const char *name, uint16_t num)
 {
 	if (ms->flags & MAGIC_MIME)
@@ -75,7 +72,7 @@ toomany(struct magic_set *ms, const char *name, uint16_t num)
 	return 1;
 }
 
-private uint16_t
+file_private uint16_t
 getu16(int swap, uint16_t value)
 {
 	union {
@@ -94,7 +91,7 @@ getu16(int swap, uint16_t value)
 		return value;
 }
 
-private uint32_t
+file_private uint32_t
 getu32(int swap, uint32_t value)
 {
 	union {
@@ -115,7 +112,7 @@ getu32(int swap, uint32_t value)
 		return value;
 }
 
-private uint64_t
+file_private uint64_t
 getu64(int swap, uint64_t value)
 {
 	union {
@@ -326,7 +323,7 @@ static const size_t	prpsoffsets64[] = {
 #define	OS_STYLE_FREEBSD	1
 #define	OS_STYLE_NETBSD		2
 
-private const char os_style_names[][8] = {
+file_private const char os_style_names[][8] = {
 	"SVR4",
 	"FreeBSD",
 	"NetBSD",
@@ -347,7 +344,7 @@ private const char os_style_names[][8] = {
 #define FLAGS_DID_AUXV			0x1000
 #define FLAGS_DID_BENCHMARK_ABI		0x40000000
 
-private int
+file_private int
 dophn_core(struct magic_set *ms, int clazz, int swap, int fd, off_t off,
     int num, size_t size, off_t fsize, int mach, int *flags,
     uint16_t *notecount)
@@ -453,6 +450,10 @@ do_note_netbsd_version(struct magic_set *ms, int swap, void *v)
 
 		if (file_printf(ms, " %u.%u", ver_maj, ver_min) == -1)
 			return -1;
+		if (ver_maj >= 9) {
+			ver_patch += 100 * ver_rel;
+			ver_rel = 0;
+		}
 		if (ver_rel == 0 && ver_patch != 0) {
 			if (file_printf(ms, ".%u", ver_patch) == -1)
 				return -1;
@@ -462,8 +463,7 @@ do_note_netbsd_version(struct magic_set *ms, int swap, void *v)
 					return -1;
 				ver_rel -= 26;
 			}
-			if (file_printf(ms, "%c", 'A' + ver_rel - 1)
-			    == -1)
+			if (file_printf(ms, "%c", 'A' + ver_rel - 1) == -1)
 				return -1;
 		}
 	}
@@ -546,7 +546,7 @@ do_note_freebsd_version(struct magic_set *ms, int swap, void *v)
 	return 0;
 }
 
-private int
+file_private int
 /*ARGSUSED*/
 do_bid_note(struct magic_set *ms, unsigned char *nbuf, uint32_t type,
     int swap __attribute__((__unused__)), uint32_t namesz, uint32_t descsz,
@@ -592,7 +592,7 @@ do_bid_note(struct magic_set *ms, unsigned char *nbuf, uint32_t type,
 	return 0;
 }
 
-private int
+file_private int
 do_os_note(struct magic_set *ms, unsigned char *nbuf, uint32_t type,
     int swap, uint32_t namesz, uint32_t descsz,
     size_t noff, size_t doff, int *flags)
@@ -691,7 +691,7 @@ do_os_note(struct magic_set *ms, unsigned char *nbuf, uint32_t type,
 	return 0;
 }
 
-private int
+file_private int
 do_pax_note(struct magic_set *ms, unsigned char *nbuf, uint32_t type,
     int swap, uint32_t namesz, uint32_t descsz,
     size_t noff, size_t doff, int *flags)
@@ -731,7 +731,7 @@ do_pax_note(struct magic_set *ms, unsigned char *nbuf, uint32_t type,
 	return 0;
 }
 
-private int
+file_private int
 do_core_note(struct magic_set *ms, unsigned char *nbuf, uint32_t type,
     int swap, uint32_t namesz, uint32_t descsz,
     size_t noff, size_t doff, int *flags, size_t size, int clazz)
@@ -943,7 +943,7 @@ do_core_note(struct magic_set *ms, unsigned char *nbuf, uint32_t type,
 	return 0;
 }
 
-private off_t
+file_private off_t
 get_offset_from_virtaddr(struct magic_set *ms, int swap, int clazz, int fd,
     off_t off, int num, off_t fsize, uint64_t virtaddr)
 {
@@ -977,7 +977,7 @@ get_offset_from_virtaddr(struct magic_set *ms, int swap, int clazz, int fd,
 	return 0;
 }
 
-private size_t
+file_private size_t
 get_string_on_virtaddr(struct magic_set *ms,
     int swap, int clazz, int fd, off_t ph_off, int ph_num,
     off_t fsize, uint64_t virtaddr, char *buf, ssize_t buflen)
@@ -1011,7 +1011,7 @@ get_string_on_virtaddr(struct magic_set *ms,
 
 
 /*ARGSUSED*/
-private int
+file_private int
 do_auxv_note(struct magic_set *ms, unsigned char *nbuf, uint32_t type,
     int swap, uint32_t namesz __attribute__((__unused__)),
     uint32_t descsz __attribute__((__unused__)),
@@ -1118,7 +1118,7 @@ do_auxv_note(struct magic_set *ms, unsigned char *nbuf, uint32_t type,
 #endif
 }
 
-private size_t
+file_private size_t
 dodynamic(struct magic_set *ms, void *vbuf, size_t offset, size_t size,
     int clazz, int swap, int *pie, size_t *need)
 {
@@ -1154,7 +1154,7 @@ dodynamic(struct magic_set *ms, void *vbuf, size_t offset, size_t size,
 }
 
 
-private size_t
+file_private size_t
 donote(struct magic_set *ms, void *vbuf, size_t offset, size_t size,
     int clazz, int swap, size_t align, int *flags, uint16_t *notecount,
     int fd, off_t ph_off, int ph_num, off_t fsize, int mach)
@@ -1375,7 +1375,7 @@ static const cap_desc_t cap_desc_386[] = {
 	{ 0, NULL }
 };
 
-private int
+file_private int
 doshn(struct magic_set *ms, int clazz, int swap, int fd, off_t off, int num,
     size_t size, off_t fsize, int mach, int strtab, int *flags,
     uint16_t *notecount)
@@ -1480,10 +1480,10 @@ doshn(struct magic_set *ms, int clazz, int swap, int fd, off_t off, int num,
 					return -1;
 				return 0;
 			}
-			if (xsh_size > MAX_SHSIZE) {
+			if (xsh_size > ms->elf_shsize_max) {
 				file_error(ms, errno, "Note section size too "
-				    "big (%ju > %u)", (uintmax_t)xsh_size,
-				    MAX_SHSIZE);
+				    "big (%ju > %zu)", (uintmax_t)xsh_size,
+				    ms->elf_shsize_max);
 				return -1;
 			}
 			if ((nbuf = malloc(xsh_size)) == NULL) {
@@ -1681,7 +1681,7 @@ doshn(struct magic_set *ms, int clazz, int swap, int fd, off_t off, int num,
  * it is pie, and does not have an interpreter or needed libraries, we
  * call it static pie.
  */
-private int
+file_private int
 dophn_exec(struct magic_set *ms, int clazz, int swap, int fd, off_t off,
     int num, size_t size, off_t fsize, int mach, int sh_num, int *flags,
     uint16_t *notecount)
@@ -1840,7 +1840,7 @@ dophn_exec(struct magic_set *ms, int clazz, int swap, int fd, off_t off,
 }
 
 
-protected int
+file_protected int
 file_tryelf(struct magic_set *ms, const struct buffer *b)
 {
 	int fd = b->fd;

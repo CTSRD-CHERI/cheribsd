@@ -1,4 +1,4 @@
-.\"	$NetBSD: make.1,v 1.366 2023/05/10 18:22:33 sjg Exp $
+.\"	$NetBSD: make.1,v 1.378 2024/07/01 21:02:26 sjg Exp $
 .\"
 .\" Copyright (c) 1990, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -29,7 +29,7 @@
 .\"
 .\"	from: @(#)make.1	8.4 (Berkeley) 3/19/94
 .\"
-.Dd May 10, 2023
+.Dd July 1, 2024
 .Dt MAKE 1
 .Os
 .Sh NAME
@@ -267,6 +267,12 @@ cooperate to avoid overloading the system.
 Specify the maximum number of jobs that
 .Nm
 may have running at any one time.
+If
+.Ar max_jobs
+is a floating point number, or ends with
+.Ql C ,
+then the value is multiplied by the number of CPUs reported online by
+.Xr sysconf 3 .
 The value of
 .Ar max_jobs
 is saved in
@@ -873,6 +879,9 @@ Is used in error handling, see
 .It Va .ERROR_CWD
 Is used in error handling, see
 .Va MAKE_PRINT_VAR_ON_ERROR .
+.It Va .ERROR_EXIT
+Is used in error handling, see
+.Va MAKE_PRINT_VAR_ON_ERROR .
 .It Va .ERROR_META_FILE
 Is used in error handling in
 .Dq meta
@@ -982,6 +991,11 @@ making it easier to track the degree of parallelism being achieved.
 The argument to the
 .Fl j
 option.
+.It Va .MAKE.JOBS.C
+A read-only boolean that indicates whether the
+.Fl j
+option supports use of
+.Ql C .
 .It Va .MAKE.LEVEL
 The recursion depth of
 .Nm .
@@ -1140,9 +1154,19 @@ This mode can be used to detect undeclared dependencies between files.
 Used to create files in a separate directory, see
 .Va .OBJDIR .
 .It Va MAKE_OBJDIR_CHECK_WRITABLE
-Used to force a separate directory for the created files,
-even if that directory is not writable, see
-.Va .OBJDIR .
+When true,
+.Nm
+will check that
+.Va .OBJDIR
+is writable, and issue a warning if not.
+.It Va MAKE_DEBUG_OBJDIR_CHECK_WRITABLE
+When true and
+.Nm
+is warning about an unwritable
+.Va .OBJDIR ,
+report the variables listed in
+.Va MAKE_PRINT_VAR_ON_ERROR
+to help debug.
 .It Va MAKEOBJDIRPREFIX
 Used to create files in a separate directory, see
 .Va .OBJDIR .
@@ -1185,6 +1209,8 @@ When
 stops due to an error, it sets
 .Sq Va .ERROR_TARGET
 to the name of the target that failed,
+.Sq Va .ERROR_EXIT
+to the exit status of the failed target,
 .Sq Va .ERROR_CMD
 to the commands of the failed target,
 and in
@@ -1508,6 +1534,10 @@ The value is interpreted as a format string for
 using
 .Xr gmtime 3 ,
 producing the formatted timestamp.
+Note: the
+.Ql %s
+format should only be used with
+.Sq Cm \&:localtime .
 If a
 .Ar timestamp
 value is not provided or is 0, the current time is used.
@@ -1556,6 +1586,9 @@ If
 .Ar c
 is omitted, no separator is used.
 The common escapes (including octal numeric codes) work as expected.
+.It Cm \&:tt
+Converts the first character of each word to upper-case,
+and the rest to lower-case letters.
 .It Cm \&:tu
 Converts the value to upper-case letters.
 .It Cm \&:tW
@@ -1771,8 +1804,9 @@ modifier which is later referenced using the index values from
 .Ql :range .
 .It Cm \&:U\| Ns Ar newval
 If the variable is undefined,
+the optional
 .Ar newval
-is the value.
+(which may be empty) is the value.
 If the variable is defined, the existing value is returned.
 This is another ODE make feature.
 It is handy for setting per-target CFLAGS for instance:
@@ -1782,7 +1816,7 @@ If a value is only required if the variable is undefined, use:
 .It Cm \&:D\| Ns Ar newval
 If the variable is defined,
 .Ar newval
-is the value.
+(which may be empty) is the value.
 .It Cm \&:L
 The name of the variable is the value.
 .It Cm \&:P
@@ -1941,12 +1975,7 @@ The directives for exporting and unexporting variables are:
 .Bl -tag -width Ds
 .It Ic .export Ar variable No ...
 Export the specified global variable.
-If no variable list is provided, all globals are exported
-except for internal variables (those that start with
-.Ql \&. ) .
-This is not affected by the
-.Fl X
-flag, so should be used with caution.
+.Pp
 For compatibility with other make programs,
 .Cm export Ar variable\| Ns Cm \&= Ns Ar value
 (without leading dot) is also accepted.
@@ -1954,6 +1983,12 @@ For compatibility with other make programs,
 Appending a variable name to
 .Va .MAKE.EXPORTED
 is equivalent to exporting a variable.
+.It Ic .export-all
+Export all globals except for internal variables (those that start with
+.Ql \&. ) .
+This is not affected by the
+.Fl X
+flag, so should be used with caution.
 .It Ic .export-env Ar variable No ...
 The same as
 .Ql .export ,
@@ -2080,7 +2115,7 @@ only evaluates a conditional as far as is necessary to determine its value.
 Parentheses can be used to override the operator precedence.
 The boolean operator
 .Sq Ic \&!
-may be used to logically negate an entire conditional.
+may be used to logically negate an expression, typically a function call.
 It is of higher precedence than
 .Sq Ic \&&& .
 .Pp
@@ -2130,9 +2165,9 @@ may also be an arithmetic or string comparison.
 Variable expansion is performed on both sides of the comparison.
 If both sides are numeric and neither is enclosed in quotes,
 the comparison is done numerically, otherwise lexicographically.
-A string is interpreted as hexadecimal integer if it is preceded by
+A string is interpreted as a hexadecimal integer if it is preceded by
 .Li 0x ,
-otherwise it is a decimal floating-point number;
+otherwise it is interpreted as a decimal floating-point number;
 octal numbers are not supported.
 .Pp
 All comparisons may use the operators
@@ -2153,7 +2188,7 @@ and its numeric value (if any) is not zero.
 When
 .Nm
 is evaluating one of these conditional expressions, and it encounters
-a (whitespace separated) word it doesn't recognize, either the
+a (whitespace-separated) word it doesn't recognize, either the
 .Dq make
 or
 .Dq defined
@@ -2176,12 +2211,13 @@ function is applied.
 .Pp
 If the conditional evaluates to true,
 parsing of the makefile continues as before.
-If it evaluates to false, the following lines are skipped.
-In both cases, this continues until the corresponding
+If it evaluates to false, the following lines until the corresponding
+.Sq Ic .elif
+variant,
 .Sq Ic .else
 or
 .Sq Ic .endif
-is found.
+are skipped.
 .Ss For loops
 For loops are typically used to apply a set of rules to a list of files.
 The syntax of a for loop is:
@@ -2400,11 +2436,9 @@ Any command lines attached to this target are executed after everything
 else is done successfully.
 .It Ic .ERROR
 Any command lines attached to this target are executed when another target fails.
-The
-.Va .ERROR_TARGET
-variable is set to the target that failed.
-See also
-.Va MAKE_PRINT_VAR_ON_ERROR .
+See 
+.Va MAKE_PRINT_VAR_ON_ERROR
+for the variables that will be set.
 .It Ic .IGNORE
 Mark each of the sources with the
 .Ic .IGNORE
@@ -2518,7 +2552,7 @@ set the read-only attribute on the global variables specified as sources.
 .It Ic .SHELL
 Sets the shell that
 .Nm
-uses to execute commands in jobs mode.
+uses to execute commands.
 The sources are a set of
 .Ar field\| Ns Cm \&= Ns Ar value
 pairs.

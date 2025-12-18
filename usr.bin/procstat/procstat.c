@@ -28,7 +28,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/sysctl.h>
 #include <sys/user.h>
@@ -94,8 +93,12 @@ static const struct procstat_cmd cmd_table[] = {
 	    PS_CMP_NORMAL },
 	{ "binary", "binary", NULL, &procstat_bin, &cmdopt_none,
 	    PS_CMP_SUBSTR },
+	{ "c18n", "c18n", NULL, &procstat_c18n, &cmdopt_none,
+	    PS_CMP_NORMAL },
 	{ "cheri", "cheri", "[-v]", &procstat_cheri, &cmdopt_verbose,
 	    PS_CMP_NORMAL },
+	{ "compartments", "compartments", NULL, &procstat_compartments,
+	    cmdopt_none, PS_CMP_NORMAL },
 	{ "cpuset", "cs", NULL, &procstat_cs, &cmdopt_cpuset, PS_CMP_NORMAL },
 	{ "cs", "cs", NULL, &procstat_cs, &cmdopt_cpuset, PS_CMP_NORMAL },
 	{ "credential", "credentials", NULL, &procstat_cred, &cmdopt_none,
@@ -118,6 +121,8 @@ static const struct procstat_cmd cmd_table[] = {
 	    PS_CMP_NORMAL },
 	{ "rlimit", "rlimit", NULL, &procstat_rlimit, &cmdopt_none,
 	    PS_CMP_NORMAL },
+	{ "rlimitusage", "rlimitusage", NULL, &procstat_rlimitusage,
+	    &cmdopt_none, PS_CMP_NORMAL },
 	{ "rusage", "rusage", "[-Ht]", &procstat_rusage, &cmdopt_rusage,
 	    PS_CMP_NORMAL },
 	{ "sigfastblock", "sigfastblock", NULL, &procstat_sigfastblock,

@@ -35,31 +35,8 @@
 #ifndef	_MACHINE_INTR_MACHDEP_H_
 #define	_MACHINE_INTR_MACHDEP_H_
 
-#define	RISCV_NIRQ		1024
-
 #ifndef	NIRQ
-#define	NIRQ			RISCV_NIRQ
-#endif
-
-#ifdef INTRNG
-#include <sys/intr.h>
-#endif
-
-struct trapframe;
-
-int riscv_teardown_intr(void *);
-int riscv_setup_intr(const char *, driver_filter_t *, driver_intr_t *,
-    void *, int, int, void **);
-void riscv_cpu_intr(struct trapframe *);
-
-typedef unsigned long * riscv_intrcnt_t;
-
-riscv_intrcnt_t riscv_intrcnt_create(const char *);
-void riscv_intrcnt_setname(riscv_intrcnt_t, const char *);
-
-#ifdef SMP
-void riscv_setup_ipihandler(driver_filter_t *);
-void riscv_unmask_ipi(void);
+#define	NIRQ			1024
 #endif
 
 enum {
@@ -75,7 +52,6 @@ enum {
 	IRQ_EXTERNAL_SUPERVISOR,
 	IRQ_EXTERNAL_HYPERVISOR,
 	IRQ_EXTERNAL_MACHINE,
-	INTC_NIRQS
 };
 
 #endif /* !_MACHINE_INTR_MACHDEP_H_ */

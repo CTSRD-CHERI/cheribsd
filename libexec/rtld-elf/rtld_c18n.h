@@ -28,115 +28,148 @@
 #ifndef RTLD_C18N_H
 #define RTLD_C18N_H
 
+#include <machine/c18n.h>
+
 #include <stdint.h>
 
 /*
  * Global symbols
  */
-#define	C18N_FUNC_SIG_COUNT	72
-
 extern uintptr_t sealer_pltgot, sealer_tramp;
 extern const char *ld_compartment_utrace;
-extern const char *ld_compartment_enable;
+extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;
 extern const char *ld_compartment_sig;
-
-void tramp_init(void);
+extern const char *ld_compartment_unwind;
+extern const char *ld_compartment_stats;
+extern const char *ld_compartment_switch_count;
+extern struct rtld_c18n_stats *c18n_stats;
 
 /*
  * Policies
  */
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-#define	C18N_RTLD_COMPARTMENT_ID	1
-#else
-#define	C18N_RTLD_COMPARTMENT_ID	0
-#endif
-#define	C18N_COMPARTMENT_ID_MAX	(UINT16_MAX >> 1)
+/*
+ * RTLD is the first compartment.
+ */
+#define	RTLD_COMPART_ID		0
 
 typedef uint16_t compart_id_t;
+/*
+ * Define another type for the stack table index to avoid confusion.
+ */
+typedef struct { uint16_t val; } stk_table_index;
 
-struct compart {
-	/*
-	 * Name of the compartment
-	 */
-	const char *name;
-	/*
-	 * NULL-terminated array of libraries that belong to the compartment
-	 */
-	const char **libraries;
-};
-
-struct policy {
-	struct compart *coms;
-	size_t count;
-};
-
-void tramp_add_comparts(struct policy *);
-compart_id_t compart_id_allocate(const char *);
+compart_id_t compart_id_allocate(const char *, int);
+compart_id_t compart_id_for_address(const Obj_Entry *, Elf_Addr);
 
 /*
  * Stack switching
  */
+struct stk_table_stk_info {
+	size_t size;
+	void *begin;
+};
+
+struct stk_table_metadata {
+	size_t capacity;
+	struct tcb_wrapper *wrap;
+	/*
+	 * This field and the next array record the base and length of the
+	 * trusted stack and each compartment stack. This information is used to
+	 * unmap the stacks when the thread exits.
+	 */
+	struct stk_table_stk_info trusted_stk;
+	struct stk_table_stk_info compart_stk[];
+};
+
 struct stk_table {
+	/*
+	 * This field contains the stack resolver when the table is installed in
+	 * a thread. When the thread exits and the table awaits to be garbage-
+	 * collected, this field points to the next element of a linked list.
+	 */
 	union {
-		void *(*resolver)(unsigned);
+		void (*resolver)(void);
 		SLIST_ENTRY(stk_table) next;
 	};
-	size_t capacity;
-	struct stk_table_stack {
-		void *bottom;
-		size_t size;
-	} stacks[];
+	/*
+	 * This field points to a structure containing metadata about the table.
+	 * The metadata is not stored in-line so that the frequently-accessed
+	 * items of the table are densely packed to reduce cache pressure.
+	 */
+	struct stk_table_metadata *meta;
+	/*
+	 * The i-th entry contains the current stack top of compartment i.
+	 */
+	struct stk_table_entry {
+		void *stack;
+		void *reserved;
+	} entries[];
 };
 
-struct Struct_Stack_Entry {
-    SLIST_ENTRY(Struct_Stack_Entry) link;
-    void *stack;
+#define	cid_to_index_raw(cid)						\
+	offsetof(struct stk_table, entries[cid].stack)
+
+#define	cid_to_index(cid)	((stk_table_index) { cid_to_index_raw(cid) })
+
+#define	index_to_cid(index)						\
+	(((index).val -							\
+	offsetof(struct stk_table, entries) -				\
+	offsetof(struct stk_table_entry, stack)) /			\
+	sizeof(struct stk_table_entry))
+
+#define	COMPART_ID_MAX		index_to_cid((stk_table_index) { -1 })
+
+#include "rtld_c18n_machdep.h"
+
+struct trusted_frame {
+	/*
+	 * Architecture-specific callee-saved registers, including fp, sp, and
+	 * the return address
+	 */
+	struct dl_c18n_compart_state state;
+	/*
+	 * INVARIANT: This field contains the top of the caller's stack when the
+	 * caller was last entered.
+	 */
+	void *osp;
+	/*
+	 * Pointer to the previous trusted frame
+	 */
+	struct trusted_frame *previous;
+	/*
+	 * Stack table index of the caller, derived from its compartment ID
+	 */
+	stk_table_index caller;
+	/*
+	 * This padding space must be filled with zeros so that an optimised
+	 * trampoline can use a wide load to load multiple fields of the trusted
+	 * frame and then use a word-sized register to extract the caller field.
+	 */
+	uint16_t zeros;
+	/*
+	 * Stack table index of the callee, derived from its compartment ID
+	 */
+	stk_table_index callee;
+	/*
+	 * Number of return value registers with architecture-specific encoding
+	 */
+	uint16_t n_rets;
+	/*
+	 * This field contains the code address in the trampoline that the
+	 * callee should return to. This is used by trampolines to detect cross-
+	 * compartment tail-calls.
+	 */
+	ptraddr_t landing;
 };
 
-void allocate_stk_table(void);
-void *_rtld_get_rstk(unsigned);
+struct tcb *c18n_allocate_tcb(struct tcb *);
+void c18n_free_tcb(void);
 
-static inline unsigned
-compart_id_to_index(compart_id_t cid)
-{
-	struct stk_table dummy;
-
-	return (sizeof(*dummy.stacks) * cid / sizeof(dummy.stacks->bottom));
-}
-
-static inline struct stk_table *
-stk_table_get(void)
-{
-	struct stk_table *table;
-
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	asm ("mrs	%0, rctpidr_el0" : "=C" (table));
-#else
-	asm ("mrs	%0, ctpidr_el0" : "=C" (table));
-#endif
-	return (table);
-}
-
-static inline void
-stk_table_set(struct stk_table *table)
-{
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	asm ("msr	rctpidr_el0, %0" :: "C" (table));
-#else
-	asm ("msr	ctpidr_el0, %0" :: "C" (table));
-#endif
-}
-
-static inline void
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-trusted_stk_set(void *sp)
-#else
-untrusted_stk_set(void *sp)
-#endif
-{
-	asm ("msr	rcsp_el0, %0" :: "C" (sp));
-}
+/*
+ * Stack unwinding
+ */
+int c18n_is_tramp(uintptr_t, const struct trusted_frame *);
 
 /*
  * Trampolines
@@ -169,17 +202,32 @@ struct tramp_data {
 	void *target;
 	const Obj_Entry *defobj;
 	const Elf_Sym *def;
-	void *entry;
 	struct func_sig sig;
 };
-_Static_assert(sizeof(struct func_sig) == sizeof(func_sig_int),
-    "Unexpected func_sig size");
 
-void *_rtld_tramp_hook(int, void *, const Obj_Entry *, const Elf_Sym *, void *,
-    void *);
-size_t tramp_compile(void **, const struct tramp_data *);
-void *tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *);
-struct func_sig tramp_fetch_sig(const Obj_Entry *, unsigned long);
+struct tramp_header {
+	/*
+	 * The target is atomic because it may be modified, after trampoline
+	 * creation, from an untagged value to a tagged value. Atomicity ensures
+	 * that the tagged value is visible to the trampoline when it is run.
+	 */
+	_Atomic(void *) target;
+	const Obj_Entry *defobj;
+	size_t symnum;
+	struct func_sig sig;
+	uint32_t entry[];
+};
+
+/*
+ * Assembly function with non-standard ABI.
+ */
+void tramp_hook(void);
+
+size_t tramp_compile(char **, const struct tramp_data *);
+
+void *tramp_intern(const Plt_Entry *, compart_id_t, const struct tramp_data *);
+struct tramp_header *tramp_reflect(const void *);
+struct func_sig sigtab_get(const Obj_Entry *, unsigned long);
 
 static inline long
 func_sig_to_otype(struct func_sig sig)
@@ -199,4 +247,6 @@ func_sig_legal(struct func_sig sig)
 void *_rtld_sandbox_code(void *, struct func_sig);
 void *_rtld_safebox_code(void *, struct func_sig);
 
+void c18n_init(Obj_Entry *, Elf_Auxinfo *[]);
+void c18n_init2(Obj_Entry *);
 #endif

@@ -26,10 +26,10 @@
  */
 
 #include "opt_acpi.h"
+#include "opt_kstack_pages.h"
 #include "opt_platform.h"
 #include "opt_ddb.h"
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/asan.h>
@@ -47,6 +47,7 @@
 #include <sys/ktr.h>
 #include <sys/limits.h>
 #include <sys/linker.h>
+#include <sys/msan.h>
 #include <sys/msgbuf.h>
 #include <sys/pcpu.h>
 #include <sys/physmem.h>
@@ -112,10 +113,10 @@
 #include <dev/smbios/smbios.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
-_Static_assert(sizeof(struct pcb) == 1456, "struct pcb is incorrect size");
+_Static_assert(sizeof(struct pcb) == 1472, "struct pcb is incorrect size");
 _Static_assert(offsetof(struct pcb, pcb_fpusaved) == 336,
     "pcb_fpusaved changed offset");
-_Static_assert(offsetof(struct pcb, pcb_fpustate) == 400,
+_Static_assert(offsetof(struct pcb, pcb_fpustate) == 416,
     "pcb_fpustate changed offset");
 #elif __has_feature(capabilities)
 _Static_assert(sizeof(struct pcb) == 1344, "struct pcb is incorrect size");
@@ -153,12 +154,20 @@ static struct trapframe proc0_tf;
 int early_boot = 1;
 int cold = 1;
 static int boot_el;
-static uint64_t hcr_el2;
 
 struct kva_md_info kmi;
 
 int64_t dczva_line_size;	/* The size of cache line the dc zva zeroes */
 int has_pan;
+
+#if defined(SOCDEV_PA)
+/*
+ * This is the virtual address used to access SOCDEV_PA. As it's set before
+ * .bss is cleared we need to ensure it's preserved. To do this use
+ * __read_mostly as it's only ever set once but read in the putc functions.
+ */
+uintptr_t socdev_va __read_mostly;
+#endif
 
 /*
  * Physical address of the EFI System Table. Stashed from the metadata hints
@@ -220,12 +229,15 @@ pan_enable(void)
 bool
 has_hyp(void)
 {
+	return (boot_el == CURRENTEL_EL_EL2);
+}
 
-	/*
-	 * XXX The E2H check is wrong, but it's close enough for now.  Needs to
-	 * be re-evaluated once we're running regularly in EL2.
-	 */
-	return (boot_el == 2 && (hcr_el2 & HCR_E2H) == 0);
+bool
+in_vhe(void)
+{
+	/* If we are currently in EL2 then must be in VHE */
+	return ((READ_SPECIALREG(CurrentEL) & CURRENTEL_EL_MASK) ==
+	    CURRENTEL_EL_EL2);
 }
 
 static void
@@ -404,7 +416,7 @@ init_proc0(vm_pointer_t kstack)
 	/* XXX-AM: We need to set bounds on pcb and kstack here as in MIPS */
 	proc_linkup0(&proc0, &thread0);
 	thread0.td_kstack = cheri_kern_andperm(kstack, CHERI_PERMS_KERNEL_DATA);
-	thread0.td_kstack_pages = kstack_pages;
+	thread0.td_kstack_pages = KSTACK_PAGES;
 #if defined(PERTHREAD_SSP)
 	thread0.td_md.md_canary = boot_canary;
 #endif
@@ -432,12 +444,12 @@ init_proc0(vm_pointer_t kstack)
  * read-only, e.g. to patch kernel code.
  */
 bool
-arm64_get_writable_addr(vm_pointer_t addr, vm_pointer_t *out)
+arm64_get_writable_addr(void *addr, void **out)
 {
 	vm_paddr_t pa;
 
 	/* Check if the page is writable */
-	if (PAR_SUCCESS(arm64_address_translate_s1e1w(addr))) {
+	if (PAR_SUCCESS(arm64_address_translate_s1e1w((vm_offset_t)addr))) {
 		*out = addr;
 		return (true);
 	}
@@ -445,16 +457,17 @@ arm64_get_writable_addr(vm_pointer_t addr, vm_pointer_t *out)
 	/*
 	 * Find the physical address of the given page.
 	 */
-	if (!pmap_klookup(addr, &pa)) {
+	if (!pmap_klookup((vm_offset_t)addr, &pa)) {
 		return (false);
 	}
 
 	/*
 	 * If it is within the DMAP region and is writable use that.
 	 */
-	if (PHYS_IN_DMAP(pa)) {
-		addr = PHYS_TO_DMAP_PAGE(pa);
-		if (PAR_SUCCESS(arm64_address_translate_s1e1w(addr))) {
+	if (PHYS_IN_DMAP_RANGE(pa)) {
+		addr = (void *)PHYS_TO_DMAP_PAGE(pa);
+		if (PAR_SUCCESS(arm64_address_translate_s1e1w(
+		    (vm_offset_t)addr))) {
 			*out = addr;
 			return (true);
 		}
@@ -769,7 +782,7 @@ try_load_dtb(caddr_t kmdp)
 		return;
 	}
 
-	if (OF_install(OFW_FDT, 0) == FALSE)
+	if (!OF_install(OFW_FDT, 0))
 		panic("Cannot install FDT");
 
 	if (OF_init((void *)dtbp) != 0)
@@ -822,10 +835,10 @@ bus_probe(void)
 	}
 	/* If no order or an invalid order was set use the default */
 	if (arm64_bus_method == ARM64_BUS_NONE) {
-		if (has_fdt)
-			arm64_bus_method = ARM64_BUS_FDT;
-		else if (has_acpi)
+		if (has_acpi)
 			arm64_bus_method = ARM64_BUS_ACPI;
+		else if (has_fdt)
+			arm64_bus_method = ARM64_BUS_FDT;
 	}
 
 	/*
@@ -920,9 +933,8 @@ initarm(struct arm64_bootparams *abp)
 	TSRAW(&thread0, TS_ENTER, __func__, NULL);
 
 	boot_el = abp->boot_el;
-	hcr_el2 = abp->hcr_el2;
 
-	/* Parse loader or FDT boot parametes. Determine last used address. */
+	/* Parse loader or FDT boot parameters. Determine last used address. */
 	lastaddr = parse_boot_param(abp);
 
 	/* Find the kernel address */
@@ -934,6 +946,17 @@ initarm(struct arm64_bootparams *abp)
 	identify_hypervisor_smbios();
 
 	update_special_regs(0);
+
+	/* Set the pcpu data, this is needed by pmap_bootstrap */
+	pcpup = &pcpu0;
+	pcpu_init(pcpup, 0, sizeof(struct pcpu));
+
+	/* Initialize the pcpu pointer for this cpu. */
+	init_cpu_pcpup(pcpup);
+
+	/* locore.S sets sp_el0 to &thread0 so no need to set it here. */
+	PCPU_SET(curthread, &thread0);
+	PCPU_SET(midr, get_midr());
 
 	link_elf_ireloc(kmdp);
 #ifdef FDT
@@ -967,17 +990,6 @@ initarm(struct arm64_bootparams *abp)
 		physmem_exclude_region(efifb->fb_addr, efifb->fb_size,
 		    EXFLAG_NOALLOC);
 
-	/* Set the pcpu data, this is needed by pmap_bootstrap */
-	pcpup = &pcpu0;
-	pcpu_init(pcpup, 0, sizeof(struct pcpu));
-
-	/* Initialize the pcpu pointer for this cpu. */
-	init_cpu_pcpup(pcpup);
-
-	/* locore.S sets sp_el0 to &thread0 so no need to set it here. */
-	PCPU_SET(curthread, &thread0);
-	PCPU_SET(midr, get_midr());
-
 	/* Do basic tuning, hz etc */
 	init_param1();
 
@@ -985,7 +997,7 @@ initarm(struct arm64_bootparams *abp)
 	pan_setup();
 
 	/* Bootstrap enough of pmap  to enter the kernel proper */
-	pmap_bootstrap(KERNBASE - abp->kern_delta, lastaddr - KERNBASE);
+	pmap_bootstrap(lastaddr - KERNBASE);
 	/* Exclude entries needed in the DMAP region, but not phys_avail */
 	if (efihdr != NULL)
 		exclude_efi_map_entries(efihdr);
@@ -1000,13 +1012,13 @@ initarm(struct arm64_bootparams *abp)
 	 * we'll end up searching for segments that we can safely use.  Those
 	 * segments also get excluded from phys_avail.
 	 */
-#if defined(KASAN)
-	pmap_bootstrap_san(KERNBASE - abp->kern_delta);
+#if defined(KASAN) || defined(KMSAN)
+	pmap_bootstrap_san();
 #endif
 
 	physmem_init_kernel_globals();
 
-	devmap_bootstrap(0, NULL);
+	devmap_bootstrap();
 
 	valid = bus_probe();
 
@@ -1050,6 +1062,7 @@ initarm(struct arm64_bootparams *abp)
 
 	kcsan_cpu_init(0);
 	kasan_init();
+	kmsan_init();
 
 	env = kern_getenv("kernelname");
 	if (env != NULL)
@@ -1078,6 +1091,10 @@ initarm(struct arm64_bootparams *abp)
 	}
 
 	early_boot = 0;
+
+	if (bootverbose && kstack_pages != KSTACK_PAGES)
+		printf("kern.kstack_pages = %d ignored for thread0\n",
+		    kstack_pages);
 
 	TSEXIT();
 }
@@ -1222,55 +1239,40 @@ void
 cheri_revoke_td_frame(struct thread *td, const struct vm_cheri_revoke_cookie
     *crc)
 {
-	CHERI_REVOKE_STATS_FOR(crst, crc);
-
-#define CHERI_REVOKE_REG(r) \
-	do { if (cheri_gettag(r)) { \
-		CHERI_REVOKE_STATS_BUMP(crst, caps_found); \
-		if (vm_cheri_revoke_test(crc, r)) { \
-			r = cheri_revoke_cap(r); \
-			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared); \
-		} \
-	    }} while(0)
-
-	CHERI_REVOKE_REG(td->td_frame->tf_sp);
-	CHERI_REVOKE_REG(td->td_frame->tf_lr);
-	CHERI_REVOKE_REG(td->td_frame->tf_elr);
-	CHERI_REVOKE_REG(td->td_frame->tf_ddc);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[0]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[1]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[2]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[3]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[4]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[5]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[6]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[7]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[8]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[9]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[10]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[11]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[12]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[13]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[14]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[15]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[16]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[17]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[18]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[19]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[20]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[21]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[22]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[23]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[24]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[25]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[26]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[27]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[28]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[29]);
-
-#undef CHERI_REVOKE_REG
-
-	return;
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_sp);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_lr);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_elr);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_ddc);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[0]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[1]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[2]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[3]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[4]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[5]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[6]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[7]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[8]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[9]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[10]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[11]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[12]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[13]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[14]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[15]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[16]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[17]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[18]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[19]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[20]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[21]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[22]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[23]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[24]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[25]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[26]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[27]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[28]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[29]);
 }
 #endif
 // CHERI CHANGES START

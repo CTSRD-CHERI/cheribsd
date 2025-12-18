@@ -5,6 +5,9 @@ JEMALLOCSRCS:= jemalloc.c arena.c background_thread.c base.c bin.c bitmap.c \
 	test_hooks.c ticker.c tsd.c witness.c
 
 CFLAGS+=-I${SRCTOP}/contrib/jemalloc/include
+.if ${MK_JEMALLOC_LG_VADDR_WIDE} != no
+CFLAGS+=-D_USE_LG_VADDR_WIDE
+.endif
 
 .if ${MK_MALLOC_REVOCATION_SHIM} == yes
 MRS_REAL_PREFIX=__
@@ -22,6 +25,8 @@ CFLAGS.jemalloc_${src}+=	-Werror=cheri-bitwise-operations -Werror=cheri
 CFLAGS.jemalloc_${src}+=	-DMALLOC_REVOCATION_SHIM
 .endif
 .endfor
+
+COMPARTMENT_POLICY+=${LIBC_SRCTOP}/stdlib/malloc/jemalloc/Compartments.json
 
 MAN+=jemalloc.3
 CLEANFILES+=jemalloc.3

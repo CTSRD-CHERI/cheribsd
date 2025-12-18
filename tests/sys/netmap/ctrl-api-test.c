@@ -1596,6 +1596,7 @@ sync_kloop_csb_enable(struct TestContext *ctx)
 	return sync_kloop_start_stop(ctx);
 }
 
+#if 0
 static int
 sync_kloop_conflict(struct TestContext *ctx)
 {
@@ -1640,6 +1641,14 @@ sync_kloop_conflict(struct TestContext *ctx)
 	/* Wait for one of the two threads to fail to start the kloop, to
 	 * avoid a race condition where th1 starts the loop and stops,
 	 * and after that th2 starts the loop successfully. */
+	/*
+	 * XXX: This doesn't fully close the race.  th2 might fail to
+	 * start executing since th1 can enter the kernel and hog the
+	 * CPU on a single-CPU system until the semaphore timeout
+	 * awakens this thread and it calls sync_kloop_stop.  Once th1
+	 * exits the kernel, th2 can finally run and will then loop
+	 * forever in the ioctl handler.
+	 */
 	clock_gettime(CLOCK_REALTIME, &to);
 	to.tv_sec += 2;
 	ret = sem_timedwait(&sem, &to);
@@ -1674,6 +1683,7 @@ sync_kloop_conflict(struct TestContext *ctx)
 	               ? 0
 	               : -1;
 }
+#endif
 
 static int
 sync_kloop_eventfds_mismatch(struct TestContext *ctx)
@@ -1803,7 +1813,6 @@ static struct nmreq_parse_test nmreq_parse_tests[] = {
 	{ "netmap:",			"",		NULL,		EINVAL, 0,		0,	0 },
 	{ "netmap:^",			"",		NULL,		EINVAL,	0,		0,	0 },
 	{ "netmap:{",			"",		NULL,		EINVAL,	0,		0,	0 },
-	{ "netmap:vale0:0",		NULL,		NULL,		EINVAL,	0,		0,	0 },
 	{ "eth0",			NULL,		NULL,		EINVAL, 0,		0,	0 },
 	{ "vale0:0",			"vale0:0",	"",		0,	NR_REG_ALL_NIC, 0,	0 },
 	{ "vale:0",			"vale:0",	"",		0,	NR_REG_ALL_NIC, 0,	0 },
@@ -1811,7 +1820,6 @@ static struct nmreq_parse_test nmreq_parse_tests[] = {
 	{ "valeXXX:YYY-4",		"valeXXX:YYY",	"",		0,	NR_REG_ONE_NIC, 4,	0 },
 	{ "netmapXXX:eth0",		NULL,		NULL,		EINVAL,	0,		0,	0 },
 	{ "netmap:14",			"14",		"",		0, 	NR_REG_ALL_NIC,	0,	0 },
-	{ "netmap:eth0&",		NULL,		NULL,		EINVAL, 0,		0,	0 },
 	{ "netmap:pipe{0",		"pipe{0",	"",		0,	NR_REG_ALL_NIC, 0,	0 },
 	{ "netmap:pipe{in",		"pipe{in",	"",		0,	NR_REG_ALL_NIC, 0,	0 },
 	{ "netmap:pipe{in-7",		"pipe{in",	"",		0,	NR_REG_ONE_NIC, 7,	0 },
@@ -2081,7 +2089,9 @@ static struct mytest tests[] = {
 	decltest(sync_kloop_eventfds_all_direct_rx),
 	decltest(sync_kloop_nocsb),
 	decltest(sync_kloop_csb_enable),
+#if 0
 	decltest(sync_kloop_conflict),
+#endif
 	decltest(sync_kloop_eventfds_mismatch),
 	decltest(null_port),
 	decltest(null_port_all_zero),

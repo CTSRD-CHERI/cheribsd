@@ -46,7 +46,15 @@
 #include <linux/spinlock.h>
 #include <linux/ktime.h>
 
+#include "opt_wlan.h"
+
+/* Currently this is only used for wlan so we can depend on that. */
+#if defined(IEEE80211_DEBUG) && !defined(SKB_DEBUG)
+#define	SKB_DEBUG
+#endif
+
 /* #define	SKB_DEBUG */
+
 #ifdef SKB_DEBUG
 #define	DSKB_TODO	0x01
 #define	DSKB_IMPROVE	0x02
@@ -89,6 +97,7 @@ struct skb_shared_hwtstamps {
 };
 
 #define	NET_SKB_PAD		max(CACHE_LINE_SIZE, 32)
+#define	SKB_DATA_ALIGN(_x)	roundup2(_x, CACHE_LINE_SIZE)
 
 struct sk_buff_head {
 		/* XXX TODO */
@@ -571,13 +580,13 @@ __skb_queue_tail(struct sk_buff_head *q, struct sk_buff *new)
 {
 
 	SKB_TRACE2(q, new);
-	__skb_queue_after(q, (struct sk_buff *)q, new);
+	__skb_queue_before(q, (struct sk_buff *)q, new);
 }
 
 static inline void
 skb_queue_tail(struct sk_buff_head *q, struct sk_buff *new)
 {
-	SKB_TRACE2(q, skb);
+	SKB_TRACE2(q, new);
 	return (__skb_queue_tail(q, new));
 }
 
@@ -609,7 +618,7 @@ static inline void
 __skb_unlink(struct sk_buff *skb, struct sk_buff_head *head)
 {
 	SKB_TRACE2(skb, head);
-	struct sk_buff *p, *n;;
+	struct sk_buff *p, *n;
 
 	head->qlen--;
 	p = skb->prev;
@@ -828,7 +837,7 @@ skb_mark_not_on_list(struct sk_buff *skb)
 }
 
 static inline void
-___skb_queue_splice_init(const struct sk_buff_head *from,
+___skb_queue_splice(const struct sk_buff_head *from,
     struct sk_buff *p, struct sk_buff *n)
 {
 	struct sk_buff *b, *e;
@@ -851,7 +860,21 @@ skb_queue_splice_init(struct sk_buff_head *from, struct sk_buff_head *to)
 	if (skb_queue_empty(from))
 		return;
 
-	___skb_queue_splice_init(from, (struct sk_buff *)to, to->next);
+	___skb_queue_splice(from, (struct sk_buff *)to, to->next);
+	to->qlen += from->qlen;
+	__skb_queue_head_init(from);
+}
+
+static inline void
+skb_queue_splice_tail_init(struct sk_buff_head *from, struct sk_buff_head *to)
+{
+
+	SKB_TRACE2(from, to);
+
+	if (skb_queue_empty(from))
+		return;
+
+	___skb_queue_splice(from, to->prev, (struct sk_buff *)to);
 	to->qlen += from->qlen;
 	__skb_queue_head_init(from);
 }
@@ -939,10 +962,9 @@ static inline uint8_t *
 skb_mac_header(const struct sk_buff *skb)
 {
 	SKB_TRACE(skb);
-	/* Make sure the mac_header was set as otherwise we return garbage. */
-	WARN_ON(skb->mac_header == 0);
 	return (skb->head + skb->mac_header);
 }
+
 static inline void
 skb_reset_mac_header(struct sk_buff *skb)
 {
@@ -1052,7 +1074,6 @@ static inline struct sk_buff *
 napi_build_skb(void *data, size_t len)
 {
 
-	SKB_TRACE(skb);
 	SKB_TODO();
 	return (NULL);
 }
@@ -1070,6 +1091,14 @@ skb_mark_for_recycle(struct sk_buff *skb)
 {
 	SKB_TRACE(skb);
 	SKB_TODO();
+}
+
+static inline int
+skb_cow_head(struct sk_buff *skb, unsigned int headroom)
+{
+	SKB_TRACE(skb);
+	SKB_TODO();
+	return (-1);
 }
 
 #define	SKB_WITH_OVERHEAD(_s)						\

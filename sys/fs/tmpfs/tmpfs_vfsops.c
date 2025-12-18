@@ -46,7 +46,6 @@
 #include "opt_ddb.h"
 #include "opt_tmpfs.h"
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/dirent.h>
@@ -209,7 +208,7 @@ again:
 			continue;
 		}
 		vm = vmspace_acquire_ref(p);
-		_PHOLD_LITE(p);
+		_PHOLD(p);
 		PROC_UNLOCK(p);
 		if (vm == NULL) {
 			PRELE(p);

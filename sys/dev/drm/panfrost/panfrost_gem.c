@@ -45,7 +45,7 @@
 #include <vm/vm_kern.h>
 #include <vm/pmap.h>
 
-#include <dev/extres/clk/clk.h>
+#include <dev/clk/clk.h>
 
 #include <drm/drm_gem.h>
 #include <drm/drm_atomic_helper.h>
@@ -95,8 +95,6 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 				continue;
 
 			vm_page_lock(m);
-			m->flags &= ~PG_FICTITIOUS;
-			m->oflags |= VPO_UNMANAGED;
 			vm_page_unwire_noq(m);
 			vm_page_free(m);
 			vm_page_unlock(m);
@@ -287,7 +285,7 @@ sgt_get_page_by_idx(struct sg_table *sgt, int pidx)
 }
 
 static vm_fault_t
-panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+panfrost_gem_fault(struct vm_fault *vmf)
 {
 	struct panfrost_gem_object *bo;
 	struct drm_gem_object *gem_obj;
@@ -296,13 +294,14 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	vm_pindex_t pidx;
 	vm_object_t obj;
 
-	obj = vma->vm_obj;
-	gem_obj = vma->vm_private_data;
+	obj = vmf->object;
+	gem_obj = obj->handle;
 	bo = (struct panfrost_gem_object *)gem_obj;
 	sc = gem_obj->dev->dev_private;
 
-	pidx = OFF_TO_IDX(vmf->virtual_address);
+	pidx = vmf->pindex;
 
+retry:
 	VM_OBJECT_WLOCK(obj);
 	if (bo->pages) {
 		if (pidx >= bo->npages) {
@@ -320,17 +319,18 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 			return (VM_FAULT_SIGBUS);
 	}
 
-	if (vm_page_busied(page))
+	if (!vm_page_tryxbusy(page)) {
+		vm_page_busy_sleep(page, "panfrost", 0);
+		goto retry;
+	}
+	if (vm_page_insert(page, obj, pidx)) {
+		vm_page_xunbusy(page);
 		goto fail_unlock;
-	if (vm_page_insert(page, obj, pidx))
-		goto fail_unlock;
-	vm_page_tryxbusy(page);
+	}
 	vm_page_valid(page);
 	VM_OBJECT_WUNLOCK(obj);
 
-	vma->vm_pfn_first = pidx;
-	vma->vm_pfn_count = 1;
-
+	vmf->count = 1;
 	return (VM_FAULT_NOPAGE);
 
 fail_unlock:
@@ -356,6 +356,7 @@ static const struct vm_operations_struct panfrost_gem_vm_ops = {
 	.fault = panfrost_gem_fault,
 	.open = panfrost_gem_vm_open,
 	.close = panfrost_gem_vm_close,
+	.objtype = OBJT_PHYS,
 };
 
 int
@@ -606,13 +607,9 @@ retry:
 
 			return (ENOMEM);
 		}
-		if ((m->flags & PG_ZERO) == 0)
-			pmap_zero_page(m);
 		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-		cpu_dcache_wb_range(va, PAGE_SIZE);
+		cpu_dcache_wb_range((void *)va, PAGE_SIZE);
 		m->valid = VM_PAGE_BITS_ALL;
-		m->oflags &= ~VPO_UNMANAGED;
-		m->flags |= PG_FICTITIOUS;
 		bo->pages[i] = m;
 	}
 
@@ -655,13 +652,9 @@ retry:
 		return (ENOMEM);
 	}
 	for (i = 0; i < bo->npages; i++) {
-		if ((m->flags & PG_ZERO) == 0)
-			pmap_zero_page(m);
 		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-		cpu_dcache_wb_range(va, PAGE_SIZE);
+		cpu_dcache_wb_range((void *)va, PAGE_SIZE);
 		m->valid = VM_PAGE_BITS_ALL;
-		m->oflags &= ~VPO_UNMANAGED;
-		m->flags |= PG_FICTITIOUS;
 		bo->pages[i] = m;
 		m++;
 	}
@@ -694,9 +687,11 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 		error = panfrost_alloc_pages_iommu(bo);
 	else
 		error = panfrost_alloc_pages_contig(bo);
-
-	if (error)
+	if (error) {
+		printf("%s:%d failed to allocate %d pages\n",
+		    __func__, __LINE__, npages);
 		return (error);
+	}
 
 	bo->sgt = drm_prime_pages_to_sg(m0, npages);
 

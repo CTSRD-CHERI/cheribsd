@@ -1,5 +1,3 @@
-#	@(#)Makefile	8.2 (Berkeley) 1/25/94
-
 CONFS=	misc/mail.rc
 PROG=	mail
 SRCS=	version.c cmd1.c cmd2.c cmd3.c cmdtab.c collect.c edit.c fio.c \

@@ -1,43 +1,47 @@
 /* Do not modify. This file is auto-generated from sha1-armv8.pl. */
 #include "arm_arch.h"
+#ifndef	__KERNEL__
+
+.hidden	OPENSSL_armcap_P
+#endif
 
 .text
 
-
-.hidden	OPENSSL_armcap_P
 .globl	sha1_block_data_order
 .type	sha1_block_data_order,%function
 .align	6
 sha1_block_data_order:
-#ifdef	__ILP32__
-	ldrsw	x16,.LOPENSSL_armcap_P
+	AARCH64_VALID_CALL_TARGET
+#ifdef __CHERI_PURE_CAPABILITY__
+	adrp	c16,:got:OPENSSL_armcap_P
+	ldr	c16,[c16,#:got_lo12:OPENSSL_armcap_P]
+	ldr	w16,[c16]
 #else
-	ldr	x16,.LOPENSSL_armcap_P
+	adrp	x16,OPENSSL_armcap_P
+	ldr	w16,[x16,#:lo12:OPENSSL_armcap_P]
 #endif
-	adr	x17,.LOPENSSL_armcap_P
-	add	x16,x16,x17
-	ldr	w16,[x16]
 	tst	w16,#ARMV8_SHA1
 	b.ne	.Lv8_entry
 
-	stp	x29,x30,[sp,#-96]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
+	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(12*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
 
-	ldp	w20,w21,[x0]
-	ldp	w22,w23,[x0,#8]
-	ldr	w24,[x0,#16]
+	ldp	w20,w21,[PTR(0)]
+	ldp	w22,w23,[PTR(0),#8]
+	ldr	w24,[PTR(0),#16]
 
 .Loop:
-	ldr	x3,[x1],#64
+	ldr	x3,[PTR(1)],#64
 	movz	w28,#0x7999
 	sub	x2,x2,#1
 	movk	w28,#0x5a82,lsl#16
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	ror	x3,x3,#32
 #else
 	rev32	x3,x3
@@ -45,7 +49,7 @@ sha1_block_data_order:
 	add	w24,w24,w28		// warm it up
 	add	w24,w24,w3
 	lsr	x4,x3,#32
-	ldr	x5,[x1,#-56]
+	ldur	x5,[PTR(1),#-56]
 	bic	w25,w23,w21
 	and	w26,w22,w21
 	ror	w27,w20,#27
@@ -55,7 +59,7 @@ sha1_block_data_order:
 	ror	w21,w21,#2
 	add	w23,w23,w4	// future e+=X[i]
 	add	w24,w24,w25		// e+=F(b,c,d)
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	ror	x5,x5,#32
 #else
 	rev32	x5,x5
@@ -70,7 +74,7 @@ sha1_block_data_order:
 	add	w22,w22,w5	// future e+=X[i]
 	add	w23,w23,w25		// e+=F(b,c,d)
 	lsr	x6,x5,#32
-	ldr	x7,[x1,#-48]
+	ldur	x7,[PTR(1),#-48]
 	bic	w25,w21,w24
 	and	w26,w20,w24
 	ror	w27,w23,#27
@@ -80,7 +84,7 @@ sha1_block_data_order:
 	ror	w24,w24,#2
 	add	w21,w21,w6	// future e+=X[i]
 	add	w22,w22,w25		// e+=F(b,c,d)
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	ror	x7,x7,#32
 #else
 	rev32	x7,x7
@@ -95,7 +99,7 @@ sha1_block_data_order:
 	add	w20,w20,w7	// future e+=X[i]
 	add	w21,w21,w25		// e+=F(b,c,d)
 	lsr	x8,x7,#32
-	ldr	x9,[x1,#-40]
+	ldur	x9,[PTR(1),#-40]
 	bic	w25,w24,w22
 	and	w26,w23,w22
 	ror	w27,w21,#27
@@ -105,7 +109,7 @@ sha1_block_data_order:
 	ror	w22,w22,#2
 	add	w24,w24,w8	// future e+=X[i]
 	add	w20,w20,w25		// e+=F(b,c,d)
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	ror	x9,x9,#32
 #else
 	rev32	x9,x9
@@ -120,7 +124,7 @@ sha1_block_data_order:
 	add	w23,w23,w9	// future e+=X[i]
 	add	w24,w24,w25		// e+=F(b,c,d)
 	lsr	x10,x9,#32
-	ldr	x11,[x1,#-32]
+	ldur	x11,[PTR(1),#-32]
 	bic	w25,w22,w20
 	and	w26,w21,w20
 	ror	w27,w24,#27
@@ -130,7 +134,7 @@ sha1_block_data_order:
 	ror	w20,w20,#2
 	add	w22,w22,w10	// future e+=X[i]
 	add	w23,w23,w25		// e+=F(b,c,d)
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	ror	x11,x11,#32
 #else
 	rev32	x11,x11
@@ -145,7 +149,7 @@ sha1_block_data_order:
 	add	w21,w21,w11	// future e+=X[i]
 	add	w22,w22,w25		// e+=F(b,c,d)
 	lsr	x12,x11,#32
-	ldr	x13,[x1,#-24]
+	ldur	x13,[PTR(1),#-24]
 	bic	w25,w20,w23
 	and	w26,w24,w23
 	ror	w27,w22,#27
@@ -155,7 +159,7 @@ sha1_block_data_order:
 	ror	w23,w23,#2
 	add	w20,w20,w12	// future e+=X[i]
 	add	w21,w21,w25		// e+=F(b,c,d)
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	ror	x13,x13,#32
 #else
 	rev32	x13,x13
@@ -170,7 +174,7 @@ sha1_block_data_order:
 	add	w24,w24,w13	// future e+=X[i]
 	add	w20,w20,w25		// e+=F(b,c,d)
 	lsr	x14,x13,#32
-	ldr	x15,[x1,#-16]
+	ldur	x15,[PTR(1),#-16]
 	bic	w25,w23,w21
 	and	w26,w22,w21
 	ror	w27,w20,#27
@@ -180,7 +184,7 @@ sha1_block_data_order:
 	ror	w21,w21,#2
 	add	w23,w23,w14	// future e+=X[i]
 	add	w24,w24,w25		// e+=F(b,c,d)
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	ror	x15,x15,#32
 #else
 	rev32	x15,x15
@@ -195,7 +199,7 @@ sha1_block_data_order:
 	add	w22,w22,w15	// future e+=X[i]
 	add	w23,w23,w25		// e+=F(b,c,d)
 	lsr	x16,x15,#32
-	ldr	x17,[x1,#-8]
+	ldur	x17,[PTR(1),#-8]
 	bic	w25,w21,w24
 	and	w26,w20,w24
 	ror	w27,w23,#27
@@ -205,7 +209,7 @@ sha1_block_data_order:
 	ror	w24,w24,#2
 	add	w21,w21,w16	// future e+=X[i]
 	add	w22,w22,w25		// e+=F(b,c,d)
-#ifdef	__ARMEB__
+#ifdef	__AARCH64EB__
 	ror	x17,x17,#32
 #else
 	rev32	x17,x17
@@ -1040,7 +1044,7 @@ sha1_block_data_order:
 	add	w21,w21,w17	// future e+=X[i]
 	add	w22,w22,w25		// e+=F(b,c,d)
 	ror	w19,w19,#31
-	ldp	w4,w5,[x0]
+	ldp	w4,w5,[PTR(0)]
 	eor	w25,w20,w23
 	ror	w27,w22,#27
 	add	w20,w20,w28		// future e+=K
@@ -1049,48 +1053,49 @@ sha1_block_data_order:
 	ror	w23,w23,#2
 	add	w20,w20,w19	// future e+=X[i]
 	add	w21,w21,w25		// e+=F(b,c,d)
-	ldp	w6,w7,[x0,#8]
+	ldp	w6,w7,[PTR(0),#8]
 	eor	w25,w24,w22
 	ror	w27,w21,#27
 	eor	w25,w25,w23
 	add	w20,w20,w27		// e+=rot(a,5)
 	ror	w22,w22,#2
-	ldr	w8,[x0,#16]
+	ldr	w8,[PTR(0),#16]
 	add	w20,w20,w25		// e+=F(b,c,d)
 	add	w21,w21,w5
 	add	w22,w22,w6
 	add	w20,w20,w4
 	add	w23,w23,w7
 	add	w24,w24,w8
-	stp	w20,w21,[x0]
-	stp	w22,w23,[x0,#8]
-	str	w24,[x0,#16]
+	stp	w20,w21,[PTR(0)]
+	stp	w22,w23,[PTR(0),#8]
+	str	w24,[PTR(0),#16]
 	cbnz	x2,.Loop
 
-	ldp	x19,x20,[sp,#16]
-	ldp	x21,x22,[sp,#32]
-	ldp	x23,x24,[sp,#48]
-	ldp	x25,x26,[sp,#64]
-	ldp	x27,x28,[sp,#80]
-	ldr	x29,[sp],#96
+	ldp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	ldp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
+	ldr	PTR(29),[PTRN(sp)],#(12*PTR_WIDTH)
 	ret
 .size	sha1_block_data_order,.-sha1_block_data_order
 .type	sha1_block_armv8,%function
 .align	6
 sha1_block_armv8:
 .Lv8_entry:
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	adr	x4,.Lconst
+	adr	PTR(4),.Lconst
 	eor	v1.16b,v1.16b,v1.16b
-	ld1	{v0.4s},[x0],#16
-	ld1	{v1.s}[0],[x0]
-	sub	x0,x0,#16
-	ld1	{v16.4s,v17.4s,v18.4s,v19.4s},[x4]
+	ld1	{v0.4s},[PTR(0)],#16
+	ld1	{v1.s}[0],[PTR(0)]
+	sub	PTR(0),PTR(0),#16
+	ld1	{v16.4s,v17.4s,v18.4s,v19.4s},[PTR(4)]
 
 .Loop_hw:
-	ld1	{v4.16b,v5.16b,v6.16b,v7.16b},[x1],#64
+	ld1	{v4.16b,v5.16b,v6.16b,v7.16b},[PTR(1)],#64
 	sub	x2,x2,#1
 	rev32	v4.16b,v4.16b
 	rev32	v5.16b,v5.16b
@@ -1199,10 +1204,10 @@ sha1_block_armv8:
 
 	cbnz	x2,.Loop_hw
 
-	st1	{v0.4s},[x0],#16
-	st1	{v1.s}[0],[x0]
+	st1	{v0.4s},[PTR(0)],#16
+	st1	{v1.s}[0],[PTR(0)]
 
-	ldr	x29,[sp],#16
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH)
 	ret
 .size	sha1_block_armv8,.-sha1_block_armv8
 .align	6
@@ -1211,12 +1216,6 @@ sha1_block_armv8:
 .long	0x6ed9eba1,0x6ed9eba1,0x6ed9eba1,0x6ed9eba1	//K_20_39
 .long	0x8f1bbcdc,0x8f1bbcdc,0x8f1bbcdc,0x8f1bbcdc	//K_40_59
 .long	0xca62c1d6,0xca62c1d6,0xca62c1d6,0xca62c1d6	//K_60_79
-.LOPENSSL_armcap_P:
-#ifdef	__ILP32__
-.long	OPENSSL_armcap_P-.
-#else
-.quad	OPENSSL_armcap_P-.
-#endif
 .byte	83,72,65,49,32,98,108,111,99,107,32,116,114,97,110,115,102,111,114,109,32,102,111,114,32,65,82,77,118,56,44,32,67,82,89,80,84,79,71,65,77,83,32,98,121,32,60,97,112,112,114,111,64,111,112,101,110,115,115,108,46,111,114,103,62,0
 .align	2
 .align	2

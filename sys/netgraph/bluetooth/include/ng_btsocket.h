@@ -51,7 +51,7 @@
 struct sockaddr_hci {
 	u_char		hci_len;	/* total length */
 	u_char		hci_family;	/* address family */
-	char		hci_node[32];	/* address (size == NG_NODESIZ ) */
+	char		hci_node[32] __subobject_variable_length_maxsize(32);	/* address (size == NG_NODESIZ ) */
 };
 
 /* Raw HCI socket options */

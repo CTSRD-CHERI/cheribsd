@@ -17,6 +17,9 @@ options 	KDTRACE_HOOKS		# Kernel DTrace hooks
 options 	DDB_CTF			# Kernel ELF linker loads CTF data
 options 	RACCT_DEFAULT_TO_DISABLED # Set kern.racct.enable=0 by default
 
+# Enable detailed accounting by the PV entry allocator.
+options 	PV_STATS
+
 # RISC-V SBI console
 device		rcons
 
@@ -32,18 +35,8 @@ device		riscv_syscon
 # Backlight subsystem
 device		backlight
 
-# VirtIO support
-device		virtio			# Generic VirtIO bus (required)
-device		virtio_pci		# VirtIO PCI device
-device		vtnet			# VirtIO Ethernet device
-device		virtio_blk		# VirtIO Block device
-device		virtio_mmio		# VirtIO MMIO bus
-device		virtio_random		# VirtIO Entropy device
-
-# NVM Express (NVMe) support
-device		nvme		# base NVMe driver
-options 	NVME_USE_NVD=0	# prefer the cam(4) based nda(4) driver
-device		nvd		# expose NVMe namespaces as disks, depends on nvme
+# MMC/SD/SDIO Card slot support
+device		dwmmc
 
 # NOTE: dtrace introduces CDDL-licensed components into the kernel
 device		dtrace			# dtrace core
@@ -58,6 +51,7 @@ device		da9063_rtc	# Dialog Semiconductor DA9063 RTC
 device		goldfish_rtc	# QEMU RTC
 
 # Ethernet drivers
+device  	dwc		# Synopsys Designware GMAC Ethernet
 device		xae		# Xilinx AXI Ethernet MAC
 
 # DMA support

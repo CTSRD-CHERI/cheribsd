@@ -1,5 +1,3 @@
-#	@(#)Makefile	8.1 (Berkeley) 6/2/93
-
 MAN=
 
 .include <bsd.own.mk>

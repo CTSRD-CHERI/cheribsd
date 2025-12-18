@@ -5,16 +5,6 @@
 # Our password input method
 SRCS+=		pwgets.c
 
-# sha256 and sha512 from sys/crypto
-.PATH: ${SYSDIR}/crypto/sha2
-CFLAGS.sha256.c+=	-DWEAK_REFS
-CFLAGS.sha512.c+=	-DWEAK_REFS
-SRCS+=		sha256c.c sha512c.c
-
-# md5 from libmd
-.PATH: ${SRCTOP}/lib/libmd
-SRCS+=		md5c.c
-
 # AES implementation from sys/crypto
 .PATH: ${SYSDIR}/crypto/rijndael
 .for i in rijndael-alg-fst.c rijndael-api-fst.c rijndael-api.c
@@ -22,7 +12,6 @@ SRCS+=		md5c.c
 CFLAGS.${i}+=	-DNDEBUG
 SRCS+=		${i}
 .endfor
-
 
 # local GELI Implementation
 .PATH: ${SYSDIR}/geom/eli
@@ -32,10 +21,8 @@ SRCS+=		${i}
 .endfor
 SRCS+=		geliboot.c \
 		geliboot_crypto.c \
-		g_eli_hmac.c \
 		g_eli_key.c \
 		g_eli_key_cache.c \
-		pkcs5v2.c \
 
 # aes
 .PATH:		${SYSDIR}/opencrypto

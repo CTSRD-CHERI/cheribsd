@@ -1,6 +1,6 @@
-
 .PATH:	${SRCTOP}/contrib/pf/authpf
 
+PACKAGE=pf
 PROG=	authpf
 MAN=	authpf.8
 BINOWN=	root

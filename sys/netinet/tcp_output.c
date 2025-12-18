@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)tcp_output.c	8.4 (Berkeley) 5/24/95
  */
 
 #include <sys/cdefs.h>
@@ -203,9 +201,7 @@ tcp_default_output(struct tcpcb *tp)
 	struct tcphdr *th;
 	u_char opt[TCP_MAXOLEN];
 	unsigned ipoptlen, optlen, hdrlen, ulen;
-#if defined(IPSEC) || defined(IPSEC_SUPPORT)
 	unsigned ipsec_optlen = 0;
-#endif
 	int idle, sendalot, curticks;
 	int sack_rxmit, sack_bytes_rxmt;
 	struct sackhole *p;
@@ -215,9 +211,6 @@ tcp_default_output(struct tcpcb *tp)
 	struct tcp_log_buffer *lgb;
 	unsigned int wanted_cookie = 0;
 	unsigned int dont_sendalot = 0;
-#if 0
-	int maxburst = TCP_MAXBURST;
-#endif
 #ifdef INET6
 	struct ip6_hdr *ip6 = NULL;
 	const bool isipv6 = (inp->inp_vflag & INP_IPV6) != 0;
@@ -241,10 +234,10 @@ tcp_default_output(struct tcpcb *tp)
 	 * only allow the initial SYN or SYN|ACK and those sent
 	 * by the retransmit timer.
 	 */
-	if (IS_FASTOPEN(tp->t_flags) &&
+	if ((tp->t_flags & TF_FASTOPEN) &&
 	    ((tp->t_state == TCPS_SYN_SENT) ||
-	     (tp->t_state == TCPS_SYN_RECEIVED)) &&
-	    SEQ_GT(tp->snd_max, tp->snd_una) && /* initial SYN or SYN|ACK sent */
+	    (tp->t_state == TCPS_SYN_RECEIVED)) &&
+	    SEQ_GT(tp->snd_max, tp->snd_una) && /* SYN or SYN|ACK sent */
 	    (tp->snd_nxt != tp->snd_una))       /* not a retransmit */
 		return (0);
 
@@ -266,6 +259,7 @@ tcp_default_output(struct tcpcb *tp)
 		}
 	}
 again:
+	sendwin = 0;
 	/*
 	 * If we've recently taken a timeout, snd_max will be greater than
 	 * snd_nxt.  There may be SACK information that allows us to avoid
@@ -273,12 +267,12 @@ again:
 	 */
 	if ((tp->t_flags & TF_SACK_PERMIT) &&
 	    SEQ_LT(tp->snd_nxt, tp->snd_max))
-		tcp_sack_adjust(tp);
+		sendwin = tcp_sack_adjust(tp);
 	sendalot = 0;
 	tso = 0;
 	mtu = 0;
 	off = tp->snd_nxt - tp->snd_una;
-	sendwin = min(tp->snd_wnd, tp->snd_cwnd);
+	sendwin = min(tp->snd_wnd, tp->snd_cwnd + sendwin);
 
 	flags = tcp_outflags[tp->t_state];
 	/*
@@ -295,7 +289,8 @@ again:
 	sack_bytes_rxmt = 0;
 	len = 0;
 	p = NULL;
-	if ((tp->t_flags & TF_SACK_PERMIT) && IN_FASTRECOVERY(tp->t_flags) &&
+	if ((tp->t_flags & TF_SACK_PERMIT) &&
+	    (IN_FASTRECOVERY(tp->t_flags) || SEQ_LT(tp->snd_nxt, tp->snd_max)) &&
 	    (p = tcp_sack_output(tp, &sack_bytes_rxmt))) {
 		uint32_t cwin;
 
@@ -332,9 +327,6 @@ again:
 			    __func__, off));
 			sack_rxmit = 1;
 			sendalot = 1;
-			TCPSTAT_INC(tcps_sack_rexmits);
-			TCPSTAT_ADD(tcps_sack_rexmit_bytes,
-			    min(len, tcp_maxseg(tp)));
 		}
 	}
 after_sack_rexmit:
@@ -397,10 +389,10 @@ after_sack_rexmit:
 	 * in which case len is already set.
 	 */
 	if (sack_rxmit == 0) {
-		if (sack_bytes_rxmt == 0)
+		if ((sack_bytes_rxmt == 0) || SEQ_LT(tp->snd_nxt, tp->snd_max)) {
 			len = ((int32_t)min(sbavail(&so->so_snd), sendwin) -
 			    off);
-		else {
+		} else {
 			int32_t cwin;
 
 			/*
@@ -441,7 +433,7 @@ after_sack_rexmit:
 		 * When sending additional segments following a TFO SYN|ACK,
 		 * do not include the SYN bit.
 		 */
-		if (IS_FASTOPEN(tp->t_flags) &&
+		if ((tp->t_flags & TF_FASTOPEN) &&
 		    (tp->t_state == TCPS_SYN_RECEIVED))
 			flags &= ~TH_SYN;
 		off--, len++;
@@ -469,12 +461,18 @@ after_sack_rexmit:
 	 *
 	 *  - When the socket is in the CLOSED state (RST is being sent)
 	 */
-	if (IS_FASTOPEN(tp->t_flags) &&
+	if ((tp->t_flags & TF_FASTOPEN) &&
 	    (((flags & TH_SYN) && (tp->t_rxtshift > 0)) ||
 	     ((tp->t_state == TCPS_SYN_SENT) &&
 	      (tp->t_tfo_client_cookie_len == 0)) ||
 	     (flags & TH_RST)))
 		len = 0;
+
+	/* Without fast-open there should never be data sent on a SYN. */
+	if ((flags & TH_SYN) && !(tp->t_flags & TF_FASTOPEN)) {
+		len = 0;
+	}
+
 	if (len <= 0) {
 		/*
 		 * If FIN has been sent but not acked,
@@ -552,23 +550,19 @@ after_sack_rexmit:
 				offsetof(struct ipoption, ipopt_list);
 	else
 		ipoptlen = 0;
-#if defined(IPSEC) || defined(IPSEC_SUPPORT)
 	ipoptlen += ipsec_optlen;
-#endif
 
 	if ((tp->t_flags & TF_TSO) && V_tcp_do_tso && len > tp->t_maxseg &&
 	    (tp->t_port == 0) &&
 	    ((tp->t_flags & TF_SIGNATURE) == 0) &&
-	    tp->rcv_numsacks == 0 && sack_rxmit == 0 &&
-	    ipoptlen == 0 && !(flags & TH_SYN))
+	    tp->rcv_numsacks == 0 && ((sack_rxmit == 0) || V_tcp_sack_tso) &&
+	    (ipoptlen == 0 || (ipoptlen == ipsec_optlen &&
+	    (tp->t_flags2 & TF2_IPSEC_TSO) != 0)) &&
+	    !(flags & TH_SYN))
 		tso = 1;
 
-	if (sack_rxmit) {
-		if (SEQ_LT(p->rxmit + len, tp->snd_una + sbused(&so->so_snd)))
-			flags &= ~TH_FIN;
-	} else {
-		if (SEQ_LT(tp->snd_nxt + len, tp->snd_una +
-		    sbused(&so->so_snd)))
+	if (SEQ_LT((sack_rxmit ? p->rxmit : tp->snd_nxt) + len,
+		    tp->snd_una + sbused(&so->so_snd))) {
 			flags &= ~TH_FIN;
 	}
 
@@ -653,8 +647,7 @@ after_sack_rexmit:
 	 * Don't send an independent window update if a delayed
 	 * ACK is pending (it will get piggy-backed on it) or the
 	 * remote side already has done a half-close and won't send
-	 * more data.  Skip this if the connection is in T/TCP
-	 * half-open state.
+	 * more data.
 	 */
 	if (recwin > 0 && !(tp->t_flags & TF_NEEDSYN) &&
 	    !(tp->t_flags & TF_DELACK) &&
@@ -811,7 +804,7 @@ send:
 			 * have caused the original SYN or SYN|ACK to have
 			 * been dropped by a middlebox.
 			 */
-			if (IS_FASTOPEN(tp->t_flags) &&
+			if ((tp->t_flags & TF_FASTOPEN) &&
 			    (tp->t_rxtshift == 0)) {
 				if (tp->t_state == TCPS_SYN_RECEIVED) {
 					to.to_tfo_len = TCP_FASTOPEN_COOKIE_LEN;
@@ -885,7 +878,7 @@ send:
 		 * If we wanted a TFO option to be added, but it was unable
 		 * to fit, ensure no data is sent.
 		 */
-		if (IS_FASTOPEN(tp->t_flags) && wanted_cookie &&
+		if ((tp->t_flags & TF_FASTOPEN) && wanted_cookie &&
 		    !(to.to_flags & TOF_FASTOPEN))
 			len = 0;
 	}
@@ -921,7 +914,7 @@ send:
 			 * overflowing or exceeding the maximum length
 			 * allowed by the network interface:
 			 */
-			KASSERT(ipoptlen == 0,
+			KASSERT(ipoptlen ==  ipsec_optlen,
 			    ("%s: TSO can't do IP options", __func__));
 
 			/*
@@ -930,8 +923,8 @@ send:
 			 */
 			if (if_hw_tsomax != 0) {
 				/* compute maximum TSO length */
-				max_len = (if_hw_tsomax - hdrlen -
-				    max_linkhdr);
+				max_len = if_hw_tsomax - hdrlen -
+				    ipsec_optlen - max_linkhdr;
 				if (max_len <= 0) {
 					len = 0;
 				} else if (len > max_len) {
@@ -945,7 +938,7 @@ send:
 			 * fractional unless the send sockbuf can be
 			 * emptied:
 			 */
-			max_len = (tp->t_maxseg - optlen);
+			max_len = tp->t_maxseg - optlen - ipsec_optlen;
 			if (((uint32_t)off + (uint32_t)len) <
 			    sbavail(&so->so_snd)) {
 				moff = len % max_len;
@@ -1039,6 +1032,13 @@ send:
 			tp->t_sndrexmitpack++;
 			TCPSTAT_INC(tcps_sndrexmitpack);
 			TCPSTAT_ADD(tcps_sndrexmitbyte, len);
+			if (sack_rxmit) {
+				TCPSTAT_INC(tcps_sack_rexmits);
+				if (tso) {
+					TCPSTAT_INC(tcps_sack_rexmits_tso);
+				}
+				TCPSTAT_ADD(tcps_sack_rexmit_bytes, len);
+			}
 #ifdef STATS
 			stats_voi_update_abs_u32(tp->t_stats, VOI_TCP_RETXPB,
 			    len);
@@ -1080,13 +1080,18 @@ send:
 				sbsndptr_adv(&so->so_snd, mb, len);
 			m->m_len += len;
 		} else {
+			int32_t old_len;
+
 			if (SEQ_LT(tp->snd_nxt, tp->snd_max))
 				msb = NULL;
 			else
 				msb = &so->so_snd;
+			old_len = len;
 			m->m_next = tcp_m_copym(mb, moff,
 			    &len, if_hw_tsomaxsegcount,
 			    if_hw_tsomaxsegsize, msb, hw_tls);
+			if (old_len != len)
+				flags &= ~TH_FIN;
 			if (len <= (tp->t_maxseg - optlen)) {
 				/*
 				 * Must have ran out of mbufs for the copy
@@ -1390,10 +1395,10 @@ send:
 	 * The TCP pseudo header checksum is always provided.
 	 */
 	if (tso) {
-		KASSERT(len > tp->t_maxseg - optlen,
+		KASSERT(len > tp->t_maxseg - optlen - ipsec_optlen,
 		    ("%s: len <= tso_segsz", __func__));
 		m->m_pkthdr.csum_flags |= CSUM_TSO;
-		m->m_pkthdr.tso_segsz = tp->t_maxseg - optlen;
+		m->m_pkthdr.tso_segsz = tp->t_maxseg - optlen - ipsec_optlen;
 	}
 
 	KASSERT(len + hdrlen == m_length(m, NULL),
@@ -1522,9 +1527,13 @@ out:
 		tcp_account_for_send(tp, len, (tp->snd_nxt != tp->snd_max), 0, hw_tls);
 	/*
 	 * In transmit state, time the transmission and arrange for
-	 * the retransmit.  In persist state, just set snd_max.
+	 * the retransmit.  In persist state, just set snd_max.  In a closed
+	 * state just return.
 	 */
-	if ((tp->t_flags & TF_FORCEDATA) == 0 ||
+	if (flags & TH_RST) {
+		TCPSTAT_INC(tcps_sndtotal);
+		return (0);
+	} else if ((tp->t_flags & TF_FORCEDATA) == 0 ||
 	    !tcp_timer_active(tp, TT_PERSIST)) {
 		tcp_seq startseq = tp->snd_nxt;
 
@@ -1629,11 +1638,16 @@ timer:
 			tp->snd_max = tp->snd_nxt + xlen;
 	}
 	if ((error == 0) &&
-	    (TCPS_HAVEESTABLISHED(tp->t_state) &&
-	     (tp->t_flags & TF_SACK_PERMIT) &&
-	     tp->rcv_numsacks > 0)) {
-		    /* Clean up any DSACK's sent */
-		    tcp_clean_dsack_blocks(tp);
+	    (tp->rcv_numsacks > 0) &&
+	    TCPS_HAVEESTABLISHED(tp->t_state) &&
+	    (tp->t_flags & TF_SACK_PERMIT)) {
+		/* Clean up any DSACK's sent */
+		tcp_clean_dsack_blocks(tp);
+	}
+	if ((error == 0) &&
+	    sack_rxmit &&
+	    SEQ_LT(tp->snd_nxt, SEQ_MIN(p->rxmit, p->end))) {
+		tp->snd_nxt = SEQ_MIN(p->rxmit, p->end);
 	}
 	if (error) {
 		/*
@@ -1654,7 +1668,7 @@ timer:
 		    ((flags & TH_SYN) == 0) &&
 		    (error != EPERM)) {
 			if (sack_rxmit) {
-				p->rxmit -= len;
+				p->rxmit = SEQ_MIN(p->end, p->rxmit) - len;
 				tp->sackhint.sack_bytes_rexmit -= len;
 				KASSERT(tp->sackhint.sack_bytes_rexmit >= 0,
 				    ("sackhint bytes rtx >= 0"));
@@ -1665,6 +1679,8 @@ timer:
 				if (flags & TH_FIN)
 					tp->snd_nxt--;
 			}
+			if (IN_RECOVERY(tp->t_flags))
+				tp->sackhint.prr_out -= len;
 		}
 		SOCKBUF_UNLOCK_ASSERT(&so->so_snd);	/* Check gotos. */
 		switch (error) {
@@ -1720,16 +1736,6 @@ timer:
 	tp->t_flags &= ~(TF_ACKNOW | TF_DELACK);
 	if (tcp_timer_active(tp, TT_DELACK))
 		tcp_timer_activate(tp, TT_DELACK, 0);
-#if 0
-	/*
-	 * This completely breaks TCP if newreno is turned on.  What happens
-	 * is that if delayed-acks are turned on on the receiver, this code
-	 * on the transmitter effectively destroys the TCP window, forcing
-	 * it to four packets (1.5Kx4 = 6K window).
-	 */
-	if (sendalot && --maxburst)
-		goto again;
-#endif
 	if (sendalot)
 		goto again;
 	return (0);
@@ -2089,7 +2095,7 @@ tcp_m_copym(struct mbuf *m, int32_t off0, int32_t *plen,
 		}
 		n->m_len = mlen;
 		len_cp += n->m_len;
-		if (m->m_flags & (M_EXT|M_EXTPG)) {
+		if (m->m_flags & (M_EXT | M_EXTPG)) {
 			n->m_data = m->m_data + off;
 			mb_dupcl(n, m);
 		} else

@@ -367,7 +367,7 @@ ng_iface_output(struct ifnet *ifp, struct mbuf *m,
 	}
 
 	/* BPF writes need to be handled specially. */
-	if (dst->sa_family == AF_UNSPEC)
+	if (dst->sa_family == AF_UNSPEC || dst->sa_family == pseudo_AF_HDRCMPLT)
 		bcopy(dst->sa_data, &af, sizeof(af));
 	else
 		af = RO_GET_FAMILY(ro, dst);
@@ -524,10 +524,6 @@ ng_iface_constructor(node_p node)
 	/* Allocate node and interface private structures */
 	priv = malloc(sizeof(*priv), M_NETGRAPH_IFACE, M_WAITOK | M_ZERO);
 	ifp = if_alloc(IFT_PROPVIRTUAL);
-	if (ifp == NULL) {
-		free(priv, M_NETGRAPH_IFACE);
-		return (ENOMEM);
-	}
 
 	rm_init(&priv->lock, "ng_iface private rmlock");
 

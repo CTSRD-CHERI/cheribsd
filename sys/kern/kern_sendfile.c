@@ -1340,11 +1340,11 @@ kern_sendfile(struct thread *td, int fd, int s, off_t offset, size_t nbytes,
 	fdrop(fp, td);
 
 	if (usbytes != NULL)
-		copyout(&sbytes, usbytes, sizeof(off_t));
+		(void)copyout(&sbytes, usbytes, sizeof(off_t));
 
 out:
-	free(hdr_uio, M_IOV);
-	free(trl_uio, M_IOV);
+	freeuio(hdr_uio);
+	freeuio(trl_uio);
 	return (error);
 }
 

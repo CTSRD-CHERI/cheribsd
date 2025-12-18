@@ -1,13 +1,8 @@
-/*
- */
-
 FBSD_1.0 {
 	bcmp;
 	bcopy;
 	memcpy;
-	memcpy_c;
 	memmove;
-	memmove_c;
 	ffs;
 	ffsl;
 	fls;
@@ -20,7 +15,6 @@ FBSD_1.0 {
 	memmem;
 	bzero;
 	memset;
-	memset_c;
 	strrchr;
 	rindex;
 	stpcpy;

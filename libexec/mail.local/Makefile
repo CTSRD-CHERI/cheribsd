@@ -1,5 +1,3 @@
-#	@(#)Makefile	8.1 (Berkeley) 7/19/93
-
 PACKAGE=sendmail
 SENDMAIL_DIR=${SRCTOP}/contrib/sendmail
 .PATH:	${SENDMAIL_DIR}/mail.local

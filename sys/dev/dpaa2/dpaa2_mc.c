@@ -73,8 +73,6 @@
 #define	mcreg_read_4(_sc, _r)		bus_read_4(&(_sc)->map[1], (_r))
 #define	mcreg_write_4(_sc, _r, _v)	bus_write_4(&(_sc)->map[1], (_r), (_v))
 
-#define COMPARE_TYPE(t, v)		(strncmp((v), (t), strlen((v))) == 0)
-
 #define IORT_DEVICE_NAME		"MCE"
 
 /* MC Registers */
@@ -117,7 +115,6 @@ static struct resource_spec dpaa2_mc_spec[] = {
 
 static u_int dpaa2_mc_get_xref(device_t, device_t);
 static u_int dpaa2_mc_map_id(device_t, device_t, uintptr_t *);
-static struct rman *dpaa2_mc_rman(device_t, int);
 
 static int dpaa2_mc_alloc_msi_impl(device_t, device_t, int, int, int *);
 static int dpaa2_mc_release_msi_impl(device_t, device_t, int, int *);
@@ -314,10 +311,10 @@ dpaa2_mc_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
 	struct rman *rm;
 	int error;
 
-	rm = dpaa2_mc_rman(mcdev, type);
-	if (!rm)
-		return (BUS_ALLOC_RESOURCE(device_get_parent(mcdev), child,
-		    type, rid, start, end, count, flags));
+	rm = dpaa2_mc_rman(mcdev, type, flags);
+	if (rm == NULL)
+		return (bus_generic_alloc_resource(mcdev, child, type, rid,
+		    start, end, count, flags));
 
 	/*
 	 * Skip managing DPAA2-specific resource. It must be provided to MC by
@@ -333,24 +330,10 @@ dpaa2_mc_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
 		}
 	}
 
-	res = rman_reserve_resource(rm, start, end, count, flags, child);
-	if (!res) {
-		device_printf(mcdev, "rman_reserve_resource() failed: "
-		    "start=%#jx, end=%#jx, count=%#jx\n", start, end, count);
+	res = bus_generic_rman_alloc_resource(mcdev, child, type, rid, start,
+	    end, count, flags);
+	if (res == NULL)
 		goto fail;
-	}
-
-	rman_set_rid(res, *rid);
-
-	if (flags & RF_ACTIVE) {
-		if (bus_activate_resource(child, type, *rid, res)) {
-			device_printf(mcdev, "bus_activate_resource() failed: "
-			    "rid=%d, res=%#jx\n", *rid, (uintmax_t) res);
-			rman_release_resource(res);
-			goto fail;
-		}
-	}
-
 	return (res);
  fail:
 	device_printf(mcdev, "%s() failed: type=%d, rid=%d, start=%#jx, "
@@ -360,56 +343,49 @@ dpaa2_mc_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
 }
 
 int
-dpaa2_mc_adjust_resource(device_t mcdev, device_t child, int type,
+dpaa2_mc_adjust_resource(device_t mcdev, device_t child,
     struct resource *r, rman_res_t start, rman_res_t end)
 {
 	struct rman *rm;
 
-	rm = dpaa2_mc_rman(mcdev, type);
+	rm = dpaa2_mc_rman(mcdev, rman_get_type(r), rman_get_flags(r));
 	if (rm)
-		return (rman_adjust_resource(r, start, end));
-	return (bus_generic_adjust_resource(mcdev, child, type, r, start, end));
+		return (bus_generic_rman_adjust_resource(mcdev, child, r,
+		    start, end));
+	return (bus_generic_adjust_resource(mcdev, child, r, start, end));
 }
 
 int
-dpaa2_mc_release_resource(device_t mcdev, device_t child, int type, int rid,
-    struct resource *r)
+dpaa2_mc_release_resource(device_t mcdev, device_t child, struct resource *r)
 {
 	struct rman *rm;
 
-	rm = dpaa2_mc_rman(mcdev, type);
-	if (rm) {
-		KASSERT(rman_is_region_manager(r, rm), ("rman mismatch"));
-		rman_release_resource(r);
-	}
-
-	return (bus_generic_release_resource(mcdev, child, type, rid, r));
+	rm = dpaa2_mc_rman(mcdev, rman_get_type(r), rman_get_flags(r));
+	if (rm)
+		return (bus_generic_rman_release_resource(mcdev, child, r));
+	return (bus_generic_release_resource(mcdev, child, r));
 }
 
 int
-dpaa2_mc_activate_resource(device_t mcdev, device_t child, int type, int rid,
-    struct resource *r)
+dpaa2_mc_activate_resource(device_t mcdev, device_t child, struct resource *r)
 {
-	int rc;
+	struct rman *rm;
 
-	if ((rc = rman_activate_resource(r)) != 0)
-		return (rc);
-
-	return (BUS_ACTIVATE_RESOURCE(device_get_parent(mcdev), child, type,
-	    rid, r));
+	rm = dpaa2_mc_rman(mcdev, rman_get_type(r), rman_get_flags(r));
+	if (rm)
+		return (bus_generic_rman_activate_resource(mcdev, child, r));
+	return (bus_generic_activate_resource(mcdev, child, r));
 }
 
 int
-dpaa2_mc_deactivate_resource(device_t mcdev, device_t child, int type, int rid,
-    struct resource *r)
+dpaa2_mc_deactivate_resource(device_t mcdev, device_t child, struct resource *r)
 {
-	int rc;
+	struct rman *rm;
 
-	if ((rc = rman_deactivate_resource(r)) != 0)
-		return (rc);
-
-	return (BUS_DEACTIVATE_RESOURCE(device_get_parent(mcdev), child, type,
-	    rid, r));
+	rm = dpaa2_mc_rman(mcdev, rman_get_type(r), rman_get_flags(r));
+	if (rm)
+		return (bus_generic_rman_deactivate_resource(mcdev, child, r));
+	return (bus_generic_deactivate_resource(mcdev, child, r));
 }
 
 /*
@@ -486,8 +462,6 @@ dpaa2_mc_manage_dev(device_t mcdev, device_t dpaa2_dev, uint32_t flags)
 		return (EINVAL);
 
 	di = malloc(sizeof(*di), M_DPAA2_MC, M_WAITOK | M_ZERO);
-	if (!di)
-		return (ENOMEM);
 	di->dpaa2_dev = dpaa2_dev;
 	di->flags = flags;
 	di->owners = 0;
@@ -500,7 +474,7 @@ dpaa2_mc_manage_dev(device_t mcdev, device_t dpaa2_dev, uint32_t flags)
 
 	if (flags & DPAA2_MC_DEV_ALLOCATABLE) {
 		/* Select rman based on a type of the DPAA2 device. */
-		rm = dpaa2_mc_rman(mcdev, dinfo->dtype);
+		rm = dpaa2_mc_rman(mcdev, dinfo->dtype, 0);
 		if (!rm)
 			return (ENOENT);
 		/* Manage DPAA2 device as an allocatable resource. */
@@ -525,7 +499,7 @@ dpaa2_mc_get_free_dev(device_t mcdev, device_t *dpaa2_dev,
 		return (EINVAL);
 
 	/* Select resource manager based on a type of the DPAA2 device. */
-	rm = dpaa2_mc_rman(mcdev, devtype);
+	rm = dpaa2_mc_rman(mcdev, devtype, 0);
 	if (!rm)
 		return (ENOENT);
 	/* Find first free DPAA2 device of the given type. */
@@ -672,68 +646,6 @@ dpaa2_mc_release_dev(device_t mcdev, device_t dpaa2_dev,
 }
 
 /**
- * @brief Convert DPAA2 device type to string.
- */
-const char *
-dpaa2_ttos(enum dpaa2_dev_type type)
-{
-	switch (type) {
-	case DPAA2_DEV_MC:
-		return ("mc"); /* NOTE: to print as information only. */
-	case DPAA2_DEV_RC:
-		return ("dprc");
-	case DPAA2_DEV_IO:
-		return ("dpio");
-	case DPAA2_DEV_NI:
-		return ("dpni");
-	case DPAA2_DEV_MCP:
-		return ("dpmcp");
-	case DPAA2_DEV_BP:
-		return ("dpbp");
-	case DPAA2_DEV_CON:
-		return ("dpcon");
-	case DPAA2_DEV_MAC:
-		return ("dpmac");
-	case DPAA2_DEV_MUX:
-		return ("dpdmux");
-	case DPAA2_DEV_SW:
-		return ("dpsw");
-	default:
-		break;
-	}
-	return ("notype");
-}
-
-/**
- * @brief Convert string to DPAA2 device type.
- */
-enum dpaa2_dev_type
-dpaa2_stot(const char *str)
-{
-	if (COMPARE_TYPE(str, "dprc")) {
-		return (DPAA2_DEV_RC);
-	} else if (COMPARE_TYPE(str, "dpio")) {
-		return (DPAA2_DEV_IO);
-	} else if (COMPARE_TYPE(str, "dpni")) {
-		return (DPAA2_DEV_NI);
-	} else if (COMPARE_TYPE(str, "dpmcp")) {
-		return (DPAA2_DEV_MCP);
-	} else if (COMPARE_TYPE(str, "dpbp")) {
-		return (DPAA2_DEV_BP);
-	} else if (COMPARE_TYPE(str, "dpcon")) {
-		return (DPAA2_DEV_CON);
-	} else if (COMPARE_TYPE(str, "dpmac")) {
-		return (DPAA2_DEV_MAC);
-	} else if (COMPARE_TYPE(str, "dpdmux")) {
-		return (DPAA2_DEV_MUX);
-	} else if (COMPARE_TYPE(str, "dpsw")) {
-		return (DPAA2_DEV_SW);
-	}
-
-	return (DPAA2_DEV_NOTYPE);
-}
-
-/**
  * @internal
  */
 static u_int
@@ -813,8 +725,8 @@ dpaa2_mc_map_id(device_t mcdev, device_t child, uintptr_t *id)
  * @internal
  * @brief Obtain a resource manager based on the given type of the resource.
  */
-static struct rman *
-dpaa2_mc_rman(device_t mcdev, int type)
+struct rman *
+dpaa2_mc_rman(device_t mcdev, int type, u_int flags)
 {
 	struct dpaa2_mc_softc *sc;
 

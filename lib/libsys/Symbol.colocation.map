@@ -1,0 +1,7 @@
+FBSD_1.5 {
+  _cosetup;
+  cosetup;
+  coregister;
+  colookup;
+  copark;
+};

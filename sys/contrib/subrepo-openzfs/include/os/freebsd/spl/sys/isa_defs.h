@@ -145,7 +145,7 @@ extern "C" {
  * Define the appropriate "implementation choices"
  */
 #if !defined(_LP64)
-#error "_LP64 not defined"
+#define	_LP64
 #endif
 #define	_SUNOS_VTOC_16
 

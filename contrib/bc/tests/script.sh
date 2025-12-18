@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# Copyright (c) 2018-2023 Gavin D. Howard and contributors.
+# Copyright (c) 2018-2024 Gavin D. Howard and contributors.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -132,7 +132,7 @@ fi
 
 # Skip the tests that require extra math if we don't have it.
 if [ "$run_extra_tests" -eq 0 ]; then
-	if [ "$f" = "rand.bc" ] || [ "$f" = "root.bc" ]; then
+	if [ "$f" = "rand.bc" ] || [ "$f" = "root.bc" ] || [ "$f" = "i2rand.bc" ]; then
 		printf 'Skipping %s script: %s\n' "$d" "$f"
 		exit 0
 	fi

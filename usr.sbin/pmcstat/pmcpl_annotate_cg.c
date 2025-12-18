@@ -49,7 +49,6 @@
  * gprof(1) compatible profiles.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/endian.h>
 #include <sys/gmon.h>
@@ -91,11 +90,11 @@
 
 void
 pmcpl_annotate_cg_process(struct pmcstat_process *pp, struct pmcstat_pmcrecord *pmcr,
-    uint32_t nsamples, uintfptr_t *cc, int usermode, uint32_t cpu)
+    uint32_t nsamples, ptraddr_t *cc, int usermode, uint32_t cpu)
 {
 	struct pmcstat_pcmap *map;
 	struct pmcstat_symbol *sym;
-	uintfptr_t newpc;
+	ptraddr_t newpc;
 	struct pmcstat_image *image;
 	int i;
 	char filename[PATH_MAX], funcname[PATH_MAX];

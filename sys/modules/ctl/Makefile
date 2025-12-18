@@ -1,4 +1,3 @@
-
 .PATH: ${SRCTOP}/sys/cam/ctl
 
 KMOD=	ctl
@@ -12,6 +11,8 @@ SRCS+=	ctl_frontend.c
 SRCS+=	ctl_frontend_cam_sim.c
 SRCS+=	ctl_frontend_ioctl.c
 SRCS+=	ctl_ha.c
+SRCS+=	ctl_nvme_all.c
+SRCS+=	ctl_nvme_cmd_table.c
 SRCS+=	ctl_scsi_all.c
 SRCS+=	ctl_tpc.c
 SRCS+=	ctl_tpc_local.c

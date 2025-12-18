@@ -123,9 +123,6 @@ get_orphan_bundle(int bank,
 
 	orphan_bundle =
 	    malloc(sizeof(*orphan_bundle), M_QAT, M_WAITOK | M_ZERO);
-	if (!orphan_bundle)
-		return ENOMEM;
-
 	csr_base = accel->bar->virt_addr;
 	orphan_bundle->csr_base = csr_base;
 	orphan_bundle->bank = bank;
@@ -323,7 +320,7 @@ cleanup_orphan_ring(struct bundle_orphan_ring *orphan,
 void
 adf_uio_do_cleanup_orphan(int bank, struct adf_uio_control_accel *accel)
 {
-	int ret, pid_found;
+	int ret;
 	struct adf_uio_instance_rings *instance_rings, *tmp;
 	struct adf_uio_control_bundle *bundle;
 	/* orphan is local pointer allocated and deallocated in this function */
@@ -347,7 +344,6 @@ adf_uio_do_cleanup_orphan(int bank, struct adf_uio_control_accel *accel)
 	if (hw_data->ring_pair_reset) {
 		hw_data->ring_pair_reset(
 		    accel_dev, orphan->bundle->hardware_bundle_number);
-		mutex_lock(&orphan->bundle->lock);
 		/*
 		 * If processes exit normally, rx_mask, tx_mask
 		 * and rings_enabled are all 0, below expression
@@ -357,7 +353,6 @@ adf_uio_do_cleanup_orphan(int bank, struct adf_uio_control_accel *accel)
 		 */
 		orphan->bundle->rings_enabled &=
 		    ~(orphan->rx_mask | orphan->tx_mask);
-		mutex_unlock(&orphan->bundle->lock);
 		goto out;
 	}
 
@@ -385,19 +380,12 @@ release:
 	 * then force a release here.
 	 */
 	mutex_lock(&bundle->list_lock);
-	pid_found = 0;
 	list_for_each_entry_safe(instance_rings, tmp, &bundle->list, list)
 	{
 		if (instance_rings->user_pid == curproc->p_pid) {
-			pid_found = 1;
+			bundle->rings_used &= ~instance_rings->ring_mask;
 			break;
 		}
 	}
 	mutex_unlock(&bundle->list_lock);
-
-	if (pid_found) {
-		mutex_lock(&bundle->lock);
-		bundle->rings_used &= ~instance_rings->ring_mask;
-		mutex_unlock(&bundle->lock);
-	}
 }

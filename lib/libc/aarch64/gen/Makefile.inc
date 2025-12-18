@@ -1,4 +1,3 @@
-
 CFLAGS+=	-DNO_COMPAT7
 
 SRCS+=	_ctx_start.S \
@@ -6,10 +5,10 @@ SRCS+=	_ctx_start.S \
 	flt_rounds.c \
 	fpgetmask.c \
 	fpsetmask.c \
+	getcontextx.c \
 	infinity.c \
 	ldexp.c \
 	makecontext.c \
 	_setjmp.S \
 	setjmp.S \
-	sigsetjmp.S \
-	trivial-getcontextx.c
+	sigsetjmp.S

@@ -1,4 +1,3 @@
-
 .include <src.opts.mk>
 
 PROG=	procstat
@@ -9,7 +8,9 @@ SRCS=	procstat.c		\
 	procstat_auxv.c		\
 	procstat_basic.c	\
 	procstat_bin.c		\
+	procstat_c18n.c		\
 	procstat_cheri.c	\
+	procstat_compartments.c	\
 	procstat_cred.c		\
 	procstat_cs.c		\
 	procstat_files.c	\
@@ -18,6 +19,7 @@ SRCS=	procstat.c		\
 	procstat_ptlwpinfo.c	\
 	procstat_pwdx.c		\
 	procstat_rlimit.c	\
+	procstat_rlimitusage.c	\
 	procstat_rusage.c	\
 	procstat_sigs.c		\
 	procstat_threads.c	\

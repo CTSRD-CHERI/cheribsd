@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)file.h	8.3 (Berkeley) 1/9/95
  */
 
 #ifndef _SYS_FILE_H_
@@ -69,7 +67,7 @@ struct nameidata;
 #define	DTYPE_DEV	11	/* Device specific fd type */
 #define	DTYPE_PROCDESC	12	/* process descriptor */
 #define	DTYPE_EVENTFD	13	/* eventfd */
-#define	DTYPE_LINUXTFD	14	/* emulation timerfd type */
+#define	DTYPE_TIMERFD	14	/* timerfd */
 
 #ifdef _KERNEL
 
@@ -132,6 +130,7 @@ typedef int fo_fallocate_t(struct file *fp, off_t offset, off_t len,
 typedef int fo_fspacectl_t(struct file *fp, int cmd,
 		    off_t *offset, off_t *length, int flags,
 		    struct ucred *active_cred, struct thread *td);
+typedef int fo_cmp_t(struct file *fp, struct file *fp1, struct thread *td);
 typedef int fo_spare_t(struct file *fp);
 typedef	int fo_flags_t;
 
@@ -155,6 +154,7 @@ struct fileops {
 	fo_get_seals_t	*fo_get_seals;
 	fo_fallocate_t	*fo_fallocate;
 	fo_fspacectl_t	*fo_fspacectl;
+	fo_cmp_t	*fo_cmp;
 	fo_spare_t	*fo_spares[8];	/* Spare slots */
 	fo_flags_t	fo_flags;	/* DFLAG_* below */
 };
@@ -264,6 +264,7 @@ int fget_write(struct thread *td, int fd, cap_rights_t *rightsp,
 int fget_fcntl(struct thread *td, int fd, cap_rights_t *rightsp,
     int needfcntl, struct file **fpp);
 int _fdrop(struct file *fp, struct thread *td);
+int fget_remote(struct thread *td, struct proc *p, int fd, struct file **fpp);
 
 fo_rdwr_t	invfo_rdwr;
 fo_truncate_t	invfo_truncate;
@@ -279,6 +280,7 @@ fo_seek_t	vn_seek;
 fo_fill_kinfo_t	vn_fill_kinfo;
 fo_kqfilter_t	vn_kqfilter_opath;
 int vn_fill_kinfo_vnode(struct vnode *vp, struct kinfo_file *kif);
+int file_kcmp_generic(struct file *fp1, struct file *fp2, struct thread *td);
 
 void finit(struct file *, u_int, short, void *, struct fileops *);
 void finit_vnode(struct file *, u_int, void *, struct fileops *);
@@ -292,8 +294,8 @@ int fgetvp_read(struct thread *td, int fd, cap_rights_t *rightsp,
     struct vnode **vpp);
 int fgetvp_write(struct thread *td, int fd, cap_rights_t *rightsp,
     struct vnode **vpp);
-int fgetvp_lookup_smr(int fd, struct nameidata *ndp, struct vnode **vpp, bool *fsearch);
-int fgetvp_lookup(int fd, struct nameidata *ndp, struct vnode **vpp);
+int fgetvp_lookup_smr(struct nameidata *ndp, struct vnode **vpp, bool *fsearch);
+int fgetvp_lookup(struct nameidata *ndp, struct vnode **vpp);
 
 static __inline __result_use_check bool
 fhold(struct file *fp)
@@ -482,8 +484,9 @@ fo_fallocate(struct file *fp, off_t offset, off_t len, struct thread *td)
 	return ((*fp->f_ops->fo_fallocate)(fp, offset, len, td));
 }
 
-static __inline int fo_fspacectl(struct file *fp, int cmd, off_t *offset,
-    off_t *length, int flags, struct ucred *active_cred, struct thread *td)
+static __inline int
+fo_fspacectl(struct file *fp, int cmd, off_t *offset, off_t *length,
+    int flags, struct ucred *active_cred, struct thread *td)
 {
 
 	if (fp->f_ops->fo_fspacectl == NULL)
@@ -492,6 +495,14 @@ static __inline int fo_fspacectl(struct file *fp, int cmd, off_t *offset,
 	    active_cred, td));
 }
 
+static __inline int
+fo_cmp(struct file *fp1, struct file *fp2, struct thread *td)
+{
+
+	if (fp1->f_ops->fo_cmp == NULL)
+		return (ENODEV);
+	return ((*fp1->f_ops->fo_cmp)(fp1, fp2, td));
+}
 
 #endif /* _KERNEL */
 

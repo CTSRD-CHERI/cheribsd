@@ -89,6 +89,7 @@ typedef struct {
 	int flags;
 	Elf_Brandnote *brand_note;
 	bool		(*header_supported)(const struct image_params *,
+	    const __ElfN(Ehdr) *, const __ElfN(Phdr) *,
 	    const int32_t *, const uint32_t *);
 		/* High 8 bits of flags is private to the ABI */
 #define	BI_CAN_EXEC_DYN		0x0001
@@ -102,6 +103,7 @@ __ElfType(Brandinfo);
 
 #define	MAX_BRANDS		8
 #define	FREEBSD_ABI_VENDOR	"FreeBSD"
+#define	GNU_ABI_VENDOR		"GNU"
 
 typedef void (*outfunc_t)(void *, struct sbuf *, size_t *);
 
@@ -124,7 +126,7 @@ void	__elfN(prepare_notes)(struct thread *, struct note_info_list *,
 void	__elfN(size_segments)(struct thread *, struct sseg_closure *, int);
 size_t	__elfN(register_note)(struct thread *, struct note_info_list *,
 	    int, outfunc_t, void *);
-bool	__elfN(parse_notes)(const struct image_params *, Elf_Note *,
+bool	__elfN(parse_notes)(const struct image_params *, const Elf_Note *,
 	    const char *, const Elf_Phdr *,
 	    bool (*)(const Elf_Note *, void *, bool *), void *);
 

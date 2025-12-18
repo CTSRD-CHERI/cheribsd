@@ -29,7 +29,6 @@
 #ifndef __BXE_H__
 #define __BXE_H__
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -126,16 +125,6 @@
 #endif
 #ifndef roundup
 #define roundup(x, y) ((((x) + ((y) - 1)) / (y)) * (y))
-#endif
-#ifndef ilog2
-static inline
-int bxe_ilog2(int x)
-{
-    int log = 0;
-    while (x >>= 1) log++;
-    return (log);
-}
-#define ilog2(x) bxe_ilog2(x)
 #endif
 
 #include "ecore_sp.h"

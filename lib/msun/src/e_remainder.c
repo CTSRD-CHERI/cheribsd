@@ -1,5 +1,4 @@
 
-/* @(#)e_remainder.c 1.3 95/01/18 */
 /*
  * ====================================================
  * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -11,7 +10,6 @@
  * ====================================================
  */
 
-#include <sys/cdefs.h>
 /* remainder(x,p)
  * Return :                  
  * 	returns  x REM p  =  x - [x/p]*p as if in infinite 

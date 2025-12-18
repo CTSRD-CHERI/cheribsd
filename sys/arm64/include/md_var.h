@@ -45,6 +45,8 @@ extern int freebsd64_szsigcode;
 #endif
 extern u_long elf_hwcap;
 extern u_long elf_hwcap2;
+extern u_long linux_elf_hwcap;
+extern u_long linux_elf_hwcap2;
 #ifdef COMPAT_FREEBSD32
 extern u_long elf32_hwcap;
 extern u_long elf32_hwcap2;

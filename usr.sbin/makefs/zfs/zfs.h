@@ -55,6 +55,7 @@ _Static_assert(MINBLOCKSIZE == SPA_MINBLOCKSIZE, "");
 
 /* All data was written in this transaction group. */
 #define	TXG			4
+#define	TXG_SIZE		4
 
 typedef struct zfs_dsl_dataset zfs_dsl_dataset_t;
 typedef struct zfs_dsl_dir zfs_dsl_dir_t;
@@ -73,7 +74,7 @@ typedef struct {
 	 */
 	char		filebuf[MAXBLOCKSIZE] __aligned(alignof(uint64_t));
 
-	bool		nowarn;
+	bool		nowarn;		/* ignored */
 
 	/* Pool parameters. */
 	const char	*poolname;
@@ -82,6 +83,7 @@ typedef struct {
 	int		ashift;		/* vdev block size */
 	uint64_t	mssize;		/* metaslab size */
 	STAILQ_HEAD(, dataset_desc) datasetdescs; /* non-root dataset descrs  */
+	bool		verify_txgs;	/* verify data upon import */
 
 	/* Pool state. */
 	uint64_t	poolguid;	/* pool and root vdev GUID */
@@ -124,7 +126,7 @@ char *dsl_dir_get_mountpoint(zfs_opt_t *, zfs_dsl_dir_t *);
 bool dsl_dir_has_dataset(zfs_dsl_dir_t *);
 bool dsl_dir_dataset_has_objset(zfs_dsl_dir_t *);
 void dsl_dir_dataset_write(zfs_opt_t *, zfs_objset_t *, zfs_dsl_dir_t *);
-void dsl_dir_size_add(zfs_dsl_dir_t *, uint64_t);
+void dsl_dir_root_finalize(zfs_opt_t *, uint64_t);
 void dsl_write(zfs_opt_t *);
 
 /* fs.c */
@@ -159,6 +161,7 @@ void vdev_fini(zfs_opt_t *zfs);
 zfs_zap_t *zap_alloc(zfs_objset_t *, dnode_phys_t *);
 void zap_add(zfs_zap_t *, const char *, size_t, size_t, const uint8_t *);
 void zap_add_uint64(zfs_zap_t *, const char *, uint64_t);
+void zap_add_uint64_self(zfs_zap_t *, uint64_t);
 void zap_add_string(zfs_zap_t *, const char *, const char *);
 bool zap_entry_exists(zfs_zap_t *, const char *);
 void zap_write(zfs_opt_t *, zfs_zap_t *);

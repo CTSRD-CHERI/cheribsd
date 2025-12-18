@@ -102,7 +102,7 @@
  */
 
 /*
- * Always use lock prefixes.  The result is slighly less optimal for
+ * Always use lock prefixes.  The result is slightly less optimal for
  * UP systems, but it matters less now, and sometimes UP is emulated
  * over SMP.
  *
@@ -295,8 +295,8 @@ static __inline void
 __storeload_barrier(void)
 {
 #if defined(_KERNEL)
-	__asm __volatile("lock; addl $0,%%gs:%0"
-	    : "+m" (*(u_int *)OFFSETOF_MONITORBUF) : : "memory", "cc");
+	__asm __volatile("lock; addl $0,%%gs:%c0"
+	    : : "i" (OFFSETOF_MONITORBUF) : "memory", "cc");
 #else /* !_KERNEL */
 	__asm __volatile("lock; addl $0,-8(%%rsp)" : : : "memory", "cc");
 #endif /* _KERNEL*/
@@ -589,6 +589,8 @@ atomic_swap_long(volatile u_long *p, u_long v)
 #define	atomic_fcmpset_rel_ptr	atomic_fcmpset_rel_long
 #define	atomic_swap_ptr		atomic_swap_long
 #define	atomic_readandclear_ptr	atomic_readandclear_long
+#define	atomic_testandset_ptr	atomic_testandset_long
+#define	atomic_testandclear_ptr	atomic_testandclear_long
 
 #endif /* !WANT_FUNCTIONS */
 

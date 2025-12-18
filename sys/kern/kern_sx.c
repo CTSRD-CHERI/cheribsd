@@ -42,7 +42,6 @@
 #include "opt_hwpmc_hooks.h"
 #include "opt_no_adaptive_sx.h"
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kdb.h>
@@ -351,7 +350,7 @@ sx_try_xlock_int(struct sx *sx LOCK_FILE_LINE_ARG_DEF)
 
 	td = curthread;
 	tid = (uintptr_t)td;
-	if (SCHEDULER_STOPPED_TD(td))
+	if (SCHEDULER_STOPPED())
 		return (1);
 
 	KASSERT(kdb_active != 0 || !TD_IS_IDLETHREAD(td),
@@ -475,7 +474,6 @@ void
 sx_downgrade_int(struct sx *sx LOCK_FILE_LINE_ARG_DEF)
 {
 	uintptr_t x;
-	int wakeup_swapper;
 
 	if (SCHEDULER_STOPPED())
 		return;
@@ -517,17 +515,13 @@ sx_downgrade_int(struct sx *sx LOCK_FILE_LINE_ARG_DEF)
 	 * Preserve SX_LOCK_EXCLUSIVE_WAITERS while downgraded to a single
 	 * shared lock.  If there are any shared waiters, wake them up.
 	 */
-	wakeup_swapper = 0;
 	x = sx->sx_lock;
 	atomic_store_rel_ptr(&sx->sx_lock, SX_SHARERS_LOCK(1) |
 	    (ptraddr_t)(x & SX_LOCK_EXCLUSIVE_WAITERS));
 	if (x & SX_LOCK_SHARED_WAITERS)
-		wakeup_swapper = sleepq_broadcast(&sx->lock_object, SLEEPQ_SX,
-		    0, SQ_SHARED_QUEUE);
+		sleepq_broadcast(&sx->lock_object, SLEEPQ_SX, 0,
+		    SQ_SHARED_QUEUE);
 	sleepq_release(&sx->lock_object);
-
-	if (wakeup_swapper)
-		kick_proc0();
 
 out:
 	curthread->td_sx_slocks++;
@@ -652,6 +646,8 @@ _sx_xlock_hard(struct sx *sx, uintptr_t x, int opts LOCK_FILE_LINE_ARG_DEF)
 #ifndef INVARIANTS
 	GIANT_SAVE(extra_work);
 #endif
+
+	THREAD_CONTENDS_ON_LOCK(&sx->lock_object);
 
 	for (;;) {
 		if (x == SX_LOCK_UNLOCKED) {
@@ -853,10 +849,17 @@ retry_sleepq:
 		sleepq_add(&sx->lock_object, NULL, sx->lock_object.lo_name,
 		    SLEEPQ_SX | ((opts & SX_INTERRUPTIBLE) ?
 		    SLEEPQ_INTERRUPTIBLE : 0), SQ_EXCLUSIVE_QUEUE);
+		/*
+		 * Hack: this can land in thread_suspend_check which will
+		 * conditionally take a mutex, tripping over an assert if a
+		 * lock we are waiting for is set.
+		 */
+		THREAD_CONTENTION_DONE(&sx->lock_object);
 		if (!(opts & SX_INTERRUPTIBLE))
 			sleepq_wait(&sx->lock_object, 0);
 		else
 			error = sleepq_wait_sig(&sx->lock_object, 0);
+		THREAD_CONTENDS_ON_LOCK(&sx->lock_object);
 #ifdef KDTRACE_HOOKS
 		sleep_time += lockstat_nsecs(&sx->lock_object);
 		sleep_cnt++;
@@ -873,6 +876,7 @@ retry_sleepq:
 			    __func__, sx);
 		x = SX_READ_VALUE(sx);
 	}
+	THREAD_CONTENTION_DONE(&sx->lock_object);
 	if (__predict_true(!extra_work))
 		return (error);
 #ifdef ADAPTIVE_SX
@@ -912,7 +916,7 @@ void
 _sx_xunlock_hard(struct sx *sx, uintptr_t x LOCK_FILE_LINE_ARG_DEF)
 {
 	uintptr_t tid, setx;
-	int queue, wakeup_swapper;
+	int queue;
 
 	if (SCHEDULER_STOPPED())
 		return;
@@ -969,14 +973,11 @@ _sx_xunlock_hard(struct sx *sx, uintptr_t x LOCK_FILE_LINE_ARG_DEF)
 		    __func__, sx, queue == SQ_SHARED_QUEUE ? "shared" :
 		    "exclusive");
 
-	wakeup_swapper = sleepq_broadcast(&sx->lock_object, SLEEPQ_SX, 0,
-	    queue);
+	sleepq_broadcast(&sx->lock_object, SLEEPQ_SX, 0, queue);
 	sleepq_release(&sx->lock_object);
-	if (wakeup_swapper)
-		kick_proc0();
 }
 
-static bool __always_inline
+static __always_inline bool
 __sx_can_read(struct thread *td, uintptr_t x, bool fp)
 {
 
@@ -988,7 +989,7 @@ __sx_can_read(struct thread *td, uintptr_t x, bool fp)
 	return (false);
 }
 
-static bool __always_inline
+static __always_inline bool
 __sx_slock_try(struct sx *sx, struct thread *td, uintptr_t *xp, bool fp
     LOCK_FILE_LINE_ARG_DEF)
 {
@@ -1074,6 +1075,8 @@ _sx_slock_hard(struct sx *sx, int opts, uintptr_t x LOCK_FILE_LINE_ARG_DEF)
 #ifndef INVARIANTS
 	GIANT_SAVE(extra_work);
 #endif
+
+	THREAD_CONTENDS_ON_LOCK(&sx->lock_object);
 
 	/*
 	 * As with rwlocks, we don't make any attempt to try to block
@@ -1205,10 +1208,17 @@ retry_sleepq:
 		sleepq_add(&sx->lock_object, NULL, sx->lock_object.lo_name,
 		    SLEEPQ_SX | ((opts & SX_INTERRUPTIBLE) ?
 		    SLEEPQ_INTERRUPTIBLE : 0), SQ_SHARED_QUEUE);
+		/*
+		 * Hack: this can land in thread_suspend_check which will
+		 * conditionally take a mutex, tripping over an assert if a
+		 * lock we are waiting for is set.
+		 */
+		THREAD_CONTENTION_DONE(&sx->lock_object);
 		if (!(opts & SX_INTERRUPTIBLE))
 			sleepq_wait(&sx->lock_object, 0);
 		else
 			error = sleepq_wait_sig(&sx->lock_object, 0);
+		THREAD_CONTENDS_ON_LOCK(&sx->lock_object);
 #ifdef KDTRACE_HOOKS
 		sleep_time += lockstat_nsecs(&sx->lock_object);
 		sleep_cnt++;
@@ -1225,6 +1235,7 @@ retry_sleepq:
 			    __func__, sx);
 		x = SX_READ_VALUE(sx);
 	}
+	THREAD_CONTENTION_DONE(&sx->lock_object);
 #if defined(KDTRACE_HOOKS) || defined(LOCK_PROFILING)
 	if (__predict_true(!extra_work))
 		return (error);
@@ -1288,7 +1299,7 @@ _sx_slock(struct sx *sx, int opts, const char *file, int line)
 	return (_sx_slock_int(sx, opts LOCK_FILE_LINE_ARG));
 }
 
-static bool __always_inline
+static __always_inline bool
 _sx_sunlock_try(struct sx *sx, struct thread *td, uintptr_t *xp)
 {
 
@@ -1315,7 +1326,6 @@ static void __noinline
 _sx_sunlock_hard(struct sx *sx, struct thread *td, uintptr_t x
     LOCK_FILE_LINE_ARG_DEF)
 {
-	int wakeup_swapper = 0;
 	uintptr_t setx, queue;
 
 	if (SCHEDULER_STOPPED())
@@ -1348,14 +1358,11 @@ _sx_sunlock_hard(struct sx *sx, struct thread *td, uintptr_t x
 		if (LOCK_LOG_TEST(&sx->lock_object, 0))
 			CTR2(KTR_LOCK, "%s: %p waking up all thread on"
 			    "exclusive queue", __func__, sx);
-		wakeup_swapper = sleepq_broadcast(&sx->lock_object, SLEEPQ_SX,
-		    0, queue);
+		sleepq_broadcast(&sx->lock_object, SLEEPQ_SX, 0, queue);
 		td->td_sx_slocks--;
 		break;
 	}
 	sleepq_release(&sx->lock_object);
-	if (wakeup_swapper)
-		kick_proc0();
 out_lockstat:
 	LOCKSTAT_PROFILE_RELEASE_RWLOCK(sx__release, sx, LOCKSTAT_READER);
 }

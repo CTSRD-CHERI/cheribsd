@@ -1,6 +1,6 @@
-
 .PATH: ${SRCTOP}/contrib/ntp/sntp/libopts
 
+PACKAGE=ntp
 LIB=	opts
 INTERNALLIB=
 

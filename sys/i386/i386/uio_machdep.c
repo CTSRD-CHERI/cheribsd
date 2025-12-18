@@ -33,11 +33,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)kern_subr.c	8.3 (Berkeley) 1/21/94
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -71,9 +68,15 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 	    ("uiomove_fromphys: mode"));
 	KASSERT(uio->uio_segflg != UIO_USERSPACE || uio->uio_td == curthread,
 	    ("uiomove_fromphys proc"));
+	KASSERT(uio->uio_resid >= 0,
+	    ("%s: uio %p resid underflow", __func__, uio));
+
 	save = td->td_pflags & TDP_DEADLKTREAT;
 	td->td_pflags |= TDP_DEADLKTREAT;
 	while (n > 0 && uio->uio_resid) {
+		KASSERT(uio->uio_iovcnt > 0,
+		    ("%s: uio %p iovcnt underflow", __func__, uio));
+
 		iov = uio->uio_iov;
 		cnt = iov->iov_len;
 		if (cnt == 0) {
@@ -91,10 +94,14 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 		switch (uio->uio_segflg) {
 		case UIO_USERSPACE:
 			maybe_yield();
-			if (uio->uio_rw == UIO_READ)
+			switch (uio->uio_rw) {
+			case UIO_READ:
 				error = copyout(cp, iov->iov_base, cnt);
-			else
+				break;
+			case UIO_WRITE:
 				error = copyin(iov->iov_base, cp, cnt);
+				break;
+			}
 			if (error) {
 				sf_buf_free(sf);
 				sched_unpin();
@@ -102,10 +109,14 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			}
 			break;
 		case UIO_SYSSPACE:
-			if (uio->uio_rw == UIO_READ)
+			switch (uio->uio_rw) {
+			case UIO_READ:
 				bcopy(cp, iov->iov_base, cnt);
-			else
+				break;
+			case UIO_WRITE:
 				bcopy(iov->iov_base, cp, cnt);
+				break;
+			}
 			break;
 		case UIO_NOCOPY:
 			break;

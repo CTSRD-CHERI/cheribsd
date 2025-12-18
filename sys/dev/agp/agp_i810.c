@@ -682,7 +682,7 @@ agp_i810_identify(driver_t *driver, device_t parent)
 
 	if (device_find_child(parent, "agp", -1) == NULL &&
 	    agp_i810_match(parent))
-		device_add_child(parent, "agp", -1);
+		device_add_child(parent, "agp", DEVICE_UNIT_ANY);
 }
 
 static int
@@ -1234,7 +1234,7 @@ agp_gen4_install_gatt(device_t dev, const vm_size_t gtt_offset)
 	struct agp_i810_softc *sc;
 
 	sc = device_get_softc(dev);
-	pmap_change_attr((vm_offset_t)rman_get_virtual(sc->sc_res[0]) +
+	pmap_change_attr((vm_pointer_t)rman_get_virtual(sc->sc_res[0]) +
 	    gtt_offset, rman_get_size(sc->sc_res[0]) - gtt_offset,
 	    VM_MEMATTR_WRITE_COMBINING);
 	agp_i830_install_gatt_init(sc);
@@ -1796,7 +1796,7 @@ agp_i810_free_memory(device_t dev, struct agp_memory *mem)
 			vm_page_unwire(m, PQ_INACTIVE);
 			VM_OBJECT_WUNLOCK(mem->am_obj);
 		} else {
-			contigfree(sc->argb_cursor, mem->am_size, M_AGP);
+			free(sc->argb_cursor, M_AGP);
 			sc->argb_cursor = NULL;
 		}
 	}
@@ -2051,10 +2051,10 @@ agp_i915_chipset_flush_free_page(device_t dev)
 	vga = device_get_parent(dev);
 	if (sc->sc_flush_page_res == NULL)
 		return;
-	BUS_DEACTIVATE_RESOURCE(device_get_parent(vga), dev, SYS_RES_MEMORY,
-	    sc->sc_flush_page_rid, sc->sc_flush_page_res);
-	BUS_RELEASE_RESOURCE(device_get_parent(vga), dev, SYS_RES_MEMORY,
-	    sc->sc_flush_page_rid, sc->sc_flush_page_res);
+	BUS_DEACTIVATE_RESOURCE(device_get_parent(vga), dev,
+	    sc->sc_flush_page_res);
+	BUS_RELEASE_RESOURCE(device_get_parent(vga), dev,
+	    sc->sc_flush_page_res);
 }
 
 static int

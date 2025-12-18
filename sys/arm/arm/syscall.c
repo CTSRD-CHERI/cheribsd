@@ -78,7 +78,6 @@
  * Created      : 28/11/94
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -118,7 +117,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	}
 	p = td->td_proc;
 	if (sa->code >= p->p_sysent->sv_size)
-		sa->callp = &p->p_sysent->sv_table[0];
+		sa->callp = &nosys_sysent;
 	else
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 	error = 0;
@@ -161,8 +160,6 @@ swi_handler(struct trapframe *frame)
 	if (td->td_md.md_spinlock_count == 0) {
 		if (__predict_true(frame->tf_spsr & PSR_I) == 0)
 			enable_interrupts(PSR_I);
-		if (__predict_true(frame->tf_spsr & PSR_F) == 0)
-			enable_interrupts(PSR_F);
 	}
 
 	syscall(td, frame);

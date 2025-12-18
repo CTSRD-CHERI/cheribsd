@@ -34,6 +34,7 @@
 #include <sys/tree.h>
 #include <sys/resource.h>
 #include <sys/cpuset.h>
+#include <sys/queue.h>
 #include <sys/sysctl.h>
 
 #include <cheri/cheri.h>
@@ -43,12 +44,14 @@
 
 #include <machine/vmparam.h>
 
+#include <assert.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <inttypes.h>
 #include <malloc_np.h>
 #include <pthread.h>
 #include <pthread_np.h>
+#include <spinlock.h>
 #include <stdatomic.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -88,13 +91,20 @@
  *
  * Values:
  *
- * QUARANTINE_HIGHWATER: Limit the quarantine size to
- *   QUARANTINE_HIGHWATER number of bytes.
- * QUARANTINE_RATIO: Limit the quarantine size to 1 / QUARANTINE_RATIO
- *   times the size of the heap (default 4).
- * CONCURRENT_REVOCATION_PASSES: Number of concurrent revocation pass
- *   before the stop-the-world pass.
+ * QUARANTINE_NUMERATOR / QUARANTINE_DENOMINATOR: Limit the quarantine
+ * size to QUARANTINE_NUMERATOR / QUARANTINE_DENOMINATOR times the size
+ * of the heap (default 1/4).
  */
+
+#ifdef QUARANTINE_RATIO
+#error QUARANTINE_RATIO is obsolete, use QUARANTINE_NUMERATOR/QUARANTINE_DENOMINATOR
+#endif
+#ifndef QUARANTINE_DENOMINATOR
+#define	QUARANTINE_DENOMINATOR	4
+#endif
+#ifndef QUARANTINE_NUMERATOR
+#define	QUARANTINE_NUMERATOR	1
+#endif
 
 #define	MALLOCX_LG_ALIGN_BITS	6
 #define	MALLOCX_LG_ALIGN_MASK	((1 << MALLOCX_LG_ALIGN_BITS) - 1)
@@ -113,11 +123,26 @@ extern void snmalloc_flush_message_queue(void);
 
 #define	MALLOC_QUARANTINE_DISABLE_ENV	"_RUNTIME_REVOCATION_DISABLE"
 #define	MALLOC_QUARANTINE_ENABLE_ENV	"_RUNTIME_REVOCATION_ENABLE"
+#define	MALLOC_ABORT_DISABLE_ENV	"_RUNTIME_ABORT_DISABLE"
+#define	MALLOC_ABORT_ENABLE_ENV		"_RUNTIME_ABORT_ENABLE"
 
 #define	MALLOC_REVOKE_EVERY_FREE_DISABLE_ENV \
 	"_RUNTIME_REVOCATION_EVERY_FREE_DISABLE"
 #define	MALLOC_REVOKE_EVERY_FREE_ENABLE_ENV \
 	"_RUNTIME_REVOCATION_EVERY_FREE_ENABLE"
+#define	MALLOC_REVOKE_SYNC_ENV \
+	"_RUNTIME_REVOCATION_SYNC_REVOKE"
+#define	MALLOC_REVOKE_ASYNC_ENV \
+	"_RUNTIME_REVOCATION_ASYNC_REVOKE"
+#define	MALLOC_BOUND_CHERI_POINTERS \
+	"_RUNTIME_BOUND_CHERI_POINTERS"
+#define	MALLOC_NOBOUND_CHERI_POINTERS \
+	"_RUNTIME_NOBOUND_CHERI_POINTERS"
+
+#define	MALLOC_QUARANTINE_DENOMINATOR_ENV \
+	"_RUNTIME_QUARANTINE_DENOMINATOR"
+#define	MALLOC_QUARANTINE_NUMERATOR_ENV \
+	"_RUNTIME_QUARANTINE_NUMERATOR"
 
 /*
  * Different allocators give their strong symbols different names.  Hide
@@ -166,7 +191,8 @@ malloc(size_t size)
 	return (mrs_malloc(size));
 }
 
-void free(void *ptr)
+void
+free(void *ptr)
 {
 	return (mrs_free(ptr));
 }
@@ -283,9 +309,48 @@ static const size_t MIN_REVOKE_HEAP_SIZE = 8 * 1024 * 1024;
 
 static volatile const struct cheri_revoke_info *cri;
 static size_t page_size;
+
+/* Flags are constant after initialization. */
 static void *entire_shadow;
 static bool quarantining = true;
 static bool revoke_every_free = false;
+static bool revoke_async = false;
+static bool bound_pointers = false;
+static bool abort_on_validation_failure = true;
+static bool mrs_initialized = false;
+
+static unsigned int quarantine_denominator = QUARANTINE_DENOMINATOR;
+static unsigned int quarantine_numerator = QUARANTINE_NUMERATOR;
+
+static spinlock_t mrs_init_lock = _SPINLOCK_INITIALIZER;
+#define	MRS_LOCK(x)	__extension__ ({	\
+	if (__isthreaded)			\
+		_SPINLOCK(x);			\
+})
+#define	MRS_UNLOCK(x)	__extension__ ({	\
+	if (__isthreaded)			\
+		_SPINUNLOCK(x);			\
+})
+
+/*
+ * Optionally apply strict bounds to pointers returned by malloc() and friends.
+ * This is technically UB since it means that the pointer passed to free() is
+ * not what we got from the allocator.  However, it may be useful for
+ * demonstrating CHERI's spatial safety guarantees in demos and so on.
+ *
+ * The default behaviour lets the allocator provide pointers with bounds
+ * covering the usable size of the allocation, beyond the requested size, which
+ * is friendlier to realloc() loops.  With revocation enabled, strict bounds
+ * would force a new allocation for each realloc() call, which can hurt quite a
+ * bit.
+ */
+static void *
+mrs_bound_pointer(void *p, size_t size)
+{
+	if (p != NULL && bound_pointers && size > 0)
+		p = cheri_setbounds(p, size);
+	return (p);
+}
 
 struct mrs_descriptor_slab_entry {
 	void *ptr;
@@ -301,7 +366,10 @@ struct mrs_descriptor_slab {
 struct mrs_quarantine {
 	size_t size;
 	size_t max_size;
+	bool revoking;
+	cheri_revoke_epoch_t epoch;	/* valid when revoking */
 	struct mrs_descriptor_slab *list;
+	TAILQ_ENTRY(mrs_quarantine) next;
 };
 
 /* XXX ABA and other issues ... should switch to atomics library */
@@ -314,8 +382,28 @@ static struct mrs_descriptor_slab * _Atomic free_descriptor_slabs;
 static _Atomic size_t allocated_size;
 static size_t max_allocated_size;
 
-/* quarantine for the application thread */
-static struct mrs_quarantine application_quarantine;
+/*
+ * Quarantine arenas for application threads.  At any given time, one is in
+ * active use, and the others are being cleaned.
+ */
+#define	APP_QUARANTINE_ARENAS	2
+_Static_assert(APP_QUARANTINE_ARENAS >= 2,
+    "APP_QUARANTINE_ARENAS must be at least 2");
+static struct mrs_quarantine app_quarantine_store[APP_QUARANTINE_ARENAS];
+
+static struct mrs_quarantine *app_quarantine;
+/* Arenas with revocation pending. */
+static TAILQ_HEAD(, mrs_quarantine) app_quarantine_revoke_list =
+    TAILQ_HEAD_INITIALIZER(app_quarantine_revoke_list);
+/* Arenas with revocation complete. */
+static TAILQ_HEAD(, mrs_quarantine) app_quarantine_free_list =
+    TAILQ_HEAD_INITIALIZER(app_quarantine_free_list);
+
+static void quarantine_flush(struct mrs_quarantine *quarantine);
+static void quarantine_move(struct mrs_quarantine *dst,
+    struct mrs_quarantine *src);
+static void quarantine_revoke(struct mrs_quarantine *quarantine);
+
 #ifdef OFFLOAD_QUARANTINE
 /* quarantine for the offload thread */
 static struct mrs_quarantine offload_quarantine;
@@ -375,7 +463,7 @@ _pthread_mutex_init_calloc_cb(pthread_mutex_t *mutex,
 #define initialize_lock(name)					\
 	_pthread_mutex_init_calloc_cb(&name, name ## _storage)
 
-create_lock(application_quarantine_lock);
+create_lock(app_quarantine_lock);
 
 /* quarantine offload support */
 #ifdef OFFLOAD_QUARANTINE
@@ -539,9 +627,6 @@ clear_region(void *mem, size_t len)
 static inline void
 quarantine_insert(struct mrs_quarantine *quarantine, void *ptr, size_t size)
 {
-  /*if (!cheri_gettag(ptr))*/
-    /*return;*/
-
 	MRS_UTRACE(UTRACE_MRS_QUARANTINE_INSERT, ptr, size, 0, NULL);
 	if (quarantine->list == NULL ||
 	    quarantine->list->num_descriptors == DESCRIPTOR_SLAB_ENTRIES) {
@@ -561,22 +646,12 @@ quarantine_insert(struct mrs_quarantine *quarantine, void *ptr, size_t size)
 
 	quarantine->list->slab[quarantine->list->num_descriptors].ptr = ptr;
 	quarantine->list->slab[quarantine->list->num_descriptors].size = size;
-
 	quarantine->list->num_descriptors++;
 
 	quarantine->size += size;
-  /*mrs_printf("qins %zu addr %p\n", size, ptr);*/
 	if (quarantine->size > quarantine->max_size) {
 		quarantine->max_size = quarantine->size;
 	}
-
-#if 0
-	if (quarantine->size > allocated_size) {
-		mrs_printf("fatal error: quarantine size %zu exceeded allocated_size %zu "
-		    "inserting %#p\n", quarantine->size, allocated_size, ptr);
-		exit(7);
-	}
-#endif
 }
 
 /*
@@ -697,29 +772,120 @@ quarantine_should_flush(struct mrs_quarantine *quarantine, bool is_free)
 		return false;
 #endif
 
-#if defined(QUARANTINE_HIGHWATER)
+	if (allocated_size < MIN_REVOKE_HEAP_SIZE)
+		return false;
 
-	return (quarantine->size >= QUARANTINE_HIGHWATER);
+	/*
+	 * Flush quarantine if
+	 *                                       quarantine_numerator
+	 * quarantine->size >= allocated_size * ----------------------
+	 *                                      quarantine_denominator
+	 *
+	 * Avoid division by multiplying both sides by quarantine_numerator.
+	 */
+	return (quarantine->size * quarantine_denominator >=
+	    allocated_size * quarantine_numerator);
+}
 
-#else /* QUARANTINE_HIGHWATER */
+static void
+app_quarantine_remove(struct mrs_quarantine *to, struct mrs_quarantine *src)
+{
+	quarantine_move(to, src);
+	TAILQ_REMOVE(&app_quarantine_revoke_list, src, next);
+	src->revoking = false;
+	TAILQ_INSERT_TAIL(&app_quarantine_free_list, src, next);
+}
 
-#if !defined(QUARANTINE_RATIO)
-#  define QUARANTINE_RATIO 4
-#endif /* !QUARANTINE_RATIO */
+/*
+ * Kick off an asynchronous revocation pass for the current application
+ * quarantine arena, and/or check to see whether a previously scheduled pass has
+ * completed.
+ *
+ * This function assumes that the application quarantine lock is held and will
+ * drop it before returning.
+ */
+static void
+app_quarantine_revoke_async(void)
+{
+	struct mrs_quarantine *curr, *next;
+	cheri_revoke_epoch_t epoch;
 
-	return ((allocated_size >= MIN_REVOKE_HEAP_SIZE) &&
-	    ((quarantine->size * QUARANTINE_RATIO) >= allocated_size));
+	/*
+	 * Add this arena to the list of pending revocations if it isn't already
+	 * there.
+	 */
+	curr = app_quarantine;
+	next = TAILQ_FIRST(&app_quarantine_free_list);
+	if (!curr->revoking && next != NULL) {
+		TAILQ_REMOVE(&app_quarantine_free_list, next, next);
+		app_quarantine = next;
 
-#endif /* !QUARANTINE_HIGHWATER */
+		curr->epoch = cri->epochs.enqueue;
+		curr->revoking = true;
+		TAILQ_INSERT_TAIL(&app_quarantine_revoke_list, curr, next);
+	}
+	assert(!TAILQ_EMPTY(&app_quarantine_revoke_list));
+	epoch = TAILQ_FIRST(&app_quarantine_revoke_list)->epoch;
+	mrs_unlock(&app_quarantine_lock);
+
+	(void)cheri_revoke(CHERI_REVOKE_ASYNC, epoch, NULL);
+
+	/*
+	 * Is it possible that some of the pending revocation work has finished?
+	 * Flush some of the revoked memory back to the underlying allocator if
+	 * so.
+	 */
+	if (cheri_revoke_epoch_clears(cri->epochs.dequeue, epoch)) {
+		struct mrs_quarantine tmp;
+
+		mrs_lock(&app_quarantine_lock);
+		next = TAILQ_FIRST(&app_quarantine_revoke_list);
+		if (next == NULL) {
+			mrs_unlock(&app_quarantine_lock);
+			return;
+		}
+		assert(next->revoking);
+		if (!cheri_revoke_epoch_clears(cri->epochs.dequeue,
+		    next->epoch)) {
+			mrs_unlock(&app_quarantine_lock);
+			return;
+		}
+
+		app_quarantine_remove(&tmp, next);
+		mrs_unlock(&app_quarantine_lock);
+		quarantine_flush(&tmp);
+	}
+}
+
+/*
+ * Handle a malloc_revoke_quarantine_force_flush() call when operating in async mode.
+ * Perform synchronous revocation for all quarantine arenas, and then revoke
+ * the currently active arena.
+ */
+static void
+malloc_revoke_quarantine_force_flush_async(void)
+{
+	struct mrs_quarantine tmp;
+
+	while (!TAILQ_EMPTY(&app_quarantine_revoke_list)) {
+		struct mrs_quarantine *curr;
+
+		curr = TAILQ_FIRST(&app_quarantine_revoke_list);
+		app_quarantine_remove(&tmp, curr);
+		mrs_unlock(&app_quarantine_lock);
+		quarantine_revoke(&tmp);
+		mrs_lock(&app_quarantine_lock);
+	}
+	quarantine_move(&tmp, app_quarantine);
+	mrs_unlock(&app_quarantine_lock);
+	quarantine_revoke(&tmp);
 }
 
 #if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS)
 static inline uint64_t
 cheri_revoke_get_cyc(void)
 {
-#if defined(__mips__)
-	return (cheri_get_cyclecount());
-#elif defined(__riscv)
+#if defined(__riscv)
 	return (__builtin_readcyclecounter());
 #elif defined(__aarch64__)
 	uint64_t _val;
@@ -793,58 +959,12 @@ print_cheri_revoke_stats(char *what, struct cheri_revoke_syscall_info *crsi,
 }
 #endif /* PRINT_CAPREVOKE */
 
-/*
- * Perform revocation then iterate through the quarantine and free entries with
- * non-zero underlying size (offload thread sets unvalidated caps to have zero
- * size).
- *
- * Supports ablation study knobs.
- */
-static inline void
+static void
 quarantine_flush(struct mrs_quarantine *quarantine)
 {
-	MRS_UTRACE(UTRACE_MRS_QUARANTINE_FLUSH, NULL, 0, 0, NULL);
-	/* Don't read epoch until all bitmap painting is done. */
-	atomic_thread_fence(memory_order_acq_rel);
-	cheri_revoke_epoch_t start_epoch = cri->epochs.enqueue;
-
-	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
-# ifdef PRINT_CAPREVOKE
-		struct cheri_revoke_syscall_info crsi = { 0 };
-		uint64_t cyc_init, cyc_fini;
-
-#if 0
-		// XXX Take the stats structure prior to doing anything else
-		cheri_revoke(CHERI_REVOKE_ONLY_IF_OPEN |
-		    CHERI_REVOKE_IGNORE_START |
-		    CHERI_REVOKE_TAKE_STATS, 0, &crsi);
-		print_caprevoke_stats("prior", &crsi, 0);
-#endif
-
-		cyc_init = cheri_revoke_get_cyc();
-		cheri_revoke(CHERI_REVOKE_TAKE_STATS, start_epoch, &crsi);
-		cyc_fini = cheri_revoke_get_cyc();
-		print_cheri_revoke_stats("load-barrier", &crsi,
-		    cyc_fini - cyc_init);
-
-		cyc_init = cheri_revoke_get_cyc();
-		cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS,
-		    start_epoch, &crsi);
-		cyc_fini = cheri_revoke_get_cyc();
-		print_cheri_revoke_stats("load-final", &crsi,
-		    cyc_fini - cyc_init);
-
-# else /* PRINT_CAPREVOKE */
-
-		cheri_revoke(CHERI_REVOKE_TAKE_STATS, start_epoch, NULL);
-		cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS,
-		    start_epoch, NULL);
-
-# endif /* !PRINT_CAPREVOKE */
-
-	}
-
 	struct mrs_descriptor_slab *prev = NULL;
+
+	MRS_UTRACE(UTRACE_MRS_QUARANTINE_FLUSH, NULL, 0, 0, NULL);
 	for (struct mrs_descriptor_slab *iter = quarantine->list; iter != NULL;
 	     iter = iter->next) {
 		for (int i = 0; i < iter->num_descriptors; i++) {
@@ -853,59 +973,56 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 			 * In the offload case, only clear the bitmap
 			 * for validated descriptors (cap != NULL).
 			 */
-			if (iter->slab[i].ptr != NULL) {
-#endif /* OFFLOAD_QUARANTINE */
+			if (iter->slab[i].ptr == NULL)
+				continue;
+#endif
 
-				/*
-				 * Doesn't matter if the underlying
-				 * size isn't a 16-byte multiple
-				 * because all allocations will be
-				 * 16-byte aligned.
-				 */
-				size_t len = __builtin_align_up(
-				    cheri_getlen(iter->slab[i].ptr),
-				    CAPREVOKE_BITMAP_ALIGNMENT);
-				caprev_shadow_nomap_clear_len(
-				    cri->base_mem_nomap, entire_shadow,
-				    cheri_getbase(iter->slab[i].ptr), len);
+			/*
+			 * Doesn't matter if the underlying
+			 * size isn't a 16-byte multiple
+			 * because all allocations will be
+			 * 16-byte aligned.
+			 */
+			size_t len = __builtin_align_up(
+			    cheri_getlen(iter->slab[i].ptr),
+			    CAPREVOKE_BITMAP_ALIGNMENT);
+			caprev_shadow_nomap_clear_len(
+			    cri->base_mem_nomap, entire_shadow,
+			    cheri_getbase(iter->slab[i].ptr), len);
 
-				/*
-				 * Don't construct a pointer to a
-				 * previously revoked region until the
-				 * bitmap is cleared.
-				 */
-				atomic_thread_fence(memory_order_release);
+			/*
+			 * Don't construct a pointer to a
+			 * previously revoked region until the
+			 * bitmap is cleared.
+			 */
+			atomic_thread_fence(memory_order_release);
 
 #ifdef CLEAR_ON_RETURN
-				clear_region(iter->slab[i].ptr,
-				    cheri_getlen(iter->slab[i].ptr));
+			clear_region(iter->slab[i].ptr,
+			    cheri_getlen(iter->slab[i].ptr));
 #endif /* CLEAR_ON_RETURN */
 
-				/*
-				 * We have a VMEM-bearing cap from
-				 * malloc_underlying_allocation.
-				 *
-				 * XXX: We used to rely on the
-				 * underlying allocator to rederive
-				 * caps but snmalloc2's CHERI support
-				 * doesn't do that by default, so
-				 * we'll clear VMEM here.  This feels
-				 * wrong, somehow; perhaps we want to
-				 * retry with snmalloc1 not doing
-				 * rederivation now that we're doing
-				 * this?
-				 */
-				REAL(free)(
-				    __builtin_cheri_perms_and(iter->slab[i].ptr,
-				    ~CHERI_PERM_SW_VMEM));
-
-#ifdef OFFLOAD_QUARANTINE
-			}
-#endif /* OFFLOAD_QUARANTINE */
+			/*
+			 * We have a VMEM-bearing cap from
+			 * malloc_underlying_allocation.
+			 *
+			 * XXX: We used to rely on the
+			 * underlying allocator to rederive
+			 * caps but snmalloc2's CHERI support
+			 * doesn't do that by default, so
+			 * we'll clear VMEM here.  This feels
+			 * wrong, somehow; perhaps we want to
+			 * retry with snmalloc1 not doing
+			 * rederivation now that we're doing
+			 * this?
+			 */
+			REAL(free)(__builtin_cheri_perms_and(iter->slab[i].ptr,
+			    ~CHERI_PERM_SW_VMEM));
 		}
 		prev = iter;
 	}
 
+	size_t utrace_allocated_size = 0;
 	if (prev != NULL) {
 		/* Free the quarantined descriptors. */
 		prev->next = free_descriptor_slabs;
@@ -915,10 +1032,57 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 
 		quarantine->list = NULL;
 		allocated_size -= quarantine->size;
+		utrace_allocated_size += quarantine->size;
 		quarantine->size = 0;
 	}
 	mrs_debug_printf("quarantine_flush: flushed, allocated_size %zu quarantine->size %zu\n",
 	    allocated_size, quarantine->size);
+	MRS_UTRACE(UTRACE_MRS_QUARANTINE_FLUSH_DONE, NULL, utrace_allocated_size, 0, NULL);
+}
+
+/*
+ * Perform revocation then iterate through the quarantine and free entries with
+ * non-zero underlying size (offload thread sets unvalidated caps to have zero
+ * size).
+ *
+ * Supports ablation study knobs.
+ */
+static void
+quarantine_revoke(struct mrs_quarantine *quarantine)
+{
+	/* Don't read epoch until all bitmap painting is done. */
+	atomic_thread_fence(memory_order_acq_rel);
+	cheri_revoke_epoch_t start_epoch = cri->epochs.enqueue;
+
+	MRS_UTRACE(UTRACE_MRS_QUARANTINE_REVOKE, NULL, 0, 0, NULL);
+	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
+# ifdef PRINT_CAPREVOKE
+		struct cheri_revoke_syscall_info crsi = { 0 };
+		uint64_t cyc_init, cyc_fini;
+
+		cyc_init = cheri_revoke_get_cyc();
+		(void)cheri_revoke(CHERI_REVOKE_TAKE_STATS, epoch, &crsi);
+		cyc_fini = cheri_revoke_get_cyc();
+		print_cheri_revoke_stats("load-barrier", &crsi,
+		    cyc_fini - cyc_init);
+
+		cyc_init = cheri_revoke_get_cyc();
+		(void)cheri_revoke(
+		    CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS, epoch,
+		    &crsi);
+		cyc_fini = cheri_revoke_get_cyc();
+		print_cheri_revoke_stats("load-final", &crsi,
+		    cyc_fini - cyc_init);
+
+# else /* PRINT_CAPREVOKE */
+		(void)cheri_revoke(CHERI_REVOKE_TAKE_STATS, start_epoch, NULL);
+		(void)cheri_revoke(
+		    CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS,
+		    start_epoch, NULL);
+# endif /* !PRINT_CAPREVOKE */
+	}
+	MRS_UTRACE(UTRACE_MRS_QUARANTINE_REVOKE_DONE, NULL, 0, 0, NULL);
+	quarantine_flush(quarantine);
 }
 
 static void
@@ -932,12 +1096,13 @@ quarantine_move(struct mrs_quarantine *dst, struct mrs_quarantine *src)
 }
 
 static void
-_internal_malloc_revoke(struct mrs_quarantine *quarantine)
+_internal_quarantine_flush(struct mrs_quarantine *quarantine)
 {
 #ifdef OFFLOAD_QUARANTINE
 
 #ifdef PRINT_CAPREVOKE_MRS
-	mrs_puts("malloc_revoke (offload): waiting for offload_quarantine to drain\n");
+	mrs_puts("malloc_revoke_quarantine_force_flush (offload): "
+	    "waiting for offload_quarantine to drain\n");
 #endif
 
 	mrs_lock(&offload_quarantine_lock);
@@ -950,8 +1115,8 @@ _internal_malloc_revoke(struct mrs_quarantine *quarantine)
 	}
 
 #ifdef PRINT_CAPREVOKE_MRS
-	mrs_puts("malloc_revoke (offload): offload_quarantine drained\n");
-	mrs_printf("malloc_revoke: cycle count after waiting on offload %" PRIu64 "\n",
+	mrs_puts("malloc_revoke_quarantine_force_flush (offload): offload_quarantine drained\n");
+	mrs_printf("malloc_revoke_quarantine_force_flush: cycle count after waiting on offload %" PRIu64 "\n",
 	    cheri_revoke_get_cyc());
 #endif /* PRINT_CAPREVOKE_MRS */
 
@@ -961,7 +1126,7 @@ _internal_malloc_revoke(struct mrs_quarantine *quarantine)
 #endif
 
 #ifdef PRINT_CAPREVOKE_MRS
-	mrs_printf("malloc_revoke: cycle count after waiting on offload %" PRIu64 "\n",
+	mrs_printf("malloc_revoke_quarantine_force_flush: cycle count after waiting on offload %" PRIu64 "\n",
 	    cheri_revoke_get_cyc());
 #endif
 
@@ -980,9 +1145,9 @@ _internal_malloc_revoke(struct mrs_quarantine *quarantine)
 #else /* OFFLOAD_QUARANTINE */
 
 #ifdef PRINT_CAPREVOKE_MRS
-	mrs_puts("malloc_revoke\n");
+	mrs_puts("malloc_revoke_quarantine_force_flush\n");
 #endif
-	quarantine_flush(quarantine);
+	quarantine_revoke(quarantine);
 #ifdef SNMALLOC_FLUSH
 	/* Consume pending messages now in our queue. */
 	snmalloc_flush_message_queue();
@@ -994,20 +1159,39 @@ _internal_malloc_revoke(struct mrs_quarantine *quarantine)
 #endif /* OFFLOAD_QUARANTINE */
 }
 
-void
-malloc_revoke(void)
+int
+malloc_revoke_quarantine_force_flush(void)
 {
 	struct mrs_quarantine local_quarantine;
 
 	if (!quarantining)
-		return;
+		return (ENOTSUP);
 
-	MRS_UTRACE(UTRACE_MRS_MALLOC_REVOKE, NULL, 0, 0, NULL);
+	MRS_UTRACE(UTRACE_MRS_MALLOC_REVOKE_QUARANTINE_FORCE_FLUSH, NULL, 0,
+	    0, NULL);
 
-	mrs_lock(&application_quarantine_lock);
-	quarantine_move(&local_quarantine, &application_quarantine);
-	mrs_unlock(&application_quarantine_lock);
-	_internal_malloc_revoke(&local_quarantine);
+	mrs_lock(&app_quarantine_lock);
+	if (revoke_async) {
+		malloc_revoke_quarantine_force_flush_async();
+	} else {
+		quarantine_move(&local_quarantine, app_quarantine);
+		mrs_unlock(&app_quarantine_lock);
+		_internal_quarantine_flush(&local_quarantine);
+	}
+
+	return (0);
+}
+
+bool
+malloc_revoke_enabled(void)
+{
+	return (quarantining);
+}
+
+void
+malloc_revoke(void)
+{
+	(void)malloc_revoke_quarantine_force_flush();
 }
 
 bool
@@ -1052,38 +1236,23 @@ check_and_perform_flush(bool is_free)
 	 * Do an unlocked check and bail quickly if the quarantine
 	 * does not require flushing.
 	 */
-	if (!quarantine_should_flush(&application_quarantine, is_free))
+	if (!quarantine_should_flush(app_quarantine, is_free))
 		return;
 
 	/* Recheck with the lock held. */
-	mrs_lock(&application_quarantine_lock);
-	if (!quarantine_should_flush(&application_quarantine, is_free)) {
-		mrs_unlock(&application_quarantine_lock);
+	mrs_lock(&app_quarantine_lock);
+	if (!quarantine_should_flush(app_quarantine, is_free)) {
+		mrs_unlock(&app_quarantine_lock);
 		return;
 	}
 
-	/*
-	 * A flush is needed, move the state into local_quarantine to
-	 * avoid holding the lock for all of the revocation.
-	 */
-#ifdef OFFLOAD_QUARANTINE
-#ifdef PRINT_CAPREVOKE
-	mrs_printf("check_and_perform_flush (offload): passed application_quarantine threshold, offloading: allocated size %zu quarantine size %zu\n",
-	    allocated_size, application_quarantine.size);
-#endif
-#ifdef PRINT_CAPREVOKE_MRS
-	mrs_printf("check_and_perform flush: cycle count before waiting on offload %" PRIu64 "\n",
-	    cheri_revoke_get_cyc());
-#endif
-#else /* OFFLOAD_QUARANTINE */
-#ifdef PRINT_CAPREVOKE
-	mrs_printf("check_and_perform_flush (no offload): passed application_quarantine threshold, revoking: allocated size %zu quarantine size %zu\n",
-	    allocated_size, application_quarantine.size);
-#endif
-#endif /* !OFFLOAD_QUARANTINE */
-	quarantine_move(&local_quarantine, &application_quarantine);
-	mrs_unlock(&application_quarantine_lock);
-	_internal_malloc_revoke(&local_quarantine);
+	if (revoke_async) {
+		app_quarantine_revoke_async();
+	} else {
+		quarantine_move(&local_quarantine, app_quarantine);
+		mrs_unlock(&app_quarantine_lock);
+		_internal_quarantine_flush(&local_quarantine);
+	}
 }
 
 /* constructor and destructor */
@@ -1115,11 +1284,10 @@ spawn_background(void)
 }
 #endif /* OFFLOAD_QUARANTINE */
 
-__attribute__((constructor))
 static void
-init(void)
+mrs_init_impl_locked(void)
 {
-	initialize_lock(application_quarantine_lock);
+	initialize_lock(app_quarantine_lock);
 	initialize_lock(printf_lock);
 
 #ifdef OFFLOAD_QUARANTINE
@@ -1153,6 +1321,50 @@ init(void)
 		exit(7);
 	}
 
+	char *envstr, *end;
+	if ((envstr = secure_getenv(MALLOC_QUARANTINE_DENOMINATOR_ENV)) !=
+	    NULL) {
+		errno = 0;
+		quarantine_denominator = strtoul(envstr, &end, 0);
+		if (*end != '\0' ||
+		    (quarantine_denominator == ULONG_MAX &&
+		     errno == ERANGE)) {
+			mrs_puts("invalid "
+			    MALLOC_QUARANTINE_DENOMINATOR_ENV "\n");
+			exit(7);
+		}
+	}
+	if ((envstr = secure_getenv(MALLOC_QUARANTINE_NUMERATOR_ENV)) !=
+	    NULL) {
+		errno = 0;
+		quarantine_numerator = strtoul(envstr, &end, 0);
+		if (*end != '\0' ||
+		    (quarantine_numerator == ULONG_MAX &&
+		     errno == ERANGE)) {
+			mrs_puts("invalid "
+			    MALLOC_QUARANTINE_NUMERATOR_ENV "\n");
+			exit(7);
+		}
+	}
+	if (quarantine_denominator == 0) {
+		mrs_puts("quarantine_denominator can not be 0\n");
+		exit(7);
+	}
+	if (quarantine_denominator > 256) {
+		/* Could overflow with 56-bits of userspace addresses */
+		mrs_puts("quarantine_denominator > 256\n");
+		exit(7);
+	}
+	if (quarantine_numerator == 0) {
+		mrs_puts("quarantine_numerator can not be 0\n");
+		exit(7);
+	}
+	if (quarantine_numerator > 256) {
+		/* Could overflow with 56-bits of userspace addresses */
+		mrs_puts("quarantine_numerator > 256\n");
+		exit(7);
+	}
+
 	if (!issetugid()) {
 		mrs_utrace = (getenv(MRS_UTRACE_ENV) != NULL);
 	}
@@ -1163,6 +1375,7 @@ init(void)
 		quarantining = ((bsdflags & ELF_BSDF_CHERI_REVOKE) != 0);
 		revoke_every_free =
 		    ((bsdflags & ELF_BSDF_CHERI_REVOKE_EVERY_FREE) != 0);
+		revoke_async = ((bsdflags & ELF_BSDF_CHERI_REVOKE_ASYNC) != 0);
 	}
 
 	if (!issetugid()) {
@@ -1172,26 +1385,36 @@ init(void)
 			quarantining = true;
 		}
 
+		if (getenv(MALLOC_ABORT_DISABLE_ENV) != NULL)
+			abort_on_validation_failure = false;
+		else if (getenv(MALLOC_ABORT_ENABLE_ENV) != NULL)
+			abort_on_validation_failure = true;
+
 		if (getenv(MALLOC_REVOKE_EVERY_FREE_DISABLE_ENV) != NULL)
 			revoke_every_free = false;
 		else if (getenv(MALLOC_REVOKE_EVERY_FREE_ENABLE_ENV) != NULL)
 			revoke_every_free = true;
+
+#ifndef OFFLOAD_QUARANTINE
+		if (getenv(MALLOC_REVOKE_SYNC_ENV) != NULL)
+			revoke_async = false;
+		else if (getenv(MALLOC_REVOKE_ASYNC_ENV) != NULL)
+			revoke_async = true;
+#endif
+
+		if (getenv(MALLOC_BOUND_CHERI_POINTERS) != NULL)
+			bound_pointers = true;
+		else if (getenv(MALLOC_NOBOUND_CHERI_POINTERS) != NULL)
+			bound_pointers = false;
 	}
 	if (!quarantining)
-#if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS) || defined(PRINT_STATS)
 		goto nosys;
-#else
-		return;
-#endif
 
 	if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
 	    (void **)&cri) != 0) {
 		if (errno == ENOSYS) {
 			quarantining = false;
-#if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS) || defined(PRINT_STATS)
 			goto nosys;
-#endif
-			return;
 		}
 		mrs_puts("error getting kernel caprevoke counters\n");
 		exit(7);
@@ -1203,10 +1426,46 @@ init(void)
 		exit(7);
 	}
 
-#if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS) || defined(PRINT_STATS)
+	for (int i = 0; i < APP_QUARANTINE_ARENAS; i++) {
+		app_quarantine_store[i].revoking = false;
+		if (i > 0) {
+			TAILQ_INSERT_TAIL(&app_quarantine_free_list,
+			    &app_quarantine_store[i], next);
+		}
+	}
+	app_quarantine = &app_quarantine_store[0];
+
 nosys:
+	mrs_initialized = true;
+
+#if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS) || defined(PRINT_STATS)
 	mrs_puts(VERSION_STRING);
 #endif
+}
+
+static void
+mrs_init_impl(void)
+{
+	MRS_LOCK(&mrs_init_lock);
+	if (!mrs_initialized)
+		mrs_init_impl_locked();
+	MRS_UNLOCK(&mrs_init_lock);
+}
+
+static __attribute__((always_inline)) void
+mrs_init(void)
+{
+	if (__predict_false(!mrs_initialized))
+		mrs_init_impl();
+	/* Invariant: mrs_init_impl must initialize mrs or exit. */
+	assert(mrs_initialized);
+}
+
+__attribute__((__constructor__(100)))
+static void
+mrs_constructor(void)
+{
+	mrs_init();
 }
 
 #ifdef PRINT_STATS
@@ -1220,8 +1479,8 @@ fini(void)
 	    offload_quarantine.max_size);
 #else /* OFFLOAD_QUARANTINE */
 	mrs_printf("fini: heap size %zu, max heap size %zu, quarantine size %zu, max quarantine size %zu\n",
-	    allocated_size, max_allocated_size, application_quarantine.size,
-	    application_quarantine.max_size);
+	    allocated_size, max_allocated_size, app_quarantine->size,
+	    app_quarantine->max_size);
 #endif /* !OFFLOAD_QUARANTINE */
 }
 #endif /* PRINT_STATS */
@@ -1229,10 +1488,18 @@ fini(void)
 /* mrs functions */
 
 static void *
+mrs_real_malloc(size_t size)
+{
+	return (mrs_bound_pointer(REAL(malloc)(size), size));
+}
+
+static void *
 mrs_malloc(size_t size)
 {
+	mrs_init();
+
 	if (!quarantining)
-		return (REAL(malloc)(size));
+		return (mrs_real_malloc(size));
 
 	/*mrs_debug_printf("mrs_malloc: called\n");*/
 
@@ -1250,9 +1517,9 @@ mrs_malloc(size_t size)
 	 * of the currently supported allocators do.
 	 */
 	if (size < CAPREVOKE_BITMAP_ALIGNMENT)
-		allocated_region = REAL(malloc)(CAPREVOKE_BITMAP_ALIGNMENT);
+		allocated_region = mrs_real_malloc(CAPREVOKE_BITMAP_ALIGNMENT);
 	else
-		allocated_region = REAL(malloc)(size);
+		allocated_region = mrs_real_malloc(size);
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0,
 		    allocated_region);
@@ -1272,13 +1539,21 @@ mrs_malloc(size_t size)
 	return (allocated_region);
 }
 
+static void *
+mrs_real_calloc(size_t number, size_t size)
+{
+	return (mrs_bound_pointer(REAL(calloc)(number, size), number * size));
+}
+
 void *
 mrs_calloc(size_t number, size_t size)
 {
 	size_t tmpsize;
 
+	mrs_init();
+
 	if (!quarantining)
-		return (REAL(calloc)(number, size));
+		return (mrs_real_calloc(number, size));
 
 	/*
 	 * This causes problems if our library is initialized before
@@ -1301,9 +1576,9 @@ mrs_calloc(size_t number, size_t size)
 	 */
 	if (!__builtin_mul_overflow(number, size, &tmpsize) &&
 	    tmpsize < CAPREVOKE_BITMAP_ALIGNMENT)
-		allocated_region = REAL(calloc)(1, CAPREVOKE_BITMAP_ALIGNMENT);
+		allocated_region = mrs_real_calloc(1, CAPREVOKE_BITMAP_ALIGNMENT);
 	else
-		allocated_region = REAL(calloc)(number, size);
+		allocated_region = mrs_real_calloc(number, size);
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number,
 		    allocated_region);
@@ -1323,10 +1598,23 @@ mrs_calloc(size_t number, size_t size)
 }
 
 static int
+mrs_real_posix_memalign(void **ptr, size_t alignment, size_t size)
+{
+	int ret;
+
+	ret = REAL(posix_memalign)(ptr, alignment, size);
+	if (ret == 0)
+		*ptr = mrs_bound_pointer(*ptr, size);
+	return (ret);
+}
+
+static int
 mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 {
+	mrs_init();
+
 	if (!quarantining)
-		return (REAL(posix_memalign)(ptr, alignment, size));
+		return (mrs_real_posix_memalign(ptr, alignment, size));
 
 	mrs_debug_printf("mrs_posix_memalign: called ptr %p alignment %zu size %zu\n",
 	    ptr, alignment, size);
@@ -1336,7 +1624,7 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 	if (alignment < CAPREVOKE_BITMAP_ALIGNMENT)
 		alignment = CAPREVOKE_BITMAP_ALIGNMENT;
 
-	int ret = REAL(posix_memalign)(ptr, alignment, size);
+	int ret = mrs_real_posix_memalign(ptr, alignment, size);
 	if (ret != 0) {
 		return (ret);
 	}
@@ -1352,10 +1640,18 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 }
 
 static void *
+mrs_real_aligned_alloc(size_t alignment, size_t size)
+{
+	return (mrs_bound_pointer(REAL(aligned_alloc)(alignment, size), size));
+}
+
+static void *
 mrs_aligned_alloc(size_t alignment, size_t size)
 {
+	mrs_init();
+
 	if (!quarantining)
-		return (REAL(aligned_alloc)(alignment, size));
+		return (mrs_real_aligned_alloc(alignment, size));
 
 	mrs_debug_printf("mrs_aligned_alloc: called alignment %zu size %zu\n",
 	    alignment, size);
@@ -1365,7 +1661,7 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	if (alignment < CAPREVOKE_BITMAP_ALIGNMENT)
 		alignment = CAPREVOKE_BITMAP_ALIGNMENT;
 
-	void *allocated_region = REAL(aligned_alloc)(alignment, size);
+	void *allocated_region = mrs_real_aligned_alloc(alignment, size);
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 		    allocated_region);
@@ -1383,6 +1679,12 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	return (allocated_region);
 }
 
+static void *
+mrs_real_realloc(void *ptr, size_t size)
+{
+	return (mrs_bound_pointer(REAL(realloc)(ptr, size), size));
+}
+
 /*
  * Replace realloc with a malloc and free to avoid dangling pointers
  * in case of in-place realloc that shrinks the buffer.  If ptr is not
@@ -1392,12 +1694,29 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 static void *
 mrs_realloc(void *ptr, size_t size)
 {
+	mrs_init();
+
 	if (!quarantining)
-		return (REAL(realloc)(ptr, size));
+		return (mrs_real_realloc(ptr, size));
 
 	size_t old_size = cheri_getlen(ptr);
 	mrs_debug_printf("mrs_realloc: called ptr %p ptr size %zu new size %zu\n",
 	    ptr, old_size, size);
+
+	/*
+	 * If the new size fits in the current allocation and we won't
+	 * be wasting too much space, just return the existing pointer.
+	 *
+	 * Only try to reclaim space by copying if we'd recover at least
+	 * half of the allocated storage.  In other cases we can't tell
+	 * the difference between shrinking and linear growth into a
+	 * large over-allocation (e.g., growing into snmalloc's
+	 * power-of-two buckets by 1K) and we especially want to avoid
+	 * copying such cases.
+	 */
+	if (ptr != NULL && cheri_gettag(ptr) && cheri_getoffset(ptr) == 0 &&
+	    size <= old_size && old_size - size <= (old_size >> 1))
+		return (ptr);
 
 	void *new_alloc = mrs_malloc(size);
 
@@ -1416,6 +1735,10 @@ mrs_realloc(void *ptr, size_t size)
 static void
 mrs_free(void *ptr)
 {
+	void *ins;
+
+	assert(mrs_initialized || ptr == NULL);
+
 	if (!quarantining)
 		return (REAL(free)(ptr));
 
@@ -1423,21 +1746,23 @@ mrs_free(void *ptr)
 
 	MRS_UTRACE(UTRACE_MRS_FREE, ptr, 0, 0, 0);
 
-	void *ins = ptr;
+	if (ptr == NULL)
+		return;
 
 	/*
 	 * If not offloading, validate the passed-in cap here and
 	 * replace it with the cap to its underlying allocation.
 	 */
 #ifdef OFFLOAD_QUARANTINE
-	if (ins == NULL) {
-		return;
-	}
+	ins = ptr
 #else
 	ins = validate_freed_pointer(ptr);
 	if (ins == NULL) {
 		mrs_debug_printf("mrs_free: validation failed\n");
-		return;
+		if (abort_on_validation_failure)
+			abort();
+		else
+			return;
 	}
 #endif /* !OFFLOAD_QUARANTINE */
 
@@ -1445,11 +1770,17 @@ mrs_free(void *ptr)
 	bzero(cheri_setoffset(ptr, 0), cheri_getlen(ptr));
 #endif
 
-	mrs_lock(&application_quarantine_lock);
-	quarantine_insert(&application_quarantine, ins, cheri_getlen(ins));
-	mrs_unlock(&application_quarantine_lock);
+	mrs_lock(&app_quarantine_lock);
+	quarantine_insert(app_quarantine, ins, cheri_getlen(ins));
+	mrs_unlock(&app_quarantine_lock);
 
 	check_and_perform_flush(true);
+}
+
+static void *
+mrs_real_mallocx(size_t size, int flags)
+{
+	return (mrs_bound_pointer(REAL(mallocx)(size, flags), size));
 }
 
 void *
@@ -1458,8 +1789,10 @@ mrs_mallocx(size_t size, int flags)
 	size_t align = MALLOCX_ALIGN_GET(flags);
 	void *ret;
 
+	mrs_init();
+
 	if (!quarantining)
-		return (REAL(mallocx)(size, flags));
+		return (mrs_real_mallocx(size, flags));
 
 	if (align <= CAPREVOKE_BITMAP_ALIGNMENT)
 		ret = mrs_malloc(size);
@@ -1474,14 +1807,22 @@ mrs_mallocx(size_t size, int flags)
 	return (ret);
 }
 
+static void *
+mrs_real_rallocx(void *ptr, size_t size, int flags)
+{
+	return (mrs_bound_pointer(REAL(rallocx)(ptr, size, flags), size));
+}
+
 void *
 mrs_rallocx(void *ptr, size_t size, int flags)
 {
 	void *new_alloc;
 	size_t old_size;
 
+	mrs_init();
+
 	if (!quarantining)
-		return (REAL(rallocx)(ptr, size, flags));
+		return (mrs_real_rallocx(ptr, size, flags));
 
 	old_size = cheri_getlen(ptr);
 
@@ -1602,12 +1943,12 @@ mrs_offload_thread(void *arg)
 
 		mrs_debug_printf("mrs_offload_thread: flushing validated quarantine size %zu\n", offload_quarantine.size);
 
-		quarantine_flush(&offload_quarantine);
+		quarantine_revoke(&offload_quarantine);
 
 #ifdef PRINT_CAPREVOKE_MRS
 		mrs_printf("mrs_offload_thread: application quarantine's (unvalidated) size "
 		    "when offloaded quarantine flush complete: %zu\n",
-		    application_quarantine.size);
+		    app_quarantine->size);
 #endif /* PRINT_CAPREVOKE_MRS */
 
 		if (pthread_cond_signal(&offload_quarantine_empty) != 0) {

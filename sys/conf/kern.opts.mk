@@ -32,6 +32,7 @@ __DEFAULT_YES_OPTIONS = \
     BLUETOOTH \
     CCD \
     CDDL \
+    CHERI_CODEPTR_RELOCS \
     CRYPT \
     CUSE \
     DTRACE \
@@ -56,27 +57,18 @@ __DEFAULT_YES_OPTIONS = \
 
 __DEFAULT_NO_OPTIONS = \
     BHYVE_SNAPSHOT \
-    EXTRA_TCP_STACKS \
-    INIT_ALL_PATTERN \
-    INIT_ALL_ZERO \
+    KERNEL_BIN \
     KERNEL_RETPOLINE \
     RATELIMIT \
     REPRODUCIBLE_BUILD \
     VERIEXEC
 
-# Some options are totally broken on some architectures. We disable
-# them. If you need to enable them on an experimental basis, you
-# must change this code.
-# Note: These only apply to the list of modules we build by default
-# and sometimes what is in the opt_*.h files by default.
-# Kernel config files are unaffected, though some targets can be
-# affected by KERNEL_SYMBOLS, FORMAT_EXTENSIONS, CTF and SSP.
-
-# Things that don't work based on the CPU
-.if ${MACHINE} == "amd64"
-# PR251083 conflict between INIT_ALL_ZERO and ifunc memset
-BROKEN_OPTIONS+= INIT_ALL_ZERO
-.endif
+# Some options are totally broken on some architectures. We disable them. If you
+# need to enable them on an experimental basis, you must change this code.
+# Note: These only apply to the list of modules we build by default and
+# sometimes what is in the opt_*.h files by default.  Kernel config files are
+# unaffected, though some targets can be affected by KERNEL_BIN, KERNEL_SYMBOLS,
+# FORMAT_EXTENSIONS, CTF and SSP.
 
 # Broken on 32-bit arm, kernel module compile errors
 .if ${MACHINE_CPUARCH} == "arm"
@@ -93,6 +85,11 @@ BROKEN_OPTIONS+= KERNEL_RETPOLINE
 BROKEN_OPTIONS+=EFI
 .endif
 
+# We only generate kernel.bin on arm and arm64, otherwise they break the build.
+.if ${MACHINE} != "arm" && ${MACHINE} != "arm64"
+BROKEN_OPTIONS+=KERNEL_BIN
+.endif
+
 .if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
 __DEFAULT_NO_OPTIONS += FDT
 .else
@@ -104,6 +101,16 @@ __DEFAULT_YES_OPTIONS += FDT
 BROKEN_OPTIONS+=CDDL
 # iw_cxgbe fails to build
 BROKEN_OPTIONS+=OFED
+.endif
+
+__SINGLE_OPTIONS = \
+	INIT_ALL
+
+__INIT_ALL_OPTIONS=	none pattern zero
+__INIT_ALL_DEFAULT=	none
+.if ${MACHINE} == "amd64"
+# PR251083 conflict between INIT_ALL_ZERO and ifunc memset
+BROKEN_SINGLE_OPTIONS+=	INIT_ALL zero none
 .endif
 
 # expanded inline from bsd.mkopt.mk to avoid share/mk dependency

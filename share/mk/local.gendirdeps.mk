@@ -1,7 +1,4 @@
 
-# we need a keyword, this noise is to prevent it being expanded
-GENDIRDEPS_HEADER= echo '\# ${FreeBSD:L:@v@$$$v$$ @:M*F*}';
-
 # suppress optional/auto dependencies
 # local.dirdeps.mk will put them in if necessary
 GENDIRDEPS_FILTER+= \
@@ -13,6 +10,8 @@ GENDIRDEPS_FILTER+= \
 	Nlib/libgcc_s \
 	Nstand/libsa/* \
 	Nstand/libsa32/* \
+	Nusr.bin/awk.host \
+	Nusr.bin/xinstall.host \
 	Ntargets/pseudo/stage* \
 	Ntools/*
 

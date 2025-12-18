@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)socketvar.h	8.3 (Berkeley) 2/19/95
  */
 
 #ifndef _SYS_SOCKETVAR_H_
@@ -48,9 +46,12 @@ typedef uint64_t so_gen_t;
 #include <sys/_sx.h>
 #include <sys/sockbuf.h>
 #include <sys/socket.h>
+#include <sys/_task.h>
 #ifdef _KERNEL
 #include <sys/caprights.h>
 #include <sys/sockopt.h>
+#else
+#include <stdbool.h>
 #endif
 
 struct vnet;
@@ -72,6 +73,25 @@ enum socket_qstate {
 	SQ_COMP = 0x1000,	/* on sol_comp */
 };
 
+
+struct so_splice {
+	struct socket *src;
+	struct socket *dst;
+	off_t max;		/* maximum bytes to splice, or -1 */
+	struct mtx mtx;
+	unsigned int wq_index;
+	enum so_splice_state {
+		SPLICE_IDLE,	/* waiting for work to arrive */
+		SPLICE_QUEUED,	/* a wakeup has queued some work */
+		SPLICE_RUNNING,	/* currently transferring data */
+		SPLICE_CLOSING,	/* waiting for work to drain */
+		SPLICE_CLOSED,	/* unsplicing, terminal state */
+		SPLICE_EXCEPTION, /* I/O error or limit, implicit unsplice */
+	} state;
+	struct timeout_task timeout;
+	STAILQ_ENTRY(so_splice) next;
+};
+
 /*-
  * Locking key to struct socket:
  * (a) constant after allocation, no locking required.
@@ -82,6 +102,7 @@ enum socket_qstate {
  * (f) not locked since integer reads/writes are atomic.
  * (g) used only as a sleep/wakeup address, no value.
  * (h) locked by global mutex so_global_mtx.
+ * (ir,is) locked by recv or send I/O locks.
  * (k) locked by KTLS workqueue mutex
  */
 TAILQ_HEAD(accept_queue, socket);
@@ -120,6 +141,9 @@ struct socket {
 
 	int so_ts_clock;	/* type of the clock used for timestamps */
 	uint32_t so_max_pacing_rate;	/* (f) TX rate limit in bytes/s */
+	struct so_splice *so_splice;	/* (b) splice state for sink */
+	struct so_splice *so_splice_back; /* (b) splice state for source */
+	off_t so_splice_sent;	/* (ir) splice bytes sent so far */
 
 	/*
 	 * Mutexes to prevent interleaving of socket I/O.  These have to be
@@ -215,7 +239,7 @@ struct socket {
 #define	SS_ISDISCONNECTING	0x0008	/* in process of disconnecting */
 #define	SS_NBIO			0x0100	/* non-blocking ops */
 #define	SS_ASYNC		0x0200	/* async i/o notify */
-#define	SS_ISCONFIRMING		0x0400	/* deciding to accept connection req */
+/* was	SS_ISCONFIRMING		0x0400	*/
 #define	SS_ISDISCONNECTED	0x2000	/* socket disconnected from peer */
 
 #ifdef _KERNEL
@@ -301,6 +325,11 @@ soeventmtx(struct socket *so, const sb_which which)
  * Macros for sockets and socket buffering.
  */
 
+
+#define	isspliced(so)		((so->so_splice != NULL &&		\
+					so->so_splice->src != NULL))
+#define	issplicedback(so)	((so->so_splice_back != NULL &&		\
+					so->so_splice_back->dst != NULL))
 /*
  * Flags to soiolock().
  */
@@ -314,12 +343,14 @@ soeventmtx(struct socket *so, const sb_which which)
 	soiolock((so), &(so)->so_snd_sx, (flags))
 #define	SOCK_IO_SEND_UNLOCK(so)						\
 	soiounlock(&(so)->so_snd_sx)
-#define	SOCK_IO_SEND_OWNED(so)	sx_xlocked(&(so)->so_snd_sx)
+#define	SOCK_IO_SEND_ASSERT_LOCKED(so)					\
+	sx_assert(&(so)->so_snd_sx, SA_LOCKED)
 #define	SOCK_IO_RECV_LOCK(so, flags)					\
 	soiolock((so), &(so)->so_rcv_sx, (flags))
 #define	SOCK_IO_RECV_UNLOCK(so)						\
 	soiounlock(&(so)->so_rcv_sx)
-#define	SOCK_IO_RECV_OWNED(so)	sx_xlocked(&(so)->so_rcv_sx)
+#define	SOCK_IO_RECV_ASSERT_LOCKED(so)					\
+	sx_assert(&(so)->so_rcv_sx, SA_LOCKED)
 
 /* do we have to send all at once on a socket? */
 #define	sosendallatonce(so) \
@@ -329,8 +360,16 @@ soeventmtx(struct socket *so, const sb_which which)
 #define	soreadabledata(so) \
 	(sbavail(&(so)->so_rcv) >= (so)->so_rcv.sb_lowat || \
 	(so)->so_error || (so)->so_rerror)
-#define	soreadable(so) \
+#define	_soreadable(so) \
 	(soreadabledata(so) || ((so)->so_rcv.sb_state & SBS_CANTRCVMORE))
+
+static inline bool
+soreadable(struct socket *so)
+{
+       if (isspliced(so))
+               return (false);
+       return (_soreadable(so));
+}
 
 /* can we write something to so? */
 #define	sowriteable(so) \
@@ -418,7 +457,8 @@ MALLOC_DECLARE(M_SONAME);
 #define HHOOK_FILT_SOREAD		4
 #define HHOOK_FILT_SOWRITE		5
 #define HHOOK_SOCKET_CLOSE		6
-#define HHOOK_SOCKET_LAST		HHOOK_SOCKET_CLOSE
+#define HHOOK_SOCKET_NEWCONN		7
+#define HHOOK_SOCKET_LAST		HHOOK_SOCKET_NEWCONN
 
 struct socket_hhook_data {
 	struct socket	*so;
@@ -438,6 +478,7 @@ struct mbuf;
 struct sockaddr;
 struct ucred;
 struct uio;
+enum shutdown_how;
 
 /* Return values for socket upcalls. */
 #define	SU_OK		0
@@ -456,7 +497,9 @@ int	getsock_cap(struct thread *td, int fd, cap_rights_t *rightsp,
 int	getsock(struct thread *td, int fd, cap_rights_t *rightsp,
 	    struct file **fpp);
 void	soabort(struct socket *so);
-int	soaccept(struct socket *so, struct sockaddr **nam);
+int	soaccept(struct socket *so, struct sockaddr *sa);
+int	sopeeraddr(struct socket *so, struct sockaddr *sa);
+int	sosockaddr(struct socket *so, struct sockaddr *sa);
 void	soaio_enqueue(struct task *task);
 void	soaio_rcv(void *context, int pending);
 void	soaio_snd(void *context, int pending);
@@ -517,7 +560,7 @@ int	sosend_dgram(struct socket *so, struct sockaddr *addr,
 int	sosend_generic(struct socket *so, struct sockaddr *addr,
 	    struct uio *uio, struct mbuf *top, struct mbuf *control,
 	    int flags, struct thread *td);
-int	soshutdown(struct socket *so, int how);
+int	soshutdown(struct socket *so, enum shutdown_how);
 void	soupcall_clear(struct socket *, sb_which);
 void	soupcall_set(struct socket *, sb_which, so_upcall_t, void *);
 void	solisten_upcall_set(struct socket *, so_upcall_t, void *);
@@ -539,6 +582,11 @@ void	soroverflow(struct socket *so);
 void	soroverflow_locked(struct socket *so);
 int	soiolock(struct socket *so, struct sx *sx, int flags);
 void	soiounlock(struct sx *sx);
+
+/*
+ * Socket splicing routines.
+ */
+void	so_splice_dispatch(struct so_splice *sp);
 
 /*
  * Accept filter functions (duh).
@@ -563,7 +611,8 @@ struct xsocket {
 	kvaddr_t	xso_so;		/* kernel address of struct socket */
 	kvaddr_t	so_pcb;		/* kernel address of struct inpcb */
 	uint64_t	so_oobmark;
-	int64_t		so_spare64[8];
+	kvaddr_t	so_splice_so;	/* kernel address of spliced socket */
+	int64_t		so_spare64[7];
 	int32_t		xso_protocol;
 	int32_t		xso_family;
 	uint32_t	so_qlen;

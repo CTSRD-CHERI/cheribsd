@@ -1,3 +1,5 @@
+# z_Linux_asm.S is missing BTI support
+MK_BRANCH_PROTECTION=no
 
 .include <bsd.compiler.mk>
 
@@ -55,14 +57,29 @@ CFLAGS+=	-fdata-sections
 CXXFLAGS+=	-fvisibility-inlines-hidden
 CXXFLAGS+=	-fno-exceptions
 CXXFLAGS+=	-fno-rtti
-CXXSTD=		c++11
+CXXSTD=		c++17
 
-.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 90000
+.if ${COMPILER_TYPE} == "clang"
+.if ${MACHINE_CPUARCH} == "i386"
+.if ${COMPILER_VERSION} >= 90000
 # When targeting i386, clang 9.0.0 produces a new warning about large atomic
 # operations "possibly incurring significant performance penalties", but there
 # is not much we can do about it.
 CWARNFLAGS+=	-Wno-atomic-alignment
 .endif
+.if ${COMPILER_VERSION} >= 170000
+# When targeting i386, clang 17.0.0 produces a new warning that __sync
+# builtin operations must have natural alignment, but there is not much we
+# can do about it.
+CWARNFLAGS+=	-Wno-sync-alignment
+.endif # COMPILER_VERSION >= 170000
+.endif # MACHINE_CPUARCH == i386
+.if ${COMPILER_VERSION} >= 180000
+# clang 18.0.0 introduces a new warning about variable length arrays in C++,
+# which OpenMP makes use of in several sources.
+CXXWARNFLAGS+=	-Wno-vla-cxx-extension
+.endif # COMPILER_VERSION >= 180000
+.endif # COMPILER_TYPE == clang
 
 LDFLAGS+=	-Wl,--warn-shared-textrel
 LDFLAGS+=	-Wl,--gc-sections

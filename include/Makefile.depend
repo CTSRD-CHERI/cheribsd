@@ -2,7 +2,6 @@
 
 DIRDEPS = \
 	bin/sh.host \
-	usr.bin/xinstall.host \
 
 
 .include <dirdeps.mk>

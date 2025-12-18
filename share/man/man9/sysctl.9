@@ -626,7 +626,7 @@ For example,
 .Fn SYSCTL_INT
 reports the raw value of an associated variable of type
 .Vt int .
-However, nodes may also export a value that is a translatation of an internal
+However, nodes may also export a value that is a translation of an internal
 representation.
 .Pp
 The
@@ -704,7 +704,7 @@ macro or the
 function.
 If the
 .Fa len
-argument in zero, the string length is computed at every access to the OID using
+argument is zero, the string length is computed at every access to the OID using
 .Xr strlen 3 .
 Use the
 .Fn SYSCTL_CONST_STRING
@@ -1058,6 +1058,9 @@ The
 .Xr sysctl 8
 utility first appeared in
 .Bx 4.4 .
+.Nm SYSCTL_ADD_CONST_STRING
+first appeared in
+.Fx 12.1 .
 .Sh AUTHORS
 .An -nosplit
 The

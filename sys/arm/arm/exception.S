@@ -52,6 +52,7 @@
 #include <machine/armreg.h>
 #include <machine/asmacros.h>
 #include <machine/trap.h>
+
 #ifdef KDTRACE_HOOKS
 	.bss
 	.align 4
@@ -165,12 +166,12 @@ _C_LABEL(dtrace_invop_jump_addr):
 #define	DO_AST								   \
 	ldr	r0, [sp];		/* Get the SPSR from stack */	   \
 	mrs	r4, cpsr;		/* save CPSR */			   \
-	orr	r1, r4, #(PSR_I|PSR_F);					   \
+	orr	r1, r4, #(PSR_I);					   \
 	msr	cpsr_c, r1;		/* Disable interrupts */	   \
 	and	r0, r0, #(PSR_MODE);	/* Returning to USR mode? */	   \
 	teq	r0, #(PSR_USR32_MODE);					   \
 	bne	2f;			/* Nope, get out now */		   \
-	bic	r4, r4, #(PSR_I|PSR_F);					   \
+	bic	r4, r4, #(PSR_I);					   \
 1:	GET_CURTHREAD_PTR(r5);						   \
 	ldr	r1, [r5, #(TD_AST)];					   \
 	teq	r1, #0;							   \
@@ -178,7 +179,7 @@ _C_LABEL(dtrace_invop_jump_addr):
 	msr	cpsr_c, r4;		/* Restore interrupts */	   \
 	mov	r0, sp;							   \
 	bl	_C_LABEL(ast);		/* ast(frame) */		   \
-	orr	r0, r4, #(PSR_I|PSR_F);					   \
+	orr	r0, r4, #(PSR_I);					   \
 	msr	cpsr_c, r0;						   \
 	b	1b;							   \
 2:
@@ -270,13 +271,9 @@ ASENTRY_NP(undefined_entry)
 	mov	r0, sp			/* exception exit routine. pass frame */
 
 	ldr	r2, [sp, #(TF_PC)]	/* load pc */
-#if __ARM_ARCH >= 7
 	tst	r4, #(PSR_T)		/* test if PSR_T */
 	subne	r2, r2, #(THUMB_INSN_SIZE)
 	subeq	r2, r2, #(INSN_SIZE)
-#else
-	sub	r2, r2, #(INSN_SIZE)	/* fix pc */
-#endif
 	str	r2, [sp, #TF_PC]	/* store pc */
 
 #ifdef KDTRACE_HOOKS
@@ -312,23 +309,9 @@ ASENTRY_NP(irq_entry)
 	PUSHFRAMEINSVC			/* mode stack, build trapframe there. */
 	adr	lr, exception_exit	/* Return from handler via standard */
 	mov	r0, sp			/* exception exit routine.  Pass the */
-	b	_C_LABEL(intr_irq_handler)/* trapframe to the handler. */
+	mov	r1, #INTR_ROOT_IRQ	/* trapframe and PIC root to the handler. */
+	b	_C_LABEL(intr_irq_handler)
 END(irq_entry)
-
-/*
- * Entry point for an FIQ interrupt.
- *
- * We don't currently support FIQ handlers very much.  Something can
- * install itself in the FIQ vector using code (that may or may not work
- * these days) in fiq.c.  If nobody does that and an FIQ happens, this
- * default handler just disables FIQs and otherwise ignores it.
- */
-ASENTRY_NP(fiq_entry)
-	mrs	r8, cpsr		/* FIQ handling isn't supported, */
-	bic	r8, #(PSR_F)		/* just disable FIQ and return.  */
-	msr	cpsr_c, r8		/* The r8 we trash here is the  */
-	subs	pc, lr, #4		/* banked FIQ-mode r8. */
-END(fiq_entry)
 
 /*
  * Entry point for an Address Exception exception.
@@ -378,8 +361,6 @@ _C_LABEL(page0):
 	ldr	pc, .Ldata_abort_entry
 	ldr	pc, .Laddr_exception_entry
 	ldr	pc, .Lirq_entry
-.fiqv:	ldr	pc, .Lfiq_entry
-	.space 256	/* room for some fiq handler code */
 
 _C_LABEL(page0_data):
 .Lreset_entry:		.word	reset_entry
@@ -389,18 +370,4 @@ _C_LABEL(page0_data):
 .Ldata_abort_entry:	.word	data_abort_entry
 .Laddr_exception_entry:	.word	addr_exception_entry
 .Lirq_entry:		.word	irq_entry
-.Lfiq_entry:		.word	fiq_entry
-
-/*
- * These items are used by the code in fiq.c to install what it calls the
- * "null" handler.  It's actually our default vector entry that just jumps
- * to the default handler which just disables FIQs and returns.
- */
-	.global _C_LABEL(fiq_nullhandler_code), _C_LABEL(fiq_nullhandler_size)
-
-_C_LABEL(fiq_nullhandler_code):
-	.word	.fiqv
-_C_LABEL(fiq_nullhandler_size):
-	.word	4
-
 

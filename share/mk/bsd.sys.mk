@@ -88,6 +88,10 @@ CWARNFLAGS.clang+=	-Wno-unused-const-variable
 .if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 150000
 CWARNFLAGS.clang+=	-Wno-error=unused-but-set-parameter
 .endif
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 190000
+# Similar to gcc >= 8.1 -Wno-error=cast-function-type below
+CWARNFLAGS.clang+=	-Wno-error=cast-function-type-mismatch
+.endif
 .endif # WARNS <= 6
 .if ${WARNS} <= 3
 CWARNFLAGS.clang+=	-Wno-tautological-compare -Wno-unused-value\
@@ -217,6 +221,7 @@ CWARNFLAGS+=	-Wno-error=aggressive-loop-optimizations	\
 		-Wno-error=restrict				\
 		-Wno-error=sizeof-pointer-memaccess		\
 		-Wno-error=stringop-truncation
+CXXWARNFLAGS+=	-Wno-error=class-memaccess
 .endif
 
 # GCC 9.2.0
@@ -234,6 +239,13 @@ CXXWARNFLAGS+=	-Wno-literal-suffix 			\
 		-Wno-error=unknown-pragmas
 .endif
 
+# GCC 13.1.0
+.if ${COMPILER_VERSION} >= 130100
+# These warnings are raised by headers in libc++ so are disabled
+# globally for all C++
+CXXWARNFLAGS+=	-Wno-dangling-reference
+.endif
+
 # GCC produces false positives for functions that switch on an
 # enum (GCC bug 87950)
 CWARNFLAGS+=	-Wno-return-type
@@ -248,6 +260,14 @@ CWARNFLAGS+=	-Wno-system-headers
 # Ignore unaligned memcpy() calls. This is just a missed optimization
 # so it should not cause the build to fail.
 CWARNFLAGS+=	-Wno-error=pass-failed
+.endif
+
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 160000
+# Work around warnings in libc++15 when built with Clang 16+.
+# This has to be here rather than scoped to libc++ since it is
+# triggered in headers used by (almost) all C++ programs.
+# FIXME: Remove this once libc++ has been upgraded.
+CXXWARNFLAGS+=-Wno-keyword-compat
 .endif
 
 # How to handle FreeBSD custom printf format specifiers.
@@ -293,11 +313,18 @@ CFLAGS.clang+=	 -Qunused-arguments
 # but not yet.
 CXXFLAGS.clang+=	 -Wno-c++11-extensions
 
+# XXX This should be defaulted to 2 when WITH_SSP is in use after further
+# testing and soak time.
+FORTIFY_SOURCE?=	0
 .if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap}
 # Don't use -Wstack-protector as it breaks world with -Werror.
 SSP_CFLAGS?=	-fstack-protector-strong
 CFLAGS+=	${SSP_CFLAGS}
 .endif # SSP && !purecap
+.if ${FORTIFY_SOURCE} > 0
+CFLAGS+=	-D_FORTIFY_SOURCE=${FORTIFY_SOURCE}
+CXXFLAGS+=	-D_FORTIFY_SOURCE=${FORTIFY_SOURCE}
+.endif
 
 # Additional flags passed in CFLAGS and CXXFLAGS when MK_DEBUG_FILES is
 # enabled.
@@ -507,3 +534,8 @@ ${_tgt}: ${META_DEPS}
 .endif
 .endfor
 .endif
+
+# we are generally the last makefile read
+CFLAGS+= ${CFLAGS_LAST}
+CXXFLAGS+= ${CXXFLAGS_LAST}
+LDFLAGS+= ${LDFLAGS_LAST}

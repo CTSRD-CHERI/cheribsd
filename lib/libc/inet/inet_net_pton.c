@@ -17,10 +17,6 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: inet_net_pton.c,v 1.10 2008/11/14 02:36:51 marka Exp $";
-#endif
-#include <sys/cdefs.h>
 #include "port_before.h"
 
 #include <sys/types.h>
@@ -142,7 +138,7 @@ inet_net_pton_ipv4(const char *src, u_char *dst, size_t size) {
 			goto enoent;
 	}
 
-	/* Firey death and destruction unless we prefetched EOS. */
+	/* Fiery death and destruction unless we prefetched EOS. */
 	if (ch != '\0')
 		goto enoent;
 

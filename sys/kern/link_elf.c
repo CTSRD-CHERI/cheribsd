@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include "opt_ddb.h"
 #include "opt_gdb.h"
 
@@ -72,12 +71,19 @@
 
 #include "linker_if.h"
 
+#ifdef DDB_CTF
+#include <ddb/db_ctf.h>
+#endif
+
 #define MAXSEGS 4
 
 typedef struct elf_file {
 	struct linker_file lf __subobject_member_used_for_c_inheritance; /* Common fields */
 	int		preloaded;	/* Was file pre-loaded */
 	caddr_t		address;	/* Relocation address */
+#ifdef __CHERI_PURE_CAPABILITY__
+	caddr_t		mapbase;	/* Capability for derived pointers */
+#endif
 #ifdef SPARSE_MAPPING
 	vm_object_t	object;		/* VM object to hold file pages */
 #endif
@@ -149,6 +155,8 @@ static int	link_elf_lookup_symbol(linker_file_t, const char *,
 		    c_linker_sym_t *);
 static int	link_elf_lookup_debug_symbol(linker_file_t, const char *,
 		    c_linker_sym_t *);
+static int 	link_elf_lookup_debug_symbol_ctf(linker_file_t lf,
+		    const char *name, c_linker_sym_t *sym, linker_ctf_t *lc);
 static int	link_elf_symbol_values(linker_file_t, c_linker_sym_t,
 		    linker_symval_t *);
 static int	link_elf_debug_symbol_values(linker_file_t, c_linker_sym_t,
@@ -167,24 +175,18 @@ static int	link_elf_each_function_nameval(linker_file_t,
 static void	link_elf_reloc_local(linker_file_t);
 static long	link_elf_symtab_get(linker_file_t, const Elf_Sym **);
 static long	link_elf_strtab_get(linker_file_t, caddr_t *);
-static int	link_elf_symidx_address(linker_file_t, unsigned long, int,
-		    ptraddr_t *);
-#ifdef __CHERI_PURE_CAPABILITY__
-static int	link_elf_symidx_capability(linker_file_t, unsigned long, int,
-		    uintcap_t *);
+#ifdef VIMAGE
+static void	link_elf_propagate_vnets(linker_file_t);
 #endif
-static int	elf_lookup(linker_file_t, Elf_Size, int, Elf_Addr *);
+static int	elf_lookup(linker_file_t, Elf_Size, int, uintptr_t *);
 
 static kobj_method_t link_elf_methods[] = {
 	KOBJMETHOD(linker_lookup_symbol,	link_elf_lookup_symbol),
 	KOBJMETHOD(linker_lookup_debug_symbol,	link_elf_lookup_debug_symbol),
+	KOBJMETHOD(linker_lookup_debug_symbol_ctf, link_elf_lookup_debug_symbol_ctf),
 	KOBJMETHOD(linker_symbol_values,	link_elf_symbol_values),
 	KOBJMETHOD(linker_debug_symbol_values,	link_elf_debug_symbol_values),
 	KOBJMETHOD(linker_search_symbol,	link_elf_search_symbol),
-	KOBJMETHOD(linker_symidx_address,	link_elf_symidx_address),
-#ifdef __CHERI_PURE_CAPABILITY__
-	KOBJMETHOD(linker_symidx_capability,	link_elf_symidx_capability),
-#endif
 	KOBJMETHOD(linker_unload,		link_elf_unload_file),
 	KOBJMETHOD(linker_load_file,		link_elf_load_file),
 	KOBJMETHOD(linker_link_preload,		link_elf_link_preload),
@@ -193,8 +195,12 @@ static kobj_method_t link_elf_methods[] = {
 	KOBJMETHOD(linker_each_function_name,	link_elf_each_function_name),
 	KOBJMETHOD(linker_each_function_nameval, link_elf_each_function_nameval),
 	KOBJMETHOD(linker_ctf_get,		link_elf_ctf_get),
+	KOBJMETHOD(linker_ctf_lookup_typename,  link_elf_ctf_lookup_typename),
 	KOBJMETHOD(linker_symtab_get,		link_elf_symtab_get),
 	KOBJMETHOD(linker_strtab_get,		link_elf_strtab_get),
+#ifdef VIMAGE
+	KOBJMETHOD(linker_propagate_vnets,	link_elf_propagate_vnets),
+#endif
 	KOBJMETHOD_END
 };
 
@@ -361,7 +367,7 @@ link_elf_error(const char *filename, const char *s)
 }
 
 static void
-link_elf_invoke_ctors(caddr_t addr, size_t size)
+link_elf_invoke_cbs(caddr_t addr, size_t size)
 {
 	void (**ctor)(void);
 	size_t i, cnt;
@@ -374,6 +380,27 @@ link_elf_invoke_ctors(caddr_t addr, size_t size)
 		if (ctor[i] != NULL)
 			(*ctor[i])();
 	}
+}
+
+static void
+link_elf_invoke_ctors(linker_file_t lf)
+{
+	KASSERT(lf->ctors_invoked == LF_NONE,
+	    ("%s: file %s ctor state %d",
+	    __func__, lf->filename, lf->ctors_invoked));
+
+	link_elf_invoke_cbs(lf->ctors_addr, lf->ctors_size);
+	lf->ctors_invoked = LF_CTORS;
+}
+
+static caddr_t
+ef_address(elf_file_t ef, ptraddr_t offset)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	return (cheri_setaddress(ef->mapbase, (ptraddr_t)ef->address + offset));
+#else
+	return (ef->address + offset);
+#endif
 }
 
 /*
@@ -406,7 +433,7 @@ link_elf_link_common_finish(linker_file_t lf)
 #endif
 
 	/* Invoke .ctors */
-	link_elf_invoke_ctors(lf->ctors_addr, lf->ctors_size);
+	link_elf_invoke_ctors(lf);
 	return (0);
 }
 
@@ -427,6 +454,8 @@ link_elf_link_common_finish(linker_file_t lf)
  *    differentiate between hypervisor, host, guest, and problem state.
  */
 extern vm_offset_t __startkernel, __endkernel;
+#elif defined(__CHERI_PURE_CAPABILITY__)
+extern char _end[];
 #endif
 
 static unsigned long kern_relbase = KERNBASE;
@@ -471,12 +500,12 @@ link_elf_init(void* arg)
 	ef->address = 0;
 #else /* __CHERI_PURE_CAPABILITY__ */
 	/*
-	 * It is particularly sad that we are not able to put bounds on
-	 * this capability.  At some point ef->address should become a
-	 * plain address and ef should grow capabilities for different
-	 * loadable segments instead.
+	 * This has to have very broad bounds for the kernel so that
+	 * relocbase passed to elf_reloc works.
 	 */
 	ef->address = cheri_setaddress(kernel_root_cap, 0);
+	ef->mapbase = cheri_setbounds(ef->address + KERNBASE,
+	    (ptraddr_t)_end - KERNBASE);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
 #ifdef SPARSE_MAPPING
@@ -527,6 +556,9 @@ link_elf_init(void* arg)
 	/* Set the bounds on load address */
 	linker_kernel_file->address = cheri_kern_setbounds(
 	    linker_kernel_file->address, linker_kernel_file->size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	ef->mapbase = linker_kernel_file->address;
+#endif
 	(void)link_elf_preload_parse_symbols(ef);
 
 #ifdef GDB
@@ -540,6 +572,7 @@ link_elf_init(void* arg)
 	TAILQ_INIT(&set_pcpu_list);
 #ifdef VIMAGE
 	TAILQ_INIT(&set_vnet_list);
+	vnet_save_init((void *)VNET_START, VNET_STOP - VNET_START);
 #endif
 }
 
@@ -615,7 +648,7 @@ parse_dynamic(elf_file_t ef)
 		{
 			/* From src/libexec/rtld-elf/rtld.c */
 			const Elf_Hashelt *hashtab = (const Elf_Hashelt *)
-			    (ef->address + dp->d_un.d_ptr);
+			    ef_address(ef, dp->d_un.d_ptr);
 			ef->nbuckets = hashtab[0];
 			ef->nchains = hashtab[1];
 			ef->buckets = cheri_kern_setbounds(hashtab + 2,
@@ -625,23 +658,23 @@ parse_dynamic(elf_file_t ef)
 			break;
 		}
 		case DT_STRTAB:
-			ef->strtab = (caddr_t) (ef->address + dp->d_un.d_ptr);
+			ef->strtab = (caddr_t) ef_address(ef, dp->d_un.d_ptr);
 			break;
 		case DT_STRSZ:
 			ef->strsz = dp->d_un.d_val;
 			break;
 		case DT_SYMTAB:
-			ef->symtab = (Elf_Sym*) (ef->address + dp->d_un.d_ptr);
+			ef->symtab = (Elf_Sym*) ef_address(ef, dp->d_un.d_ptr);
 			break;
 		case DT_SYMENT:
 			if (dp->d_un.d_val != sizeof(Elf_Sym))
 				return (ENOEXEC);
 			break;
 		case DT_PLTGOT:
-			ef->got = (Elf_Addr *) (ef->address + dp->d_un.d_ptr);
+			ef->got = (Elf_Addr *) ef_address(ef, dp->d_un.d_ptr);
 			break;
 		case DT_REL:
-			ef->rel = (const Elf_Rel *) (ef->address + dp->d_un.d_ptr);
+			ef->rel = (const Elf_Rel *) ef_address(ef, dp->d_un.d_ptr);
 			break;
 		case DT_RELSZ:
 			ef->relsize = dp->d_un.d_val;
@@ -651,13 +684,13 @@ parse_dynamic(elf_file_t ef)
 				return (ENOEXEC);
 			break;
 		case DT_JMPREL:
-			ef->pltrel = (const Elf_Rel *) (ef->address + dp->d_un.d_ptr);
+			ef->pltrel = (const Elf_Rel *) ef_address(ef, dp->d_un.d_ptr);
 			break;
 		case DT_PLTRELSZ:
 			ef->pltrelsize = dp->d_un.d_val;
 			break;
 		case DT_RELA:
-			ef->rela = (const Elf_Rela *) (ef->address + dp->d_un.d_ptr);
+			ef->rela = (const Elf_Rela *) ef_address(ef, dp->d_un.d_ptr);
 			break;
 		case DT_RELASZ:
 			ef->relasize = dp->d_un.d_val;
@@ -673,7 +706,7 @@ parse_dynamic(elf_file_t ef)
 			break;
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
 		case DT_CHERI___CAPRELOCS:
-			ef->caprelocs = ef->address + dp->d_un.d_ptr;
+			ef->caprelocs = ef_address(ef, dp->d_un.d_ptr);
 			break;
 		case DT_CHERI___CAPRELOCSSZ:
 			ef->caprelocssize = dp->d_un.d_val;
@@ -715,7 +748,7 @@ parse_dynamic(elf_file_t ef)
 	 * XXX-AM: How do we get .got size?
 	 * We probably have to leave it like this or define
 	 * a symbol after GOT, in any case the got capability
-	 * would be limited by ef->address capability.
+	 * would be limited by ef->mapbase capability.
 	 */
 	/* if (ef->got) */
 	/* 	ef->got */
@@ -808,6 +841,7 @@ parse_vnet(elf_file_t ef)
 
 	ef->vnet_start = NULL;
 	ef->vnet_stop = NULL;
+	ef->vnet_base = NULL;
 	error = link_elf_lookup_set(&ef->lf, "vnet", (void ***)&ef->vnet_start,
 	    (void ***)&ef->vnet_stop, NULL);
 	/* Error just means there is no vnet data set to relocate. */
@@ -850,7 +884,7 @@ parse_vnet(elf_file_t ef)
 		return (ENOSPC);
 	}
 	memcpy(ef->vnet_base, ef->vnet_start, size);
-	vnet_data_copy(ef->vnet_base, size);
+	vnet_save_init(ef->vnet_base, size);
 	elf_set_add(&set_vnet_list, ef->vnet_start, ef->vnet_stop,
 	    ef->vnet_base);
 
@@ -873,8 +907,8 @@ preload_protect(elf_file_t ef, vm_prot_t prot)
 	int error;
 
 	error = 0;
-	hdr = (Elf_Ehdr *)ef->address;
-	phdr = (Elf_Phdr *)(ef->address + hdr->e_phoff);
+	hdr = (Elf_Ehdr *)ef_address(ef, 0);
+	phdr = (Elf_Phdr *)ef_address(ef, hdr->e_phoff);
 	phlimit = phdr + hdr->e_phnum;
 	for (; phdr < phlimit; phdr++) {
 		if (phdr->p_type != PT_LOAD)
@@ -885,8 +919,8 @@ preload_protect(elf_file_t ef, vm_prot_t prot)
 			nprot |= VM_PROT_WRITE;
 		if ((phdr->p_flags & PF_X) != 0)
 			nprot |= VM_PROT_EXECUTE;
-		error = pmap_change_prot((vm_offset_t)ef->address +
-		    phdr->p_vaddr, round_page(phdr->p_memsz), nprot);
+		error = pmap_change_prot((vm_pointer_t)ef_address(ef,
+		    phdr->p_vaddr), round_page(phdr->p_memsz), nprot);
 		if (error != 0)
 			break;
 	}
@@ -983,13 +1017,14 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	ef->address = cheri_setbounds(ef->address, *(size_t *)sizeptr);
 	ef->address = cheri_andperm(ef->address, CHERI_PERMS_KERNEL_CODE |
 	    CHERI_PERMS_KERNEL_DATA);
+	ef->mapbase = ef->address;
 #else
 	ef->address = *(caddr_t *)baseptr;
 #endif
 #ifdef SPARSE_MAPPING
 	ef->object = NULL;
 #endif
-	dp = ef->address + *(vm_offset_t *)dynptr;
+	dp = ef_address(ef, *(vm_offset_t *)dynptr);
 	ef->dynamic = (Elf_Dyn *)dp;
 	lf->address = ef->address;
 	lf->size = *(size_t *)sizeptr;
@@ -999,8 +1034,10 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	ctors_sizep = (Elf_Size *)preload_search_info(modptr,
 	    MODINFO_METADATA | MODINFOMD_CTORS_SIZE);
 	if (ctors_addrp != NULL && ctors_sizep != NULL) {
-		lf->ctors_addr = ef->address + *ctors_addrp;
+		lf->ctors_addr = ef_address(ef, *ctors_addrp);
 		lf->ctors_size = *ctors_sizep;
+		lf->ctors_addr = cheri_kern_setbounds(lf->ctors_addr,
+		    lf->ctors_size);
 	}
 
 #ifdef __arm__
@@ -1253,6 +1290,9 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	mapbase = malloc_exec(mapsize, M_LINKER, M_WAITOK);
 #endif
 	ef->address = mapbase;
+#ifdef __CHERI_PURE_CAPABILITY__
+	ef->mapbase = mapbase;
+#endif
 
 	/*
 	 * Read the text and data sections and zero the bss.
@@ -1385,6 +1425,8 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 			/* Record relocated address and size of .ctors. */
 			lf->ctors_addr = mapbase + shdr[i].sh_addr - base_vaddr;
 			lf->ctors_size = shdr[i].sh_size;
+			lf->ctors_addr = cheri_kern_setbounds(lf->ctors_addr,
+			    lf->ctors_size);
 		}
 	}
 	if (symtabindex < 0 || symstrindex < 0)
@@ -1697,7 +1739,7 @@ link_elf_lookup_debug_symbol(linker_file_t lf, const char *name,
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
- * Given a pointer into a linker file derived from ef->address, narrow
+ * Given a pointer into a linker file derived from ef->mapbase, narrow
  * its permissions and bounds.
  */
 static caddr_t
@@ -1711,6 +1753,7 @@ make_capability(const Elf_Sym *sym, caddr_t val)
 #ifdef CHERI_FLAGS_CAP_MODE
 		val = cheri_setflags(val, CHERI_FLAGS_CAP_MODE);
 #endif
+		val = cheri_sealentry(val);
 		break;
 	default:
 		val = cheri_setbounds(val, sym->st_size);
@@ -1720,6 +1763,34 @@ make_capability(const Elf_Sym *sym, caddr_t val)
 	return (val);
 }
 #endif
+
+static int
+link_elf_lookup_debug_symbol_ctf(linker_file_t lf, const char *name,
+    c_linker_sym_t *sym, linker_ctf_t *lc)
+{
+	elf_file_t ef = (elf_file_t)lf;
+	const Elf_Sym *symp;
+	const char *strp;
+	int i;
+
+	for (i = 0, symp = ef->ddbsymtab; i < ef->ddbsymcnt; i++, symp++) {
+		strp = ef->ddbstrtab + symp->st_name;
+		if (strcmp(name, strp) == 0) {
+			if (symp->st_shndx != SHN_UNDEF ||
+			    (symp->st_value != 0 &&
+				(ELF_ST_TYPE(symp->st_info) == STT_FUNC ||
+				    ELF_ST_TYPE(symp->st_info) ==
+					STT_GNU_IFUNC))) {
+				*sym = (c_linker_sym_t)symp;
+				break;
+			}
+			return (ENOENT);
+		}
+	}
+
+	/* Populate CTF info structure if symbol was found. */
+	return (i < ef->ddbsymcnt ? link_elf_ctf_get_ddb(lf, lc) : ENOENT);
+}
 
 static int
 link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
@@ -1735,12 +1806,12 @@ link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
 		if (!see_local && ELF_ST_BIND(es->st_info) == STB_LOCAL)
 			return (ENOENT);
 		symval->name = ef->strtab + es->st_name;
-		val = (caddr_t)ef->address + es->st_value;
-		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
-			val = ((caddr_t (*)(void))val)();
+		val = ef_address(ef, es->st_value);
 #ifdef __CHERI_PURE_CAPABILITY__
 		val = make_capability(es, val);
 #endif
+		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
+			val = ((caddr_t (*)(void))val)();
 		symval->value = val;
 		symval->size = es->st_size;
 		return (0);
@@ -1772,12 +1843,12 @@ link_elf_debug_symbol_values(linker_file_t lf, c_linker_sym_t sym,
 
 	if (es >= ef->ddbsymtab && es < (ef->ddbsymtab + ef->ddbsymcnt)) {
 		symval->name = ef->ddbstrtab + es->st_name;
-		val = (caddr_t)ef->address + es->st_value;
-		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
-			val = ((caddr_t (*)(void))val)();
+		val = ef_address(ef, es->st_value);
 #ifdef __CHERI_PURE_CAPABILITY__
 		val = make_capability(es, val);
 #endif
+		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
+			val = ((caddr_t (*)(void))val)();
 		symval->value = val;
 		symval->size = es->st_size;
 		return (0);
@@ -1946,21 +2017,14 @@ elf_get_symname(linker_file_t lf, Elf_Size symidx)
 }
 
 /*
- * Symbol lookup functions that can be used when the symbol index is known (ie
+ * Symbol lookup function that can be used when the symbol index is known (ie
  * in relocations). It uses the symbol index instead of doing a fully fledged
  * hash table based lookup when such is valid. For example for local symbols.
  * This is not only more efficient, it's also more correct. It's not always
  * the case that the symbol can be found through the hash table.
  */
-#ifdef __CHERI_PURE_CAPABILITY__
 static int
-link_elf_symidx_capability(linker_file_t lf, unsigned long symidx, int deps,
-    uintcap_t *res)
-#else
-static int
-link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
-    ptraddr_t *res)
-#endif
+elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, uintptr_t *res)
 {
 	elf_file_t ef = (elf_file_t)lf;
 	const Elf_Sym *sym;
@@ -1985,12 +2049,11 @@ link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
 			*res = 0;
 			return (EINVAL);
 		}
+		addr = ef_address(ef, sym->st_value);
 #ifdef __CHERI_PURE_CAPABILITY__
-		*res = (uintcap_t)make_capability(sym, ef->address +
-		    sym->st_value);
-#else
-		*res = ((ptraddr_t)ef->address + sym->st_value);
+		addr = make_capability(sym, addr);
 #endif
+		*res = (uintptr_t)addr;
 		return (0);
 	}
 
@@ -2029,39 +2092,8 @@ link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
 #endif
 	}
 #endif
-#ifdef __CHERI_PURE_CAPABILITY__
-	*res = (uintcap_t)addr;
-#else
-	*res = (ptraddr_t)addr;
-#endif
+	*res = (uintptr_t)addr;
 	return (0);
-}
-
-#ifdef __CHERI_PURE_CAPABILITY__
-static int
-link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
-    ptraddr_t *res)
-{
-	uintcap_t cap;
-	int error;
-
-	error = link_elf_symidx_capability(lf, symidx, deps, &cap);
-	if (error == 0)
-		*res = (ptraddr_t)cap;
-	return (error);
-}
-#endif
-
-static int
-elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
-{
-	ptraddr_t addr;
-	int error;
-
-	error = link_elf_symidx_address(lf, symidx, deps, &addr);
-	if (error == 0)
-		*res = addr;
-	return (error);
 }
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
@@ -2072,7 +2104,7 @@ resolve_cap_reloc(void *arg, bool function, bool constant, ptraddr_t object,
 	elf_file_t ef = arg;
 	caddr_t addr, start, base;
 
-	addr = ef->address + object;
+	addr = ef_address(ef, object);
 	if (elf_set_find(&set_pcpu_list, addr, &start, &base)) {
 		addr = (ptraddr_t)addr - (ptraddr_t)start + base;
 	}
@@ -2104,6 +2136,24 @@ link_elf_reloc_local(linker_file_t lf)
 	const Elf_Rela *rela;
 	elf_file_t ef = (elf_file_t)lf;
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
+	/*
+	 * Perform __cap_relocs relocations if there are any:
+	 *
+	 * NB: Must come first as each CHERI-RISC-V's R_RISCV_JUMP_SLOT has a
+	 * corresponding relocation here for .plt[0] and we don't want that to
+	 * overwrite the eagerly-bound target.
+	 */
+	if (ef->caprelocs != NULL) {
+		void *data_cap;
+
+		data_cap = cheri_andperm(ef->mapbase, CHERI_PERMS_KERNEL_DATA);
+		init_linker_file_cap_relocs(ef->caprelocs,
+		    (char *)ef->caprelocs + ef->caprelocssize, data_cap,
+		    (ptraddr_t)ef->address, resolve_cap_reloc, ef);
+	}
+#endif
+
 	/* Perform relocations without addend if there are any: */
 	if ((rel = ef->rel) != NULL) {
 		rellim = (const Elf_Rel *)((const char *)ef->rel + ef->relsize);
@@ -2124,17 +2174,6 @@ link_elf_reloc_local(linker_file_t lf)
 			rela++;
 		}
 	}
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
-	if (ef->caprelocs != NULL) {
-		void *data_cap;
-
-		data_cap = cheri_andperm(ef->address, CHERI_PERMS_KERNEL_DATA);
-		init_linker_file_cap_relocs(ef->caprelocs,
-		    (char *)ef->caprelocs + ef->caprelocssize, data_cap,
-		    (ptraddr_t)ef->address, resolve_cap_reloc, ef);
-	}
-#endif
 }
 
 static long
@@ -2163,6 +2202,20 @@ link_elf_strtab_get(linker_file_t lf, caddr_t *strtab)
 	return (ef->ddbstrcnt);
 }
 
+#ifdef VIMAGE
+static void
+link_elf_propagate_vnets(linker_file_t lf)
+{
+	elf_file_t ef = (elf_file_t)lf;
+	int size;
+
+	if (ef->vnet_base != 0) {
+		size = (uintptr_t)ef->vnet_stop - (uintptr_t)ef->vnet_start;
+		vnet_data_copy((void *)ef->vnet_base, size);
+	}
+}
+#endif
+
 #if defined(__i386__) || defined(__amd64__) || defined(__aarch64__) || defined(__powerpc__)
 /*
  * Use this lookup routine when performing relocations early during boot.
@@ -2171,7 +2224,7 @@ link_elf_strtab_get(linker_file_t lf, caddr_t *strtab)
  */
 static int
 elf_lookup_ifunc(linker_file_t lf, Elf_Size symidx, int deps __unused,
-    Elf_Addr *res)
+    uintptr_t *res)
 {
 	elf_file_t ef;
 	const Elf_Sym *symp;
@@ -2180,8 +2233,11 @@ elf_lookup_ifunc(linker_file_t lf, Elf_Size symidx, int deps __unused,
 	ef = (elf_file_t)lf;
 	symp = ef->symtab + symidx;
 	if (ELF_ST_TYPE(symp->st_info) == STT_GNU_IFUNC) {
-		val = (caddr_t)ef->address + symp->st_value;
-		*res = ((Elf_Addr (*)(void))val)();
+		val = ef_address(ef, symp->st_value);
+#ifdef __CHERI_PURE_CAPABILITY__
+		val = make_capability(symp, val);
+#endif
+		*res = ((uintptr_t (*)(void))val)();
 		return (0);
 	}
 	return (ENOENT);
@@ -2212,6 +2268,8 @@ link_elf_ireloc(caddr_t kmdp)
 	 * as in link_elf_init().
 	 */
 	ef->address = cheri_setaddress(kernel_root_cap, 0);
+	ef->mapbase = cheri_setbounds(ef->address + KERNBASE,
+	    (ptraddr_t)_end - KERNBASE);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
 	parse_dynamic(ef);

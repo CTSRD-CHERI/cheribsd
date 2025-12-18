@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/endian.h>
@@ -150,8 +149,6 @@ smb_memdup(const void *umem, int len)
 	if (len > 8 * 1024)
 		return NULL;
 	p = malloc(len, M_SMBSTR, M_WAITOK);
-	if (p == NULL)
-		return NULL;
 	bcopy(umem, p, len);
 	return p;
 }

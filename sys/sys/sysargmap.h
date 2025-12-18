@@ -2,7 +2,6 @@
  * System call argument map.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * $FreeBSD$
  */
 
 #ifndef _SYSARGMAP_H_
@@ -61,8 +60,6 @@ static int sysargmask[] = {
 	[SYS_chroot] = (0x0 | 0x1),
 	[SYS_msync] = (0x0 | 0x1),
 	[SYS_vfork] = (0x0),
-	[SYS_sbrk] = (0x0),
-	[SYS_sstk] = (0x0),
 	[SYS_munmap] = (0x0 | 0x1),
 	[SYS_mprotect] = (0x0 | 0x1),
 	[SYS_madvise] = (0x0 | 0x1),
@@ -119,9 +116,9 @@ static int sysargmask[] = {
 	[SYS_rtprio] = (0x0 | 0x4),
 	[SYS_capfromfd] = (0x0 | 0x1),
 	[SYS_captofd] = (0x0 | 0x1 | 0x2),
-	[SYS_semsys] = (0x0 | 0x2 | 0x4 | 0x8 | 0x10),
-	[SYS_msgsys] = (0x0 | 0x2 | 0x4 | 0x8 | 0x10 | 0x20),
-	[SYS_shmsys] = (0x0 | 0x2 | 0x4 | 0x8),
+	[SYS_semsys] = (0x0),
+	[SYS_msgsys] = (0x0),
+	[SYS_shmsys] = (0x0),
 	[SYS_setfib] = (0x0),
 	[SYS_ntp_adjtime] = (0x0 | 0x1),
 	[SYS__cosetup] = (0x0 | 0x2 | 0x4),
@@ -421,6 +418,12 @@ static int sysargmask[] = {
 	[SYS_sched_getcpu] = (0x0),
 	[SYS_swapoff] = (0x0 | 0x1),
 	[SYS_kqueuex] = (0x0),
+	[SYS_membarrier] = (0x0),
+	[SYS_timerfd_create] = (0x0),
+	[SYS_timerfd_gettime] = (0x0 | 0x2),
+	[SYS_timerfd_settime] = (0x0 | 0x4 | 0x8),
+	[SYS_kcmp] = (0x0 | 0x8 | 0x10),
+	[SYS_getrlimitusage] = (0x0 | 0x4),
 };
 
 #endif /* !_SYSARGMAP_H_ */

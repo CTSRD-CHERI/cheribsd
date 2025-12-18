@@ -58,6 +58,37 @@ pr183198_cleanup()
 	pft_cleanup
 }
 
+atf_test_case "pr279225" "cleanup"
+pr279225_head()
+{
+	atf_set descr "Test that we can retrieve longer anchor names, PR 279225"
+	atf_set require.user root
+}
+
+pr279225_body()
+{
+	pft_init
+
+	vnet_mkjail alcatraz
+
+	pft_set_rules alcatraz \
+		"nat-anchor \"appjail-nat/jail/*\" all" \
+		"rdr-anchor \"appjail-rdr/*\" all" \
+		"anchor \"appjail/jail/*\" all"
+
+	atf_check -s exit:0 -o match:"nat-anchor \"appjail-nat/jail/\*\" all \{" \
+		jexec alcatraz pfctl -sn -a "*"
+	atf_check -s exit:0 -o match:"rdr-anchor \"appjail-rdr/\*\" all \{" \
+		jexec alcatraz pfctl -sn -a "*"
+	atf_check -s exit:0 -o match:"anchor \"appjail/jail/\*\" all \{" \
+		jexec alcatraz pfctl -sr -a "*"
+}
+
+pr279225_cleanup()
+{
+	pft_cleanup
+}
+
 atf_test_case "nested_anchor" "cleanup"
 nested_anchor_head()
 {
@@ -130,9 +161,84 @@ wildcard_cleanup()
 	pft_cleanup
 }
 
+atf_test_case "nested_label" "cleanup"
+nested_label_head()
+{
+	atf_set descr "Test recursive listing of labels"
+	atf_set require.user root
+}
+
+nested_label_body()
+{
+	pft_init
+
+	vnet_mkjail alcatraz
+
+	pft_set_rules alcatraz \
+		"anchor \"foo\" { \n\
+			pass in quick proto icmp label \"passicmp\"\n\
+			anchor \"bar\" { \n\
+				pass in proto tcp label \"passtcp\"\n\
+			} \n\
+		}" \
+		"pass quick from any to any label \"anytoany\""
+
+	atf_check -s exit:0 \
+	    -o inline:"passicmp 0 0 0 0 0 0 0 0
+passtcp 0 0 0 0 0 0 0 0
+anytoany 0 0 0 0 0 0 0 0
+" jexec alcatraz pfctl -sl -a*
+}
+
+nested_label_cleanup()
+{
+	pft_cleanup
+}
+
+atf_test_case "quick" "cleanup"
+quick_head()
+{
+	atf_set descr "Test handling of quick on anchors"
+	atf_set require.user root
+}
+
+quick_body()
+{
+	pft_init
+
+	epair=$(vnet_mkepair)
+	vnet_mkjail alcatraz ${epair}a
+
+	ifconfig ${epair}b 192.0.2.2/24 up
+	jexec alcatraz ifconfig ${epair}a 192.0.2.1/24 up
+
+	# Sanity check
+	atf_check -s exit:0 -o ignore ping -c 1 192.0.2.1
+
+	jexec alcatraz pfctl -e
+	pft_set_rules alcatraz \
+	    "anchor quick {\n\
+	        pass\n\
+	    }" \
+	    "block"
+
+	# We can still ping because the anchor is 'quick'
+	atf_check -s exit:0 -o ignore ping -c 1 192.0.2.1
+	jexec alcatraz pfctl -sr -v
+	jexec alcatraz pfctl -ss -v
+}
+
+quick_cleanup()
+{
+	pft_cleanup
+}
+
 atf_init_test_cases()
 {
 	atf_add_test_case "pr183198"
+	atf_add_test_case "pr279225"
 	atf_add_test_case "nested_anchor"
 	atf_add_test_case "wildcard"
+	atf_add_test_case "nested_label"
+	atf_add_test_case "quick"
 }

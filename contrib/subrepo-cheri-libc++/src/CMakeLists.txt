@@ -4,7 +4,6 @@ set(LIBCXX_LIB_CMAKEFILES_DIR "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTOR
 set(LIBCXX_SOURCES
   algorithm.cpp
   any.cpp
-  assert.cpp
   atomic.cpp
   barrier.cpp
   bind.cpp
@@ -13,6 +12,10 @@ set(LIBCXX_SOURCES
   condition_variable.cpp
   condition_variable_destructor.cpp
   exception.cpp
+  filesystem/filesystem_clock.cpp
+  filesystem/filesystem_error.cpp
+  filesystem/path_parser.h
+  filesystem/path.cpp
   functional.cpp
   future.cpp
   hash.cpp
@@ -32,10 +35,13 @@ set(LIBCXX_SOURCES
   include/to_chars_floating_point.h
   legacy_pointer_safety.cpp
   memory.cpp
+  memory_resource.cpp
   mutex.cpp
   mutex_destructor.cpp
-  new.cpp
+  new_handler.cpp
+  new_helpers.cpp
   optional.cpp
+  print.cpp
   random_shuffle.cpp
   ryu/d2fixed.cpp
   ryu/d2s.cpp
@@ -52,24 +58,16 @@ set(LIBCXX_SOURCES
   support/runtime/exception_pointer_glibcxx.ipp
   support/runtime/exception_pointer_msvc.ipp
   support/runtime/exception_pointer_unimplemented.ipp
-  support/runtime/new_handler_fallback.ipp
   support/runtime/stdexcept_default.ipp
   support/runtime/stdexcept_vcruntime.ipp
   system_error.cpp
   thread.cpp
   typeinfo.cpp
-  utility.cpp
   valarray.cpp
   variant.cpp
   vector.cpp
+  verbose_abort.cpp
   )
-
-if (LIBCXX_ENABLE_DEBUG_MODE OR LIBCXX_ENABLE_BACKWARDS_COMPATIBILITY_DEBUG_MODE_SYMBOLS)
-  list(APPEND LIBCXX_SOURCES
-    debug.cpp
-    legacy_debug_handler.cpp
-    )
-endif()
 
 if (LIBCXX_ENABLE_RANDOM_DEVICE)
   list(APPEND LIBCXX_SOURCES
@@ -100,12 +98,6 @@ if(WIN32)
       support/win32/thread_win32.cpp
       )
   endif()
-elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "SunOS")
-  list(APPEND LIBCXX_SOURCES
-    support/solaris/mbsnrtowcs.inc
-    support/solaris/wcsnrtombs.inc
-    support/solaris/xlocale.cpp
-    )
 elseif(ZOS)
   list(APPEND LIBCXX_SOURCES
     support/ibm/mbsnrtowcs.cpp
@@ -116,10 +108,12 @@ endif()
 
 if (LIBCXX_ENABLE_FILESYSTEM)
   list(APPEND LIBCXX_SOURCES
-    filesystem/filesystem_common.h
-    filesystem/operations.cpp
+    filesystem/directory_entry.cpp
     filesystem/directory_iterator.cpp
+    filesystem/file_descriptor.h
+    filesystem/operations.cpp
     filesystem/posix_compat.h
+    filesystem/time_utils.h
     )
   # Filesystem uses __int128_t, which requires a definition of __muloi4 when
   # compiled with UBSAN. This definition is not provided by libgcc_s, but is
@@ -130,6 +124,12 @@ if (LIBCXX_ENABLE_FILESYSTEM)
       filesystem/int128_builtins.cpp
       )
   endif()
+endif()
+
+if (LIBCXX_ENABLE_NEW_DELETE_DEFINITIONS)
+  list(APPEND LIBCXX_SOURCES
+    new.cpp
+    )
 endif()
 
 # Add all the headers to the project for IDEs.
@@ -181,16 +181,6 @@ if (APPLE AND LLVM_USE_SANITIZER)
   endif()
 endif()
 
-if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS AND NOT TARGET pstl::ParallelSTL)
-  message(FATAL_ERROR "Could not find ParallelSTL")
-endif()
-
-function(cxx_set_common_defines name)
-  if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
-    target_link_libraries(${name} PUBLIC pstl::ParallelSTL)
-  endif()
-endfunction()
-
 split_list(LIBCXX_COMPILE_FLAGS)
 split_list(LIBCXX_LINK_FLAGS)
 
@@ -204,13 +194,22 @@ if (LIBCXX_ENABLE_SHARED)
     PROPERTIES
       COMPILE_FLAGS "${LIBCXX_COMPILE_FLAGS}"
       LINK_FLAGS    "${LIBCXX_LINK_FLAGS}"
-      OUTPUT_NAME   "c++"
+      OUTPUT_NAME   "${LIBCXX_SHARED_OUTPUT_NAME}"
       VERSION       "${LIBCXX_LIBRARY_VERSION}"
       SOVERSION     "${LIBCXX_ABI_VERSION}"
       DEFINE_SYMBOL ""
   )
   cxx_add_common_build_flags(cxx_shared)
-  cxx_set_common_defines(cxx_shared)
+
+  if(ZOS)
+    add_custom_command(TARGET cxx_shared POST_BUILD
+      COMMAND
+        ${LIBCXX_SOURCE_DIR}/utils/zos_rename_dll_side_deck.sh
+        $<TARGET_LINKER_FILE_NAME:cxx_shared> $<TARGET_FILE_NAME:cxx_shared> "${LIBCXX_DLL_NAME}"
+      COMMENT "Rename dll name inside the side deck file"
+      WORKING_DIRECTORY $<TARGET_FILE_DIR:cxx_shared>
+    )
+  endif()
 
   # Link against libc++abi
   if (LIBCXX_STATICALLY_LINK_ABI_IN_SHARED_LIBRARY)
@@ -289,10 +288,9 @@ if (LIBCXX_ENABLE_STATIC)
     PROPERTIES
       COMPILE_FLAGS "${LIBCXX_COMPILE_FLAGS}"
       LINK_FLAGS    "${LIBCXX_LINK_FLAGS}"
-      OUTPUT_NAME   "c++"
+      OUTPUT_NAME   "${LIBCXX_STATIC_OUTPUT_NAME}"
   )
   cxx_add_common_build_flags(cxx_static)
-  cxx_set_common_defines(cxx_static)
 
   if (LIBCXX_HERMETIC_STATIC_LIBRARY)
     # If the hermetic library doesn't define the operator new/delete functions
@@ -319,8 +317,13 @@ add_custom_target(cxx DEPENDS ${LIBCXX_BUILD_TARGETS})
 
 set(LIBCXX_EXPERIMENTAL_SOURCES
   experimental/memory_resource.cpp
-  format.cpp
   )
+
+if (LIBCXX_PSTL_CPU_BACKEND STREQUAL "libdispatch")
+  list(APPEND LIBCXX_EXPERIMENTAL_SOURCES
+    pstl/libdispatch.cpp
+    )
+endif()
 
 add_library(cxx_experimental STATIC ${LIBCXX_EXPERIMENTAL_SOURCES})
 target_link_libraries(cxx_experimental PUBLIC cxx-headers)
@@ -343,27 +346,6 @@ set_target_properties(cxx_experimental
 )
 cxx_add_common_build_flags(cxx_experimental)
 target_compile_options(cxx_experimental PUBLIC -D_LIBCPP_ENABLE_EXPERIMENTAL)
-
-
-if (LIBCXX_BUILD_EXTERNAL_THREAD_LIBRARY)
-  set(LIBCXX_EXTERNAL_THREADING_SUPPORT_SOURCES
-      "${CMAKE_CURRENT_SOURCE_DIR}/../test/support/external_threads.cpp")
-
-  if (LIBCXX_ENABLE_SHARED)
-    add_library(cxx_external_threads SHARED ${LIBCXX_EXTERNAL_THREADING_SUPPORT_SOURCES})
-  else()
-    add_library(cxx_external_threads STATIC ${LIBCXX_EXTERNAL_THREADING_SUPPORT_SOURCES})
-  endif()
-
-  set_target_properties(cxx_external_threads
-    PROPERTIES
-      LINK_FLAGS    "${LIBCXX_LINK_FLAGS}"
-      COMPILE_FLAGS "${LIBCXX_COMPILE_FLAGS}"
-      OUTPUT_NAME   "c++external_threads"
-  )
-
-  target_link_libraries(cxx_external_threads PRIVATE cxx-headers)
-endif()
 
 if (LIBCXX_INSTALL_SHARED_LIBRARY)
   install(TARGETS cxx_shared
@@ -401,14 +383,10 @@ if (NOT CMAKE_CONFIGURATION_TYPES)
     if(LIBCXX_INSTALL_HEADERS)
       set(header_install_target install-cxx-headers)
     endif()
-    if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
-      set(pstl_install_target install-pstl)
-    endif()
     add_custom_target(install-cxx
                       DEPENDS ${lib_install_target}
                               cxx_experimental
                               ${header_install_target}
-                              ${pstl_install_target}
                       COMMAND "${CMAKE_COMMAND}"
                       -DCMAKE_INSTALL_COMPONENT=cxx
                       -P "${LIBCXX_BINARY_DIR}/cmake_install.cmake")
@@ -416,7 +394,6 @@ if (NOT CMAKE_CONFIGURATION_TYPES)
                       DEPENDS ${lib_install_target}
                               cxx_experimental
                               ${header_install_target}
-                              ${pstl_install_target}
                       COMMAND "${CMAKE_COMMAND}"
                       -DCMAKE_INSTALL_COMPONENT=cxx
                       -DCMAKE_INSTALL_DO_STRIP=1

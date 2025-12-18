@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
@@ -59,22 +58,20 @@
 #include <string.h>
 #include <sysexits.h>
 #include <unistd.h>
-#include <err.h>
 #include <libxo/xo.h>
 #include "netstat.h"
 #include "common.h"
 
 /* column widths; each followed by one space */
+#define WID_IF_DEFAULT		(Wflag ? IFNAMSIZ : 12)	/* width of netif column */
 #ifndef INET6
 #define	WID_DST_DEFAULT(af) 	18	/* width of destination column */
 #define	WID_GW_DEFAULT(af)	18	/* width of gateway column */
-#define	WID_IF_DEFAULT(af)	(Wflag ? 10 : 8) /* width of netif column */
 #else
 #define	WID_DST_DEFAULT(af) \
 	((af) == AF_INET6 ? (numeric_addr ? 33: 18) : 18)
 #define	WID_GW_DEFAULT(af) \
 	((af) == AF_INET6 ? (numeric_addr ? 29 : 18) : 18)
-#define	WID_IF_DEFAULT(af)	((af) == AF_INET6 ? 8 : (Wflag ? 10 : 8))
 #endif /*INET6*/
 static int wid_dst;
 static int wid_gw;
@@ -215,7 +212,7 @@ nhop_map_update(struct nhop_map *map, uint32_t idx, char *gw, char *ifname)
 
 		sz = new_size * (sizeof(struct nhop_entry));
 		if ((map->ptr = realloc(map->ptr, sz)) == NULL)
-			errx(2, "realloc(%zu) failed", sz);
+			xo_errx(EX_OSERR, "realloc(%zu) failed", sz);
 
 		memset(&map->ptr[map->size], 0, (new_size - map->size) * sizeof(struct nhop_entry));
 		map->size = new_size;
@@ -354,12 +351,12 @@ dump_nhops_sysctl(int fibnum, int af, struct nhops_dump *nd)
 	mib[5] = 0;
 	mib[6] = fibnum;
 	if (sysctl(mib, nitems(mib), NULL, &needed, NULL, 0) < 0)
-		err(EX_OSERR, "sysctl: net.route.0.%d.nhdump.%d estimate", af,
+		xo_err(EX_OSERR, "sysctl: net.route.0.%d.nhdump.%d estimate", af,
 		    fibnum);
 	if ((buf = malloc(needed)) == NULL)
-		errx(2, "malloc(%lu)", (unsigned long)needed);
+		xo_errx(EX_OSERR, "malloc(%lu)", (unsigned long)needed);
 	if (sysctl(mib, nitems(mib), buf, &needed, NULL, 0) < 0)
-		err(1, "sysctl: net.route.0.%d.nhdump.%d", af, fibnum);
+		xo_err(EX_OSERR, "sysctl: net.route.0.%d.nhdump.%d", af, fibnum);
 	lim  = buf + needed;
 
 	/*
@@ -416,7 +413,7 @@ print_nhops_sysctl(int fibnum, int af)
 		wid_flags = 6;
 		wid_pksent = 8;
 		wid_mtu = 6;
-		wid_if = WID_IF_DEFAULT(fam);
+		wid_if = WID_IF_DEFAULT;
 		xo_open_instance("rt-family");
 		pr_family(fam);
 		xo_open_list("nh-entry");
@@ -465,7 +462,7 @@ nhops_print(int fibnum, int af)
 	if (sysctlbyname("net.fibs", &numfibs, &intsize, NULL, 0) == -1)
 		numfibs = 1;
 	if (fibnum < 0 || fibnum > numfibs - 1)
-		errx(EX_USAGE, "%d: invalid fib", fibnum);
+		xo_errx(EX_USAGE, "%d: invalid fib", fibnum);
 
 	ifmap = prepare_ifmap(&ifmap_size);
 

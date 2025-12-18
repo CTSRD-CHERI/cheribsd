@@ -52,11 +52,6 @@
 #include <sys/vm.h>
 #include <sys/vmmeter.h>
 
-#if __FreeBSD_version >= 1300139
-static struct sx arc_vnlru_lock;
-static struct vnode *arc_vnlru_marker;
-#endif
-
 extern struct vfsops zfs_vfsops;
 
 uint_t zfs_arc_free_target = 0;
@@ -94,17 +89,17 @@ arc_available_memory(void)
 	if (n < lowest) {
 		lowest = n;
 	}
-#if defined(__i386) || !defined(UMA_MD_SMALL_ALLOC)
+#if !defined(UMA_MD_SMALL_ALLOC) && !defined(UMA_USE_DMAP)
 	/*
-	 * If we're on an i386 platform, it's possible that we'll exhaust the
-	 * kernel heap space before we ever run out of available physical
-	 * memory.  Most checks of the size of the heap_area compare against
-	 * tune.t_minarmem, which is the minimum available real memory that we
-	 * can have in the system.  However, this is generally fixed at 25 pages
-	 * which is so low that it's useless.  In this comparison, we seek to
-	 * calculate the total heap-size, and reclaim if more than 3/4ths of the
-	 * heap is allocated.  (Or, in the calculation, if less than 1/4th is
-	 * free)
+	 * If we're on a platform without a direct map, it's possible that we'll
+	 * exhaust the kernel heap space before we ever run out of available
+	 * physical memory.  Most checks of the size of the heap_area compare
+	 * against tune.t_minarmem, which is the minimum available real memory
+	 * that we can have in the system.  However, this is generally fixed at
+	 * 25 pages which is so low that it's useless.  In this comparison, we
+	 * seek to calculate the total heap-size, and reclaim if more than
+	 * 3/4ths of the heap is allocated.  (Or, in the calculation, if less
+	 * than 1/4th is free)
 	 */
 	n = uma_avail() - (long)(uma_limit() / 4);
 	if (n < lowest) {
@@ -131,53 +126,6 @@ arc_default_max(uint64_t min, uint64_t allmem)
 	return (MAX(allmem * 5 / 8, size));
 }
 
-/*
- * Helper function for arc_prune_async() it is responsible for safely
- * handling the execution of a registered arc_prune_func_t.
- */
-static void
-arc_prune_task(void *arg)
-{
-	uint64_t nr_scan = (uintptr_t)arg;
-
-#ifndef __ILP32__
-	if (nr_scan > INT_MAX)
-		nr_scan = INT_MAX;
-#endif
-
-#if __FreeBSD_version >= 1300139
-	sx_xlock(&arc_vnlru_lock);
-	vnlru_free_vfsops(nr_scan, &zfs_vfsops, arc_vnlru_marker);
-	sx_xunlock(&arc_vnlru_lock);
-#else
-	vnlru_free(nr_scan, &zfs_vfsops);
-#endif
-}
-
-/*
- * Notify registered consumers they must drop holds on a portion of the ARC
- * buffered they reference.  This provides a mechanism to ensure the ARC can
- * honor the metadata limit and reclaim otherwise pinned ARC buffers.  This
- * is analogous to dnlc_reduce_cache() but more generic.
- *
- * This operation is performed asynchronously so it may be safely called
- * in the context of the arc_reclaim_thread().  A reference is taken here
- * for each registered arc_prune_t and the arc_prune_task() is responsible
- * for releasing it once the registered arc_prune_func_t has completed.
- */
-void
-arc_prune_async(uint64_t adjust)
-{
-
-#ifndef __LP64__
-	if (adjust > UINTPTR_MAX)
-		adjust = UINTPTR_MAX;
-#endif
-	taskq_dispatch(arc_prune_taskq, arc_prune_task,
-	    (void *)(intptr_t)adjust, TQ_SLEEP);
-	ARCSTAT_BUMP(arcstat_prune);
-}
-
 uint64_t
 arc_all_memory(void)
 {
@@ -201,26 +149,29 @@ static eventhandler_tag arc_event_lowmem = NULL;
 static void
 arc_lowmem(void *arg __unused, int howto __unused)
 {
-	int64_t free_memory, to_free;
+	int64_t can_free, free_memory, to_free;
 
 	arc_no_grow = B_TRUE;
 	arc_warm = B_TRUE;
 	arc_growtime = gethrtime() + SEC2NSEC(arc_grow_retry);
+
 	free_memory = arc_available_memory();
-	int64_t can_free = arc_c - arc_c_min;
-	if (can_free <= 0)
-		return;
-	to_free = (can_free >> arc_shrink_shift) - MIN(free_memory, 0);
+	can_free = arc_c - arc_c_min;
+	to_free = (MAX(can_free, 0) >> arc_shrink_shift) - MIN(free_memory, 0);
 	DTRACE_PROBE2(arc__needfree, int64_t, free_memory, int64_t, to_free);
-	arc_reduce_target_size(to_free);
+	to_free = arc_reduce_target_size(to_free);
 
 	/*
 	 * It is unsafe to block here in arbitrary threads, because we can come
 	 * here from ARC itself and may hold ARC locks and thus risk a deadlock
 	 * with ARC reclaim thread.
 	 */
-	if (curproc == pageproc)
-		arc_wait_for_eviction(to_free, B_FALSE);
+	if (curproc == pageproc) {
+		arc_wait_for_eviction(to_free, B_FALSE, B_FALSE);
+		ARCSTAT_BUMP(arcstat_memory_indirect_count);
+	} else {
+		ARCSTAT_BUMP(arcstat_memory_direct_count);
+	}
 }
 
 void
@@ -228,10 +179,6 @@ arc_lowmem_init(void)
 {
 	arc_event_lowmem = EVENTHANDLER_REGISTER(vm_lowmem, arc_lowmem, NULL,
 	    EVENTHANDLER_PRI_FIRST);
-#if __FreeBSD_version >= 1300139
-	arc_vnlru_marker = vnlru_alloc_marker();
-	sx_init(&arc_vnlru_lock, "arc vnlru lock");
-#endif
 }
 
 void
@@ -239,12 +186,6 @@ arc_lowmem_fini(void)
 {
 	if (arc_event_lowmem != NULL)
 		EVENTHANDLER_DEREGISTER(vm_lowmem, arc_event_lowmem);
-#if __FreeBSD_version >= 1300139
-	if (arc_vnlru_marker != NULL) {
-		vnlru_free_marker(arc_vnlru_marker);
-		sx_destroy(&arc_vnlru_lock);
-	}
-#endif
 }
 
 void

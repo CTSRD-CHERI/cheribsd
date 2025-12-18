@@ -1,6 +1,6 @@
-
 .PATH: ${SRCTOP}/contrib/ntp/util
 
+PACKAGE=ntp
 PROG=	ntptime
 MAN=
 

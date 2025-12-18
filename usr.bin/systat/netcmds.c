@@ -30,9 +30,6 @@
  */
 
 
-#ifdef lint
-static const char sccsid[] = "@(#)netcmds.c	8.1 (Berkeley) 6/6/93";
-#endif
 
 /*
  * Common network command support routines.
@@ -248,7 +245,7 @@ showports(void)
 		if (sp)
 			printw("%s ", sp->s_name);
 		else
-			printw("%d ", p->port);
+			printw("%ld ", p->port);
 	}
 }
 

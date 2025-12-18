@@ -169,11 +169,17 @@ Substring commands are accepted.
 Display command line arguments for the process.
 .Pp
 Substring commands are accepted.
+.It Ar c18n
+Display CHERI compartmentalization information about a process.
 .It Ar cheri
 Display CHERI-specific information about the process.
 If the
 .Fl v
 flag is passed then extra information is shown.
+.It Ar compartments
+Display information on
+.Xr c18n 7
+compartments within the process.
 .It Ar environment | Fl e
 Display environment variables for the process.
 .Pp
@@ -297,6 +303,31 @@ command
 .It ARGS
 command line arguments (if available)
 .El
+.Ss Compartmentalization information
+Display CHERI compartmentalization information for a process (see
+.Xr c18n 7 ) :
+.Pp
+.Bl -tag -width TRMPTBL -compact
+.It PID
+process ID
+.It COMM
+command
+.It COMP
+number of compartments
+.It STKS
+number of compartment stacks
+.It TRMPS
+number of initialized trampolines
+.It TRPGS
+number of pages mapped for trampolines
+.It MEM
+total size of
+.Xr c18n 7
+data structures (including stack lookup tables, trampoline lookup tables, etc.,
+but excluding execution stacks and trampolines which have dedicated counters)
+.It SWTCH
+number of compartment switches performed so far
+.El
 .Ss CHERI information
 Display the process ID, command, and CHERI-specific information:
 .Pp
@@ -313,6 +344,10 @@ quarantining status
 in-kernel revoker state
 .It EPOCH
 in-kernel revoker epoch
+.It C18N
+number of
+.Xr c18n 7
+compartments
 .El
 .Pp
 The following values indicate the support for CHERI in the process ABI:
@@ -348,6 +383,31 @@ revoker being initialized
 revoker initialized, epoch open
 .It closing
 revoker finishing an epoch
+.El
+.Ss Compartment List
+Display the list of
+.Xr c18n 7
+compartments within a process:
+.Pp
+.Bl -tag -width CNAME -compact
+.It PID
+process ID
+.It COMM
+command
+.It CID
+compartment ID
+.It FLAG
+flags on the compartment
+.It CNAME
+compartment name
+.El
+.Pp
+The following compartment flags may be displayed:
+.Pp
+.Bl -tag -width X -compact
+.It D
+contains a library loaded via
+.Xr dlopen 3
 .El
 .Ss Environment Variables
 Display the process ID, command, and environment variables:
@@ -915,6 +975,7 @@ procstat: procstat_getprocs()
 .Xr sctp 4 ,
 .Xr tcp 4 ,
 .Xr udp 4 ,
+.Xr c18n 7 ,
 .Xr stack 9
 .Sh AUTHORS
 .An Robert N M Watson Aq Mt rwatson@FreeBSD.org .

@@ -206,7 +206,8 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 				if ((l3e & ATTR_DESCR_MASK) != L3_PAGE)
 					continue;
 				pa = PTE_TO_PHYS(l3e);
-				if (PHYS_IN_DMAP(pa) && vm_phys_is_dumpable(pa))
+				if (PHYS_IN_DMAP_RANGE(pa) &&
+				    vm_phys_is_dumpable(pa))
 					vm_page_dump_add(state->dump_bitset,
 					    pa);
 			}
@@ -220,7 +221,7 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 	dumpsize += round_page(sizeof(dump_avail));
 	dumpsize += round_page(BITSET_SIZE(vm_page_dump_pages));
 	VM_PAGE_DUMP_FOREACH(state->dump_bitset, pa) {
-		if (PHYS_IN_DMAP(pa) && vm_phys_is_dumpable(pa))
+		if (PHYS_IN_DMAP_RANGE(pa) && vm_phys_is_dumpable(pa))
 			dumpsize += PAGE_SIZE;
 		else
 			vm_page_dump_drop(state->dump_bitset, pa);
@@ -313,8 +314,8 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 			for (i = 0; i < Ln_ENTRIES; i++) {
 				for (j = 0; j < Ln_ENTRIES; j++) {
 					tmpbuffer[j] = (pa + i * L2_SIZE +
-					    j * PAGE_SIZE) | ATTR_DEFAULT |
-					    L3_PAGE;
+					    j * PAGE_SIZE) | ATTR_AF |
+					    pmap_sh_attr | L3_PAGE;
 				}
 				error = blk_write(di, (char *)&tmpbuffer, 0,
 				    PAGE_SIZE);
@@ -333,7 +334,7 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 			/* Generate fake l3 entries based upon the l1 entry */
 			for (i = 0; i < Ln_ENTRIES; i++) {
 				tmpbuffer[i] = (pa + i * PAGE_SIZE) |
-				    ATTR_DEFAULT | L3_PAGE;
+				    ATTR_AF | pmap_sh_attr | L3_PAGE;
 			}
 			error = blk_write(di, (char *)&tmpbuffer, 0, PAGE_SIZE);
 			if (error)
@@ -351,7 +352,7 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 			 * We always write a page, even if it is zero. If pa
 			 * is malformed, write the zeroed tmpbuffer.
 			 */
-			if (PHYS_IN_DMAP(pa) && vm_phys_is_dumpable(pa))
+			if (PHYS_IN_DMAP_RANGE(pa) && vm_phys_is_dumpable(pa))
 				error = blk_write(di, NULL, pa, PAGE_SIZE);
 			else
 				error = blk_write(di, (char *)&tmpbuffer, 0,

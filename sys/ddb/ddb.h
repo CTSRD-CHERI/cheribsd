@@ -235,7 +235,7 @@ void		db_check_interrupt(void);
 void		db_clear_watchpoints(void);
 db_addr_t	db_disasm(db_addr_t loc, bool altfmt);
 				/* instruction disassembler */
-void		db_error(const char *s);
+void		db_error(const char *s) __dead2;
 int		db_expression(db_expr_t *valuep);
 int		db_getc(void);
 int		db_get_variable(db_expr_t *valuep);
@@ -305,6 +305,14 @@ db_cmdfcn_t	db_trace_until_matching_cmd;
 db_cmdfcn_t	db_unscript_cmd;
 db_cmdfcn_t	db_watchpoint_cmd;
 db_cmdfcn_t	db_write_cmd;
+db_cmdfcn_t	db_pprint_cmd;
+
+#ifdef HAS_HW_BREAKPOINT
+void		db_md_list_breakpoints(void);
+
+db_cmdfcn_t	db_deletehbreak_cmd;
+db_cmdfcn_t	db_hbreakpoint_cmd;
+#endif
 
 /*
  * Interface between DDB and the DDB output capture facility.

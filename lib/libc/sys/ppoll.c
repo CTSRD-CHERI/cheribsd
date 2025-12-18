@@ -29,20 +29,17 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/poll.h>
+#include <ssp/ssp.h>
 #include "libc_private.h"
 
 __weak_reference(__sys_ppoll, __ppoll);
 
-#pragma weak ppoll
-int
-ppoll(struct pollfd pfd[], nfds_t nfds, const struct timespec *__restrict
-    timeout, const sigset_t *__restrict newsigmask)
+int __weak_symbol
+__ssp_real(ppoll)(struct pollfd pfd[], nfds_t nfds,
+    const struct timespec *__restrict timeout,
+    const sigset_t *__restrict newsigmask)
 {
-
-	return (((int (*)(struct pollfd *, nfds_t, const struct timespec *,
-	    const sigset_t *)) __libc_interposing[INTERPOS_ppoll])(pfd, nfds,
-	    timeout, newsigmask));
+	return (INTERPOS_SYS(ppoll, pfd, nfds, timeout, newsigmask));
 }

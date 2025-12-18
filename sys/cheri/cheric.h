@@ -213,7 +213,7 @@ cheri_zerocap(void)
 	return (void * __capability)0;
 }
 
-static inline uint64_t
+static inline size_t
 cheri_bytes_remaining(const void * __capability cap)
 {
 	if (cheri_getoffset(cap) >= cheri_getlen(cap))
@@ -234,14 +234,15 @@ cheri_bytes_remaining(const void * __capability cap)
 #else
 #define	cheri_ptr_to_bounded_cap(ptr) cheri_ptr((ptr), sizeof(*(ptr)))
 #endif
+
 /*
  * Convert a capability to a pointer. Returns NULL if there are less than
- * min_size accessible bytes remiaing in cap.
+ * min_size accessible bytes remaining in cap.
  */
 #define cheri_cap_to_ptr(cap, min_size)	__extension__({			\
 	typedef __typeof__(*(cap)) __underlying_type;			\
 	__underlying_type* __result = 0;				\
-	if (cheri_gettag(cap) && cheri_bytes_remaining(cap) >= (uint64_t)min_size) { \
+	if (cheri_gettag(cap) && cheri_bytes_remaining(cap) >= min_size) { \
 		__result = (__cheri_fromcap __underlying_type*)(cap);	\
 	} __result; })
 

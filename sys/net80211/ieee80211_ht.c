@@ -25,10 +25,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-#ifdef __FreeBSD__
-#endif
-
 /*
  * IEEE 802.11n protocol support.
  */
@@ -521,7 +517,7 @@ ampdu_rx_purge_slot(struct ieee80211_rx_ampdu *rap, int i)
 	struct mbuf *m;
 
 	/* Walk the queue, removing frames as appropriate */
-	while (mbufq_len(&rap->rxa_mq[i]) != 0) {
+	for (;;) {
 		m = mbufq_dequeue(&rap->rxa_mq[i]);
 		if (m == NULL)
 			break;
@@ -571,7 +567,7 @@ ampdu_rx_add_slot(struct ieee80211_rx_ampdu *rap, int off, int tid,
 	/*
 	 * Get the rxs of the final mbuf in the slot, if one exists.
 	 */
-	if (mbufq_len(&rap->rxa_mq[off]) != 0) {
+	if (!mbufq_empty(&rap->rxa_mq[off])) {
 		rxs_final = ieee80211_get_rx_params_ptr(mbufq_last(&rap->rxa_mq[off]));
 	}
 
@@ -601,7 +597,7 @@ ampdu_rx_add_slot(struct ieee80211_rx_ampdu *rap, int off, int tid,
 	 * If the list is empty OR we have determined we can put more
 	 * driver decap'ed AMSDU frames in here, then insert.
 	 */
-	if ((mbufq_len(&rap->rxa_mq[off]) == 0) || (toss_dup == 0)) {
+	if (mbufq_empty(&rap->rxa_mq[off]) || (toss_dup == 0)) {
 		if (mbufq_enqueue(&rap->rxa_mq[off], m) != 0) {
 			IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT | IEEE80211_MSG_11N,
 			    ni->ni_macaddr,
@@ -816,7 +812,7 @@ ampdu_dispatch_slot(struct ieee80211_rx_ampdu *rap, struct ieee80211_node *ni,
 	struct mbuf *m;
 	int n = 0;
 
-	while (mbufq_len(&rap->rxa_mq[i]) != 0) {
+	for (;;) {
 		m = mbufq_dequeue(&rap->rxa_mq[i]);
 		if (m == NULL)
 			break;
@@ -1079,7 +1075,7 @@ again:
 			/*
 			 * Dispatch as many packets as we can.
 			 */
-			KASSERT((mbufq_len(&rap->rxa_mq[0]) == 0), ("unexpected dup"));
+			KASSERT(mbufq_empty(&rap->rxa_mq[0]), ("unexpected dup"));
 			ampdu_dispatch(ni, m);
 			ampdu_rx_dispatch(rap, ni);
 			return CONSUMED;
@@ -1935,12 +1931,12 @@ ieee80211_vht_get_vhtflags(struct ieee80211_node *ni, uint32_t htflags)
 	uint32_t vhtflags = 0;
 
 	vhtflags = 0;
-	if (ni->ni_flags & IEEE80211_NODE_VHT && vap->iv_flags_vht & IEEE80211_FVHT_VHT) {
+	if (ni->ni_flags & IEEE80211_NODE_VHT && vap->iv_vht_flags & IEEE80211_FVHT_VHT) {
 		if ((ni->ni_vht_chanwidth == IEEE80211_VHT_CHANWIDTH_160MHZ) &&
 		    /* XXX 2 means "160MHz and 80+80MHz", 1 means "160MHz" */
-		    (_IEEE80211_MASKSHIFT(vap->iv_vhtcaps,
+		    (_IEEE80211_MASKSHIFT(vap->iv_vht_cap.vht_cap_info,
 		     IEEE80211_VHTCAP_SUPP_CHAN_WIDTH_MASK) >= 1) &&
-		    (vap->iv_flags_vht & IEEE80211_FVHT_USEVHT160)) {
+		    (vap->iv_vht_flags & IEEE80211_FVHT_USEVHT160)) {
 			vhtflags = IEEE80211_CHAN_VHT160;
 			/* Mirror the HT40 flags */
 			if (htflags == IEEE80211_CHAN_HT40U) {
@@ -1950,9 +1946,9 @@ ieee80211_vht_get_vhtflags(struct ieee80211_node *ni, uint32_t htflags)
 			}
 		} else if ((ni->ni_vht_chanwidth == IEEE80211_VHT_CHANWIDTH_80P80MHZ) &&
 		    /* XXX 2 means "160MHz and 80+80MHz" */
-		    (_IEEE80211_MASKSHIFT(vap->iv_vhtcaps,
+		    (_IEEE80211_MASKSHIFT(vap->iv_vht_cap.vht_cap_info,
 		     IEEE80211_VHTCAP_SUPP_CHAN_WIDTH_MASK) == 2) &&
-		    (vap->iv_flags_vht & IEEE80211_FVHT_USEVHT80P80)) {
+		    (vap->iv_vht_flags & IEEE80211_FVHT_USEVHT80P80)) {
 			vhtflags = IEEE80211_CHAN_VHT80P80;
 			/* Mirror the HT40 flags */
 			if (htflags == IEEE80211_CHAN_HT40U) {
@@ -1961,7 +1957,7 @@ ieee80211_vht_get_vhtflags(struct ieee80211_node *ni, uint32_t htflags)
 				vhtflags |= IEEE80211_CHAN_HT40D;
 			}
 		} else if ((ni->ni_vht_chanwidth == IEEE80211_VHT_CHANWIDTH_80MHZ) &&
-		    (vap->iv_flags_vht & IEEE80211_FVHT_USEVHT80)) {
+		    (vap->iv_vht_flags & IEEE80211_FVHT_USEVHT80)) {
 			vhtflags = IEEE80211_CHAN_VHT80;
 			/* Mirror the HT40 flags */
 			if (htflags == IEEE80211_CHAN_HT40U) {
@@ -1979,11 +1975,11 @@ ieee80211_vht_get_vhtflags(struct ieee80211_node *ni, uint32_t htflags)
 			 * 'ht40' as that flag.
 			 */
 			if ((htflags == IEEE80211_CHAN_HT40U) &&
-			    (vap->iv_flags_vht & IEEE80211_FVHT_USEVHT40)) {
+			    (vap->iv_vht_flags & IEEE80211_FVHT_USEVHT40)) {
 				vhtflags = IEEE80211_CHAN_VHT40U
 				    | IEEE80211_CHAN_HT40U;
 			} else if (htflags == IEEE80211_CHAN_HT40D &&
-			    (vap->iv_flags_vht & IEEE80211_FVHT_USEVHT40)) {
+			    (vap->iv_vht_flags & IEEE80211_FVHT_USEVHT40)) {
 				vhtflags = IEEE80211_CHAN_VHT40D
 				    | IEEE80211_CHAN_HT40D;
 			} else if (htflags == IEEE80211_CHAN_HT20) {

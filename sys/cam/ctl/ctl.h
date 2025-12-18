@@ -55,6 +55,7 @@ typedef enum {
 	CTL_PORT_ISCSI		= 0x10,
 	CTL_PORT_SAS		= 0x20,
 	CTL_PORT_UMASS		= 0x40,
+	CTL_PORT_NVMF		= 0x80,
 	CTL_PORT_ALL		= 0xff,
 	CTL_PORT_ISC		= 0x100 // FC port for inter-shelf communication
 } ctl_port_type;
@@ -129,7 +130,9 @@ typedef enum {
 
 #ifdef	_KERNEL
 
+#ifdef MALLOC_DECLARE	/* from malloc.h */
 MALLOC_DECLARE(M_CTL);
+#endif
 
 struct ctl_page_index;
 
@@ -137,9 +140,13 @@ struct ctl_page_index;
 SYSCTL_DECL(_kern_cam_ctl);
 #endif
 
+struct cdev;
 struct ctl_lun;
 struct ctl_port;
 struct ctl_softc;
+struct ctl_scsiio;
+struct sbuf;
+union ctl_io;
 
 /*
  * Put a string into an sbuf, escaping characters that are illegal or not

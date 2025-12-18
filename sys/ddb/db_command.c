@@ -33,7 +33,6 @@
  * Command dispatcher.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/cons.h>
@@ -127,6 +126,10 @@ static struct db_command db_cmds[] = {
 	DB_CMD("delete",	db_delete_cmd,		0),
 	DB_CMD("d",		db_delete_cmd,		0),
 	DB_CMD("dump",		db_dump,		DB_CMD_MEMSAFE),
+#ifdef HAS_HW_BREAKPOINT
+	DB_CMD("dhbreak",	db_deletehbreak_cmd,	0),
+	DB_CMD("hbreak",	db_hbreakpoint_cmd,	0),
+#endif
 	DB_CMD("break",		db_breakpoint_cmd,	0),
 	DB_CMD("b",		db_breakpoint_cmd,	0),
 	DB_CMD("dwatch",	db_deletewatch_cmd,	0),
@@ -164,6 +167,7 @@ static struct db_command db_cmds[] = {
 	DB_CMD("capture",	db_capture_cmd,		CS_OWN|DB_CMD_MEMSAFE),
 	DB_CMD("textdump",	db_textdump_cmd,	CS_OWN|DB_CMD_MEMSAFE),
 	DB_CMD("findstack",	db_findstack_cmd,	0),
+	DB_CMD("pprint",	db_pprint_cmd,		CS_OWN),
 };
 struct db_command_table db_cmd_table = LIST_HEAD_INITIALIZER(db_cmd_table);
 
@@ -576,6 +580,7 @@ db_error(const char *s)
 	    db_printf("%s", s);
 	db_flush_lex();
 	kdb_reenter_silent();
+	panic("%s: did not reenter debugger", __func__);
 }
 
 static void
@@ -866,10 +871,7 @@ db_stack_trace(db_expr_t tid, bool hastid, db_expr_t count, char *modif)
 	else
 		pid = -1;
 	db_printf("Tracing pid %d tid %ld td %p\n", pid, (long)td->td_tid, td);
-	if (td->td_proc != NULL && (td->td_proc->p_flag & P_INMEM) == 0)
-		db_printf("--- swapped out\n");
-	else
-		db_trace_thread(td, count);
+	db_trace_thread(td, count);
 }
 
 static void
@@ -893,10 +895,7 @@ _db_stack_trace_all(bool active_only)
 				db_printf("\nTracing command %s pid %d"
 				    " tid %ld td %p\n", td->td_proc->p_comm,
 				    td->td_proc->p_pid, (long)td->td_tid, td);
-			if (td->td_proc->p_flag & P_INMEM)
-				db_trace_thread(td, -1);
-			else
-				db_printf("--- swapped out\n");
+			db_trace_thread(td, -1);
 			if (db_pager_quit) {
 				kdb_jmpbuf(prev_jb);
 				return;

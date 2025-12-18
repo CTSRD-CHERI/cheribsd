@@ -177,7 +177,7 @@ epair_tx_start_deferred(void *arg, int pending)
 	 * end up starving ourselves in a multi-epair routing configuration.
 	 */
 	mtx_lock(&q->mtx);
-	if (mbufq_len(&q->q) > 0) {
+	if (!mbufq_empty(&q->q)) {
 		resched = true;
 		q->state = EPAIR_QUEUE_WAKING;
 	} else {
@@ -516,9 +516,6 @@ epair_alloc_sc(struct if_clone *ifc)
 	struct epair_softc *sc;
 
 	struct ifnet *ifp = if_alloc(IFT_ETHER);
-	if (ifp == NULL)
-		return (NULL);
-
 	sc = malloc(sizeof(struct epair_softc), M_EPAIR, M_WAITOK | M_ZERO);
 	sc->ifp = ifp;
 	sc->num_queues = epair_tasks.tasks;
@@ -614,8 +611,6 @@ epair_generate_mac(struct epair_softc *sc, uint8_t *eaddr)
 static void
 epair_free_sc(struct epair_softc *sc)
 {
-	if (sc == NULL)
-		return;
 
 	if_free(sc->ifp);
 	ifmedia_removeall(&sc->media);
@@ -714,12 +709,6 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len,
 	/* Allocate memory for both [ab] interfaces */
 	sca = epair_alloc_sc(ifc);
 	scb = epair_alloc_sc(ifc);
-	if (sca == NULL || scb == NULL) {
-		epair_free_sc(sca);
-		epair_free_sc(scb);
-		ifc_free_unit(ifc, unit);
-		return (ENOSPC);
-	}
 
 	/*
 	 * Cross-reference the interfaces so we will be able to free both.

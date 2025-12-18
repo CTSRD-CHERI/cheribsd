@@ -1,4 +1,3 @@
-
 MAN=
 
 .include <src.opts.mk>
@@ -7,6 +6,7 @@ MAN=
 
 BINDIR=	/usr/bin
 
+PACKAGE=ntp
 PROG=	ntpq
 SRCS= 	ntpq.c ntpq-opts.c ntpq-subs.c version.c
 
@@ -19,12 +19,10 @@ CFLAGS+= -I${SRCTOP}/contrib/ntp/include \
 	-I${SRCTOP}/contrib/ntp/sntp/libopts \
 	-I${.CURDIR:H}
 
-LIBADD+=	edit ntp opts m pthread
+LIBADD+=	edit ntp opts m md pthread
 
 .if ${MK_OPENSSL} != "no"
 LIBADD+=	crypto
-.else
-LIBADD+=	md
 .endif
 
 CLEANFILES+= .version version.c

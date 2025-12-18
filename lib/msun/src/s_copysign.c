@@ -1,4 +1,3 @@
-/* @(#)s_copysign.c 5.1 93/09/24 */
 /*
  * ====================================================
  * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -10,7 +9,6 @@
  * ====================================================
  */
 
-#include <sys/cdefs.h>
 /*
  * copysign(double x, double y)
  * copysign(x,y) returns a value with the magnitude of x and

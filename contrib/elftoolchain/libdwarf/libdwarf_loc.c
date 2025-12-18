@@ -43,7 +43,7 @@ _dwarf_loc_fill_loc(Dwarf_Debug dbg, Dwarf_Locdesc *lbuf, uint8_t pointer_size,
 {
 	int count;
 	uint64_t operand1;
-	uint64_t operand2;
+	Dwarf_Uintptr operand2;
 	uint8_t *ps, *pe, s;
 
 	count = 0;
@@ -293,7 +293,7 @@ _dwarf_loc_fill_loc(Dwarf_Debug dbg, Dwarf_Locdesc *lbuf, uint8_t pointer_size,
 		case DW_OP_implicit_value:
 		case DW_OP_GNU_entry_value:
 			operand1 = _dwarf_decode_uleb128(&p);
-			operand2 = (Dwarf_Unsigned) (uintptr_t) p;
+			operand2 = (uintptr_t) p;
 			p += operand1;
 			break;
 
@@ -343,7 +343,7 @@ _dwarf_loc_fill_loc(Dwarf_Debug dbg, Dwarf_Locdesc *lbuf, uint8_t pointer_size,
 		 */
 		case DW_OP_GNU_const_type:
 			operand1 = _dwarf_decode_uleb128(&p);
-			operand2 = (Dwarf_Unsigned) (uintptr_t) p;
+			operand2 = (uintptr_t) p;
 			s = *p++;
 			p += s;
 			break;

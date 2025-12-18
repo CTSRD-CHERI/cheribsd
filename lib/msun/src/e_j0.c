@@ -1,4 +1,3 @@
-/* @(#)e_j0.c 1.3 95/01/18 */
 /*
  * ====================================================
  * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -10,7 +9,6 @@
  * ====================================================
  */
 
-#include <sys/cdefs.h>
 /* j0(x), y0(x)
  * Bessel function of the first and second kinds of order zero.
  * Method -- j0(x):

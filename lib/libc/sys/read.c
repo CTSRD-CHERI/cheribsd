@@ -29,7 +29,6 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -41,7 +40,5 @@ __weak_reference(__sys_read, __read);
 ssize_t
 read(int fd, void *buf, size_t nbytes)
 {
-
-	return (((ssize_t (*)(int, void *, size_t))
-	    __libc_interposing[INTERPOS_read])(fd, buf, nbytes));
+	return (INTERPOS_SYS(read, fd, buf, nbytes));
 }

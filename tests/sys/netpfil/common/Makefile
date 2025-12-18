@@ -1,7 +1,7 @@
-
 PACKAGE=	tests
 
 TESTSDIR=	${TESTSBASE}/sys/netpfil/common
+BINDIR=		${TESTSDIR}
 
 
 ATF_TESTS_SH+=	\
@@ -13,19 +13,24 @@ ATF_TESTS_SH+=	\
 		fragments \
 		forward
 
-# Tests reuse jail names and so cannot run in parallel.
-TEST_METADATA+=	is_exclusive=true
+# Allow tests to run in parallel in their own jails
+TEST_METADATA+= execenv="jail"
+TEST_METADATA+= execenv_jail_params="vnet allow.raw_sockets"
+
+PROGS=		divapp
 
 ${PACKAGE}FILES+=	\
 		utils.subr \
 		runner.subr \
 		pft_icmp_check.py \
 		pft_ping.py \
+		pft_rst.py \
 		pft_synflood.py \
 		sniffer.py
 
 ${PACKAGE}FILESMODE_pft_icmp_check.py=	0555
 ${PACKAGE}FILESMODE_pft_ping.py=	0555
+${PACKAGE}FILESMODE_pft_rst.py=	0555
 ${PACKAGE}FILESMODE_pft_synflood.py=	0555
 
 .include <bsd.test.mk>

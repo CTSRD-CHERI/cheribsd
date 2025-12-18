@@ -24,9 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -120,7 +117,7 @@ vfs_optionisset(const vfs_t *vfsp, const char *opt, char **argp)
 
 int
 mount_snapshot(kthread_t *td, vnode_t **vpp, const char *fstype, char *fspath,
-    char *fspec, int fsflags)
+    char *fspec, int fsflags, vfs_t *parent_vfsp)
 {
 	struct vfsconf *vfsp;
 	struct mount *mp;
@@ -161,7 +158,7 @@ mount_snapshot(kthread_t *td, vnode_t **vpp, const char *fstype, char *fspath,
 		return (error);
 	}
 	vn_seqc_write_begin(vp);
-	VOP_UNLOCK1(vp);
+	VOP_UNLOCK(vp);
 
 	/*
 	 * Allocate and initialize the filesystem.
@@ -220,6 +217,13 @@ mount_snapshot(kthread_t *td, vnode_t **vpp, const char *fstype, char *fspath,
 	mp->mnt_opt = mp->mnt_optnew;
 	(void) VFS_STATFS(mp, &mp->mnt_stat);
 
+#ifdef VFS_SUPPORTS_EXJAIL_CLONE
+	/*
+	 * Clone the mnt_exjail credentials of the parent, as required.
+	 */
+	vfs_exjail_clone(parent_vfsp, mp);
+#endif
+
 	/*
 	 * Prevent external consumers of mount options from reading
 	 * mnt_optnew.
@@ -245,10 +249,8 @@ mount_snapshot(kthread_t *td, vnode_t **vpp, const char *fstype, char *fspath,
 	if (VFS_ROOT(mp, LK_EXCLUSIVE, &mvp))
 		panic("mount: lost mount");
 	vn_seqc_write_end(vp);
-	VOP_UNLOCK1(vp);
-#if __FreeBSD_version >= 1300048
+	VOP_UNLOCK(vp);
 	vfs_op_exit(mp);
-#endif
 	vfs_unbusy(mp);
 	*vpp = mvp;
 	return (0);
@@ -268,12 +270,8 @@ void
 vn_rele_async(vnode_t *vp, taskq_t *taskq)
 {
 	VERIFY3U(vp->v_usecount, >, 0);
-	if (refcount_release_if_not_last(&vp->v_usecount)) {
-#if __FreeBSD_version < 1300045
-		vdrop(vp);
-#endif
+	if (refcount_release_if_not_last(&vp->v_usecount))
 		return;
-	}
 	VERIFY3U(taskq_dispatch((taskq_t *)taskq,
 	    (task_func_t *)vrele, vp, TQ_SLEEP), !=, 0);
 }

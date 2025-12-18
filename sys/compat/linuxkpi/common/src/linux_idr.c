@@ -27,7 +27,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -70,7 +69,7 @@ idr_preload_dequeue_locked(struct linux_idr_cache *lic)
 	struct idr_layer *retval;
 
 	/* check if wrong thread is trying to dequeue */
-	if (mtx_owned(&lic->lock.m) == 0)
+	if (mtx_owned(&lic->lock) == 0)
 		return (NULL);
 
 	retval = lic->head;
@@ -178,6 +177,14 @@ void
 idr_destroy(struct idr *idr)
 {
 	struct idr_layer *il, *iln;
+
+	/*
+	 * This idr can be reused, and this function might be called multiple times
+	 * without a idr_init(). Check if this is the case.  If we do not do this
+	 * then the mutex will panic while asserting that it is valid.
+	 */
+	if (mtx_initialized(&idr->lock) == 0)
+		return;
 
 	idr_remove_all(idr);
 	mtx_lock(&idr->lock);
@@ -755,10 +762,9 @@ ida_simple_get(struct ida *ida, unsigned int start, unsigned int end,
 	unsigned int max;
 
 	MPASS((int)start >= 0);
-	MPASS((int)end >= 0);
 
-	if (end == 0)
-		max = 0x80000000;
+	if ((int)end <= 0)
+		max = INT_MAX;
 	else {
 		MPASS(end > start);
 		max = end - 1;
@@ -804,4 +810,5 @@ ida_destroy(struct ida *ida)
 {
 	idr_destroy(&ida->idr);
 	free(ida->free_bitmap, M_IDR);
+	ida->free_bitmap = NULL;
 }

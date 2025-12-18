@@ -162,8 +162,6 @@ icattach(device_t dev)
 	if_t ifp;
 
 	ifp = sc->ic_ifp = if_alloc(IFT_PARA);
-	if (ifp == NULL)
-		return (ENOSPC);
 
 	mtx_init(&sc->ic_lock, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);
@@ -363,8 +361,8 @@ icoutput(if_t ifp, struct mbuf *m, const struct sockaddr *dst,
 	u_char *cp;
 	u_int32_t hdr;
 
-	/* BPF writes need to be handled specially. */ 
-	if (dst->sa_family == AF_UNSPEC)
+	/* BPF writes need to be handled specially. */
+	if (dst->sa_family == AF_UNSPEC || dst->sa_family == pseudo_AF_HDRCMPLT)
 		bcopy(dst->sa_data, &hdr, sizeof(hdr));
 	else 
 		hdr = RO_GET_FAMILY(ro, dst);

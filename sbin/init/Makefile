@@ -1,5 +1,3 @@
-#	@(#)Makefile	8.1 (Berkeley) 7/19/93
-
 CONFGROUPS=	CONFTTYS
 PACKAGE=runtime
 PROG=	init

@@ -29,9 +29,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     @(#)ls.1	8.7 (Berkeley) 7/29/94
-.\"
-.Dd July 18, 2023
+.Dd July 22, 2024
 .Dt LS 1
 .Os
 .Sh NAME
@@ -246,9 +244,11 @@ but only if
 .Dv stdout
 is a tty and either the
 .Fl G
-flag is specified or the
+flag is specified or one of the environment variables
 .Ev COLORTERM
-environment variable is set and not empty.
+or
+.Ev CLICOLOR
+is set and not empty.
 .Pp
 .Cm never
 will disable color regardless of environment variables.
@@ -434,6 +434,8 @@ output is not to a terminal.
 .It Fl ,
 (Comma) When the
 .Fl l
+or
+.Fl s
 option is set, print file sizes grouped and separated by thousands using the
 non-monetary separator returned by
 .Xr localeconv 3 ,
@@ -459,9 +461,9 @@ options all override each other; the last one specified determines
 the file time used.
 .Pp
 The
-.Fl S
+.Fl S , t
 and
-.Fl t
+.Fl v
 options override each other; the last one specified determines
 the sort order used.
 .Pp
@@ -743,7 +745,7 @@ where
 is the foreground color and
 .Ar b
 is the background color.
-When the background color is capitalized, the text will underlined.
+When the background color is capitalized, the text is underlined.
 .Pp
 The color designators are as follows:
 .Pp
@@ -927,7 +929,7 @@ command appeared in
 The
 .Fl v
 option was added in
-.Fx 14.0 .
+.Fx 13.2 .
 .Sh BUGS
 To maintain backward compatibility, the relationships between the many
 options are quite complex.

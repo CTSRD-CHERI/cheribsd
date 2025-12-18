@@ -30,7 +30,6 @@
  *
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/module.h>
@@ -247,7 +246,7 @@ cuda_attach(device_t dev)
 			device_printf(dev, "CUDA child <%s>\n",name);
 
 		if (strncmp(name, "adb", 4) == 0) {
-			sc->adb_bus = device_add_child(dev,"adb",-1);
+			sc->adb_bus = device_add_child(dev,"adb",DEVICE_UNIT_ANY);
 		}
 	}
 
@@ -748,7 +747,13 @@ cuda_shutdown(void *xsc, int howto)
 	struct cuda_softc *sc = xsc;
 	uint8_t cmd[] = {CUDA_PSEUDO, 0};
 
-	cmd[1] = (howto & RB_HALT) ? CMD_POWEROFF : CMD_RESET;
+	if ((howto & RB_POWEROFF) != 0)
+		cmd[1] = CMD_POWEROFF;
+	else if ((howto & RB_HALT) == 0)
+		cmd[1] = CMD_RESET;
+	else
+		return;
+
 	cuda_poll(sc->sc_dev);
 	cuda_send(sc, 1, 2, cmd);
 

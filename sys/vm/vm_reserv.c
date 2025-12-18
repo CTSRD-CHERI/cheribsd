@@ -79,6 +79,29 @@
 
 #if VM_NRESERVLEVEL > 0
 
+/*
+ * Temporarily simulate two-level reservations.  Effectively, VM_LEVEL_0_* is
+ * level 1, and VM_SUBLEVEL_0_* is level 0.
+ */
+#if VM_NRESERVLEVEL == 2
+#undef VM_NRESERVLEVEL
+#define	VM_NRESERVLEVEL		1
+#if VM_LEVEL_0_ORDER == 4
+#undef VM_LEVEL_0_ORDER
+#define	VM_LEVEL_0_ORDER	(4 + VM_LEVEL_1_ORDER)
+#define	VM_SUBLEVEL_0_NPAGES	(1 << 4)
+#elif VM_LEVEL_0_ORDER == 7
+#undef VM_LEVEL_0_ORDER
+#define	VM_LEVEL_0_ORDER	(7 + VM_LEVEL_1_ORDER)
+#define	VM_SUBLEVEL_0_NPAGES	(1 << 7)
+#else
+#error "Unsupported level 0 reservation size"
+#endif
+#define	VM_LEVEL_0_PSIND	2
+#else
+#define	VM_LEVEL_0_PSIND	1
+#endif
+
 #ifndef VM_LEVEL_0_ORDER_MAX
 #define	VM_LEVEL_0_ORDER_MAX	VM_LEVEL_0_ORDER
 #endif
@@ -384,6 +407,27 @@ vm_reserv_insert(vm_reserv_t rv, vm_object_t object, vm_pindex_t pindex)
 	vm_reserv_object_unlock(object);
 }
 
+#ifdef VM_SUBLEVEL_0_NPAGES
+static inline bool
+vm_reserv_is_sublevel_full(vm_reserv_t rv, int index)
+{
+	_Static_assert(VM_SUBLEVEL_0_NPAGES == 16 ||
+	    VM_SUBLEVEL_0_NPAGES == 128,
+	    "vm_reserv_is_sublevel_full: unsupported VM_SUBLEVEL_0_NPAGES");
+	/* An equivalent bit_ntest() compiles to more instructions. */
+	switch (VM_SUBLEVEL_0_NPAGES) {
+	case 16:
+		return (((uint16_t *)rv->popmap)[index / 16] == UINT16_MAX);
+	case 128:
+		index = rounddown2(index, 128) / 64;
+		return (((uint64_t *)rv->popmap)[index] == UINT64_MAX &&
+		    ((uint64_t *)rv->popmap)[index + 1] == UINT64_MAX);
+	default:
+		__unreachable();
+	}
+}
+#endif
+
 /*
  * Reduces the given reservation's population count.  If the population count
  * becomes zero, the reservation is destroyed.  Additionally, moves the
@@ -409,11 +453,15 @@ vm_reserv_depopulate(vm_reserv_t rv, int index)
 	    ("vm_reserv_depopulate: reserv %p's domain is corrupted %d",
 	    rv, rv->domain));
 	if (rv->popcnt == VM_LEVEL_0_NPAGES) {
-		KASSERT(rv->pages->psind == 1,
+		KASSERT(rv->pages->psind == VM_LEVEL_0_PSIND,
 		    ("vm_reserv_depopulate: reserv %p is already demoted",
 		    rv));
-		rv->pages->psind = 0;
+		rv->pages->psind = VM_LEVEL_0_PSIND - 1;
 	}
+#ifdef VM_SUBLEVEL_0_NPAGES
+	if (vm_reserv_is_sublevel_full(rv, index))
+		rv->pages[rounddown2(index, VM_SUBLEVEL_0_NPAGES)].psind = 0;
+#endif
 	bit_clear(rv->popmap, index);
 	rv->popcnt--;
 	if ((unsigned)(ticks - rv->lasttick) >= PARTPOPSLOP ||
@@ -528,12 +576,17 @@ vm_reserv_populate(vm_reserv_t rv, int index)
 	    index));
 	KASSERT(rv->popcnt < VM_LEVEL_0_NPAGES,
 	    ("vm_reserv_populate: reserv %p is already full", rv));
-	KASSERT(rv->pages->psind == 0,
+	KASSERT(rv->pages->psind >= 0 &&
+	    rv->pages->psind < VM_LEVEL_0_PSIND,
 	    ("vm_reserv_populate: reserv %p is already promoted", rv));
 	KASSERT(rv->domain < vm_ndomains,
 	    ("vm_reserv_populate: reserv %p's domain is corrupted %d",
 	    rv, rv->domain));
 	bit_set(rv->popmap, index);
+#ifdef VM_SUBLEVEL_0_NPAGES
+	if (vm_reserv_is_sublevel_full(rv, index))
+		rv->pages[rounddown2(index, VM_SUBLEVEL_0_NPAGES)].psind = 1;
+#endif
 	rv->popcnt++;
 	if ((unsigned)(ticks - rv->lasttick) < PARTPOPSLOP &&
 	    rv->inpartpopq && rv->popcnt != VM_LEVEL_0_NPAGES)
@@ -548,10 +601,10 @@ vm_reserv_populate(vm_reserv_t rv, int index)
 		rv->inpartpopq = TRUE;
 		TAILQ_INSERT_TAIL(&vm_rvd[rv->domain].partpop, rv, partpopq);
 	} else {
-		KASSERT(rv->pages->psind == 0,
+		KASSERT(rv->pages->psind == VM_LEVEL_0_PSIND - 1,
 		    ("vm_reserv_populate: reserv %p is already promoted",
 		    rv));
-		rv->pages->psind = 1;
+		rv->pages->psind = VM_LEVEL_0_PSIND;
 	}
 	vm_reserv_domain_unlock(rv->domain);
 }
@@ -895,13 +948,18 @@ out:
 static void
 vm_reserv_break(vm_reserv_t rv)
 {
+	vm_page_t m;
 	int hi, lo, pos;
 
 	vm_reserv_assert_locked(rv);
 	CTR5(KTR_VM, "%s: rv %p object %p popcnt %d inpartpop %d",
 	    __FUNCTION__, rv, rv->object, rv->popcnt, rv->inpartpopq);
 	vm_reserv_remove(rv);
-	rv->pages->psind = 0;
+	m = rv->pages;
+#ifdef VM_SUBLEVEL_0_NPAGES
+	for (; m < rv->pages + VM_LEVEL_0_NPAGES; m += VM_SUBLEVEL_0_NPAGES)
+#endif
+		m->psind = 0;
 	hi = lo = -1;
 	pos = 0;
 	for (;;) {
@@ -1068,6 +1126,27 @@ vm_reserv_is_page_free(vm_page_t m)
 }
 
 /*
+ * Returns true if the given page is part of a block of npages, starting at a
+ * multiple of npages, that are all allocated.  Otherwise, returns false.
+ */
+bool
+vm_reserv_is_populated(vm_page_t m, int npages)
+{
+	vm_reserv_t rv;
+	int index;
+
+	KASSERT(npages <= VM_LEVEL_0_NPAGES,
+	    ("%s: npages %d exceeds VM_LEVEL_0_NPAGES", __func__, npages));
+	KASSERT(powerof2(npages),
+	    ("%s: npages %d is not a power of 2", __func__, npages));
+	rv = vm_reserv_from_page(m);
+	if (rv->object == NULL)
+		return (false);
+	index = rounddown2(m - rv->pages, npages);
+	return (bit_ntest(rv->popmap, index, index + npages - 1, 1));
+}
+
+/*
  * If the given page belongs to a reservation, returns the level of that
  * reservation.  Otherwise, returns -1.
  */
@@ -1077,7 +1156,11 @@ vm_reserv_level(vm_page_t m)
 	vm_reserv_t rv;
 
 	rv = vm_reserv_from_page(m);
+#ifdef VM_SUBLEVEL_0_NPAGES
+	return (rv->object != NULL ? 1 : -1);
+#else
 	return (rv->object != NULL ? 0 : -1);
+#endif
 }
 
 /*
@@ -1090,7 +1173,15 @@ vm_reserv_level_iffullpop(vm_page_t m)
 	vm_reserv_t rv;
 
 	rv = vm_reserv_from_page(m);
-	return (rv->popcnt == VM_LEVEL_0_NPAGES ? 0 : -1);
+	if (rv->popcnt == VM_LEVEL_0_NPAGES) {
+#ifdef VM_SUBLEVEL_0_NPAGES
+		return (1);
+	} else if (rv->pages != NULL &&
+	    vm_reserv_is_sublevel_full(rv, m - rv->pages)) {
+#endif
+		return (0);
+	}
+	return (-1);
 }
 
 /*
@@ -1201,7 +1292,7 @@ vm_reserv_find_contig(vm_reserv_t rv, int npages, int lo,
  * Searches the partially populated reservation queue for the least recently
  * changed reservation with free pages that satisfy the given request for
  * contiguous physical memory.  If a satisfactory reservation is found, it is
- * broken.  Returns true if a reservation is broken and false otherwise.
+ * broken.  Returns a page if a reservation is broken and NULL otherwise.
  */
 vm_page_t
 vm_reserv_reclaim_contig(int domain, u_long npages, vm_paddr_t low,
@@ -1217,7 +1308,7 @@ vm_reserv_reclaim_contig(int domain, u_long npages, vm_paddr_t low,
 	KASSERT(powerof2(alignment), ("alignment is not a power of 2"));
 	KASSERT(powerof2(boundary), ("boundary is not a power of 2"));
 	if (npages > VM_LEVEL_0_NPAGES - 1)
-		return (false);
+		return (NULL);
 	size = npages << PAGE_SHIFT;
 	/* 
 	 * Ensure that a free range starting at a boundary-multiple
@@ -1345,6 +1436,10 @@ vm_reserv_size(int level)
 
 	switch (level) {
 	case 0:
+#ifdef VM_SUBLEVEL_0_NPAGES
+		return (VM_SUBLEVEL_0_NPAGES * PAGE_SIZE);
+	case 1:
+#endif
 		return (VM_LEVEL_0_SIZE);
 	case -1:
 		return (PAGE_SIZE);
@@ -1420,12 +1515,16 @@ vm_reserv_to_superpage(vm_page_t m)
 
 	VM_OBJECT_ASSERT_LOCKED(m->object);
 	rv = vm_reserv_from_page(m);
-	if (rv->object == m->object && rv->popcnt == VM_LEVEL_0_NPAGES)
-		m = rv->pages;
-	else
-		m = NULL;
-
-	return (m);
+	if (rv->object == m->object) {
+		if (rv->popcnt == VM_LEVEL_0_NPAGES)
+			return (rv->pages);
+#ifdef VM_SUBLEVEL_0_NPAGES
+		if (vm_reserv_is_sublevel_full(rv, m - rv->pages))
+			return (rv->pages + rounddown2(m - rv->pages,
+			    VM_SUBLEVEL_0_NPAGES));
+#endif
+	}
+	return (NULL);
 }
 
 #endif	/* VM_NRESERVLEVEL > 0 */

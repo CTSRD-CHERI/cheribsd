@@ -32,7 +32,6 @@
 #include "opt_acpi.h"
 #include "opt_platform.h"
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bitstring.h>
@@ -494,6 +493,10 @@ gic_v3_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 		return (0);
 	case GICV3_IVAR_REDIST:
 		*result = (uintptr_t)&sc->gic_redists.pcpu[PCPU_GET(cpuid)];
+		return (0);
+	case GICV3_IVAR_SUPPORT_LPIS:
+		*result =
+		    (gic_d_read(sc, 4, GICD_TYPER) & GICD_TYPER_LPIS) != 0;
 		return (0);
 	case GIC_IVAR_HW_REV:
 		KASSERT(
@@ -1090,7 +1093,7 @@ gic_v3_bind_intr(device_t dev, struct intr_irqsrc *isrc)
 
 #ifdef SMP
 static void
-gic_v3_init_secondary(device_t dev)
+gic_v3_init_secondary(device_t dev, uint32_t rootnum)
 {
 	struct gic_v3_setup_periph_args pargs;
 	device_t child;
@@ -1137,7 +1140,7 @@ gic_v3_init_secondary(device_t dev)
 
 	for (i = 0; i < sc->gic_nchildren; i++) {
 		child = sc->gic_children[i];
-		PIC_INIT_SECONDARY(child);
+		PIC_INIT_SECONDARY(child, rootnum);
 	}
 }
 

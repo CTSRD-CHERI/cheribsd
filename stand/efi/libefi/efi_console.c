@@ -24,7 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <efi.h>
 #include <efilib.h>
@@ -64,7 +63,7 @@ void HO(void);
 void end_term(void);
 #endif
 
-#define	TEXT_ROWS	24
+#define	TEXT_ROWS	25
 #define	TEXT_COLS	80
 
 static tf_bell_t	efi_cons_bell;
@@ -127,14 +126,14 @@ int efi_cons_poll(void);
 static void cons_draw_frame(teken_attr_t *);
 
 struct console efi_console = {
-	"efi",
-	"EFI console",
-	C_WIDEOUT,
-	efi_cons_probe,
-	efi_cons_init,
-	efi_cons_putchar,
-	efi_cons_getchar,
-	efi_cons_poll
+	.c_name = "efi",
+	.c_desc = "EFI console",
+	.c_flags = C_WIDEOUT,
+	.c_probe = efi_cons_probe,
+	.c_init = efi_cons_init,
+	.c_out = efi_cons_putchar,
+	.c_in = efi_cons_getchar,
+	.c_ready = efi_cons_poll
 };
 
 /*

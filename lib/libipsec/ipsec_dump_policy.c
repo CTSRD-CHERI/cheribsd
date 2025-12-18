@@ -31,7 +31,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -68,9 +67,9 @@ static char *set_address(char *, size_t, struct sockaddr *);
  * When delimiter == NULL, alternatively ' '(space) is applied.
  */
 char *
-ipsec_dump_policy(caddr_t policy, char *delimiter)
+ipsec_dump_policy(c_caddr_t policy, const char *delimiter)
 {
-	struct sadb_x_policy *xpl = (struct sadb_x_policy *)policy;
+	const struct sadb_x_policy *xpl = (const struct sadb_x_policy *)policy;
 	struct sadb_x_ipsecrequest *xisr;
 	size_t off, buflen;
 	char *buf;

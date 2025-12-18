@@ -1,4 +1,4 @@
-# $NetBSD: dep-var.mk,v 1.8 2023/05/10 15:53:32 rillig Exp $
+# $NetBSD: dep-var.mk,v 1.12 2024/06/02 15:31:26 rillig Exp $
 #
 # Tests for variable references in dependency declarations.
 #
@@ -9,11 +9,11 @@
 
 # expect: Var_Parse: ${UNDEF1} (eval-defined)
 # Even though undefined expressions should lead to errors, no error message is
-# generated for this line.  The variable expression ${UNDEF1} simply expands
+# generated for this line.  The expression ${UNDEF1} simply expands
 # to an empty string.
 all: ${UNDEF1}
 
-# Using a double dollar in order to circumvent immediate variable expansion
+# Using a double dollar in order to circumvent immediate expression expansion
 # feels like unintended behavior.  At least the manual page says nothing at
 # all about defined or undefined variables in dependency lines.
 #
@@ -25,7 +25,7 @@ all: $${DEF2} a-$${DEF2}-b
 # XXX: The -dv log says later when expanding the sources of 'all':
 #	Var_Parse: ${UNDEF3} (eval-defined)
 # but no error message is generated for this line, just like for UNDEF1.
-# The variable expression ${UNDEF3} simply expands to an empty string.
+# The expression ${UNDEF3} simply expands to an empty string.
 all: $${UNDEF3}
 
 # Try out how many levels of indirection are really expanded in dependency
@@ -63,7 +63,7 @@ INDIRECT_3=	indirect
 UNDEF1=	undef1
 DEF2=	def2
 
-# Cover the code in SuffExpandChildren that deals with malformed variable
+# Cover the code in SuffExpandChildren that deals with malformed
 # expressions.
 #
 # This seems to be an edge case that never happens in practice, and it would
@@ -84,8 +84,8 @@ all: $$$$)
 # in normal mode since ParseDependency does not handle any errors after
 # calling Var_Parse.
 # expect: Var_Parse: ${:U\$)}: (eval-defined)
-# expect: Var_Parse: $INDIRECT_2-2-1 $): (parse-only)
-# expect: Var_Parse: $): (parse-only)
+# expect: Var_Parse: $INDIRECT_2-2-1 $): (parse)
+# expect: Var_Parse: $): (parse)
 undef1 def2 a-def2-b 1-2-$$INDIRECT_2-2-1 ${:U\$)}:
 	@echo ${.TARGET:Q}
 

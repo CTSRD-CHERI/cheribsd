@@ -48,10 +48,6 @@
 # include <paths.h>
 #endif
 
-#if !defined(lint)
-static const char sccsid[] = "@(#)fils.c	1.21 4/20/96 (C) 1993-2000 Darren Reed";
-static const char rcsid[] = "@(#)$Id$";
-#endif
 
 
 extern	char	*optarg;
@@ -338,7 +334,7 @@ int main(int argc, char *argv[])
 		case 'm' :
 			filter = parseipfexpr(optarg, NULL);
 			if (filter == NULL) {
-				fprintf(stderr, "Error parseing '%s'\n",
+				fprintf(stderr, "Error parsing '%s'\n",
 					optarg);
 				exit(1);
 			}

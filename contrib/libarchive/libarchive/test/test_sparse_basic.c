@@ -23,7 +23,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "test.h"
-__FBSDID("$FreeBSD$");
 
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
@@ -68,13 +67,16 @@ struct sparse {
 
 static void create_sparse_file(const char *, const struct sparse *);
 
-#if defined(__APPLE__)
-/* On APFS holes need to be at least 4096x4097 bytes */
-#define MIN_HOLE 16781312
-#else
-/* Elsewhere we work with 4096*10 bytes */
-#define MIN_HOLE 409600
-#endif
+/* This should be large enough that any OS/filesystem that
+ * does support sparse files is certain to store a gap this big
+ * as a hole. */
+/* A few data points:
+ * = ZFS on FreeBSD needs this to be at least 200kB
+ * = macOS APFS needs this to be at least 4096x4097 bytes
+ *
+ * 32MiB here is bigger than either of the above.
+ */
+#define MIN_HOLE (32 * 1024UL * 1024UL)
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
 #include <winioctl.h>
@@ -121,7 +123,7 @@ create_sparse_file(const char *path, const struct sparse *s)
 	memset(buff, ' ', sizeof(buff));
 
 	handle = CreateFileA(path, GENERIC_WRITE, 0,
-	    NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL,
+	    NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
 	    NULL);
 	assert(handle != INVALID_HANDLE_VALUE);
 	assert(DeviceIoControl(handle, FSCTL_SET_SPARSE, NULL, 0,

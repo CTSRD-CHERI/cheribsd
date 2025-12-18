@@ -114,16 +114,11 @@ _CPUCFLAGS = -mfloat-abi=softfp
 _CPUCFLAGS = -march=armv7 -mfpu=vfp
 .  elif ${CPUTYPE:Marmv[67]*} != ""
 # Handle all the armvX types that FreeBSD runs:
-#	armv6, armv6t2, armv7, armv7-a, armv7ve
+#	armv7, armv7-a, armv7ve
 # they require -march=. All the others require -mcpu=.
 _CPUCFLAGS = -march=${CPUTYPE}
 .  else
 # Common values for FreeBSD
-# arm: (any arm v4 or v5 processor you are targeting)
-#	arm920t, arm926ej-s, marvell-pj4, fa526, fa626,
-#	fa606te, fa626te, fa726te
-# armv6:
-# 	arm1176jzf-s
 # armv7: generic-armv7-a, cortex-a5, cortex-a7, cortex-a8, cortex-a9,
 #       cortex-a12, cortex-a15, cortex-a17
 #       cortex-a53, cortex-a57, cortex-a72,
@@ -159,16 +154,19 @@ _CPUCFLAGS = -mcpu=${CPUTYPE}
 
 ########## i386
 . if ${MACHINE_CPUARCH} == "i386"
-.  if ${CPUTYPE} == "znver3" || ${CPUTYPE} == "znver2" || \
+.  if ${CPUTYPE} == "znver4"
+MACHINE_CPU = avx512 avx2 avx sse42 sse41 ssse3 sse4a sse3 sse2 sse mmx k6 k5 i586 f16c
+.  elif ${CPUTYPE} == "znver3" || ${CPUTYPE} == "znver2" || \
     ${CPUTYPE} == "znver1"
-MACHINE_CPU = avx2 avx sse42 sse41 ssse3 sse4a sse3 sse2 sse mmx k6 k5 i586
+MACHINE_CPU = avx2 avx sse42 sse41 ssse3 sse4a sse3 sse2 sse mmx k6 k5 i586 f16c
 .  elif ${CPUTYPE} == "bdver4"
-MACHINE_CPU = xop avx2 avx sse42 sse41 ssse3 sse4a sse3 sse2 sse mmx k6 k5 i586
-.  elif ${CPUTYPE} == "bdver3" || ${CPUTYPE} == "bdver2" || \
-    ${CPUTYPE} == "bdver1"
+MACHINE_CPU = xop avx2 avx sse42 sse41 ssse3 sse4a sse3 sse2 sse mmx k6 k5 i586 f16c
+.  elif ${CPUTYPE} == "bdver3" || ${CPUTYPE} == "bdver2"
+MACHINE_CPU = xop avx sse42 sse41 ssse3 sse4a sse3 sse2 sse mmx k6 k5 i586 f16c
+.  elif ${CPUTYPE} == "bdver1"
 MACHINE_CPU = xop avx sse42 sse41 ssse3 sse4a sse3 sse2 sse mmx k6 k5 i586
 .  elif ${CPUTYPE} == "btver2"
-MACHINE_CPU = avx sse42 sse41 ssse3 sse4a sse3 sse2 sse mmx k6 k5 i586
+MACHINE_CPU = avx sse42 sse41 ssse3 sse4a sse3 sse2 sse mmx k6 k5 i586 f16c
 .  elif ${CPUTYPE} == "btver1"
 MACHINE_CPU = ssse3 sse4a sse3 sse2 sse mmx k6 k5 i586
 .  elif ${CPUTYPE} == "amdfam10"
@@ -195,12 +193,14 @@ MACHINE_CPU = k5 i586
     ${CPUTYPE} == "cannonlake" || ${CPUTYPE} == "knm" || \
     ${CPUTYPE} == "skylake-avx512" || ${CPUTYPE} == "knl" || \
     ${CPUTYPE} == "x86-64-v4"
-MACHINE_CPU = avx512 avx2 avx sse42 sse41 ssse3 sse3 sse2 sse i686 mmx i586
+MACHINE_CPU = avx512 avx2 avx sse42 sse41 ssse3 sse3 sse2 sse i686 mmx i586 f16c
 .  elif ${CPUTYPE} == "alderlake" || ${CPUTYPE} == "skylake" || \
     ${CPUTYPE} == "broadwell" || ${CPUTYPE} == "haswell" || \
     ${CPUTYPE} == "x86-64-v3"
-MACHINE_CPU = avx2 avx sse42 sse41 ssse3 sse3 sse2 sse i686 mmx i586
-.  elif ${CPUTYPE} == "ivybridge" || ${CPUTYPE} == "sandybridge"
+MACHINE_CPU = avx2 avx sse42 sse41 ssse3 sse3 sse2 sse i686 mmx i586 f16c
+.  elif ${CPUTYPE} == "ivybridge"
+MACHINE_CPU = avx sse42 sse41 ssse3 sse3 sse2 sse i686 mmx i586 f16c
+.  elif ${CPUTYPE} == "sandybridge"
 MACHINE_CPU = avx sse42 sse41 ssse3 sse3 sse2 sse i686 mmx i586
 .  elif ${CPUTYPE} == "tremont" || ${CPUTYPE} == "goldmont-plus" || \
     ${CPUTYPE} == "goldmont" || ${CPUTYPE} == "westmere" || \
@@ -240,16 +240,19 @@ MACHINE_CPU = mmx
 MACHINE_CPU += i486
 ########## amd64
 . elif ${MACHINE_CPUARCH} == "amd64"
-.  if ${CPUTYPE} == "znver3" || ${CPUTYPE} == "znver2" || \
+.  if ${CPUTYPE} == "znver4"
+MACHINE_CPU = avx512 avx2 avx sse42 sse41 ssse3 sse4a sse3 f16c
+.  elif ${CPUTYPE} == "znver3" || ${CPUTYPE} == "znver2" || \
     ${CPUTYPE} == "znver1"
-MACHINE_CPU = avx2 avx sse42 sse41 ssse3 sse4a sse3
+MACHINE_CPU = avx2 avx sse42 sse41 ssse3 sse4a sse3 f16c
 .  elif ${CPUTYPE} == "bdver4"
-MACHINE_CPU = xop avx2 avx sse42 sse41 ssse3 sse4a sse3
-.  elif ${CPUTYPE} == "bdver3" || ${CPUTYPE} == "bdver2" || \
-    ${CPUTYPE} == "bdver1"
+MACHINE_CPU = xop avx2 avx sse42 sse41 ssse3 sse4a sse3 f16c
+.  elif ${CPUTYPE} == "bdver3" || ${CPUTYPE} == "bdver2"
+MACHINE_CPU = xop avx sse42 sse41 ssse3 sse4a sse3 f16c
+.  elif ${CPUTYPE} == "bdver1"
 MACHINE_CPU = xop avx sse42 sse41 ssse3 sse4a sse3
 .  elif ${CPUTYPE} == "btver2"
-MACHINE_CPU = avx sse42 sse41 ssse3 sse4a sse3
+MACHINE_CPU = avx sse42 sse41 ssse3 sse4a sse3 f16c
 .  elif ${CPUTYPE} == "btver1"
 MACHINE_CPU = ssse3 sse4a sse3
 .  elif ${CPUTYPE} == "amdfam10"
@@ -266,12 +269,14 @@ MACHINE_CPU = k8 3dnow
     ${CPUTYPE} == "cannonlake" || ${CPUTYPE} == "knm" || \
     ${CPUTYPE} == "skylake-avx512" || ${CPUTYPE} == "knl" || \
     ${CPUTYPE} == "x86-64-v4"
-MACHINE_CPU = avx512 avx2 avx sse42 sse41 ssse3 sse3
+MACHINE_CPU = avx512 avx2 avx sse42 sse41 ssse3 sse3 f16c
 .  elif ${CPUTYPE} == "alderlake" || ${CPUTYPE} == "skylake" || \
     ${CPUTYPE} == "broadwell" || ${CPUTYPE} == "haswell" || \
     ${CPUTYPE} == "x86-64-v3"
-MACHINE_CPU = avx2 avx sse42 sse41 ssse3 sse3
-.  elif ${CPUTYPE} == "ivybridge" || ${CPUTYPE} == "sandybridge"
+MACHINE_CPU = avx2 avx sse42 sse41 ssse3 sse3 f16c
+.  elif ${CPUTYPE} == "ivybridge"
+MACHINE_CPU = avx sse42 sse41 ssse3 sse3 f16c
+.  elif ${CPUTYPE} == "sandybridge"
 MACHINE_CPU = avx sse42 sse41 ssse3 sse3
 .  elif ${CPUTYPE} == "tremont" || ${CPUTYPE} == "goldmont-plus" || \
     ${CPUTYPE} == "goldmont" || ${CPUTYPE} == "westmere" || \
@@ -330,7 +335,7 @@ MACHINE_CPU += riscv
 .if ${MACHINE_CPUARCH} == "aarch64"
 . if ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-march=morello
-CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs=caller-only
+CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs
 LDFLAGS+=	-march=morello
 . endif
 
@@ -349,13 +354,10 @@ LDFLAGS+=	-mabi=aapcs
 ########## arm
 .if ${MACHINE_CPUARCH} == "arm"
 MACHINE_CPU += arm
-. if ${MACHINE_ARCH:Marmv6*} != ""
-MACHINE_CPU += armv6
-. endif
 . if ${MACHINE_ARCH:Marmv7*} != ""
 MACHINE_CPU += armv7
 . endif
-# Normally armv6 and armv7 are hard float ABI from FreeBSD 11 onwards. However
+# Normally armv7 is hard float ABI from FreeBSD 11 onwards. However
 # when CPUTYPE has 'soft' in it, we use the soft-float ABI to allow building of
 # soft-float ABI libraries. In this case, we have to add the -mfloat-abi=softfp
 # to force that.

@@ -26,7 +26,7 @@
  * Copyright 2014 HybridCluster. All rights reserved.
  * Copyright 2016 RackTop Systems.
  * Copyright (c) 2016 Actifio, Inc. All rights reserved.
- * Copyright (c) 2019, Klara Inc.
+ * Copyright (c) 2019, 2024, Klara, Inc.
  * Copyright (c) 2019, Allan Jude
  */
 
@@ -619,7 +619,7 @@ dump_spill(dmu_send_cookie_t *dscp, const blkptr_t *bp, uint64_t object,
 
 	/* See comment in dump_dnode() for full details */
 	if (zfs_send_unmodified_spill_blocks &&
-	    (bp->blk_birth <= dscp->dsc_fromtxg)) {
+	    (BP_GET_LOGICAL_BIRTH(bp) <= dscp->dsc_fromtxg)) {
 		drrs->drr_flags |= DRR_SPILL_UNMODIFIED;
 	}
 
@@ -804,7 +804,7 @@ dump_dnode(dmu_send_cookie_t *dscp, const blkptr_t *bp, uint64_t object,
 	 */
 	if (zfs_send_unmodified_spill_blocks &&
 	    (dnp->dn_flags & DNODE_FLAG_SPILL_BLKPTR) &&
-	    (DN_SPILL_BLKPTR(dnp)->blk_birth <= dscp->dsc_fromtxg)) {
+	    (BP_GET_LOGICAL_BIRTH(DN_SPILL_BLKPTR(dnp)) <= dscp->dsc_fromtxg)) {
 		struct send_range record;
 		blkptr_t *bp = DN_SPILL_BLKPTR(dnp);
 
@@ -1123,9 +1123,7 @@ send_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 	 */
 	if (sta->os->os_encrypted &&
 	    !BP_IS_HOLE(bp) && !BP_USES_CRYPT(bp)) {
-		spa_log_error(spa, zb, &bp->blk_birth);
-		zfs_panic_recover("unencrypted block in encrypted "
-		    "object set %llu", dmu_objset_id(sta->os));
+		spa_log_error(spa, zb, BP_GET_LOGICAL_BIRTH(bp));
 		return (SET_ERROR(EIO));
 	}
 
@@ -2013,6 +2011,21 @@ setup_featureflags(struct dmu_send_params *dspp, objset_t *os,
 	if (dsl_dataset_feature_is_active(to_ds, SPA_FEATURE_LARGE_DNODE)) {
 		*featureflags |= DMU_BACKUP_FEATURE_LARGE_DNODE;
 	}
+
+	if (dsl_dataset_feature_is_active(to_ds, SPA_FEATURE_LONGNAME)) {
+		*featureflags |= DMU_BACKUP_FEATURE_LONGNAME;
+	}
+
+	if (dsl_dataset_feature_is_active(to_ds, SPA_FEATURE_LARGE_MICROZAP)) {
+		/*
+		 * We must never split a large microzap block, so we can only
+		 * send large microzaps if LARGE_BLOCKS is already enabled.
+		 */
+		if (!(*featureflags & DMU_BACKUP_FEATURE_LARGE_BLOCKS))
+			return (SET_ERROR(ZFS_ERR_STREAM_LARGE_MICROZAP));
+		*featureflags |= DMU_BACKUP_FEATURE_LARGE_MICROZAP;
+	}
+
 	return (0);
 }
 
@@ -2554,7 +2567,7 @@ dmu_send_impl(struct dmu_send_params *dspp)
 	while (err == 0 && !range->eos_marker) {
 		err = do_dump(&dsc, range);
 		range = get_next_range(&srt_arg->q, range);
-		if (issig(JUSTLOOKING) && issig(FORREAL))
+		if (issig())
 			err = SET_ERROR(EINTR);
 	}
 

@@ -7,14 +7,6 @@ UPDATE_DEPENDFILE= no
 .endif
 .endif
 
-NOSSPPICO?= .nossppico
-PIEO?= .pieo
-OBJ_EXTENSIONS+= ${NOSSPPICO} ${PIEO}
-
-CFLAGS+= ${CFLAGS_LAST}
-CXXFLAGS+= ${CXXFLAGS_LAST}
-LDFLAGS+= ${LDFLAGS_LAST}
-
 CLEANFILES+= .depend
 
 # handy for debugging

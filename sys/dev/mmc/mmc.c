@@ -53,7 +53,6 @@
  * information, know-how or other confidential information to any third party.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -1916,7 +1915,7 @@ child_common:
 			mmc_log_card(sc->dev, ivar, newcard);
 		if (newcard) {
 			/* Add device. */
-			child = device_add_child(sc->dev, NULL, -1);
+			child = device_add_child(sc->dev, NULL, DEVICE_UNIT_ANY);
 			if (child != NULL) {
 				device_set_ivars(child, ivar);
 				sc->child_list = realloc(sc->child_list,

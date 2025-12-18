@@ -1,5 +1,4 @@
 
-/* @(#)e_log.c 1.3 95/01/18 */
 /*
  * ====================================================
  * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -11,7 +10,6 @@
  * ====================================================
  */
 
-#include <sys/cdefs.h>
 /*
  * k_log1p(f):
  * Return log(1+f) - f for 1+f in ~[sqrt(2)/2, sqrt(2)].

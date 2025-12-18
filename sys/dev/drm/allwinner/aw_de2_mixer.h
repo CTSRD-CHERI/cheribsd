@@ -28,8 +28,8 @@
 #ifndef _AW_DE2_MIXER_H_
 #define	_AW_DE2_MIXER_H_
 
-#include <dev/extres/clk/clk.h>
-#include <dev/extres/hwreset/hwreset.h>
+#include <dev/clk/clk.h>
+#include <dev/hwreset/hwreset.h>
 
 /* Global Control register */
 #define	GBL_CTL			0x00

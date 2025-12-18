@@ -29,7 +29,6 @@
  * acl_equiv_mode_np: Check if an ACL can be represented as a mode_t.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -50,7 +49,7 @@ acl_equiv_mode_np(acl_t acl, mode_t *mode_p)
 
 	/* Linux returns 0 for ACL returned by acl_init() */
 	if (_acl_brand(acl) == ACL_BRAND_UNKNOWN && acl->ats_acl.acl_cnt == 0)
-		return (0);
+		goto done;
 
 	// TODO: Do we want to handle ACL_BRAND_NFS4 in this function? */
 	if (_acl_brand(acl) != ACL_BRAND_POSIX)
@@ -92,6 +91,7 @@ acl_equiv_mode_np(acl_t acl, mode_t *mode_p)
 		}
 	}
 
+done:
 	if (mode_p != NULL)
 		*mode_p = ret_mode;
 

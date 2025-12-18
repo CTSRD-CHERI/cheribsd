@@ -24,7 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/acl.h>
 #include <sys/queue.h>
@@ -460,7 +459,6 @@ main(int argc, char *argv[])
 			break;
 		default:
 			usage();
-			break;
 		}
 	argc -= optind;
 	argv += optind;

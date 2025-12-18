@@ -81,7 +81,7 @@ _rtld_bind_start:
 	sub	r1, r1, #4		/* r1 = 4 * n */
 	add	r1, r1, r1		/* r1 = 8 * n */
 
-	ldr	r0, [lr, #-4]		/* get obj ptr from GOT[1] */
+	ldr	r0, [lr, #-4]		/* get plt ptr from GOT[1] */
 	mov	r4, ip			/* save GOT location */
 
 	mov	r5, sp			/* Save the stack pointer */

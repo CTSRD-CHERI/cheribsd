@@ -38,7 +38,7 @@
 void pmcpl_gmon_shutdown(FILE *mf);
 void pmcpl_gmon_process(
     struct pmcstat_process *pp, struct pmcstat_pmcrecord *pmcr,
-    uint32_t nsamples, uintfptr_t *cc, int usermode, uint32_t cpu);
+    uint32_t nsamples, ptraddr_t *cc, int usermode, uint32_t cpu);
 void pmcpl_gmon_initimage(struct pmcstat_image *pi);
 void pmcpl_gmon_shutdownimage(struct pmcstat_image *pi);
 void pmcpl_gmon_newpmc(pmcstat_interned_string ps,

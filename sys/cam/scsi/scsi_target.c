@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -531,10 +530,11 @@ targwrite(struct cdev *dev, struct uio *uio, int ioflag)
 	write_len = error = 0;
 	CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
 		  ("write - uio_resid %zd\n", uio->uio_resid));
+	uiomove_enable_cap(uio);
 	while (uio->uio_resid >= sizeof(user_ccb) && error == 0) {
 		union ccb *ccb;
 
-		error = uiomove_cap((caddr_t)&user_ccb, sizeof(user_ccb), uio);
+		error = uiomove((caddr_t)&user_ccb, sizeof(user_ccb), uio);
 		if (error != 0) {
 			CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
 				  ("write - uiomove failed (%d)\n", error));
@@ -635,8 +635,8 @@ targstart(struct cam_periph *periph, union ccb *start_ccb)
 			xpt_print(periph->path,
 			    "targsendccb failed, err %d\n", error);
 			xpt_release_ccb(start_ccb);
-			suword(&descr->user_ccb->ccb_h.status,
-			       CAM_REQ_CMP_ERR);
+			(void)suword(&descr->user_ccb->ccb_h.status,
+			    CAM_REQ_CMP_ERR);
 			TAILQ_INSERT_TAIL(&softc->abort_queue, descr, tqe);
 			notify_user(softc);
 		}
@@ -812,6 +812,7 @@ targread(struct cdev *dev, struct uio *uio, int ioflag)
 	user_queue = &softc->user_ccb_queue;
 	abort_queue = &softc->abort_queue;
 	CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH, ("targread\n"));
+	uiomove_enable_cap(uio);
 
 	/* If no data is available, wait or return immediately */
 	cam_periph_lock(softc->periph);
@@ -851,7 +852,7 @@ targread(struct cdev *dev, struct uio *uio, int ioflag)
 		if (error != 0)
 			goto read_fail;
 		cam_periph_unlock(softc->periph);
-		error = uiomove_cap((caddr_t)&user_ccb, sizeof(user_ccb), uio);
+		error = uiomove((caddr_t)&user_ccb, sizeof(user_ccb), uio);
 		cam_periph_lock(softc->periph);
 		if (error != 0)
 			goto read_fail;
@@ -869,9 +870,12 @@ targread(struct cdev *dev, struct uio *uio, int ioflag)
 		CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
 			  ("targread aborted descr %p (%p)\n",
 			  user_descr, (__cheri_fromcap void *)user_ccb));
-		suword(&user_ccb->ccb_h.status, CAM_REQ_ABORTED);
+		if (suword(&user_ccb->ccb_h.status, CAM_REQ_ABORTED) != 0) {
+			error = EFAULT;
+			goto read_fail;
+		}
 		cam_periph_unlock(softc->periph);
-		error = uiomove_cap((caddr_t)&user_ccb, sizeof(user_ccb), uio);
+		error = uiomove((caddr_t)&user_ccb, sizeof(user_ccb), uio);
 		cam_periph_lock(softc->periph);
 		if (error != 0)
 			goto read_fail;
@@ -907,18 +911,29 @@ targreturnccb(struct targ_softc *softc, union ccb *ccb)
 	u_ccbh = &descr->user_ccb->ccb_h;
 
 	/* Copy out the central portion of the ccb_hdr */
-	copyout(&ccb->ccb_h.retry_count, &u_ccbh->retry_count,
-		offsetof(struct ccb_hdr, periph_priv) -
-		offsetof(struct ccb_hdr, retry_count));
+	error = copyout(&ccb->ccb_h.retry_count, &u_ccbh->retry_count,
+	    offsetof(struct ccb_hdr, periph_priv) -
+	    offsetof(struct ccb_hdr, retry_count));
+	if (error != 0) {
+		xpt_print(softc->path,
+		    "targreturnccb - CCB header copyout failed (%d)\n", error);
+	}
 
 	/* Copy out the rest of the ccb (after the ccb_hdr) */
 	ccb_len = targccblen(ccb->ccb_h.func_code) - sizeof(struct ccb_hdr);
-	if (descr->mapinfo.num_bufs_used != 0)
-		cam_periph_unmapmem(ccb, &descr->mapinfo);
-	error = copyout(&ccb->ccb_h + 1, u_ccbh + 1, ccb_len);
-	if (error != 0) {
-		xpt_print(softc->path,
-		    "targreturnccb - CCB copyout failed (%d)\n", error);
+	if (descr->mapinfo.num_bufs_used != 0) {
+		int error1;
+
+		error1 = cam_periph_unmapmem(ccb, &descr->mapinfo);
+		if (error == 0)
+			error = error1;
+	}
+	if (error == 0) {
+		error = copyout(&ccb->ccb_h + 1, u_ccbh + 1, ccb_len);
+		if (error != 0) {
+			xpt_print(softc->path,
+			    "targreturnccb - CCB copyout failed (%d)\n", error);
+		}
 	}
 	/* Free CCB or send back to devq. */
 	targfreeccb(softc, ccb);

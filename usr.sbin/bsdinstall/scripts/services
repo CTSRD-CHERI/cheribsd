@@ -47,7 +47,7 @@ fi
 echo -n > $BSDINSTALL_TMPETC/rc.conf.services
 echo -n > $BSDINSTALL_TMPBOOT/loader.conf.services
 
-exec 3>&1
+exec 5>&1
 DAEMONS=$( bsddialog --backtitle "$OSNAME Installer" \
     --title "System Configuration" --no-cancel --separate-output \
     --checklist "Choose the services you would like to be started at boot:" \
@@ -63,9 +63,9 @@ DAEMONS=$( bsddialog --backtitle "$OSNAME Installer" \
 		${powerd_enable:-off} \
 	dumpdev "Enable kernel crash dumps to /var/crash" ${dumpdev:-on} \
 	debugger_on_panic "Run debugger on kernel panic" ${debugger_on_panic:-off} \
-2>&1 1>&3 )
+2>&1 1>&5 )
 retval=$?
-exec 3>&-
+exec 5>&-
 
 if [ $retval -ne $BSDDIALOG_OK ]; then
 	exit 1

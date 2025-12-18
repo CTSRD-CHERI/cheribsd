@@ -63,13 +63,13 @@
 #include <machine/vm.h>
 #include <machine/vmparam.h>
 #include <machine/vmm.h>
-#include <machine/vmm_dev.h>
 #include <machine/vmm_instruction_emul.h>
 
 #include <dev/pci/pcireg.h>
+#include <dev/vmm/vmm_dev.h>
+#include <dev/vmm/vmm_ktr.h>
+#include <dev/vmm/vmm_stat.h>
 
-#include "vmm_ktr.h"
-#include "vmm_stat.h"
 #include "arm64.h"
 #include "mmu.h"
 
@@ -144,6 +144,7 @@ struct vm {
 	volatile cpuset_t active_cpus;		/* (i) active vcpus */
 	volatile cpuset_t debug_cpus;		/* (i) vcpus stopped for debug */
 	int		suspend;		/* (i) stop VM execution */
+	bool		dying;			/* (o) is dying */
 	volatile cpuset_t suspended_cpus; 	/* (i) suspended vcpus */
 	volatile cpuset_t halted_cpus;		/* (x) cpus in a hard halt */
 	struct mem_map	mem_maps[VM_MAX_MEMMAPS]; /* (i) guest address space */
@@ -240,6 +241,23 @@ SYSCTL_UINT(_hw_vmm, OID_AUTO, maxcpu, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
 static void vm_free_memmap(struct vm *vm, int ident);
 static bool sysmem_mapping(struct vm *vm, struct mem_map *mm);
 static void vcpu_notify_event_locked(struct vcpu *vcpu);
+
+/* global statistics */
+VMM_STAT(VMEXIT_COUNT, "total number of vm exits");
+VMM_STAT(VMEXIT_UNKNOWN, "number of vmexits for the unknown exception");
+VMM_STAT(VMEXIT_WFI, "number of times wfi was intercepted");
+VMM_STAT(VMEXIT_WFE, "number of times wfe was intercepted");
+VMM_STAT(VMEXIT_HVC, "number of times hvc was intercepted");
+VMM_STAT(VMEXIT_MSR, "number of times msr/mrs was intercepted");
+VMM_STAT(VMEXIT_DATA_ABORT, "number of vmexits for a data abort");
+VMM_STAT(VMEXIT_INSN_ABORT, "number of vmexits for an instruction abort");
+VMM_STAT(VMEXIT_UNHANDLED_SYNC, "number of vmexits for an unhandled synchronous exception");
+VMM_STAT(VMEXIT_IRQ, "number of vmexits for an irq");
+VMM_STAT(VMEXIT_FIQ, "number of vmexits for an interrupt");
+VMM_STAT(VMEXIT_BRK, "number of vmexits for a breakpoint exception");
+VMM_STAT(VMEXIT_SS, "number of vmexits for a single-step exception");
+VMM_STAT(VMEXIT_UNHANDLED_EL2, "number of vmexits for an unhandled EL2 exception");
+VMM_STAT(VMEXIT_UNHANDLED, "number of vmexits for an unhandled exception");
 
 /*
  * Upper limit on vm_maxcpu. We could increase this to 28 bits, but this
@@ -408,6 +426,14 @@ vm_init(struct vm *vm, bool create)
 	}
 }
 
+void
+vm_disable_vcpu_creation(struct vm *vm)
+{
+	sx_xlock(&vm->vcpus_init_lock);
+	vm->dying = true;
+	sx_xunlock(&vm->vcpus_init_lock);
+}
+
 struct vcpu *
 vm_alloc_vcpu(struct vm *vm, int vcpuid)
 {
@@ -426,7 +452,7 @@ vm_alloc_vcpu(struct vm *vm, int vcpuid)
 
 	sx_xlock(&vm->vcpus_init_lock);
 	vcpu = vm->vcpu[vcpuid];
-	if (vcpu == NULL/* && !vm->dying*/) {
+	if (vcpu == NULL && !vm->dying) {
 		vcpu = vcpu_alloc(vm, vcpuid);
 		vcpu_init(vcpu);
 
@@ -842,8 +868,15 @@ vm_mmap_getnext(struct vm *vm, vm_paddr_t *gpa, int *segid,
 			*segoff = mmnext->segoff;
 		if (len)
 			*len = mmnext->len;
-		if (prot)
+		if (prot) {
 			*prot = mmnext->prot;
+
+			/*
+			 * Hide the bits implicitly added by vm_mmap_memseg().
+			 * Userspace might not expect to see them returned here.
+			 */
+			*prot &= ~(VM_PROT_CAP | VM_PROT_NO_IMPLY_CAP);
+		}
 		if (flags)
 			*flags = mmnext->flags;
 		return (0);
@@ -1537,8 +1570,9 @@ _vm_gpa_hold(struct vm *vm, vm_paddr_t gpa, size_t len, int reqprot,
 			void * __capability gpap;
 
 #if __has_feature(capabilities)
-			gpap = cheri_setaddress(vmm_gpa_root_cap,
-			    trunc_page(gpa));
+			gpap = cheri_setboundsexact(
+			    cheri_setaddress(vmm_gpa_root_cap, trunc_page(gpa)),
+			    PAGE_SIZE);
 #else
 			gpap = (void *)trunc_page(gpa);
 #endif
@@ -1550,7 +1584,7 @@ _vm_gpa_hold(struct vm *vm, vm_paddr_t gpa, size_t len, int reqprot,
 
 	if (count == 1) {
 		*cookie = m;
-		return (cheri_kern_setbounds(
+		return (cheri_kern_setboundsexact(
 		    (void *)(PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)) + pageoff), len));
 	} else {
 		*cookie = NULL;
@@ -1599,6 +1633,23 @@ vm_get_register(struct vcpu *vcpu, int reg, uintcap_t *retval)
 
 	return (vmmops_getreg(vcpu->cookie, reg, retval));
 }
+
+#if __has_feature(capabilities)
+int
+vm_get_register_cheri_capability_tag(struct vcpu *vcpu, int reg, uint8_t *tagp)
+{
+	uintcap_t val;
+	int error;
+
+	if (reg >= VM_REG_LAST)
+		return (EINVAL);
+
+	error = vmmops_getreg(vcpu->cookie, reg, &val);
+	if (error == 0)
+		*tagp = cheri_gettag(val);
+	return (error);
+}
+#endif
 
 int
 vm_set_register(struct vcpu *vcpu, int reg, uintcap_t val)
@@ -1655,6 +1706,26 @@ vm_deassert_irq(struct vm *vm, uint32_t irq)
 {
 	return (vgic_inject_irq(vm->cookie, -1, irq, false));
 }
+
+#if __has_feature(capabilities)
+int
+vm_get_cheri_capability_tag(struct vm *vm, struct vm_cheri_capability_tag *vt)
+{
+	uintcap_t *cap;
+	void *cookie;
+
+	if (!__is_aligned(vt->gpa, sizeof(*cap)))
+		return (EINVAL);
+
+	cap = vm_gpa_hold_global(vm, vt->gpa, sizeof(*cap), VM_PROT_READ,
+	    &cookie);
+	if (cap == NULL)
+		return (EFAULT);
+	vt->tag = cheri_gettag(*cap);
+	vm_gpa_release(cookie);
+	return (0);
+}
+#endif
 
 int
 vm_raise_msi(struct vm *vm, uint64_t msg, uint64_t addr, int bus, int slot,
@@ -1749,6 +1820,54 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 	return (0);
 }
 
+static int
+vm_handle_suspend(struct vcpu *vcpu, bool *retu)
+{
+	struct vm *vm = vcpu->vm;
+	int error, i;
+	struct thread *td;
+
+	error = 0;
+	td = curthread;
+
+	CPU_SET_ATOMIC(vcpu->vcpuid, &vm->suspended_cpus);
+
+	/*
+	 * Wait until all 'active_cpus' have suspended themselves.
+	 *
+	 * Since a VM may be suspended at any time including when one or
+	 * more vcpus are doing a rendezvous we need to call the rendezvous
+	 * handler while we are waiting to prevent a deadlock.
+	 */
+	vcpu_lock(vcpu);
+	while (error == 0) {
+		if (CPU_CMP(&vm->suspended_cpus, &vm->active_cpus) == 0)
+			break;
+
+		vcpu_require_state_locked(vcpu, VCPU_SLEEPING);
+		msleep_spin(vcpu, &vcpu->mtx, "vmsusp", hz);
+		vcpu_require_state_locked(vcpu, VCPU_FROZEN);
+		if (td_ast_pending(td, TDA_SUSPEND)) {
+			vcpu_unlock(vcpu);
+			error = thread_check_susp(td, false);
+			vcpu_lock(vcpu);
+		}
+	}
+	vcpu_unlock(vcpu);
+
+	/*
+	 * Wakeup the other sleeping vcpus and return to userspace.
+	 */
+	for (i = 0; i < vm->maxcpus; i++) {
+		if (CPU_ISSET(i, &vm->suspended_cpus)) {
+			vcpu_notify_event(vm_vcpu(vm, i));
+		}
+	}
+
+	*retu = true;
+	return (error);
+}
+
 int
 vm_run(struct vcpu *vcpu)
 {
@@ -1819,6 +1938,11 @@ restart:
 		case VM_EXITCODE_PAGING:
 			vcpu->nextpc = vme->pc;
 			error = vm_handle_paging(vcpu, &retu);
+			break;
+
+		case VM_EXITCODE_SUSPENDED:
+			vcpu->nextpc = vme->pc;
+			error = vm_handle_suspend(vcpu, &retu);
 			break;
 
 		default:

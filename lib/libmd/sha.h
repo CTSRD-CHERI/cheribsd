@@ -58,7 +58,6 @@
 #ifndef _SHA_H_
 #define _SHA_H_		1
 
-#include <sys/cdefs.h>
 #include <sys/types.h>		/* XXX switch to machine/ansi.h and __ types */
 
 #define	SHA_CBLOCK	64
@@ -108,12 +107,6 @@ __BEGIN_DECLS
 #define SHA_Data	_libmd_SHA_Data
 #endif
 
-#ifndef SHA_Transform
-#define SHA_Transform	_libmd_SHA_Transform
-#endif
-#ifndef SHA_version
-#define SHA_version	_libmd_SHA_version
-#endif
 #ifndef sha_block
 #define sha_block	_libmd_sha_block
 #endif
@@ -145,13 +138,10 @@ __BEGIN_DECLS
 #ifndef SHA1_Data
 #define SHA1_Data	_libmd_SHA1_Data
 #endif
-
 #ifndef SHA1_Transform
 #define SHA1_Transform	_libmd_SHA1_Transform
 #endif
-#ifndef SHA1_version
-#define SHA1_version	_libmd_SHA1_version
-#endif
+
 #ifndef sha1_block
 #define sha1_block	_libmd_sha1_block
 #endif

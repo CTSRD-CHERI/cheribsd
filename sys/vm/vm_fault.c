@@ -40,8 +40,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	from: @(#)vm_fault.c	8.4 (Berkeley) 1/12/94
- *
  *
  * Copyright (c) 1987, 1990 Carnegie-Mellon University.
  * All rights reserved.
@@ -384,7 +382,8 @@ vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 	struct vm_cheri_revoke_cookie crc;
 
 	res = vm_cheri_revoke_cookie_init(fs->map, &crc);
-	KASSERT(res == KERN_SUCCESS, ("cheri revoke cookie init WTF"));
+	KASSERT(res == KERN_SUCCESS,
+	    ("vm_cheri_revoke_cookie_init failure in vm_fault_cheri_revoke"));
 	(void) res; /* Placate !INVARIANT builds */
 
 	vm_fault_unlock_map(fs);
@@ -417,8 +416,6 @@ vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 	} else {
 		hascaps = vm_cheri_revoke_page_ro(&crc, m);
 	}
-
-	vm_cheri_revoke_cookie_rele(&crc);
 
 	/*
 	 * TODO: Well, this is kind of awkward.  We should, on the load side, be
@@ -501,12 +498,10 @@ vm_fault_soft_fast(struct faultstate *fs)
 	psind = 0;
 #if VM_NRESERVLEVEL > 0
 	if ((m->flags & PG_FICTITIOUS) == 0 &&
-	    (m_super = vm_reserv_to_superpage(m)) != NULL &&
-	    rounddown2(vaddr, pagesizes[m_super->psind]) >= fs->entry->start &&
-	    roundup2(vaddr + 1, pagesizes[m_super->psind]) <= fs->entry->end &&
-	    (vaddr & (pagesizes[m_super->psind] - 1)) == (VM_PAGE_TO_PHYS(m) &
-	    (pagesizes[m_super->psind] - 1)) && !fs->wired &&
-	    pmap_ps_enabled(fs->map->pmap)) {
+	    (m_super = vm_reserv_to_superpage(m)) != NULL) {
+		psind = m_super->psind;
+		KASSERT(psind > 0,
+		    ("psind %d of m_super %p < 1", psind, m_super));
 		flags = PS_ALL_VALID;
 		if ((fs->prot & VM_PROT_WRITE) != 0) {
 			/*
@@ -527,9 +522,23 @@ vm_fault_soft_fast(struct faultstate *fs)
 			 */
 			flags |= PS_ALL_CAPSTORE;
 		}
-		if (vm_page_ps_test(m_super, flags, m)) {
+		while (rounddown2(vaddr, pagesizes[psind]) < fs->entry->start ||
+		    roundup2(vaddr + 1, pagesizes[psind]) > fs->entry->end ||
+		    (vaddr & (pagesizes[psind] - 1)) !=
+		    (VM_PAGE_TO_PHYS(m) & (pagesizes[psind] - 1)) ||
+		    !vm_page_ps_test(m_super, psind, flags, m) ||
+		    !pmap_ps_enabled(fs->map->pmap)) {
+			psind--;
+			if (psind == 0)
+				break;
+			m_super += rounddown2(m - m_super,
+			    atop(pagesizes[psind]));
+			KASSERT(m_super->psind >= psind,
+			    ("psind %d of m_super %p < %d", m_super->psind,
+			    m_super, psind));
+		}
+		if (psind > 0) {
 			m_map = m_super;
-			psind = m_super->psind;
 			vaddr = rounddown2(vaddr, pagesizes[psind]);
 			/* Preset the modified bit for dirty superpages. */
 			if ((flags & PS_ALL_DIRTY) != 0)
@@ -630,7 +639,9 @@ vm_fault_populate_cleanup(vm_object_t object, vm_pindex_t first,
 	VM_OBJECT_ASSERT_WLOCKED(object);
 	MPASS(first <= last);
 	for (pidx = first, m = vm_page_lookup(object, pidx);
-	    pidx <= last; pidx++, m = vm_page_next(m)) {
+	    pidx <= last; pidx++, m = TAILQ_NEXT(m, listq)) {
+		KASSERT(m != NULL && m->pindex == pidx,
+		    ("%s: pindex mismatch", __func__));
 		vm_fault_populate_check_page(m);
 		vm_page_deactivate(m);
 		vm_page_xunbusy(m);
@@ -778,14 +789,15 @@ skip_pmap_bdry:
 	prot = VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot);
 	for (pidx = pager_first, m = vm_page_lookup(fs->first_object, pidx);
 	    pidx <= pager_last;
-	    pidx += npages, m = vm_page_next(&m[npages - 1])) {
+	    pidx += npages, m = TAILQ_NEXT(&m[npages - 1], listq)) {
 		vaddr = fs->entry->start + IDX_TO_OFF(pidx) - fs->entry->offset;
-
+		KASSERT(m != NULL && m->pindex == pidx,
+		    ("%s: pindex mismatch", __func__));
 		psind = m->psind;
-		if (psind > 0 && ((vaddr & (pagesizes[psind] - 1)) != 0 ||
+		while (psind > 0 && ((vaddr & (pagesizes[psind] - 1)) != 0 ||
 		    pidx + OFF_TO_IDX(pagesizes[psind]) - 1 > pager_last ||
-		    !pmap_ps_enabled(fs->map->pmap) || fs->wired))
-			psind = 0;
+		    !pmap_ps_enabled(fs->map->pmap)))
+			psind--;
 
 		npages = atop(pagesizes[psind]);
 		for (i = 0; i < npages; i++) {
@@ -1302,25 +1314,38 @@ vm_fault_cow(struct faultstate *fs)
 		 * The destination page will always belong to a
 		 * tag-bearing VM object.
 		 */
-		KASSERT(fs->first_object->flags & (OBJ_HASCAP | OBJ_NOCAP),
-		    ("%s: destination object %p doesn't have OBJ_HASCAP",
+		KASSERT((fs->first_object->flags & (OBJ_HASCAP | OBJ_NOCAP)) &&
+		    (fs->first_object->flags & (OBJ_HASCAP | OBJ_NOCAP)) !=
+		    (OBJ_HASCAP | OBJ_NOCAP),
+		    ("%s: destination object %p cap flags are inconsistent",
 		    __func__, fs->first_object));
 		if (fs->object->flags & OBJ_HASCAP) {
-			vm_page_aflag_set(fs->first_m, fs->m->a.flags &
-			    (PGA_CAPSTORE | PGA_CAPDIRTY));
+			uint16_t flags;
+
+			/*
+			 * If CAPSTORE is set, we have to assume that the source
+			 * is CAPDIRTY as well, as we'd have to examine its PTEs
+			 * to get a definitive answer.
+			 */
+			flags = vm_page_astate_load(fs->m).flags &
+			    (PGA_CAPSTORE | PGA_CAPDIRTY);
+			if ((flags & PGA_CAPSTORE) != 0)
+				flags |= PGA_CAPDIRTY;
+			if (flags != 0)
+				vm_page_aflag_set(fs->first_m, flags);
 			pmap_copy_page_tags(fs->m, fs->first_m);
 		} else
 #endif
 			pmap_copy_page(fs->m, fs->first_m);
 
-		vm_page_valid(fs->first_m);
 		if (fs->wired && (fs->fault_flags & VM_FAULT_WIRE) == 0) {
 			vm_page_wire(fs->first_m);
 			vm_page_unwire(fs->m, PQ_INACTIVE);
 		}
 		/*
-		 * Save the cow page to be released after
-		 * pmap_enter is complete.
+		 * Save the COW page to be released after pmap_enter is
+		 * complete.  The new copy will be marked valid when we're ready
+		 * to map it.
 		 */
 		fs->m_cow = fs->m;
 		fs->m = NULL;
@@ -2046,6 +2071,19 @@ found:
 		fs.entry->next_read = vaddr + ptoa(ahead) + PAGE_SIZE;
 
 	/*
+	 * If the page to be mapped was copied from a backing object, we defer
+	 * marking it valid until here, where the fault handler is guaranteed to
+	 * succeed.  Otherwise we can end up with a shadowed, mapped page in the
+	 * backing object, which violates an invariant of vm_object_collapse()
+	 * that shadowed pages are not mapped.
+	 */
+	if (fs.m_cow != NULL) {
+		KASSERT(vm_page_none_valid(fs.m),
+		    ("vm_fault: page %p is already valid", fs.m_cow));
+		vm_page_valid(fs.m);
+	}
+
+	/*
 	 * Page must be completely valid or it is not fit to
 	 * map into user space.  vm_pager_get_pages() ensures this.
 	 */
@@ -2208,25 +2246,12 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 	vm_offset_t addr, starta;
 	vm_pindex_t pindex;
 	vm_page_t m;
+	vm_prot_t prot;
 	int i;
 
 	pmap = fs->map->pmap;
 	if (pmap != vmspace_pmap(curthread->td_proc->p_vmspace))
 		return;
-
-#ifdef CHERI_CAPREVOKE
-	/*
-	 * If we're trying to insert pages during a load-side revocation scan,
-	 * we should be having the revoker visit each before exposing them to
-	 * userland.  However, this raises a number of challenges, and this
-	 * method is just an optimization, so we nop it out right now.
-	 *
-	 * XXX CAPREVOKE This could be much better in just about every way
-	 */
-	if (cheri_revoke_st_is_revoking(fs->map->vm_cheri_revoke_st)) {
-		return;
-	}
-#endif
 
 	entry = fs->entry;
 
@@ -2237,6 +2262,14 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 		if (starta < entry->start)
 			starta = entry->start;
 	}
+	prot = entry->protection;
+
+	/*
+	 * If pmap_enter() has enabled write access on a nearby mapping, then
+	 * don't attempt promotion, because it will fail.
+	 */
+	if ((fs->prot & VM_PROT_WRITE) != 0)
+		prot |= VM_PROT_NO_PROMOTE;
 
 	/*
 	 * Generate the sequence of virtual addresses that are candidates for
@@ -2304,8 +2337,7 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 			 * VM_PROT_WRITE_CAP is ignored.
 			 */
 			pmap_enter_quick(pmap, addr, m,
-			    VM_OBJECT_MASK_CAP_PROT(lobject,
-			    entry->protection));
+			    VM_OBJECT_MASK_CAP_PROT(lobject, prot));
 		}
 		if (!obj_locked || lobject != entry->object.vm_object)
 			VM_OBJECT_RUNLOCK(lobject);
@@ -2561,9 +2593,20 @@ again:
 			 * See longer discussion in vm_fault_cow.
 			 */
 			if (object->flags & OBJ_HASCAP) {
-				/* Copy across CAPSTORE | CAPDIRTY state, too */
-				vm_page_aflag_set(dst_m, src_m->a.flags &
-				    (PGA_CAPSTORE | PGA_CAPDIRTY));
+				uint16_t flags;
+
+				/*
+				 * If CAPSTORE is set, we have to assume that
+				 * the source is CAPDIRTY as well, as we'd have
+				 * to examine its PTEs to get a definitive
+				 * answer.
+				 */
+				flags = vm_page_astate_load(src_m).flags &
+				    (PGA_CAPSTORE | PGA_CAPDIRTY);
+				if ((flags & PGA_CAPSTORE) != 0)
+					flags |= PGA_CAPDIRTY;
+				if (flags != 0)
+					vm_page_aflag_set(dst_m, flags);
 				pmap_copy_page_tags(src_m, dst_m);
 			} else
 #endif

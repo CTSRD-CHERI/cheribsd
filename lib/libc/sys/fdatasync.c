@@ -29,7 +29,6 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/fcntl.h>
 #include <unistd.h>
@@ -38,6 +37,5 @@
 int
 fdatasync(int fd)
 {
-
-	return (((int (*)(int))__libc_interposing[INTERPOS_fdatasync])(fd));
+	return (INTERPOS_SYS(fdatasync, fd));
 }

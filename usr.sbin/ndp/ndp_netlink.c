@@ -28,7 +28,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <paths.h>
-#include <err.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -42,7 +41,6 @@
 #include <netlink/netlink_snl_route_compat.h>
 #include <netlink/netlink_snl_route_parsers.h>
 
-#include <libxo/xo.h>
 #include "ndp.h"
 
 #define RTF_ANNOUNCE	RTF_PROTO2
@@ -56,12 +54,12 @@ nl_init_socket(struct snl_state *ss)
 	if (modfind("netlink") == -1 && errno == ENOENT) {
 		/* Try to load */
 		if (kldload("netlink") == -1)
-			err(1, "netlink is not loaded and load attempt failed");
+			xo_err(1, "netlink is not loaded and load attempt failed");
 		if (snl_init(ss, NETLINK_ROUTE))
 			return;
 	}
 
-	err(1, "unable to open netlink socket");
+	xo_err(1, "unable to open netlink socket");
 }
 
 static bool
@@ -76,7 +74,7 @@ get_link_info(struct snl_state *ss, uint32_t ifindex,
 	struct ifinfomsg *ifmsg = snl_reserve_msg_object(&nw, struct ifinfomsg);
 	if (ifmsg != NULL)
 		ifmsg->ifi_index = ifindex;
-	if (!snl_finalize_msg(&nw) || !snl_send_message(ss, hdr))
+	if (! (hdr = snl_finalize_msg(&nw)) || !snl_send_message(ss, hdr))
 		return (false);
 
 	hdr = snl_read_reply(ss, hdr->nlmsg_seq);
@@ -152,7 +150,7 @@ guess_ifindex(struct snl_state *ss, uint32_t fibnum, const struct sockaddr_in6 *
 	snl_add_msg_attr_ip(&nw, RTA_DST, (struct sockaddr *)dst);
 	snl_add_msg_attr_u32(&nw, RTA_TABLE, fibnum);
 
-	if (!snl_finalize_msg(&nw) || !snl_send_message(ss, hdr))
+	if (! (hdr = snl_finalize_msg(&nw)) || !snl_send_message(ss, hdr))
 		return (0);
 
 	hdr = snl_read_reply(ss, hdr->nlmsg_seq);
@@ -180,11 +178,11 @@ guess_ifindex(struct snl_state *ss, uint32_t fibnum, const struct sockaddr_in6 *
 
 	int off = snl_add_msg_attr_nested(&nw, NHA_FREEBSD);
 	snl_add_msg_attr_u32(&nw, NHAF_KID, r.rta_knh_id);
-	snl_add_msg_attr_u8(&nw, NHAF_FAMILY, AF_INET);
+	snl_add_msg_attr_u8(&nw, NHAF_FAMILY, AF_INET6);
 	snl_add_msg_attr_u32(&nw, NHAF_TABLE, fibnum);
 	snl_end_attr_nested(&nw, off);
 
-	if (!snl_finalize_msg(&nw) || !snl_send_message(ss, hdr))
+	if (! (hdr = snl_finalize_msg(&nw)) || !snl_send_message(ss, hdr))
 		return (0);
 
 	hdr = snl_read_reply(ss, hdr->nlmsg_seq);
@@ -230,9 +228,12 @@ print_entry(struct snl_parsed_neigh *neigh, struct snl_parsed_link_simple *link)
 		.sdl_family = AF_LINK,
 		.sdl_type = link->ifi_type,
 		.sdl_len = sizeof(struct sockaddr_dl),
-		.sdl_alen = NLA_DATA_LEN(neigh->nda_lladdr),
 	};
-	memcpy(sdl.sdl_data, NLA_DATA(neigh->nda_lladdr), sdl.sdl_alen);
+
+	if (neigh->nda_lladdr) {
+		sdl.sdl_alen = NLA_DATA_LEN(neigh->nda_lladdr),
+		memcpy(sdl.sdl_data, NLA_DATA(neigh->nda_lladdr), sdl.sdl_alen);
+	}
 
 	addrwidth = strlen(host_buf);
 	if (addrwidth < W_ADDR)
@@ -324,7 +325,7 @@ print_entries_nl(uint32_t ifindex, struct sockaddr_in6 *addr, bool cflag)
 		ndmsg->ndm_ifindex = ifindex;
 	}
 
-	if (!snl_finalize_msg(&nw) || !snl_send_message(&ss_req, hdr)) {
+	if (! (hdr = snl_finalize_msg(&nw)) || !snl_send_message(&ss_req, hdr)) {
 		snl_free(&ss_req);
 		return (0);
 	}
@@ -338,7 +339,7 @@ print_entries_nl(uint32_t ifindex, struct sockaddr_in6 *addr, bool cflag)
 	if (!opts.tflag && !cflag) {
 		char xobuf[200];
 		snprintf(xobuf, sizeof(xobuf),
-		    "{T:/%%-%d.%ds} {T:/%%-%d.%ds} {T:/%%%d.%ds} {T:/%%-9.9s} {T:%%1s} {T:%%5s}\n",
+		    "{T:/%%-%d.%ds} {T:/%%-%d.%ds} {T:/%%%d.%ds} {T:/%%-9.9s} {T:/%%1s} {T:/%%5s}\n",
 		    W_ADDR, W_ADDR, W_LL, W_LL, W_IF, W_IF);
 		xo_emit(xobuf, "Neighbor", "Linklayer Address", "Netif", "Expire", "S", "Flags");
 	}
@@ -369,13 +370,14 @@ print_entries_nl(uint32_t ifindex, struct sockaddr_in6 *addr, bool cflag)
 				continue;
 		}
 
-		print_entry(&neigh, &link);
 		if (cflag) {
 			char dst_str[INET6_ADDRSTRLEN];
 
 			inet_ntop(AF_INET6, &dst->sin6_addr, dst_str, sizeof(dst_str));
-			delete_nl(neigh.nda_ifindex, dst_str);
-		}
+			delete_nl(neigh.nda_ifindex, dst_str, false); /* no warn */
+		} else
+			print_entry(&neigh, &link);
+
 		count++;
 		snl_clear_lb(&ss_req);
 	}
@@ -388,8 +390,9 @@ print_entries_nl(uint32_t ifindex, struct sockaddr_in6 *addr, bool cflag)
 }
 
 int
-delete_nl(uint32_t ifindex, char *host)
+delete_nl(uint32_t ifindex, char *host, bool warn)
 {
+#define xo_warnx(...) do { if (warn) { xo_warnx(__VA_ARGS__); } } while(0)
 	struct snl_state ss = {};
 	struct snl_writer nw;
 	struct sockaddr_in6 dst;
@@ -418,7 +421,7 @@ delete_nl(uint32_t ifindex, char *host)
 	}
 	snl_add_msg_attr_ip(&nw, NDA_DST, (struct sockaddr *)&dst);
 
-	if (!snl_finalize_msg(&nw) || !snl_send_message(&ss, hdr)) {
+	if (! (hdr = snl_finalize_msg(&nw)) || !snl_send_message(&ss, hdr)) {
 		snl_free(&ss);
 		return (1);
 	}
@@ -455,6 +458,7 @@ delete_nl(uint32_t ifindex, char *host)
 	snl_free(&ss);
 
 	return (e.error != 0);
+#undef xo_warnx /* see above */
 }
 
 int
@@ -490,7 +494,7 @@ set_nl(uint32_t ifindex, struct sockaddr_in6 *dst, struct sockaddr_dl *sdl, char
 	snl_add_msg_attr_ip(&nw, NDA_DST, (struct sockaddr *)dst);
 	snl_add_msg_attr(&nw, NDA_LLADDR, sdl->sdl_alen, LLADDR(sdl));
 
-	if (!snl_finalize_msg(&nw) || !snl_send_message(&ss, hdr)) {
+	if (! (hdr = snl_finalize_msg(&nw)) || !snl_send_message(&ss, hdr)) {
 		snl_free(&ss);
 		return (1);
 	}

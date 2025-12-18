@@ -24,7 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -98,10 +97,10 @@ static const STRUCT_USB_HOST_ID ure_devs[] = {
   USB_IFACE_CLASS(UICLASS_VENDOR), \
   USB_IFACE_SUBCLASS(UISUBCLASS_VENDOR) }
 	URE_DEV(LENOVO, RTL8153, URE_FLAG_8153),
-	URE_DEV(LENOVO, TBT3LAN, 0),
 	URE_DEV(LENOVO, TBT3LANGEN2, 0),
 	URE_DEV(LENOVO, ONELINK, 0),
 	URE_DEV(LENOVO, RTL8153_04, URE_FLAG_8153),
+	URE_DEV(LENOVO, ONELINKPLUS, URE_FLAG_8153),
 	URE_DEV(LENOVO, USBCLAN, 0),
 	URE_DEV(LENOVO, USBCLANGEN2, 0),
 	URE_DEV(LENOVO, USBCLANHYBRID, 0),
@@ -480,7 +479,7 @@ done:
 }
 
 /*
- * Probe for a RTL8152/RTL8153 chip.
+ * Probe for a RTL8152/RTL8153/RTL8156 chip.
  */
 static int
 ure_probe(device_t dev)

@@ -48,10 +48,6 @@
  * CHERI CHANGES END
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)vfprintf.c	8.1 (Berkeley) 6/4/93";
-#endif /* LIBC_SCCS and not lint */
-#include <sys/cdefs.h>
 /*
  * Actual printf innards.
  *
@@ -88,7 +84,8 @@ static char sccsid[] = "@(#)vfprintf.c	8.1 (Berkeley) 6/4/93";
 #include "printflocal.h"
 
 static int	__sprint(FILE *, struct __suio *, locale_t);
-static int	__sbprintf(FILE *, locale_t, const char *, va_list) __printflike(3, 0)
+static int	__sbprintf(FILE *, locale_t, int, const char *, va_list)
+	__printflike(4, 0)
 	__noinline;
 static char	*__wcsconv(wchar_t *, int);
 
@@ -189,7 +186,7 @@ __sprint(FILE *fp, struct __suio *uio, locale_t locale)
  * worries about ungetc buffers and so forth.
  */
 static int
-__sbprintf(FILE *fp, locale_t locale, const char *fmt, va_list ap)
+__sbprintf(FILE *fp, locale_t locale, int serrno, const char *fmt, va_list ap)
 {
 	int ret;
 	FILE fake = FAKE_FILE;
@@ -213,7 +210,7 @@ __sbprintf(FILE *fp, locale_t locale, const char *fmt, va_list ap)
 	fake._lbfsize = 0;	/* not actually used, but Just In Case */
 
 	/* do the work, then copy any error status */
-	ret = __vfprintf(&fake, locale, fmt, ap);
+	ret = __vfprintf(&fake, locale, serrno, fmt, ap);
 	if (ret >= 0 && __fflush(&fake))
 		ret = EOF;
 	if (fake._flags & __SERR)
@@ -285,8 +282,9 @@ __wcsconv(wchar_t *wcsarg, int prec)
  */
 int
 vfprintf_l(FILE * __restrict fp, locale_t locale, const char * __restrict fmt0,
-		va_list ap)
+    va_list ap)
 {
+	int serrno = errno;
 	int ret;
 	FIX_LOCALE(locale);
 
@@ -294,9 +292,9 @@ vfprintf_l(FILE * __restrict fp, locale_t locale, const char * __restrict fmt0,
 	/* optimise fprintf(stderr) (and other unbuffered Unix files) */
 	if ((fp->_flags & (__SNBF|__SWR|__SRW)) == (__SNBF|__SWR) &&
 	    fp->_file >= 0)
-		ret = __sbprintf(fp, locale, fmt0, ap);
+		ret = __sbprintf(fp, locale, serrno, fmt0, ap);
 	else
-		ret = __vfprintf(fp, locale, fmt0, ap);
+		ret = __vfprintf(fp, locale, serrno, fmt0, ap);
 	FUNLOCKFILE_CANCELSAFE();
 	return (ret);
 }
@@ -332,7 +330,7 @@ vfprintf(FILE * __restrict fp, const char * __restrict fmt0, va_list ap)
  * Non-MT-safe version
  */
 int
-__vfprintf(FILE *fp, locale_t locale, const char *fmt0, va_list ap)
+__vfprintf(FILE *fp, locale_t locale, int serrno, const char *fmt0, va_list ap)
 {
 	char *fmt;		/* format string */
 	int ch;			/* character from fmt */
@@ -342,7 +340,8 @@ __vfprintf(FILE *fp, locale_t locale, const char *fmt0, va_list ap)
 	int ret;		/* return value accumulator */
 	int width;		/* width from format (%8d), or 0 */
 	int prec;		/* precision from format; <0 for N/A */
-	int saved_errno;
+	int error;
+	char errnomsg[NL_TEXTMAX];
 	char sign;		/* sign prefix (' ', '+', '-', or \0) */
 	struct grouping_state gs; /* thousands' grouping info */
 
@@ -483,8 +482,6 @@ __vfprintf(FILE *fp, locale_t locale, const char *fmt0, va_list ap)
 		val = GETARG (int); \
 	}
 
-	if (__use_xprintf == 0 && getenv("USE_XPRINTF"))
-		__use_xprintf = 1;
 	if (__use_xprintf > 0)
 		return (__xvprintf(fp, fmt0, ap));
 
@@ -497,7 +494,6 @@ __vfprintf(FILE *fp, locale_t locale, const char *fmt0, va_list ap)
 	savserr = fp->_flags & __SERR;
 	fp->_flags &= ~__SERR;
 
-	saved_errno = errno;
 	convbuf = NULL;
 	fmt = (char *)fmt0;
 	argtable = NULL;
@@ -645,9 +641,65 @@ reswitch:	switch (ch) {
 		case 't':
 			flags |= PTRDIFFT;
 			goto rflag;
+		case 'w':
+			/*
+			 * Fixed-width integer types.  On all platforms we
+			 * support, int8_t is equivalent to char, int16_t
+			 * is equivalent to short, int32_t is equivalent
+			 * to int, int64_t is equivalent to long long int.
+			 * Furthermore, int_fast8_t, int_fast16_t and
+			 * int_fast32_t are equivalent to int, and
+			 * int_fast64_t is equivalent to long long int.
+			 */
+			flags &= ~(CHARINT|SHORTINT|LONGINT|LLONGINT|INTMAXT);
+			if (fmt[0] == 'f') {
+				flags |= FASTINT;
+				fmt++;
+			} else {
+				flags &= ~FASTINT;
+			}
+			if (fmt[0] == '8') {
+				if (!(flags & FASTINT))
+					flags |= CHARINT;
+				else
+					/* no flag set = 32 */ ;
+				fmt += 1;
+			} else if (fmt[0] == '1' && fmt[1] == '6') {
+				if (!(flags & FASTINT))
+					flags |= SHORTINT;
+				else
+					/* no flag set = 32 */ ;
+				fmt += 2;
+			} else if (fmt[0] == '3' && fmt[1] == '2') {
+				/* no flag set = 32 */ ;
+				fmt += 2;
+			} else if (fmt[0] == '6' && fmt[1] == '4') {
+				flags |= LLONGINT;
+				fmt += 2;
+			} else {
+				if (flags & FASTINT) {
+					flags &= ~FASTINT;
+					fmt--;
+				}
+				goto invalid;
+			}
+			goto rflag;
 		case 'z':
 			flags |= SIZET;
 			goto rflag;
+		case 'B':
+		case 'b':
+			if (flags & INTMAX_SIZE)
+				ujval = UJARG();
+			else
+				ulval = UARG();
+			base = 2;
+			/* leading 0b/B only if non-zero */
+			if (flags & ALT &&
+			    (flags & INTMAX_SIZE ? ujval != 0 : ulval != 0))
+				ox[1] = ch;
+			goto nosign;
+			break;
 		case 'C':
 			flags |= LONGINT;
 			/*FALLTHROUGH*/
@@ -812,7 +864,9 @@ fp_common:
 			break;
 #endif /* !NO_FLOATING_POINT */
 		case 'm':
-			cp = strerror(saved_errno);
+			error = __strerror_rl(serrno, errnomsg,
+			    sizeof(errnomsg), locale);
+			cp = error == 0 ? errnomsg : "<strerror failure>";
 			size = (prec >= 0) ? strnlen(cp, prec) : strlen(cp);
 			sign = '\0';
 			break;
@@ -977,6 +1031,7 @@ number:			if ((dprec = prec) >= 0)
 		default:	/* "%?" prints ?, unless ? is NUL */
 			if (ch == '\0')
 				goto done;
+invalid:
 			/* pretend it was %c with argument ch */
 			cp = buf;
 			*cp = ch;

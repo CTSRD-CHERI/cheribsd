@@ -28,6 +28,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/elf_common.h>
 
 #include <machine/asm.h>
 
@@ -51,3 +52,5 @@ EEND(vmm_call_hyp2)
 EEND(vmm_call_hyp1)
 EEND(vmm_call_hyp0)
 EEND(vmm_call_hyp_init)
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

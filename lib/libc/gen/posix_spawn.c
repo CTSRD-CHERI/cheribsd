@@ -26,9 +26,9 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include "namespace.h"
 #include <sys/param.h>
+#include <sys/procctl.h>
 #include <sys/queue.h>
 #include <sys/wait.h>
 
@@ -93,7 +93,7 @@ static int
 process_spawnattr(const posix_spawnattr_t sa)
 {
 	struct sigaction sigact = { .sa_flags = 0, .sa_handler = SIG_DFL };
-	int i;
+	int aslr, i;
 
 	/*
 	 * POSIX doesn't really describe in which order everything
@@ -139,6 +139,13 @@ process_spawnattr(const posix_spawnattr_t sa)
 				if (__sys_sigaction(i, &sigact, NULL) != 0)
 					return (errno);
 		}
+	}
+
+	/* Disable ASLR. */
+	if ((sa->sa_flags & POSIX_SPAWN_DISABLE_ASLR_NP) != 0) {
+		aslr = PROC_ASLR_FORCE_DISABLE;
+		if (procctl(P_PID, 0, PROC_ASLR_CTL, &aslr) != 0)
+			return (errno);
 	}
 
 	return (0);
@@ -228,7 +235,7 @@ struct posix_spawn_args {
 #if defined(__i386__) || defined(__amd64__)
 /*
  * Below we'll assume that _RFORK_THREAD_STACK_SIZE is appropriately aligned for
- * the posix_spawn() case where we do not end up calling _execvpe and won't ever
+ * the posix_spawn() case where we do not end up calling execvpe and won't ever
  * try to allocate space on the stack for argv[].
  */
 #define	_RFORK_THREAD_STACK_SIZE	4096
@@ -323,18 +330,27 @@ do_posix_spawn(pid_t *pid, const char *path,
 	 * ideal vfork(2) if we get an EINVAL from rfork -- this should only
 	 * happen with newer libc on older kernel that doesn't accept
 	 * RFSPAWN.
+	 *
+	 * Combination of vfork() (or its equivalent rfork() form) and
+	 * a special property of the libthr rtld locks ensure that
+	 * rtld is operational in the child.  In particular, libthr
+	 * rtld locks do not store owner' tid into the lock word.
 	 */
 #ifdef _RFORK_THREAD_STACK_SIZE
 	/*
 	 * x86 stores the return address on the stack, so rfork(2) cannot work
-	 * as-is because the child would clobber the return address om the
+	 * as-is because the child would clobber the return address of the
 	 * parent.  Because of this, we must use rfork_thread instead while
 	 * almost every other arch stores the return address in a register.
 	 */
 	p = rfork_thread(RFSPAWN, stack + stacksz, _posix_spawn_thr, &psa);
 	free(stack);
 #else
+#ifdef CHERI_LIB_C18N
+	p = __sys_rfork(RFSPAWN);
+#else
 	p = rfork(RFSPAWN);
+#endif
 	if (p == 0)
 		/* _posix_spawn_thr does not return */
 		_posix_spawn_thr(&psa);
@@ -644,6 +660,11 @@ posix_spawnattr_getcopid(const posix_spawnattr_t * __restrict sa,
 int
 posix_spawnattr_setflags(posix_spawnattr_t *sa, short flags)
 {
+	if ((flags & ~(POSIX_SPAWN_RESETIDS | POSIX_SPAWN_SETPGROUP |
+	    POSIX_SPAWN_SETSCHEDPARAM | POSIX_SPAWN_SETSCHEDULER |
+	    POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK |
+	    POSIX_SPAWN_DISABLE_ASLR_NP)) != 0)
+		return (EINVAL);
 	(*sa)->sa_flags = flags;
 	return (0);
 }

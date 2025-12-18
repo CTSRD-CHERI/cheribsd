@@ -1,4 +1,3 @@
-
 SHLIB_NAME?=	padlock.so
 
 SRCS=	e_padlock.c
@@ -10,6 +9,6 @@ SRCS+=	e_padlock-x86.S
 
 LDFLAGS.bfd+=	-Wl,-znoexecstack
 
-.PATH:	${SRCTOP}/secure/lib/libcrypto/arch/${MACHINE_CPUARCH}
+.PATH:	${SRCTOP}/sys/crypto/openssl/${MACHINE_CPUARCH}
 
 .include <bsd.lib.mk>

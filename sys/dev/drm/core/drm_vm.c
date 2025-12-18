@@ -370,6 +370,7 @@ static const struct vm_operations_struct drm_vm_ops = {
 	.fault = drm_vm_fault,
 	.open = drm_vm_open,
 	.close = drm_vm_close,
+	.objtype = OBJT_MGTDEVICE,
 };
 
 /** Shared virtual memory operations */
@@ -377,6 +378,7 @@ static const struct vm_operations_struct drm_vm_shm_ops = {
 	.fault = drm_vm_shm_fault,
 	.open = drm_vm_open,
 	.close = drm_vm_shm_close,
+	.objtype = OBJT_MGTDEVICE,
 };
 
 /** DMA virtual memory operations */
@@ -384,6 +386,7 @@ static const struct vm_operations_struct drm_vm_dma_ops = {
 	.fault = drm_vm_dma_fault,
 	.open = drm_vm_open,
 	.close = drm_vm_close,
+	.objtype = OBJT_MGTDEVICE,
 };
 
 /** Scatter-gather virtual memory operations */

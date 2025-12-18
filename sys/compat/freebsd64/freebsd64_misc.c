@@ -151,7 +151,7 @@ int
 freebsd64_wait6(struct thread *td, struct freebsd64_wait6_args *uap)
 {
 	siginfo_t si, *sip;
-	struct siginfo64 si64;
+	struct __siginfo64 si64;
 	int error;
 	
 	if (uap->info != NULL) {
@@ -388,7 +388,6 @@ freebsd64_copyinuio(const struct iovec * __capability cb_arg, u_int iovcnt,
 	struct iovec64 iov64;
 	struct iovec *iov;
 	struct uio *uio;
-	size_t iovlen;
 	int error, i;
 	/*
 	 * The first argument is not actually a struct iovec *, but C's type
@@ -400,26 +399,24 @@ freebsd64_copyinuio(const struct iovec * __capability cb_arg, u_int iovcnt,
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	iovlen = iovcnt * sizeof(struct iovec);
-	uio = malloc(iovlen + sizeof(*uio), M_IOV, M_WAITOK);
-	iov = (struct iovec *)(uio + 1);
+	uio = allocuio(iovcnt);
+	iov = uio->uio_iov;
 	for (i = 0; i < iovcnt; i++) {
 		error = copyin(&iovp[i], &iov64, sizeof(iov64));
 		if (error) {
-			free(uio, M_IOV);
+			freeuio(uio);
 			return (error);
 		}
 		IOVEC_INIT_C(&iov[i], __USER_CAP(iov64.iov_base, iov64.iov_len),
 		    iov64.iov_len);
 	}
-	uio->uio_iov = iov;
 	uio->uio_iovcnt = iovcnt;
 	uio->uio_segflg = UIO_USERSPACE;
 	uio->uio_offset = -1;
 	uio->uio_resid = 0;
 	for (i = 0; i < iovcnt; i++) {
 		if (iov[i].iov_len > SIZE_MAX - uio->uio_resid) {
-			free(uio, M_IOV);
+			freeuio(uio);
 			return (EINVAL);
 		}
 		uio->uio_resid += iov[i].iov_len;
@@ -1182,7 +1179,7 @@ freebsd64_fcntl(struct thread *td, struct freebsd64_fcntl_args *uap)
 	case F_SETLK:
 	case F_SETLKW:
 	case F_SETLK_REMOTE:
-		arg = (intcap_t)__USER_CAP_UNBOUND((void *)uap->arg);
+		arg = (intcap_t)__USER_CAP_UNBOUND(uap->arg);
 		break;
 	default:
 		arg = (intcap_t)uap->arg;
@@ -1477,6 +1474,14 @@ freebsd64_getrlimit(struct thread *td, struct freebsd64_getrlimit_args *uap)
 }
 
 int
+freebsd64_getrlimitusage(struct thread *td,
+    struct freebsd64_getrlimitusage_args *uap)
+{
+	return (user_getrlimitusage(td, uap->which, uap->flags,
+	    __USER_CAP_OBJ(uap->res)));
+}
+
+int
 freebsd64_getrusage(struct thread *td, struct freebsd64_getrusage_args *uap)
 {
 	struct rusage ru;
@@ -1599,8 +1604,9 @@ freebsd64_thr_exit(struct thread *td, struct freebsd64_thr_exit_args *uap)
 
 	/* Signal userland that it can free the stack. */
 	if (uap->state != NULL) {
-		suword(__USER_CAP_OBJ(uap->state), 1);
-		kern_umtx_wake(td, __USER_CAP_OBJ(uap->state), INT_MAX, 0);
+		(void)suword(__USER_CAP_OBJ(uap->state), 1);
+		(void)kern_umtx_wake(td, __USER_CAP_OBJ(uap->state), INT_MAX,
+		    0);
 	}
 
 	return (kern_thr_exit(td));

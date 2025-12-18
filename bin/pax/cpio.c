@@ -33,12 +33,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-#if 0
-static char sccsid[] = "@(#)cpio.c	8.1 (Berkeley) 5/31/93";
-#endif
-#endif /* not lint */
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -280,13 +274,13 @@ cpio_rd(ARCHD *arcn, char *buf)
 	 */
 	if (cpio_id(buf, sizeof(HD_CPIO)) < 0)
 		return(-1);
+	memset(arcn, 0, sizeof *arcn);
 	hd = (HD_CPIO *)buf;
 
 	/*
 	 * byte oriented cpio (posix) does not have padding! extract the octal
 	 * ascii fields from the header
 	 */
-	arcn->pad = 0L;
 	arcn->sb.st_dev = (dev_t)asc_ul(hd->c_dev, sizeof(hd->c_dev), OCT);
 	arcn->sb.st_ino = (ino_t)asc_ul(hd->c_ino, sizeof(hd->c_ino), OCT);
 	arcn->sb.st_mode = (mode_t)asc_ul(hd->c_mode, sizeof(hd->c_mode), OCT);
@@ -315,8 +309,6 @@ cpio_rd(ARCHD *arcn, char *buf)
 		/*
 	 	 * no link name to read for this file
 	 	 */
-		arcn->ln_nlen = 0;
-		arcn->ln_name[0] = '\0';
 		return(com_rd(arcn));
 	}
 
@@ -561,8 +553,8 @@ vcpio_rd(ARCHD *arcn, char *buf)
 			return(-1);
 	}
 
+	memset(arcn, 0, sizeof *arcn);
 	hd = (HD_VCPIO *)buf;
-	arcn->pad = 0L;
 
 	/*
 	 * extract the hex ascii fields from the header
@@ -609,8 +601,6 @@ vcpio_rd(ARCHD *arcn, char *buf)
 		/*
 		 * we have a valid header (not a link)
 		 */
-		arcn->ln_nlen = 0;
-		arcn->ln_name[0] = '\0';
 		arcn->pad = VCPIO_PAD(arcn->sb.st_size);
 		return(com_rd(arcn));
 	}
@@ -857,7 +847,7 @@ bcpio_rd(ARCHD *arcn, char *buf)
 	if (bcpio_id(buf, sizeof(HD_BCPIO)) < 0)
 		return(-1);
 
-	arcn->pad = 0L;
+	memset(arcn, 0, sizeof *arcn);
 	hd = (HD_BCPIO *)buf;
 	if (swp_head) {
 		/*
@@ -919,8 +909,6 @@ bcpio_rd(ARCHD *arcn, char *buf)
 		/*
 		 * we have a valid header (not a link)
 		 */
-		arcn->ln_nlen = 0;
-		arcn->ln_name[0] = '\0';
 		arcn->pad = BCPIO_PAD(arcn->sb.st_size);
 		return(com_rd(arcn));
 	}

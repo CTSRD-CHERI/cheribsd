@@ -103,6 +103,60 @@ cheri_revoke_hoarders(struct proc *p, struct vm_cheri_revoke_cookie *crc)
 	kqueue_cheri_revoke(p->p_fd, crc);
 }
 
+void
+cheri_revoke_vmspace_fork(struct vmspace *dstvm, struct vmspace *srcvm)
+{
+	vm_map_t dst, src;
+	int error __diagused;
+
+	dst = &dstvm->vm_map;
+	src = &srcvm->vm_map;
+
+	/*
+	 * Revocation holds the map busy, so if we're here, there isn't a state
+	 * transition in progress (but an epoch might be open).
+	 *
+	 * XXX NWF We should probably go around again to force the epoch closed.
+	 */
+	dst->vm_cheri_revoke_st = src->vm_cheri_revoke_st;
+	dst->vm_cheri_async_revoke_st = src->vm_cheri_async_revoke_st;
+	dst->vm_cheri_revoke_test = src->vm_cheri_revoke_test;
+	dst->vm_cheri_revoke_quarantining = src->vm_cheri_revoke_quarantining;
+
+	switch (cheri_revoke_st_get_state(dst->vm_cheri_async_revoke_st)) {
+	case CHERI_REVOKE_ST_NONE:
+		break;
+	case CHERI_REVOKE_ST_INITING: {
+		struct vm_cheri_revoke_cookie vmcrc;
+		enum cheri_revoke_state state __diagused;
+
+		state = cheri_revoke_st_get_state(dst->vm_cheri_revoke_st);
+		KASSERT(state != CHERI_REVOKE_ST_NONE,
+		    ("%s: bad revocation state %d", __func__, state));
+
+		/*
+		 * Kick off an asynchronous revocation pass to keep the state
+		 * machine in sync in the child process.
+		 */
+		error = vm_cheri_revoke_cookie_init(dst, &vmcrc);
+		KASSERT(error == KERN_SUCCESS,
+		    ("%s: vm_cheri_revoke_cookie_init() returned %d",
+		    __func__, error));
+		vm_cheri_revoke_pass_async(dstvm, &vmcrc);
+		break;
+	}
+	case CHERI_REVOKE_ST_INITED:
+		/*
+		 * The source map should be busy while in this state, and busy
+		 * maps can't be forked.
+		 */
+		__assert_unreachable();
+		break;
+	case CHERI_REVOKE_ST_CLOSING:
+		break;
+	}
+}
+
 static int
 cheri_revoke_fini(struct cheri_revoke_syscall_info * __capability crsi,
     int res, struct cheri_revoke_stats *crst,
@@ -310,34 +364,36 @@ kern_cheri_revoke(struct thread *td, int flags,
 	struct vm_cheri_revoke_cookie vmcrc;
 	struct cheri_revoke_info_page * __capability info_page;
 
-	vm = vmspace_acquire_ref(td->td_proc);
+	KASSERT(td == curthread, ("%s: td is not curthread", __func__));
+
+	vm = td->td_proc->p_vmspace;
 	vmm = &vm->vm_map;
 
-	/*
-	 * We need some value that's more or less "now", but we don't have
-	 * to be too picky about it.  This value is not reported to
-	 * userland, just used to guide the interlocking below.
-	 */
-	if ((flags & CHERI_REVOKE_IGNORE_START) != 0) {
-		start_epoch = cheri_revoke_st_get_epoch(
-		    vmm->vm_cheri_revoke_st);
+	if ((flags & (CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_ASYNC)) ==
+	    (CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_ASYNC)) {
+		/* Not sure what this means yet, so don't allow it. */
+		return (EINVAL);
 	}
 
 	/* Serialize and figure out what we're supposed to do */
 	vm_map_lock(vmm);
 	{
-		static const int fast_out_flags = CHERI_REVOKE_NO_WAIT_OK |
-		    CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_LAST_NO_EARLY;
 		int ires = 0;
+
+		KASSERT(!vmm->system_map, ("%s: system map?", __func__));
+
+		/*
+		 * We need some value that's more or less "now", but we don't have
+		 * to be too picky about it.  This value is not reported to
+		 * userland, just used to guide the interlocking below.
+		 */
+		if ((flags & CHERI_REVOKE_IGNORE_START) != 0) {
+			start_epoch = cheri_revoke_st_get_epoch(
+			    vmm->vm_cheri_revoke_st);
+		}
 
 		if (!vmm->vm_cheri_revoke_quarantining)
 			vmm->vm_cheri_revoke_quarantining = true;
-
-		if ((flags & (fast_out_flags | CHERI_REVOKE_LAST_PASS)) ==
-		    fast_out_flags) {
-			/* Apparently they really just wanted the time. */
-			goto fast_out;
-		}
 
 reentry:
 		epoch = cheri_revoke_st_get_epoch(vmm->vm_cheri_revoke_st);
@@ -369,7 +425,6 @@ fast_out:
 #endif
 			vm_map_unlock(vmm);
 			cv_signal(&vmm->vm_cheri_revoke_cv);
-			vmspace_free(vm);
 
 			return (cheri_revoke_fini(crsi, ires, crstp,
 			    &crepochs));
@@ -397,22 +452,49 @@ fast_out:
 			 */
 			if (flags & CHERI_REVOKE_LAST_PASS) {
 				myst = CHERI_REVOKE_ST_CLOSING;
+			} else if (flags & CHERI_REVOKE_ASYNC) {
+				enum cheri_revoke_state asyncst;
+
+				asyncst = cheri_revoke_st_get_state(
+				    vmm->vm_cheri_async_revoke_st);
+				KASSERT(asyncst != CHERI_REVOKE_ST_NONE,
+				    ("bad async state %d", asyncst));
+
+				if (asyncst != CHERI_REVOKE_ST_CLOSING) {
+					/*
+					 * We're still waiting for the previous
+					 * request to complete, so there's
+					 * nothing to do.
+					 */
+					goto fast_out;
+				}
+
+				if (vmm->vm_cheri_async_revoke_status ==
+				    KERN_SUCCESS) {
+					/*
+					 * The pass succeeded: reset the async
+					 * state and update our main state.
+					 */
+					cheri_revoke_st_set(
+					    &vmm->vm_cheri_async_revoke_st,
+					    epoch, CHERI_REVOKE_ST_NONE);
+					myst = CHERI_REVOKE_ST_CLOSING;
+				} else {
+					/*
+					 * The previous pass failed.  Try again
+					 * in the hopes that the failure was
+					 * transient.
+					 */
+					myst = CHERI_REVOKE_ST_INITING;
+				}
 			} else {
 				goto fast_out;
 			}
 			break;
 		case CHERI_REVOKE_ST_CLOSING:
-			/* There is another revoker in progress.  Wait? */
-			if ((flags & CHERI_REVOKE_ONLY_IF_OPEN) != 0) {
-				goto fast_out;
-			}
-			/* FALLTHROUGH */
 		case CHERI_REVOKE_ST_INITING:
-			KASSERT(vmm->system_map == 0, ("System map?"));
-
-			if ((flags & CHERI_REVOKE_NO_WAIT_OK) != 0) {
+			if ((flags & CHERI_REVOKE_ASYNC) != 0)
 				goto fast_out;
-			}
 
 			/* There is another revoker in progress.  Wait. */
 			ires = cv_wait_sig(&vmm->vm_cheri_revoke_cv,
@@ -420,7 +502,6 @@ fast_out:
 			if (ires != 0) {
 				vm_map_unlock(vmm);
 				cv_signal(&vmm->vm_cheri_revoke_cv);
-				vmspace_free(vm);
 				return (ires);
 			}
 
@@ -434,22 +515,13 @@ fast_out:
 			(myst == CHERI_REVOKE_ST_CLOSING),
 		    ("Beginning revocation with bad current state"));
 
-		if (((flags & CHERI_REVOKE_ONLY_IF_OPEN) != 0) &&
-		    ((epoch & 1) == 0)) {
-			/*
-			 * If we're requesting work only if an epoch is open
-			 * and one isn't, then there's only one thing to do!
-			 */
-			goto fast_out;
-		}
-
 		if (entryst == CHERI_REVOKE_ST_NONE) {
-			vm_map_entry_t entry;
 			int test_flags =
 			    VM_CHERI_REVOKE_CF_NO_COARSE_MEM |
 			    VM_CHERI_REVOKE_CF_NO_OTYPES |
 			    VM_CHERI_REVOKE_CF_NO_CIDS;
-			if (!vm_map_entry_start_revocation(vmm, &entry))
+
+			if (!vm_map_entry_start_revocation(vmm, NULL))
 				test_flags |= VM_CHERI_REVOKE_CF_NO_REV_ENTRY;
 			vm_cheri_revoke_set_test(vmm, test_flags);
 		}
@@ -462,7 +534,6 @@ fast_out:
 		res = vm_cheri_revoke_cookie_init(&vm->vm_map, &vmcrc);
 		if (res != KERN_SUCCESS) {
 			vm_map_unlock(vmm);
-			vmspace_free(vm);
 			return (cheri_revoke_fini(crsi, vm_mmap_to_errno(res),
 			    crstp, &crepochs));
 		}
@@ -473,6 +544,11 @@ fast_out:
 		 * do below.
 		 */
 		cheri_revoke_st_set(&vmm->vm_cheri_revoke_st, epoch, myst);
+		if ((flags & CHERI_REVOKE_ASYNC) != 0 &&
+		    myst == CHERI_REVOKE_ST_INITING) {
+			cheri_revoke_st_set(&vmm->vm_cheri_async_revoke_st,
+			    epoch, myst);
+		}
 	}
 	vm_map_unlock(vmm);
 
@@ -498,9 +574,13 @@ fast_out:
 	 * to close it out, there's no need to do any thread singling, so
 	 * don't.
 	 */
-	if ((entryst == CHERI_REVOKE_ST_INITED) &&
-	    (myst == CHERI_REVOKE_ST_CLOSING))
-		goto close_already_inited;
+	if (entryst == CHERI_REVOKE_ST_INITED &&
+	    myst == CHERI_REVOKE_ST_CLOSING) {
+		if ((flags & CHERI_REVOKE_ASYNC) == 0)
+			goto close_already_inited;
+		else
+			goto post_revoke_pass;
+	}
 
 	KASSERT(myst == CHERI_REVOKE_ST_INITING ||
 	    myst == CHERI_REVOKE_ST_CLOSING,
@@ -517,15 +597,17 @@ fast_out:
 				PROC_UNLOCK(td->td_proc);
 
 				vm_map_lock(vmm);
+				/* Roll back some earlier state changes. */
 				cheri_revoke_st_set(&vmm->vm_cheri_revoke_st,
 				    epoch, entryst);
+				if (flags & CHERI_REVOKE_ASYNC) {
+					cheri_revoke_st_set(
+					    &vmm->vm_cheri_async_revoke_st,
+					    epoch, CHERI_REVOKE_ST_NONE);
+				}
 				vm_map_unlock(vmm);
 
 				/* XXX Don't signal other would-be revokers? */
-
-				vm_cheri_revoke_cookie_rele(&vmcrc);
-				vmspace_free(vm);
-
 				/* XXX Don't copy out the stat structure? */
 
 				return (ERESTART);
@@ -561,50 +643,45 @@ fast_out:
 		/* Per-thread kernel hoarders */
 		FOREACH_THREAD_IN_PROC (td->td_proc, ptd) {
 			cheri_revoke_td_frame(ptd, &vmcrc);
-			sigaltstack_cheri_revoke(ptd, &vmcrc);
+			sig_thread_cheri_revoke(ptd, &vmcrc);
 		}
 	}
 
 	/* Per-process kernel hoarders */
 	cheri_revoke_hoarders(td->td_proc, &vmcrc);
 
-	switch(myst) {
-	default:
-		panic("impossible");
-	case CHERI_REVOKE_ST_CLOSING:
-	case CHERI_REVOKE_ST_INITING:
-		if (entryst == CHERI_REVOKE_ST_NONE) {
-			/*
-			 * Increment the GCLG.  Immediately install for the
-			 * current thread; any others are currently off-core
-			 * and will be switched back to and so will call
-			 * pmap_activate themselves.
-			 *
-			 * pmap_caploadgen_next also shoots down all TLBs
-			 * with this AS possibly cached, ensuring that
-			 * nobody continues to see a stale LCLG (from two
-			 * epochs ago) as now suddenly valid again.
-			 *
-			 * Take a write lock on the address space around this
-			 * so that we don't race any page faults from kernel
-			 * worker threads; we won't race any page faults from
-			 * userspace already since we're single-threaded.
-			 *
-			 * XXXMJ this statement is not quite true.  The map lock
-			 * is acquired during page fault handing but may be
-			 * dropped (and re-acquired) around calls into the
-			 * pager.  In other words, it appears to be possible to
-			 * increment the GCLG after a (kernel) thread has
-			 * faulted but before it has installed a PTE for the new
-			 * mapping.
-			 */
-			vm_map_lock(&vm->vm_map);
-			pmap_caploadgen_next(vmm->pmap);
-			pmap_activate(td);
-			vm_map_unlock(&vm->vm_map);
-		}
-		res = KERN_SUCCESS;
-		break;
+	KASSERT(myst == CHERI_REVOKE_ST_INITING ||
+	    myst == CHERI_REVOKE_ST_CLOSING,
+	    ("unexpected state %d in revoker", myst));
+	if (entryst == CHERI_REVOKE_ST_NONE) {
+		/*
+		 * Increment the GCLG.  Immediately install for the
+		 * current thread; any others are currently off-core
+		 * and will be switched back to and so will call
+		 * pmap_activate themselves.
+		 *
+		 * pmap_caploadgen_next also shoots down all TLBs
+		 * with this AS possibly cached, ensuring that
+		 * nobody continues to see a stale LCLG (from two
+		 * epochs ago) as now suddenly valid again.
+		 *
+		 * Take a write lock on the address space around this
+		 * so that we don't race any page faults from kernel
+		 * worker threads; we won't race any page faults from
+		 * userspace already since we're single-threaded.
+		 *
+		 * XXXMJ this statement is not quite true.  The map lock
+		 * is acquired during page fault handing but may be
+		 * dropped (and re-acquired) around calls into the
+		 * pager.  In other words, it appears to be possible to
+		 * increment the GCLG after a (kernel) thread has
+		 * faulted but before it has installed a PTE for the new
+		 * mapping.
+		 */
+		vm_map_lock(&vm->vm_map);
+		pmap_caploadgen_next(vmm->pmap);
+		pmap_activate(td);
+		vm_map_unlock(&vm->vm_map);
 	}
 
 	PROC_LOCK(td->td_proc);
@@ -612,65 +689,54 @@ fast_out:
 	if ((td->td_proc->p_flag & P_HADTHREADS) != 0) {
 		thread_single_end(td->td_proc, SINGLE_BOUNDARY);
 	}
+	PROC_UNLOCK(td->td_proc);
 
 	/* Post barrier phase! */
-
-	if (res != KERN_SUCCESS) {
-		PROC_UNLOCK(td->td_proc);
-
-		vm_map_lock(vmm);
-		cheri_revoke_st_set(&vmm->vm_cheri_revoke_st, epoch, entryst);
-		vm_map_unlock(vmm);
-
-		cv_signal(&vmm->vm_cheri_revoke_cv);
-
-		vm_cheri_revoke_cookie_rele(&vmcrc);
-		vmspace_free(vm);
-
-		return (cheri_revoke_fini(crsi, vm_mmap_to_errno(res), crstp,
-		    &crepochs));
-	}
-	PROC_UNLOCK(td->td_proc);
 
 	/*
 	 * If we came in with no epoch open, we have just opened one.
 	 * Bump the epoch count we will report to userland below.
 	 */
+	res = KERN_SUCCESS;
 	if (entryst == CHERI_REVOKE_ST_NONE) {
 		epoch++;
 
-		KASSERT((myst == CHERI_REVOKE_ST_INITING) ||
-			(myst == CHERI_REVOKE_ST_CLOSING),
-			("Bad myst when finishing"));
-		entryst = CHERI_REVOKE_ST_INITED;
-
-		if (myst == CHERI_REVOKE_ST_CLOSING) {
+		switch (myst) {
+		default:
+			__assert_unreachable();
+		case CHERI_REVOKE_ST_CLOSING:
 close_already_inited:	/* (entryst == CHERI_REVOKE_ST_INITED) above */
+			KASSERT((flags & CHERI_REVOKE_ASYNC) == 0,
+			    ("closing with async"));
 
-			/* Walk the VM */
-			res = vm_cheri_revoke_pass(&vmcrc, 0);
+			res = vm_cheri_revoke_pass(&vmcrc);
+			if (res != KERN_SUCCESS)
+				myst = CHERI_REVOKE_ST_INITED;
+			break;
+		case CHERI_REVOKE_ST_INITING:
+			if ((flags & CHERI_REVOKE_ASYNC) != 0)
+				vm_cheri_revoke_pass_async(vm, &vmcrc);
+			myst = CHERI_REVOKE_ST_INITED;
+			break;
 		}
 	}
+post_revoke_pass:
 
 	/* OK, that's that.  Where do we stand now? */
-	if ((res == KERN_SUCCESS) &&
-	    (myst == CHERI_REVOKE_ST_CLOSING)) {
-
-#ifdef DIAGNOSTIC
-		vm_cheri_assert_consistent_clg(&vm->vm_map);
-#endif
-
+	if (res == KERN_SUCCESS && myst == CHERI_REVOKE_ST_CLOSING) {
 		/* Signal the end of this revocation epoch */
 		epoch++;
 		crepochs.dequeue = epoch;
 		vm_cheri_revoke_publish_epochs(info_page, &crepochs);
-		entryst = CHERI_REVOKE_ST_NONE;
+		myst = CHERI_REVOKE_ST_NONE;
 
 		vm_map_entry_end_revocation(&vm->vm_map);
 	}
 
 	vm_map_lock(vmm);
-	cheri_revoke_st_set(&vmm->vm_cheri_revoke_st, epoch, entryst);
+	cheri_revoke_st_set(&vmm->vm_cheri_revoke_st, epoch, myst);
+	if (res == KERN_SUCCESS)
+		vm_cheri_assert_consistent_clg(&vm->vm_map);
 #ifdef CHERI_CAPREVOKE_STATS
 	if (flags & CHERI_REVOKE_TAKE_STATS) {
 		sx_xlock(&vmm->vm_cheri_revoke_stats_sx);
@@ -687,9 +753,6 @@ close_already_inited:	/* (entryst == CHERI_REVOKE_ST_INITED) above */
 
 	/* Broadcast here: some sleepers may be able to take the fast out */
 	cv_broadcast(&vmm->vm_cheri_revoke_cv);
-
-	vm_cheri_revoke_cookie_rele(&vmcrc);
-	vmspace_free(vm);
 
 	return (cheri_revoke_fini(crsi, vm_mmap_to_errno(res), crstp,
 	    &crepochs));

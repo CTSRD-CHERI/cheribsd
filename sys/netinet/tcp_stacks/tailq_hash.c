@@ -58,7 +58,6 @@
 #include <netinet6/in6_pcb.h>
 #include <netinet6/ip6_var.h>
 #include <netinet/tcp.h>
-#define	TCPOUTFLAGS
 #include <netinet/tcp_fsm.h>
 #include <netinet/tcp_seq.h>
 #include <netinet/tcp_timer.h>
@@ -66,7 +65,6 @@
 #include <netinet/tcp_log_buf.h>
 #include <netinet/tcp_syncache.h>
 #include <netinet/tcp_hpts.h>
-#include <netinet/tcp_ratelimit.h>
 #include <netinet/tcp_accounting.h>
 #include <netinet/tcpip.h>
 #include <netinet/cc/cc.h>
@@ -101,6 +99,7 @@
 #include "sack_filter.h"
 #include "tcp_rack.h"
 #include "tailq_hash.h"
+#include "opt_global.h"
 
 
 struct rack_sendmap *
@@ -108,7 +107,7 @@ tqhash_min(struct tailq_hash *hs)
 {
 	struct rack_sendmap *rsm;
 
-	rsm = tqhash_find(hs, hs->min);
+	rsm = hs->rsm_min;
 	return(rsm);
 }
 
@@ -117,7 +116,7 @@ tqhash_max(struct tailq_hash *hs)
 {
 	struct rack_sendmap *rsm;
 
-	rsm = tqhash_find(hs, (hs->max - 1));
+	rsm = hs->rsm_max;
 	return (rsm);
 }
 
@@ -225,13 +224,19 @@ tqhash_prev(struct tailq_hash *hs, struct rack_sendmap *rsm)
 void
 tqhash_remove(struct tailq_hash *hs, struct rack_sendmap *rsm, int type)
 {
-	TAILQ_REMOVE(&hs->ht[rsm->bindex], rsm, next);
+
 	hs->count--;
 	if (hs->count == 0) {
 		hs->min = hs->max;
+		hs->rsm_max = hs->rsm_min = NULL;
 	} else if (type == REMOVE_TYPE_CUMACK) {
 		hs->min = rsm->r_end;
+		hs->rsm_min = tqhash_next(hs, rsm);
+	} else if (rsm == hs->rsm_max) {
+		hs->rsm_max = tqhash_prev(hs, rsm);
+		hs->max = hs->rsm_max->r_end;
 	}
+	TAILQ_REMOVE(&hs->ht[rsm->bindex], rsm, next);
 }
 
 int
@@ -241,6 +246,7 @@ tqhash_insert(struct tailq_hash *hs, struct rack_sendmap *rsm)
 	int inserted = 0;
 	uint32_t ebucket;
 
+#ifdef INVARIANTS
 	if (hs->count > 0) {
 		if ((rsm->r_end - hs->min) >  MAX_ALLOWED_SEQ_RANGE) {
 			return (-1);
@@ -250,6 +256,7 @@ tqhash_insert(struct tailq_hash *hs, struct rack_sendmap *rsm)
 			return (-2);
 		}
 	}
+#endif
 	rsm->bindex = rsm->r_start / SEQ_BUCKET_SIZE;
 	rsm->bindex %= MAX_HASH_ENTRIES;
 	ebucket = rsm->r_end / SEQ_BUCKET_SIZE;
@@ -264,13 +271,17 @@ tqhash_insert(struct tailq_hash *hs, struct rack_sendmap *rsm)
 		/* Special case */
 		hs->min = rsm->r_start;
 		hs->max = rsm->r_end;
+		hs->rsm_min = hs->rsm_max = rsm;
 		hs->count = 1;
 	} else {
 		hs->count++;
-		if (SEQ_GT(rsm->r_end, hs->max))
+		if (SEQ_GEQ(rsm->r_end, hs->max)) {
 			hs->max = rsm->r_end;
-		if (SEQ_LT(rsm->r_start, hs->min))
+			hs->rsm_max = rsm;
+		} if (SEQ_LEQ(rsm->r_start, hs->min)) {
 			hs->min = rsm->r_start;
+			hs->rsm_min = rsm;
+		}
 	}
 	/* Check the common case of inserting at the end */
 	l = TAILQ_LAST(&hs->ht[rsm->bindex], rack_head);
@@ -300,6 +311,7 @@ tqhash_init(struct tailq_hash *hs)
 		TAILQ_INIT(&hs->ht[i]);
 	}
 	hs->min = hs->max = 0;
+	hs->rsm_min = hs->rsm_max = NULL;
 	hs->count = 0;
 }
 
@@ -340,3 +352,11 @@ tqhash_trim(struct tailq_hash *hs, uint32_t th_ack)
 	return (0);
 }
 
+void
+tqhash_update_end(struct tailq_hash *hs, struct rack_sendmap *rsm,
+    uint32_t th_ack)
+{
+	if (hs->max == rsm->r_end)
+		hs->max = th_ack;
+	rsm->r_end = th_ack;
+}

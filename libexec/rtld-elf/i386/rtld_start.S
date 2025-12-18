@@ -64,7 +64,7 @@
 /*
  * Binder entry point.  Control is transferred to here by code in the PLT.
  * On entry, there are two arguments on the stack.  In ascending address
- * order, they are (1) "obj", a pointer to the calling object's Obj_Entry,
+ * order, they are (1) "plt", a pointer to the calling object's Plt_Entry,
  * and (2) "reloff", the byte offset of the appropriate relocation entry
  * in the PLT relocation table.
  *
@@ -81,13 +81,13 @@ _rtld_bind_start:
 	pushl	%edx			# Save %edx
 	pushl	%ecx			# Save %ecx
 	pushl	20(%esp)		# Copy reloff argument
-	pushl	20(%esp)		# Copy obj argument
+	pushl	20(%esp)		# Copy plt argument
 
 	call	_rtld_bind		# Transfer control to the binder
 	/* Now %eax contains the entry point of the function being called. */
 
 	addl	$8,%esp			# Discard binder arguments
-	movl	%eax,20(%esp)		# Store target over obj argument
+	movl	%eax,20(%esp)		# Store target over plt argument
 	popl	%ecx			# Restore %ecx
 	popl	%edx			# Restore %edx
 	popl	%eax			# Restore %eax

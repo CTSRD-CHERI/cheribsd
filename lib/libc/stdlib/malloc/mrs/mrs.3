@@ -51,11 +51,6 @@
 .Fn realloc "void *ptr, size_t size"
 .Ft void
 .Fn free "void *ptr"
-.Ft void
-.Fn malloc_revoke "void"
-.In malloc_np.h
-.Ft bool
-.Fn malloc_is_revoking "void"
 .Sh DESCRIPTION
 The Malloc Revocation Shim (MRS) extends a CHERI-aware malloc implemention
 with revocation support, providing heap temporal safety.
@@ -86,15 +81,6 @@ The undocumented
 3.0 interfaces are not implemented by
 .Nm
 because no CheriABI program should have ever used them.
-.Pp
-The
-.Fn malloc_revoke
-function triggers a full revocation pass, returning when the pass is
-complete.
-This results in the revocation of all pointers staged for quarantine by
-.Fn free
-or
-.Fn realloc .
 .Sh ENABLING REVOCATION
 Because heap temporal safety is an experimental feature with performance
 impacts that are not fully characterized,
@@ -158,8 +144,8 @@ is set.
 .Pp
 A program can determine at runtime if
 .Nm
-revocation is enabled by checking the return value of
-.Fn malloc_is_revoking .
+or similar revocation is enabled by checking the return value of
+.Fn malloc_revoke_enabled .
 .Sh TRACING
 .Nm
 supports
@@ -207,7 +193,8 @@ To override the system default and binary settings run the program as follows:
 .Xr ktrace 1 ,
 .Xr proccontrol 1 ,
 .Xr jemalloc 3 ,
-.Xr malloc_revoke 3 ,
+.Xr malloc_revoke_enabled 3 ,
+.Xr malloc_revoke_quarantine_force_flush 3 ,
 .Xr sysctl 8
 .Sh BUGS
 .Nm

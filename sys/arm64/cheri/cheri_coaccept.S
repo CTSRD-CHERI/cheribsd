@@ -32,6 +32,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/elf_common.h>
 #include <sys/syscall.h>
 #include <machine/asm.h>
 #include <machine/cherireg.h>
@@ -52,7 +53,7 @@
  */
 
 #define	SIGCODE(sym)						\
-	.section .rodata; .globl sym; .type sym,@object; .align 4; sym: .cfi_startproc
+	.section .rodata; .globl sym; .type sym,@object; .align 4; sym: .cfi_startproc; BTI_C
 
 #define CSYM(x)							\
 	.globl x; .type x,@object; x:
@@ -277,3 +278,5 @@ eswitcher_coaccept:
 szswitcher_coaccept:
 	.long eswitcher_coaccept - switcher_coaccept
 	.size szswitcher_coaccept, . - szswitcher_coaccept
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

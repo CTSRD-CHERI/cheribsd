@@ -34,7 +34,7 @@
  */
 
 #include "opt_platform.h"
-#include <sys/cdefs.h>
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -67,7 +67,7 @@
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
-#include <dev/extres/clk/clk.h>
+#include <dev/clk/clk.h>
 #endif
 
 #include <dev/eqos/if_eqos_reg.h>
@@ -442,8 +442,8 @@ eqos_setup_rxfilter(struct eqos_softc *sc)
 	WR4(sc, GMAC_MAC_ADDRESS0_LOW, val);
 
 	/* Multicast hash filters */
-	WR4(sc, GMAC_MAC_HASH_TABLE_REG0, hash[1]);
-	WR4(sc, GMAC_MAC_HASH_TABLE_REG1, hash[0]);
+	WR4(sc, GMAC_MAC_HASH_TABLE_REG0, hash[0]);
+	WR4(sc, GMAC_MAC_HASH_TABLE_REG1, hash[1]);
 
 	/* Packet filter config */
 	WR4(sc, GMAC_MAC_PACKET_FILTER, pfil);
@@ -597,7 +597,7 @@ eqos_start_locked(if_t ifp)
 			if_setdrvflagbits(ifp, IFF_DRV_OACTIVE, 0);
 			break;
 		}
-		if_bpfmtap(ifp, m);
+		bpf_mtap_if(ifp, m);
 		pending++;
 	}
 
@@ -687,7 +687,7 @@ eqos_rxintr(struct eqos_softc *sc)
 			break;
 
 		if (rdes3 & (EQOS_RDES3_OE | EQOS_RDES3_RE))
-			printf("Receive errer rdes3=%08x\n", rdes3);
+			printf("Receive error rdes3=%08x\n", rdes3);
 
 		bus_dmamap_sync(sc->rx.buf_tag,
 		    sc->rx.buf_map[sc->rx.head].map, BUS_DMASYNC_POSTREAD);
@@ -1119,6 +1119,9 @@ eqos_attach(device_t dev)
 		return (ENXIO);
 	}
 
+	if ((error = IF_EQOS_INIT(dev)))
+		return (error);
+
 	sc->dev = dev;
 	ver  = RD4(sc, GMAC_MAC_VERSION);
 	userver = (ver & GMAC_MAC_VERSION_USERVER_MASK) >>
@@ -1126,7 +1129,7 @@ eqos_attach(device_t dev)
 	snpsver = ver & GMAC_MAC_VERSION_SNPSVER_MASK;
 
 	if (snpsver != 0x51) {
-		device_printf(dev, "EQOS version 0x%02xx not supported\n",
+		device_printf(dev, "EQOS version 0x%02x not supported\n",
 		    snpsver);
 		return (ENXIO);
 	}
@@ -1141,10 +1144,6 @@ eqos_attach(device_t dev)
 		    sc->hw_feature[0], sc->hw_feature[1],
 		    sc->hw_feature[2], sc->hw_feature[3]);
 	}
-
-
-	if ((error = IF_EQOS_INIT(dev)))
-		return (error);
 
 	mtx_init(&sc->lock, "eqos lock", MTX_NETWORK_LOCK, MTX_DEF);
 	callout_init_mtx(&sc->callout, &sc->lock, 0);

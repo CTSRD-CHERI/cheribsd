@@ -28,10 +28,6 @@
  */
 
 
-#include <sys/cdefs.h>
-__COPYRIGHT("@(#) Copyright (c) 2008 Iain Hibbert. All rights reserved.");
-__RCSID("$NetBSD: btpand.c,v 1.1 2008/08/17 13:20:57 plunky Exp $");
-
 #include <sys/wait.h>
 
 #define L2CAP_SOCKET_CHECKED
@@ -147,10 +143,13 @@ main(int argc, char *argv[])
 
 		case 's': /* service */
 		case 'S': /* service (no SDP) */
-			for (ul = 0; strcasecmp(optarg, services[ul].name); ul++) {
-				if (ul == __arraycount(services))
-					errx(EXIT_FAILURE, "%s: unknown service", optarg);
+			for (ul = 0; ul < __arraycount(services); ul++) {
+				if (strcasecmp(optarg, services[ul].name) == 0)
+					break;
 			}
+
+			if (ul == __arraycount(services))
+				errx(EXIT_FAILURE, "%s: unknown service", optarg);
 
 			if (ch == 's')
 				service_name = services[ul].name;

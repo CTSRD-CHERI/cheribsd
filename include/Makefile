@@ -1,12 +1,10 @@
-#	@(#)Makefile	8.2 (Berkeley) 1/4/94
-#
 # Doing a "make install" builds /usr/include.
 
 .include <src.opts.mk>
 
-PACKAGE=runtime
+PACKAGE=clibs
 CLEANFILES= osreldate.h version
-SUBDIR= arpa protocols rpcsvc rpc xlocale
+SUBDIR= arpa protocols rpcsvc rpc ssp xlocale
 .if ${MACHINE_CPUARCH} == "amd64"
 SUBDIR+=		i386
 INCLUDE_SUBDIRS+=	i386
@@ -31,7 +29,7 @@ INCS=	a.out.h ar.h assert.h bitstring.h byteswap.h \
 	pthread_np.h pwd.h ranlib.h readpassphrase.h regex.h \
 	res_update.h resolv.h runetype.h sched.h \
 	search.h semaphore.h setjmp.h \
-	signal.h spawn.h stab.h stdalign.h stdbool.h stddef.h \
+	signal.h spawn.h stab.h stdalign.h stdbool.h stdckdint.h stddef.h \
 	stdnoreturn.h stdio.h stdlib.h string.h stringlist.h \
 	strings.h sysexits.h tar.h termios.h tgmath.h \
 	time.h timeconv.h timers.h ttyent.h \
@@ -68,7 +66,9 @@ LSUBDIRS=	dev/acpica dev/agp dev/ciss dev/filemon dev/firewire \
 	netinet/netdump \
 	netinet/tcp_stacks \
 	netlink/route \
-	security/mac_biba security/mac_bsdextended security/mac_lomac \
+	security/mac_biba security/mac_bsdextended \
+	security/mac_grantbylabel \
+	security/mac_lomac \
 	security/mac_mls security/mac_partition \
 	security/mac_veriexec \
 	sys/disk \
@@ -97,10 +97,10 @@ BSM=		audit.h \
 BSMPACKAGE=	libbsm
 BSMDIR=		${INCLUDEDIR}/bsm
 
-.PATH: ${SRCTOP}/sys/security/audit
-SECAUDIT=	audit.h \
-		audit_ioctl.h \
-		audit_private.h
+.PATH: ${SRCTOP}/sys/security
+SECAUDIT=	audit/audit.h \
+		audit/audit_ioctl.h \
+		audit/audit_private.h
 SECAUDITPACKAGE=	libbsm
 SECAUDITDIR=	${INCLUDEDIR}/security/audit
 
@@ -183,6 +183,11 @@ OPENCRYPTODIR=	${INCLUDEDIR}/crypto
 NVME=		nvme.h
 NVMEDIR=	${INCLUDEDIR}/dev/nvme
 
+.PATH: ${SRCTOP}/sys/dev/nvmf
+NVMF=		nvmf.h \
+		nvmf_proto.h
+NVMFDIR=	${INCLUDEDIR}/dev/nvmf
+
 .PATH: ${SRCTOP}/sys/dev/pci
 PCI=		pcireg.h
 PCIDIR=		${INCLUDEDIR}/dev/pci
@@ -214,7 +219,8 @@ IPFILTERDIR=	${INCLUDEDIR}/netinet
 .PATH: ${SRCTOP}/sys/netpfil/pf
 PF=		pf.h \
 		pf_altq.h \
-		pf_mtag.h
+		pf_mtag.h \
+		pf_nl.h
 PFPACKAGE=	pf
 PFDIR=	${INCLUDEDIR}/netpfil/pf
 
@@ -255,6 +261,7 @@ INCSGROUPS=	INCS \
 		HYPERV \
 		OPENCRYPTO \
 		NVME \
+		NVMF \
 		PCI \
 		RPC \
 		SECAUDIT \
@@ -347,7 +354,7 @@ _MARCHS+=	x86
 
 META_TARGETS+=	compat
 stage_includes: ${SHARED}
-SDESTDIR=	${SYSROOT:U${DESTDIR}}
+SDESTDIR?=	${SYSROOT:U${DESTDIR}}
 
 # Take care of stale directory-level symlinks.
 # Note: The "|| true" after find is needed in case one of the directories does

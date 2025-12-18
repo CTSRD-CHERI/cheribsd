@@ -222,6 +222,12 @@ vdev_prop_get_inherited(vdev_t *vd, vdev_prop_t prop)
 		case VDEV_PROP_IO_T:
 			propval = vd->vdev_io_t;
 			break;
+		case VDEV_PROP_SLOW_IO_N:
+			propval = vd->vdev_slow_io_n;
+			break;
+		case VDEV_PROP_SLOW_IO_T:
+			propval = vd->vdev_slow_io_t;
+			break;
 		default:
 			propval = propdef;
 			break;
@@ -589,6 +595,8 @@ zfs_ereport_start(nvlist_t **ereport_out, nvlist_t **detector_out,
 			    DATA_TYPE_UINT64, vs->vs_checksum_errors,
 			    FM_EREPORT_PAYLOAD_ZFS_VDEV_DELAYS,
 			    DATA_TYPE_UINT64, vs->vs_slow_ios,
+			    FM_EREPORT_PAYLOAD_ZFS_VDEV_DIO_VERIFY_ERRORS,
+			    DATA_TYPE_UINT64, vs->vs_dio_verify_errors,
 			    NULL);
 		}
 
@@ -639,7 +647,7 @@ zfs_ereport_start(nvlist_t **ereport_out, nvlist_t **detector_out,
 		fm_payload_set(ereport, FM_EREPORT_PAYLOAD_ZFS_ZIO_ERR,
 		    DATA_TYPE_INT32, zio->io_error, NULL);
 		fm_payload_set(ereport, FM_EREPORT_PAYLOAD_ZFS_ZIO_FLAGS,
-		    DATA_TYPE_INT32, zio->io_flags, NULL);
+		    DATA_TYPE_UINT64, zio->io_flags, NULL);
 		fm_payload_set(ereport, FM_EREPORT_PAYLOAD_ZFS_ZIO_STAGE,
 		    DATA_TYPE_UINT32, zio->io_stage, NULL);
 		fm_payload_set(ereport, FM_EREPORT_PAYLOAD_ZFS_ZIO_PIPELINE,
@@ -741,6 +749,26 @@ zfs_ereport_start(nvlist_t **ereport_out, nvlist_t **detector_out,
 			    NULL);
 	}
 
+	if (vd != NULL && strcmp(subclass, FM_EREPORT_ZFS_DELAY) == 0) {
+		uint64_t slow_io_n, slow_io_t;
+
+		slow_io_n = vdev_prop_get_inherited(vd, VDEV_PROP_SLOW_IO_N);
+		if (slow_io_n != vdev_prop_default_numeric(VDEV_PROP_SLOW_IO_N))
+			fm_payload_set(ereport,
+			    FM_EREPORT_PAYLOAD_ZFS_VDEV_SLOW_IO_N,
+			    DATA_TYPE_UINT64,
+			    slow_io_n,
+			    NULL);
+
+		slow_io_t = vdev_prop_get_inherited(vd, VDEV_PROP_SLOW_IO_T);
+		if (slow_io_t != vdev_prop_default_numeric(VDEV_PROP_SLOW_IO_T))
+			fm_payload_set(ereport,
+			    FM_EREPORT_PAYLOAD_ZFS_VDEV_SLOW_IO_T,
+			    DATA_TYPE_UINT64,
+			    slow_io_t,
+			    NULL);
+	}
+
 	mutex_exit(&spa->spa_errlist_lock);
 
 	*ereport_out = ereport;
@@ -754,10 +782,6 @@ zfs_ereport_start(nvlist_t **ereport_out, nvlist_t **detector_out,
 #define	MAX_RANGES		16
 
 typedef struct zfs_ecksum_info {
-	/* histograms of set and cleared bits by bit number in a 64-bit word */
-	uint8_t zei_histogram_set[sizeof (uint64_t) * NBBY];
-	uint8_t zei_histogram_cleared[sizeof (uint64_t) * NBBY];
-
 	/* inline arrays of bits set and cleared. */
 	uint64_t zei_bits_set[ZFM_MAX_INLINE];
 	uint64_t zei_bits_cleared[ZFM_MAX_INLINE];
@@ -781,7 +805,7 @@ typedef struct zfs_ecksum_info {
 } zfs_ecksum_info_t;
 
 static void
-update_histogram(uint64_t value_arg, uint8_t *hist, uint32_t *count)
+update_bad_bits(uint64_t value_arg, uint32_t *count)
 {
 	size_t i;
 	size_t bits = 0;
@@ -789,10 +813,8 @@ update_histogram(uint64_t value_arg, uint8_t *hist, uint32_t *count)
 
 	/* We store the bits in big-endian (largest-first) order */
 	for (i = 0; i < 64; i++) {
-		if (value & (1ull << i)) {
-			hist[63 - i]++;
+		if (value & (1ull << i))
 			++bits;
-		}
 	}
 	/* update the count of bits changed */
 	*count += bits;
@@ -920,14 +942,6 @@ annotate_ecksum(nvlist_t *ereport, zio_bad_cksum_t *info,
 
 	if (info != NULL && info->zbc_has_cksum) {
 		fm_payload_set(ereport,
-		    FM_EREPORT_PAYLOAD_ZFS_CKSUM_EXPECTED,
-		    DATA_TYPE_UINT64_ARRAY,
-		    sizeof (info->zbc_expected) / sizeof (uint64_t),
-		    (uint64_t *)&info->zbc_expected,
-		    FM_EREPORT_PAYLOAD_ZFS_CKSUM_ACTUAL,
-		    DATA_TYPE_UINT64_ARRAY,
-		    sizeof (info->zbc_actual) / sizeof (uint64_t),
-		    (uint64_t *)&info->zbc_actual,
 		    FM_EREPORT_PAYLOAD_ZFS_CKSUM_ALGO,
 		    DATA_TYPE_STRING,
 		    info->zbc_checksum_name,
@@ -1010,10 +1024,8 @@ annotate_ecksum(nvlist_t *ereport, zio_bad_cksum_t *info,
 				offset++;
 			}
 
-			update_histogram(set, eip->zei_histogram_set,
-			    &eip->zei_range_sets[range]);
-			update_histogram(cleared, eip->zei_histogram_cleared,
-			    &eip->zei_range_clears[range]);
+			update_bad_bits(set, &eip->zei_range_sets[range]);
+			update_bad_bits(cleared, &eip->zei_range_clears[range]);
 		}
 
 		/* convert to byte offsets */
@@ -1048,15 +1060,6 @@ annotate_ecksum(nvlist_t *ereport, zio_bad_cksum_t *info,
 		    FM_EREPORT_PAYLOAD_ZFS_BAD_CLEARED_BITS,
 		    DATA_TYPE_UINT8_ARRAY,
 		    inline_size, (uint8_t *)eip->zei_bits_cleared,
-		    NULL);
-	} else {
-		fm_payload_set(ereport,
-		    FM_EREPORT_PAYLOAD_ZFS_BAD_SET_HISTOGRAM,
-		    DATA_TYPE_UINT8_ARRAY,
-		    NBBY * sizeof (uint64_t), eip->zei_histogram_set,
-		    FM_EREPORT_PAYLOAD_ZFS_BAD_CLEARED_HISTOGRAM,
-		    DATA_TYPE_UINT8_ARRAY,
-		    NBBY * sizeof (uint64_t), eip->zei_histogram_cleared,
 		    NULL);
 	}
 	return (eip);
@@ -1095,10 +1098,7 @@ zfs_ereport_is_valid(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio)
 		return (B_FALSE);
 
 	if (zio != NULL) {
-		/*
-		 * If this is not a read or write zio, ignore the error.  This
-		 * can occur if the DKIOCFLUSHWRITECACHE ioctl fails.
-		 */
+		/* If this is not a read or write zio, ignore the error */
 		if (zio->io_type != ZIO_TYPE_READ &&
 		    zio->io_type != ZIO_TYPE_WRITE)
 			return (B_FALSE);

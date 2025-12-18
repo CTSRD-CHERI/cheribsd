@@ -29,20 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char copyright[] =
-"@(#) Copyright (c) 1987, 1988, 1993\n\
-	The Regents of the University of California.  All rights reserved.\n";
-#endif /* not lint */
-
-#ifndef lint
-#if 0
-static char sccsid[] = "@(#)time.c	8.1 (Berkeley) 6/6/93";
-#endif
-static const char rcsid[] =
-  "$FreeBSD$";
-#endif /* not lint */
-
 #include <sys/types.h>
 #include <sys/resource.h>
 #include <sys/signal.h>
@@ -68,7 +54,7 @@ static void showtime(FILE *, struct timespec *, struct timespec *,
 static void siginfo(int);
 static void usage(void) __dead2;
 
-static sig_atomic_t siginfo_recvd;
+static volatile sig_atomic_t siginfo_recvd;
 static char decimal_point;
 static struct timespec before_ts;
 static int hflag, pflag;

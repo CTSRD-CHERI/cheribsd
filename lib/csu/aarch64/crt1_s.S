@@ -30,6 +30,8 @@
  */
 
 #include <machine/asm.h>
+#include <sys/elf_common.h>
+
 	/*
 	 * The program entry point
 	 * void _start(char **ap, void (*cleanup)(void)) __dead2
@@ -57,8 +59,8 @@ ENTRY(_start)
 	mov	x3, x22		/* restore cleanup */
 #endif
 #ifdef PIC
-	adrp	x4, main
-	add	x4, x4, :lo12:main
+	adrp	x4, :got:main
+	ldr	x4, [x4, :got_lo12:main]
 #else
 	ldr	x4, =main
 #endif
@@ -77,3 +79,5 @@ eprol:
 END(_start)
 
 	.section .note.GNU-stack,"",@progbits
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

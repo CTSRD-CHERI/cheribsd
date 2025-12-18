@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)extern.h	8.3 (Berkeley) 4/16/94
  */
 
 #include <sys/cdefs.h>
@@ -88,6 +86,7 @@ exec_f	f_delete;
 exec_f	f_depth;
 exec_f	f_empty;
 exec_f	f_exec;
+exec_f	f_executable;
 exec_f	f_expr;
 exec_f	f_false;
 exec_f	f_flags;
@@ -109,11 +108,13 @@ exec_f	f_print;
 exec_f	f_print0;
 exec_f	f_prune;
 exec_f	f_quit;
+exec_f	f_readable;
 exec_f	f_regex;
 exec_f	f_size;
 exec_f	f_sparse;
 exec_f	f_type;
 exec_f	f_user;
+exec_f	f_writable;
 
 extern int ftsoptions, ignore_readdir_race, isdepth, isoutput;
 extern int issort, isxargs;
@@ -123,3 +124,4 @@ extern int exitstatus;
 extern time_t now;
 extern int dotfd;
 extern FTS *tree;
+extern volatile sig_atomic_t showinfo;

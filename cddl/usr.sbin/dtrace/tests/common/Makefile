@@ -1,4 +1,3 @@
-
 # We exclude several subdirectories: nfs and sysevent do not compile on
 # FreeBSD, and docsExamples doesn't seem amenable to automated testing.
 
@@ -39,6 +38,7 @@ TESTS_SUBDIRS+= aggs \
 		misc \
 		multiaggs \
 		offsetof \
+		oformat \
 		operators \
 		pid \
 		plockstat \

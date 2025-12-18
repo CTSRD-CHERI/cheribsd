@@ -27,7 +27,6 @@
  *
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/lock.h>
@@ -60,8 +59,6 @@ stack_save_td(struct stack *st, struct thread *td)
 	struct unwind_state frame;
 
 	THREAD_LOCK_ASSERT(td, MA_OWNED);
-	KASSERT(!TD_IS_SWAPPED(td),
-	    ("stack_save_td: thread %p is swapped", td));
 
 	if (TD_IS_RUNNING(td))
 		return (EOPNOTSUPP);

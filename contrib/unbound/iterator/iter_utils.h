@@ -189,10 +189,13 @@ void iter_mark_pside_cycle_targets(struct module_qstate* qstate,
  * 	if not, then the IPv4 addresses are useless.
  * @param supports_ipv6: if we support ipv6 for lookups to the target.
  * 	if not, then the IPv6 addresses are useless.
+ * @param use_nat64: if we support NAT64 for lookups to the target.
+ *	if yes, IPv4 addresses are useful even if we don't support IPv4.
  * @return true if dp is useless.
  */
-int iter_dp_is_useless(struct query_info* qinfo, uint16_t qflags, 
-	struct delegpt* dp, int supports_ipv4, int supports_ipv6);
+int iter_dp_is_useless(struct query_info* qinfo, uint16_t qflags,
+	struct delegpt* dp, int supports_ipv4, int supports_ipv6,
+	int use_nat64);
 
 /**
  * See if qname has DNSSEC needs.  This is true if there is a trust anchor above
@@ -404,10 +407,14 @@ int iter_dp_cangodown(struct query_info* qinfo, struct delegpt* dp);
  * 	Used for NXDOMAIN checks, above that it is an nxdomain from a
  * 	different server and zone. You can pass NULL to not get it.
  * @param retdpnamelen: returns the length of the dpname.
+ * @param dpname_storage: this is where the dpname buf is stored, if any.
+ * 	So that caller can manage the buffer.
+ * @param dpname_storage_len: size of dpname_storage buffer.
  * @return true if no_cache is set in stub or fwd.
  */
 int iter_stub_fwd_no_cache(struct module_qstate *qstate,
-	struct query_info *qinf, uint8_t** retdpname, size_t* retdpnamelen);
+	struct query_info *qinf, uint8_t** retdpname, size_t* retdpnamelen,
+	uint8_t* dpname_storage, size_t dpname_storage_len);
 
 /**
  * Set support for IP4 and IP6 depending on outgoing interfaces
@@ -420,5 +427,12 @@ int iter_stub_fwd_no_cache(struct module_qstate *qstate,
  */
 void iterator_set_ip46_support(struct module_stack* mods,
 	struct module_env* env, struct outside_network* outnet);
+
+/**
+ * Limit NSEC and NSEC3 TTL in response, RFC9077
+ * @param msg: dns message, the SOA record ttl is used to restrict ttls
+ *	of NSEC and NSEC3 RRsets. If no SOA record, nothing happens.
+ */
+void limit_nsec_ttl(struct dns_msg* msg);
 
 #endif /* ITERATOR_ITER_UTILS_H */

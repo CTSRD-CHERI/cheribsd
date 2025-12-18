@@ -30,19 +30,22 @@
 
 #include <machine/asm.h>
 #include <machine/setjmp.h>
+#include <sys/elf_common.h>
 
 ENTRY(_setjmp)
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	/* Store Executive mode state */
-	str	REGN(lr), [REGN(sp), #-REG_WIDTH]!
-	bl	_rtld_setjmp
-	ldr	REGN(lr), [REGN(sp)], #REG_WIDTH
-#endif
-
 	/* Store the magic value and stack pointer */
 	ldr	x8, .Lmagic
 	mov	REG(9), REGN(sp)
 	stp	REG(8), REG(9), [REG(0)], #(REG_WIDTH * 2)
+#ifdef CHERI_LIB_C18N
+	/* Store the trusted stack pointer */
+	stp	c0, c30, [csp, #-0x20]!
+	mov	c0, c30
+	bl	dl_c18n_get_trusted_stack
+	ldp	c1, c30, [csp], #0x20
+	str	c0, [c1], #REG_WIDTH
+	mov	c0, c1
+#endif
 
 	/* Store the general purpose registers and lr */
 	stp	REG(19), REG(20), [REG(0)], #(REG_WIDTH * 2)
@@ -69,20 +72,33 @@ ENTRY(_setjmp)
 END(_setjmp)
 
 ENTRY(_longjmp)
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	/* Restore Executive mode state */
-	bl	_rtld_longjmp
-#endif
-
 	/* Check the magic value */
 	ldr	REG(8), [REG(0)], #(REG_WIDTH)
 	ldr	x9, .Lmagic
 	cmp	x8, x9
 	b.ne	botch
 
+#ifdef CHERI_LIB_C18N
+	/*
+	 * Preserve the arguments in callee-saved registers instead of pushing
+	 * them onto the stack because stack unwinding will switch the stack.
+	 */
+	mov	c19, c0
+	mov	c20, c1
+	/* Pass the target untrusted stack pointer and trusted stack pointer */
+	ldp	c0, c1, [c0]
+	bl	dl_c18n_unwind_trusted_stack
+	mov	c0, c19
+	mov	c1, c20
+#endif
+
 	/* Restore the stack pointer */
 	ldr	REG(8), [REG(0)], #(REG_WIDTH)
 	mov	REGN(sp), REG(8)
+#ifdef CHERI_LIB_C18N
+	/* Skip the trusted stack pointer */
+	add	c0, c0, #REG_WIDTH
+#endif
 
 	/* Restore the general purpose registers and lr */
 	ldp	REG(19), REG(20), [REG(0)], #(REG_WIDTH * 2)
@@ -113,3 +129,5 @@ botch:
 	bl	_C_LABEL(abort)
 #endif
 END(_longjmp)
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

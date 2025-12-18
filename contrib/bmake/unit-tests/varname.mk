@@ -1,4 +1,4 @@
-# $NetBSD: varname.mk,v 1.11 2023/06/01 20:56:35 rillig Exp $
+# $NetBSD: varname.mk,v 1.14 2023/11/19 21:47:52 rillig Exp $
 #
 # Tests for special variables, such as .MAKE or .PARSEDIR.
 # And for variable names in general.
@@ -12,7 +12,7 @@ VAR{{{}}}=	3 braces
 .  error
 .endif
 
-# In variable expressions, the parser works differently.  It doesn't treat
+# In expressions, the parser works differently.  It doesn't treat
 # braces and parentheses equally, therefore the first closing brace already
 # marks the end of the variable name.
 VARNAME=	VAR(((
@@ -34,7 +34,7 @@ ${:UVAR(((}=	try1
 # as an escape character, therefore the parentheses still count to the nesting
 # level, which at the end of the line is still 3.  Therefore this is not a
 # variable assignment as well.
-# expect+1: Invalid line type
+# expect+1: Invalid line '${:UVAR\(\(\(}=	try2', expanded to 'VAR\(\(\(=	try2'
 ${:UVAR\(\(\(}=	try2
 # To assign to a variable with an arbitrary name, the variable name has to
 # come from an external source, not the text that is parsed in the assignment

@@ -328,6 +328,45 @@ freebsd64_ktimer_gettime(struct thread *td,
 		error = copyout(&val, __USER_CAP_OBJ(uap->value), sizeof(val));
 	return (error);
 }
+
+int
+freebsd64_timerfd_gettime(struct thread *td,
+    struct freebsd64_timerfd_gettime_args *uap)
+{
+	struct itimerspec curr_value;
+	int error;
+
+	error = kern_timerfd_gettime(td, uap->fd, &curr_value);
+	if (error == 0)
+		error = copyout(&curr_value, __USER_CAP_OBJ(uap->curr_value),
+		    sizeof(curr_value));
+
+	return (error);
+}
+
+int
+freebsd64_timerfd_settime(struct thread *td,
+    struct freebsd64_timerfd_settime_args *uap)
+{
+	struct itimerspec new_value, old_value;
+	int error;
+
+	error = copyin(__USER_CAP_OBJ(uap->new_value), &new_value,
+	    sizeof(new_value));
+	if (error != 0)
+		return (error);
+	if (uap->old_value == NULL) {
+		error = kern_timerfd_settime(td, uap->fd, uap->flags,
+		    &new_value, NULL);
+	} else {
+		error = kern_timerfd_settime(td, uap->fd, uap->flags,
+		    &new_value, &old_value);
+		if (error == 0)
+			error = copyout(&old_value,
+			    __USER_CAP_OBJ(uap->old_value), sizeof(old_value));
+	}
+	return (error);
+}
 /*
  * CHERI CHANGES START
  * {

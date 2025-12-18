@@ -1,5 +1,3 @@
-#	@(#)Makefile.inc	8.1 (Berkeley) 6/4/93
-
 .if ${MK_MACHDEP_OPTIMIZATIONS} != "no"
 .PATH: ${LIBC_SRCTOP}/${LIBC_ARCH}/string
 .endif
@@ -29,11 +27,13 @@ MISRCS+=bcmp.c bcopy.c bzero.c explicit_bzero.c \
 	wmemcmp.c \
 	wmemcpy.c wmemmove.c wmempcpy.c wmemset.c
 
+SYM_MAPS+=	${LIBC_SRCTOP}/string/Symbol.map
+COMPARTMENT_POLICY+=${LIBC_SRCTOP}/string/Compartments.json
+
 .if ${MACHINE_CPU:Mcheri} && !${MACHINE_ABI:Mpurecap}
 MISRCS+=memcpy_c.c memmove_c.c memset_c.c
+SYM_MAPS+=	${LIBC_SRCTOP}/string/Symbol_cheri_hybrid.map
 .endif
-
-SYM_MAPS+=	${LIBC_SRCTOP}/string/Symbol.map
 
 .if ${MK_ASAN} != "no"
 # These source files deliberately read out of bounds since they assume that

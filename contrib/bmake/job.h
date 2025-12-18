@@ -1,4 +1,4 @@
-/*	$NetBSD: job.h,v 1.77 2021/12/15 12:58:01 rillig Exp $	*/
+/*	$NetBSD: job.h,v 1.80 2024/07/07 07:50:57 rillig Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1990 The Regents of the University of California.
@@ -73,9 +73,7 @@
  *	from: @(#)job.h	8.1 (Berkeley) 6/6/93
  */
 
-/*
- * Running of jobs in parallel mode.
- */
+/* Run jobs in parallel mode. */
 
 #ifndef MAKE_JOB_H
 #define MAKE_JOB_H
@@ -181,7 +179,7 @@ typedef struct Job {
 #endif
 } Job;
 
-extern const char *shellPath;
+extern char *shellPath;
 extern const char *shellName;
 extern char *shellErrFlag;
 
@@ -198,7 +196,9 @@ void Job_Make(GNode *);
 void Job_Init(void);
 bool Job_ParseShell(char *) MAKE_ATTR_USE;
 int Job_Finish(void);
+#ifdef CLEANUP
 void Job_End(void);
+#endif
 void Job_Wait(void);
 void Job_AbortAll(void);
 void Job_TokenReturn(void);

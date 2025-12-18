@@ -29,7 +29,7 @@
 .\" Copyright 2018 Nexenta Systems, Inc.
 .\" Copyright 2019 Joyent, Inc.
 .\"
-.Dd March 16, 2022
+.Dd April 20, 2024
 .Dt ZFS-SET 8
 .Os
 .
@@ -39,12 +39,14 @@
 .Sh SYNOPSIS
 .Nm zfs
 .Cm set
+.Op Fl u
 .Ar property Ns = Ns Ar value Oo Ar property Ns = Ns Ar value Oc Ns …
 .Ar filesystem Ns | Ns Ar volume Ns | Ns Ar snapshot Ns …
 .Nm zfs
 .Cm get
 .Op Fl r Ns | Ns Fl d Ar depth
 .Op Fl Hp
+.Op Fl j Op Ar --json-int
 .Oo Fl o Ar field Ns Oo , Ns Ar field Oc Ns … Oc
 .Oo Fl s Ar source Ns Oo , Ns Ar source Oc Ns … Oc
 .Oo Fl t Ar type Ns Oo , Ns Ar type Oc Ns … Oc
@@ -60,6 +62,7 @@
 .It Xo
 .Nm zfs
 .Cm set
+.Op Fl u
 .Ar property Ns = Ns Ar value Oo Ar property Ns = Ns Ar value Oc Ns …
 .Ar filesystem Ns | Ns Ar volume Ns | Ns Ar snapshot Ns …
 .Xc
@@ -79,11 +82,17 @@ For more information, see the
 .Em User Properties
 section of
 .Xr zfsprops 7 .
+.Bl -tag -width "-u"
+.It Fl u
+Update mountpoint, sharenfs, sharesmb property but do not mount or share the
+dataset.
+.El
 .It Xo
 .Nm zfs
 .Cm get
 .Op Fl r Ns | Ns Fl d Ar depth
 .Op Fl Hp
+.Op Fl j Op Ar --json-int
 .Oo Fl o Ar field Ns Oo , Ns Ar field Oc Ns … Oc
 .Oo Fl s Ar source Ns Oo , Ns Ar source Oc Ns … Oc
 .Oo Fl t Ar type Ns Oo , Ns Ar type Oc Ns … Oc
@@ -121,6 +130,11 @@ The value
 can be used to display all properties that apply to the given dataset's type
 .Pq Sy filesystem , volume , snapshot , No or Sy bookmark .
 .Bl -tag -width "-s source"
+.It Fl j , -json Op Ar --json-int
+Display the output in JSON format.
+Specify
+.Sy --json-int
+to display numbers in integer format instead of strings for JSON output.
 .It Fl H
 Display output in a form more easily parsed by scripts.
 Any headers are omitted, and fields are explicitly separated by a single tab
@@ -151,6 +165,15 @@ A comma-separated list of types to display, where
 .Ar type
 is one of
 .Sy filesystem , snapshot , volume , bookmark , No or Sy all .
+.Sy fs ,
+.Sy snap ,
+or
+.Sy vol
+can be used as aliases for
+.Sy filesystem ,
+.Sy snapshot ,
+or
+.Sy volume .
 .El
 .It Xo
 .Nm zfs
@@ -265,6 +288,50 @@ The following command gets a single property value:
 .Bd -literal -compact -offset Ds
 .No # Nm zfs Cm get Fl H o Sy value compression Ar pool/home/bob
 on
+.Ed
+.Pp
+The following command gets a single property value recursively in JSON format:
+.Bd -literal -compact -offset Ds
+.No # Nm zfs Cm get Fl j Fl r Sy mountpoint Ar pool/home | Nm jq
+{
+  "output_version": {
+    "command": "zfs get",
+    "vers_major": 0,
+    "vers_minor": 1
+  },
+  "datasets": {
+    "pool/home": {
+      "name": "pool/home",
+      "type": "FILESYSTEM",
+      "pool": "pool",
+      "createtxg": "10",
+      "properties": {
+        "mountpoint": {
+          "value": "/pool/home",
+          "source": {
+            "type": "DEFAULT",
+            "data": "-"
+          }
+        }
+      }
+    },
+    "pool/home/bob": {
+      "name": "pool/home/bob",
+      "type": "FILESYSTEM",
+      "pool": "pool",
+      "createtxg": "1176",
+      "properties": {
+        "mountpoint": {
+          "value": "/pool/home/bob",
+          "source": {
+            "type": "DEFAULT",
+            "data": "-"
+          }
+        }
+      }
+    }
+  }
+}
 .Ed
 .Pp
 The following command lists all properties with local settings for

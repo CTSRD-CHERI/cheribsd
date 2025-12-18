@@ -42,7 +42,7 @@
 #include <dev/iicbus/iiconf.h>
 #include <dev/iicbus/iicbus.h>
 
-#include <dev/extres/clk/clk.h>
+#include <dev/clk/clk.h>
 
 #include <dev/cadence/cdns_i2c.h>
 

@@ -33,7 +33,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #ifndef WITHOUT_CAPSICUM
 #include <sys/capsicum.h>
@@ -103,7 +102,7 @@ static sig_t old_winch_handler;
 #define	SNAPSHOT_CHUNK	(4 * MB)
 #define	PROG_BUF_SZ	(8192)
 
-#define	SNAPSHOT_BUFFER_SIZE (20 * MB)
+#define	SNAPSHOT_BUFFER_SIZE (40 * MB)
 
 #define	JSON_KERNEL_ARR_KEY		"kern_structs"
 #define	JSON_DEV_ARR_KEY		"devices"
@@ -137,8 +136,9 @@ static const struct vm_snapshot_kern_info snapshot_kern_structs[] = {
 };
 
 static cpuset_t vcpus_active, vcpus_suspended;
-static pthread_mutex_t vcpu_lock;
-static pthread_cond_t vcpus_idle, vcpus_can_run;
+static pthread_mutex_t vcpu_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t vcpus_idle = PTHREAD_COND_INITIALIZER;
+static pthread_cond_t vcpus_can_run = PTHREAD_COND_INITIALIZER;
 static bool checkpoint_active;
 
 /*
@@ -155,13 +155,13 @@ strcat_extension(const char *base_str, const char *ext)
 	ext_len = strnlen(ext, NAME_MAX);
 
 	if (base_len + ext_len > NAME_MAX) {
-		fprintf(stderr, "Filename exceeds maximum length.\n");
+		EPRINTLN("Filename exceeds maximum length.");
 		return (NULL);
 	}
 
 	res = malloc(base_len + ext_len + 1);
 	if (res == NULL) {
-		perror("Failed to allocate memory.");
+		EPRINTLN("Failed to allocate memory: %s", strerror(errno));
 		return (NULL);
 	}
 
@@ -176,7 +176,7 @@ void
 destroy_restore_state(struct restore_state *rstate)
 {
 	if (rstate == NULL) {
-		fprintf(stderr, "Attempting to destroy NULL restore struct.\n");
+		EPRINTLN("Attempting to destroy NULL restore struct.");
 		return;
 	}
 
@@ -1394,22 +1394,6 @@ vm_do_checkpoint(struct vmctx *ctx, const nvlist_t *nvl)
 	return (error);
 }
 IPC_COMMAND(ipc_cmd_set, checkpoint, vm_do_checkpoint);
-
-void
-init_snapshot(void)
-{
-	int err;
-
-	err = pthread_mutex_init(&vcpu_lock, NULL);
-	if (err != 0)
-		errc(1, err, "checkpoint mutex init");
-	err = pthread_cond_init(&vcpus_idle, NULL);
-	if (err != 0)
-		errc(1, err, "checkpoint cv init (vcpus_idle)");
-	err = pthread_cond_init(&vcpus_can_run, NULL);
-	if (err != 0)
-		errc(1, err, "checkpoint cv init (vcpus_can_run)");
-}
 
 /*
  * Create the listening socket for IPC with bhyvectl

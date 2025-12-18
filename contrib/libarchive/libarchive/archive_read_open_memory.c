@@ -24,7 +24,6 @@
  */
 
 #include "archive_platform.h"
-__FBSDID("$FreeBSD$");
 
 #include <errno.h>
 #include <stdlib.h>
@@ -70,7 +69,7 @@ archive_read_open_memory2(struct archive *a, const void *buff,
 {
 	struct read_memory_data *mine;
 
-	mine = (struct read_memory_data *)calloc(1, sizeof(*mine));
+	mine = calloc(1, sizeof(*mine));
 	if (mine == NULL) {
 		archive_set_error(a, ENOMEM, "No memory");
 		return (ARCHIVE_FATAL);

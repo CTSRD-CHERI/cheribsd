@@ -1,11 +1,15 @@
-
 .include <src.lua.mk>
+
+SUBDIR+=	libfreebsd
+SUBDIR+=	libhash
+SUBDIR+=	libjail
+SUBDIR+=	libucl
 
 LUASRC?=	${SRCTOP}/contrib/lua/src
 .PATH: ${LUASRC}
 
 PROG=	flua
-WARNS?=	2
+WARNS?=	3
 MAN=	# No manpage; this is internal.
 
 CWARNFLAGS.gcc+=	-Wno-format-nonliteral
@@ -18,7 +22,7 @@ SRCS+=	lua.c
 # FreeBSD Extensions
 .PATH: ${.CURDIR}/modules
 SRCS+=	linit_flua.c
-SRCS+=	lfs.c lposix.c
+SRCS+=	lfs.c lposix.c lfbsd.c
 
 CFLAGS+=	-I${SRCTOP}/lib/liblua -I${.CURDIR}/modules -I${LUASRC}
 CFLAGS+=	-DLUA_PROGNAME="\"${PROG}\""
@@ -35,11 +39,5 @@ LDFLAGS+=	-Wl,-E
 # the use of `tmpnam' is dangerous, better use `mkstemp'
 LD_FATAL_WARNINGS=no
 .endif
-
-UCLSRC?=	${SRCTOP}/contrib/libucl
-.PATH: ${UCLSRC}/lua
-SRCS+=	lua_ucl.c
-CFLAGS+=	-I${UCLSRC}/include -I${UCLSRC}/src -I${UCLSRC}/uthash
-LIBADD+=	ucl
 
 .include <bsd.prog.mk>

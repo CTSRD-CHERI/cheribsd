@@ -119,6 +119,12 @@ static int ig4iic_pci_detach(device_t dev);
 #define PCI_CHIP_COMETLAKE_V_I2C_1	0xa3e18086
 #define PCI_CHIP_COMETLAKE_V_I2C_2	0xa3e28086
 #define PCI_CHIP_COMETLAKE_V_I2C_3	0xa3e38086
+#define	PCI_CHIP_ICELAKE_LP_I2C_0	0x34e88086
+#define	PCI_CHIP_ICELAKE_LP_I2C_1	0x34e98086
+#define	PCI_CHIP_ICELAKE_LP_I2C_2	0x34ea8086
+#define	PCI_CHIP_ICELAKE_LP_I2C_3	0x34eb8086
+#define	PCI_CHIP_ICELAKE_LP_I2C_4	0x34c58086
+#define	PCI_CHIP_ICELAKE_LP_I2C_5	0x34c68086
 #define PCI_CHIP_TIGERLAKE_H_I2C_0	0x43d88086
 #define PCI_CHIP_TIGERLAKE_H_I2C_1	0x43e88086
 #define PCI_CHIP_TIGERLAKE_H_I2C_2	0x43e98086
@@ -162,6 +168,10 @@ static int ig4iic_pci_detach(device_t dev);
 #define PCI_CHIP_ALDERLAKE_M_I2C_3	0x54eb8086
 #define PCI_CHIP_ALDERLAKE_M_I2C_4	0x54c58086
 #define PCI_CHIP_ALDERLAKE_M_I2C_5	0x54c68086
+#define PCI_CHIP_METEORLAKE_M_I2C_0	0x7e788086
+#define PCI_CHIP_METEORLAKE_M_I2C_1	0x7e798086
+#define PCI_CHIP_METEORLAKE_M_I2C_2	0x7e508086
+#define PCI_CHIP_METEORLAKE_M_I2C_3	0x7e518086
 
 struct ig4iic_pci_device {
 	uint32_t	devid;
@@ -225,6 +235,12 @@ static struct ig4iic_pci_device ig4iic_pci_devices[] = {
 	{ PCI_CHIP_COMETLAKE_V_I2C_1, "Intel Comet Lake-V I2C Controller-1", IG4_CANNONLAKE},
 	{ PCI_CHIP_COMETLAKE_V_I2C_2, "Intel Comet Lake-V I2C Controller-2", IG4_CANNONLAKE},
 	{ PCI_CHIP_COMETLAKE_V_I2C_3, "Intel Comet Lake-V I2C Controller-3", IG4_CANNONLAKE},
+	{ PCI_CHIP_ICELAKE_LP_I2C_0, "Intel Ice Lake-LP I2C Controller-0", IG4_TIGERLAKE},
+	{ PCI_CHIP_ICELAKE_LP_I2C_1, "Intel Ice Lake-LP I2C Controller-1", IG4_TIGERLAKE},
+	{ PCI_CHIP_ICELAKE_LP_I2C_2, "Intel Ice Lake-LP I2C Controller-2", IG4_TIGERLAKE},
+	{ PCI_CHIP_ICELAKE_LP_I2C_3, "Intel Ice Lake-LP I2C Controller-3", IG4_TIGERLAKE},
+	{ PCI_CHIP_ICELAKE_LP_I2C_4, "Intel Ice Lake-LP I2C Controller-4", IG4_TIGERLAKE},
+	{ PCI_CHIP_ICELAKE_LP_I2C_5, "Intel Ice Lake-LP I2C Controller-5", IG4_TIGERLAKE},
 	{ PCI_CHIP_TIGERLAKE_H_I2C_0, "Intel Tiger Lake-H I2C Controller-0", IG4_TIGERLAKE},
 	{ PCI_CHIP_TIGERLAKE_H_I2C_1, "Intel Tiger Lake-H I2C Controller-1", IG4_TIGERLAKE},
 	{ PCI_CHIP_TIGERLAKE_H_I2C_2, "Intel Tiger Lake-H I2C Controller-2", IG4_TIGERLAKE},
@@ -268,6 +284,10 @@ static struct ig4iic_pci_device ig4iic_pci_devices[] = {
 	{ PCI_CHIP_ALDERLAKE_M_I2C_3, "Intel Alder Lake-M I2C Controller-3", IG4_TIGERLAKE},
 	{ PCI_CHIP_ALDERLAKE_M_I2C_4, "Intel Alder Lake-M I2C Controller-4", IG4_TIGERLAKE},
 	{ PCI_CHIP_ALDERLAKE_M_I2C_5, "Intel Alder Lake-M I2C Controller-5", IG4_TIGERLAKE},
+	{ PCI_CHIP_METEORLAKE_M_I2C_0, "Intel Meteor Lake-M I2C Controller-0", IG4_TIGERLAKE},
+	{ PCI_CHIP_METEORLAKE_M_I2C_1, "Intel Meteor Lake-M I2C Controller-1", IG4_TIGERLAKE},
+	{ PCI_CHIP_METEORLAKE_M_I2C_2, "Intel Meteor Lake-M I2C Controller-2", IG4_TIGERLAKE},
+	{ PCI_CHIP_METEORLAKE_M_I2C_3, "Intel Meteor Lake-M I2C Controller-3", IG4_TIGERLAKE},
 };
 
 static int

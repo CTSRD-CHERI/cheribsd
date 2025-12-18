@@ -32,8 +32,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)in_pcb.h	8.1 (Berkeley) 6/10/93
  */
 
 #ifndef _NETINET_IN_PCB_H_
@@ -135,8 +133,9 @@ struct in_conninfo {
 /*
  * struct inpcb captures the network layer state for TCP, UDP, and raw IPv4 and
  * IPv6 sockets.  In the case of TCP and UDP, further per-connection state is
- * hung off of inp_ppcb most of the time.  Almost all fields of struct inpcb
- * are static after creation or protected by a per-inpcb rwlock, inp_lock.
+ * located in a larger protocol specific structure that embeds inpcb in it.
+ * Almost all fields of struct inpcb are static after creation or protected by
+ * a per-inpcb rwlock, inp_lock.
  *
  * A inpcb database is indexed by addresses/ports hash as well as list of
  * all pcbs that belong to a certain proto. Database lookups or list traversals
@@ -179,7 +178,6 @@ struct inpcb {
 	int	inp_flags;		/* (i) generic IP/datagram flags */
 	int	inp_flags2;		/* (i) generic IP/datagram flags #2*/
 	uint8_t inp_numa_domain;	/* numa domain */
-	void	*inp_ppcb;		/* (i) pointer to per-protocol pcb */
 	struct	socket *inp_socket;	/* (i) back pointer to socket */
 	struct	inpcbinfo *inp_pcbinfo;	/* (c) PCB list info */
 	struct	ucred	*inp_cred;	/* (c) cache of socket cred */
@@ -268,8 +266,7 @@ struct xinpcb {
 	struct xsocket	xi_socket;		/* (s,p) */
 	struct in_conninfo inp_inc;		/* (s,p) */
 	uint64_t	inp_gencnt;		/* (s,p) */
-	kvaddr_t	inp_ppcb;		/* (s) netstat(1) */
-	int64_t		inp_spare64[4];
+	int64_t		inp_spare64[5];
 	uint32_t	inp_flow;		/* (s) */
 	uint32_t	inp_flowid;		/* (s) */
 	uint32_t	inp_flowtype;		/* (s) */
@@ -481,12 +478,8 @@ void inp_unlock_assert(struct inpcb *);
 
 void	inp_apply_all(struct inpcbinfo *, void (*func)(struct inpcb *, void *),
 	    void *arg);
-int 	inp_ip_tos_get(const struct inpcb *inp);
-void 	inp_ip_tos_set(struct inpcb *inp, int val);
 struct socket *
 	inp_inpcbtosocket(struct inpcb *inp);
-struct tcpcb *
-	inp_inpcbtotcpcb(struct inpcb *inp);
 void 	inp_4tuple_get(struct inpcb *inp, uint32_t *laddr, uint16_t *lp,
 		uint32_t *faddr, uint16_t *fp);
 
@@ -672,7 +665,6 @@ int	in_pcbconnect(struct inpcb *, struct sockaddr_in *, struct ucred *,
 	    bool);
 int	in_pcbconnect_setup(struct inpcb *, struct sockaddr_in *, in_addr_t *,
 	    u_short *, in_addr_t *, u_short *, struct ucred *);
-void	in_pcbdetach(struct inpcb *);
 void	in_pcbdisconnect(struct inpcb *);
 void	in_pcbdrop(struct inpcb *);
 void	in_pcbfree(struct inpcb *);
@@ -686,8 +678,6 @@ struct inpcb *
 struct inpcb *
 	in_pcblookup_mbuf(struct inpcbinfo *, struct in_addr, u_int,
 	    struct in_addr, u_int, int, struct ifnet *, struct mbuf *);
-void	in_pcbnotifyall(struct inpcbinfo *pcbinfo, struct in_addr,
-	    int, struct inpcb *(*)(struct inpcb *, int));
 void	in_pcbref(struct inpcb *);
 void	in_pcbrehash(struct inpcb *);
 void	in_pcbremhash_locked(struct inpcb *);
@@ -725,10 +715,8 @@ struct inpcb_iterator {
 struct inpcb *inp_next(struct inpcb_iterator *);
 void	in_losing(struct inpcb *);
 void	in_pcbsetsolabel(struct socket *so);
-int	in_getpeeraddr(struct socket *so, struct sockaddr **nam);
-int	in_getsockaddr(struct socket *so, struct sockaddr **nam);
-struct sockaddr *
-	in_sockaddr(in_port_t port, struct in_addr *addr);
+int	in_getpeeraddr(struct socket *, struct sockaddr *sa);
+int	in_getsockaddr(struct socket *, struct sockaddr *sa);
 void	in_pcbsosetlabel(struct socket *so);
 #ifdef RATELIMIT
 int

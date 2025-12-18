@@ -29,12 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#if 0
-#ifndef lint
-static char sccsid[] = "@(#)lisp.c	8.3 (Berkeley) 4/2/94";
-#endif
-#endif
-
 #include <sys/cdefs.h>
 #include <ctype.h>
 #include <limits.h>
@@ -50,7 +44,7 @@ static char sccsid[] = "@(#)lisp.c	8.3 (Berkeley) 4/2/94";
 void
 l_entries(void)
 {
-	int	special;
+	bool	special;
 	char	*cp;
 	char	savedc;
 	char	tok[MAXTOKEN];
@@ -63,15 +57,15 @@ l_entries(void)
 		lbp = lbuf;
 		if (!cicmp("(def"))
 			continue;
-		special = NO;
+		special = false;
 		switch(*lbp | ' ') {
 		case 'm':
 			if (cicmp("method"))
-				special = YES;
+				special = true;
 			break;
 		case 'w':
 			if (cicmp("wrapper") || cicmp("whopper"))
-				special = YES;
+				special = true;
 		}
 		for (; !isspace(*lbp); ++lbp)
 			continue;

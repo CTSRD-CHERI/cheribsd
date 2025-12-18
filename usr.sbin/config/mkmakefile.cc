@@ -29,14 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-#if 0
-static char sccsid[] = "@(#)mkmakefile.c	8.1 (Berkeley) 6/6/93";
-#endif
-static const char rcsid[] =
-  "$FreeBSD$";
-#endif /* not lint */
-
 /*
  * Build the makefile for the system, from
  * the information in the files files and the
@@ -392,13 +384,25 @@ read_file(char *fname)
 	struct file_list *tp;
 	struct device *dp;
 	struct opt *op;
+	struct includepath *ipath;
 	configword wd;
-	char *rfile, *compilewith, *depends, *clean, *warning;
+	char *rfile, *compilewith, *depends, *clean, *fnamebuf, *warning;
 	const char *objprefix;
 	int compile, match, nreqs, std, filetype, negate,
 	    imp_rule, no_ctfconvert, no_obj, before_depend, nowerror;
 
 	fp = fopen(fname, "r");
+	if (fp == NULL) {
+		SLIST_FOREACH(ipath, &includepath, path_next) {
+			asprintf(&fnamebuf, "%s/%s", ipath->path, fname);
+			if (fnamebuf != NULL) {
+				fp = fopen(fnamebuf, "r");
+				if (fp != NULL)
+					break;
+				free(fnamebuf);
+			}
+		}
+	}
 	if (fp == NULL)
 		err(1, "%s", fname);
 next:
@@ -573,7 +577,7 @@ next:
 				goto nextparam;
 			}
 		match &= negate;
-nextparam:;
+nextparam:
 		negate = 0;
 	}
 	compile += match;

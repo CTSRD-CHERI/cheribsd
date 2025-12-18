@@ -27,7 +27,6 @@
  * Allwinner GMAC clock
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -40,8 +39,8 @@
 #include <dev/ofw/ofw_bus_subr.h>
 #include <dev/ofw/ofw_subr.h>
 
-#include <dev/extres/clk/clk_mux.h>
-#include <dev/extres/clk/clk_gate.h>
+#include <dev/clk/clk_mux.h>
+#include <dev/clk/clk_gate.h>
 
 #include "clkdev_if.h"
 

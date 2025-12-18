@@ -29,18 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char copyright[] =
-"@(#) Copyright (c) 1980, 1987, 1992, 1993\n\
-	The Regents of the University of California.  All rights reserved.\n";
-#endif /* not lint */
-
-#ifndef lint
-#if 0
-static char sccsid[] = "@(#)head.c	8.2 (Berkeley) 5/4/95";
-#endif
-#endif /* not lint */
-#include <sys/cdefs.h>
 #include <sys/capsicum.h>
 #include <sys/types.h>
 
@@ -168,12 +156,13 @@ main(int argc, char *argv[])
 static void
 head(FILE *fp, intmax_t cnt)
 {
-	char *cp;
-	size_t error, readlen;
+	char *cp = NULL;
+	size_t error, bufsize = 0;
+	ssize_t readlen;
 
-	while (cnt != 0 && (cp = fgetln(fp, &readlen)) != NULL) {
+	while (cnt != 0 && (readlen = getline(&cp, &bufsize, fp)) >= 0) {
 		error = fwrite(cp, sizeof(char), readlen, stdout);
-		if (error != readlen)
+		if ((ssize_t)error != readlen)
 			err(1, "stdout");
 		cnt--;
 	}

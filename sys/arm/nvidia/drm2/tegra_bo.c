@@ -24,7 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -33,7 +32,7 @@
 
 #include <machine/bus.h>
 
-#include <dev/extres/clk/clk.h>
+#include <dev/clk/clk.h>
 #include <dev/drm2/drmP.h>
 #include <dev/drm2/drm_crtc_helper.h>
 #include <dev/drm2/drm_fb_helper.h>
@@ -63,7 +62,7 @@ tegra_bo_destruct(struct tegra_bo *bo)
 	for (i = 0; i < bo->npages; i++) {
 		m = bo->m[i];
 		vm_page_busy_acquire(m, 0);
-		cdev_pager_free_page(bo->cdev_pager, m);
+		cdev_mgtdev_pager_free_page(bo->cdev_pager, m);
 		m->flags &= ~PG_FICTITIOUS;
 		vm_page_unwire_noq(m);
 		vm_page_free(m);
@@ -72,7 +71,7 @@ tegra_bo_destruct(struct tegra_bo *bo)
 
 	vm_object_deallocate(bo->cdev_pager);
 	if (bo->vbase != 0)
-		vmem_free(kmem_arena, bo->vbase, size);
+		vmem_free(kernel_arena, bo->vbase, size);
 }
 
 static void
@@ -95,7 +94,7 @@ tegra_bo_alloc_contig(size_t npages, u_long alignment, vm_memattr_t memattr,
     vm_page_t **ret_page)
 {
 	vm_page_t m;
-	int tries, i;
+	int err, i, tries;
 	vm_paddr_t low, high, boundary;
 
 	low = 0;
@@ -107,9 +106,12 @@ retry:
 	    low, high, alignment, boundary, memattr);
 	if (m == NULL) {
 		if (tries < 3) {
-			if (!vm_page_reclaim_contig(0, npages, low, high,
-			    alignment, boundary))
+			err = vm_page_reclaim_contig(0, npages, low, high,
+			    alignment, boundary);
+			if (err == ENOMEM)
 				vm_wait(NULL);
+			else if (err != 0)
+				return (ENOMEM);
 			tries++;
 			goto retry;
 		}
@@ -135,7 +137,7 @@ tegra_bo_init_pager(struct tegra_bo *bo)
 	size = round_page(bo->gem_obj.size);
 
 	bo->pbase = VM_PAGE_TO_PHYS(bo->m[0]);
-	if (vmem_alloc(kmem_arena, size, M_WAITOK | M_BESTFIT, &bo->vbase))
+	if (vmem_alloc(kernel_arena, size, M_WAITOK | M_BESTFIT, &bo->vbase))
 		return (ENOMEM);
 
 	VM_OBJECT_WLOCK(bo->cdev_pager);

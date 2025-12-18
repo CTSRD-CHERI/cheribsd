@@ -28,7 +28,6 @@
 #ifndef _MACHINE_OFW_MACHDEP_H_
 #define _MACHINE_OFW_MACHDEP_H_
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/rman.h>
 #include <sys/bus.h>
@@ -43,7 +42,7 @@ typedef	uint32_t	cell_t;
 void OF_getetheraddr(device_t dev, u_char *addr);
 
 void OF_initial_setup(void *fdt_ptr, void *junk, int (*openfirm)(void *));
-boolean_t OF_bootstrap(void);
+bool OF_bootstrap(void);
 
 void OF_reboot(void);
 

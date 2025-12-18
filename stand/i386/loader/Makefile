@@ -1,12 +1,11 @@
-
 HAVE_ZFS=		${MK_LOADER_ZFS}
 
 LOADER_NET_SUPPORT?=	yes
 LOADER_NFS_SUPPORT?=	yes
 LOADER_TFTP_SUPPORT?=	yes
 LOADER_CD9660_SUPPORT?=	yes
-LOADER_EXT2FS_SUPPORT?=	yes
-LOADER_MSDOS_SUPPORT?=	yes
+LOADER_EXT2FS_SUPPORT?=	no
+LOADER_MSDOS_SUPPORT?=	no
 LOADER_UFS_SUPPORT?=	yes
 LOADER_GZIP_SUPPORT?=	yes
 LOADER_BZIP2_SUPPORT?=	yes
@@ -23,7 +22,7 @@ VERSION_FILE=	${.CURDIR}/../loader/version
 # non-random survey suggests that 20k-25k is a good value for 'most' machines.
 # We also need to subtract maximum stack usage (20-25k).
 #
-# So 640k - 40k - 25k - 25k = 550k = 563,200 bytes, but use 550,000 below for
+# So 640k - 40k - 25k - 25k = 550k = 563,200 bytes, but use 560,000 below for
 # some extra buffer for more complex setups and/or wider BIOS lomem variation.
 #
 # Some systems use more stack or have BIOS reserve more RAM (or both), and will
@@ -33,18 +32,37 @@ VERSION_FILE=	${.CURDIR}/../loader/version
 #
 # will tell you how many kiB of lomem are available.
 #
-LOADERSIZE?=	550000		# Largest known safe size for loader.bin
+# We further reduce this to 500k, though, to give PXE an additional 64k of space
+# so pxeloader will fit. If you have special needs that do not include pxeboot,
+# you can safely set this as high as 560000 generally, or a bit higher if you
+# have tight control over the machines you are booting on.
+#
+LOADERSIZE?=	500000		# Largest known safe size for loader.bin
 
 .PATH:		${BOOTSRC}/i386/loader
 
 # architecture-specific loader code
-SRCS=		main.c conf.c vers.c chain.c gfx_fb.c 8x16.c
+SRCS+=		chain.c
+SRCS+=		conf.c
+SRCS+=		gfx_bios.c
+SRCS+=		main.c
+SRCS+=		vers.c
+
+.if ${MK_LOADER_BIOS_TEXTONLY} == "no"
+SRCS+=		gfx_fb.c
+SRCS+=		8x16.c
 
 CFLAGS.gfx_fb.c += -I${.CURDIR}/../libi386
 CFLAGS.gfx_fb.c += -I$(SRCTOP)/sys/teken
 CFLAGS.gfx_fb.c += -I${SRCTOP}/sys/cddl/contrib/opensolaris/common/lz4
 CFLAGS.gfx_fb.c += -I${SRCTOP}/contrib/pnglite
 CFLAGS.gfx_fb.c += -DHAVE_MEMCPY -I${SRCTOP}/sys/contrib/zlib
+CFLAGS.gfx_bios.c += -I$(SRCTOP)/sys/teken
+CFLAGS.gfx_bios.c += -I${SRCTOP}/contrib/pnglite
+.else
+CFLAGS.gfx_bios.c += -DBIOS_TEXT_ONLY
+CFLAGS.conf.c	+= -DBIOS_TEXT_ONLY
+.endif
 
 # Include bcache code.
 HAVE_BCACHE=	yes
@@ -112,8 +130,8 @@ FILESMODE_${LOADER}= ${BINMODE} -b
 # Note: crt0.o needs to be first for pxeboot(8) to work. It assumes that the
 # startup code is located at the start of the loader and will jump
 # there. Although btx is more flexible than this, the emulated boot2 environment
-# that pxeldr provides has none of that flexibility assumes an entry point of
-# 0. In addition, pxeldr and cdboot assume that it is loading an a.out file.
+# that pxeldr provides has none of that flexibility and assumes the entry point
+# is 0. Finally, both pxeldr and cdboot assume they are loading an a.out file.
 #
 # We must add it to the LDFLAGS instead of the OBJS because the former won't try
 # to clean it. When it is in OBJS, this cleaning can lead to races where

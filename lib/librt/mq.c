@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <sys/mqueue.h>
@@ -42,18 +41,6 @@
 #include "sigev_thread.h"
 #include "un-namespace.h"
 #include "libc_private.h"
-
-extern int	__sys_kmq_notify(int, const struct sigevent *);
-extern int	__sys_kmq_open(const char *, int, mode_t,
-		    const struct mq_attr *);
-extern int	__sys_kmq_setattr(int, const struct mq_attr *__restrict,
-		    struct mq_attr *__restrict);
-extern ssize_t	__sys_kmq_timedreceive(int, char *__restrict, size_t,
-		    unsigned *__restrict, const struct timespec *__restrict);
-extern int	__sys_kmq_timedsend(int, const char *, size_t, unsigned,
-		    const struct timespec *);
-extern int	__sys_kmq_unlink(const char *);
-extern int	__sys_close(int fd);
 
 struct __mq {
 	int oshandle;

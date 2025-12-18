@@ -40,8 +40,8 @@ if [ $(id -u) -ne 0 ]; then
 	echo "1..0 # SKIP you must be root"
 	exit 0
 fi
-if [ -z "$(which perl)" ]; then
-	echo "1..0 # SKIP perl must be installed"
+if [ ! -c /dev/mdctl ]; then
+	echo "1..0 # SKIP no /dev/mdctl to create md devices"
 	exit 0
 fi
 

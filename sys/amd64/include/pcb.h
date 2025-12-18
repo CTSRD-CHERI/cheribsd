@@ -31,8 +31,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	from: @(#)pcb.h	5.10 (Berkeley) 5/12/91
  */
 
 #ifndef _AMD64_PCB_H_
@@ -78,14 +76,14 @@ struct pcb {
 	uint16_t	pcb_tr;
 
 	u_int		pcb_flags;
-#define	PCB_FULL_IRET	0x01	/* full iret is required */
-#define	PCB_DBREGS	0x02	/* process using debug registers */
-#define	PCB_KERNFPU	0x04	/* kernel uses fpu */
-#define	PCB_FPUINITDONE	0x08	/* fpu state is initialized */
-#define	PCB_USERFPUINITDONE 0x10 /* fpu user state is initialized */
-#define	PCB_KERNFPU_THR	0x20	/* fpu_kern_thread() */
-#define	PCB_32BIT	0x40	/* process has 32 bit context (segs etc) */
-#define	PCB_FPUNOSAVE	0x80	/* no save area for current FPU ctx */
+#define	PCB_FULL_IRET	0x0001	/* full iret is required */
+#define	PCB_DBREGS	0x0002	/* process using debug registers */
+#define	PCB_KERNFPU	0x0004	/* kernel uses fpu */
+#define	PCB_FPUINITDONE	0x0008	/* fpu state is initialized */
+#define	PCB_USERFPUINITDONE 0x0010 /* fpu user state is initialized */
+#define	PCB_KERNFPU_THR	0x0020	/* fpu_kern_thread() */
+#define	PCB_32BIT	0x0040	/* process has 32 bit context (segs etc) */
+#define	PCB_FPUNOSAVE	0x0080	/* no save area for current FPU ctx */
 
 	uint16_t	pcb_initial_fpucw;
 

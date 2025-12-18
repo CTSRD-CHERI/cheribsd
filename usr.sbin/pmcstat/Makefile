@@ -1,9 +1,6 @@
 #
 #
 
-# XXX: not at all purecap clean
-MK_WERROR=	no
-
 PROG_CXX=	pmcstat
 MAN=	pmcstat.8
 

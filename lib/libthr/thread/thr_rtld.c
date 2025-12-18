@@ -26,11 +26,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
  /*
   * A lockless rwlock for rtld.
   */
-#include <sys/cdefs.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #include <link.h>
@@ -41,8 +39,7 @@
 #include "rtld_lock.h"
 #include "thr_private.h"
 
-#undef errno
-extern int errno;
+extern int __libsys_errno;
 
 static int	_thr_rtld_clr_flag(int);
 static void	*_thr_rtld_lock_create(void);
@@ -52,9 +49,18 @@ static void	_thr_rtld_rlock_acquire(void *);
 static int	_thr_rtld_set_flag(int);
 static void	_thr_rtld_wlock_acquire(void *);
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#ifdef CHERI_LIB_C18N
 void _thread_start(struct pthread *);
 void _thr_sighandler(int, siginfo_t *, void *);
+
+/*
+ * These weak symbols will always be resolved at runtime.
+ */
+#pragma weak _rtld_thread_start_init
+void _rtld_thread_start_init(void (*)(struct pthread *));
+
+#pragma weak _rtld_sighandler_init
+void _rtld_sighandler_init(void (*)(int, siginfo_t *, void *));
 #endif
 
 struct rtld_lock {
@@ -103,14 +109,14 @@ _thr_rtld_lock_destroy(void *lock)
 	if (curthread != _thr_initial)		\
 		errsave = curthread->error;	\
 	else					\
-		errsave = errno;		\
+		errsave = __libsys_errno;	\
 }
 
 #define RESTORE_ERRNO()	{ 			\
 	if (curthread != _thr_initial)  	\
 		curthread->error = errsave;	\
 	else					\
-		errno = errsave;		\
+		__libsys_errno = errsave;	\
 }
 
 static void
@@ -227,8 +233,8 @@ _thr_rtld_init(void)
 	struct RtldLockInfo	li;
 	struct pthread		*curthread;
 	ucontext_t *uc;
-	long dummy = -1;
 	int uc_len;
+	char dummy[2] = {};
 
 	curthread = _get_curthread();
 
@@ -237,17 +243,18 @@ _thr_rtld_init(void)
 	 * XXXAR: this line here hangs when running Qt unit tests, let's just
 	 * use an invalid opcode to get EINVAL
 	 */
-	/* _umtx_op_err((struct umtx *)&dummy, UMTX_OP_WAKE, 1, 0, 0); */
-	_umtx_op_err((struct umtx *)&dummy, INT_MAX, 1, 0, 0);
+	/* _umtx_op_err(&dummy, UMTX_OP_WAKE, 1, 0, 0); */
+	_umtx_op_err(&dummy, INT_MAX, 1, 0, 0);
 	
 	/* force to resolve errno() PLT */
 	__error();
 
 	/* force to resolve memcpy PLT */
-	memcpy(&dummy, &dummy, sizeof(dummy));
+	memcpy(&dummy[0], &dummy[1], 1);
 
 	mprotect(NULL, 0, 0);
 	_rtld_get_stack_prot();
+	thr_wake(-1);
 
 	li.rtli_version = RTLI_VERSION;
 	li.lock_create  = _thr_rtld_lock_create;
@@ -283,13 +290,16 @@ _thr_rtld_init(void)
 	/* mask signals, also force to resolve __sys_sigprocmask PLT */
 	_thr_signal_block(curthread);
 	_rtld_thread_init(&li);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#ifdef CHERI_LIB_C18N
 	_rtld_thread_start_init(_thread_start);
 	_rtld_sighandler_init(_thr_sighandler);
 #endif
 	_thr_signal_unblock(curthread);
 	_thr_signal_block_check_fast();
 	_thr_signal_block_setup(curthread);
+
+	/* resolve machine depended functions, if any */
+	_thr_resolve_machdep();
 
 	uc_len = __getcontextx_size();
 	uc = alloca(uc_len);

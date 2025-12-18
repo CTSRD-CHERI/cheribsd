@@ -1,6 +1,5 @@
 /*-
  * Copyright (c) 2016 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Konstantin Belousov <kib@FreeBSD.org>
  * under sponsorship from the FreeBSD Foundation.
@@ -27,7 +26,7 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
+#include <sys/param.h>
 #include <sys/procctl.h>
 #include <err.h>
 #include <stdbool.h>
@@ -36,9 +35,9 @@
 #include <string.h>
 #include <unistd.h>
 
-enum {
-	MODE_ASLR,
+enum mode {
 	MODE_INVALID,
+	MODE_ASLR,
 	MODE_TRACE,
 	MODE_TRAPCAP,
 	MODE_PROTMAX,
@@ -56,6 +55,35 @@ enum {
 	MODE_CHERI_REVOKE,
 	MODE_CHERI_OPPORTUNISTIC,
 #endif
+#ifdef PROC_CHERI_C18N_CTL
+	MODE_CHERI_C18N,
+#endif
+};
+
+static const struct {
+	enum mode mode;
+	const char *name;
+} modes[] = {
+	{ MODE_ASLR,		"aslr" },
+	{ MODE_TRACE,		"trace" },
+	{ MODE_TRAPCAP,		"trapcap" },
+	{ MODE_PROTMAX,		"protmax" },
+	{ MODE_STACKGAP, 	"stackgap" },
+	{ MODE_NO_NEW_PRIVS,	"nonewprivs" },
+	{ MODE_WXMAP,		"wxmap" },
+#ifdef PROC_KPTI_CTL
+	{ MODE_KPTI, 		"kpti" },
+#endif
+#ifdef PROC_LA_CTL
+	{ MODE_LA57,		"la57" },
+	{ MODE_LA48,		"la48" },
+#endif
+#if __has_feature(capabilities)
+	{ MODE_CHERI_REVOKE,	"cherirevoke" },
+#endif
+#ifdef PROC_CHERI_C18N_CTL
+	{ MODE_CHERI_C18N,	"cheric18n" },
+#endif
 };
 
 static pid_t
@@ -72,29 +100,17 @@ str2pid(const char *str)
 	return (res);
 }
 
-#ifdef PROC_KPTI_CTL
-#define	KPTI_USAGE "|kpti"
-#else
-#define	KPTI_USAGE
-#endif
-#ifdef PROC_LA_CTL
-#define	LA_USAGE "|la48|la57"
-#else
-#define	LA_USAGE
-#endif
-#if __has_feature(capabilities)
-#define	CHERI_USAGE "|cherirevoke|opportunistic"
-#else
-#define	CHERI_USAGE
-#endif
-
 static void __dead2
 usage(void)
 {
-
-	fprintf(stderr, "Usage: proccontrol -m (aslr|protmax|trace|trapcap|"
-	    "stackgap|nonewprivs|wxmap"KPTI_USAGE LA_USAGE CHERI_USAGE
-	    ") [-q] [-s (enable|disable)] [-p pid | command]\n");
+	fprintf(stderr, "Usage:\n");
+	fprintf(stderr, "    proccontrol -m mode -s (enable|disable) "
+	    "(-p pid | command)\n");
+	fprintf(stderr, "    proccontrol -m mode -q [-p pid]\n");
+	fprintf(stderr, "Modes: ");
+	for (size_t i = 0; i < nitems(modes); i++)
+		fprintf(stderr, "%s%s", i == 0 ? "" : "|", modes[i].name);
+	fprintf(stderr, "\n");
 	exit(1);
 }
 
@@ -112,37 +128,15 @@ main(int argc, char *argv[])
 	while ((ch = getopt(argc, argv, "m:qs:p:")) != -1) {
 		switch (ch) {
 		case 'm':
-			if (strcmp(optarg, "aslr") == 0)
-				mode = MODE_ASLR;
-			else if (strcmp(optarg, "protmax") == 0)
-				mode = MODE_PROTMAX;
-			else if (strcmp(optarg, "trace") == 0)
-				mode = MODE_TRACE;
-			else if (strcmp(optarg, "trapcap") == 0)
-				mode = MODE_TRAPCAP;
-			else if (strcmp(optarg, "stackgap") == 0)
-				mode = MODE_STACKGAP;
-			else if (strcmp(optarg, "nonewprivs") == 0)
-				mode = MODE_NO_NEW_PRIVS;
-			else if (strcmp(optarg, "wxmap") == 0)
-				mode = MODE_WXMAP;
-#ifdef PROC_KPTI_CTL
-			else if (strcmp(optarg, "kpti") == 0)
-				mode = MODE_KPTI;
-#endif
-#ifdef PROC_LA_CTL
-			else if (strcmp(optarg, "la57") == 0)
-				mode = MODE_LA57;
-			else if (strcmp(optarg, "la48") == 0)
-				mode = MODE_LA48;
-#endif
-#if __has_feature(capabilities)
-			else if (strcmp(optarg, "cherirevoke") == 0)
-				mode = MODE_CHERI_REVOKE;
-			else if (strcmp(optarg, "opportunistic") == 0)
-				mode = MODE_CHERI_OPPORTUNISTIC;
-#endif
-			else
+			if (mode != MODE_INVALID)
+				usage();
+			for (size_t i = 0; i < nitems(modes); i++) {
+				if (strcmp(optarg, modes[i].name) == 0) {
+					mode = modes[i].mode;
+					break;
+				}
+			}
+			if (mode == MODE_INVALID)
 				usage();
 			break;
 		case 's':
@@ -173,6 +167,8 @@ main(int argc, char *argv[])
 			usage();
 		pid = getpid();
 	} else if (pid == -1) {
+		if (!query)
+			usage();
 		pid = getpid();
 	}
 
@@ -218,6 +214,12 @@ main(int argc, char *argv[])
 			break;
 		case MODE_CHERI_OPPORTUNISTIC:
 			error = procctl(P_PID, pid, PROC_CHERI_COLOCATION_STATUS,
+			    &arg);
+			break;
+#endif
+#ifdef PROC_CHERI_C18N_CTL
+		case MODE_CHERI_C18N:
+			error = procctl(P_PID, pid, PROC_CHERI_C18N_STATUS,
 			    &arg);
 			break;
 #endif
@@ -390,6 +392,21 @@ main(int argc, char *argv[])
 			}
 			break;
 #endif
+#ifdef PROC_CHERI_C18N_CTL
+		case MODE_CHERI_C18N:
+			switch (arg) {
+			case PROC_CHERI_C18N_ENABLE:
+				printf("enabled");
+				break;
+			case PROC_CHERI_C18N_DISABLE:
+				printf("disabled");
+				break;
+			case PROC_CHERI_C18N_NOFORCE:
+				printf("not forced");
+				break;
+			}
+			break;
+#endif
 		}
 	} else {
 		switch (mode) {
@@ -457,8 +474,15 @@ main(int argc, char *argv[])
 			break;
 		case MODE_CHERI_OPPORTUNISTIC:
 			arg = enable ? PROC_CHERI_OPPORTUNISTIC_ENABLE :
-			    PROC_CHERI_OPPORTUNISTIC_ENABLE;
+				       PROC_CHERI_OPPORTUNISTIC_ENABLE;
 			error = procctl(P_PID, pid, PROC_CHERI_COLOCATION_CTL, &arg);
+			break;
+#endif
+#ifdef PROC_CHERI_C18N_CTL
+		case MODE_CHERI_C18N:
+			arg = enable ? PROC_CHERI_C18N_ENABLE :
+			    PROC_CHERI_C18N_DISABLE;
+			error = procctl(P_PID, pid, PROC_CHERI_C18N_CTL, &arg);
 			break;
 #endif
 		default:

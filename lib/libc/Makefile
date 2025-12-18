@@ -1,5 +1,3 @@
-#	@(#)Makefile	8.2 (Berkeley) 2/3/94
-
 PACKAGE=	clibs
 SHLIBDIR?= /lib
 
@@ -8,19 +6,26 @@ SHLIBDIR?= /lib
 .if !defined(LIBC_SRCTOP)
 LIBC_SRCTOP:= ${.PARSEDIR}
 .endif
+.if !defined(LIBSYS_SRCTOP)
+LIBSYS_SRCTOP?=	${LIBC_SRCTOP:H}/libsys
+.endif
 
-# Pick the current architecture directory for libc. In general, this is
-# named MACHINE_CPUARCH, but some ABIs are different enough to require
-# their own libc, so allow a directory named MACHINE_ARCH to override this.
-
-.if exists(${LIBC_SRCTOP}/${MACHINE_ARCH:S/powerpc64le/powerpc64/})
-LIBC_ARCH=${MACHINE_ARCH:S/powerpc64le/powerpc64/}
+# Pick the current architecture directory for libc. In general, this is named
+# MACHINE_CPUARCH, but some ABIs are different enough to require their own libc,
+# so allow a directory named MACHINE_ARCH to override this (though treat
+# powerpc64le and powerpc64 the same).
+# Note: This is copied to msun/Makefile
+M=${MACHINE_ARCH:S/powerpc64le/powerpc64/}
+.if exists(${LIBC_SRCTOP}/${M})
+LIBC_ARCH=${M}
 .else
 LIBC_ARCH=${MACHINE_CPUARCH}
 .endif
 .if empty(LIBC_ARCH)
 .error LIBC_ARCH is empty
 .endif
+
+CFLAGS+=-D_FORTIFY_SOURCE_read=_read
 
 # All library objects contain FreeBSD revision strings by default; they may be
 # excluded as a space-saving measure.  To produce a library that does
@@ -30,7 +35,7 @@ LIBC_ARCH=${MACHINE_CPUARCH}
 # To include RCS ID strings from other BSD projects, remove -DNO__RCSID from CFLAGS.
 CFLAGS+=-DNO__SCCSID -DNO__RCSID
 
-.ifdef RTLD_SANDBOX
+.ifdef CHERI_LIB_C18N
 SHLIB=c
 .else
 LIB?=c
@@ -46,6 +51,7 @@ SHLIB_LDSCRIPT_LINKS=libxnet.so
 WARNS?=	2
 CFLAGS+=-I${LIBC_SRCTOP}/include
 CFLAGS+=-I${LIBC_SRCTOP}/${LIBC_ARCH}
+CFLAGS+=-I${LIBSYS_SRCTOP}/${LIBC_ARCH}
 .if ${MK_NLS} != "no"
 CFLAGS+=-DNLS
 .endif
@@ -59,24 +65,23 @@ CANCELPOINTS_CFLAGS=-fexceptions
 CFLAGS+=${CANCELPOINTS_CFLAGS}
 .endif
 
-.ifdef RTLD_SANDBOX
-CFLAGS+=-DRTLD_SANDBOX
-SYM_MAPS+=${LIBC_SRCTOP}/Symbol-c18n.map
-.endif
-
 # Use a more efficient TLS model for libc since we can reasonably assume that
 # it will be loaded during program startup.
-.if ${LIBC_ARCH} == "aarch64" || ${LIBC_ARCH} == "amd64" || \
-    ${LIBC_ARCH} == "i386" || ${LIBC_ARCH} == "riscv" || \
-    ${LIBC_ARCH:Mpowerpc*} != ""
 CFLAGS+= -ftls-model=initial-exec
-.endif
 
 #
 # Link with static libcompiler_rt.a.
 #
 LDFLAGS+= -nodefaultlibs
 LIBADD+=	compiler_rt
+LIBADD+=	sys
+.if defined(COMPAT_libcompat) && ${COMPAT_libcompat} == "32"
+# XXX: work around gcc -m32 + bfd ld path issue for DT_NEEDED symbols.
+# https://sourceware.org/bugzilla/show_bug.cgi?id=31395
+LDFLAGS+=	-Wl,--rpath=/usr/lib${COMPAT_libcompat}
+.endif
+
+LDFLAGS+=-Wl,--auxiliary,libsys.so.7
 
 .if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap} && \
     (${LIBC_ARCH} == "i386" || ${LIBC_ARCH:Mpowerpc*} != "")
@@ -132,14 +137,7 @@ NOASM=
 .include "${LIBC_SRCTOP}/stdlib/Makefile.inc"
 .include "${LIBC_SRCTOP}/stdtime/Makefile.inc"
 .include "${LIBC_SRCTOP}/string/Makefile.inc"
-.if !defined(NO_SYSCALLS)
 .include "${LIBC_SRCTOP}/sys/Makefile.inc"
-.else
-.PATH: ${LIBC_SRCTOP}/sys
-SRCS+=	interposing_table.c
-CFLAGS+=	-DNO_SYSCALLS
-.endif
-
 .if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap}
 .include "${LIBC_SRCTOP}/secure/Makefile.inc"
 .endif
@@ -150,7 +148,6 @@ CFLAGS+=	-DNO_SYSCALLS
 .include "${LIBC_SRCTOP}/softfloat/Makefile.inc"
 .endif
 .if ${LIBC_ARCH} == "i386" || ${LIBC_ARCH} == "amd64"
-.include "${LIBC_SRCTOP}/x86/sys/Makefile.inc"
 .include "${LIBC_SRCTOP}/x86/gen/Makefile.inc"
 .endif
 .if ${MK_NIS} != "no"
@@ -175,7 +172,6 @@ STATICOBJS+=${LIBC_NONSHARED_SRCS:S/.c$/.o/}
 
 VERSION_DEF=${LIBC_SRCTOP}/Versions.def
 SYMBOL_MAPS=${SYM_MAPS}
-CFLAGS+= -DSYMBOL_VERSIONING
 
 # If there are no machine dependent sources, append all the
 # machine-independent sources:
@@ -208,12 +204,12 @@ libkern.${LIBC_ARCH}:: ${KMSRCS}
 	${CP} ${.ALLSRC} ${DESTDIR}/sys/libkern/${LIBC_ARCH}
 .endif
 
-.if !defined(NO_SYSCALLS) && !defined(RTLD_SANDBOX)
+.if !defined(CHERI_LIB_C18N)
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 .endif
 
-.if defined(NO_SYSCALLS) || defined(RTLD_SANDBOX)
+.if defined(CHERI_LIB_C18N)
 MAN:=
 MLINKS:=
 NLS:=
@@ -250,6 +246,6 @@ GENDIRDEPS_FILTER+= N${RELDIR:H}/msun
 # Disable warnings in contributed sources.
 CWARNFLAGS:=	${.IMPSRC:Ngdtoa_*.c:C/^.+$/${CWARNFLAGS}/:C/^$/-w/}
 # Disable stack protection for SSP symbols.
-SSP_CFLAGS:=	${.IMPSRC:N*/stack_protector.c:C/^.+$/${SSP_CFLAGS}/}
+SSP_CFLAGS:=	${.IMPSRC:N*/libc_stack_protector.c:C/^.+$/${SSP_CFLAGS}/}
 # Generate stack unwinding tables for cancellation points
 CANCELPOINTS_CFLAGS:=	${.IMPSRC:Mcancelpoints_*:C/^.+$/${CANCELPOINTS_CFLAGS}/:C/^$//}

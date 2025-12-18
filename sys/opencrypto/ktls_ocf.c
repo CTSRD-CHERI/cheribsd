@@ -25,7 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/counter.h>
@@ -978,7 +977,7 @@ ktls_ocf_free(struct ktls_session *tls)
 }
 
 int
-ktls_ocf_try(struct socket *so, struct ktls_session *tls, int direction)
+ktls_ocf_try(struct ktls_session *tls, int direction)
 {
 	struct crypto_session_params csp, mac_csp, recrypt_csp;
 	struct ktls_ocf_session *os;

@@ -32,8 +32,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)systm.h	8.7 (Berkeley) 3/29/95
  */
 
 #ifndef _SYS_SYSTM_H_
@@ -47,6 +45,7 @@
 #include <machine/atomic.h>
 #include <machine/cpufunc.h>
 #if __has_feature(capabilities)
+#include <machine/param.h>
 #include <machine/vmparam.h>
 #endif
 
@@ -60,9 +59,9 @@ __NULLABILITY_PRAGMA_PUSH
 extern int cold;		/* nonzero if we are doing a cold boot */
 extern int suspend_blocked;	/* block suspend due to pending shutdown */
 extern int rebooting;		/* kern_reboot() has been called. */
-extern char version[];		/* system version */
-extern char compiler_version[];	/* compiler version */
-extern char copyright[];	/* system copyright */
+extern const char version[];	/* system version */
+extern const char compiler_version[];	/* compiler version */
+extern const char copyright[];	/* system copyright */
 extern int kstack_pages;	/* number of kernel stack pages */
 
 extern u_long pagesizes[];	/* supported page sizes */
@@ -88,7 +87,7 @@ extern u_long maxphys;		/* max raw I/O transfer size */
  */
 enum VM_GUEST { VM_GUEST_NO = 0, VM_GUEST_VM, VM_GUEST_XEN, VM_GUEST_HV,
 		VM_GUEST_VMWARE, VM_GUEST_KVM, VM_GUEST_BHYVE, VM_GUEST_VBOX,
-		VM_GUEST_PARALLELS, VM_LAST };
+		VM_GUEST_PARALLELS, VM_GUEST_NVMM, VM_GUEST_LAST };
 
 #endif /* KERNEL */
 
@@ -107,6 +106,16 @@ struct ucred;
 #include <sys/param.h>		/* MAXCPU */
 #include <sys/pcpu.h>		/* curthread */
 #include <sys/kpilite.h>
+
+extern bool scheduler_stopped;
+
+/*
+ * If we have already panic'd and this is the thread that called
+ * panic(), then don't block on any mutexes but silently succeed.
+ * Otherwise, the kernel will deadlock since the scheduler isn't
+ * going to run the thread that holds any lock we need.
+ */
+#define	SCHEDULER_STOPPED()	__predict_false(scheduler_stopped)
 
 /*
  * Macros to create userspace capabilities from virtual addresses.
@@ -159,7 +168,7 @@ struct ucred;
 #define	__USER_CAP_STR(strp)	__USER_CAP_UNBOUND(strp)
 #define	__USER_CAP_PATH(path)	__USER_CAP((path), MAXPATHLEN)
 
-extern int osreldate;
+extern const int osreldate;
 
 extern const void *zero_region;	/* address space maps to a zeroed page	*/
 
@@ -258,6 +267,16 @@ critical_exit(void)
 #ifdef  EARLY_PRINTF
 typedef void early_putc_t(int ch);
 extern early_putc_t *early_putc;
+#define	CHECK_EARLY_PRINTF(x)	\
+    __CONCAT(early_printf_, EARLY_PRINTF) == __CONCAT(early_printf_, x)
+#define	early_printf_1		1
+#define	early_printf_mvebu	2
+#define	early_printf_ns8250	3
+#define	early_printf_pl011	4
+#define	early_printf_snps	5
+#define	early_printf_sbi	6
+#else
+#define	CHECK_EARLY_PRINTF(x)	0
 #endif
 int	kvprintf(char const *, void (*)(int, void*), void *, int,
 	    __va_list) __printflike(1, 0);
@@ -373,33 +392,36 @@ void	*memmove_early(void * _Nonnull dest, const void * _Nonnull src, size_t n);
 	((__r >= __len) ? ENAMETOOLONG : 0);			\
 })
 
-int	copyinstr(const void * __restrict __capability udaddr,
-	    void * _Nonnull __restrict kaddr, size_t len,
-	    size_t * __restrict lencopied);
-int	copyin(const void * __restrict __capability udaddr,
-	    void * _Nonnull __restrict kaddr, size_t len);
+int __result_use_check copyinstr(const void * __restrict __capability udaddr,
+    void * _Nonnull __restrict kaddr, size_t len,
+    size_t * __restrict lencopied);
+int __result_use_check copyin(const void * __restrict __capability udaddr,
+    void * _Nonnull __restrict kaddr, size_t len);
 #if __has_feature(capabilities)
-int	copyincap(const void * __restrict __capability udaddr,
-	    void * _Nonnull __restrict kaddr, size_t len);
+int __result_use_check copyincap(const void * __restrict __capability udaddr,
+    void * _Nonnull __restrict kaddr, size_t len);
 #else
 #define	copyincap	copyin
 #endif
-int	copyin_nofault(const void * __capability __restrict udaddr,
-	    void * _Nonnull __restrict kaddr, size_t len);
-int	copyout(const void * _Nonnull __restrict kaddr,
-	    void * __restrict __capability udaddr, size_t len);
+int __result_use_check copyin_nofault(
+    const void * __capability __restrict udaddr,
+    void * _Nonnull __restrict kaddr, size_t len);
+int __result_use_or_ignore_check copyout(const void * _Nonnull __restrict kaddr,
+    void * __restrict __capability udaddr, size_t len);
 #if __has_feature(capabilities)
-int	copyoutcap(const void * _Nonnull __restrict kaddr,
-	    void * __capability __restrict udaddr, size_t len);
+int __result_use_or_ignore_check copyoutcap(
+    const void * _Nonnull __restrict kaddr,
+    void * __capability __restrict udaddr, size_t len);
 #else
 #define	copyoutcap	copyout
 #endif
-int	copyout_nofault(const void * _Nonnull __restrict kaddr,
-	    void * __capability __restrict udaddr, size_t len);
+int __result_use_or_ignore_check copyout_nofault(
+    const void * _Nonnull __restrict kaddr,
+    void * __capability __restrict udaddr, size_t len);
 #if __has_feature(capabilities)
-int	copyoutcap_nofault(
-	    const void * _Nonnull __restrict kaddr,
-	    void * __capability __restrict udaddr, size_t len);
+int __result_use_or_ignore_check copyoutcap_nofault(
+    const void * _Nonnull __restrict kaddr,
+    void * __capability __restrict udaddr, size_t len);
 #else
 #define	copyoutcap_nofault	copyout_nofault
 #endif
@@ -423,21 +445,31 @@ int	fuword16(volatile const void * __capability base);
 int32_t	fuword32(volatile const void * __capability base);
 int64_t	fuword64(volatile const void * __capability base);
 #if __has_feature(capabilities)
-int	fuecap(volatile const void * __capability base, intcap_t *val);
+int __result_use_check fuecap(volatile const void * __capability base,
+    intcap_t *val);
 #define	fueptr			fuecap
 #else
 #define	fueptr(base, val)	fueword((base), (long *)(val))
 #endif
-int	fueword(volatile const void * __capability base, long *val);
-int	fueword32(volatile const void * __capability base, int32_t *val);
-int	fueword64(volatile const void * __capability base, int64_t *val);
-int	subyte(volatile void * __capability base, int byte);
-int	suword(volatile void * __capability base, long word);
-int	suword16(volatile void * __capability base, int word);
-int	suword32(volatile void * __capability base, int32_t word);
-int	suword64(volatile void * __capability base, int64_t word);
+int __result_use_check fueword(volatile const void * __capability base,
+    long *val);
+int __result_use_check fueword32(volatile const void * __capability base,
+    int32_t *val);
+int __result_use_check fueword64(volatile const void * __capability base,
+    int64_t *val);
+int __result_use_or_ignore_check subyte(volatile void * __capability base,
+    int byte);
+int __result_use_or_ignore_check suword(volatile void * __capability base,
+    long word);
+int __result_use_or_ignore_check suword16(volatile void * __capability base,
+    int word);
+int __result_use_or_ignore_check suword32(volatile void * __capability base,
+    int32_t word);
+int __result_use_or_ignore_check suword64(volatile void * __capability base,
+    int64_t word);
 #if __has_feature(capabilities)
-int	sucap(volatile const void * __capability base, intcap_t val);
+int __result_use_or_ignore_check sucap(volatile const void * __capability base,
+    intcap_t val);
 #define	suptr			sucap
 #else
 #define	suptr			suword
@@ -503,6 +535,14 @@ void	cpu_new_callout(int cpu, sbintime_t bt, sbintime_t bt_opt);
 void	cpu_et_frequency(struct eventtimer *et, uint64_t newfreq);
 extern int	cpu_disable_c2_sleep;
 extern int	cpu_disable_c3_sleep;
+
+extern void	(*tcp_hpts_softclock)(void);
+extern volatile uint32_t __read_frequently hpts_that_need_softclock;
+
+#define	tcp_hpts_softclock()	do {					\
+		if (hpts_that_need_softclock > 0)			\
+			tcp_hpts_softclock();				\
+} while (0)
 
 char	*kern_getenv(const char *name);
 void	freeenv(char *env);
@@ -604,6 +644,8 @@ int poll_no_poll(int events);
 
 /* XXX: Should be void nanodelay(u_int nsec); */
 void	DELAY(int usec);
+
+int kcmp_cmp(uintptr_t a, uintptr_t b);
 
 /* Root mount holdback API */
 struct root_hold_token {

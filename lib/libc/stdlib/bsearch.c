@@ -29,16 +29,13 @@
  * SUCH DAMAGE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)bsearch.c	8.1 (Berkeley) 6/4/93";
-#endif /* LIBC_SCCS and not lint */
-#include <sys/cdefs.h>
 #include <stddef.h>
 #include <stdlib.h>
 
 #ifdef	I_AM_BSEARCH_B
 #include "block_abi.h"
 #define	COMPAR(x,y)	CALL_BLOCK(compar, x, y)
+typedef DECLARE_BLOCK(int, compar_block, const void *, const void *);
 #else
 #define	COMPAR(x,y)	compar(x, y)
 #endif
@@ -62,7 +59,7 @@ static char sccsid[] = "@(#)bsearch.c	8.1 (Berkeley) 6/4/93";
 #ifdef I_AM_BSEARCH_B
 void *
 bsearch_b(const void *key, const void *base0, size_t nmemb, size_t size,
-    DECLARE_BLOCK(int, compar, const void *, const void *))
+    compar_block compar)
 #else
 void *
 bsearch(const void *key, const void *base0, size_t nmemb, size_t size,

@@ -136,8 +136,10 @@ SX_SYSINIT(allprison_lock, &allprison_lock, "allprison");
 struct	prisonlist allprison = TAILQ_HEAD_INITIALIZER(allprison);
 LIST_HEAD(, prison_racct) allprison_racct;
 int	lastprid = 0;
+int	lastdeadid = 0;
 
 static int get_next_prid(struct prison **insprp);
+static int get_next_deadid(struct prison **insprp);
 static int do_jail_attach(struct thread *td, struct prison *pr, int drflags);
 static void prison_complete(void *context, int pending);
 static void prison_deref(struct prison *pr, int flags);
@@ -220,6 +222,9 @@ static struct bool_flags pr_flag_allow[NBBY * NBPW] = {
 #ifdef VIMAGE
 	{"allow.nfsd", "allow.nonfsd", PR_ALLOW_NFSD},
 #endif
+	{"allow.extattr", "allow.noextattr", PR_ALLOW_EXTATTR},
+	{"allow.adjtime", "allow.noadjtime", PR_ALLOW_ADJTIME},
+	{"allow.settime", "allow.nosettime", PR_ALLOW_SETTIME},
 };
 static unsigned pr_allow_all = PR_ALLOW_ALL_STATIC;
 const size_t pr_flag_allow_size = sizeof(pr_flag_allow);
@@ -541,7 +546,7 @@ user_jail_set(struct thread *td, struct iovec * __capability iovp,
 	if (error)
 		return (error);
 	error = kern_jail_set(td, auio, flags);
-	free(auio, M_IOV);
+	freeuio(auio);
 	return (error);
 }
 
@@ -983,7 +988,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 #endif
 	struct vfsopt *opt;
 	struct vfsoptlist *opts;
-	struct prison *pr, *deadpr, *inspr, *mypr, *ppr, *tpr;
+	struct prison *pr, *deadpr, *dinspr, *inspr, *mypr, *ppr, *tpr;
 	struct vnode *root;
 	char *domain, *errmsg, *host, *name, *namelc, *p, *path, *uuid;
 	char *g_path, *osrelstr;
@@ -994,10 +999,10 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 #endif
 	unsigned long hid;
 	size_t namelen, onamelen, pnamelen;
-	int born, created, cuflags, descend, drflags, enforce;
+	int created, cuflags, descend, drflags, enforce;
 	int error, errmsg_len, errmsg_pos;
 	int gotchildmax, gotenforce, gothid, gotrsnum, gotslevel;
-	int jid, jsys, len, level;
+	int deadid, jid, jsys, len, level;
 	int childmax, osreldt, rsnum, slevel;
 #ifdef INET
 	int ip4s;
@@ -1411,6 +1416,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 	 */
 	pr = NULL;
 	inspr = NULL;
+	deadpr = NULL;
 	if (cuflags == JAIL_CREATE && jid == 0 && name != NULL) {
 		namelc = strrchr(name, '.');
 		jid = strtoul(namelc != NULL ? namelc + 1 : name, &p, 10);
@@ -1440,69 +1446,38 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 				continue;
 			if (inspr->pr_id > jid)
 				break;
-			pr = inspr;
-			mtx_lock(&pr->pr_mtx);
-			drflags |= PD_LOCKED;
+			if (prison_isalive(inspr)) {
+				pr = inspr;
+				mtx_lock(&pr->pr_mtx);
+				drflags |= PD_LOCKED;
+			} else {
+				/* Note a dying jail to handle later. */
+				deadpr = inspr;
+			}
 			inspr = NULL;
 			break;
 		}
-		if (pr != NULL) {
-			/* Create: jid must not exist. */
-			if (cuflags == JAIL_CREATE) {
-				/*
-				 * Even creators that cannot see the jail will
-				 * get EEXIST.
-				 */
-				error = EEXIST;
-				vfs_opterror(opts, "jail %d already exists",
-				    jid);
-				goto done_deref;
-			}
-			if (!prison_ischild(mypr, pr)) {
-				/*
-				 * Updaters get ENOENT if they cannot see the
-				 * jail.  This is true even for CREATE | UPDATE,
-				 * which normally cannot give this error.
-				 */
-				error = ENOENT;
-				vfs_opterror(opts, "jail %d not found", jid);
-				goto done_deref;
-			}
-			ppr = pr->pr_parent;
-			if (!prison_isalive(ppr)) {
-				error = ENOENT;
-				vfs_opterror(opts, "jail %d is dying",
-				    ppr->pr_id);
-				goto done_deref;
-			}
-			if (!prison_isalive(pr)) {
-				if (!(flags & JAIL_DYING)) {
-					error = ENOENT;
-					vfs_opterror(opts, "jail %d is dying",
-					    jid);
-					goto done_deref;
-				}
-				if ((flags & JAIL_ATTACH) ||
-				    (pr_flags & PR_PERSIST)) {
-					/*
-					 * A dying jail might be resurrected
-					 * (via attach or persist), but first
-					 * it must determine if another jail
-					 * has claimed its name.  Accomplish
-					 * this by implicitly re-setting the
-					 * name.
-					 */
-					if (name == NULL)
-						name = prison_name(mypr, pr);
-				}
-			}
-		} else {
-			/* Update: jid must exist. */
-			if (cuflags == JAIL_UPDATE) {
-				error = ENOENT;
-				vfs_opterror(opts, "jail %d not found", jid);
-				goto done_deref;
-			}
+		if (cuflags == JAIL_CREATE && pr != NULL) {
+			/*
+			 * Even creators that cannot see the jail will
+			 * get EEXIST.
+			 */
+			error = EEXIST;
+			vfs_opterror(opts, "jail %d already exists", jid);
+			goto done_deref;
+		}
+		if ((pr == NULL)
+		    ? cuflags == JAIL_UPDATE
+		    : !prison_ischild(mypr, pr)) {
+			/*
+			 * Updaters get ENOENT for nonexistent jails,
+			 * or for jails they cannot see.  The latter
+			 * case is true even for CREATE | UPDATE,
+			 * which normally cannot give this error.
+			 */
+			error = ENOENT;
+			vfs_opterror(opts, "jail %d not found", jid);
+			goto done_deref;
 		}
 	}
 	/*
@@ -1554,54 +1529,35 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 		if (namelc[0] != '\0') {
 			pnamelen =
 			    (ppr == &prison0) ? 0 : strlen(ppr->pr_name) + 1;
-			deadpr = NULL;
 			FOREACH_PRISON_CHILD(ppr, tpr) {
-				if (tpr != pr &&
-				    !strcmp(tpr->pr_name + pnamelen, namelc)) {
-					if (prison_isalive(tpr)) {
-						if (pr == NULL &&
-						    cuflags != JAIL_CREATE) {
-							/*
-							 * Use this jail
-							 * for updates.
-							 */
-							pr = tpr;
-							mtx_lock(&pr->pr_mtx);
-							drflags |= PD_LOCKED;
-							break;
-						}
-						/*
-						 * Create, or update(jid):
-						 * name must not exist in an
-						 * active sibling jail.
-						 */
-						error = EEXIST;
-						vfs_opterror(opts,
-						   "jail \"%s\" already exists",
-						   name);
-						goto done_deref;
-					}
-					if (pr == NULL &&
-					    cuflags != JAIL_CREATE) {
-						deadpr = tpr;
-					}
-				}
-			}
-			/* If no active jail is found, use a dying one. */
-			if (deadpr != NULL && pr == NULL) {
-				if (flags & JAIL_DYING) {
-					pr = deadpr;
-					mtx_lock(&pr->pr_mtx);
-					drflags |= PD_LOCKED;
-				} else if (cuflags == JAIL_UPDATE) {
-					error = ENOENT;
+				if (tpr == pr || !prison_isalive(tpr) ||
+				    strcmp(tpr->pr_name + pnamelen, namelc))
+					continue;
+				if (cuflags == JAIL_CREATE || pr != NULL) {
+					/*
+					 * Create, or update(jid): name must
+					 * not exist in an active sibling jail.
+					 */
+					error = EEXIST;
 					vfs_opterror(opts,
-					    "jail \"%s\" is dying", name);
+					    "jail \"%s\" already exists", name);
 					goto done_deref;
 				}
+				/* Use this jail for updates. */
+				pr = tpr;
+				mtx_lock(&pr->pr_mtx);
+				drflags |= PD_LOCKED;
+				break;
 			}
-			/* Update: name must exist if no jid. */
-			else if (cuflags == JAIL_UPDATE && pr == NULL) {
+			/*
+			 * Update: name must exist if no jid is specified.
+			 * As with the jid case, the jail must be currently
+			 * visible, or else even CREATE | UPDATE will get
+			 * an error.
+			 */
+			if ((pr == NULL)
+			    ? cuflags == JAIL_UPDATE
+			    : !prison_isalive(pr)) {
 				error = ENOENT;
 				vfs_opterror(opts, "jail \"%s\" not found",
 				    name);
@@ -1625,6 +1581,36 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 				vfs_opterror(opts, "prison limit exceeded");
 				goto done_deref;
 			}
+
+		if (deadpr != NULL) {
+			/*
+			 * The prison being created has the same ID as a dying
+			 * one.  Handle this by giving the dying jail a new ID.
+			 * This may cause some confusion to user space, but
+			 * only to those listing dying jails.
+			 */
+			deadid = get_next_deadid(&dinspr);
+			if (deadid == 0) {
+				error = EAGAIN;
+				vfs_opterror(opts, "no available jail IDs");
+				goto done_deref;
+			}
+			mtx_lock(&deadpr->pr_mtx);
+			deadpr->pr_id = deadid;
+			mtx_unlock(&deadpr->pr_mtx);
+			if (dinspr == deadpr)
+				inspr = deadpr;
+			else {
+				inspr = TAILQ_NEXT(deadpr, pr_list);
+				TAILQ_REMOVE(&allprison, deadpr, pr_list);
+				if (dinspr != NULL)
+					TAILQ_INSERT_AFTER(&allprison, dinspr,
+					    deadpr, pr_list);
+				else
+					TAILQ_INSERT_HEAD(&allprison, deadpr,
+					    pr_list);
+			}
+		}
 		if (jid == 0 && (jid = get_next_prid(&inspr)) == 0) {
 			error = EAGAIN;
 			vfs_opterror(opts, "no available jail IDs");
@@ -2024,14 +2010,13 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 	 * Persistent prisons get an extra reference, and prisons losing their
 	 * persist flag lose that reference.
 	 */
-	born = !prison_isalive(pr);
 	if (ch_flags & PR_PERSIST & (pr_flags ^ pr->pr_flags)) {
 		if (pr_flags & PR_PERSIST) {
 			prison_hold(pr);
 			/*
-			 * This may make a dead prison alive again, but wait
-			 * to label it as such until after OSD calls have had
-			 * a chance to run (and perhaps to fail).
+			 * This may be a new prison's first user reference,
+			 * but wait to call it alive until after OSD calls
+			 * have had a chance to run (and perhaps to fail).
 			 */
 			refcount_acquire(&pr->pr_uref);
 		} else {
@@ -2046,7 +2031,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 	 * Any errors past this point will need to de-persist newly created
 	 * prisons, as well as call remove methods.
 	 */
-	if (born)
+	if (created)
 		drflags |= PD_KILL;
 
 #ifdef RACCT
@@ -2099,7 +2084,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 #endif
 
 	/* Let the modules do their work. */
-	if (born) {
+	if (created) {
 		error = osd_jail_call(pr, PR_METHOD_CREATE, opts);
 		if (error)
 			goto done_deref;
@@ -2112,7 +2097,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 	 * A new prison is now ready to be seen; either it has gained a user
 	 * reference via persistence, or is about to gain one via attachment.
 	 */
-	if (born) {
+	if (created) {
 		drflags = prison_lock_xlock(pr, drflags);
 		pr->pr_state = PRISON_STATE_ALIVE;
 	}
@@ -2142,7 +2127,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 	}
 #endif
 
-	if (born && pr != &prison0 && (pr->pr_allow & PR_ALLOW_NFSD) != 0 &&
+	if (created && pr != &prison0 && (pr->pr_allow & PR_ALLOW_NFSD) != 0 &&
 	    (pr->pr_root->v_vflag & VV_ROOT) == 0)
 		printf("Warning jail jid=%d: mountd/nfsd requires a separate"
 		   " file system\n", pr->pr_id);
@@ -2171,7 +2156,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 				    optuio->uio_iov[errmsg_pos].iov_base,
 				    errmsg_len);
 			else
-				copyout(errmsg,
+				(void)copyout(errmsg,
 				    optuio->uio_iov[errmsg_pos].iov_base,
 				    errmsg_len);
 		}
@@ -2250,6 +2235,55 @@ get_next_prid(struct prison **insprp)
 }
 
 /*
+ * Find the next available ID for a renumbered dead prison.  This is the same
+ * as get_next_prid, but counting backward from the end of the range.
+ */
+static int
+get_next_deadid(struct prison **dinsprp)
+{
+	struct prison *dinspr;
+	int deadid, minid;
+
+	deadid = lastdeadid ? lastdeadid - 1 : JAIL_MAX;
+	/*
+	 * Take two reverse passes through the allprison list: first
+	 * starting with the proposed deadid, then ending with it.
+	 */
+	for (minid = 1; minid != 0; ) {
+		TAILQ_FOREACH_REVERSE(dinspr, &allprison, prisonlist, pr_list) {
+			if (dinspr->pr_id > deadid)
+				continue;
+			if (dinspr->pr_id < deadid) {
+				/* Found an opening. */
+				minid = 0;
+				break;
+			}
+			if (--deadid < minid) {
+				if (lastdeadid == minid || lastdeadid == 0)
+				{
+					/*
+					 * The entire legal range
+					 * has been traversed
+					 */
+					return 0;
+				}
+				/* Try again from the end. */
+				deadid = JAIL_MAX;
+				minid = lastdeadid;
+				break;
+			}
+		}
+		if (dinspr == NULL) {
+			/* Found room at the beginning of the list. */
+			break;
+		}
+	}
+	*dinsprp = dinspr;
+	lastdeadid = deadid;
+	return (deadid);
+}
+
+/*
  * struct jail_get_args {
  *	struct iovec *iovp;
  *	unsigned int iovcnt;
@@ -2282,7 +2316,7 @@ user_jail_get(struct thread *td, struct iovec * __capability iovp,
 	error = kern_jail_get(td, auio, flags);
 	if (error == 0)
 		error = updateiov_f(auio, iovp);
-	free(auio, M_IOV);
+	freeuio(auio);
 	return (error);
 }
 
@@ -2566,7 +2600,7 @@ kern_jail_get(struct thread *td, struct uio *optuio, int flags)
 				    optuio->uio_iov[errmsg_pos].iov_base,
 				    errmsg_len);
 			else
-				copyout(errmsg,
+				(void)copyout(errmsg,
 				    optuio->uio_iov[errmsg_pos].iov_base,
 				    errmsg_len);
 		}
@@ -3956,6 +3990,7 @@ prison_priv_check(struct ucred *cred, int priv)
 		 */
 	case PRIV_SEEOTHERGIDS:
 	case PRIV_SEEOTHERUIDS:
+	case PRIV_SEEJAILPROC:
 
 		/*
 		 * Jail implements inter-process debugging limits already, so
@@ -4078,6 +4113,17 @@ prison_priv_check(struct ucred *cred, int priv)
 		return (0);
 
 		/*
+		 * Conditionally allow privileged process in the jail to
+		 * manipulate filesystem extended attributes in the system
+		 * namespace.
+		 */
+	case PRIV_VFS_EXTATTR_SYSTEM:
+		if ((cred->cr_prison->pr_allow & PR_ALLOW_EXTATTR) != 0)
+			return (0);
+		else
+			return (EPERM);
+
+		/*
 		 * Conditionnaly allow locking (unlocking) physical pages
 		 * in memory.
 		 */
@@ -4140,6 +4186,28 @@ prison_priv_check(struct ucred *cred, int priv)
 		if (cred->cr_prison->pr_allow & PR_ALLOW_READ_MSGBUF)
 			return (0);
 		return (EPERM);
+
+		/*
+		 * Conditionally allow privileged process in the jail adjust
+		 * machine time.
+		 */
+	case PRIV_ADJTIME:
+	case PRIV_NTP_ADJTIME:
+		if (cred->cr_prison->pr_allow &
+		    (PR_ALLOW_ADJTIME | PR_ALLOW_SETTIME)) {
+			return (0);
+		}
+		return (EPERM);
+
+		/*
+		 * Conditionally allow privileged process in the jail set
+		 * machine time.
+		 */
+	case PRIV_CLOCK_SETTIME:
+		if (cred->cr_prison->pr_allow & PR_ALLOW_SETTIME)
+			return (0);
+		else
+			return (EPERM);
 
 	default:
 		/*
@@ -4410,6 +4478,10 @@ SYSCTL_PROC(_security_jail, OID_AUTO, mount_allowed,
     CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
     NULL, PR_ALLOW_MOUNT, sysctl_jail_default_allow, "I",
     "Processes in jail can mount/unmount jail-friendly file systems (deprecated)");
+SYSCTL_PROC(_security_jail, OID_AUTO, mlock_allowed,
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
+    NULL, PR_ALLOW_MLOCK, sysctl_jail_default_allow, "I",
+    "Processes in jail can lock/unlock physical pages in memory");
 
 static int
 sysctl_jail_default_level(SYSCTL_HANDLER_ARGS)
@@ -4437,6 +4509,35 @@ SYSCTL_PROC(_security_jail, OID_AUTO, devfs_ruleset,
     &jail_default_devfs_rsnum, offsetof(struct prison, pr_devfs_rsnum),
     sysctl_jail_default_level, "I",
     "Ruleset for the devfs filesystem in jail (deprecated)");
+
+SYSCTL_NODE(_security_jail, OID_AUTO, children, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "Limits and stats of child jails");
+
+static int
+sysctl_jail_children(SYSCTL_HANDLER_ARGS)
+{
+	struct prison *pr;
+	int i;
+
+	pr = req->td->td_ucred->cr_prison;
+
+	switch (oidp->oid_kind & CTLTYPE) {
+	case CTLTYPE_INT:
+		i = *(int *)((char *)pr + arg2);
+		return (SYSCTL_OUT(req, &i, sizeof(i)));
+	}
+
+	return (0);
+}
+
+SYSCTL_PROC(_security_jail_children, OID_AUTO, max,
+    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE,
+    NULL, offsetof(struct prison, pr_childmax), sysctl_jail_children,
+    "I", "Maximum number of child jails");
+SYSCTL_PROC(_security_jail_children, OID_AUTO, cur,
+    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE,
+    NULL, offsetof(struct prison, pr_childcount), sysctl_jail_children,
+    "I", "Current number of child jails");
 
 /*
  * Nodes to describe jail parameters.  Maximum length of string parameters
@@ -4570,6 +4671,12 @@ SYSCTL_JAIL_PARAM(_allow, suser, CTLTYPE_INT | CTLFLAG_RW,
 SYSCTL_JAIL_PARAM(_allow, nfsd, CTLTYPE_INT | CTLFLAG_RW,
     "B", "Mountd/nfsd may run in the jail");
 #endif
+SYSCTL_JAIL_PARAM(_allow, extattr, CTLTYPE_INT | CTLFLAG_RW,
+    "B", "Jail may set system-level filesystem extended attributes");
+SYSCTL_JAIL_PARAM(_allow, adjtime, CTLTYPE_INT | CTLFLAG_RW,
+    "B", "Jail may adjust system time");
+SYSCTL_JAIL_PARAM(_allow, settime, CTLTYPE_INT | CTLFLAG_RW,
+    "B", "Jail may set system time");
 
 SYSCTL_JAIL_PARAM_SUBNODE(allow, mount, "Jail mount/unmount permission flags");
 SYSCTL_JAIL_PARAM(_allow_mount, , CTLTYPE_INT | CTLFLAG_RW,

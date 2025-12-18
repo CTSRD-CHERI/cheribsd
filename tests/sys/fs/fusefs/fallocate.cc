@@ -302,9 +302,61 @@ TEST_F(Fspacectl, erofs)
 	build_iovec(&iov, &iovlen, "fspath", (void*)statbuf.f_mntonname, -1);
 	build_iovec(&iov, &iovlen, "from", __DECONST(void *, "/dev/fuse"), -1);
 	ASSERT_EQ(0, nmount(iov, iovlen, newflags)) << strerror(errno);
+	free_iovec(&iov, &iovlen);
 
 	EXPECT_EQ(-1, fspacectl(fd, SPACECTL_DEALLOC, &rqsr, 0, NULL));
 	EXPECT_EQ(EROFS, errno);
+
+	leak(fd);
+}
+
+/*
+ * If FUSE_GETATTR fails when determining the size of the file, fspacectl
+ * should fail gracefully.  This failure mode is easiest to trigger when
+ * attribute caching is disabled.
+ */
+TEST_F(Fspacectl, getattr_fails)
+{
+	const char FULLPATH[] = "mountpoint/some_file.txt";
+	const char RELPATH[] = "some_file.txt";
+	Sequence seq;
+	struct spacectl_range rqsr;
+	const uint64_t ino = 42;
+	const uint64_t fsize = 2000;
+	int fd;
+
+	expect_lookup(RELPATH, ino, S_IFREG | 0644, fsize, 1, 0);
+	expect_open(ino, 0, 1);
+	EXPECT_CALL(*m_mock, process(
+		ResultOf([](auto in) {
+			return (in.header.opcode == FUSE_GETATTR &&
+				in.header.nodeid == ino);
+		}, Eq(true)),
+		_)
+	).Times(1)
+	.InSequence(seq)
+	.WillOnce(Invoke(ReturnImmediate([](auto i __unused, auto& out) {
+		SET_OUT_HEADER_LEN(out, attr);
+		out.body.attr.attr.ino = ino;
+		out.body.attr.attr.mode = S_IFREG | 0644;
+		out.body.attr.attr.size = fsize;
+		out.body.attr.attr_valid = 0;
+	})));
+	EXPECT_CALL(*m_mock, process(
+		ResultOf([](auto in) {
+			return (in.header.opcode == FUSE_GETATTR &&
+				in.header.nodeid == ino);
+		}, Eq(true)),
+		_)
+	).InSequence(seq)
+	.WillOnce(ReturnErrno(EIO));
+
+	fd = open(FULLPATH, O_RDWR);
+	ASSERT_LE(0, fd) << strerror(errno);
+	rqsr.r_offset = 500;
+	rqsr.r_len = 1000;
+	EXPECT_EQ(-1, fspacectl(fd, SPACECTL_DEALLOC, &rqsr, 0, NULL));
+	EXPECT_EQ(EIO, errno);
 
 	leak(fd);
 }
@@ -415,14 +467,14 @@ TEST_F(Fspacectl_7_18, ok)
 	const char FULLPATH[] = "mountpoint/some_file.txt";
 	const char RELPATH[] = "some_file.txt";
 	struct spacectl_range rqsr, rmsr;
-	void *buf;
+	char *buf;
 	uint64_t ino = 42;
 	uint64_t fsize = 2000;
 	uint64_t offset = 500;
 	uint64_t length = 1000;
 	int fd;
 
-	buf = malloc(length);
+	buf = new char[length];
 
 	expect_lookup(RELPATH, ino, S_IFREG | 0644, fsize, 1);
 	expect_open(ino, 0, 1);
@@ -437,7 +489,7 @@ TEST_F(Fspacectl_7_18, ok)
 	EXPECT_EQ((off_t)(offset + length), rmsr.r_offset);
 
 	leak(fd);
-	free(buf);
+	delete[] buf;
 }
 
 /*
@@ -633,6 +685,7 @@ TEST_F(PosixFallocate, erofs)
 	build_iovec(&iov, &iovlen, "fspath", (void*)statbuf.f_mntonname, -1);
 	build_iovec(&iov, &iovlen, "from", __DECONST(void *, "/dev/fuse"), -1);
 	ASSERT_EQ(0, nmount(iov, iovlen, newflags)) << strerror(errno);
+	free_iovec(&iov, &iovlen);
 
 	EXPECT_EQ(EROFS, posix_fallocate(fd, offset, length));
 

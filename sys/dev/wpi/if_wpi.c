@@ -1906,7 +1906,6 @@ static void
 wpi_rx_done(struct wpi_softc *sc, struct wpi_rx_desc *desc,
     struct wpi_rx_data *data)
 {
-	struct epoch_tracker et;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct wpi_rx_ring *ring = &sc->rxq;
 	struct wpi_rx_stat *stat;
@@ -2026,7 +2025,6 @@ wpi_rx_done(struct wpi_softc *sc, struct wpi_rx_desc *desc,
 	}
 
 	WPI_UNLOCK(sc);
-	NET_EPOCH_ENTER(et);
 
 	/* Send the frame to the 802.11 layer. */
 	if (ni != NULL) {
@@ -2036,7 +2034,6 @@ wpi_rx_done(struct wpi_softc *sc, struct wpi_rx_desc *desc,
 	} else
 		(void)ieee80211_input_all(ic, m, stat->rssi, WPI_RSSI_OFFSET);
 
-	NET_EPOCH_EXIT(et);
 	WPI_LOCK(sc);
 
 	return;
@@ -2768,7 +2765,7 @@ wpi_cmd2(struct wpi_softc *sc, struct wpi_buf *buf)
 		ring->pending = 0;
 		sc->sc_update_tx_ring(sc, ring);
 	} else
-		ieee80211_node_incref(data->ni);
+		(void) ieee80211_ref_node(data->ni);
 
 end:	DPRINTF(sc, WPI_DEBUG_TRACE, error ? TRACE_STR_END_ERR : TRACE_STR_END,
 	    __func__);
@@ -4644,8 +4641,8 @@ again:
 		return !error;
 	}
 
-	if (!(kflags & WPI_KFLAG_MULTICAST) && &vap->iv_nw_keys[0] <= k &&
-	    k < &vap->iv_nw_keys[IEEE80211_WEP_NKID]) {
+	if (!(kflags & WPI_KFLAG_MULTICAST) &&
+	    ieee80211_is_key_global(vap, k)) {
 		kflags |= WPI_KFLAG_MULTICAST;
 		node.kflags = htole16(kflags);
 
@@ -4729,8 +4726,8 @@ again:
 		return !error;
 	}
 
-	if (!(kflags & WPI_KFLAG_MULTICAST) && &vap->iv_nw_keys[0] <= k &&
-	    k < &vap->iv_nw_keys[IEEE80211_WEP_NKID]) {
+	if (!(kflags & WPI_KFLAG_MULTICAST) &&
+	    ieee80211_is_key_global(vap, k)) {
 		kflags |= WPI_KFLAG_MULTICAST;
 		node.kflags = htole16(kflags);
 
@@ -4785,8 +4782,7 @@ wpi_process_key(struct ieee80211vap *vap, const struct ieee80211_key *k,
 	}
 
 	/* Handle group keys. */
-	if (&vap->iv_nw_keys[0] <= k &&
-	    k < &vap->iv_nw_keys[IEEE80211_WEP_NKID]) {
+	if (ieee80211_is_key_global(vap, k)) {
 		WPI_NT_LOCK(sc);
 		if (set)
 			wvp->wv_gtk |= WPI_VAP_KEY(k->wk_keyix);

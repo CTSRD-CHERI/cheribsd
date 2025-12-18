@@ -28,7 +28,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include "opt_acpi.h"
 
 #include <sys/param.h>
@@ -55,6 +54,7 @@
 #include <x86/include/busdma_impl.h>
 #include <x86/iommu/intel_reg.h>
 #include <dev/iommu/busdma_iommu.h>
+#include <x86/iommu/x86_iommu.h>
 #include <x86/iommu/intel_dmar.h>
 
 /*
@@ -127,7 +127,7 @@ dmar_fault_intr(void *arg)
 	int fri, frir, faultp;
 	bool enqueue;
 
-	unit = arg;
+	unit = IOMMU2DMAR((struct iommu_unit *)arg);
 	enqueue = false;
 	fsts = dmar_read4(unit, DMAR_FSTS_REG);
 	dmar_fault_intr_clear(unit, fsts);
@@ -276,9 +276,9 @@ dmar_init_fault_log(struct dmar_unit *unit)
 	    "dmar%d fault taskq", unit->iommu.unit);
 
 	DMAR_LOCK(unit);
-	dmar_disable_fault_intr(unit);
+	dmar_disable_fault_intr(&unit->iommu);
 	dmar_clear_faults(unit);
-	dmar_enable_fault_intr(unit);
+	dmar_enable_fault_intr(&unit->iommu);
 	DMAR_UNLOCK(unit);
 
 	return (0);
@@ -292,7 +292,7 @@ dmar_fini_fault_log(struct dmar_unit *unit)
 		return;
 
 	DMAR_LOCK(unit);
-	dmar_disable_fault_intr(unit);
+	dmar_disable_fault_intr(&unit->iommu);
 	DMAR_UNLOCK(unit);
 
 	taskqueue_drain(unit->fault_taskqueue, &unit->fault_task);
@@ -306,10 +306,12 @@ dmar_fini_fault_log(struct dmar_unit *unit)
 }
 
 void
-dmar_enable_fault_intr(struct dmar_unit *unit)
+dmar_enable_fault_intr(struct iommu_unit *iommu)
 {
+	struct dmar_unit *unit;
 	uint32_t fectl;
 
+	unit = IOMMU2DMAR(iommu);
 	DMAR_ASSERT_LOCKED(unit);
 	fectl = dmar_read4(unit, DMAR_FECTL_REG);
 	fectl &= ~DMAR_FECTL_IM;
@@ -317,10 +319,12 @@ dmar_enable_fault_intr(struct dmar_unit *unit)
 }
 
 void
-dmar_disable_fault_intr(struct dmar_unit *unit)
+dmar_disable_fault_intr(struct iommu_unit *iommu)
 {
+	struct dmar_unit *unit;
 	uint32_t fectl;
 
+	unit = IOMMU2DMAR(iommu);
 	DMAR_ASSERT_LOCKED(unit);
 	fectl = dmar_read4(unit, DMAR_FECTL_REG);
 	dmar_write4(unit, DMAR_FECTL_REG, fectl | DMAR_FECTL_IM);

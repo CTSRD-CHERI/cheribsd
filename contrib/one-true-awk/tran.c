@@ -57,8 +57,7 @@ Cell	*fnrloc;	/* FNR */
 Cell	*ofsloc;	/* OFS */
 Cell	*orsloc;	/* ORS */
 Cell	*rsloc;		/* RS */
-Array	*ARGVtab;	/* symbol table containing ARGV[...] */
-Array	*ENVtab;	/* symbol table containing ENVIRON[...] */
+Cell	*ARGVcell;	/* cell with symbol table containing ARGV[...] */
 Cell	*rstartloc;	/* RSTART */
 Cell	*rlengthloc;	/* RLENGTH */
 Cell	*subseploc;	/* SUBSEP */
@@ -69,18 +68,6 @@ Node	*nullnode;	/* zero&null, converted into a node for comparisons */
 Cell	*literal0;
 
 extern Cell **fldtab;
-
-static void
-setfree(Cell *vp)
-{
-	if (&vp->sval == FS || &vp->sval == RS ||
-	    &vp->sval == OFS || &vp->sval == ORS ||
-	    &vp->sval == OFMT || &vp->sval == CONVFMT ||
-	    &vp->sval == FILENAME || &vp->sval == SUBSEP)
-		vp->tval |= DONTFREE;
-	else
-		vp->tval &= ~DONTFREE;
-}
 
 void syminit(void)	/* initialize symbol table with builtin vars */
 {
@@ -119,36 +106,39 @@ void syminit(void)	/* initialize symbol table with builtin vars */
 
 void arginit(int ac, char **av)	/* set up ARGV and ARGC */
 {
+	Array *ap;
 	Cell *cp;
 	int i;
 	char temp[50];
 
 	ARGC = &setsymtab("ARGC", "", (Awkfloat) ac, NUM, symtab)->fval;
 	cp = setsymtab("ARGV", "", 0.0, ARR, symtab);
-	ARGVtab = makesymtab(NSYMTAB);	/* could be (int) ARGC as well */
+	ap = makesymtab(NSYMTAB);	/* could be (int) ARGC as well */
 	free(cp->sval);
-	cp->sval = (char *) ARGVtab;
+	cp->sval = (char *) ap;
 	for (i = 0; i < ac; i++) {
 		double result;
 
 		sprintf(temp, "%d", i);
 		if (is_number(*av, & result))
-			setsymtab(temp, *av, result, STR|NUM, ARGVtab);
+			setsymtab(temp, *av, result, STR|NUM, ap);
 		else
-			setsymtab(temp, *av, 0.0, STR, ARGVtab);
+			setsymtab(temp, *av, 0.0, STR, ap);
 		av++;
 	}
+	ARGVcell = cp;
 }
 
 void envinit(char **envp)	/* set up ENVIRON variable */
 {
+	Array *ap;
 	Cell *cp;
 	char *p;
 
 	cp = setsymtab("ENVIRON", "", 0.0, ARR, symtab);
-	ENVtab = makesymtab(NSYMTAB);
+	ap = makesymtab(NSYMTAB);
 	free(cp->sval);
-	cp->sval = (char *) ENVtab;
+	cp->sval = (char *) ap;
 	for ( ; *envp; envp++) {
 		double result;
 
@@ -158,9 +148,9 @@ void envinit(char **envp)	/* set up ENVIRON variable */
 			continue;
 		*p++ = 0;	/* split into two strings at = */
 		if (is_number(p, & result))
-			setsymtab(*envp, p, result, STR|NUM, ENVtab);
+			setsymtab(*envp, p, result, STR|NUM, ap);
 		else
-			setsymtab(*envp, p, 0.0, STR, ENVtab);
+			setsymtab(*envp, p, 0.0, STR, ap);
 		p[-1] = '=';	/* restore in case env is passed down to a shell */
 	}
 }
@@ -320,7 +310,7 @@ Awkfloat setfval(Cell *vp, Awkfloat f)	/* set float val of a Cell */
 	} else if (&vp->fval == NF) {
 		donerec = false;	/* mark $0 invalid */
 		setlastfld(f);
-		DPRINTF("setting NF to %g\n", f);
+		DPRINTF("setfval: setting NF to %g\n", f);
 	} else if (isrec(vp)) {
 		donefld = false;	/* mark $1... invalid */
 		donerec = true;
@@ -360,6 +350,10 @@ char *setsval(Cell *vp, const char *s)	/* set string val of a Cell */
 		(void*)vp, NN(vp->nval), s, vp->tval, donerec, donefld);
 	if ((vp->tval & (NUM | STR)) == 0)
 		funnyvar(vp, "assign to");
+	if (CSV && (vp == rsloc))
+		WARNING("danger: don't set RS when --csv is in effect");
+	if (CSV && (vp == fsloc))
+		WARNING("danger: don't set FS when --csv is in effect");
 	if (isfld(vp)) {
 		donerec = false;	/* mark $0 invalid */
 		fldno = atoi(vp->nval);
@@ -377,10 +371,9 @@ char *setsval(Cell *vp, const char *s)	/* set string val of a Cell */
 	t = s ? tostring(s) : tostring("");	/* in case it's self-assign */
 	if (freeable(vp))
 		xfree(vp->sval);
-	vp->tval &= ~(NUM|CONVC|CONVO);
+	vp->tval &= ~(NUM|DONTFREE|CONVC|CONVO);
 	vp->tval |= STR;
 	vp->fmt = NULL;
-	setfree(vp);
 	DPRINTF("setsval %p: %s = \"%s (%p) \", t=%o r,f=%d,%d\n",
 		(void*)vp, NN(vp->nval), t, (void*)t, vp->tval, donerec, donefld);
 	vp->sval = t;
@@ -388,7 +381,7 @@ char *setsval(Cell *vp, const char *s)	/* set string val of a Cell */
 		donerec = false;	/* mark $0 invalid */
 		f = getfval(vp);
 		setlastfld(f);
-		DPRINTF("setting NF to %g\n", f);
+		DPRINTF("setsval: setting NF to %g\n", f);
 	}
 
 	return(vp->sval);
@@ -576,7 +569,6 @@ Cell *catstr(Cell *a, Cell *b) /* concatenate a and b */
 
 char *qstring(const char *is, int delim)	/* collect string up to next delim */
 {
-	const char *os = is;
 	int c, n;
 	const uschar *s = (const uschar *) is;
 	uschar *buf, *bp;
@@ -585,7 +577,7 @@ char *qstring(const char *is, int delim)	/* collect string up to next delim */
 		FATAL( "out of space in qstring(%s)", s);
 	for (bp = buf; (c = *s) != delim; s++) {
 		if (c == '\n')
-			SYNTAX( "newline in string %.20s...", os );
+			SYNTAX( "newline in string %.20s...", is );
 		else if (c != '\\')
 			*bp++ = c;
 		else {	/* \something */

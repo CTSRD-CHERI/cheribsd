@@ -44,7 +44,6 @@
  * Author: Ken Merry <ken@FreeBSD.org>
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ctype.h>
@@ -84,6 +83,7 @@
 #include <cam/ctl/ctl_ha.h>
 #include <cam/ctl/ctl_private.h>
 #include <cam/ctl/ctl_debug.h>
+#include <cam/ctl/ctl_nvme_all.h>
 #include <cam/ctl/ctl_scsi_all.h>
 #include <cam/ctl/ctl_error.h>
 
@@ -123,72 +123,6 @@ const static struct scsi_da_rw_recovery_page rw_er_page_changeable = {
 	/*write_retry_count*/0,
 	/*reserved2*/0,
 	/*recovery_time_limit*/{0, 0},
-};
-
-const static struct scsi_format_page format_page_default = {
-	/*page_code*/SMS_FORMAT_DEVICE_PAGE,
-	/*page_length*/sizeof(struct scsi_format_page) - 2,
-	/*tracks_per_zone*/ {0, 0},
-	/*alt_sectors_per_zone*/ {0, 0},
-	/*alt_tracks_per_zone*/ {0, 0},
-	/*alt_tracks_per_lun*/ {0, 0},
-	/*sectors_per_track*/ {(CTL_DEFAULT_SECTORS_PER_TRACK >> 8) & 0xff,
-			        CTL_DEFAULT_SECTORS_PER_TRACK & 0xff},
-	/*bytes_per_sector*/ {0, 0},
-	/*interleave*/ {0, 0},
-	/*track_skew*/ {0, 0},
-	/*cylinder_skew*/ {0, 0},
-	/*flags*/ SFP_HSEC,
-	/*reserved*/ {0, 0, 0}
-};
-
-const static struct scsi_format_page format_page_changeable = {
-	/*page_code*/SMS_FORMAT_DEVICE_PAGE,
-	/*page_length*/sizeof(struct scsi_format_page) - 2,
-	/*tracks_per_zone*/ {0, 0},
-	/*alt_sectors_per_zone*/ {0, 0},
-	/*alt_tracks_per_zone*/ {0, 0},
-	/*alt_tracks_per_lun*/ {0, 0},
-	/*sectors_per_track*/ {0, 0},
-	/*bytes_per_sector*/ {0, 0},
-	/*interleave*/ {0, 0},
-	/*track_skew*/ {0, 0},
-	/*cylinder_skew*/ {0, 0},
-	/*flags*/ 0,
-	/*reserved*/ {0, 0, 0}
-};
-
-const static struct scsi_rigid_disk_page rigid_disk_page_default = {
-	/*page_code*/SMS_RIGID_DISK_PAGE,
-	/*page_length*/sizeof(struct scsi_rigid_disk_page) - 2,
-	/*cylinders*/ {0, 0, 0},
-	/*heads*/ CTL_DEFAULT_HEADS,
-	/*start_write_precomp*/ {0, 0, 0},
-	/*start_reduced_current*/ {0, 0, 0},
-	/*step_rate*/ {0, 0},
-	/*landing_zone_cylinder*/ {0, 0, 0},
-	/*rpl*/ SRDP_RPL_DISABLED,
-	/*rotational_offset*/ 0,
-	/*reserved1*/ 0,
-	/*rotation_rate*/ {(CTL_DEFAULT_ROTATION_RATE >> 8) & 0xff,
-			   CTL_DEFAULT_ROTATION_RATE & 0xff},
-	/*reserved2*/ {0, 0}
-};
-
-const static struct scsi_rigid_disk_page rigid_disk_page_changeable = {
-	/*page_code*/SMS_RIGID_DISK_PAGE,
-	/*page_length*/sizeof(struct scsi_rigid_disk_page) - 2,
-	/*cylinders*/ {0, 0, 0},
-	/*heads*/ 0,
-	/*start_write_precomp*/ {0, 0, 0},
-	/*start_reduced_current*/ {0, 0, 0},
-	/*step_rate*/ {0, 0},
-	/*landing_zone_cylinder*/ {0, 0, 0},
-	/*rpl*/ 0,
-	/*rotational_offset*/ 0,
-	/*reserved1*/ 0,
-	/*rotation_rate*/ {0, 0},
-	/*reserved2*/ {0, 0}
 };
 
 const static struct scsi_da_verify_recovery_page verify_er_page_default = {
@@ -514,6 +448,8 @@ static int ctl_scsiio_lun_check(struct ctl_lun *lun,
 static void ctl_failover_lun(union ctl_io *io);
 static void ctl_scsiio_precheck(struct ctl_scsiio *ctsio);
 static int ctl_scsiio(struct ctl_scsiio *ctsio);
+static void ctl_nvmeio_precheck(struct ctl_nvmeio *ctnio);
+static int ctl_nvmeio(struct ctl_nvmeio *ctnio);
 
 static int ctl_target_reset(union ctl_io *io);
 static void ctl_do_lun_reset(struct ctl_lun *lun, uint32_t initidx,
@@ -595,6 +531,38 @@ static moduledata_t ctl_moduledata = {
 DECLARE_MODULE(ctl, ctl_moduledata, SI_SUB_CONFIGURE, SI_ORDER_THIRD);
 MODULE_VERSION(ctl, 1);
 
+static void
+ctl_be_move_done(union ctl_io *io, bool samethr)
+{
+	switch (io->io_hdr.io_type) {
+	case CTL_IO_SCSI:
+		io->scsiio.be_move_done(io, samethr);
+		break;
+	case CTL_IO_NVME:
+	case CTL_IO_NVME_ADMIN:
+		io->nvmeio.be_move_done(io, samethr);
+		break;
+	default:
+		__assert_unreachable();
+	}
+}
+
+static void
+ctl_continue_io(union ctl_io *io)
+{
+	switch (io->io_hdr.io_type) {
+	case CTL_IO_SCSI:
+		io->scsiio.io_cont(io);
+		break;
+	case CTL_IO_NVME:
+	case CTL_IO_NVME_ADMIN:
+		io->nvmeio.io_cont(io);
+		break;
+	default:
+		__assert_unreachable();
+	}
+}
+
 static struct ctl_frontend ha_frontend =
 {
 	.name = "ha",
@@ -652,6 +620,8 @@ ctl_ha_datamove(union ctl_io *io)
 	uint32_t sg_entries_sent;
 	int do_sg_copy, i, j;
 
+	CTL_IO_ASSERT(io, SCSI);
+
 	memset(&msg.dt, 0, sizeof(msg.dt));
 	msg.hdr.msg_type = CTL_MSG_DATAMOVE;
 	msg.hdr.original_sc = io->io_hdr.remote_io;
@@ -668,32 +638,32 @@ ctl_ha_datamove(union ctl_io *io)
 	 * us to get more than CTL_HA_MAX_SG_ENTRIES S/G entries,
 	 * then we need to break this up into multiple transfers.
 	 */
-	if (io->scsiio.kern_sg_entries == 0) {
+	if (ctl_kern_sg_entries(io) == 0) {
 		msg.dt.kern_sg_entries = 1;
 #if 0
 		if (io->io_hdr.flags & CTL_FLAG_BUS_ADDR) {
-			msg.dt.sg_list[0].addr = io->scsiio.kern_data_ptr;
+			msg.dt.sg_list[0].addr = ctl_kern_data_ptr(io);
 		} else {
 			/* XXX KDM use busdma here! */
 			msg.dt.sg_list[0].addr =
-			    (void *)vtophys(io->scsiio.kern_data_ptr);
+			    (void *)vtophys(ctl_kern_data_ptr(io));
 		}
 #else
 		KASSERT((io->io_hdr.flags & CTL_FLAG_BUS_ADDR) == 0,
 		    ("HA does not support BUS_ADDR"));
-		msg.dt.sg_list[0].addr = io->scsiio.kern_data_ptr;
+		msg.dt.sg_list[0].addr = ctl_kern_data_ptr(io);
 #endif
-		msg.dt.sg_list[0].len = io->scsiio.kern_data_len;
+		msg.dt.sg_list[0].len = ctl_kern_data_len(io);
 		do_sg_copy = 0;
 	} else {
-		msg.dt.kern_sg_entries = io->scsiio.kern_sg_entries;
+		msg.dt.kern_sg_entries = ctl_kern_sg_entries(io);
 		do_sg_copy = 1;
 	}
 
-	msg.dt.kern_data_len = io->scsiio.kern_data_len;
-	msg.dt.kern_total_len = io->scsiio.kern_total_len;
-	msg.dt.kern_data_resid = io->scsiio.kern_data_resid;
-	msg.dt.kern_rel_offset = io->scsiio.kern_rel_offset;
+	msg.dt.kern_data_len = ctl_kern_data_len(io);
+	msg.dt.kern_total_len = ctl_kern_total_len(io);
+	msg.dt.kern_data_resid = ctl_kern_data_resid(io);
+	msg.dt.kern_rel_offset = ctl_kern_rel_offset(io);
 	msg.dt.sg_sequence = 0;
 
 	/*
@@ -707,7 +677,7 @@ ctl_ha_datamove(union ctl_io *io)
 		    sizeof(msg.dt.sg_list[0])),
 		    msg.dt.kern_sg_entries - sg_entries_sent);
 		if (do_sg_copy != 0) {
-			sgl = (struct ctl_sg_entry *)io->scsiio.kern_data_ptr;
+			sgl = (struct ctl_sg_entry *)ctl_kern_data_ptr(io);
 			for (i = sg_entries_sent, j = 0;
 			     i < msg.dt.cur_sg_entries; i++, j++) {
 #if 0
@@ -1563,6 +1533,8 @@ ctl_isc_event_handler(ctl_ha_channel channel, ctl_ha_event event, int param)
 				/* XXX KDM do something here */
 				break;
 			}
+			CTL_IO_ASSERT(io, SCSI);
+
 			io->io_hdr.msg_type = CTL_MSG_DATAMOVE;
 			io->io_hdr.flags |= CTL_FLAG_IO_ACTIVE;
 			/*
@@ -1636,6 +1608,8 @@ ctl_isc_event_handler(ctl_ha_channel channel, ctl_ha_event event, int param)
 			 * back to the initiator.
 			 */
 			io = msg->hdr.serializing_sc;
+			CTL_IO_ASSERT(io, SCSI);
+
 			io->io_hdr.msg_type = CTL_MSG_DATAMOVE_DONE;
 			io->io_hdr.flags &= ~CTL_FLAG_DMA_INPROG;
 			io->io_hdr.flags |= CTL_FLAG_IO_ACTIVE;
@@ -2477,6 +2451,8 @@ ctl_ioctl_fill_ooa(struct ctl_lun *lun, uint32_t *cur_fill_num,
 		union ctl_io *io = (union ctl_io *)ioh;
 		struct ctl_ooa_entry *entry;
 
+		CTL_IO_ASSERT(io, SCSI);
+
 		/*
 		 * If we've got more than we can fit, just count the
 		 * remaining entries.
@@ -2535,13 +2511,13 @@ ctl_sbuf_printf_esc(struct sbuf *sb, char *str, int size)
 	for (; *str && str < end; str++) {
 		switch (*str) {
 		case '&':
-			retval = sbuf_printf(sb, "&amp;");
+			retval = sbuf_cat(sb, "&amp;");
 			break;
 		case '>':
-			retval = sbuf_printf(sb, "&gt;");
+			retval = sbuf_cat(sb, "&gt;");
 			break;
 		case '<':
-			retval = sbuf_printf(sb, "&lt;");
+			retval = sbuf_cat(sb, "&lt;");
 			break;
 		default:
 			retval = sbuf_putc(sb, *str);
@@ -2566,13 +2542,13 @@ ctl_id_sbuf(struct ctl_devid *id, struct sbuf *sb)
 	desc = (struct scsi_vpd_id_descriptor *)id->data;
 	switch (desc->id_type & SVPD_ID_TYPE_MASK) {
 	case SVPD_ID_TYPE_T10:
-		sbuf_printf(sb, "t10.");
+		sbuf_cat(sb, "t10.");
 		break;
 	case SVPD_ID_TYPE_EUI64:
-		sbuf_printf(sb, "eui.");
+		sbuf_cat(sb, "eui.");
 		break;
 	case SVPD_ID_TYPE_NAA:
-		sbuf_printf(sb, "naa.");
+		sbuf_cat(sb, "naa.");
 		break;
 	case SVPD_ID_TYPE_SCSI_NAME:
 		break;
@@ -2587,7 +2563,7 @@ ctl_id_sbuf(struct ctl_devid *id, struct sbuf *sb)
 		    (char *)desc->identifier);
 		break;
 	case SVPD_ID_CODESET_UTF8:
-		sbuf_printf(sb, "%s", (char *)desc->identifier);
+		sbuf_cat(sb, (char *)desc->identifier);
 		break;
 	}
 }
@@ -2711,12 +2687,6 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 		}
 
 		entries = malloc(ooa_hdr->alloc_len, M_CTL, M_WAITOK | M_ZERO);
-		if (entries == NULL) {
-			printf("%s: could not allocate %d bytes for OOA "
-			       "dump\n", __func__, ooa_hdr->alloc_len);
-			retval = ENOMEM;
-			break;
-		}
 
 		mtx_lock(&softc->ctl_lock);
 		if ((ooa_hdr->flags & CTL_OOA_FLAG_ALL_LUNS) == 0 &&
@@ -3089,7 +3059,7 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 			break;
 		}
 
-		sbuf_printf(sb, "<ctllunlist>\n");
+		sbuf_cat(sb, "<ctllunlist>\n");
 
 		mtx_lock(&softc->ctl_lock);
 		STAILQ_FOREACH(lun, &softc->lun_list, links) {
@@ -3119,7 +3089,7 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 				break;
 
 			if (lun->backend == NULL) {
-				retval = sbuf_printf(sb, "</lun>\n");
+				retval = sbuf_cat(sb, "</lun>\n");
 				if (retval != 0)
 					break;
 				continue;
@@ -3138,7 +3108,7 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 			if (retval != 0)
 				break;
 
-			retval = sbuf_printf(sb, "\t<serial_number>");
+			retval = sbuf_cat(sb, "\t<serial_number>");
 
 			if (retval != 0)
 				break;
@@ -3150,12 +3120,12 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 			if (retval != 0)
 				break;
 
-			retval = sbuf_printf(sb, "</serial_number>\n");
+			retval = sbuf_cat(sb, "</serial_number>\n");
 		
 			if (retval != 0)
 				break;
 
-			retval = sbuf_printf(sb, "\t<device_id>");
+			retval = sbuf_cat(sb, "\t<device_id>");
 
 			if (retval != 0)
 				break;
@@ -3167,7 +3137,7 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 			if (retval != 0)
 				break;
 
-			retval = sbuf_printf(sb, "</device_id>\n");
+			retval = sbuf_cat(sb, "</device_id>\n");
 
 			if (retval != 0)
 				break;
@@ -3187,13 +3157,13 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 					value = dnvlist_get_string(
 					    lun->be_lun->options, name, NULL);
 					if (value != NULL)
-						sbuf_printf(sb, "%s", value);
+						sbuf_cat(sb, value);
 				}
 
 				sbuf_printf(sb, "</%s>\n", name);
 			}
 
-			retval = sbuf_printf(sb, "</lun>\n");
+			retval = sbuf_cat(sb, "</lun>\n");
 
 			if (retval != 0)
 				break;
@@ -3204,7 +3174,7 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 		mtx_unlock(&softc->ctl_lock);
 
 		if ((retval != 0)
-		 || ((retval = sbuf_printf(sb, "</ctllunlist>\n")) != 0)) {
+		 || ((retval = sbuf_cat(sb, "</ctllunlist>\n")) != 0)) {
 			retval = 0;
 			sbuf_delete(sb);
 			list->status = CTL_LUN_LIST_NEED_MORE_SPACE;
@@ -3235,6 +3205,23 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 			ci->status = CTL_ISCSI_ERROR;
 			snprintf(ci->error_str, sizeof(ci->error_str),
 			    "Frontend \"iscsi\" not found.");
+			break;
+		}
+
+		retval = fe->ioctl(dev, cmd, addr, flag, td);
+		break;
+	}
+	case CTL_NVMF: {
+		struct ctl_nvmf *cn;
+		struct ctl_frontend *fe;
+
+		cn = (struct ctl_nvmf *)addr;
+
+		fe = ctl_frontend_find("nvmf");
+		if (fe == NULL) {
+			cn->status = CTL_NVMF_ERROR;
+			snprintf(cn->error_str, sizeof(cn->error_str),
+			    "Frontend \"nvmf\" not found.");
 			break;
 		}
 
@@ -3354,7 +3341,7 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 			break;
 		}
 
-		sbuf_printf(sb, "<ctlportlist>\n");
+		sbuf_cat(sb, "<ctlportlist>\n");
 
 		mtx_lock(&softc->ctl_lock);
 		STAILQ_FOREACH(port, &softc->port_list, links) {
@@ -3399,15 +3386,15 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 				break;
 
 			if (port->target_devid != NULL) {
-				sbuf_printf(sb, "\t<target>");
+				sbuf_cat(sb, "\t<target>");
 				ctl_id_sbuf(port->target_devid, sb);
-				sbuf_printf(sb, "</target>\n");
+				sbuf_cat(sb, "</target>\n");
 			}
 
 			if (port->port_devid != NULL) {
-				sbuf_printf(sb, "\t<port>");
+				sbuf_cat(sb, "\t<port>");
 				ctl_id_sbuf(port->port_devid, sb);
-				sbuf_printf(sb, "</port>\n");
+				sbuf_cat(sb, "</port>\n");
 			}
 
 			if (port->port_info != NULL) {
@@ -3432,7 +3419,7 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 			}
 
 			if (port->lun_map != NULL) {
-				sbuf_printf(sb, "\t<lun_map>on</lun_map>\n");
+				sbuf_cat(sb, "\t<lun_map>on</lun_map>\n");
 				for (j = 0; j < port->lun_map_size; j++) {
 					plun = ctl_lun_map_from_port(port, j);
 					if (plun == UINT32_MAX)
@@ -3463,14 +3450,14 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 			if (retval != 0)
 				break;
 
-			retval = sbuf_printf(sb, "</targ_port>\n");
+			retval = sbuf_cat(sb, "</targ_port>\n");
 			if (retval != 0)
 				break;
 		}
 		mtx_unlock(&softc->ctl_lock);
 
 		if ((retval != 0)
-		 || ((retval = sbuf_printf(sb, "</ctlportlist>\n")) != 0)) {
+		 || ((retval = sbuf_cat(sb, "</ctlportlist>\n")) != 0)) {
 			retval = 0;
 			sbuf_delete(sb);
 			list->status = CTL_LUN_LIST_NEED_MORE_SPACE;
@@ -4125,134 +4112,6 @@ ctl_init_page_index(struct ctl_lun *lun)
 				(uint8_t *)lun->mode_pages.rw_er_page;
 			break;
 		}
-		case SMS_FORMAT_DEVICE_PAGE: {
-			struct scsi_format_page *format_page;
-
-			KASSERT(page_index->subpage == SMS_SUBPAGE_PAGE_0,
-			    ("subpage %#x for page %#x is incorrect!",
-			    page_index->subpage, page_code));
-
-			/*
-			 * Sectors per track are set above.  Bytes per
-			 * sector need to be set here on a per-LUN basis.
-			 */
-			memcpy(&lun->mode_pages.format_page[CTL_PAGE_CURRENT],
-			       &format_page_default,
-			       sizeof(format_page_default));
-			memcpy(&lun->mode_pages.format_page[
-			       CTL_PAGE_CHANGEABLE], &format_page_changeable,
-			       sizeof(format_page_changeable));
-			memcpy(&lun->mode_pages.format_page[CTL_PAGE_DEFAULT],
-			       &format_page_default,
-			       sizeof(format_page_default));
-			memcpy(&lun->mode_pages.format_page[CTL_PAGE_SAVED],
-			       &format_page_default,
-			       sizeof(format_page_default));
-
-			format_page = &lun->mode_pages.format_page[
-				CTL_PAGE_CURRENT];
-			scsi_ulto2b(lun->be_lun->blocksize,
-				    format_page->bytes_per_sector);
-
-			format_page = &lun->mode_pages.format_page[
-				CTL_PAGE_DEFAULT];
-			scsi_ulto2b(lun->be_lun->blocksize,
-				    format_page->bytes_per_sector);
-
-			format_page = &lun->mode_pages.format_page[
-				CTL_PAGE_SAVED];
-			scsi_ulto2b(lun->be_lun->blocksize,
-				    format_page->bytes_per_sector);
-
-			page_index->page_data =
-				(uint8_t *)lun->mode_pages.format_page;
-			break;
-		}
-		case SMS_RIGID_DISK_PAGE: {
-			struct scsi_rigid_disk_page *rigid_disk_page;
-			uint32_t sectors_per_cylinder;
-			uint64_t cylinders;
-#ifndef	__XSCALE__
-			int shift;
-#endif /* !__XSCALE__ */
-
-			KASSERT(page_index->subpage == SMS_SUBPAGE_PAGE_0,
-			    ("subpage %#x for page %#x is incorrect!",
-			    page_index->subpage, page_code));
-
-			/*
-			 * Rotation rate and sectors per track are set
-			 * above.  We calculate the cylinders here based on
-			 * capacity.  Due to the number of heads and
-			 * sectors per track we're using, smaller arrays
-			 * may turn out to have 0 cylinders.  Linux and
-			 * FreeBSD don't pay attention to these mode pages
-			 * to figure out capacity, but Solaris does.  It
-			 * seems to deal with 0 cylinders just fine, and
-			 * works out a fake geometry based on the capacity.
-			 */
-			memcpy(&lun->mode_pages.rigid_disk_page[
-			       CTL_PAGE_DEFAULT], &rigid_disk_page_default,
-			       sizeof(rigid_disk_page_default));
-			memcpy(&lun->mode_pages.rigid_disk_page[
-			       CTL_PAGE_CHANGEABLE],&rigid_disk_page_changeable,
-			       sizeof(rigid_disk_page_changeable));
-
-			sectors_per_cylinder = CTL_DEFAULT_SECTORS_PER_TRACK *
-				CTL_DEFAULT_HEADS;
-
-			/*
-			 * The divide method here will be more accurate,
-			 * probably, but results in floating point being
-			 * used in the kernel on i386 (__udivdi3()).  On the
-			 * XScale, though, __udivdi3() is implemented in
-			 * software.
-			 *
-			 * The shift method for cylinder calculation is
-			 * accurate if sectors_per_cylinder is a power of
-			 * 2.  Otherwise it might be slightly off -- you
-			 * might have a bit of a truncation problem.
-			 */
-#ifdef	__XSCALE__
-			cylinders = (lun->be_lun->maxlba + 1) /
-				sectors_per_cylinder;
-#else
-			for (shift = 31; shift > 0; shift--) {
-				if (sectors_per_cylinder & (1 << shift))
-					break;
-			}
-			cylinders = (lun->be_lun->maxlba + 1) >> shift;
-#endif
-
-			/*
-			 * We've basically got 3 bytes, or 24 bits for the
-			 * cylinder size in the mode page.  If we're over,
-			 * just round down to 2^24.
-			 */
-			if (cylinders > 0xffffff)
-				cylinders = 0xffffff;
-
-			rigid_disk_page = &lun->mode_pages.rigid_disk_page[
-				CTL_PAGE_DEFAULT];
-			scsi_ulto3b(cylinders, rigid_disk_page->cylinders);
-
-			if ((value = dnvlist_get_string(lun->be_lun->options,
-			    "rpm", NULL)) != NULL) {
-				scsi_ulto2b(strtol(value, NULL, 0),
-				     rigid_disk_page->rotation_rate);
-			}
-
-			memcpy(&lun->mode_pages.rigid_disk_page[CTL_PAGE_CURRENT],
-			       &lun->mode_pages.rigid_disk_page[CTL_PAGE_DEFAULT],
-			       sizeof(rigid_disk_page_default));
-			memcpy(&lun->mode_pages.rigid_disk_page[CTL_PAGE_SAVED],
-			       &lun->mode_pages.rigid_disk_page[CTL_PAGE_DEFAULT],
-			       sizeof(rigid_disk_page_default));
-
-			page_index->page_data =
-				(uint8_t *)lun->mode_pages.rigid_disk_page;
-			break;
-		}
 		case SMS_VERIFY_ERROR_RECOVERY_PAGE: {
 			KASSERT(page_index->subpage == SMS_SUBPAGE_PAGE_0,
 			    ("subpage %#x for page %#x is incorrect!",
@@ -4771,7 +4630,7 @@ fail:
 	ctl_tpc_lun_init(lun);
 	if (lun->flags & CTL_LUN_REMOVABLE) {
 		lun->prevent = malloc((CTL_MAX_INITIATORS + 31) / 32 * 4,
-		    M_CTL, M_WAITOK);
+		    M_CTL, M_WAITOK | M_ZERO);
 	}
 
 	/*
@@ -5108,6 +4967,91 @@ ctl_lun_capacity_changed(struct ctl_be_lun *be_lun)
 	}
 }
 
+void
+ctl_lun_nsdata_ids(struct ctl_be_lun *be_lun,
+    struct nvme_namespace_data *nsdata)
+{
+	struct ctl_lun *lun = (struct ctl_lun *)be_lun->ctl_lun;
+	struct scsi_vpd_id_descriptor *idd;
+
+	if (lun->lun_devid == NULL)
+		return;
+
+	idd = scsi_get_devid_desc((struct scsi_vpd_id_descriptor *)
+	    lun->lun_devid->data, lun->lun_devid->len, scsi_devid_is_lun_naa);
+	if (idd != NULL) {
+		if (idd->length == 16) {
+			memcpy(nsdata->nguid, idd->identifier, 16);
+			return;
+		}
+		if (idd->length == 8) {
+			memcpy(nsdata->eui64, idd->identifier, 8);
+			return;
+		}
+	}
+
+	idd = scsi_get_devid_desc((struct scsi_vpd_id_descriptor *)
+	    lun->lun_devid->data, lun->lun_devid->len, scsi_devid_is_lun_eui64);
+	if (idd != NULL) {
+		if (idd->length == 8) {
+			memcpy(nsdata->eui64, idd->identifier, 8);
+			return;
+		}
+	}
+}
+
+void
+ctl_lun_nvme_ids(struct ctl_be_lun *be_lun, void *data)
+{
+	struct ctl_lun *lun = (struct ctl_lun *)be_lun->ctl_lun;
+	struct scsi_vpd_id_descriptor *naa, *eui64, *uuid;
+	char *p;
+
+	memset(data, 0, 4096);
+
+	if (lun->lun_devid == NULL)
+		return;
+
+	naa = scsi_get_devid_desc((struct scsi_vpd_id_descriptor *)
+	    lun->lun_devid->data, lun->lun_devid->len, scsi_devid_is_lun_naa);
+	eui64 = scsi_get_devid_desc((struct scsi_vpd_id_descriptor *)
+	    lun->lun_devid->data, lun->lun_devid->len, scsi_devid_is_lun_eui64);
+	uuid = scsi_get_devid_desc((struct scsi_vpd_id_descriptor *)
+	    lun->lun_devid->data, lun->lun_devid->len, scsi_devid_is_lun_uuid);
+
+	p = data;
+
+	/* EUI64 */
+	if ((naa != NULL && naa->length == 8) || eui64 != NULL) {
+		*p++ = 1;
+		*p++ = 8;
+		p += 2;
+		if (naa != NULL && naa->length == 8)
+			memcpy(p, naa->identifier, 8);
+		else
+			memcpy(p, eui64->identifier, 8);
+		p += 8;
+	}
+
+	/* NGUID */
+	if (naa != NULL && naa->length == 16) {
+		*p++ = 1;
+		*p++ = 16;
+		p += 2;
+		memcpy(p, naa->identifier, 16);
+		p += 16;
+	}
+
+	/* UUID */
+	if (uuid != NULL) {
+		*p++ = 1;
+		*p++ = uuid->length;
+		p += 2;
+		memcpy(p, uuid->identifier, uuid->length);
+		p += uuid->length;
+	}
+}
+
 /*
  * Backend "memory move is complete" callback for requests that never
  * make it down to say RAIDCore's configuration code.
@@ -5118,8 +5062,6 @@ ctl_config_move_done(union ctl_io *io, bool samethr)
 	int retval;
 
 	CTL_DEBUG_PRINT(("ctl_config_move_done\n"));
-	KASSERT(io->io_hdr.io_type == CTL_IO_SCSI,
-	    ("%s: unexpected I/O type %x", __func__, io->io_hdr.io_type));
 
 	if (ctl_debug & CTL_DEBUG_CDB_DATA)
 		ctl_data_print(io);
@@ -5133,7 +5075,7 @@ ctl_config_move_done(union ctl_io *io, bool samethr)
 		 * we'll need to know how to clean them up here as well.
 		 */
 		if (io->io_hdr.flags & CTL_FLAG_ALLOCATED)
-			free(io->scsiio.kern_data_ptr, M_CTL);
+			free(ctl_kern_data_ptr(io), M_CTL);
 		ctl_done(io);
 		retval = CTL_RETVAL_COMPLETE;
 	} else {
@@ -5154,7 +5096,17 @@ ctl_config_move_done(union ctl_io *io, bool samethr)
 		 * XXX KDM call ctl_scsiio() again for now, and check flag
 		 * bits to see whether we're allocated or not.
 		 */
-		retval = ctl_scsiio(&io->scsiio);
+		switch (io->io_hdr.io_type) {
+		case CTL_IO_SCSI:
+			retval = ctl_scsiio(&io->scsiio);
+			break;
+		case CTL_IO_NVME:
+		case CTL_IO_NVME_ADMIN:
+			retval = ctl_nvmeio(&io->nvmeio);
+			break;
+		default:
+			__assert_unreachable();
+		}
 	}
 	return (retval);
 }
@@ -5178,7 +5130,7 @@ ctl_data_submit_done(union ctl_io *io)
 	    (io->io_hdr.flags & CTL_FLAG_ABORT) == 0 &&
 	    ((io->io_hdr.status & CTL_STATUS_MASK) == CTL_STATUS_NONE ||
 	     (io->io_hdr.status & CTL_STATUS_MASK) == CTL_SUCCESS)) {
-		io->scsiio.io_cont(io);
+		ctl_continue_io(io);
 		return;
 	}
 	ctl_done(io);
@@ -5205,7 +5157,7 @@ ctl_config_write_done(union ctl_io *io)
 	    (io->io_hdr.flags & CTL_FLAG_ABORT) == 0 &&
 	    ((io->io_hdr.status & CTL_STATUS_MASK) == CTL_STATUS_NONE ||
 	     (io->io_hdr.status & CTL_STATUS_MASK) == CTL_SUCCESS)) {
-		io->scsiio.io_cont(io);
+		ctl_continue_io(io);
 		return;
 	}
 	/*
@@ -5214,7 +5166,7 @@ ctl_config_write_done(union ctl_io *io)
 	 * no data, like start/stop unit, we need to check here.
 	 */
 	if (io->io_hdr.flags & CTL_FLAG_ALLOCATED)
-		buf = io->scsiio.kern_data_ptr;
+		buf = ctl_kern_data_ptr(io);
 	else
 		buf = NULL;
 	ctl_done(io);
@@ -5234,7 +5186,7 @@ ctl_config_read_done(union ctl_io *io)
 	    ((io->io_hdr.status & CTL_STATUS_MASK) != CTL_STATUS_NONE &&
 	     (io->io_hdr.status & CTL_STATUS_MASK) != CTL_SUCCESS)) {
 		if (io->io_hdr.flags & CTL_FLAG_ALLOCATED)
-			buf = io->scsiio.kern_data_ptr;
+			buf = ctl_kern_data_ptr(io);
 		else
 			buf = NULL;
 		ctl_done(io);
@@ -5249,7 +5201,7 @@ ctl_config_read_done(union ctl_io *io)
 	 * the I/O just yet.
 	 */
 	if (io->io_hdr.flags & CTL_FLAG_IO_CONT) {
-		io->scsiio.io_cont(io);
+		ctl_continue_io(io);
 		return;
 	}
 
@@ -5634,7 +5586,7 @@ ctl_read_buffer(struct ctl_scsiio *ctsio)
 	} else {
 		if (lun->write_buffer == NULL) {
 			lun->write_buffer = malloc(CTL_WRITE_BUFFER_SIZE,
-			    M_CTL, M_WAITOK);
+			    M_CTL, M_WAITOK | M_ZERO);
 		}
 		ctsio->kern_data_ptr = lun->write_buffer + buffer_offset;
 	}
@@ -5673,21 +5625,24 @@ ctl_write_buffer(struct ctl_scsiio *ctsio)
 		return (CTL_RETVAL_COMPLETE);
 	}
 
+	if (lun->write_buffer == NULL) {
+		lun->write_buffer = malloc(CTL_WRITE_BUFFER_SIZE,
+			    M_CTL, M_WAITOK | M_ZERO);
+	}
+
 	/*
-	 * If we've got a kernel request that hasn't been malloced yet,
-	 * malloc it and tell the caller the data buffer is here.
+	 * If this kernel request hasn't started yet, initialize the data
+	 * buffer to the correct region of the LUN's write buffer.  Note that
+	 * this doesn't set CTL_FLAG_ALLOCATED since this points into a
+	 * persistent buffer belonging to the LUN rather than a buffer
+	 * dedicated to this request.
 	 */
-	if ((ctsio->io_hdr.flags & CTL_FLAG_ALLOCATED) == 0) {
-		if (lun->write_buffer == NULL) {
-			lun->write_buffer = malloc(CTL_WRITE_BUFFER_SIZE,
-			    M_CTL, M_WAITOK);
-		}
+	if (ctsio->kern_data_ptr == NULL) {
 		ctsio->kern_data_ptr = lun->write_buffer + buffer_offset;
 		ctsio->kern_data_len = len;
 		ctsio->kern_total_len = len;
 		ctsio->kern_rel_offset = 0;
 		ctsio->kern_sg_entries = 0;
-		ctsio->io_hdr.flags |= CTL_FLAG_ALLOCATED;
 		ctsio->be_move_done = ctl_config_move_done;
 		ctl_datamove((union ctl_io *)ctsio);
 
@@ -5706,6 +5661,8 @@ ctl_write_same_cont(union ctl_io *io)
 	struct ctl_scsiio *ctsio;
 	struct ctl_lba_len_flags *lbalen;
 	int retval;
+
+	CTL_IO_ASSERT(io, SCSI);
 
 	ctsio = &io->scsiio;
 	ctsio->io_hdr.status = CTL_STATUS_NONE;
@@ -6051,6 +6008,8 @@ ctl_do_mode_select(union ctl_io *io)
 	union ctl_modepage_info *modepage_info;
 	uint16_t *len_left, *len_used;
 	int retval, i;
+
+	CTL_IO_ASSERT(io, SCSI);
 
 	ctsio = &io->scsiio;
 	page_index = NULL;
@@ -7497,34 +7456,30 @@ ctl_report_supported_opcodes(struct ctl_scsiio *ctsio)
 		break;
 	case RSO_OPTIONS_OC:
 		if (ctl_cmd_table[opcode].flags & CTL_CMD_FLAG_SA5) {
-			ctl_set_invalid_field(/*ctsio*/ ctsio,
-					      /*sks_valid*/ 1,
-					      /*command*/ 1,
-					      /*field*/ 2,
-					      /*bit_valid*/ 1,
-					      /*bit*/ 2);
-			ctl_done((union ctl_io *)ctsio);
-			return (CTL_RETVAL_COMPLETE);
+			goto invalid_options;
 		}
 		total_len = sizeof(struct scsi_report_supported_opcodes_one) + 32;
 		break;
 	case RSO_OPTIONS_OC_SA:
-		if ((ctl_cmd_table[opcode].flags & CTL_CMD_FLAG_SA5) == 0 ||
-		    service_action >= 32) {
-			ctl_set_invalid_field(/*ctsio*/ ctsio,
-					      /*sks_valid*/ 1,
-					      /*command*/ 1,
-					      /*field*/ 2,
-					      /*bit_valid*/ 1,
-					      /*bit*/ 2);
-			ctl_done((union ctl_io *)ctsio);
-			return (CTL_RETVAL_COMPLETE);
+		if ((ctl_cmd_table[opcode].flags & CTL_CMD_FLAG_SA5) == 0) {
+			goto invalid_options;
 		}
 		/* FALLTHROUGH */
 	case RSO_OPTIONS_OC_ASA:
+		if (service_action >= 32) {
+			ctl_set_invalid_field(/*ctsio*/ ctsio,
+					      /*sks_valid*/ 1,
+					      /*command*/ 1,
+					      /*field*/ 4,
+					      /*bit_valid*/ 0,
+					      /*bit*/ 0);
+			ctl_done((union ctl_io *)ctsio);
+			return (CTL_RETVAL_COMPLETE);
+		}
 		total_len = sizeof(struct scsi_report_supported_opcodes_one) + 32;
 		break;
 	default:
+invalid_options:
 		ctl_set_invalid_field(/*ctsio*/ ctsio,
 				      /*sks_valid*/ 1,
 				      /*command*/ 1,
@@ -8318,6 +8273,18 @@ ctl_persistent_reserve_out(struct ctl_scsiio *ctsio)
 
 	param_len = scsi_4btoul(cdb->length);
 
+	/* validate the parameter length */
+	if (param_len != 24) {
+		ctl_set_invalid_field(ctsio,
+				/*sks_valid*/ 1,
+				/*command*/ 1,
+				/*field*/ 5,
+				/*bit_valid*/ 1,
+				/*bit*/ 0);
+		ctl_done((union ctl_io *)ctsio);
+		return (CTL_RETVAL_COMPLETE);
+	}
+
 	if ((ctsio->io_hdr.flags & CTL_FLAG_ALLOCATED) == 0) {
 		ctsio->kern_data_ptr = malloc(param_len, M_CTL, M_WAITOK);
 		ctsio->kern_data_len = param_len;
@@ -8965,6 +8932,8 @@ ctl_cnw_cont(union ctl_io *io)
 	struct ctl_lba_len_flags *lbalen;
 	int retval;
 
+	CTL_IO_ASSERT(io, SCSI);
+
 	ctsio = &io->scsiio;
 	ctsio->io_hdr.status = CTL_STATUS_NONE;
 	ctsio->io_hdr.flags &= ~CTL_FLAG_IO_CONT;
@@ -9340,14 +9309,8 @@ ctl_request_sense(struct ctl_scsiio *ctsio)
 	sense_ptr = (struct scsi_sense_data *)ctsio->kern_data_ptr;
 	ctsio->kern_sg_entries = 0;
 	ctsio->kern_rel_offset = 0;
-
-	/*
-	 * struct scsi_sense_data, which is currently set to 256 bytes, is
-	 * larger than the largest allowed value for the length field in the
-	 * REQUEST SENSE CDB, which is 252 bytes as of SPC-4.
-	 */
-	ctsio->kern_data_len = cdb->length;
-	ctsio->kern_total_len = cdb->length;
+	ctsio->kern_data_len = ctsio->kern_total_len =
+	    MIN(cdb->length, sizeof(*sense_ptr));
 
 	/*
 	 * If we don't have a LUN, we don't have any pending sense.
@@ -10749,14 +10712,732 @@ ctl_read_toc(struct ctl_scsiio *ctsio)
 }
 
 /*
+ * For NVMe commands, parse the LBA and length.
+ */
+static bool
+ctl_nvme_get_lba_len(struct ctl_nvmeio *ctnio, uint64_t *lba, uint32_t *len)
+{
+	CTL_IO_ASSERT(ctnio, NVME);
+
+	switch (ctnio->cmd.opc) {
+	case NVME_OPC_WRITE:
+	case NVME_OPC_READ:
+	case NVME_OPC_WRITE_UNCORRECTABLE:
+	case NVME_OPC_COMPARE:
+	case NVME_OPC_WRITE_ZEROES:
+	case NVME_OPC_VERIFY:
+		*lba = (uint64_t)le32toh(ctnio->cmd.cdw11) << 32 |
+		    le32toh(ctnio->cmd.cdw10);
+		*len = (le32toh(ctnio->cmd.cdw12) & 0xffff) + 1;
+		return (true);
+	default:
+		*lba = 0;
+		*len = 0;
+		return (false);
+	}
+}
+
+static bool
+ctl_nvme_fua(struct ctl_nvmeio *ctnio)
+{
+	return ((le32toh(ctnio->cmd.cdw12) & (1U << 30)) != 0);
+}
+
+int
+ctl_nvme_identify(struct ctl_nvmeio *ctnio)
+{
+	struct ctl_lun *lun = CTL_LUN(ctnio);
+	size_t len;
+	int retval;
+	uint8_t cns;
+
+	CTL_DEBUG_PRINT(("ctl_nvme_identify\n"));
+
+	CTL_IO_ASSERT(ctnio, NVME_ADMIN);
+	MPASS(ctnio->cmd.opc == NVME_OPC_IDENTIFY);
+
+	/*
+	 * The data buffer for Identify is always 4096 bytes, see
+	 * 5.51.1 in NVMe base specification 1.4.
+	 */
+	len = 4096;
+
+	ctnio->kern_data_ptr = malloc(len, M_CTL, M_WAITOK);
+	ctnio->kern_data_len = len;
+	ctnio->kern_total_len = len;
+	ctnio->kern_rel_offset = 0;
+	ctnio->kern_sg_entries = 0;
+
+	ctl_nvme_set_success(ctnio);
+	ctnio->io_hdr.flags |= CTL_FLAG_ALLOCATED;
+	ctnio->be_move_done = ctl_config_move_done;
+
+	/*
+	 * If we don't have a LUN, return an empty result for CNS == 0.
+	 */
+	if (lun == NULL) {
+		cns = le32toh(ctnio->cmd.cdw10) & 0xff;
+		switch (cns) {
+		case 0:
+			memset(ctnio->kern_data_ptr, 0, len);
+			ctl_datamove((union ctl_io *)ctnio);
+			break;
+		default:
+			ctl_nvme_set_invalid_field(ctnio);
+			break;
+		}
+		return (CTL_RETVAL_COMPLETE);
+	}
+
+	retval = lun->backend->config_read((union ctl_io *)ctnio);
+	return (retval);
+}
+
+int
+ctl_nvme_flush(struct ctl_nvmeio *ctnio)
+{
+	struct ctl_lun *lun = CTL_LUN(ctnio);
+	int retval;
+
+	CTL_DEBUG_PRINT(("ctl_nvme_flush\n"));
+
+	CTL_IO_ASSERT(ctnio, NVME);
+	MPASS(ctnio->cmd.opc == NVME_OPC_FLUSH);
+
+	/*
+	 * NVMe flushes always flush the entire namespace, not an LBA
+	 * range.
+	 */
+	retval = lun->backend->config_write((union ctl_io *)ctnio);
+
+	return (retval);
+}
+
+int
+ctl_nvme_read_write(struct ctl_nvmeio *ctnio)
+{
+	struct ctl_lun *lun = CTL_LUN(ctnio);
+	struct ctl_lba_len_flags *lbalen;
+	uint64_t lba;
+	uint32_t num_blocks;
+	int flags, retval;
+	bool isread;
+
+	CTL_DEBUG_PRINT(("ctl_nvme_read_write: command: %#x\n",
+	    ctnio->cmd.opc));
+
+	CTL_IO_ASSERT(ctnio, NVME);
+	MPASS(ctnio->cmd.opc == NVME_OPC_WRITE ||
+	    ctnio->cmd.opc == NVME_OPC_READ);
+
+	flags = 0;
+	isread = ctnio->cmd.opc == NVME_OPC_READ;
+	ctl_nvme_get_lba_len(ctnio, &lba, &num_blocks);
+
+	/*
+	 * The first check is to make sure we're in bounds, the second
+	 * check is to catch wrap-around problems.  If the lba + num blocks
+	 * is less than the lba, then we've wrapped around and the block
+	 * range is invalid anyway.
+	 */
+	if (((lba + num_blocks) > (lun->be_lun->maxlba + 1))
+	 || ((lba + num_blocks) < lba)) {
+		ctl_nvme_set_lba_out_of_range(ctnio);
+		ctl_done((union ctl_io *)ctnio);
+		return (CTL_RETVAL_COMPLETE);
+	}
+
+	/*
+	 * Set FUA and/or DPO if caches are disabled.
+	 *
+	 * For a read this may not be quite correct for the block
+	 * backend as any earlier writes to the LBA range should be
+	 * flushed to backing store as part of the read.
+	 */
+	if (ctl_nvme_fua(ctnio)) {
+		flags |= CTL_LLF_FUA;
+		if (isread)
+			flags |= CTL_LLF_DPO;
+	}
+
+	lbalen = (struct ctl_lba_len_flags *)
+	    &ctnio->io_hdr.ctl_private[CTL_PRIV_LBA_LEN];
+	lbalen->lba = lba;
+	lbalen->len = num_blocks;
+	lbalen->flags = (isread ? CTL_LLF_READ : CTL_LLF_WRITE) | flags;
+
+	ctnio->kern_total_len = num_blocks * lun->be_lun->blocksize;
+	ctnio->kern_rel_offset = 0;
+
+	CTL_DEBUG_PRINT(("ctl_nvme_read_write: calling data_submit()\n"));
+
+	retval = lun->backend->data_submit((union ctl_io *)ctnio);
+	return (retval);
+}
+
+int
+ctl_nvme_write_uncorrectable(struct ctl_nvmeio *ctnio)
+{
+	struct ctl_lun *lun = CTL_LUN(ctnio);
+	struct ctl_lba_len_flags *lbalen;
+	uint64_t lba;
+	uint32_t num_blocks;
+	int retval;
+
+	CTL_DEBUG_PRINT(("ctl_nvme_write_uncorrectable\n"));
+
+	CTL_IO_ASSERT(ctnio, NVME);
+	MPASS(ctnio->cmd.opc == NVME_OPC_WRITE_UNCORRECTABLE);
+
+	ctl_nvme_get_lba_len(ctnio, &lba, &num_blocks);
+
+	/*
+	 * The first check is to make sure we're in bounds, the second
+	 * check is to catch wrap-around problems.  If the lba + num blocks
+	 * is less than the lba, then we've wrapped around and the block
+	 * range is invalid anyway.
+	 */
+	if (((lba + num_blocks) > (lun->be_lun->maxlba + 1))
+	 || ((lba + num_blocks) < lba)) {
+		ctl_nvme_set_lba_out_of_range(ctnio);
+		ctl_done((union ctl_io *)ctnio);
+		return (CTL_RETVAL_COMPLETE);
+	}
+
+	lbalen = (struct ctl_lba_len_flags *)
+	    &ctnio->io_hdr.ctl_private[CTL_PRIV_LBA_LEN];
+	lbalen->lba = lba;
+	lbalen->len = num_blocks;
+	lbalen->flags = 0;
+	retval = lun->backend->config_write((union ctl_io *)ctnio);
+
+	return (retval);
+}
+
+int
+ctl_nvme_compare(struct ctl_nvmeio *ctnio)
+{
+	struct ctl_lun *lun = CTL_LUN(ctnio);
+	struct ctl_lba_len_flags *lbalen;
+	uint64_t lba;
+	uint32_t num_blocks;
+	int flags;
+	int retval;
+
+	CTL_DEBUG_PRINT(("ctl_nvme_compare\n"));
+
+	CTL_IO_ASSERT(ctnio, NVME);
+	MPASS(ctnio->cmd.opc == NVME_OPC_COMPARE);
+
+	flags = 0;
+	ctl_nvme_get_lba_len(ctnio, &lba, &num_blocks);
+	if (ctl_nvme_fua(ctnio))
+		flags |= CTL_LLF_FUA;
+
+	/*
+	 * The first check is to make sure we're in bounds, the second
+	 * check is to catch wrap-around problems.  If the lba + num blocks
+	 * is less than the lba, then we've wrapped around and the block
+	 * range is invalid anyway.
+	 */
+	if (((lba + num_blocks) > (lun->be_lun->maxlba + 1))
+	 || ((lba + num_blocks) < lba)) {
+		ctl_nvme_set_lba_out_of_range(ctnio);
+		ctl_done((union ctl_io *)ctnio);
+		return (CTL_RETVAL_COMPLETE);
+	}
+
+	lbalen = (struct ctl_lba_len_flags *)
+	    &ctnio->io_hdr.ctl_private[CTL_PRIV_LBA_LEN];
+	lbalen->lba = lba;
+	lbalen->len = num_blocks;
+	lbalen->flags = CTL_LLF_COMPARE | flags;
+	ctnio->kern_total_len = num_blocks * lun->be_lun->blocksize;
+	ctnio->kern_rel_offset = 0;
+
+	CTL_DEBUG_PRINT(("ctl_nvme_compare: calling data_submit()\n"));
+	retval = lun->backend->data_submit((union ctl_io *)ctnio);
+	return (retval);
+}
+
+int
+ctl_nvme_write_zeroes(struct ctl_nvmeio *ctnio)
+{
+	struct ctl_lun *lun = CTL_LUN(ctnio);
+	struct ctl_lba_len_flags *lbalen;
+	uint64_t lba;
+	uint32_t num_blocks;
+	int retval;
+
+	CTL_DEBUG_PRINT(("ctl_nvme_write_zeroes\n"));
+
+	CTL_IO_ASSERT(ctnio, NVME);
+	MPASS(ctnio->cmd.opc == NVME_OPC_WRITE_ZEROES);
+
+	ctl_nvme_get_lba_len(ctnio, &lba, &num_blocks);
+
+	/*
+	 * The first check is to make sure we're in bounds, the second
+	 * check is to catch wrap-around problems.  If the lba + num blocks
+	 * is less than the lba, then we've wrapped around and the block
+	 * range is invalid anyway.
+	 */
+	if (((lba + num_blocks) > (lun->be_lun->maxlba + 1))
+	 || ((lba + num_blocks) < lba)) {
+		ctl_nvme_set_lba_out_of_range(ctnio);
+		ctl_done((union ctl_io *)ctnio);
+		return (CTL_RETVAL_COMPLETE);
+	}
+
+	lbalen = (struct ctl_lba_len_flags *)
+	    &ctnio->io_hdr.ctl_private[CTL_PRIV_LBA_LEN];
+	lbalen->lba = lba;
+	lbalen->len = num_blocks;
+	lbalen->flags = 0;
+	retval = lun->backend->config_write((union ctl_io *)ctnio);
+
+	return (retval);
+}
+
+int
+ctl_nvme_dataset_management(struct ctl_nvmeio *ctnio)
+{
+	struct ctl_lun *lun = CTL_LUN(ctnio);
+	struct nvme_dsm_range *r;
+	uint64_t lba;
+	uint32_t len, num_blocks;
+	u_int i, ranges;
+	int retval;
+
+	CTL_DEBUG_PRINT(("ctl_nvme_dataset_management\n"));
+
+	CTL_IO_ASSERT(ctnio, NVME);
+	MPASS(ctnio->cmd.opc == NVME_OPC_DATASET_MANAGEMENT);
+
+	ranges = le32toh(ctnio->cmd.cdw10) & 0xff;
+	len = ranges * sizeof(struct nvme_dsm_range);
+
+	/*
+	 * If we've got a kernel request that hasn't been malloced yet,
+	 * malloc it and tell the caller the data buffer is here.
+	 */
+	if ((ctnio->io_hdr.flags & CTL_FLAG_ALLOCATED) == 0) {
+		ctnio->kern_data_ptr = malloc(len, M_CTL, M_WAITOK);
+		ctnio->kern_data_len = len;
+		ctnio->kern_total_len = len;
+		ctnio->kern_rel_offset = 0;
+		ctnio->kern_sg_entries = 0;
+		ctnio->io_hdr.flags |= CTL_FLAG_ALLOCATED;
+		ctnio->be_move_done = ctl_config_move_done;
+		ctl_datamove((union ctl_io *)ctnio);
+
+		return (CTL_RETVAL_COMPLETE);
+	}
+
+	/*
+	 * Require a flat buffer of the correct size.
+	 */
+	if (ctnio->kern_sg_entries > 0 ||
+	    ctnio->kern_total_len - ctnio->kern_data_resid != len)
+		return (CTL_RETVAL_ERROR);
+
+	/*
+	 * Verify that none of the ranges are out of bounds.
+	 */
+	r = (struct nvme_dsm_range *)ctnio->kern_data_ptr;
+	for (i = 0; i < ranges; i++) {
+		lba = le64toh(r[i].starting_lba);
+		num_blocks = le32toh(r[i].length);
+		if (((lba + num_blocks) > (lun->be_lun->maxlba + 1))
+		    || ((lba + num_blocks) < lba)) {
+			ctl_nvme_set_lba_out_of_range(ctnio);
+			ctl_done((union ctl_io *)ctnio);
+			return (CTL_RETVAL_COMPLETE);
+		}
+	}
+
+	CTL_DEBUG_PRINT(("ctl_nvme_dataset_management: calling config_write()\n"));
+	retval = lun->backend->config_write((union ctl_io *)ctnio);
+	return (retval);
+}
+
+int
+ctl_nvme_verify(struct ctl_nvmeio *ctnio)
+{
+	struct ctl_lun *lun = CTL_LUN(ctnio);
+	struct ctl_lba_len_flags *lbalen;
+	uint64_t lba;
+	uint32_t num_blocks;
+	int flags;
+	int retval;
+
+	CTL_DEBUG_PRINT(("ctl_nvme_verify\n"));
+
+	CTL_IO_ASSERT(ctnio, NVME);
+	MPASS(ctnio->cmd.opc == NVME_OPC_VERIFY);
+
+	flags = 0;
+	ctl_nvme_get_lba_len(ctnio, &lba, &num_blocks);
+	if (ctl_nvme_fua(ctnio))
+		flags |= CTL_LLF_FUA;
+
+	/*
+	 * The first check is to make sure we're in bounds, the second
+	 * check is to catch wrap-around problems.  If the lba + num blocks
+	 * is less than the lba, then we've wrapped around and the block
+	 * range is invalid anyway.
+	 */
+	if (((lba + num_blocks) > (lun->be_lun->maxlba + 1))
+	 || ((lba + num_blocks) < lba)) {
+		ctl_nvme_set_lba_out_of_range(ctnio);
+		ctl_done((union ctl_io *)ctnio);
+		return (CTL_RETVAL_COMPLETE);
+	}
+
+	lbalen = (struct ctl_lba_len_flags *)
+	    &ctnio->io_hdr.ctl_private[CTL_PRIV_LBA_LEN];
+	lbalen->lba = lba;
+	lbalen->len = num_blocks;
+	lbalen->flags = CTL_LLF_VERIFY | flags;
+	ctnio->kern_total_len = 0;
+	ctnio->kern_rel_offset = 0;
+
+	CTL_DEBUG_PRINT(("ctl_nvme_verify: calling data_submit()\n"));
+	retval = lun->backend->data_submit((union ctl_io *)ctnio);
+	return (retval);
+}
+
+static const struct ctl_nvme_cmd_entry *
+ctl_nvme_get_cmd_entry(struct ctl_nvmeio *ctnio)
+{
+	const struct ctl_nvme_cmd_entry *entry;
+
+	switch (ctnio->io_hdr.io_type) {
+	case CTL_IO_NVME:
+		entry = &nvme_nvm_cmd_table[ctnio->cmd.opc];
+		break;
+	case CTL_IO_NVME_ADMIN:
+		entry = &nvme_admin_cmd_table[ctnio->cmd.opc];
+		break;
+	default:
+		__assert_unreachable();
+	}
+	return (entry);
+}
+
+static const struct ctl_nvme_cmd_entry *
+ctl_nvme_validate_command(struct ctl_nvmeio *ctnio)
+{
+	const struct ctl_nvme_cmd_entry *entry;
+
+	entry = ctl_nvme_get_cmd_entry(ctnio);
+	if (entry->execute == NULL) {
+		ctl_nvme_set_invalid_opcode(ctnio);
+		ctl_done((union ctl_io *)ctnio);
+		return (NULL);
+	}
+
+	/* Validate fused commands. */
+	switch (NVMEV(NVME_CMD_FUSE, ctnio->cmd.fuse)) {
+	case NVME_FUSE_NORMAL:
+		break;
+	case NVME_FUSE_FIRST:
+		if (ctnio->io_hdr.io_type != CTL_IO_NVME ||
+		    ctnio->cmd.opc != NVME_OPC_COMPARE) {
+			ctl_nvme_set_invalid_field(ctnio);
+			ctl_done((union ctl_io *)ctnio);
+			return (NULL);
+		}
+		break;
+	case NVME_FUSE_SECOND:
+		if (ctnio->io_hdr.io_type != CTL_IO_NVME ||
+		    ctnio->cmd.opc != NVME_OPC_COMPARE) {
+			ctl_nvme_set_invalid_field(ctnio);
+			ctl_done((union ctl_io *)ctnio);
+			return (NULL);
+		}
+		break;
+	default:
+		ctl_nvme_set_invalid_field(ctnio);
+		ctl_done((union ctl_io *)ctnio);
+		return (NULL);
+	}
+
+	return (entry);
+}
+
+/*
+ * This is a simpler version of ctl_scsiio_lun_check that fails
+ * requests on a LUN without active media.
+ *
+ * Returns true if the command has been completed with an error.
+ */
+static bool
+ctl_nvmeio_lun_check(struct ctl_lun *lun,
+    const struct ctl_nvme_cmd_entry *entry, struct ctl_nvmeio *ctnio)
+{
+	mtx_assert(&lun->lun_lock, MA_OWNED);
+
+	if ((entry->flags & CTL_CMD_FLAG_OK_ON_NO_MEDIA) == 0) {
+		if ((lun->flags & (CTL_LUN_EJECTED | CTL_LUN_NO_MEDIA |
+		    CTL_LUN_STOPPED)) != 0) {
+			ctl_nvme_set_namespace_not_ready(ctnio);
+			return (true);
+		}
+	}
+
+	return (false);
+}
+
+/*
+ * Check for blockage against the OOA (Order Of Arrival) queue.
+ * Assumptions:
+ * - pending_io is generally either incoming, or on the blocked queue
+ * - starting I/O is the I/O we want to start the check with.
+ */
+static ctl_action
+ctl_nvme_check_ooa(struct ctl_lun *lun, union ctl_io *pending_io,
+    union ctl_io **starting_io, union ctl_io **aborted_io)
+{
+	union ctl_io *ooa_io = *starting_io;
+
+	CTL_IO_ASSERT(pending_io, NVME, NVME_ADMIN);
+
+	mtx_assert(&lun->lun_lock, MA_OWNED);
+
+	*aborted_io = NULL;
+
+	/*
+	 * Aborted commands are not going to be executed and may even
+	 * not report completion, so we don't care about their order.
+	 * Let them complete ASAP to clean the OOA queue.
+	 */
+	if (__predict_false(pending_io->io_hdr.flags & CTL_FLAG_ABORT))
+		return (CTL_ACTION_PASS);
+
+	/*
+	 * NVMe has rather simple command ordering requirements.  In
+	 * particular, there is no requirement on the controller to
+	 * enforce a specific order for overlapping LBAs.  The only
+	 * constraint is that fused operations (Compare and Write),
+	 * must be completed as a unit.
+	 *
+	 * To support fused operations, the following strategy is used:
+	 * - the first half of a fused command is not enqueued to rtr
+	 *   until the second half is enqueued
+	 * - the second half of a fused command blocks on the first
+	 *   half of a fuse command
+	 * - subsequent commands block on the second half of the
+	 *   fused command
+	 */
+
+	/*
+	 * Is the previously submitted command the first half of a
+	 * fused operation?
+	 */
+	if (ooa_io != NULL &&
+	    NVMEV(NVME_CMD_FUSE, ooa_io->nvmeio.cmd.fuse) == NVME_FUSE_FIRST) {
+		/*
+		 * If this is the second half, enqueue the first half
+		 * and block the second half on the first half.
+		 */
+		if (NVMEV(NVME_CMD_FUSE, pending_io->nvmeio.cmd.fuse) ==
+		    NVME_FUSE_SECOND) {
+			/*
+			 * XXX: Do we need to wait for other rtr requests
+			 * to drain so this is truly atomic?
+			 */
+			return (CTL_ACTION_FUSED);
+		}
+
+		/* Abort the first half. */
+		ctl_nvme_set_missing_fused_command(&ooa_io->nvmeio);
+		*aborted_io = ooa_io;
+	} else {
+		switch (NVMEV(NVME_CMD_FUSE, pending_io->nvmeio.cmd.fuse)) {
+		case NVME_FUSE_FIRST:
+			/* First half, wait for the second half. */
+			return (CTL_ACTION_SKIP);
+		case NVME_FUSE_SECOND:
+			/* Second half without a matching first half, abort. */
+			ctl_nvme_set_missing_fused_command(&pending_io->nvmeio);
+			*aborted_io = pending_io;
+			return (CTL_ACTION_SKIP);
+		}
+	}
+
+	/*
+	 * Scan the OOA queue looking for the most recent second half
+	 * of a fused op.
+	 */
+	for (; ooa_io != NULL;
+	     ooa_io = (union ctl_io *)LIST_NEXT(&ooa_io->io_hdr, ooa_links)) {
+		if (NVMEV(NVME_CMD_FUSE, ooa_io->nvmeio.cmd.fuse) ==
+		    NVME_FUSE_SECOND) {
+			*starting_io = ooa_io;
+			return (CTL_ACTION_BLOCK);
+		}
+	}
+
+	*starting_io = NULL;
+	return (CTL_ACTION_PASS);
+}
+
+static void
+ctl_nvmeio_precheck(struct ctl_nvmeio *ctnio)
+{
+	struct ctl_softc *softc = CTL_SOFTC(ctnio);
+	struct ctl_lun *lun;
+	const struct ctl_nvme_cmd_entry *entry;
+	union ctl_io *bio, *aborted_io;
+	uint32_t targ_lun;
+
+	lun = NULL;
+	targ_lun = ctnio->io_hdr.nexus.targ_mapped_lun;
+	if (targ_lun < ctl_max_luns)
+		lun = softc->ctl_luns[targ_lun];
+	if (lun != NULL) {
+		/*
+		 * If the LUN is invalid, pretend that it doesn't exist.
+		 * It will go away as soon as all pending I/O has been
+		 * completed.
+		 */
+		mtx_lock(&lun->lun_lock);
+		if (lun->flags & CTL_LUN_DISABLED) {
+			mtx_unlock(&lun->lun_lock);
+			lun = NULL;
+		}
+	}
+	CTL_LUN(ctnio) = lun;
+	if (lun != NULL) {
+		CTL_BACKEND_LUN(ctnio) = lun->be_lun;
+
+		/*
+		 * Every I/O goes into the OOA queue for a particular LUN,
+		 * and stays there until completion.
+		 */
+#ifdef CTL_TIME_IO
+		if (LIST_EMPTY(&lun->ooa_queue))
+			lun->idle_time += getsbinuptime() - lun->last_busy;
+#endif
+		LIST_INSERT_HEAD(&lun->ooa_queue, &ctnio->io_hdr, ooa_links);
+	}
+
+	/* Get command entry and return error if it is unsupported. */
+	entry = ctl_nvme_validate_command(ctnio);
+	if (entry == NULL) {
+		if (lun)
+			mtx_unlock(&lun->lun_lock);
+		return;
+	}
+
+	ctnio->io_hdr.flags &= ~CTL_FLAG_DATA_MASK;
+	ctnio->io_hdr.flags |= entry->flags & CTL_FLAG_DATA_MASK;
+
+	/* All NVMe commands other than IDENTIFY require a LUN. */
+	if (lun == NULL) {
+		if (entry->flags & CTL_CMD_FLAG_OK_ON_NO_LUN) {
+			ctnio->io_hdr.flags |= CTL_FLAG_IS_WAS_ON_RTR;
+			ctl_enqueue_rtr((union ctl_io *)ctnio);
+			return;
+		}
+
+		ctl_nvme_set_invalid_namespace(ctnio);
+		ctl_done((union ctl_io *)ctnio);
+		CTL_DEBUG_PRINT(("ctl_nvmeio_precheck: bailing out due to invalid LUN\n"));
+		return;
+	} else {
+		/*
+		 * NVMe namespaces can only be backed by T_DIRECT LUNs.
+		 */
+		if (lun->be_lun->lun_type != T_DIRECT) {
+			mtx_unlock(&lun->lun_lock);
+			ctl_nvme_set_invalid_namespace(ctnio);
+			ctl_done((union ctl_io *)ctnio);
+			return;
+		}
+	}
+
+	if (ctl_nvmeio_lun_check(lun, entry, ctnio) != 0) {
+		mtx_unlock(&lun->lun_lock);
+		ctl_done((union ctl_io *)ctnio);
+		return;
+	}
+
+	bio = (union ctl_io *)LIST_NEXT(&ctnio->io_hdr, ooa_links);
+	switch (ctl_nvme_check_ooa(lun, (union ctl_io *)ctnio, &bio,
+	    &aborted_io)) {
+	case CTL_ACTION_PASS:
+		ctnio->io_hdr.flags |= CTL_FLAG_IS_WAS_ON_RTR;
+		mtx_unlock(&lun->lun_lock);
+		ctl_enqueue_rtr((union ctl_io *)ctnio);
+		break;
+	case CTL_ACTION_FUSED:
+		/* Block the second half on the first half. */
+		ctnio->io_hdr.blocker = bio;
+		TAILQ_INSERT_TAIL(&bio->io_hdr.blocked_queue, &ctnio->io_hdr,
+				  blocked_links);
+
+		/* Pass the first half. */
+		bio->io_hdr.flags |= CTL_FLAG_IS_WAS_ON_RTR;
+		mtx_unlock(&lun->lun_lock);
+		ctl_enqueue_rtr(bio);
+		break;
+	case CTL_ACTION_SKIP:
+		mtx_unlock(&lun->lun_lock);
+		break;
+	case CTL_ACTION_BLOCK:
+		ctnio->io_hdr.blocker = bio;
+		TAILQ_INSERT_TAIL(&bio->io_hdr.blocked_queue, &ctnio->io_hdr,
+				  blocked_links);
+		mtx_unlock(&lun->lun_lock);
+		break;
+	default:
+		__assert_unreachable();
+	}
+	if (aborted_io != NULL)
+		ctl_done(aborted_io);
+}
+
+static int
+ctl_nvmeio(struct ctl_nvmeio *ctnio)
+{
+	const struct ctl_nvme_cmd_entry *entry;
+	int retval;
+
+	CTL_DEBUG_PRINT(("ctl_nvmeio %s opc=%02X\n",
+	    ctnio->io_hdr.io_type == CTL_IO_NVME ? "nvm" : "admin",
+	    ctnio->cmd.opc));
+
+	entry = ctl_nvme_get_cmd_entry(ctnio);
+	MPASS(entry != NULL);
+
+	/*
+	 * If this I/O has been aborted, just send it straight to
+	 * ctl_done() without executing it.
+	 */
+	if (ctnio->io_hdr.flags & CTL_FLAG_ABORT) {
+		ctl_done((union ctl_io *)ctnio);
+		return (CTL_RETVAL_COMPLETE);
+	}
+
+	/*
+	 * All the checks should have been handled by ctl_nvmeio_precheck().
+	 * We should be clear now to just execute the I/O.
+	 */
+	retval = entry->execute(ctnio);
+
+	return (retval);
+}
+
+/*
  * For known CDB types, parse the LBA and length.
  */
 static int
 ctl_get_lba_len(union ctl_io *io, uint64_t *lba, uint64_t *len)
 {
 
-	KASSERT(io->io_hdr.io_type == CTL_IO_SCSI,
-	    ("%s: unexpected I/O type %x", __func__, io->io_hdr.io_type));
+	CTL_IO_ASSERT(io, SCSI);
 
 	switch (io->scsiio.cdb[0]) {
 	case COMPARE_AND_WRITE: {
@@ -10936,8 +11617,7 @@ ctl_extent_check_unmap(union ctl_io *io, uint64_t lba2, uint64_t len2)
 	uint64_t lba;
 	uint32_t len;
 
-	KASSERT(io->io_hdr.io_type == CTL_IO_SCSI,
-	    ("%s: unexpected I/O type %x", __func__, io->io_hdr.io_type));
+	CTL_IO_ASSERT(io, SCSI);
 
 	/* If not UNMAP -- go other way. */
 	if (io->scsiio.cdb[0] != UNMAP)
@@ -11007,6 +11687,8 @@ static ctl_action
 ctl_check_for_blockage(struct ctl_lun *lun, union ctl_io *pending_io,
     const uint8_t *serialize_row, union ctl_io *ooa_io)
 {
+	CTL_IO_ASSERT(pending_io, SCSI);
+	CTL_IO_ASSERT(ooa_io, SCSI);
 
 	/*
 	 * The initiator attempted multiple untagged commands at the same
@@ -11115,6 +11797,8 @@ ctl_check_ooa(struct ctl_lun *lun, union ctl_io *pending_io,
 	const uint8_t *serialize_row;
 	ctl_action action;
 
+	CTL_IO_ASSERT(pending_io, SCSI);
+
 	mtx_assert(&lun->lun_lock, MA_OWNED);
 
 	/*
@@ -11164,13 +11848,15 @@ ctl_check_ooa(struct ctl_lun *lun, union ctl_io *pending_io,
  * we know for sure that the blocker I/O does no longer count.
  */
 static void
-ctl_try_unblock_io(struct ctl_lun *lun, union ctl_io *io, bool skip)
+ctl_scsi_try_unblock_io(struct ctl_lun *lun, union ctl_io *io, bool skip)
 {
 	struct ctl_softc *softc = lun->ctl_softc;
 	union ctl_io *bio, *obio;
 	const struct ctl_cmd_entry *entry;
 	union ctl_ha_msg msg_info;
 	ctl_action action;
+
+	CTL_IO_ASSERT(io, SCSI);
 
 	mtx_assert(&lun->lun_lock, MA_OWNED);
 
@@ -11254,6 +11940,72 @@ error:
 
 		ctl_done(io);
 		break;
+	}
+}
+
+static void
+ctl_nvme_try_unblock_io(struct ctl_lun *lun, union ctl_io *io, bool skip)
+{
+	union ctl_io *bio;
+	const struct ctl_nvme_cmd_entry *entry;
+
+	CTL_IO_ASSERT(io, NVME, NVME_ADMIN);
+
+	mtx_assert(&lun->lun_lock, MA_OWNED);
+
+	if (io->io_hdr.blocker == NULL)
+		return;
+
+	/*
+	 * If this is the second half of a fused operation, it should
+	 * be the only io on the blocked list.  If the first half
+	 * failed, complete the second half with an appropriate error.
+	 */
+	bio = io->io_hdr.blocker;
+	if (NVMEV(NVME_CMD_FUSE, io->nvmeio.cmd.fuse) == NVME_FUSE_SECOND) {
+		MPASS(io ==
+		    (union ctl_io *)TAILQ_FIRST(&bio->io_hdr.blocked_queue));
+		MPASS(TAILQ_NEXT(&io->io_hdr, blocked_links) == NULL);
+
+		TAILQ_REMOVE(&bio->io_hdr.blocked_queue, &io->io_hdr,
+		    blocked_links);
+		if (bio->io_hdr.status != CTL_SUCCESS) {
+			ctl_nvme_set_failed_fused_command(&io->nvmeio);
+			ctl_done(io);
+			return;
+		}
+	} else {
+		/*
+		 * This must be a command that was blocked on the
+		 * second half of a fused operation.
+		 */
+		MPASS(NVMEV(NVME_CMD_FUSE, bio->nvmeio.cmd.fuse) ==
+		    NVME_FUSE_SECOND);
+		TAILQ_REMOVE(&bio->io_hdr.blocked_queue, &io->io_hdr,
+		    blocked_links);
+	}
+
+	entry = ctl_nvme_get_cmd_entry(&io->nvmeio);
+	if (ctl_nvmeio_lun_check(lun, entry, &io->nvmeio) != 0) {
+		ctl_done(io);
+		return;
+	}
+
+	io->io_hdr.flags |= CTL_FLAG_IS_WAS_ON_RTR;
+	ctl_enqueue_rtr(io);
+}
+
+static void
+ctl_try_unblock_io(struct ctl_lun *lun, union ctl_io *io, bool skip)
+{
+	switch (io->io_hdr.io_type) {
+	case CTL_IO_SCSI:
+		return (ctl_scsi_try_unblock_io(lun, io, skip));
+	case CTL_IO_NVME:
+	case CTL_IO_NVME_ADMIN:
+		return (ctl_nvme_try_unblock_io(lun, io, skip));
+	default:
+		__assert_unreachable();
 	}
 }
 
@@ -11412,6 +12164,8 @@ bailout:
 static void
 ctl_failover_io(union ctl_io *io, int have_lock)
 {
+	CTL_IO_ASSERT(io, SCSI);
+
 	ctl_set_busy(&io->scsiio);
 	ctl_done(io);
 }
@@ -11968,6 +12722,7 @@ ctl_abort_tasks_lun(struct ctl_lun *lun, uint32_t targ_port, uint32_t init_id,
 	 */
 	LIST_FOREACH(xioh, &lun->ooa_queue, ooa_links) {
 		union ctl_io *xio = (union ctl_io *)xioh;
+
 		if ((targ_port == UINT32_MAX ||
 		     targ_port == xioh->nexus.targ_port) &&
 		    (init_id == UINT32_MAX ||
@@ -11979,6 +12734,7 @@ ctl_abort_tasks_lun(struct ctl_lun *lun, uint32_t targ_port, uint32_t init_id,
 			if (!other_sc && !(lun->flags & CTL_LUN_PRIMARY_SC)) {
 				union ctl_ha_msg msg_info;
 
+				CTL_IO_ASSERT(xio, SCSI);
 				msg_info.hdr.nexus = xioh->nexus;
 				msg_info.task.task_action = CTL_TASK_ABORT_TASK;
 				msg_info.task.tag_num = xio->scsiio.tag_num;
@@ -12119,6 +12875,8 @@ ctl_abort_task(union ctl_io *io)
 	 */
 	LIST_FOREACH(xioh, &lun->ooa_queue, ooa_links) {
 		union ctl_io *xio = (union ctl_io *)xioh;
+
+		CTL_IO_ASSERT(xio, SCSI);
 		if ((xioh->nexus.targ_port != io->io_hdr.nexus.targ_port)
 		 || (xioh->nexus.initid != io->io_hdr.nexus.initid)
 		 || (xioh->flags & CTL_FLAG_ABORT))
@@ -12190,6 +12948,8 @@ ctl_query_task(union ctl_io *io, int task_set)
 	mtx_unlock(&softc->ctl_lock);
 	LIST_FOREACH(xioh, &lun->ooa_queue, ooa_links) {
 		union ctl_io *xio = (union ctl_io *)xioh;
+
+		CTL_IO_ASSERT(xio, SCSI);
 		if ((xioh->nexus.targ_port != io->io_hdr.nexus.targ_port)
 		 || (xioh->nexus.initid != io->io_hdr.nexus.initid)
 		 || (xioh->flags & CTL_FLAG_ABORT))
@@ -12302,6 +13062,8 @@ ctl_handle_isc(union ctl_io *io)
 	struct ctl_lun *lun;
 	const struct ctl_cmd_entry *entry;
 	uint32_t targ_lun;
+
+	CTL_IO_ASSERT(io, SCSI);
 
 	targ_lun = io->io_hdr.nexus.targ_mapped_lun;
 	switch (io->io_hdr.msg_type) {
@@ -12438,6 +13200,8 @@ ctl_inject_error(struct ctl_lun *lun, union ctl_io *io)
 {
 	struct ctl_error_desc *desc, *desc2;
 
+	CTL_IO_ASSERT(io, SCSI);
+
 	mtx_assert(&lun->lun_lock, MA_OWNED);
 
 	STAILQ_FOREACH_SAFE(desc, &lun->error_list, links, desc2) {
@@ -12516,12 +13280,7 @@ ctl_datamove_done_process(union ctl_io *io)
 {
 #ifdef CTL_TIME_IO
 	struct bintime cur_bt;
-#endif
 
-	KASSERT(io->io_hdr.io_type == CTL_IO_SCSI,
-	    ("%s: unexpected I/O type %x", __func__, io->io_hdr.io_type));
-
-#ifdef CTL_TIME_IO
 	getbinuptime(&cur_bt);
 	bintime_sub(&cur_bt, &io->io_hdr.dma_start_bt);
 	bintime_add(&io->io_hdr.dma_bt, &cur_bt);
@@ -12531,13 +13290,36 @@ ctl_datamove_done_process(union ctl_io *io)
 	if ((io->io_hdr.port_status != 0) &&
 	    ((io->io_hdr.status & CTL_STATUS_MASK) == CTL_STATUS_NONE ||
 	     (io->io_hdr.status & CTL_STATUS_MASK) == CTL_SUCCESS)) {
-		ctl_set_internal_failure(&io->scsiio, /*sks_valid*/ 1,
-		    /*retry_count*/ io->io_hdr.port_status);
-	} else if (io->scsiio.kern_data_resid != 0 &&
+		switch (io->io_hdr.io_type) {
+		case CTL_IO_SCSI:
+			ctl_set_internal_failure(&io->scsiio, /*sks_valid*/ 1,
+			    /*retry_count*/ io->io_hdr.port_status);
+			break;
+		case CTL_IO_NVME:
+		case CTL_IO_NVME_ADMIN:
+			if (io->io_hdr.flags & CTL_FLAG_ABORT)
+				ctl_nvme_set_command_aborted(&io->nvmeio);
+			else
+				ctl_nvme_set_data_transfer_error(&io->nvmeio);
+			break;
+		default:
+			__assert_unreachable();
+		}
+	} else if (ctl_kern_data_resid(io) != 0 &&
 	    (io->io_hdr.flags & CTL_FLAG_DATA_MASK) == CTL_FLAG_DATA_OUT &&
 	    ((io->io_hdr.status & CTL_STATUS_MASK) == CTL_STATUS_NONE ||
 	     (io->io_hdr.status & CTL_STATUS_MASK) == CTL_SUCCESS)) {
-		ctl_set_invalid_field_ciu(&io->scsiio);
+		switch (io->io_hdr.io_type) {
+		case CTL_IO_SCSI:
+			ctl_set_invalid_field_ciu(&io->scsiio);
+			break;
+		case CTL_IO_NVME:
+		case CTL_IO_NVME_ADMIN:
+			ctl_nvme_set_data_transfer_error(&io->nvmeio);
+			break;
+		default:
+			__assert_unreachable();
+		}
 	} else if (ctl_debug & CTL_DEBUG_CDB_DATA)
 		ctl_data_print(io);
 }
@@ -12547,7 +13329,7 @@ ctl_datamove_done(union ctl_io *io, bool samethr)
 {
 
 	ctl_datamove_done_process(io);
-	io->scsiio.be_move_done(io, samethr);
+	ctl_be_move_done(io, samethr);
 }
 
 void
@@ -12560,7 +13342,7 @@ ctl_datamove(union ctl_io *io)
 	CTL_DEBUG_PRINT(("ctl_datamove\n"));
 
 	/* No data transferred yet.  Frontend must update this when done. */
-	io->scsiio.kern_data_resid = io->scsiio.kern_data_len;
+	ctl_set_kern_data_resid(io, ctl_kern_data_len(io));
 
 #ifdef CTL_TIME_IO
 	getbinuptime(&io->io_hdr.dma_start_bt);
@@ -12593,20 +13375,33 @@ ctl_datamove(union ctl_io *io)
 	 * the data move.
 	 */
 	if (io->io_hdr.flags & CTL_FLAG_ABORT) {
-		printf("ctl_datamove: tag 0x%jx on (%u:%u:%u) aborted\n",
-		       io->scsiio.tag_num, io->io_hdr.nexus.initid,
-		       io->io_hdr.nexus.targ_port,
-		       io->io_hdr.nexus.targ_lun);
+		switch (io->io_hdr.io_type) {
+		case CTL_IO_SCSI:
+			printf("ctl_datamove: tag 0x%jx on (%u:%u:%u) aborted\n",
+			    io->scsiio.tag_num, io->io_hdr.nexus.initid,
+			    io->io_hdr.nexus.targ_port,
+			    io->io_hdr.nexus.targ_lun);
+			break;
+		case CTL_IO_NVME:
+		case CTL_IO_NVME_ADMIN:
+			printf("ctl_datamove: CID 0x%x on (%u:%u:%u) aborted\n",
+			    le16toh(io->nvmeio.cmd.cid),
+			    io->io_hdr.nexus.initid, io->io_hdr.nexus.targ_port,
+			    io->io_hdr.nexus.targ_lun);
+			break;
+		default:
+			__assert_unreachable();
+		}
 		io->io_hdr.port_status = 31337;
 		ctl_datamove_done_process(io);
-		io->scsiio.be_move_done(io, true);
+		ctl_be_move_done(io, true);
 		return;
 	}
 
 	/* Don't confuse frontend with zero length data move. */
-	if (io->scsiio.kern_data_len == 0) {
+	if (ctl_kern_data_len(io) == 0) {
 		ctl_datamove_done_process(io);
-		io->scsiio.be_move_done(io, true);
+		ctl_be_move_done(io, true);
 		return;
 	}
 
@@ -12621,6 +13416,8 @@ ctl_send_datamove_done(union ctl_io *io, int have_lock)
 #ifdef CTL_TIME_IO
 	struct bintime cur_bt;
 #endif
+
+	CTL_IO_ASSERT(io, SCSI);
 
 	memset(&msg, 0, sizeof(msg));
 	msg.hdr.msg_type = CTL_MSG_DATAMOVE_DONE;
@@ -12664,6 +13461,7 @@ ctl_datamove_remote_write_cb(struct ctl_ha_dt_req *rq)
 	uint32_t i;
 
 	io = rq->context;
+	CTL_IO_ASSERT(io, SCSI);
 
 	if (rq->ret != CTL_HA_STATUS_SUCCESS) {
 		printf("%s: ISC DMA write failed with error %d", __func__,
@@ -12708,6 +13506,8 @@ ctl_datamove_remote_write(union ctl_io *io)
 	int retval;
 	void (*fe_datamove)(union ctl_io *io);
 
+	CTL_IO_ASSERT(io, SCSI);
+
 	/*
 	 * - Get the data from the host/HBA into local memory.
 	 * - DMA memory from the local controller to the remote controller.
@@ -12736,6 +13536,8 @@ ctl_datamove_remote_dm_read_cb(union ctl_io *io, bool samethr)
 {
 	uint32_t i;
 
+	CTL_IO_ASSERT(io, SCSI);
+
 	for (i = 0; i < io->scsiio.kern_sg_entries; i++)
 		free(CTL_LSGLT(io)[i].addr, M_CTL);
 	free(CTL_RSGL(io), M_CTL);
@@ -12758,6 +13560,7 @@ ctl_datamove_remote_read_cb(struct ctl_ha_dt_req *rq)
 	void (*fe_datamove)(union ctl_io *io);
 
 	io = rq->context;
+	CTL_IO_ASSERT(io, SCSI);
 
 	if (rq->ret != CTL_HA_STATUS_SUCCESS) {
 		printf("%s: ISC DMA read failed with error %d\n", __func__,
@@ -12791,6 +13594,8 @@ ctl_datamove_remote_sgl_setup(union ctl_io *io)
 	uint32_t len_to_go;
 	int retval;
 	int i;
+
+	CTL_IO_ASSERT(io, SCSI);
 
 	retval = 0;
 	local_sglist = CTL_LSGL(io);
@@ -12828,6 +13633,8 @@ ctl_datamove_remote_xfer(union ctl_io *io, unsigned command,
 	int i, j, isc_ret;
 
 	rq = ctl_dt_req_alloc();
+
+	CTL_IO_ASSERT(io, SCSI);
 
 	/*
 	 * If we failed to allocate the request, and if the DMA didn't fail
@@ -12962,7 +13769,7 @@ ctl_datamove_remote_read(union ctl_io *io)
 		 * datamove done message, or call the callback with an
 		 * error if there is a problem.
 		 */
-		for (i = 0; i < io->scsiio.kern_sg_entries; i++)
+		for (i = 0; i < ctl_kern_sg_entries(io); i++)
 			free(CTL_LSGLT(io)[i].addr, M_CTL);
 		free(CTL_RSGL(io), M_CTL);
 		CTL_RSGL(io) = NULL;
@@ -12980,6 +13787,7 @@ ctl_datamove_remote_read(union ctl_io *io)
 static void
 ctl_datamove_remote(union ctl_io *io)
 {
+	CTL_IO_ASSERT(io, SCSI);
 
 	mtx_assert(&((struct ctl_softc *)CTL_SOFTC(io))->ctl_lock, MA_NOTOWNED);
 
@@ -13032,28 +13840,10 @@ ctl_process_done(union ctl_io *io)
 		char path_str[64];
 		struct sbuf sb;
 
-		ctl_scsi_path_string(io, path_str, sizeof(path_str));
+		ctl_scsi_path_string(&io->io_hdr, path_str, sizeof(path_str));
 		sbuf_new(&sb, str, sizeof(str), SBUF_FIXEDLEN);
 
-		sbuf_cat(&sb, path_str);
-		switch (io->io_hdr.io_type) {
-		case CTL_IO_SCSI:
-			ctl_scsi_command_string(&io->scsiio, NULL, &sb);
-			sbuf_printf(&sb, "\n");
-			sbuf_cat(&sb, path_str);
-			sbuf_printf(&sb, "Tag: 0x%jx/%d, Prio: %d\n",
-				    io->scsiio.tag_num, io->scsiio.tag_type,
-				    io->scsiio.priority);
-			break;
-		case CTL_IO_TASK:
-			sbuf_printf(&sb, "Task Action: %d Tag: 0x%jx/%d\n",
-				    io->taskio.task_action,
-				    io->taskio.tag_num, io->taskio.tag_type);
-			break;
-		default:
-			panic("%s: Invalid CTL I/O type %d\n",
-			    __func__, io->io_hdr.io_type);
-		}
+		ctl_io_sbuf(io, &sb);
 		sbuf_cat(&sb, path_str);
 		sbuf_printf(&sb, "ctl_process_done: %jd seconds\n",
 			    (intmax_t)time_uptime - io->io_hdr.start_time);
@@ -13064,6 +13854,8 @@ ctl_process_done(union ctl_io *io)
 
 	switch (io->io_hdr.io_type) {
 	case CTL_IO_SCSI:
+	case CTL_IO_NVME:
+	case CTL_IO_NVME_ADMIN:
 		break;
 	case CTL_IO_TASK:
 		if (ctl_debug & CTL_DEBUG_INFO)
@@ -13094,6 +13886,8 @@ ctl_process_done(union ctl_io *io)
 		uint8_t mrie = lun->MODE_IE.mrie;
 		uint8_t per = ((lun->MODE_RWER.byte3 & SMS_RWER_PER) ||
 		    (lun->MODE_VER.byte3 & SMS_VER_PER));
+
+		CTL_IO_ASSERT(io, SCSI);
 		if (((mrie == SIEP_MRIE_REC_COND && per) ||
 		     mrie == SIEP_MRIE_REC_UNCOND ||
 		     mrie == SIEP_MRIE_NO_SENSE) &&
@@ -13127,7 +13921,9 @@ ctl_process_done(union ctl_io *io)
 	 * XXX KDM should we also track I/O latency?
 	 */
 	if ((io->io_hdr.status & CTL_STATUS_MASK) == CTL_SUCCESS &&
-	    io->io_hdr.io_type == CTL_IO_SCSI) {
+	    (io->io_hdr.io_type == CTL_IO_SCSI ||
+	    io->io_hdr.io_type == CTL_IO_NVME ||
+	    io->io_hdr.io_type == CTL_IO_NVME_ADMIN)) {
 		int type;
 #ifdef CTL_TIME_IO
 		struct bintime bt;
@@ -13144,7 +13940,7 @@ ctl_process_done(union ctl_io *io)
 		else
 			type = CTL_STATS_NO_IO;
 
-		lun->stats.bytes[type] += io->scsiio.kern_total_len;
+		lun->stats.bytes[type] += ctl_kern_total_len(io);
 		lun->stats.operations[type] ++;
 		lun->stats.dmas[type] += io->io_hdr.num_dmas;
 #ifdef CTL_TIME_IO
@@ -13153,7 +13949,7 @@ ctl_process_done(union ctl_io *io)
 #endif
 
 		mtx_lock(&port->port_lock);
-		port->stats.bytes[type] += io->scsiio.kern_total_len;
+		port->stats.bytes[type] += ctl_kern_total_len(io);
 		port->stats.operations[type] ++;
 		port->stats.dmas[type] += io->io_hdr.num_dmas;
 #ifdef CTL_TIME_IO
@@ -13197,8 +13993,19 @@ bailout:
 	 * properly.  The FETD is responsible for freeing the I/O and doing
 	 * whatever it needs to do to clean up its state.
 	 */
-	if (io->io_hdr.flags & CTL_FLAG_ABORT)
-		ctl_set_task_aborted(&io->scsiio);
+	if (io->io_hdr.flags & CTL_FLAG_ABORT) {
+		switch (io->io_hdr.io_type) {
+		case CTL_IO_SCSI:
+			ctl_set_task_aborted(&io->scsiio);
+			break;
+		case CTL_IO_NVME:
+		case CTL_IO_NVME_ADMIN:
+			ctl_nvme_set_command_aborted(&io->nvmeio);
+			break;
+		default:
+			__assert_unreachable();
+		}
+	}
 
 	/*
 	 * If enabled, print command error status.
@@ -13240,6 +14047,7 @@ ctl_queue_sense(union ctl_io *io)
 	uint32_t initidx, p, targ_lun;
 
 	CTL_DEBUG_PRINT(("ctl_queue_sense\n"));
+	CTL_IO_ASSERT(io, SCSI);
 
 	targ_lun = ctl_lun_map_from_port(port, io->io_hdr.nexus.targ_lun);
 
@@ -13287,7 +14095,22 @@ ctl_queue(union ctl_io *io)
 {
 	struct ctl_port *port = CTL_PORT(io);
 
-	CTL_DEBUG_PRINT(("ctl_queue cdb[0]=%02X\n", io->scsiio.cdb[0]));
+	switch (io->io_hdr.io_type) {
+	case CTL_IO_SCSI:
+	case CTL_IO_TASK:
+		CTL_DEBUG_PRINT(("ctl_queue cdb[0]=%02X\n", io->scsiio.cdb[0]));
+		break;
+	case CTL_IO_NVME:
+		CTL_DEBUG_PRINT(("ctl_queue nvme nvm cmd=%02X\n",
+		    io->nvmeio.cmd.opc));
+		break;
+	case CTL_IO_NVME_ADMIN:
+		CTL_DEBUG_PRINT(("ctl_queue nvme admin cmd=%02X\n",
+		    io->nvmeio.cmd.opc));
+		break;
+	default:
+		break;
+	}
 
 #ifdef CTL_TIME_IO
 	io->io_hdr.start_time = time_uptime;
@@ -13301,6 +14124,8 @@ ctl_queue(union ctl_io *io)
 	switch (io->io_hdr.io_type) {
 	case CTL_IO_SCSI:
 	case CTL_IO_TASK:
+	case CTL_IO_NVME:
+	case CTL_IO_NVME_ADMIN:
 		if (ctl_debug & CTL_DEBUG_CDB)
 			ctl_io_print(io);
 		ctl_enqueue_incoming(io);
@@ -13339,6 +14164,12 @@ ctl_run(union ctl_io *io)
 		if (ctl_debug & CTL_DEBUG_CDB)
 			ctl_io_print(io);
 		ctl_run_task(io);
+		break;
+	case CTL_IO_NVME:
+	case CTL_IO_NVME_ADMIN:
+		if (ctl_debug & CTL_DEBUG_CDB)
+			ctl_io_print(io);
+		ctl_nvmeio_precheck(&io->nvmeio);
 		break;
 	default:
 		printf("ctl_run: unknown I/O type %d\n", io->io_hdr.io_type);
@@ -13383,22 +14214,54 @@ ctl_done(union ctl_io *io)
 	 */
 #if 0
 	if (io->io_hdr.flags & CTL_FLAG_ALREADY_DONE) {
-		printf("%s: type %d msg %d cdb %x iptl: "
-		       "%u:%u:%u tag 0x%04x "
-		       "flag %#x status %x\n",
-			__func__,
-			io->io_hdr.io_type,
-			io->io_hdr.msg_type,
-			io->scsiio.cdb[0],
-			io->io_hdr.nexus.initid,
-			io->io_hdr.nexus.targ_port,
-			io->io_hdr.nexus.targ_lun,
-			(io->io_hdr.io_type ==
-			CTL_IO_TASK) ?
-			io->taskio.tag_num :
-			io->scsiio.tag_num,
-		        io->io_hdr.flags,
-			io->io_hdr.status);
+		switch (io->io_hdr.io_type) {
+		case CTL_IO_SCSI:
+		case CTL_IO_TASK:
+			printf("%s: type %d msg %d cdb %x iptl: "
+			    "%u:%u:%u tag 0x%04lx "
+			    "flag %#x status %x\n",
+			    __func__,
+			    io->io_hdr.io_type,
+			    io->io_hdr.msg_type,
+			    io->scsiio.cdb[0],
+			    io->io_hdr.nexus.initid,
+			    io->io_hdr.nexus.targ_port,
+			    io->io_hdr.nexus.targ_lun,
+			    (io->io_hdr.io_type == CTL_IO_TASK) ?
+			    io->taskio.tag_num :
+			    io->scsiio.tag_num,
+			    io->io_hdr.flags,
+			    io->io_hdr.status);
+			break;
+		case CTL_IO_NVME:
+		case CTL_IO_NVME_ADMIN:
+			printf("%s: type %d msg %d opc %x iptl: "
+			    "%u:%u:%u cid 0x%04x "
+			    "flag %#x status %x\n",
+			    __func__,
+			    io->io_hdr.io_type,
+			    io->io_hdr.msg_type,
+			    io->nvmeio.cmd.opc,
+			    io->io_hdr.nexus.initid,
+			    io->io_hdr.nexus.targ_port,
+			    io->io_hdr.nexus.targ_lun,
+			    io->nvmeio.cmd.cid,
+			    io->io_hdr.flags,
+			    io->io_hdr.status);
+			break;
+		default:
+			printf("%s: type %d msg %d iptl: "
+			    "%u:%u:%u flag %#x status %x\n",
+			    __func__,
+			    io->io_hdr.io_type,
+			    io->io_hdr.msg_type,
+			    io->io_hdr.nexus.initid,
+			    io->io_hdr.nexus.targ_port,
+			    io->io_hdr.nexus.targ_lun,
+			    io->io_hdr.flags,
+			    io->io_hdr.status);
+			break;
+		}
 	} else
 		io->io_hdr.flags |= CTL_FLAG_ALREADY_DONE;
 #endif
@@ -13477,19 +14340,41 @@ ctl_work_thread(void *arg)
 		if (io != NULL) {
 			STAILQ_REMOVE_HEAD(&thr->incoming_queue, links);
 			mtx_unlock(&thr->queue_lock);
-			if (io->io_hdr.io_type == CTL_IO_TASK)
+			switch (io->io_hdr.io_type) {
+			case CTL_IO_TASK:
 				ctl_run_task(io);
-			else
+				break;
+			case CTL_IO_SCSI:
 				ctl_scsiio_precheck(&io->scsiio);
+				break;
+			case CTL_IO_NVME:
+			case CTL_IO_NVME_ADMIN:
+				ctl_nvmeio_precheck(&io->nvmeio);
+				break;
+			default:
+				__assert_unreachable();
+			}
 			continue;
 		}
 		io = (union ctl_io *)STAILQ_FIRST(&thr->rtr_queue);
 		if (io != NULL) {
 			STAILQ_REMOVE_HEAD(&thr->rtr_queue, links);
 			mtx_unlock(&thr->queue_lock);
-			retval = ctl_scsiio(&io->scsiio);
-			if (retval != CTL_RETVAL_COMPLETE)
-				CTL_DEBUG_PRINT(("ctl_scsiio failed\n"));
+			switch (io->io_hdr.io_type) {
+			case CTL_IO_SCSI:
+				retval = ctl_scsiio(&io->scsiio);
+				if (retval != CTL_RETVAL_COMPLETE)
+					CTL_DEBUG_PRINT(("ctl_scsiio failed\n"));
+				break;
+			case CTL_IO_NVME:
+			case CTL_IO_NVME_ADMIN:
+				retval = ctl_nvmeio(&io->nvmeio);
+				if (retval != CTL_RETVAL_COMPLETE)
+					CTL_DEBUG_PRINT(("ctl_nvmeio failed\n"));
+				break;
+			default:
+				__assert_unreachable();
+			}
 			continue;
 		}
 

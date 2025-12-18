@@ -25,7 +25,6 @@
  */
 
 #include "test.h"
-__FBSDID("$FreeBSD$");
 
 /*
  * A basic exercise of lz4 reading and writing.
@@ -59,10 +58,10 @@ DEFINE_TEST(test_write_filter_lz4)
 	assertEqualInt(ARCHIVE_OK, archive_write_free(a));
 
 	buffsize = 2000000;
-	assert(NULL != (buff = (char *)malloc(buffsize)));
+	assert(NULL != (buff = malloc(buffsize)));
 
 	datasize = 10000;
-	assert(NULL != (data = (char *)calloc(1, datasize)));
+	assert(NULL != (data = calloc(datasize, 1)));
 	filecount = 10;
 
 	/*
@@ -303,10 +302,10 @@ test_options(const char *options)
 	assertEqualInt(ARCHIVE_OK, archive_write_free(a));
 
 	buffsize = 2000000;
-	assert(NULL != (buff = (char *)malloc(buffsize)));
+	assert(NULL != (buff = malloc(buffsize)));
 
 	datasize = 10000;
-	assert(NULL != (data = (char *)calloc(1, datasize)));
+	assert(NULL != (data = calloc(datasize, 1)));
 	filecount = 10;
 
 	/*

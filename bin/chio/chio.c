@@ -32,17 +32,9 @@
  */
 /*
  * Additional Copyright (c) 1997, by Matthew Jacob, for NASA/Ames Research Ctr.
- * Addidional Copyright (c) 2000, by C. Stephen Gunn, Waterspout Communications
+ * Additional Copyright (c) 2000, by C. Stephen Gunn, Waterspout Communications
  */
 
-#if 0
-#ifndef lint
-static const char copyright[] =
-	"@(#) Copyright (c) 1996 Jason R. Thorpe.  All rights reserved.";
-#endif /* not lint */
-#endif
-
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/chio.h> 
 #include <err.h>

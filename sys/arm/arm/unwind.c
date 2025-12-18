@@ -28,7 +28,6 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/linker.h>
@@ -398,6 +397,9 @@ unwind_exec_insn(struct unwind_state *state)
 		if (mask == 0)
 			return 1;
 
+		if (!__is_aligned(vsp, sizeof(register_t)))
+			return 1;
+
 		/* Update SP */
 		update_vsp = 1;
 
@@ -430,6 +432,9 @@ unwind_exec_insn(struct unwind_state *state)
 		/* Read how many registers to load */
 		count = insn & INSN_POP_COUNT_MASK;
 
+		if (!__is_aligned(vsp, sizeof(register_t)))
+			return 1;
+
 		/* Update sp */
 		update_vsp = 1;
 
@@ -458,6 +463,9 @@ unwind_exec_insn(struct unwind_state *state)
 
 		mask = unwind_exec_read_byte(state);
 		if (mask == 0 || (mask & 0xf0) != 0)
+			return 1;
+
+		if (!__is_aligned(vsp, sizeof(register_t)))
 			return 1;
 
 		/* Update SP */

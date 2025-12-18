@@ -51,8 +51,8 @@
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 #include <dev/mdio/mdio.h>
-#include <dev/extres/clk/clk.h>
-#include <dev/extres/hwreset/hwreset.h>
+#include <dev/clk/clk.h>
+#include <dev/hwreset/hwreset.h>
 
 #include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
@@ -200,14 +200,6 @@ ar40xx_attach_phys(struct ar40xx_softc *sc)
 	snprintf(name, IFNAMSIZ, "%sport", device_get_nameunit(sc->sc_dev));
 	for (phy = 0; phy < AR40XX_NUM_PHYS; phy++) {
 		sc->sc_phys.ifp[phy] = if_alloc(IFT_ETHER);
-		if (sc->sc_phys.ifp[phy] == NULL) {
-			device_printf(sc->sc_dev,
-			    "PHY %d: couldn't allocate ifnet structure\n",
-			    phy);
-			err = ENOMEM;
-			break;
-		}
-
 		sc->sc_phys.ifp[phy]->if_softc = sc;
 		sc->sc_phys.ifp[phy]->if_flags |= IFF_UP | IFF_BROADCAST |
 		    IFF_DRV_RUNNING | IFF_SIMPLEX;

@@ -570,7 +570,7 @@ isa_probe_children(device_t dev)
 		    strcmp(kern_ident, "GENERIC") == 0 &&
 		    device_is_attached(child))
 			device_printf(child,
-			    "non-PNP ISA device will be removed from GENERIC in FreeBSD 14.\n");
+			    "non-PNP ISA device will be removed from GENERIC in FreeBSD 15.\n");
 	}
 
 	/*
@@ -909,8 +909,6 @@ isa_driver_added(device_t dev, driver_t *driver)
 		STAILQ_FOREACH(rle, &idev->id_resources, link) {
 			if (rle->res)
 				resource_list_release(rl, dev, child,
-						      rle->type,
-						      rle->rid,
 						      rle->res);
 		}
 

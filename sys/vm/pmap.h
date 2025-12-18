@@ -31,8 +31,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	from: @(#)pmap.h	8.1 (Berkeley) 6/11/93
- *
  *
  * Copyright (c) 1987, 1990 Carnegie-Mellon University.
  * All rights reserved.
@@ -83,13 +81,14 @@ typedef struct pmap_statistics *pmap_statistics_t;
  * Each machine-dependent implementation is required to provide:
  *
  * vm_memattr_t	pmap_page_get_memattr(vm_page_t);
- * boolean_t	pmap_page_is_mapped(vm_page_t);
- * boolean_t	pmap_page_is_write_mapped(vm_page_t);
+ * bool		pmap_page_is_mapped(vm_page_t);
+ * bool		pmap_page_is_write_mapped(vm_page_t);
  * void		pmap_page_set_memattr(vm_page_t, vm_memattr_t);
  */
 #include <machine/pmap.h>
 
 #ifdef _KERNEL
+#include <sys/_cpuset.h>
 struct thread;
 
 /*
@@ -118,6 +117,7 @@ extern vm_offset_t kernel_vm_end;
 #define	PMAP_TS_REFERENCED_MAX	5
 
 void		 pmap_activate(struct thread *td);
+void		 pmap_active_cpus(pmap_t pmap, cpuset_t *res);
 void		 pmap_advise(pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 		    int advice);
 void		 pmap_align_superpage(vm_object_t, vm_ooffset_t, vm_offset_t *,
@@ -150,6 +150,10 @@ void		 pmap_copy_page_tags(vm_page_t, vm_page_t);
 #endif
 void		 pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset,
 		    vm_page_t mb[], vm_offset_t b_offset, int xfersize);
+#if __has_feature(capabilities)
+void		 pmap_copy_pages_tags(vm_page_t ma[], vm_offset_t a_offset,
+		    vm_page_t mb[], vm_offset_t b_offset, int xfersize);
+#endif
 
 /*
  * CHERI capability revocation imposes the following novel demand on pmap_enter
@@ -170,16 +174,15 @@ vm_page_t	 pmap_extract_and_hold(pmap_t pmap, vm_offset_t va,
 		    vm_prot_t prot);
 void		 pmap_growkernel(vm_offset_t);
 void		 pmap_init(void);
-boolean_t	 pmap_is_modified(vm_page_t m);
-boolean_t	 pmap_is_prefaultable(pmap_t pmap, vm_offset_t va);
-boolean_t	 pmap_is_referenced(vm_page_t m);
-boolean_t	 pmap_is_valid_memattr(pmap_t, vm_memattr_t);
+bool		 pmap_is_modified(vm_page_t m);
+bool		 pmap_is_prefaultable(pmap_t pmap, vm_offset_t va);
+bool		 pmap_is_referenced(vm_page_t m);
+bool		 pmap_is_valid_memattr(pmap_t, vm_memattr_t);
 vm_pointer_t	 pmap_map(vm_pointer_t *, vm_paddr_t, vm_paddr_t, int);
-int		 pmap_mincore(pmap_t pmap, vm_offset_t addr,
-		    vm_paddr_t *pap);
+int		 pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap);
 void		 pmap_object_init_pt(pmap_t pmap, vm_offset_t addr,
 		    vm_object_t object, vm_pindex_t pindex, vm_size_t size);
-boolean_t	 pmap_page_exists_quick(pmap_t pmap, vm_page_t m);
+bool		 pmap_page_exists_quick(pmap_t pmap, vm_page_t m);
 void		 pmap_page_init(vm_page_t m);
 int		 pmap_page_wired_mappings(vm_page_t m);
 int		 pmap_pinit(pmap_t);

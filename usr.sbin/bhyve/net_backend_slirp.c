@@ -502,8 +502,10 @@ _slirp_init(struct net_backend *be, const char *devname __unused,
 			goto err;
 		while ((rule = strsep(&rules, ";")) != NULL) {
 			error = config_one_hostfwd(priv, rule);
-			if (error != 0)
+			if (error != 0) {
+				free(tofree);
 				goto err;
+			}
 		}
 		free(tofree);
 	}
@@ -625,11 +627,11 @@ slirp_recv_enable(struct net_backend *be)
 }
 
 static void
-slirp_recv_disable(struct net_backend *be __unused)
+slirp_recv_disable(struct net_backend *be)
 {
 	struct slirp_priv *priv = NET_BE_PRIV(be);
 
-	mevent_enable(priv->mevp);
+	mevent_disable(priv->mevp);
 }
 
 static uint64_t

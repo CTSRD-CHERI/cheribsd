@@ -24,7 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
@@ -136,7 +135,7 @@ retry:
 				continue;
 			if (vm_page_busy_acquire(m, VM_ALLOC_WAITFAIL) == 0)
 				goto retry;
-			cdev_pager_free_page(map->mem, m);
+			cdev_mgtdev_pager_free_page(map->mem, m);
 		}
 		VM_OBJECT_WUNLOCK(map->mem);
 

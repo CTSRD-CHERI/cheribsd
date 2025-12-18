@@ -27,10 +27,10 @@
  */
 #include "opt_ddb.h"
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
+#include <sys/intr.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -52,7 +52,6 @@
 #include <machine/debug_monitor.h>
 #include <machine/smp.h>
 #include <machine/pcb.h>
-#include <machine/intr.h>
 #include <machine/vmparam.h>
 #ifdef VFP
 #include <machine/vfp.h>
@@ -170,9 +169,7 @@ init_secondary(int cpu)
 
 	/* Spin until the BSP releases the APs */
 	while (!atomic_load_acq_int(&aps_ready)) {
-#if __ARM_ARCH >= 7
 		__asm __volatile("wfe");
-#endif
 	}
 
 	/* Initialize curthread */
@@ -301,11 +298,11 @@ release_aps(void *dummy __unused)
 	if (mp_ncpus == 1)
 		return;
 
-	intr_pic_ipi_setup(IPI_RENDEZVOUS, "rendezvous", ipi_rendezvous, NULL);
-	intr_pic_ipi_setup(IPI_AST, "ast", ipi_ast, NULL);
-	intr_pic_ipi_setup(IPI_STOP, "stop", ipi_stop, NULL);
-	intr_pic_ipi_setup(IPI_PREEMPT, "preempt", ipi_preempt, NULL);
-	intr_pic_ipi_setup(IPI_HARDCLOCK, "hardclock", ipi_hardclock, NULL);
+	intr_ipi_setup(IPI_RENDEZVOUS, "rendezvous", ipi_rendezvous, NULL);
+	intr_ipi_setup(IPI_AST, "ast", ipi_ast, NULL);
+	intr_ipi_setup(IPI_STOP, "stop", ipi_stop, NULL);
+	intr_ipi_setup(IPI_PREEMPT, "preempt", ipi_preempt, NULL);
+	intr_ipi_setup(IPI_HARDCLOCK, "hardclock", ipi_hardclock, NULL);
 
 	atomic_store_rel_int(&aps_ready, 1);
 	/* Wake the other threads up */

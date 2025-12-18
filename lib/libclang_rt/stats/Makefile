@@ -1,4 +1,3 @@
-
 .include <bsd.init.mk>
 
 LIB=		clang_rt.stats-${CRTARCH}
@@ -10,7 +9,7 @@ SRCS+=		sanitizer_common/sanitizer_chained_origin_depot.cpp
 SRCS+=		sanitizer_common/sanitizer_common.cpp
 SRCS+=		sanitizer_common/sanitizer_common_libcdep.cpp
 SRCS+=		sanitizer_common/sanitizer_deadlock_detector1.cpp
-SRCS+=		sanitizer_common/sanitizer_deadlock_detector2.cpp
+SRCS+=		sanitizer_common/sanitizer_dl.cpp
 SRCS+=		sanitizer_common/sanitizer_errno.cpp
 SRCS+=		sanitizer_common/sanitizer_file.cpp
 SRCS+=		sanitizer_common/sanitizer_flag_parser.cpp
@@ -21,13 +20,12 @@ SRCS+=		sanitizer_common/sanitizer_linux.cpp
 SRCS+=		sanitizer_common/sanitizer_linux_libcdep.cpp
 SRCS+=		sanitizer_common/sanitizer_mutex.cpp
 SRCS+=		sanitizer_common/sanitizer_platform_limits_freebsd.cpp
-SRCS+=		sanitizer_common/sanitizer_platform_limits_linux.cpp
-SRCS+=		sanitizer_common/sanitizer_platform_limits_posix.cpp
 SRCS+=		sanitizer_common/sanitizer_posix.cpp
 SRCS+=		sanitizer_common/sanitizer_posix_libcdep.cpp
 SRCS+=		sanitizer_common/sanitizer_printf.cpp
 SRCS+=		sanitizer_common/sanitizer_procmaps_bsd.cpp
 SRCS+=		sanitizer_common/sanitizer_procmaps_common.cpp
+SRCS+=		sanitizer_common/sanitizer_range.cpp
 SRCS+=		sanitizer_common/sanitizer_stack_store.cpp
 SRCS+=		sanitizer_common/sanitizer_stackdepot.cpp
 SRCS+=		sanitizer_common/sanitizer_stacktrace.cpp
@@ -37,9 +35,11 @@ SRCS+=		sanitizer_common/sanitizer_suppressions.cpp
 SRCS+=		sanitizer_common/sanitizer_symbolizer.cpp
 SRCS+=		sanitizer_common/sanitizer_symbolizer_libbacktrace.cpp
 SRCS+=		sanitizer_common/sanitizer_symbolizer_libcdep.cpp
+SRCS+=		sanitizer_common/sanitizer_symbolizer_markup.cpp
 SRCS+=		sanitizer_common/sanitizer_symbolizer_posix_libcdep.cpp
 SRCS+=		sanitizer_common/sanitizer_symbolizer_report.cpp
 SRCS+=		sanitizer_common/sanitizer_termination.cpp
+SRCS+=		sanitizer_common/sanitizer_thread_arg_retval.cpp
 SRCS+=		sanitizer_common/sanitizer_thread_registry.cpp
 SRCS+=		sanitizer_common/sanitizer_tls_get_addr.cpp
 SRCS+=		sanitizer_common/sanitizer_type_traits.cpp

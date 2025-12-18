@@ -28,7 +28,6 @@
  * X-Powers AXP803/813/818 PMU for Allwinner SoCs
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/eventhandler.h>
@@ -48,7 +47,7 @@
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
-#include <dev/extres/regulator/regulator.h>
+#include <dev/regulator/regulator.h>
 
 #include "gpio_if.h"
 #include "iicbus_if.h"

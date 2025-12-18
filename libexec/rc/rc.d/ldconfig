@@ -16,12 +16,11 @@ stop_cmd=":"
 
 ldconfig_paths()
 {
-	local _dirs _files _ii _ldconf _ldpaths _paths
+	local _dirs _files _ii _ldpaths _paths
 
 	_dirs="${1}"
 	_paths="${2}"
 	_ldpaths="${3}"
-	_ldconf="${4}"
 
 	for _ii in ${_dirs}; do
 		if [ -d "${_ii}" ]; then
@@ -31,7 +30,7 @@ ldconfig_paths()
 			fi
 		fi
 	done
-	for _ii in ${_paths} ${_soconf}; do
+	for _ii in ${_paths}; do
 		if [ -r "${_ii}" ]; then
 			_ldpaths="${_ldpaths} ${_ii}"
 		fi
@@ -48,8 +47,9 @@ ldconfig_start()
 	ldconfig=${ldconfig_command}
 	checkyesno ldconfig_insecure && _ins="-i"
 	if [ -x "${ldconfig_command}" ]; then
+		_LDC=$(/libexec/ld-elf.so.1 -v | sed -n -e '/^Default lib path /s///p' | tr : ' ')
 		_LDC=$(ldconfig_paths "${ldconfig_local_dirs}" \
-		    "${ldconfig_paths}" "/lib /usr/lib" "/etc/ld-elf.so.conf")
+		    "${ldconfig_paths} /etc/ld-elf.so.conf" "$_LDC")
 		startmsg 'ELF ldconfig path:' ${_LDC}
 		${ldconfig} -elf ${_ins} ${_LDC}
 
@@ -62,7 +62,7 @@ ldconfig_start()
 			${ldconfig} -f /var/run/ld-elf-c18n.so.hints ${_ins} ${_LDC}
 
 			_LDC=$(ldconfig_paths "${ldconfig_local64cb_dirs}" \
-			    "${ldconfig64cb_paths}" "" "")
+			    "${ldconfig64cb_paths}" "")
 			startmsg 'Benchmark ABI ldconfig path:' ${_LDC}
 			${ldconfig} -f /var/run/ld-elf64cb.so.hints ${_ins} ${_LDC}
 
@@ -73,22 +73,33 @@ ldconfig_start()
 			# FALLTHROUGH
 		riscv64c)
 			_LDC=$(ldconfig_paths "${ldconfig_local64_dirs}" \
-			    "${ldconfig64_paths}" "" "")
+			    "${ldconfig64_paths}" "")
 			startmsg '64-bit compatibility ldconfig path:' ${_LDC}
 			${ldconfig} -64 ${_ins} ${_LDC}
 			;;
 		esac
-		case ${machine_arch} in
-		aarch64*|amd64|powerpc64)
+
+		if check_kern_features compat_freebsd32; then
+			_LDC=""
+			if [ -x /libexec/ld-elf32.so.1 ]; then
+				for x in $(/libexec/ld-elf32.so.1 -v | sed -n -e '/^Default lib path /s///p' | tr : ' '); do
+					if [ -d "${x}" ]; then
+						_LDC="${_LDC} ${x}"
+					fi
+				done
+			fi
 			_LDC=$(ldconfig_paths "${ldconfig_local32_dirs}" \
-			    "${ldconfig32_paths}" "" "")
+			    "${ldconfig32_paths}" "$_LDC")
 			startmsg '32-bit compatibility ldconfig path:' ${_LDC}
 			${ldconfig} -32 ${_ins} ${_LDC}
-			;;
-		esac
+		fi
 
 	fi
 }
 
 load_rc_config $name
+
+# doesn't make sense to run in a svcj: config setting
+ldconfig_svcj="NO"
+
 run_rc_command "$1"

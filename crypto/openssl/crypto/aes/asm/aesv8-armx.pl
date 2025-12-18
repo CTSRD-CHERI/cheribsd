@@ -79,7 +79,10 @@ $code=<<___;
 
 #if __ARM_MAX_ARCH__>=7
 ___
-$code.=".arch	armv8-a+crypto\n.text\n"		if ($flavour =~ /64/);
+$code.=<<___						if ($flavour =~ /64/);
+.arch_extension	crypto
+.text
+___
 $code.=<<___						if ($flavour !~ /64/);
 .arch	armv7-a	// don't confuse not-so-latest binutils with argv8 :-)
 .fpu	neon
@@ -101,17 +104,20 @@ ___
 # transliterate common code to either flavour with regex vodoo.
 #
 {{{
-my ($inp,$bits,$out,$ptr,$rounds)=("x0","w1","x2","x3","w12");
+my ($inp,$bits,$out,$ptr,$rval,$rounds)=("PTR(0)","w1","PTR(2)","PTR(3)","x3","w12");
+my ($inpx,$outx)=("x0","x2");
 my ($zero,$rcon,$mask,$in0,$in1,$tmp,$key)=
 	$flavour=~/64/? map("q$_",(0..6)) : map("q$_",(0..3,8..10));
 
 
 $code.=<<___;
 .align	5
+.type	.Lrcon,%object
 .Lrcon:
 .long	0x01,0x01,0x01,0x01
 .long	0x0c0f0e0d,0x0c0f0e0d,0x0c0f0e0d,0x0c0f0e0d	// rotate-n-splat
 .long	0x1b,0x1b,0x1b,0x1b
+.size	.Lrcon, . - .Lrcon
 
 .globl	${prefix}_set_encrypt_key
 .type	${prefix}_set_encrypt_key,%function
@@ -120,16 +126,18 @@ ${prefix}_set_encrypt_key:
 .Lenc_key:
 ___
 $code.=<<___	if ($flavour =~ /64/);
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	AARCH64_VALID_CALL_TARGET
+	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 ___
 $code.=<<___;
-	mov	$ptr,#-1
-	cmp	$inp,#0
+	mov	$rval,#-1
+	cmp	$inpx,#0
 	b.eq	.Lenc_key_abort
-	cmp	$out,#0
+	cmp	$outx,#0
 	b.eq	.Lenc_key_abort
-	mov	$ptr,#-2
+	mov	$rval,#-2
 	cmp	$bits,#128
 	b.lt	.Lenc_key_abort
 	cmp	$bits,#256
@@ -281,11 +289,11 @@ $code.=<<___;
 
 .Ldone:
 	str	$rounds,[$out]
-	mov	$ptr,#0
+	mov	$rval,#0
 
 .Lenc_key_abort:
-	mov	x0,$ptr			// return value
-	`"ldr	x29,[sp],#16"		if ($flavour =~ /64/)`
+	mov	x0,$rval		// return value
+	`"ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH)"	if ($flavour =~ /64/)`
 	ret
 .size	${prefix}_set_encrypt_key,.-${prefix}_set_encrypt_key
 
@@ -295,9 +303,9 @@ $code.=<<___;
 ${prefix}_set_decrypt_key:
 ___
 $code.=<<___	if ($flavour =~ /64/);
-	.inst	0xd503233f		// paciasp
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	AARCH64_SIGN_LINK_REGISTER
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 ___
 $code.=<<___	if ($flavour !~ /64/);
 	stmdb	sp!,{r4,lr}
@@ -338,8 +346,8 @@ $code.=<<___	if ($flavour !~ /64/);
 	ldmia	sp!,{r4,pc}
 ___
 $code.=<<___	if ($flavour =~ /64/);
-	ldp	x29,x30,[sp],#16
-	.inst	0xd50323bf		// autiasp
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(2*PTR_WIDTH)
+	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 ___
 $code.=<<___;
@@ -350,7 +358,7 @@ ___
 sub gen_block () {
 my $dir = shift;
 my ($e,$mc) = $dir eq "en" ? ("e","mc") : ("d","imc");
-my ($inp,$out,$key)=map("x$_",(0..2));
+my ($inp,$out,$key)=map("PTR($_)",(0..2));
 my $rounds="w3";
 my ($rndkey0,$rndkey1,$inout)=map("q$_",(0..3));
 
@@ -359,6 +367,11 @@ $code.=<<___;
 .type	${prefix}_${dir}crypt,%function
 .align	5
 ${prefix}_${dir}crypt:
+___
+$code.=<<___	if ($flavour =~ /64/);
+	AARCH64_VALID_CALL_TARGET
+___
+$code.=<<___;
 	ldr	$rounds,[$key,#240]
 	vld1.32	{$rndkey0},[$key],#16
 	vld1.8	{$inout},[$inp]
@@ -415,8 +428,8 @@ ___
 # store, just looks like what the original ECB implementation does.
 
 {{{
-my ($inp,$out,$len,$key)=map("x$_",(0..3));
-my ($enc,$rounds,$cnt,$key_,$step)=("w4","w5","w6","x7","x8");
+my ($inp,$out,$len,$key)=("PTR(0)","PTR(1)","x2","PTR(3)");
+my ($enc,$rounds,$cnt,$key_,$step)=("w4","w5","w6","PTR(7)","x8");
 my ($dat0,$dat1,$in0,$in1,$tmp0,$tmp1,$tmp2,$rndlast)=map("q$_",(0..7));
 
 my ($dat,$tmp,$rndzero_n_last)=($dat0,$tmp0,$tmp1);
@@ -442,6 +455,7 @@ $code.=<<___;
 ${prefix}_ecb_encrypt:
 ___
 $code.=<<___	if ($flavour =~ /64/);
+	AARCH64_VALID_CALL_TARGET
 	subs	$len,$len,#16
 	// Original input data size bigger than 16, jump to big size processing.
 	b.ne    .Lecb_big_size
@@ -533,8 +547,8 @@ $code.=<<___	if ($flavour =~ /64/);
 .Lecb_big_size:
 ___
 $code.=<<___	if ($flavour =~ /64/);
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 ___
 $code.=<<___	if ($flavour !~ /64/);
 	mov	ip,sp
@@ -1209,7 +1223,7 @@ $code.=<<___	if ($flavour !~ /64/);
 	ldmia	sp!,{r4-r8,pc}
 ___
 $code.=<<___	if ($flavour =~ /64/);
-	ldr	x29,[sp],#16
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH)
 ___
 $code.=<<___	if ($flavour =~ /64/);
 .Lecb_Final_abort:
@@ -1220,12 +1234,13 @@ $code.=<<___;
 ___
 }}}
 {{{
-my ($inp,$out,$len,$key,$ivp)=map("x$_",(0..4)); my $enc="w5";
-my ($rounds,$cnt,$key_,$step,$step1)=($enc,"w6","x7","x8","x12");
+my ($inp,$out,$len,$key,$ivp)=("PTR(0)","PTR(1)","x2","PTR(3)","PTR(4)");
+my $enc="w5";
+my ($rounds,$cnt,$key_,$step,$step1)=($enc,"w6","PTR(7)","x8","x12");
 my ($dat0,$dat1,$in0,$in1,$tmp0,$tmp1,$ivec,$rndlast)=map("q$_",(0..7));
 
 my ($dat,$tmp,$rndzero_n_last)=($dat0,$tmp0,$tmp1);
-my ($key4,$key5,$key6,$key7)=("x6","x12","x14",$key);
+my ($key4,$key5,$key6,$key7)=("PTR(6)","PTR(12)","PTR(14)",$key);
 
 ### q8-q15	preloaded key schedule
 
@@ -1236,8 +1251,10 @@ $code.=<<___;
 ${prefix}_cbc_encrypt:
 ___
 $code.=<<___	if ($flavour =~ /64/);
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	AARCH64_VALID_CALL_TARGET
+	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 ___
 $code.=<<___	if ($flavour !~ /64/);
 	mov	ip,sp
@@ -1734,7 +1751,7 @@ $code.=<<___	if ($flavour !~ /64/);
 	ldmia	sp!,{r4-r8,pc}
 ___
 $code.=<<___	if ($flavour =~ /64/);
-	ldr	x29,[sp],#16
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH)
 	ret
 ___
 $code.=<<___;
@@ -1742,8 +1759,8 @@ $code.=<<___;
 ___
 }}}
 {{{
-my ($inp,$out,$len,$key,$ivp)=map("x$_",(0..4));
-my ($rounds,$cnt,$key_)=("w5","w6","x7");
+my ($inp,$out,$len,$key,$ivp)=("PTR(0)","PTR(1)","x2","PTR(3)","PTR(4)");
+my ($rounds,$cnt,$key_)=("w5","w6","PTR(7)");
 my ($ctr,$tctr0,$tctr1,$tctr2)=map("w$_",(8..10,12));
 my $step="x12";		# aliases with $tctr2
 
@@ -1764,8 +1781,10 @@ $code.=<<___;
 ${prefix}_ctr32_encrypt_blocks:
 ___
 $code.=<<___	if ($flavour =~ /64/);
-	stp		x29,x30,[sp,#-16]!
-	add		x29,sp,#0
+	AARCH64_VALID_CALL_TARGET
+	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
+	stp		PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add		PTR(29),PTRN(sp),#0
 ___
 $code.=<<___	if ($flavour !~ /64/);
 	mov		ip,sp
@@ -2184,7 +2203,7 @@ $code.=<<___	if ($flavour !~ /64/);
 	ldmia		sp!,{r4-r10,pc}
 ___
 $code.=<<___	if ($flavour =~ /64/);
-	ldr		x29,[sp],#16
+	ldr		PTR(29),[PTRN(sp)],#(2*PTR_WIDTH)
 	ret
 ___
 $code.=<<___;
@@ -2222,10 +2241,12 @@ ___
 # plain text block.
 
 {{{
-my ($inp,$out,$len,$key1,$key2,$ivp)=map("x$_",(0..5));
-my ($rounds0,$rounds,$key_,$step,$ivl,$ivh)=("w5","w6","x7","x8","x9","x10");
-my ($tmpoutp,$loutp,$l2outp,$tmpinp)=("x13","w14","w15","x20");
+my ($inp,$out,$len,$key1,$key2,$ivp)=("PTR(0)","PTR(1)","x2","PTR(3)","PTR(4)","PTR(5)");
+my ($ivpx)=("x5");
+my ($rounds0,$rounds,$key_,$step,$ivl,$ivh)=("w5","w6","PTR(7)","x8","x9","x10");
+my ($tmpoutp,$loutp,$l2outp,$tmpinp)=("PTR(13)","w14","w15","PTR(20)");
 my ($tailcnt,$midnum,$midnumx,$constnum,$constnumx)=("x21","w22","x22","w19","x19");
+my ($tailcntp,$midnump,$constnump)=("PTR(21)","PTR(22)","PTR(19)");
 my ($xoffset,$tmpmx,$tmpmw)=("x6","x11","w11");
 my ($dat0,$dat1,$in0,$in1,$tmp0,$tmp1,$tmp2,$rndlast)=map("q$_",(0..7));
 my ($iv0,$iv1,$iv2,$iv3,$iv4)=("v6.16b","v8.16b","v9.16b","v10.16b","v11.16b");
@@ -2256,6 +2277,7 @@ $code.=<<___	if ($flavour =~ /64/);
 ${prefix}_xts_encrypt:
 ___
 $code.=<<___	if ($flavour =~ /64/);
+	AARCH64_VALID_CALL_TARGET
 	cmp	$len,#16
 	// Original input data size bigger than 16, jump to big size processing.
 	b.ne	.Lxts_enc_big_size
@@ -2333,10 +2355,10 @@ $code.=<<___	if ($flavour =~ /64/);
 .Lxts_enc_big_size:
 ___
 $code.=<<___	if ($flavour =~ /64/);
-	stp	$constnumx,$tmpinp,[sp,#-64]!
-	stp	$tailcnt,$midnumx,[sp,#48]
-	stp	$ivd10,$ivd20,[sp,#32]
-	stp	$ivd30,$ivd40,[sp,#16]
+	stp	$constnump,$tmpinp,[PTRN(sp),#-(4*PTR_WIDTH+32)]!
+	stp	$tailcntp,$midnump,[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	$ivd10,$ivd20,[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	$ivd30,$ivd40,[PTRN(sp),#(4*PTR_WIDTH+16)]
 
 	// tailcnt store the tail value of length%16.
 	and	$tailcnt,$len,#0xf
@@ -2387,7 +2409,7 @@ $code.=<<___	if ($flavour =~ /64/);
 
 	vld1.32	{q8-q9},[$key1]			// load key schedule...
 	sub	$rounds0,$rounds0,#6
-	add	$key_,$key1,$ivp,lsl#4		// pointer to last 7 round keys
+	add	$key_,$key1,$ivpx,lsl#4		// pointer to last 7 round keys
 	sub	$rounds0,$rounds0,#2
 	vld1.32	{q10-q11},[$key_],#32
 	vld1.32	{q12-q13},[$key_],#32
@@ -2888,10 +2910,10 @@ $code.=<<___	if ($flavour =~ /64/);
 	vst1.8	{$tmpin},[$out]
 
 .Lxts_abort:
-	ldp	$tailcnt,$midnumx,[sp,#48]
-	ldp	$ivd10,$ivd20,[sp,#32]
-	ldp	$ivd30,$ivd40,[sp,#16]
-	ldp	$constnumx,$tmpinp,[sp],#64
+	ldp	$tailcntp,$midnump,[PTRN(sp),#(2*PTR_WIDTH)]
+	ldp	$ivd10,$ivd20,[PTRN(sp),#(4*PTR_WIDTH)]
+	ldp	$ivd30,$ivd40,[PTRN(sp),#(4*PTR_WIDTH+16)]
+	ldp	$constnump,$tmpinp,[PTRN(sp)],#(4*PTR_WIDTH+32)
 .Lxts_enc_final_abort:
 	ret
 .size	${prefix}_xts_encrypt,.-${prefix}_xts_encrypt
@@ -2899,10 +2921,12 @@ ___
 
 }}}
 {{{
-my ($inp,$out,$len,$key1,$key2,$ivp)=map("x$_",(0..5));
-my ($rounds0,$rounds,$key_,$step,$ivl,$ivh)=("w5","w6","x7","x8","x9","x10");
-my ($tmpoutp,$loutp,$l2outp,$tmpinp)=("x13","w14","w15","x20");
+my ($inp,$out,$len,$key1,$key2,$ivp)=("PTR(0)","PTR(1)","x2","PTR(3)","PTR(4)","PTR(5)");
+my ($ivpx)=("x5");
+my ($rounds0,$rounds,$key_,$step,$ivl,$ivh)=("w5","w6","PTR(7)","x8","x9","x10");
+my ($tmpoutp,$loutp,$l2outp,$tmpinp)=("PTR(13)","w14","w15","PTR(20)");
 my ($tailcnt,$midnum,$midnumx,$constnum,$constnumx)=("x21","w22","x22","w19","x19");
+my ($tailcntp,$midnump,$constnump)=("PTR(21)","PTR(22)","PTR(19)");
 my ($xoffset,$tmpmx,$tmpmw)=("x6","x11","w11");
 my ($dat0,$dat1,$in0,$in1,$tmp0,$tmp1,$tmp2,$rndlast)=map("q$_",(0..7));
 my ($iv0,$iv1,$iv2,$iv3,$iv4,$tmpin)=("v6.16b","v8.16b","v9.16b","v10.16b","v11.16b","v26.16b");
@@ -2930,6 +2954,7 @@ $code.=<<___	if ($flavour =~ /64/);
 .type	${prefix}_xts_decrypt,%function
 .align	5
 ${prefix}_xts_decrypt:
+	AARCH64_VALID_CALL_TARGET
 ___
 $code.=<<___	if ($flavour =~ /64/);
 	cmp	$len,#16
@@ -3007,10 +3032,10 @@ $code.=<<___	if ($flavour =~ /64/);
 .Lxts_dec_big_size:
 ___
 $code.=<<___	if ($flavour =~ /64/);
-	stp	$constnumx,$tmpinp,[sp,#-64]!
-	stp	$tailcnt,$midnumx,[sp,#48]
-	stp	$ivd10,$ivd20,[sp,#32]
-	stp	$ivd30,$ivd40,[sp,#16]
+	stp	$constnump,$tmpinp,[PTRN(sp),#-(4*PTR_WIDTH+32)]!
+	stp	$tailcntp,$midnump,[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	$ivd10,$ivd20,[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	$ivd30,$ivd40,[PTRN(sp),#(4*PTR_WIDTH+16)]
 
 	and	$tailcnt,$len,#0xf
 	and	$len,$len,#-16
@@ -3066,7 +3091,7 @@ $code.=<<___	if ($flavour =~ /64/);
 
 	vld1.32	{q8-q9},[$key1]			// load key schedule...
 	sub	$rounds0,$rounds0,#6
-	add	$key_,$key1,$ivp,lsl#4		// pointer to last 7 round keys
+	add	$key_,$key1,$ivpx,lsl#4		// pointer to last 7 round keys
 	sub	$rounds0,$rounds0,#2
 	vld1.32	{q10-q11},[$key_],#32		// load key schedule...
 	vld1.32	{q12-q13},[$key_],#32
@@ -3539,7 +3564,7 @@ $code.=<<___	if ($flavour =~ /64/);
 	tst	$tailcnt,#0xf
 	b.eq	.Lxts_dec_abort
 	// Processing the last two blocks with cipher stealing.
-	mov	x7,x3
+	mov	$key_,$key1
 	cbnz	x2,.Lxts_dec_1st_done
 	vld1.8	{$dat0},[$inp],#16
 
@@ -3608,10 +3633,10 @@ $code.=<<___	if ($flavour =~ /64/);
 	vst1.8	{$tmpin},[$out]
 
 .Lxts_dec_abort:
-	ldp	$tailcnt,$midnumx,[sp,#48]
-	ldp	$ivd10,$ivd20,[sp,#32]
-	ldp	$ivd30,$ivd40,[sp,#16]
-	ldp	$constnumx,$tmpinp,[sp],#64
+	ldp	$tailcntp,$midnump,[PTRN(sp),#(2*PTR_WIDTH)]
+	ldp	$ivd10,$ivd20,[PTRN(sp),#(4*PTR_WIDTH)]
+	ldp	$ivd30,$ivd40,[PTRN(sp),#(4*PTR_WIDTH+16)]
+	ldp	$constnump,$tmpinp,[PTRN(sp)],#(4*PTR_WIDTH+32)
 
 .Lxts_dec_final_abort:
 	ret
@@ -3660,6 +3685,9 @@ if ($flavour =~ /64/) {			######## 64-bit code
 	s/\.[ui]?32//o and s/\.16b/\.4s/go;
 	s/\.[ui]?64//o and s/\.16b/\.2d/go;
 	s/\.[42]([sd])\[([0-3])\]/\.$1\[$2\]/o;
+
+	# Switch preprocessor checks to aarch64 versions.
+	s/__ARME([BL])__/__AARCH64E$1__/go;
 
 	print $_,"\n";
     }
