@@ -2121,7 +2121,7 @@ sysctl_old_kernel(struct sysctl_req *req, const void *p, size_t l)
 				    req->oldidx, PTR2CAP(p), i);
 			else
 #endif
-				memcpynocap_c((char * __capability)req->oldptr +
+				memcpy_data_c((char * __capability)req->oldptr +
 				    req->oldidx, PTR2CAP(p), i);
 		}
 	}
@@ -2144,7 +2144,7 @@ sysctl_new_kernel(struct sysctl_req *req, void *p, size_t l)
 		    (const char * __capability)req->newptr + req->newidx, l);
 	else
 #endif
-		memcpynocap_c(PTR2CAP(p),
+		memcpy_data_c(PTR2CAP(p),
 		    (const char * __capability)req->newptr + req->newidx, l);
 	req->newidx += l;
 	return (0);

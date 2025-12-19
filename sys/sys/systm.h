@@ -267,31 +267,31 @@ void	*memcpy(void * _Nonnull to, const void * _Nonnull from, size_t len);
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
 int	memcmp(const void *b1, const void *b2, size_t len);
 #if __has_feature(capabilities)
-void	*memcpynocap(void * _Nonnull to, const void * _Nonnull from,
+void	*memcpy_data(void * _Nonnull to, const void * _Nonnull from,
     size_t len);
-void	*memmovenocap(void * _Nonnull dest, const void * _Nonnull src,
+void	*memmove_data(void * _Nonnull dest, const void * _Nonnull src,
     size_t n);
 #else
-#define	memcpynocap	memcpy
-#define	memmovenocap	memmove
+#define	memcpy_data	memcpy
+#define	memmove_data	memmove
 #endif
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 void	* __capability memset_c(void * _Nonnull __capability buf, int c,
 	    size_t len);
 void	* __capability memcpy_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
-void	* __capability memcpynocap_c(void * _Nonnull __capability to,
+void	* __capability memcpy_data_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
 void	* __capability memmove_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
-void	* __capability memmovenocap_c(void * _Nonnull __capability dest,
+void	* __capability memmove_data_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
 #else
 #define	memset_c	memset
 #define	memcpy_c	memcpy
-#define	memcpynocap_c	memcpynocap
+#define	memcpy_data_c	memcpy_data
 #define	memmove_c	memmove
-#define	memmovenocap_c	memmovenocap
+#define	memmove_data_c	memmove_data
 #endif
 
 #ifdef SAN_NEEDS_INTERCEPTORS
@@ -321,8 +321,8 @@ int	SAN_INTERCEPTOR(memcmp)(const void *, const void *, size_t);
 #endif /* SAN_NEEDS_INTERCEPTORS */
 
 #define bcopy_c(from, to, len)		memmove_c((to), (from), (len))
-#define bcopynocap(from, to, len)	memmovenocap((to), (from), (len))
-#define bcopynocap_c(from, to, len)	memmovenocap_c((to), (from), (len))
+#define bcopy_data(from, to, len)	memmove_data((to), (from), (len))
+#define bcopy_data_c(from, to, len)	memmove_data_c((to), (from), (len))
 
 void	*memset_early(void * _Nonnull buf, int c, size_t len);
 #define bzero_early(buf, len) memset_early((buf), 0, (len))

@@ -305,10 +305,10 @@ uiomove_flags(void *cp, int n, struct uio *uio, bool nofault)
 				break;
 #endif
 			case UIO_READ:
-				bcopynocap_c(PTR2CAP(cp), iov->iov_base, cnt);
+				bcopy_data_c(PTR2CAP(cp), iov->iov_base, cnt);
 				break;
 			case UIO_WRITE:
-				bcopynocap_c(iov->iov_base, PTR2CAP(cp), cnt);
+				bcopy_data_c(iov->iov_base, PTR2CAP(cp), cnt);
 				break;
 			}
 			break;
