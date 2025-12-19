@@ -4692,7 +4692,7 @@ pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 		}
 #if __has_feature(capabilities)
 		if (clear_tags)
-			bcopynocap(a_cp, b_cp, cnt);
+			bcopy_data(a_cp, b_cp, cnt);
 		else
 #endif
 			bcopy(a_cp, b_cp, cnt);

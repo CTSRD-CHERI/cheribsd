@@ -3736,7 +3736,7 @@ sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 	if (sopt->sopt_td != NULL)
 		return (copyin(sopt->sopt_val, buf, valsize));
 
-	bcopynocap((__cheri_fromcap void *)sopt->sopt_val, buf, valsize);
+	bcopy_data((__cheri_fromcap void *)sopt->sopt_val, buf, valsize);
 	return (0);
 }
 
@@ -4070,7 +4070,7 @@ sooptcopyout(struct sockopt *sopt, const void *buf, size_t len)
 		if (sopt->sopt_td != NULL)
 			error = copyout(buf, sopt->sopt_val, valsize);
 		else
-			bcopynocap(buf, (__cheri_fromcap void *)sopt->sopt_val,
+			bcopy_data(buf, (__cheri_fromcap void *)sopt->sopt_val,
 			    valsize);
 	}
 	return (error);

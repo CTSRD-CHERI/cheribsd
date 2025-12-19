@@ -127,10 +127,10 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 				break;
 #endif
 			case UIO_READ:
-				bcopynocap_c(PTR2CAP(cp), iov->iov_base, cnt);
+				bcopy_data_c(PTR2CAP(cp), iov->iov_base, cnt);
 				break;
 			case UIO_WRITE:
-				bcopynocap_c(iov->iov_base, PTR2CAP(cp), cnt);
+				bcopy_data_c(iov->iov_base, PTR2CAP(cp), cnt);
 				break;
 			}
 			break;

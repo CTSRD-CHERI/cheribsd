@@ -140,13 +140,13 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 __strong_reference(memcpy_c, memmove_c);
 
 void * __capability
-memcpynocap_c(void * __capability dst, const void *  __capability src,
+memcpy_data_c(void * __capability dst, const void *  __capability src,
     size_t len)
 {
 	return (memcpy_c(dst, cheri_perms_and(src, ~CHERI_PERM_LOAD_CAP), len));
 }
 
-__strong_reference(memcpynocap_c, memmovenocap_c);
+__strong_reference(memcpy_data_c, memmove_data_c);
 /*
  * CHERI CHANGES START
  * {
