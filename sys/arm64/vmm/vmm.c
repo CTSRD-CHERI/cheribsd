@@ -1663,20 +1663,28 @@ vm_set_register(struct vcpu *vcpu, int reg, uintcap_t val)
 	if (reg >= VM_REG_LAST)
 		return (EINVAL);
 	error = vmmops_setreg(vcpu->cookie, reg, val);
-	if (error || reg != VM_REG_GUEST_PC)
+	if (error)
 		return (error);
 
+	switch (reg) {
+	case VM_REG_GUEST_PC:
 #if __has_feature(capabilities)
-#ifdef __CHERI_PURE_CAPABILITY__
-	vcpu->nextpc = (uintcap_t)cheri_perms_and(
-	    cheri_address_set(vmm_gva_root_cap, val),
-	    cheri_perms_get(cheri_pcc_get()));
-#else
-	vcpu->nextpc = (uintcap_t)cheri_address_set(cheri_pcc_get(), val);
+	case VM_REG_GUEST_PCC:
 #endif
+		error = vmmops_getreg(vcpu->cookie,
+#if __has_feature(capabilities)
+		    VM_REG_GUEST_PCC,
 #else
-	vcpu->nextpc = val;
+		    VM_REG_GUEST_PC,
 #endif
+		    &vcpu->nextpc);
+		if (error != 0)
+			panic("%s: error %d updating nextpc", __func__,
+			    error);
+		break;
+	default:
+		break;
+	}
 
 	return (0);
 }

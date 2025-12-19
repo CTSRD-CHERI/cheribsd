@@ -1449,14 +1449,7 @@ vmmops_setreg(void *vcpui, int reg, uintcap_t val)
 	switch (reg) {
 	case VM_REG_GUEST_PC:
 #ifdef __CHERI_PURE_CAPABILITY__
-		/*
-		 * This register is set by bhyve when booting and
-		 * starting secondary vCPUs.  Userspace does not hold a
-		 * capability for the entire guest virtual address
-		 * space, so we must derive a capability here.
-		 */
-		*(uintcap_t *)regp = (uintcap_t)
-		    cheri_address_set(kernel_root_cap, val);
+		*(uintcap_t *)regp = cheri_address_set(*(uintcap_t *)regp, val);
 		break;
 #endif
 	case VM_REG_GUEST_LR:
