@@ -516,6 +516,8 @@ main(int argc, char **argv)
 	memset(&priv, 0, sizeof(priv));
 	priv.sock = sd;
 	priv.pipe = pipe;
+	if (ioctl(priv.sock, FIONBIO, &(int){0}) == -1)
+		err(1, "ioctl(FIONBIO)");
 	if (pipe2(priv.wakeup, O_CLOEXEC | O_NONBLOCK) != 0)
 		err(1, "pipe2");
 
