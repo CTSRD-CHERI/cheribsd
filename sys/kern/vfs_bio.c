@@ -1201,12 +1201,8 @@ kern_vfs_bio_buffer_alloc(caddr_t v, long physmem_est)
 
 	/*
 	 * Reserve space for the buffer cache buffers
-	 * When we are called the first time, the capability is invalid
-	 * so we can not set bounds.
 	 */
-	if (cheri_kern_tag_get(v))
-		buf = (void *)cheri_kern_bounds_set(v, nbuf * STRUCT_BUF_ALLOCATION);
-	buf = (char *)v;
+	buf = (void *)cheri_kern_bounds_set(v, nbuf * STRUCT_BUF_ALLOCATION);
 	v = (caddr_t)v + STRUCT_BUF_ALLOCATION * nbuf;
 
 	return (v);
