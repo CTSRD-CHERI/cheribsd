@@ -38,3 +38,4 @@ ace2_syncpoint_modevent(module_t mod, int type, void *data)
 }
 
 DEV_MODULE(ace2_syncpoint, ace2_syncpoint_modevent, NULL);
+MODULE_VERSION(ace2_syncpoint, 1);
