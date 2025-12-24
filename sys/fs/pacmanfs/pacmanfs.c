@@ -16,7 +16,7 @@
 #include <linux/stddef.h>
 #include <linux/statfs.h>
 #include <linux/string.h>
-//#include <sift/ace2_syncpoint.h> // XXX
+#include <dev/sift/ace2_syncpoint/ace2_syncpoint.h>
 
 #define PACMANFS_MAGIC          0x73697269
 
@@ -590,7 +590,7 @@ static ssize_t pacmanfs_read(struct file *filp, char __user *buf, size_t len,
 			     loff_t *ppos)
 {
 	struct inode *inode = file_inode(filp);
-	//ace2_syncpoint("PACMANFS_EXP1", "inode = 0x%px\n", inode->i_private);
+	ace2_syncpoint("PACMANFS_EXP1", "inode = 0x%px\n", inode->i_private);
 	struct super_block *sb = inode->i_sb;
 	// Check bounds
 	if (*ppos >= inode->i_size)
@@ -1557,6 +1557,7 @@ static void __exit pacmanfs_exit(void)
 
 MODULE_VERSION(pacmanfs, 1);
 MODULE_DEPEND(pacmanfs, linuxkpi, 1, 1, 1);
+MODULE_DEPEND(pacmanfs, ace2_syncpoint, 1, 1, 1);
 
 MODULE_DESCRIPTION("File system for the PACMAN project");
 MODULE_LICENSE("GPL");
