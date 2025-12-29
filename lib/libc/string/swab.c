@@ -6,11 +6,13 @@
 #include <unistd.h>
 #include <sys/endian.h>
 
+typedef uint16_t __aligned(1) unaligned16_t;
+
 void
 swab(const void * __restrict from, void * __restrict to, ssize_t len)
 {
-	const uint16_t *f __aligned(1) = from;
-	uint16_t *t __aligned(1) = to;
+	const unaligned16_t *f = from;
+	unaligned16_t *t = to;
 
 	/*
 	 * POSIX says overlapping copy behavior is undefined, however many
