@@ -1,9 +1,15 @@
 DEVRTW88DIR=	${SRCTOP}/sys/contrib/dev/rtw88
 
+.include <kmod.opts.mk>
+
 .PATH: ${DEVRTW88DIR}
 
 WITH_CONFIG_PM=	0
+.if ${MACHINE_CPU:Mcheri} && !${MACHINE_ABI:Mpurecap}
+WITH_DEBUGFS=	0
+.else
 WITH_DEBUGFS=	1
+.endif
 
 KMOD=	if_rtw88
 

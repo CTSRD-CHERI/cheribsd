@@ -1,9 +1,15 @@
 DEVIWLWIFIDIR=	${SRCTOP}/sys/contrib/dev/iwlwifi
 
+.include <kmod.opts.mk>
+
 .PATH: ${DEVIWLWIFIDIR}
 
 WITH_CONFIG_PM=	0
+.if ${MACHINE_CPU:Mcheri} && !${MACHINE_ABI:Mpurecap}
+WITH_DEBUGFS=	0
+.else
 WITH_DEBUGFS=	1
+.endif
 
 KMOD=	if_iwlwifi
 
