@@ -253,7 +253,12 @@ if [ -h "$OBJTOP"/lib/libc/jemalloc.3 ]; then
 	run rm -f "$OBJTOP"/lib/libc/jemalloc.3
 fi
 
-if [ $MACHINE_ARCH = aarch64 ]; then
+if [ $MACHINE = arm64 ]; then
+	if [ ${MACHINE_ARCH} == aarch64c ]; then
+		OBJTOP_SAVE="$OBJTOP"
+		OBJTOP="$OBJTOP/obj-lib64"
+	fi
+
 	# 20250110  5e7d93a60440  add strcmp SIMD implementation
 	clean_dep   lib/libc strcmp S arm-optimized-routines
 	run rm -f "$OBJTOP"/lib/libc/strcmp.S
@@ -301,4 +306,8 @@ if [ $MACHINE_ARCH = aarch64 ]; then
 
 	# 20250110  3f224333af16  add timingsafe_memcmp() assembly implementation
 	clean_dep   lib/libc timingsafe_memcmp c
+
+	if [ ${MACHINE_ARCH} == aarch64c ]; then
+		OBJTOP="$OBJTOP_SAVE"
+	fi
 fi
