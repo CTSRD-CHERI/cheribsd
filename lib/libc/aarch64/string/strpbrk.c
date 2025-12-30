@@ -1,3 +1,6 @@
+#ifdef __CHERI_PURE_CAPABILITY__
+#include "../../string/strpbrk.c"
+#else
 /*-
  * Copyright (c) 2023 The FreeBSD Foundation
  *
@@ -41,3 +44,4 @@ strpbrk(const char *s, const char *charset)
 
 	return (s[loc] == '\0' ? NULL : (char *)&s[loc]);
 }
+#endif

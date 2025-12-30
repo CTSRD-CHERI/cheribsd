@@ -1,3 +1,6 @@
+#ifdef __CHERI_PURE_CAPABILITY__
+#include "../../string/strcat.c"
+#else
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
@@ -18,3 +21,4 @@ strcat(char * __restrict s, const char * __restrict append)
 
 	return(save);
 }
+#endif
