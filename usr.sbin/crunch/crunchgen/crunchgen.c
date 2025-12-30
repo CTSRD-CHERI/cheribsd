@@ -1007,9 +1007,9 @@ top_makefile_rules(FILE *outmk)
 	if (makeobj) {
 		fprintf(outmk, "MAKEOBJDIRPREFIX?=%s\n", objprefix);
 		fprintf(outmk, "MAKEENV=env MAKEOBJDIRPREFIX=$(MAKEOBJDIRPREFIX)\n");
-		fprintf(outmk, "CRUNCHMAKE=$(MAKEENV) $(MAKE) -D_CRUNCHGEN\n");
+		fprintf(outmk, "CRUNCHMAKE=$(MAKEENV) $(MAKE)\n");
 	} else {
-		fprintf(outmk, "CRUNCHMAKE=$(MAKE) -D_CRUNCHGEN\n");
+		fprintf(outmk, "CRUNCHMAKE=$(MAKE)\n");
 	}
 
 	if (buildopts) {
