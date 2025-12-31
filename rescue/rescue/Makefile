@@ -17,6 +17,9 @@ CRUNCH_BUILDOPTS+=	MK_PIE=no NO_SHARED=yes
 LDFLAGS+=	-Wl,--allow-multiple-definition
 .endif
 
+# ld.lld: error: could not determine size of cap reloc against local object snl_f_p_empty
+LD_FATAL_WARNINGS=	no
+
 PROG=	rescue
 BINDIR?=/rescue
 

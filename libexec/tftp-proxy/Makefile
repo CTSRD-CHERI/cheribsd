@@ -9,4 +9,7 @@ LIBADD= pfctl
 
 WARNS?=	3
 
+# ld.lld: error: could not determine size of cap reloc against local object snl_f_p_empty
+LD_FATAL_WARNINGS=	no
+
 .include <bsd.prog.mk>
