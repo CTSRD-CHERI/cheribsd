@@ -24,6 +24,7 @@ FBSD_1.3 {
 FBSD_1.8 {
     rtld_get_var;
     rtld_set_var;
+    rtld_cheri_mrs_statsp;
 };
 
 FBSDprivate_1.0 {

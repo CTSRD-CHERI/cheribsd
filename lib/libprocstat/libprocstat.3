@@ -1,4 +1,4 @@
-.\" Copyright (c) 2024 Capabilities Limited
+.\" Copyright (c) 2024-2025 Capabilities Limited
 .\" Copyright (c) 2011 Sergey Kandaurov <pluknet@FreeBSD.org>
 .\" All rights reserved.
 .\"
@@ -59,6 +59,7 @@
 .Nm procstat_getfiles ,
 .Nm procstat_getgroups ,
 .Nm procstat_getkstack ,
+.Nm procstat_getmrs ,
 .Nm procstat_getosrel ,
 .Nm procstat_getpathname ,
 .Nm procstat_getprocs ,
@@ -77,6 +78,7 @@
 .In sys/queue.h
 .In sys/socket.h
 .In cheri/c18n.h
+.In cheri/cheri_mrs.h
 .In libprocstat.h
 .Ft void
 .Fn procstat_close "struct procstat *procstat"
@@ -216,6 +218,12 @@
 .Fa "struct procstat *procstat"
 .Fa "struct kinfo_proc *kp"
 .Fa "unsigned int *count"
+.Fc
+.Ft "int"
+.Fo procstat_getmrs
+.Fa "struct procstat *procstat"
+.Fa "struct kinfo_proc *kp"
+.Fa "struct cheri_mrs_stat *stats"
 .Fc
 .Ft int
 .Fo procstat_getosrel
@@ -615,6 +623,12 @@ On return, the compartment list is terminated with a compartment ID of
 .Dv CHERI_C18N_COMPART_LAST .
 If a terminating entry is not found in the returned array, then there was
 insufficient space, and the caller should allocate a larger array and retry.
+.Pp
+Th
+.Fn procstat_getmrs
+function retrieves heap and
+.Xr mrs
+statistics relating to allocation and revocation.
 .Sh SEE ALSO
 .Xr fstat 1 ,
 .Xr fuser 1 ,

@@ -1051,8 +1051,10 @@ typedef struct {
 #define	AT_CHERI_C18N	37	/* Compartment info block */
 #define	AT_HWCAP3	38	/* CPU feature flags 3. */
 #define	AT_HWCAP4	39	/* CPU feature flags 4. */
+#define	AT_CHERI_MRS	40	/* Heap and mrs info block */
 
-#define	AT_COUNT	40	/* Count of defined aux entry types. */
+#define	AT_COUNT	41	/* Count of defined aux entry types. */
+
 
 /*
  * Relocation types.

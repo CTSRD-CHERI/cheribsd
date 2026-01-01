@@ -53,12 +53,6 @@
 #include "procstat.h"
 
 static char get_abi_cheri(struct kinfo_proc *kipp);
-static const char *get_quarantining(struct procstat *procstat,
-    struct kinfo_proc *kipp);
-static const char *get_revoker_epoch(struct procstat *procstat,
-    struct kinfo_proc *kipp);
-static const char *get_revoker_state(struct procstat *procstat,
-    struct kinfo_proc *kipp);
 static const char *get_c18n(struct procstat *procstat,
     struct kinfo_proc *kipp);
 
@@ -112,75 +106,6 @@ get_abi_cheri(struct kinfo_proc *kipp)
 		if (strcmp(abis[i].emul, kipp->ki_emul) == 0)
 			return (abis[i].abi);
 	return ('?');
-}
-
-static const char *
-get_quarantining(struct procstat *procstat, struct kinfo_proc *kipp)
-{
-	int quarantining;
-
-	if (procstat_getquarantining(procstat, kipp, &quarantining) == 0) {
-		switch (quarantining) {
-		case 0:
-			return ("no");
-		case 1:
-			return ("yes");
-		case -1:
-			return ("!");
-		default:
-			warnx("%s: unknown quarantining status", __func__);
-			return ("?");
-		}
-	} else {
-		return ("-");
-	}
-}
-
-static const char *
-get_revoker_epoch(struct procstat *procstat, struct kinfo_proc *kipp)
-{
-	uint64_t epoch;
-	static char revoker_epoch_buf[2*16 + 2 + 1]; /* 0x + number + NUL */
-
-	if (procstat_get_revoker_epoch(procstat, kipp, &epoch) == 0) {
-		switch (epoch) {
-		case (uint64_t)-1:
-			return ("na");
-		default:
-			snprintf(revoker_epoch_buf, sizeof(revoker_epoch_buf),
-			    "%ju", (uintmax_t)epoch);
-			return (revoker_epoch_buf);
-		}
-	} else {
-		return ("-");
-	}
-
-}
-
-static const char *
-get_revoker_state(struct procstat *procstat, struct kinfo_proc *kipp)
-{
-	int state;
-
-	if (procstat_get_revoker_state(procstat, kipp, &state) == 0) {
-		switch (state) {
-		case CHERI_REVOKE_ST_NONE:
-			return ("none");
-		case CHERI_REVOKE_ST_INITING:
-			return ("initing");
-		case CHERI_REVOKE_ST_INITED:
-			return ("inited");
-		case CHERI_REVOKE_ST_CLOSING:
-			return ("closing");
-		case -1:
-			return ("!");
-		default:
-			warnx("%s: unknown quarantining status", __func__);
-			return ("?");
-		}
-	} else {
-		return ("-");
-	}
 }
 
 static const char *

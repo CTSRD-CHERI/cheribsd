@@ -291,6 +291,13 @@ procstat_auxv(struct procstat *procstat, struct kinfo_proc *kipp)
 			    fmt_ptr(auxv[i].a_un.a_ptr));
 			break;
 #endif
+#ifdef AT_CHERI_MRS
+		case AT_CHERI_MRS:
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_CHERI_MRS/%s}\n",
+			    prefix, "AT_CHERI_MRS",
+			    fmt_ptr(auxv[i].a_un.a_ptr));
+			break;
+#endif
 		default:
 			xo_emit("{dw:/%s}{Lw:/%16ld/%ld}{:UNKNOWN/%#lx}\n",
 			    prefix, auxv[i].a_type, auxv[i].a_un.a_val);
