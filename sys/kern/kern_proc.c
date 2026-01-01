@@ -111,6 +111,7 @@
 #if __has_feature(capabilities)
 #include <cheri/c18n.h>
 #include <cheri/cheric.h>
+#include <cheri/cheri_mrs.h>
 #endif
 
 SDT_PROVIDER_DEFINE(proc);
@@ -2766,6 +2767,58 @@ out:
 	PRELE(p);
 	return (error);
 }
+
+/*
+ * Return heap and mrs statistics block from the target process.
+ *
+ * XXXRW: Probably storage for 'stats' should be heap allocated, not stack
+ * allocated, in case of substantial future growth.
+ */
+static int
+sysctl_kern_proc_cheri_mrs_stats(SYSCTL_HANDLER_ARGS)
+{
+	int *name = (int *)arg1;
+	u_int namelen = arg2;
+	struct proc *p;
+	struct cheri_mrs_stats stats;
+	int error;
+	ssize_t n;
+
+	if (namelen != 1)
+		return (EINVAL);
+
+	error = pget((pid_t)name[0], PGET_WANTREAD, &p);
+	if (error != 0)
+		return (error);
+
+	if ((p->p_flag & P_SYSTEM) != 0 ||
+	    SV_PROC_FLAG(p, SV_CHERI) == 0 ||
+	    p->p_cheri_mrs_stats == NULL)
+		goto out;
+
+	n = proc_readmem(curthread, p, (vm_offset_t)p->p_cheri_mrs_stats,
+	    &stats, sizeof(stats));
+	if (n != sizeof(stats)) {
+		error = EFAULT;
+		goto out;
+	}
+
+	/*
+	 * If there is a version mismatch or the statistics block is oversized,
+	 * error out.
+	 */
+	if (stats.cms_version != CHERI_MRS_STATS_VERSION ||
+	    stats.cms_size == 0 ||
+	    stats.cms_size > CHERI_MRS_STATS_MAX_SIZE) {
+		error = ENOEXEC;
+		goto out;
+	}
+
+	error = SYSCTL_OUT(req, &stats, stats.cms_size);
+out:
+	PRELE(p);
+	return (error);
+}
 #endif
 
 /*
@@ -4010,6 +4063,10 @@ static SYSCTL_NODE(_kern_proc, KERN_PROC_C18N_STATS, c18n, CTLFLAG_RD |
 static SYSCTL_NODE(_kern_proc, KERN_PROC_C18N_COMPARTS, c18n_compartments,
 	CTLFLAG_RD | CTLFLAG_MPSAFE, sysctl_kern_proc_c18n_compartments,
 	"Compartment list");
+
+static SYSCTL_NODE(_kern_proc, KERN_PROC_CHERI_MRS_STATS, cheri_mrs_stats,
+	CTLFLAG_RD | CTLFLAG_MPSAFE, sysctl_kern_proc_cheri_mrs_stats,
+	"Heap and mrs statistics");
 #endif
 
 static SYSCTL_NODE(_kern_proc, KERN_PROC_PATHNAME, pathname, CTLFLAG_RD |

@@ -1,10 +1,16 @@
 /*-
  * Copyright (c) 2019 Brett F. Gutstein
+ * Copyright (c) 2025 Capabilities Limited
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
  * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
  * DARPA SSITH research programme.
+ *
+ * This software was developed by SRI International, the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology), and Capabilities Limited under Defense Advanced Research
+ * Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +35,7 @@
  */
 
 #include <sys/param.h>
+#include <sys/auxv.h>
 #include <sys/ktrace.h>
 #include <sys/mman.h>
 #include <sys/tree.h>
@@ -37,8 +44,10 @@
 #include <sys/queue.h>
 #include <sys/sysctl.h>
 
+#include <cheri/cheric.h>
 #include <cheri/revoke.h>
 #include <cheri/libcaprevoke.h>
+#include <cheri/cheri_mrs.h>
 
 #include <machine/vmparam.h>
 
@@ -321,6 +330,11 @@ static bool mrs_initialized = false;
 static unsigned int quarantine_denominator = QUARANTINE_DENOMINATOR;
 static unsigned int quarantine_numerator = QUARANTINE_NUMERATOR;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static struct cheri_mrs_stats cheri_mrs_stats_dummy;
+static struct cheri_mrs_stats *cmsp = &cheri_mrs_stats_dummy;
+#endif
+
 static spinlock_t mrs_init_lock = _SPINLOCK_INITIALIZER;
 #define	MRS_LOCK(x)	__extension__ ({	\
 	if (__isthreaded)			\
@@ -597,6 +611,8 @@ increment_allocated_size(void *allocated)
 	if (allocated_size > max_allocated_size) {
 		max_allocated_size = allocated_size;
 	}
+	atomic_store(&cmsp->cms_mrs_allocated_size, allocated_size);
+	atomic_store(&cmsp->cms_mrs_max_allocated_size, max_allocated_size);
 }
 
 static inline void
@@ -832,6 +848,9 @@ app_quarantine_revoke_async(void)
 	mrs_unlock(&app_quarantine_lock);
 
 	(void)cheri_revoke(CHERI_REVOKE_ASYNC, epoch, NULL);
+#ifdef __CHERI_PURE_CAPABILITY__
+	atomic_store(&cmsp->cms_mrs_epoch, epoch);
+#endif
 
 	/*
 	 * Is it possible that some of the pending revocation work has finished?
@@ -1027,6 +1046,15 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 
 	size_t utrace_allocated_size = 0;
 	if (prev != NULL) {
+#ifdef __CHERI_PURE_CAPABILITY__
+		atomic_fetch_add(&cmsp->cms_mrs_count_returned, 1);
+		atomic_fetch_add(&cmsp->cms_mrs_bytes_returned, quarantine->size);
+
+		atomic_fetch_sub(&cmsp->cms_mrs_count_inquarantine, 1);
+		atomic_fetch_sub(&cmsp->cms_mrs_bytes_inquarantine,
+		    quarantine->size);
+#endif
+
 		/* Free the quarantined descriptors. */
 		prev->next = free_descriptor_slabs;
 		while (!atomic_compare_exchange_weak(&free_descriptor_slabs,
@@ -1037,6 +1065,10 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 		allocated_size -= quarantine->size;
 		utrace_allocated_size += quarantine->size;
 		quarantine->size = 0;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+		atomic_store(&cmsp->cms_mrs_allocated_size, allocated_size);
+#endif
 	}
 	mrs_debug_printf("quarantine_flush: flushed, allocated_size %zu quarantine->size %zu\n",
 	    allocated_size, quarantine->size);
@@ -1066,6 +1098,9 @@ quarantine_revoke(struct mrs_quarantine *quarantine)
 		cyc_init = cheri_revoke_get_cyc();
 		(void)cheri_revoke(CHERI_REVOKE_TAKE_STATS, epoch, &crsi);
 		cyc_fini = cheri_revoke_get_cyc();
+#ifdef __CHERI_PURE_CAPABILITY__
+		atomic_store(&cmsp->cms_mrs_epoch, epoch);
+#endif
 		print_cheri_revoke_stats("load-barrier", &crsi,
 		    cyc_fini - cyc_init);
 
@@ -1082,6 +1117,9 @@ quarantine_revoke(struct mrs_quarantine *quarantine)
 		(void)cheri_revoke(
 		    CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS,
 		    start_epoch, NULL);
+#ifdef __CHERI_PURE_CAPABILITY__
+		atomic_store(&cmsp->cms_mrs_epoch, start_epoch);
+#endif
 # endif /* !PRINT_CAPREVOKE */
 	}
 	MRS_UTRACE(UTRACE_MRS_QUARANTINE_REVOKE_DONE, NULL, 0, 0, NULL);
@@ -1438,6 +1476,29 @@ mrs_init_impl_locked(void)
 	}
 	app_quarantine = &app_quarantine_store[0];
 
+	/*
+	 * Initial export of stats, to be updated on various allocation/etc.
+	 * events.
+	 */
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (_elf_aux_info(AT_CHERI_MRS, &cmsp, sizeof(cmsp)) < 0)
+		mrs_puts("error getting AT_CHERI_MRS\n");
+	cmsp->cms_mrs_arenas = APP_QUARANTINE_ARENAS;
+	cmsp->cms_mrs_quarantine_numerator = quarantine_numerator;
+	cmsp->cms_mrs_quarantine_denominator = quarantine_denominator;
+	cmsp->cms_mrs_revocation_minimum = MIN_REVOKE_HEAP_SIZE;
+	if (quarantining)
+		cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_QUARANTINING;
+	if (revoke_every_free)
+		cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_EVERYFREE;
+	if (revoke_async)
+		cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_ASYNCREVOKE;
+	if (abort_on_validation_failure)
+		cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_ABORTONFAIL;
+	if (bound_pointers)
+		cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_BOUNDPTRS;
+#endif
+
 nosys:
 	mrs_initialized = true;
 
@@ -1538,6 +1599,14 @@ mrs_malloc(size_t size)
 	/*mrs_debug_printf("mrs_malloc: called size 0x%zx, allocation %#p\n",
 	    size, allocated_region);*/
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	atomic_fetch_add(&cmsp->cms_mrs_count_allocated, 1);
+	atomic_fetch_add(&cmsp->cms_mrs_bytes_allocated,
+	    cheri_length_get(allocated_region));
+	atomic_fetch_add(&cmsp->cms_mrs_count_inheap, 1);
+	atomic_fetch_add(&cmsp->cms_mrs_bytes_inheap,
+	    cheri_length_get(allocated_region));
+#endif
 	MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, allocated_region);
 	return (allocated_region);
 }
@@ -1596,6 +1665,14 @@ mrs_calloc(size_t number, size_t size)
 	 */
 	/*mrs_debug_printf("mrs_calloc: exit called %d size 0x%zx address %p\n", number, size, allocated_region);*/
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	atomic_fetch_add(&cmsp->cms_mrs_count_allocated, 1);
+	atomic_fetch_add(&cmsp->cms_mrs_bytes_allocated,
+	    cheri_length_get(allocated_region));
+	atomic_fetch_add(&cmsp->cms_mrs_count_inheap, 1);
+	atomic_fetch_add(&cmsp->cms_mrs_bytes_inheap,
+	    cheri_length_get(allocated_region));
+#endif
 	MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number, allocated_region);
 	return (allocated_region);
 }
@@ -1638,6 +1715,12 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 
 	increment_allocated_size(*ptr);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	atomic_fetch_add(&cmsp->cms_mrs_count_allocated, 1);
+	atomic_fetch_add(&cmsp->cms_mrs_bytes_allocated, cheri_length_get(*ptr));
+	atomic_fetch_add(&cmsp->cms_mrs_count_inheap, 1);
+	atomic_fetch_add(&cmsp->cms_mrs_bytes_inheap, cheri_length_get(*ptr));
+#endif
 	MRS_UTRACE(UTRACE_MRS_POSIX_MEMALIGN, NULL, size, alignment, *ptr);
 	return (ret);
 }
@@ -1677,6 +1760,14 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 
 	increment_allocated_size(allocated_region);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	atomic_fetch_add(&cmsp->cms_mrs_count_allocated, 1);
+	atomic_fetch_add(&cmsp->cms_mrs_bytes_allocated,
+	    cheri_length_get(allocated_region));
+	atomic_fetch_add(&cmsp->cms_mrs_count_inheap, 1);
+	atomic_fetch_add(&cmsp->cms_mrs_bytes_inheap,
+	    cheri_length_get(allocated_region));
+#endif
 	MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 	    allocated_region);
 	return (allocated_region);
@@ -1771,6 +1862,17 @@ mrs_free(void *ptr)
 
 #ifdef CLEAR_ON_FREE
 	bzero(cheri_offset_set(ptr, 0), cheri_length_get(ptr));
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	atomic_fetch_add(&cmsp->cms_mrs_count_freed, 1);
+	atomic_fetch_add(&cmsp->cms_mrs_bytes_freed, cheri_length_get(ins));
+
+	atomic_fetch_sub(&cmsp->cms_mrs_count_inheap, 1);
+	atomic_fetch_sub(&cmsp->cms_mrs_bytes_inheap, cheri_length_get(ins));
+	atomic_fetch_add(&cmsp->cms_mrs_count_inquarantine, 1);
+	atomic_fetch_add(&cmsp->cms_mrs_bytes_inquarantine,
+	    cheri_length_get(ins));
 #endif
 
 	mrs_lock(&app_quarantine_lock);

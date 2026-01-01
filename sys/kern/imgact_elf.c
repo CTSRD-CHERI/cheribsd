@@ -1983,6 +1983,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	stacksz = imgp->proc->p_limit->pl_rlimit[RLIMIT_STACK].rlim_cur;
 	AUXARGS_ENTRY(pos, AT_USRSTACKLIM, stacksz);
 	AUXARGS_ENTRY_PTR(pos, AT_CHERI_C18N, imgp->c18n_info);
+	AUXARGS_ENTRY_PTR(pos, AT_CHERI_MRS, imgp->cheri_mrs_stats);
 	AUXARGS_ENTRY(pos, AT_NULL, 0);
 
 	free(imgp->auxargs, M_TEMP);
