@@ -580,7 +580,7 @@ ATOMIC_CMPSET(ptr);
 ATOMIC_FCMPSET(ptr);
 
 static __inline uintptr_t
-atomic_load_acq_ptr(volatile uintptr_t *p)
+atomic_load_acq_ptr(const volatile uintptr_t *p)
 {
 
 	return (__atomic_load_n(p, __ATOMIC_ACQUIRE));
