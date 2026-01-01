@@ -102,6 +102,7 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #include <cheri/cherireg.h>
+#include <cheri/cheri_mrs.h>
 #endif
 
 #ifdef KDTRACE_HOOKS
@@ -2046,6 +2047,16 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	    cheri_bounds_set_exact(destp, sizeof(*imgp->c18n_info));
 	p->p_c18n_info =
 	    (__cheri_fromcap struct cheri_c18n_info *)imgp->c18n_info;
+
+	/*
+	 * Allocate the mrs statistics header.
+	 */
+	destp -= sizeof(*imgp->cheri_mrs_stats);
+	destp = rounddown2(destp, sizeof(void * __capability));
+	imgp->cheri_mrs_stats = (struct cheri_mrs_stats * __kerncap)
+	    cheri_bounds_set_exact(destp, sizeof(*imgp->cheri_mrs_stats));
+	p->p_cheri_mrs_stats =
+	    (__cheri_fromcap struct cheri_mrs_stats *)imgp->cheri_mrs_stats;
 #endif
 
 	if (imgp->auxargs) {
