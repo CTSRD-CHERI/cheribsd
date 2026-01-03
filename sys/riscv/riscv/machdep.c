@@ -129,9 +129,7 @@ cpuset_t all_harts;
 
 extern int *end;
 
-#ifdef FDT
 static char static_kenv[PAGE_SIZE];
-#endif
 
 /*
  * When emulating RISC-V boards under QEMU, ISA-level tracing can be enabled and
@@ -541,10 +539,8 @@ parse_metadata(void)
 #endif
 #ifdef FDT
 	try_load_dtb();
-	if (kern_envp == NULL) {
-		init_static_kenv(static_kenv, sizeof(static_kenv));
+	if (kern_envp == NULL)
 		parse_fdt_bootargs();
-	}
 #endif
 	return (lastaddr);
 }
