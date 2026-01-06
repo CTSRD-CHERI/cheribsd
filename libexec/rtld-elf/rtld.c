@@ -1519,8 +1519,7 @@ create_pcc_caps(Obj_Entry *obj, const char *name)
 	const char *pcc_cap;
 	unsigned long i, j;
 
-	for (ph = obj->phdr;
-	    (const char *)ph < (const char *)obj->phdr + obj->phsize; ph++) {
+	for (ph = obj->phdr; ph < obj->phdr + obj->phnum; ph++) {
 		switch (ph->p_type) {
 		case PT_CHERI_PCC:
 			obj->npcc_caps++;
@@ -1533,8 +1532,7 @@ create_pcc_caps(Obj_Entry *obj, const char *name)
 
 	i = 0;
 	obj->pcc_caps = xcalloc(obj->npcc_caps, sizeof(*obj->pcc_caps));
-	for (ph = obj->phdr;
-	    (const char *)ph < (const char *)obj->phdr + obj->phsize; ph++) {
+	for (ph = obj->phdr; ph < obj->phdr + obj->phnum; ph++) {
 		switch (ph->p_type) {
 		case PT_CHERI_PCC:
 			pcc_cap = obj->text_rodata_cap + ph->p_vaddr;
@@ -2105,7 +2103,7 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	set_bounds_if_nonnull(obj->c18nstrtab, obj->c18nstrsize);
 #endif
 	set_bounds_if_nonnull(obj->strtab, obj->strsize);
-	set_bounds_if_nonnull(obj->phdr, obj->phsize);
+	set_bounds_if_nonnull(obj->phdr, obj->phnum * sizeof(*obj->phdr));
 
 	set_bounds_if_nonnull(obj->preinit_array_ptr,
 	    obj->preinit_array_num * sizeof(InitArrayEntry));
@@ -2155,7 +2153,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 		if (ph->p_type != PT_PHDR)
 			continue;
 
-		obj->phsize = ph->p_memsz;
+		obj->phnum = ph->p_memsz / sizeof(*ph);
 #ifdef __CHERI_PURE_CAPABILITY__
 		obj->phdr = cheri_bounds_set(phdr, ph->p_memsz);
 #else
@@ -2947,8 +2945,7 @@ parse_rtld_phdr(Obj_Entry *obj)
 #ifndef __CHERI_PURE_CAPABILITY__
 	obj->stack_flags = PF_X | PF_R | PF_W;
 #endif
-	for (ph = obj->phdr;
-	    (const char *)ph < (const char *)obj->phdr + obj->phsize; ph++) {
+	for (ph = obj->phdr; ph < obj->phdr + obj->phnum; ph++) {
 		switch (ph->p_type) {
 		case PT_LOAD:
 			if (first_seg) {
@@ -3020,7 +3017,7 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	assert(!objtmp.textrel);
 	ehdr = (Elf_Ehdr *)mapbase;
 	objtmp.phdr = (Elf_Phdr *)((char *)mapbase + ehdr->e_phoff);
-	objtmp.phsize = ehdr->e_phnum * sizeof(objtmp.phdr[0]);
+	objtmp.phnum = ehdr->e_phnum;
 #if __has_feature(capabilities)
 	/* This was done in _rtld_do___caprelocs_self */
 	objtmp.cap_relocs_processed = true;
@@ -3524,7 +3521,7 @@ load_kpreload(const void *addr)
 	obj = obj_new();
 	phdr = (const Elf_Phdr *)((const char *)addr + ehdr->e_phoff);
 	obj->phdr = phdr;
-	obj->phsize = ehdr->e_phnum * sizeof(*phdr);
+	obj->phnum = ehdr->e_phnum;
 	phlimit = phdr + ehdr->e_phnum;
 	seg0 = segn = NULL;
 
@@ -3945,10 +3942,10 @@ reloc_textrel_prot(Obj_Entry *obj, bool before)
 {
 	const Elf_Phdr *ph;
 	void *base;
-	size_t l, sz;
+	size_t sz;
 	int prot;
 
-	for (l = obj->phsize / sizeof(*ph), ph = obj->phdr; l > 0; l--, ph++) {
+	for (ph = obj->phdr; ph < obj->phdr + obj->phnum; ph++) {
 		if (ph->p_type != PT_LOAD || (ph->p_flags & PF_W) != 0)
 			continue;
 		base = obj->relocbase + rtld_trunc_page(ph->p_vaddr);
@@ -4998,7 +4995,7 @@ rtld_fill_dl_phdr_info(const Obj_Entry *obj, struct dl_phdr_info *phdr_info)
 	phdr_info->dlpi_phdr = obj->phdr;
 #endif
 	phdr_info->dlpi_name = obj->path;
-	phdr_info->dlpi_phnum = obj->phsize / sizeof(obj->phdr[0]);
+	phdr_info->dlpi_phnum = obj->phnum;
 	phdr_info->dlpi_tls_modid = obj->tlsindex;
 	phdr_info->dlpi_tls_data = (char *)tls_get_addr_slow(_tcb_get(),
 	    obj->tlsindex, 0, true);
@@ -6565,8 +6562,7 @@ validate_c18nstrtab(const Obj_Entry *obj)
 			return (false);
 	}
 
-	for (ph = obj->phdr;
-	    (const char *)ph < (const char *)obj->phdr + obj->phsize; ph++) {
+	for (ph = obj->phdr; ph < obj->phdr + obj->phnum; ph++) {
 		switch (ph->p_type) {
 		case PT_C18N_NAME:
 			if (obj->c18nstrtab == NULL ||
@@ -6589,8 +6585,7 @@ c18n_setup_compartments(Obj_Entry *obj, const char *name, int flags)
 	assert(obj->default_compart_id == 0);
 	obj->default_compart_id = compart_id_allocate(name, flags);
 
-	for (ph = obj->phdr;
-	    (const char *)ph < (const char *)obj->phdr + obj->phsize; ph++) {
+	for (ph = obj->phdr; ph < obj->phdr + obj->phnum; ph++) {
 		switch (ph->p_type) {
 		case PT_C18N_NAME:
 			obj->ncomparts++;
@@ -6603,8 +6598,7 @@ c18n_setup_compartments(Obj_Entry *obj, const char *name, int flags)
 
 	obj->comparts = xcalloc(obj->ncomparts, sizeof(*obj->comparts));
 	compart = obj->comparts;
-	for (ph = obj->phdr;
-	    (const char *)ph < (const char *)obj->phdr + obj->phsize; ph++) {
+	for (ph = obj->phdr; ph < obj->phdr + obj->phnum; ph++) {
 		switch (ph->p_type) {
 		case PT_C18N_NAME:
 			compart->obj = obj;
@@ -6985,8 +6979,7 @@ obj_remap_relro(Obj_Entry *obj, int prot)
 	caddr_t relro_page;
 	size_t relro_size;
 
-	for (ph = obj->phdr; (const char *)ph < (const char *)obj->phdr +
-	    obj->phsize; ph++) {
+	for (ph = obj->phdr; ph < obj->phdr + obj->phnum; ph++) {
 		if (ph->p_type != PT_GNU_RELRO)
 			continue;
 		relro_page = obj->relocbase + rtld_trunc_page(ph->p_vaddr);
