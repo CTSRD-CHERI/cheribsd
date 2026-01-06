@@ -79,10 +79,10 @@ static struct resource_spec ccache_spec[] = {
  * Non-standard EIC7700 cache-flushing routine.
  */
 static void
-ccache_flush_range(vm_offset_t start, size_t len)
+ccache_flush_range(vm_pointer_t start, size_t len)
 {
-	vm_offset_t paddr;
-	vm_offset_t sva;
+	vm_pointer_t paddr;
+	vm_pointer_t sva;
 	vm_offset_t step;
 	uint64_t line;
 
