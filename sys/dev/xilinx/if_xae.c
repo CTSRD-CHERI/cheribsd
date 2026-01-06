@@ -958,8 +958,8 @@ xae_setup_dma(struct xae_softc *sc)
 	int error;
 	int idx;
 
-	sc->rxbuf_align = PAGE_SIZE;
-	sc->txbuf_align = PAGE_SIZE;
+	sc->rxbuf_align = 1;
+	sc->txbuf_align = 16;
 
 	/*
 	 * Set up TX descriptor ring, descriptors, and dma maps.
@@ -1066,7 +1066,7 @@ xae_setup_dma(struct xae_softc *sc)
 
 	error = bus_dma_tag_create(
 	    bus_get_dma_tag(sc->dev),	/* Parent tag. */
-	    1, 0,			/* alignment, boundary */
+	    sc->rxbuf_align, 0,		/* alignment, boundary */
 	    BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
 	    BUS_SPACE_MAXADDR,		/* highaddr */
 	    NULL, NULL,			/* filter, filterarg */
