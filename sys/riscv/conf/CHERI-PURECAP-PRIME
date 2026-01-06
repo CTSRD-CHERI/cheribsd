@@ -1,13 +1,13 @@
 #NO_UNIVERSE
 
 include "GENERIC"
-# include "std.MFS-ROOT"
-include "std.CHERI-PURECAP"
+#include "std.MFS-ROOT"
 
+include "std.CHERI-PURECAP"
 ident CHERI-PURECAP-PRIME
 
 options 	FDT
-options         HZ=100
+options		HZ=100
 
 nooptions	CHERI_CAPREVOKE_NO_CLEAN
 options		CHERI_CAPREVOKE_TWOSTAGE_CLEAN
@@ -15,8 +15,10 @@ options		CHERI_CAPREVOKE_TWOSTAGE_CLEAN
 options		FDT_DTB_STATIC
 makeoptions	FDT_DTS_FILE=prime-up.dts
 
-options		HWC_HOOKS
-device		hwc
+#options		HWC_HOOKS
+#device		hwc
 
 #options	EARLY_PRINTF=sbi
 device		xlnx_pcib
+
+options 	ROOTDEVNAME=\"ufs:/dev/nda0p2\"
