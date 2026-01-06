@@ -286,7 +286,7 @@ int dl_iterate_phdr(__dl_iterate_hdr_callback, void *) __exported;
 int _rtld_addr_phdr(const void *, struct dl_phdr_info *) __exported;
 int _rtld_get_stack_prot(void) __exported;
 int _rtld_is_dlopened(void *) __exported;
-void _rtld_error(const char *, ...) __exported __printflike(1, 2);
+void _rtld_error(const char *, ...) __exported;
 const char *rtld_get_var(const char *name) __exported;
 int rtld_set_var(const char *name, const char *val) __exported;
 
