@@ -3498,6 +3498,15 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
+	/* freebsd64_msetname */
+	case 592: {
+		struct freebsd64_msetname_args *p = params;
+		uarg[a++] = (intcap_t)p->addr; /* void * */
+		uarg[a++] = p->len; /* size_t */
+		uarg[a++] = (intcap_t)p->name; /* const char * */
+		*n_args = 3;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -9359,6 +9368,22 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* freebsd64_msetname */
+	case 592:
+		switch (ndx) {
+		case 0:
+			p = "userland void *";
+			break;
+		case 1:
+			p = "size_t";
+			break;
+		case 2:
+			p = "userland const char *";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -11354,6 +11379,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* freebsd64_setcred */
 	case 591:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* freebsd64_msetname */
+	case 592:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

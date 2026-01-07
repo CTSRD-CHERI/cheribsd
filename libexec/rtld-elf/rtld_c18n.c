@@ -759,6 +759,7 @@ create_stk(size_t size)
 	stk = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_STACK, -1, 0);
 	if (stk == MAP_FAILED)
 		rtld_fatal("mmap failed");
+	(void)msetname(stk, size, "rtld:c18n_stack");
 
 	return (stk + size);
 }
@@ -1137,6 +1138,7 @@ tramp_pg_new(struct tramp_pg *next)
 	    -1, 0);
 	if (pg == MAP_FAILED)
 		rtld_fatal("mmap failed");
+	(void)msetname(pg, capacity, "rtld:c18n_tramp");
 	SLIST_NEXT(pg, link) = next;
 	atomic_store_explicit(&pg->size, 0, memory_order_relaxed);
 	pg->capacity = capacity - offsetof(typeof(*pg), trampolines);
@@ -1764,6 +1766,7 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 	    fd == -1 ? MAP_ANON : MAP_SHARED, fd, 0);
 	if (c18n_stats == MAP_FAILED)
 		rtld_fatal("c18n: Cannot mmap file (%s)", rtld_strerror(errno));
+	(void)msetname(c18n_stats, sizeof(*c18n_stats), "rtld:c18n_stats");
 	atomic_store_explicit(&c18n_stats->version, RTLD_C18N_STATS_VERSION,
 	    memory_order_release);
 

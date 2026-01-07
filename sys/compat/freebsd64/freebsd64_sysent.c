@@ -659,4 +659,5 @@ struct sysent freebsd64_sysent[] = {
 	{ .sy_narg = AS(freebsd64_getrlimitusage_args), .sy_call = (sy_call_t *)freebsd64_getrlimitusage, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 589 = freebsd64_getrlimitusage */
 	{ .sy_narg = AS(fchroot_args), .sy_call = (sy_call_t *)sys_fchroot, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 590 = fchroot */
 	{ .sy_narg = AS(freebsd64_setcred_args), .sy_call = (sy_call_t *)freebsd64_setcred, .sy_auevent = AUE_SETCRED, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 591 = freebsd64_setcred */
+	{ .sy_narg = AS(freebsd64_msetname_args), .sy_call = (sy_call_t *)freebsd64_msetname, .sy_auevent = AUE_MSETNAME, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 592 = freebsd64_msetname */
 };

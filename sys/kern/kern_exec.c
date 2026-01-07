@@ -1407,18 +1407,18 @@ exec_map_stack(struct image_params *imgp)
 			    __func__, error, vm_mmap_to_errno(error));
 		}
 
-		error = vm_map_find(map, obj, 0,
+		error = vm_map_find_name(map, obj, 0,
 		    &sharedpage_addr, sv->sv_shared_page_len,
 		    sv->sv_maxuser, VMFS_ANY_SPACE,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
-		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE);
+		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE, "kernel:vdso");
 	} else {
-		vm_map_fixed(map, obj, 0, sv->sv_shared_page_base,
+		vm_map_fixed_name(map, obj, 0, sv->sv_shared_page_base,
 		    &sharedpage_addr, sv->sv_shared_page_len,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
-		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE);
+		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE, "kernel:vdso");
 	}
 	if (error != KERN_SUCCESS) {
 		uprintf("%s: mapping shared page at addr: %p"

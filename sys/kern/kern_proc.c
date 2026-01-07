@@ -3271,6 +3271,15 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 			kve->kve_shadow_count = 0;
 		}
 
+		/*
+		 * If an object type hasn't provided a name, but the mapping
+		 * has provided one, use the mapping's name.
+		 */
+		if (kve->kve_path[0] == '\0' && entry->name[0] != '\0') {
+			strlcpy(kve->kve_path, entry->name,
+			    sizeof(kve->kve_path));
+		}
+
 		/* Pack record size down */
 		if ((flags & KERN_VMMAP_PACK_KINFO) != 0)
 			kve->kve_structsize =

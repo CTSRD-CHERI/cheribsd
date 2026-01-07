@@ -1510,6 +1510,62 @@ done2:
 }
 
 #ifndef _SYS_SYSPROTO_H_
+struct msetname_args {
+	const void *addr;
+	size_t len;
+	const char *name;
+};
+#endif
+
+int
+sys_msetname(struct thread *td, struct msetname_args *uap)
+{
+
+#if __has_feature(capabilities)
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (EPROT);
+	if ((cheri_perms_get(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
+		return (EPROT);
+#endif
+
+	return (kern_msetname(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
+	    uap->name));
+}
+
+int
+kern_msetname(struct thread *td, uintptr_t addr0, size_t len,
+    const char *name)
+{
+	char lname[MAP_ENTRY_NAME_LEN];
+	vm_offset_t addr;
+	vm_size_t size, pageoff;
+	int error;
+
+	addr = (vm_offset_t)addr0;
+	size = len;
+
+	pageoff = (addr & PAGE_MASK);
+	addr -= pageoff;
+	size += pageoff;
+	size = (vm_size_t) round_page(size);
+	if (addr + size < addr)
+		return (EINVAL);
+
+	error = copyinstr(name, lname, sizeof(lname), NULL);
+	if (error != 0)
+		return (error);
+
+	switch (vm_map_msetname(&td->td_proc->p_vmspace->vm_map, addr,
+	    addr + size, lname)) {
+	case KERN_SUCCESS:
+		return (0);
+	case KERN_PROTECTION_FAILURE:
+		return (EACCES);
+	}
+	return (EINVAL);
+}
+
+#ifndef _SYS_SYSPROTO_H_
 struct mlock_args {
 	const void *addr;
 	size_t len;

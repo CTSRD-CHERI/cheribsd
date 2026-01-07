@@ -597,4 +597,5 @@ const char *syscallnames[] = {
 	"getrlimitusage",			/* 589 = getrlimitusage */
 	"fchroot",			/* 590 = fchroot */
 	"setcred",			/* 591 = setcred */
+	"msetname",			/* 592 = msetname */
 };

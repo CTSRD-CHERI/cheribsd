@@ -414,6 +414,7 @@ static int sysargmask[] = {
 	[SYS_getrlimitusage] = (0x0 | 0x4),
 	[SYS_fchroot] = (0x0),
 	[SYS_setcred] = (0x0 | 0x2),
+	[SYS_msetname] = (0x0 | 0x1 | 0x4),
 };
 
 #endif /* !_SYSARGMAP_H_ */

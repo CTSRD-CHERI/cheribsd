@@ -111,6 +111,8 @@ os_pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
 		os_pages_unmap(ret, size);
 		ret = NULL;
 	}
+	if (ret != NULL)
+		(void)msetname(ret, size, "jemalloc:os_pages_map");
 #endif
 	assert(ret == NULL || (addr == NULL && ret != addr) || (addr != NULL &&
 	    ret == addr));
@@ -231,8 +233,9 @@ pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
 		void *ret = mmap(addr, size, prot, flags, -1, 0);
 		if (ret == MAP_FAILED) {
 			ret = NULL;
+		} else {
+			(void)msetname(ret, size, "jemalloc:pages_map");
 		}
-
 		return ret;
 	}
 #endif
@@ -300,6 +303,7 @@ pages_commit_impl(void *addr, size_t size, bool commit) {
 			os_pages_unmap(result, size);
 			return true;
 		}
+		(void)msetname(result, size, "jemalloc:pages_commit_impl");
 		return false;
 	}
 #endif

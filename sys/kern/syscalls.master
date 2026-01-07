@@ -3384,5 +3384,12 @@
 		    size_t size
 		);
 	}
+592	AUE_MSETNAME	STD|CAPENABLED {
+		int msetname(
+		    _In_ void *addr,
+		    size_t len,
+		    _In_z_ const char *name
+		);
+	}
 
 ; vim: syntax=off

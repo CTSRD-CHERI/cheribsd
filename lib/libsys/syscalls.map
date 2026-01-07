@@ -815,4 +815,6 @@ FBSDprivate_1.0 {
 	__sys_fchroot;
 	_setcred;
 	__sys_setcred;
+	_msetname;
+	__sys_msetname;
 };

@@ -550,8 +550,9 @@ kern_shmat_locked(struct thread *td, int shmid,
 	max_va = 0;
 #endif
 	vm_object_reference(shmseg->object);
-	rv = vm_map_find(&p->p_vmspace->vm_map, shmseg->object, 0, &attach_va,
-	    size, max_va, find_space, prot, prot, cow);
+	rv = vm_map_find_name(&p->p_vmspace->vm_map, shmseg->object, 0,
+	    &attach_va, size, max_va, find_space, prot, prot, cow,
+	    "kernel:sysv_shm");
 	if (rv != KERN_SUCCESS) {
 		vm_object_deallocate(shmseg->object);
 		return (ENOMEM);

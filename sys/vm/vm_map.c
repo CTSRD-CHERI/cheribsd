@@ -1856,7 +1856,7 @@ vm_map_lookup_entry(
 static int
 vm_map_insert1(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
     vm_pointer_t start, vm_pointer_t end, vm_prot_t prot, vm_prot_t max, int cow,
-    vm_offset_t reservation, vm_map_entry_t *res)
+    vm_offset_t reservation, vm_map_entry_t *res, const char *name)
 {
 	vm_map_entry_t new_entry, next_entry, prev_entry;
 	struct ucred *cred;
@@ -2082,6 +2082,33 @@ charged:
 
 	new_entry->eflags = protoeflags;
 	new_entry->object.vm_object = object;
+
+	/*
+	 * If a specific name is requested, use that.  Otherwise, for entries
+	 * with NULL objects, try to derive a suitable name from the entry's
+	 * flags.
+	 */
+	if (name != NULL )
+		strlcpy(new_entry->name, name, sizeof(new_entry->name));
+#if 0
+	else if (new_entry->object.vm_object == NULL &&
+	    (new_entry->eflags & MAP_ENTRY_GUARD) != 0)
+		strlcpy(new_entry->name, "kernel:vm_guard",
+		    sizeof(new_entry->name));
+	else if (new_entry->object.vm_object == NULL &&
+	    (new_entry->eflags & MAP_ENTRY_STACK_GAP) != 0)
+		strlcpy(new_entry->name, "kernel:vm_stackgap",
+		    sizeof(new_entry->name));
+	else if (new_entry->object.vm_object == NULL &&
+	    (new_entry->eflags & MAP_ENTRY_GROWS_DOWN) != 0)
+		strlcpy(new_entry->name, "kernel:vm_stack",
+		    sizeof(new_entry->name));
+#endif
+	else if (new_entry->object.vm_object == NULL)
+		strlcpy(new_entry->name, "kernel:vm_anon",
+		    sizeof(new_entry->name));
+	else
+		new_entry->name[0] = '\0';
 	new_entry->offset = offset;
 
 	new_entry->inheritance = inheritance;
@@ -2155,7 +2182,24 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	vm_map_entry_t res;
 
 	return (vm_map_insert1(map, object, offset, start, end, prot, max,
-	    cow, reservation, &res));
+	    cow, reservation, &res, NULL));
+}
+
+/*
+ *	vm_map_insert_name:
+ *
+ *	Identical to vm_map_insert() but accepts a string name for
+ *	the new map entry.
+ */
+int
+vm_map_insert_name(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
+    vm_pointer_t start, vm_pointer_t end, vm_prot_t prot, vm_prot_t max,
+    int cow, vm_offset_t reservation, const char *name)
+{
+	vm_map_entry_t res;
+
+	return (vm_map_insert1(map, object, offset, start, end, prot, max,
+	    cow, reservation, &res, name));
 }
 
 /*
@@ -2287,6 +2331,16 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
     vm_pointer_t start, vm_pointer_t *reservp /* OUT */, vm_size_t length,
     vm_prot_t prot, vm_prot_t max, int cow)
 {
+
+	return (vm_map_fixed_name(map, object, offset, start, reservp, length,
+	    prot, max, cow, NULL));
+}
+
+int
+vm_map_fixed_name(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
+    vm_pointer_t start, vm_pointer_t *reservp /* OUT */, vm_size_t length,
+    vm_prot_t prot, vm_prot_t max, int cow, const char *name)
+{
 	vm_pointer_t end;
 	vm_offset_t reservation_id = start;
 	int result;
@@ -2350,8 +2404,8 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		result = vm_map_stack_locked(map, start, length, sgrowsiz,
 		    prot, max, cow);
 	} else {
-		result = vm_map_insert(map, object, offset, start, end,
-		    prot, max, cow, reservation_id);
+		result = vm_map_insert_name(map, object, offset, start, end,
+		    prot, max, cow, reservation_id, name);
 	}
 	if (result != KERN_SUCCESS)
 		goto err;
@@ -2504,11 +2558,22 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
     vm_size_t length, vm_offset_t max_addr, int find_space,
     vm_prot_t prot, vm_prot_t max, int cow)
 {
+
+	return (vm_map_find_name(map, object, offset, addr, length, max_addr,
+	    find_space, prot, max, cow, NULL));
+}
+
+int
+vm_map_find_name(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
+    vm_pointer_t *addr,	/* IN/OUT */
+    vm_size_t length, vm_offset_t max_addr, int find_space,
+    vm_prot_t prot, vm_prot_t max, int cow, const char *name)
+{
 	int rv;
 
 	vm_map_lock(map);
-	rv = vm_map_find_locked(map, object, offset, addr, length, max_addr,
-	    find_space, prot, max, cow);
+	rv = vm_map_find_name_locked(map, object, offset, addr, length,
+	    max_addr, find_space, prot, max, cow, name);
 	vm_map_unlock(map);
 	return (rv);
 }
@@ -2518,6 +2583,17 @@ vm_map_find_locked(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
     vm_pointer_t *addr,	/* IN/OUT */
     vm_size_t length, vm_offset_t max_addr, int find_space,
     vm_prot_t prot, vm_prot_t max, int cow)
+{
+
+	return (vm_map_find_name_locked(map, object, offset, addr, length,
+	    max_addr, find_space, prot, max, cow, NULL));
+}
+
+int
+vm_map_find_name_locked(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
+    vm_pointer_t *addr,	/* IN/OUT */
+    vm_size_t length, vm_offset_t max_addr, int find_space,
+    vm_prot_t prot, vm_prot_t max, int cow, const char *name)
 {
 	vm_offset_t alignment, curr_min_addr, min_addr, vaddr;
 	int gap, pidx, rv, try;
@@ -2693,8 +2769,9 @@ again:
 		rv = vm_map_stack_locked(map, reservation, unpadded_length,
 		    sgrowsiz, prot, max, cow);
 	} else {
-		rv = vm_map_insert(map, object, offset, reservation,
-		    reservation + unpadded_length, prot, max, cow, reservation);
+		rv = vm_map_insert_name(map, object, offset, reservation,
+		    reservation + unpadded_length, prot, max, cow,
+		    reservation, name);
 	}
 	if (rv != KERN_SUCCESS) {
 		vm_map_reservation_delete_locked(map, reservation);
@@ -2769,8 +2846,10 @@ vm_map_mergeable_neighbors(vm_map_t map, vm_map_entry_t prev,
 	    (entry->eflags & MAP_ENTRY_NOMERGE_MASK) == 0,
 	    ("vm_map_mergeable_neighbors: neither %p nor %p are mergeable",
 	    prev, entry));
+
 	return (prev->end == entry->start &&
 	    prev->object.vm_object == entry->object.vm_object &&
+	    strncmp(prev->name, entry->name, sizeof(prev->name)) == 0 &&
 	    (prev->object.vm_object == NULL ||
 	    prev->offset + (prev->end - prev->start) == entry->offset) &&
 	    prev->eflags == entry->eflags &&
@@ -3713,6 +3792,28 @@ vm_map_madvise(
 		}
 		vm_map_unlock_read(map);
 	}
+	return (0);
+}
+
+/*
+ *	vm_map_msetname:
+ *
+ *	Set the name on the specified target range in
+ *	the target map.
+ */
+int
+vm_map_msetname(vm_map_t map, vm_offset_t start, vm_offset_t end,
+    const char *name)
+{
+	vm_map_entry_t entry;
+
+	vm_map_lock(map);
+	VM_MAP_RANGE_CHECK(map, start, end);
+	if (!vm_map_lookup_entry(map, start, &entry))
+		entry = vm_map_entry_succ(entry);
+	for (; entry->start < end; entry = vm_map_entry_succ(entry))
+		strlcpy(entry->name, name, sizeof(entry->name));
+	vm_map_unlock(map);
 	return (0);
 }
 
@@ -5033,6 +5134,8 @@ vm_map_copy_entry(
 				src_entry->eflags &= ~MAP_ENTRY_WRITECNT;
 				vm_object_reference(src_object);
 				fake_entry->object.vm_object = src_object;
+				memcpy(&fake_entry->name, &src_entry->name,
+				    sizeof(fake_entry->name));
 				fake_entry->start = src_entry->start;
 				fake_entry->end = src_entry->end;
 				fake_entry->defer_next =
@@ -5316,6 +5419,8 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 			new_entry->protection = old_entry->protection;
 			new_entry->max_protection = old_entry->max_protection;
 			new_entry->inheritance = VM_INHERIT_ZERO;
+			memcpy(&new_entry->name, &old_entry->name,
+			    sizeof(new_entry->name));
 
 			vm_map_entry_link(new_map, new_entry);
 			vmspace_map_entry_forked(vm1, vm2, new_entry);
@@ -5336,6 +5441,8 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 			new_entry->eflags = MAP_ENTRY_UNMAPPED;
 			new_entry->inheritance = VM_INHERIT_QUARANTINE;
 			new_entry->cred = NULL;
+			memcpy(&new_entry->name, &old_entry->name,
+			    sizeof(new_entry->name));
 
 			vm_map_entry_link(new_map, new_entry);
 			/*
@@ -5471,7 +5578,7 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 	gap_bot = addrbos;
 	gap_top = bot;
 	rv = vm_map_insert1(map, NULL, 0, bot, top, prot, max, cow, reservation,
-	    &new_entry);
+	    &new_entry, "kernel:vm_stack");
 	if (rv != KERN_SUCCESS)
 		return (rv);
 	KASSERT(new_entry->end == top || new_entry->start == bot,
@@ -5482,7 +5589,7 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 		return (KERN_SUCCESS);
 	rv = vm_map_insert1(map, NULL, 0, gap_bot, gap_top, VM_PROT_NONE,
 	    VM_PROT_NONE, MAP_CREATE_GUARD | MAP_CREATE_STACK_GAP,
-	    reservation, &gap_entry);
+	    reservation, &gap_entry, "kernel:vm_stack_guard");
 	if (rv == KERN_SUCCESS) {
 		KASSERT((gap_entry->eflags & MAP_ENTRY_GUARD) != 0,
 		    ("entry %p not gap %#x", gap_entry, gap_entry->eflags));
@@ -5704,7 +5811,8 @@ retry:
 			rv1 = vm_map_insert1(map, NULL, 0, gap_start,
 			    gap_end, VM_PROT_NONE, VM_PROT_NONE,
 			    MAP_CREATE_GUARD | MAP_CREATE_STACK_GAP,
-			    stack_entry->reservation, &gap_entry);
+			    stack_entry->reservation, &gap_entry,
+			    "kernel:vm_stack_guard");
 			MPASS(rv1 == KERN_SUCCESS);
 			gap_entry->next_read = sgp;
 			gap_entry->offset = prot | VM_PROT_MAX(max);
@@ -6149,6 +6257,8 @@ vm_map_reservation_init_entry(vm_map_entry_t new_entry)
 	new_entry->cred = NULL;
 	new_entry->eflags = MAP_ENTRY_UNMAPPED;
 	new_entry->object.vm_object = NULL;
+	strlcpy(new_entry->name, "kernel:vm_reservation",
+	    sizeof(new_entry->name));
 	new_entry->offset = 0;
 	/* handle MAP_INHERIT_SHARE cow flag? */
 	new_entry->inheritance = VM_INHERIT_DEFAULT;

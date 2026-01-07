@@ -161,6 +161,13 @@ freebsd64_mlock(struct thread *td, struct freebsd64_mlock_args *uap)
 }
 
 int
+freebsd64_msetname(struct thread *td, struct freebsd64_msetname_args *uap)
+{
+
+	return (kern_msetname(td, (uintptr_t)uap->addr, uap->len, uap->name));
+}
+
+int
 freebsd64_munlock(struct thread *td, struct freebsd64_munlock_args *uap)
 {
 	return (kern_munlock(td, (uintptr_t)uap->addr, uap->len));

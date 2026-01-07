@@ -293,6 +293,8 @@ _thr_stack_alloc(struct pthread_attr *attr)
 		    MAP_STACK, -1, 0);
 		if (stackaddr == MAP_FAILED)
 			stackaddr = NULL;
+		else
+			msetname(stackaddr, stacksize, "libthr:stack");
 #else
 		/* Map the stack and guard page together, and split guard
 		   page from allocated space: */
@@ -301,6 +303,8 @@ _thr_stack_alloc(struct pthread_attr *attr)
 		     -1, 0)) != MAP_FAILED &&
 		    (guardsize == 0 ||
 		     mprotect(stackaddr, guardsize, PROT_NONE) == 0)) {
+			msetname(stackaddr, stacksize + guardsize,
+			    "libthr:stack");
 			stackaddr += guardsize;
 		} else {
 			if (stackaddr != MAP_FAILED)

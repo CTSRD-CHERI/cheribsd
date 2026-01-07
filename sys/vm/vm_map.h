@@ -105,6 +105,7 @@ union vm_map_object {
  *	the next_read member is reused as the stack_guard_page storage, and
  *	offset is the stack protection.
  */
+#define	MAP_ENTRY_NAME_LEN	32
 struct vm_map_entry {
 	struct vm_map_entry *left;	/* left child or previous entry */
 	struct vm_map_entry *right;	/* right child or next entry */
@@ -117,6 +118,7 @@ struct vm_map_entry {
 	vm_offset_t next_read;		/* vaddr of the next sequential read */
 	vm_size_t max_free;		/* max free space in subtree */
 	union vm_map_object object;	/* object I point to */
+	char name[MAP_ENTRY_NAME_LEN];	/* optional name for object */
 	vm_ooffset_t offset;		/* offset into object */
 	vm_eflags_t eflags;		/* map entry flags */
 	vm_prot_t protection;		/* protection code */
@@ -574,8 +576,14 @@ int vm_map_find_min(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t *,
     vm_size_t, vm_offset_t, vm_offset_t, int, vm_prot_t, vm_prot_t, int);
 int vm_map_find_aligned(vm_map_t map, vm_offset_t *addr, vm_size_t length,
     vm_offset_t max_addr, vm_offset_t alignment);
+int vm_map_find_name(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t *,
+    vm_size_t, vm_offset_t, int, vm_prot_t, vm_prot_t, int, const char *);
+int vm_map_find_name_locked(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t *,
+    vm_size_t, vm_offset_t, int, vm_prot_t, vm_prot_t, int, const char *);
 int vm_map_fixed(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t,
     vm_pointer_t *, vm_size_t, vm_prot_t, vm_prot_t, int);
+int vm_map_fixed_name(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t,
+    vm_pointer_t *, vm_size_t, vm_prot_t, vm_prot_t, int, const char *);
 vm_offset_t vm_map_findspace(vm_map_t, vm_offset_t, vm_size_t);
 int vm_map_alignspace(vm_map_t, vm_object_t, vm_ooffset_t,
     vm_offset_t *, vm_size_t, vm_offset_t, vm_offset_t);
@@ -584,6 +592,8 @@ void vm_map_init(vm_map_t, pmap_t, uintcap_t, uintcap_t);
 void vm_map_init_system(vm_map_t, pmap_t, uintcap_t, uintcap_t);
 int vm_map_insert (vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t,
     vm_pointer_t, vm_prot_t, vm_prot_t, int, vm_offset_t);
+int vm_map_insert_name (vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t,
+    vm_pointer_t, vm_prot_t, vm_prot_t, int, vm_offset_t, const char *);
 int vm_map_lookup (vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, vm_object_t *,
     vm_pindex_t *, vm_prot_t *, boolean_t *);
 int vm_map_lookup_locked(vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, vm_object_t *,
@@ -651,6 +661,7 @@ int vm_map_submap (vm_map_t, vm_pointer_t, vm_pointer_t, vm_map_t);
 int vm_map_sync(vm_map_t, vm_offset_t, vm_offset_t, boolean_t, boolean_t,
     boolean_t);
 int vm_map_madvise (vm_map_t, vm_offset_t, vm_offset_t, int);
+int vm_map_msetname (vm_map_t, vm_offset_t, vm_offset_t, const char *);
 int vm_map_stack (vm_map_t, vm_pointer_t, vm_size_t, vm_prot_t, vm_prot_t, int);
 int vm_map_unwire(vm_map_t map, vm_offset_t start, vm_offset_t end,
     int flags);
