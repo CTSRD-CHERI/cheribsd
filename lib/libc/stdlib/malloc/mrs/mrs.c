@@ -125,6 +125,8 @@ extern void snmalloc_flush_message_queue(void);
 #define	MALLOC_QUARANTINE_ENABLE_ENV	"_RUNTIME_REVOCATION_ENABLE"
 #define	MALLOC_ABORT_DISABLE_ENV	"_RUNTIME_ABORT_DISABLE"
 #define	MALLOC_ABORT_ENABLE_ENV		"_RUNTIME_ABORT_ENABLE"
+#define	MALLOC_ZERO_DISABLE_ENV	"_RUNTIME_ZERO_DISABLE"
+#define	MALLOC_ZERO_ENABLE_ENV	"_RUNTIME_ZERO_ENABLE"
 
 #define	MALLOC_REVOKE_EVERY_FREE_DISABLE_ENV \
 	"_RUNTIME_REVOCATION_EVERY_FREE_DISABLE"
@@ -319,6 +321,7 @@ static size_t page_size;
 /* Flags are constant after initialization. */
 static void *entire_shadow;
 static bool quarantining = true;
+static bool zeroing = false;
 static bool revoke_every_free = false;
 static bool revoke_async = false;
 static bool bound_pointers = false;
@@ -1390,7 +1393,11 @@ mrs_init_impl_locked(void)
 		} else if (getenv(MALLOC_QUARANTINE_ENABLE_ENV) != NULL) {
 			quarantining = true;
 		}
-
+		if (getenv(MALLOC_ZERO_DISABLE_ENV) != NULL) {
+			zeroing = false;
+		} else if (getenv(MALLOC_ZERO_ENABLE_ENV) != NULL) {
+			zeroing = true;
+		}
 		if (getenv(MALLOC_ABORT_DISABLE_ENV) != NULL)
 			abort_on_validation_failure = false;
 		else if (getenv(MALLOC_ABORT_ENABLE_ENV) != NULL)
@@ -1528,8 +1535,10 @@ mrs_malloc(size_t size)
 		allocated_region = mrs_real_malloc(CAPREVOKE_BITMAP_ALIGNMENT);
 	else
 		allocated_region = mrs_real_malloc(size);
-	for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT){
-		dczero((char*)(allocated_region+i));
+	if(zeroing){
+		for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT){
+			dczero((char*)(allocated_region+i));
+		}
 	}
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0,
@@ -1596,14 +1605,18 @@ mrs_calloc(size_t number, size_t size)
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number,
 		    allocated_region);
-		for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
-			dczero((char*)(allocated_region+i));
+		if(zeroing){
+			for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
+				dczero((char*)(allocated_region+i));
+		}
 		return (allocated_region);
 	}
 	
 	increment_allocated_size(allocated_region);
-	for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
-		dczero((char*)(allocated_region+i));
+	if(zeroing){
+		for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
+			dczero((char*)(allocated_region+i));
+	}
 	/*
 	 * This causes problems if our library is initialized before
 	 * the thread library.
@@ -1688,8 +1701,10 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 		    allocated_region);
-		for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
-			dczero((char*)(allocated_region+i));
+		if(zeroing){
+			for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
+				dczero((char*)(allocated_region+i));
+		}
 		return (allocated_region);
 	}
 
@@ -1701,8 +1716,10 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 
 	MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 	    allocated_region);
-	for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
+	if(zeroing){
+		for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
 			dczero((char*)(allocated_region+i));
+	}
 	return (allocated_region);
 }
 
@@ -1748,8 +1765,10 @@ mrs_realloc(void *ptr, size_t size)
 		return (ptr);
 	
 	void *new_alloc = mrs_malloc(size);
-	for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
-		dczero((char*)(new_alloc+i));
+	if(zeroing){
+		for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
+			dczero((char*)(new_alloc+i));
+	}
 	/*
 	 * Per the C standard, copy and free IFF the old pointer is valid
 	 * and allocation succeeds.
@@ -1836,8 +1855,10 @@ mrs_mallocx(size_t size, int flags)
 	if (ret != NULL && (flags & MALLOCX_ZERO) != 0)
 		clear_region(ret, cheri_getlen(ret));
 #endif
-	for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
-		dczero((char*)(ret+i));
+	if(zeroing){
+		for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
+			dczero((char*)(ret+i));
+	}
 	return (ret);
 }
 
@@ -1992,3 +2013,4 @@ mrs_offload_thread(void *arg)
 	}
 }
 #endif /* OFFLOAD_QUARANTINE */
+
