@@ -359,15 +359,15 @@ kern_cheri_revoke(struct thread *td, int flags,
 #else
 	struct cheri_revoke_stats *crstp = NULL;
 #endif
-	struct vmspace *vm;
-	vm_map_t vmm;
+	struct vmspace *vmspace;
+	vm_map_t map;
 	struct vm_cheri_revoke_cookie vmcrc;
 	struct cheri_revoke_info_page * __capability info_page;
 
 	KASSERT(td == curthread, ("%s: td is not curthread", __func__));
 
-	vm = td->td_proc->p_vmspace;
-	vmm = &vm->vm_map;
+	vmspace = td->td_proc->p_vmspace;
+	map = &vmspace->vm_map;
 
 	if ((flags & (CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_ASYNC)) ==
 	    (CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_ASYNC)) {
@@ -376,11 +376,11 @@ kern_cheri_revoke(struct thread *td, int flags,
 	}
 
 	/* Serialize and figure out what we're supposed to do */
-	vm_map_lock(vmm);
+	vm_map_lock(map);
 	{
 		int ires = 0;
 
-		KASSERT(!vm_map_is_system(vmm), ("%s: system map?", __func__));
+		KASSERT(!vm_map_is_system(map), ("%s: system map?", __func__));
 
 		/*
 		 * We need some value that's more or less "now", but we don't have
@@ -389,15 +389,15 @@ kern_cheri_revoke(struct thread *td, int flags,
 		 */
 		if ((flags & CHERI_REVOKE_IGNORE_START) != 0) {
 			start_epoch = cheri_revoke_st_get_epoch(
-			    vmm->vm_cheri_revoke_st);
+			    map->vm_cheri_revoke_st);
 		}
 
-		if (!vmm->vm_cheri_revoke_quarantining)
-			vmm->vm_cheri_revoke_quarantining = true;
+		if (!map->vm_cheri_revoke_quarantining)
+			map->vm_cheri_revoke_quarantining = true;
 
 reentry:
-		epoch = cheri_revoke_st_get_epoch(vmm->vm_cheri_revoke_st);
-		entryst = cheri_revoke_st_get_state(vmm->vm_cheri_revoke_st);
+		epoch = cheri_revoke_st_get_epoch(map->vm_cheri_revoke_st);
+		entryst = cheri_revoke_st_get_state(map->vm_cheri_revoke_st);
 
 		if (cheri_revoke_epoch_clears(epoch, start_epoch)) {
 			/*
@@ -411,20 +411,20 @@ reentry:
 fast_out:
 #ifdef CHERI_CAPREVOKE_STATS
 			if (flags & CHERI_REVOKE_TAKE_STATS) {
-				sx_xlock(&vmm->vm_cheri_revoke_stats_sx);
+				sx_xlock(&map->vm_cheri_revoke_stats_sx);
 				crst = *(struct cheri_revoke_stats*)
-				    &vmm->vm_cheri_revoke_stats;
-				bzero(&vmm->vm_cheri_revoke_stats,
-				    sizeof(vmm->vm_cheri_revoke_stats));
-				sx_xunlock(&vmm->vm_cheri_revoke_stats_sx);
+				    &map->vm_cheri_revoke_stats;
+				bzero(&map->vm_cheri_revoke_stats,
+				    sizeof(map->vm_cheri_revoke_stats));
+				sx_xunlock(&map->vm_cheri_revoke_stats_sx);
 				crstp = &crst;
 			} else {
 				crstp = (struct cheri_revoke_stats*)
-				    &vmm->vm_cheri_revoke_stats;
+				    &map->vm_cheri_revoke_stats;
 			}
 #endif
-			vm_map_unlock(vmm);
-			cv_signal(&vmm->vm_cheri_revoke_cv);
+			vm_map_unlock(map);
+			cv_signal(&map->vm_cheri_revoke_cv);
 
 			return (cheri_revoke_fini(crsi, ires, crstp,
 			    &crepochs));
@@ -456,7 +456,7 @@ fast_out:
 				enum cheri_revoke_state asyncst;
 
 				asyncst = cheri_revoke_st_get_state(
-				    vmm->vm_cheri_async_revoke_st);
+				    map->vm_cheri_async_revoke_st);
 				KASSERT(asyncst != CHERI_REVOKE_ST_NONE,
 				    ("bad async state %d", asyncst));
 
@@ -469,14 +469,14 @@ fast_out:
 					goto fast_out;
 				}
 
-				if (vmm->vm_cheri_async_revoke_status ==
+				if (map->vm_cheri_async_revoke_status ==
 				    KERN_SUCCESS) {
 					/*
 					 * The pass succeeded: reset the async
 					 * state and update our main state.
 					 */
 					cheri_revoke_st_set(
-					    &vmm->vm_cheri_async_revoke_st,
+					    &map->vm_cheri_async_revoke_st,
 					    epoch, CHERI_REVOKE_ST_NONE);
 					myst = CHERI_REVOKE_ST_CLOSING;
 				} else {
@@ -497,11 +497,11 @@ fast_out:
 				goto fast_out;
 
 			/* There is another revoker in progress.  Wait. */
-			ires = cv_wait_sig(&vmm->vm_cheri_revoke_cv,
-			    &vmm->lock);
+			ires = cv_wait_sig(&map->vm_cheri_revoke_cv,
+			    &map->lock);
 			if (ires != 0) {
-				vm_map_unlock(vmm);
-				cv_signal(&vmm->vm_cheri_revoke_cv);
+				vm_map_unlock(map);
+				cv_signal(&map->vm_cheri_revoke_cv);
 				return (ires);
 			}
 
@@ -521,19 +521,19 @@ fast_out:
 			    VM_CHERI_REVOKE_CF_NO_OTYPES |
 			    VM_CHERI_REVOKE_CF_NO_CIDS;
 
-			if (!vm_map_entry_start_revocation(vmm, NULL))
+			if (!vm_map_entry_start_revocation(map, NULL))
 				test_flags |= VM_CHERI_REVOKE_CF_NO_REV_ENTRY;
-			vm_cheri_revoke_set_test(vmm, test_flags);
+			vm_cheri_revoke_set_test(map, test_flags);
 		}
 
 #ifdef CHERI_CAPREVOKE_STATS
 		crstp = (struct cheri_revoke_stats *)
-		    &vmm->vm_cheri_revoke_stats;
+		    &map->vm_cheri_revoke_stats;
 #endif
 
-		res = vm_cheri_revoke_cookie_init(&vm->vm_map, &vmcrc);
+		res = vm_cheri_revoke_cookie_init(map, &vmcrc);
 		if (res != KERN_SUCCESS) {
-			vm_map_unlock(vmm);
+			vm_map_unlock(map);
 			return (cheri_revoke_fini(crsi, vm_mmap_to_errno(res),
 			    crstp, &crepochs));
 		}
@@ -543,14 +543,14 @@ fast_out:
 		 * until we're certain it's actually open, which we can only
 		 * do below.
 		 */
-		cheri_revoke_st_set(&vmm->vm_cheri_revoke_st, epoch, myst);
+		cheri_revoke_st_set(&map->vm_cheri_revoke_st, epoch, myst);
 		if ((flags & CHERI_REVOKE_ASYNC) != 0 &&
 		    myst == CHERI_REVOKE_ST_INITING) {
-			cheri_revoke_st_set(&vmm->vm_cheri_async_revoke_st,
+			cheri_revoke_st_set(&map->vm_cheri_async_revoke_st,
 			    epoch, myst);
 		}
 	}
-	vm_map_unlock(vmm);
+	vm_map_unlock(map);
 
 	/*
 	 * I am the revoker; expose an incremented epoch to userland
@@ -565,7 +565,7 @@ fast_out:
 		crepochs.enqueue = epoch + 1;
 	}
 	crepochs.dequeue = epoch;
-	vm_cheri_revoke_info_page(vmm, td->td_proc->p_sysent, &info_page);
+	vm_cheri_revoke_info_page(map, td->td_proc->p_sysent, &info_page);
 	vm_cheri_revoke_publish_epochs(info_page, &crepochs);
 	wmb();
 
@@ -596,16 +596,16 @@ fast_out:
 			if (thread_single(td->td_proc, SINGLE_BOUNDARY)) {
 				PROC_UNLOCK(td->td_proc);
 
-				vm_map_lock(vmm);
+				vm_map_lock(map);
 				/* Roll back some earlier state changes. */
-				cheri_revoke_st_set(&vmm->vm_cheri_revoke_st,
+				cheri_revoke_st_set(&map->vm_cheri_revoke_st,
 				    epoch, entryst);
 				if (flags & CHERI_REVOKE_ASYNC) {
 					cheri_revoke_st_set(
-					    &vmm->vm_cheri_async_revoke_st,
+					    &map->vm_cheri_async_revoke_st,
 					    epoch, CHERI_REVOKE_ST_NONE);
 				}
-				vm_map_unlock(vmm);
+				vm_map_unlock(map);
 
 				/* XXX Don't signal other would-be revokers? */
 				/* XXX Don't copy out the stat structure? */
@@ -678,10 +678,10 @@ fast_out:
 		 * faulted but before it has installed a PTE for the new
 		 * mapping.
 		 */
-		vm_map_lock(&vm->vm_map);
-		pmap_caploadgen_next(vmm->pmap);
+		vm_map_lock(map);
+		pmap_caploadgen_next(map->pmap);
 		pmap_activate(td);
-		vm_map_unlock(&vm->vm_map);
+		vm_map_unlock(map);
 	}
 
 	PROC_LOCK(td->td_proc);
@@ -715,7 +715,7 @@ close_already_inited:	/* (entryst == CHERI_REVOKE_ST_INITED) above */
 			break;
 		case CHERI_REVOKE_ST_INITING:
 			if ((flags & CHERI_REVOKE_ASYNC) != 0)
-				vm_cheri_revoke_pass_async(vm, &vmcrc);
+				vm_cheri_revoke_pass_async(vmspace, &vmcrc);
 			myst = CHERI_REVOKE_ST_INITED;
 			break;
 		}
@@ -730,29 +730,29 @@ post_revoke_pass:
 		vm_cheri_revoke_publish_epochs(info_page, &crepochs);
 		myst = CHERI_REVOKE_ST_NONE;
 
-		vm_map_entry_end_revocation(&vm->vm_map);
+		vm_map_entry_end_revocation(map);
 	}
 
-	vm_map_lock(vmm);
-	cheri_revoke_st_set(&vmm->vm_cheri_revoke_st, epoch, myst);
+	vm_map_lock(map);
+	cheri_revoke_st_set(&map->vm_cheri_revoke_st, epoch, myst);
 	if (res == KERN_SUCCESS)
-		vm_cheri_assert_consistent_clg(&vm->vm_map);
+		vm_cheri_assert_consistent_clg(map);
 #ifdef CHERI_CAPREVOKE_STATS
 	if (flags & CHERI_REVOKE_TAKE_STATS) {
-		sx_xlock(&vmm->vm_cheri_revoke_stats_sx);
-		crst = *(struct cheri_revoke_stats*)&vmm->vm_cheri_revoke_stats;
+		sx_xlock(&map->vm_cheri_revoke_stats_sx);
+		crst = *(struct cheri_revoke_stats*)&map->vm_cheri_revoke_stats;
 		crstp = &crst;
-		bzero(&vmm->vm_cheri_revoke_stats,
-		    sizeof(vmm->vm_cheri_revoke_stats));
-		sx_xunlock(&vmm->vm_cheri_revoke_stats_sx);
+		bzero(&map->vm_cheri_revoke_stats,
+		    sizeof(map->vm_cheri_revoke_stats));
+		sx_xunlock(&map->vm_cheri_revoke_stats_sx);
 	} else {
-		crstp = (struct cheri_revoke_stats*)&vmm->vm_cheri_revoke_stats;
+		crstp = (struct cheri_revoke_stats*)&map->vm_cheri_revoke_stats;
 	}
 #endif
-	vm_map_unlock(vmm);
+	vm_map_unlock(map);
 
 	/* Broadcast here: some sleepers may be able to take the fast out */
-	cv_broadcast(&vmm->vm_cheri_revoke_cv);
+	cv_broadcast(&map->vm_cheri_revoke_cv);
 
 	return (cheri_revoke_fini(crsi, vm_mmap_to_errno(res), crstp,
 	    &crepochs));
@@ -762,8 +762,7 @@ static int
 kern_cheri_revoke_get_shadow(struct thread *td, int flags,
     void * __capability arena, void * __capability * __capability shadow)
 {
-	struct vmspace *vm;
-	vm_map_t vmm;
+	vm_map_t map;
 	void * __capability cres;
 	vm_offset_t base, size;
 	int arena_perms, error;
@@ -832,13 +831,12 @@ kern_cheri_revoke_get_shadow(struct thread *td, int flags,
 	if (!cheri_tag_get(cres))
 		return (EINVAL);
 
-	vm = td->td_proc->p_vmspace;
-	vmm = &vm->vm_map;
-	vm_map_lock(vmm);
-	if (!vmm->vm_cheri_revoke_quarantining) {
-		vmm->vm_cheri_revoke_quarantining = true;
+	map = &td->td_proc->p_vmspace->vm_map;
+	vm_map_lock(map);
+	if (!map->vm_cheri_revoke_quarantining) {
+		map->vm_cheri_revoke_quarantining = true;
 	}
-	vm_map_unlock(vmm);
+	vm_map_unlock(map);
 
 	error = copyoutptr(&cres, shadow, sizeof(cres));
 
