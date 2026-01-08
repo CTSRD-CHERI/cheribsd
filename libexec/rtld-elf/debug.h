@@ -33,8 +33,6 @@
 #define DEBUG_H 1
 
 #include <sys/cdefs.h>
-/* assert() is always enabled. For expensive checks use dbg_assert() instead. */
-#undef NDEBUG
 #include <assert.h>
 #include <string.h>
 #include "rtld_paths.h"
@@ -47,10 +45,8 @@ __END_DECLS
 
 #ifndef NO_LD_DEBUG
 #define dbg(...)	debug_printf(__VA_ARGS__)
-#define dbg_assert(cond)	assert(cond)
 #else
 #define dbg(...)	((void) 0)
-#define dbg_assert(cond)	((void) 0)
 #endif
 
 #define msg(s)		rtld_putstr(s)
