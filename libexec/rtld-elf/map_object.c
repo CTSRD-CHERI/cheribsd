@@ -234,7 +234,7 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 	 * result */
 	mapsize = CHERI_REPRESENTABLE_LENGTH(mapsize);
 	base_vlimit = base_vaddr + mapsize;
-	dbg_assert(round_page(base_vlimit) == base_vlimit);
+	assert(round_page(base_vlimit) == base_vlimit);
 #endif
 	base_addr = (caddr_t)(uintptr_t)base_vaddr;
 	base_flags = __getosreldate() >= P_OSREL_MAP_GUARD ?
