@@ -58,10 +58,6 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		    symname(obj, r_symndx));
 		return -1;
 	}
-#if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE >= 2
-	dbg("%s: found %s from obj=%s in defobj=%s", __func__,
-	    symname(obj, r_symndx), obj->path, defobj->path);
-#endif
 
 	/*
 	 * If symbol is IFUNC, only perform relocation
@@ -172,11 +168,5 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		return -1;
 	}
 	*((const void * __capability *)where) = symval;
-#if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE >= 2
-	dbg("CAP(%p/0x%lx) %s in %s --> %#lp in %s", where,
-	    (const char *)where - (const char *)obj->relocbase,
-	    symname(obj, r_symndx), obj->path,
-	    *((void * __capability *)where), defobj->path);
-#endif
 	return 0;
 }
