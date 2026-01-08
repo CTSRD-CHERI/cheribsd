@@ -562,15 +562,6 @@ __END_DECLS
 #include "rtld_cheri_machdep.h"
 #endif
 
-/* Architectures other than CHERI can just call the pointer */
-#ifndef call_init_array_pointer
-#define call_init_array_pointer(obj, target) call_init_pointer(obj, (target))
-#endif
-
-#ifndef call_fini_array_pointer
-#define call_fini_array_pointer(obj, target) call_initfini_pointer(obj, (target))
-#endif
-
 #ifndef make_rtld_function_pointer
 #ifdef CHERI_LIB_C18N
 #define make_rtld_function_pointer(target_func)                         \
