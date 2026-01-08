@@ -245,8 +245,6 @@ static const char
     *ld_elf_hints_path; /* Environment variable for alternative hints path */
 static const char *ld_tracing;	    /* Called from ldd to print libs */
 static const char *ld_utrace;	    /* Use utrace() to log events. */
-static bool ld_skip_init_funcs = false; /* XXXAR: debug environment variable to
-					   verify relocation processing */
 static struct obj_entry_q obj_list; /* Queue of all loaded objects */
 static Obj_Entry *obj_main;	    /* The main program shared object */
 static Obj_Entry obj_rtld;	    /* The dynamic linker shared object */
@@ -428,7 +426,6 @@ static struct ld_env_var_desc ld_env_vars[] = {
 	LD_ENV_DESC(SHOW_AUXV, false),
 	LD_ENV_DESC(STATIC_TLS_EXTRA, false),
 	LD_ENV_DESC(NO_DL_ITERATE_PHDR_AFTER_FORK, false),
-	LD_ENV_DESC(SKIP_INIT_FUNCS, true),
 #ifdef CHERI_LIB_C18N
 	LD_ENV_DESC(UTRACE_COMPARTMENT, false),
 	LD_ENV_DESC(COMPARTMENT_ENABLE, false),
@@ -829,7 +826,6 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	ld_preload_fds = ld_get_env_var(LD_PRELOAD_FDS);
 	ld_elf_hints_path = ld_get_env_var(LD_ELF_HINTS_PATH);
 	ld_loadfltr = ld_get_env_var(LD_LOADFLTR) != NULL;
-	ld_skip_init_funcs = ld_get_env_var(LD_SKIP_INIT_FUNCS) != NULL;
 	library_path_rpath = ld_get_env_var(LD_LIBRARY_PATH_RPATH);
 	if (library_path_rpath != NULL) {
 		if (library_path_rpath[0] == 'y' ||
@@ -3559,7 +3555,7 @@ preinit_main(void)
 	int index;
 
 	preinit_addr = obj_main->preinit_array;
-	if (preinit_addr == NULL || ld_skip_init_funcs)
+	if (preinit_addr == NULL)
 		return;
 
 	for (index = 0; index < obj_main->preinit_array_num; index++) {
@@ -3693,8 +3689,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	 */
 	saved_msg = errmsg_save();
 	STAILQ_FOREACH(elm, list, link) {
-		if (elm->obj->init_done ||
-		    ld_skip_init_funcs) /* Initialized early. */
+		if (elm->obj->init_done) /* Initialized early. */
 			continue;
 		/*
 		 * Race: other thread might try to use this object before
