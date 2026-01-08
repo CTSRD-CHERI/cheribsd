@@ -328,11 +328,11 @@ typedef struct Struct_Obj_Entry {
     const struct func_sig *sigtab;
 #endif
 
-    void* init_ptr;		/* Initialization function to call */
-    void* fini_ptr;		/* Termination function to call */
-    InitArrayEntry* preinit_array_ptr;	/* Pre-initialization array of functions */
-    InitArrayEntry* init_array_ptr;	/* Initialization array of functions */
-    InitArrayEntry* fini_array_ptr;	/* Termination array of functions */
+    void *init;			/* Initialization function to call */
+    void *fini;			/* Termination function to call */
+    InitArrayEntry *preinit_array;	/* Pre-initialization array of functions */
+    InitArrayEntry *init_array;	/* Initialization array of functions */
+    InitArrayEntry *fini_array;	/* Termination array of functions */
     int preinit_array_num;	/* Number of entries in preinit_array */
     int init_array_num; 	/* Number of entries in init_array */
     int fini_array_num; 	/* Number of entries in fini_array */
