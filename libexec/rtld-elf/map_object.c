@@ -253,9 +253,6 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 #endif
 	}
 
-	dbg("Allocating entire object: mmap(" PTR_FMT
-	    ", 0x%zx, 0x%x, 0x%x, -1, 0)",
-	    base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL), base_flags);
 	mapbase = mmap(base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL),
 	    base_flags, -1, 0);
 	if (mapbase == MAP_FAILED) {
@@ -285,8 +282,6 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 		data_addr = mapbase + (data_vaddr - base_vaddr);
 		data_prot = convert_prot(segs[i]->p_flags);
 		data_flags = convert_flags(segs[i]->p_flags) | MAP_FIXED;
-		dbg("Mapping %s PT_LOAD(%d) with flags 0x%x at %p", path, i,
-		    segs[i]->p_flags, data_addr, data_vlimit);
 
 		size_t data_len = data_vlimit - data_vaddr;
 		if (data_len != 0 && mmap(data_addr,
@@ -413,7 +408,6 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 	if (hdr->e_entry != 0) {
 #ifdef __CHERI_PURE_CAPABILITY__
 		obj->entry = (const void *)pcc_cap(obj, hdr->e_entry);
-		dbg("\tentry for %s: %-#p", path, obj->entry);
 #else
 		obj->entry = (const void *)(obj->relocbase + hdr->e_entry);
 #endif
