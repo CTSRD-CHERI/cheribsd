@@ -85,10 +85,10 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
 
 /* TODO: Per-function captable/PLT/FNDESC support */
 #define call_init_array_pointer(obj, target)				\
-	(((InitArrFunc)(target).value)(main_argc, main_argv, environ))
+	(((InitArrFunc)(target))(main_argc, main_argv, environ))
 
 #define call_fini_array_pointer(obj, target)				\
-	(((InitFunc)(target).value)())
+	(((InitFunc)(target))())
 
 #else /* __CHERI_PURE_CAPABILITY__ */
 

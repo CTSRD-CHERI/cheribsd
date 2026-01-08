@@ -1168,7 +1168,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		 * functions for binaries linked with old crt1 which calls
 		 * _init itself.
 		 */
-		obj_main->init = obj_main->fini = NULL;
+		obj_main->init = obj_main->fini = (uintptr_t)NULL;
 		obj_main->preinit_array = obj_main->init_array =
 		    obj_main->fini_array = NULL;
 	}
@@ -1901,44 +1901,43 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 			break;
 
 		case DT_INIT:
-			obj->init = (void *)(obj->relocbase +
+			obj->init = (uintptr_t)(obj->relocbase +
 			    dynp->d_un.d_ptr);
 			break;
 
 		case DT_PREINIT_ARRAY:
-			obj->preinit_array = (InitArrayEntry *)(obj->relocbase +
+			obj->preinit_array = (uintptr_t *)(obj->relocbase +
 				dynp->d_un.d_ptr);
 			break;
 
 		case DT_PREINIT_ARRAYSZ:
 			obj->preinit_array_num = dynp->d_un.d_val /
-			    sizeof(InitArrayEntry);
+			    sizeof(uintptr_t);
 			break;
 
 		case DT_INIT_ARRAY:
-			obj->init_array = (InitArrayEntry *)(obj->relocbase +
+			obj->init_array = (uintptr_t *)(obj->relocbase +
 				dynp->d_un.d_ptr);
 			break;
 
 		case DT_INIT_ARRAYSZ:
 			obj->init_array_num = dynp->d_un.d_val /
-			    sizeof(InitArrayEntry);
+			    sizeof(uintptr_t);
 			break;
 
 		case DT_FINI:
-			obj->fini = (void *)(obj->relocbase +
+			obj->fini = (uintptr_t)(obj->relocbase +
 			    dynp->d_un.d_ptr);
 			break;
 
 		case DT_FINI_ARRAY:
-			obj->fini_array =
-			    (InitArrayEntry *)(obj->relocbase +
-				dynp->d_un.d_ptr);
+			obj->fini_array = (uintptr_t *)(obj->relocbase +
+			    dynp->d_un.d_ptr);
 			break;
 
 		case DT_FINI_ARRAYSZ:
 			obj->fini_array_num = dynp->d_un.d_val /
-			    sizeof(InitArrayEntry);
+			    sizeof(uintptr_t);
 			break;
 
 		case DT_DEBUG:
@@ -2104,11 +2103,11 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	set_bounds_if_nonnull(obj->phdr, obj->phnum * sizeof(*obj->phdr));
 
 	set_bounds_if_nonnull(obj->preinit_array,
-	    obj->preinit_array_num * sizeof(InitArrayEntry));
+	    obj->preinit_array_num * sizeof(*obj->preinit_array));
 	set_bounds_if_nonnull(obj->init_array,
-	    obj->init_array_num * sizeof(InitArrayEntry));
+	    obj->init_array_num * sizeof(*obj->init_array));
 	set_bounds_if_nonnull(obj->fini_array,
-	    obj->fini_array_num * sizeof(InitArrayEntry));
+	    obj->fini_array_num * sizeof(*obj->fini_array));
 
 #ifdef RTLD_HAS_CAPRELOCS
 	set_bounds_if_nonnull(obj->cap_relocs, obj->cap_relocs_size);
@@ -3184,7 +3183,7 @@ initlist_add_objects(Obj_Entry *obj, Obj_Entry *tail, Objlist *list)
 	objlist_push_tail(list, obj);
 
 	/* Add the object to the global fini list in the reverse order. */
-	if ((obj->fini != NULL || obj->fini_array != NULL) &&
+	if ((obj->fini != (uintptr_t)NULL || obj->fini_array != NULL) &&
 	    !obj->on_fini_list) {
 		objlist_push_head(&list_fini, obj);
 		obj->on_fini_list = true;
@@ -3615,7 +3614,7 @@ obj_from_addr(const void *addr)
 static void
 preinit_main(void)
 {
-	InitArrayEntry *preinit_addr;
+	uintptr_t *preinit_addr;
 	int index;
 
 	preinit_addr = obj_main->preinit_array;
@@ -3623,14 +3622,11 @@ preinit_main(void)
 		return;
 
 	for (index = 0; index < obj_main->preinit_array_num; index++) {
-		if (preinit_addr[index].value != 0 &&
-		    preinit_addr[index].value != 1) {
+		if (preinit_addr[index] != 0 && preinit_addr[index] != 1) {
 			dbg("calling preinit function for %s at %p",
-			    obj_main->path,
-			    (void *)(uintptr_t)preinit_addr[index].value);
+			    obj_main->path, (void *)preinit_addr[index]);
 			LD_UTRACE(UTRACE_INIT_CALL, obj_main,
-			    (void *)(intptr_t)preinit_addr[index].value, 0, 0,
-			    obj_main->path);
+			    (void *)preinit_addr[index], 0, 0, obj_main->path);
 			call_init_array_pointer(obj_main, preinit_addr[index]);
 		}
 	}
@@ -3648,7 +3644,7 @@ objlist_call_fini(Objlist *list, Obj_Entry *root, RtldLockState *lockstate)
 {
 	Objlist_Entry *elm;
 	struct dlerror_save *saved_msg;
-	InitArrayEntry *fini_addr;
+	uintptr_t *fini_addr;
 	int index;
 
 	assert(root == NULL || root->refcount == 1);
@@ -3688,31 +3684,27 @@ objlist_call_fini(Objlist *list, Obj_Entry *root, RtldLockState *lockstate)
 			if (fini_addr != NULL && elm->obj->fini_array_num > 0) {
 				for (index = elm->obj->fini_array_num - 1;
 				    index >= 0; index--) {
-					if (fini_addr[index].value != 0 &&
-					    fini_addr[index].value != 1) {
+					if (fini_addr[index] != 0 &&
+					    fini_addr[index] != 1) {
 				dbg("calling fini function for %s at %p",
 						    elm->obj->path,
-						    (void *)(uintptr_t)
-						    fini_addr[index].value);
+						    (void *)fini_addr[index]);
 						LD_UTRACE(UTRACE_FINI_CALL,
 						    elm->obj,
-						    (void *)(intptr_t)
-						    fini_addr[index].value, 0,
+						    (void *)fini_addr[index], 0,
 						    0, elm->obj->path);
 						call_fini_array_pointer(
 						    elm->obj, fini_addr[index]);
 					}
 				}
 			}
-			if (elm->obj->fini != NULL) {
+			if (elm->obj->fini != (uintptr_t)NULL) {
 				dbg("calling fini function for %s at " PTR_FMT,
-				    elm->obj->path,
-				    (void *)(uintptr_t)elm->obj->fini);
+				    elm->obj->path, (void *)elm->obj->fini);
 				LD_UTRACE(UTRACE_FINI_CALL, elm->obj,
-				    (void *)(intptr_t)elm->obj->fini, 0, 0,
+				    (void *)elm->obj->fini, 0, 0,
 				    elm->obj->path);
-				call_initfini_pointer(elm->obj,
-				    elm->obj->fini);
+				call_initfini_pointer(elm->obj, elm->obj->fini);
 			}
 			wlock_acquire(rtld_bind_lock, lockstate);
 			unhold_object(elm->obj);
@@ -3742,7 +3734,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	Objlist_Entry *elm;
 	Obj_Entry *obj;
 	struct dlerror_save *saved_msg;
-	InitArrayEntry *init_addr;
+	uintptr_t *init_addr;
 	void (*reg)(void (*)(void));
 	int index;
 
@@ -3793,28 +3785,24 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 		 * It is legal to have both DT_INIT and DT_INIT_ARRAY defined.
 		 * When this happens, DT_INIT is processed first.
 		 */
-		if (elm->obj->init != NULL) {
+		if (elm->obj->init != (uintptr_t)NULL) {
 			dbg("calling init function for %s at " PTR_FMT,
-			    elm->obj->path,
-			    (void *)(uintptr_t)elm->obj->init);
+			    elm->obj->path, (void *)elm->obj->init);
 			LD_UTRACE(UTRACE_INIT_CALL, elm->obj,
-			    (void *)(intptr_t)elm->obj->init, 0, 0,
-			    elm->obj->path);
+			    (void *)elm->obj->init, 0, 0, elm->obj->path);
 			call_init_pointer(elm->obj, elm->obj->init);
 		}
 		init_addr = elm->obj->init_array;
 		if (init_addr != NULL) {
 			for (index = 0; index < elm->obj->init_array_num;
 			    index++) {
-				if (init_addr[index].value != 0 &&
-				    init_addr[index].value != 1) {
+				if (init_addr[index] != 0 &&
+				    init_addr[index] != 1) {
 				dbg("calling init function for %s at %p",
 					    elm->obj->path,
-					    (void *)(uintptr_t)
-					    init_addr[index].value);
+					    (void *)init_addr[index]);
 					LD_UTRACE(UTRACE_INIT_CALL, elm->obj,
-					    (void *)(uintptr_t)
-					    init_addr[index].value, 0, 0,
+					    (void *)init_addr[index], 0, 0,
 					    elm->obj->path);
 					call_init_array_pointer(elm->obj,
 					    init_addr[index]);
