@@ -332,7 +332,9 @@ MACHINE_CPU += riscv
 . if ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-march=morello
 CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs
+CFLAGS+=	-cheri-codeptr-relocs
 LDFLAGS+=	-march=morello
+LDFLAGS+=	-cheri-codeptr-relocs
 . endif
 
 . if ${MACHINE_ARCH:Maarch64*cb*}
