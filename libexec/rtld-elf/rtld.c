@@ -2999,12 +2999,6 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	const Elf_Dyn *dyn_soname;
 	const Elf_Dyn *dyn_runpath;
 
-#if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE > 1
-	/* debug is not initialized yet so dbg() is a no-op -> use printf()*/
-	rtld_fdprintf(STDERR_FILENO, "rtld: %s(" PTR_FMT ", %p)\n", __func__,
-	    mapbase, aux_info);
-#endif
-
 	/*
 	 * Conjure up an Obj_Entry structure for the dynamic linker.
 	 *
@@ -3047,23 +3041,6 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 
 	/* Initialize the object list. */
 	TAILQ_INIT(&obj_list);
-
-#if defined(RTLD_HAS_CAPRELOCS) && defined(DEBUG_VERBOSE)
-	if (objtmp.cap_relocs) {
-		extern char __start___cap_relocs, __stop___cap_relocs;
-		size_t cap_relocs_size = ((caddr_t)&__stop___cap_relocs -
-		    (caddr_t)&__start___cap_relocs);
-#if DEBUG_VERBOSE > 3
-		rtld_printf("RTLD has DT_CHERI___CAPRELOCS = " PTR_FMT ", "
-		    "__start___cap_relocs= " PTR_FMT "\n"
-		    "DT_CHERI___CAPRELOCSSZ = %zd, difference = %zd\n",
-		    objtmp.cap_relocs, &__start___cap_relocs, cap_relocs_size,
-		    objtmp.cap_relocs_size);
-#endif
-		assert(objtmp.cap_relocs == &__start___cap_relocs);
-		assert(objtmp.cap_relocs_size == cap_relocs_size);
-	}
-#endif
 
 	/* Now that non-local variables can be accesses, copy out obj_rtld. */
 	memcpy(&obj_rtld, &objtmp, sizeof(obj_rtld));
