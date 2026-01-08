@@ -44,10 +44,8 @@ static const char rel_format[] =  " %-25s %6lx %08lx %08lx %7d %10p %08lx\n";
 int debug = 0;
 
 void
-debug_printf(enum RtldDebugCategory cat, const char *format, ...)
+debug_printf(const char *format, ...)
 {
-    dbg_assert(cat != 0);
-    if (debug & cat) {
 	va_list ap;
 	va_start(ap, format);
 
@@ -55,9 +53,7 @@ debug_printf(enum RtldDebugCategory cat, const char *format, ...)
 	rtld_fdputchar(STDERR_FILENO, '\n');
 
 	va_end(ap);
-    }
 }
-
 
 void
 dump_relocations (Obj_Entry *obj0)

@@ -231,6 +231,7 @@ static bool dangerous_ld_env;	    /* True if environment variables have been
 				       used to affect the libraries loaded */
 bool ld_bind_not;		    /* Disable PLT update */
 static const char *ld_bind_now; /* Environment variable for immediate binding */
+static const char *ld_debug;	/* Environment variable for debugging */
 static bool ld_dynamic_weak = true; /* True if non-weak definition overrides
 				       weak definition */
 static const char *ld_library_path; /* Environment variable for search path */
@@ -411,10 +412,6 @@ static struct ld_env_var_desc ld_env_vars[] = {
 	LD_ENV_DESC(LIBMAP_DISABLE, true),
 	LD_ENV_DESC(BIND_NOT, true),
 	LD_ENV_DESC(DEBUG, true, .can_update = true, .debug = true),
-	LD_ENV_DESC(DEBUG_VERBOSE, true),
-	LD_ENV_DESC(DEBUG_CHERI, true),
-	LD_ENV_DESC(DEBUG_STATS, true),
-	LD_ENV_DESC(DEBUG_CATEGORIES, true),
 	LD_ENV_DESC(ELF_HINTS_PATH, true),
 	LD_ENV_DESC(LOADFLTR, true),
 	LD_ENV_DESC(LIBRARY_PATH_RPATH, true, .can_update = true),
@@ -513,20 +510,6 @@ rtld_init_env_vars(char **env)
 {
 	rtld_init_env_vars_for_prefix(env, ld_env_prefix);
 }
-
-#ifdef DEBUG
-static inline bool
-is_env_var_set(int idx)
-{
-	const char *env_var;
-
-	env_var = ld_get_env_var(idx);
-
-	/* return true if the variable is nonnull and not equal to "0" */
-	return (env_var != NULL && *env_var != '\0' &&
-	    __builtin_strcmp(env_var, "0") != 0);
-}
-#endif
 
 static void
 set_ld_elf_hints_path(void)
@@ -834,6 +817,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		}
 	}
 
+	ld_debug = ld_get_env_var(LD_DEBUG);
 	if (ld_bind_now == NULL)
 		ld_bind_not = ld_get_env_var(LD_BIND_NOT) != NULL;
 	ld_dynamic_weak = ld_get_env_var(LD_DYNAMIC_WEAK) == NULL;
@@ -889,19 +873,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #endif
 
 	set_ld_elf_hints_path();
-#ifdef DEBUG
-	if (is_env_var_set(LD_DEBUG))
-		debug = RTLD_DBG_NO_CATEGORY;
-	if (is_env_var_set(LD_DEBUG_VERBOSE))
-		debug = RTLD_DBG_ALL;
-	if (is_env_var_set(LD_DEBUG_CHERI))
-		debug |= RTLD_DBG_CHERI_PLT | RTLD_DBG_CHERI |
-		    RTLD_DBG_CHERI_PLT_VERBOSE;
-	if (is_env_var_set(LD_DEBUG_STATS))
-		debug |= RTLD_DBG_RELOC_STATS;
-	if (ld_get_env_var(LD_DEBUG_CATEGORIES))
-		debug |= parse_integer(ld_get_env_var(LD_DEBUG_CATEGORIES));
-#endif
+	if (ld_debug != NULL && *ld_debug != '\0')
+		debug = 1;
 	dbg("%s is initialized, base address = " PTR_FMT, __progname,
 	    (caddr_t)aux_info[AT_BASE]->a_un.a_ptr);
 	dbg("RTLD dynamic = " PTR_FMT, obj_rtld.dynamic);
@@ -7390,8 +7363,7 @@ rtld_set_var(const char *name, const char *val)
 			lvd->val = NULL;
 		lvd->owned = true;
 		if (lvd->debug)
-			debug = (lvd->val != NULL && *lvd->val != '\0') ?
-			    RTLD_DBG_NO_CATEGORY : 0;
+			debug = lvd->val != NULL && *lvd->val != '\0';
 		return (0);
 	}
 	return (ENOENT);
