@@ -934,28 +934,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		assert(aux_info[AT_PHENT]->a_un.a_val == sizeof(Elf_Phdr));
 		assert(aux_info[AT_ENTRY] != NULL);
 		imgentry = (dlfunc_t)aux_info[AT_ENTRY]->a_un.a_ptr;
-		dbg("Values from kernel:\n\tAT_PHDR=" PTR_FMT "\n"
-		    "\tAT_BASE=" PTR_FMT "\n\tAT_ENTRY=" PTR_FMT "\n",
-		    phdr, aux_info[AT_BASE]->a_un.a_ptr,
-		    (const void *)imgentry);
 		if ((obj_main = digest_phdr(phdr, phnum, imgentry, argv0)) ==
 		    NULL)
 			rtld_die();
-		dbg("Parsed values:\n\tmapbase=" PTR_FMT "\n\tmapsize=%#zx"
-#ifdef __CHERI_PURE_CAPABILITY__
-		    "\n\ttext_rodata=" PTR_FMT
-#endif
-		    "\n\tvaddrbase=%#zx\n\trelocbase=" PTR_FMT "\n",
-		    obj_main->mapbase, obj_main->mapsize,
-#ifdef __CHERI_PURE_CAPABILITY__
-		    obj_main->text_rodata_cap,
-#endif
-		    obj_main->vaddrbase, obj_main->relocbase);
-#ifdef __CHERI_PURE_CAPABILITY__
-		for (unsigned long idx = 0; idx < obj_main->npcc_caps; idx++)
-			dbg("\tpcc_caps[%lu]=" PTR_FMT "\n", idx,
-			    obj_main->pcc_caps[idx]);
-#endif
 	}
 
 	if (aux_info[AT_EXECPATH] != NULL && fd == -1) {
@@ -2149,8 +2130,6 @@ digest_dynamic(Obj_Entry *obj, int early)
 static Obj_Entry *
 digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 {
-	dbg("%s(0, entry=" PTR_FMT ", phdr=" PTR_FMT ", path=%s)\n", __func__,
-	    entry, phdr, path);
 	Obj_Entry *obj;
 	const Elf_Phdr *phlimit = phdr + phnum;
 	const Elf_Phdr *ph;
@@ -3758,11 +3737,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 		}
 		lock_release(rtld_bind_lock, lockstate);
 		if (reg != NULL) {
-			func_ptr_type exit_ptr =
-			    make_rtld_function_pointer(rtld_exit);
-			dbg("Calling __libc_atexit(rtld_exit (" PTR_FMT "))",
-			    (void *)exit_ptr);
-			reg(exit_ptr);
+			reg(make_rtld_function_pointer(rtld_exit));
 			rtld_exit_ptr =
 			    make_rtld_function_pointer(rtld_nop_exit);
 		}
@@ -3795,7 +3770,6 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 				}
 			}
 		}
-		dbg("Done calling init functions for %s", elm->obj->path);
 		wlock_acquire(rtld_bind_lock, lockstate);
 		unhold_object(elm->obj);
 	}
@@ -4715,7 +4689,6 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 		if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 			sym = __DECONST(void *,
 			    make_function_pointer(def, defobj));
-			dbg("dlsym(%s) is function: " PTR_FMT, name, sym);
 #ifdef CHERI_LIB_C18N
 			/*
 			 * XXX Dapeng: Need to handle tail-calls causing the
@@ -4737,8 +4710,6 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 #endif
 		} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 			sym = rtld_resolve_ifunc(defobj, def);
-			dbg("dlsym(%s) is ifunc. Resolved to: " PTR_FMT, name,
-			    sym);
 		} else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
 			ti.ti_module = defobj->tlsindex;
 			ti.ti_offset = def->st_value - TLS_DTV_OFFSET;
@@ -4750,13 +4721,9 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 #if !defined(__riscv) && defined(__CHERI_PURE_CAPABILITY__)
 			sym = cheri_bounds_set(sym, def->st_size);
 #endif
-			dbg("dlsym(%s) is TLS. Resolved to: " PTR_FMT, name,
-			    sym);
-		} else {
+		} else
 			sym = make_data_pointer(def, defobj);
-			dbg("dlsym(%s) is type %d. Resolved to: " PTR_FMT, name,
-			    ELF_ST_TYPE(def->st_info), sym);
-		}
+
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(DEBUG)
 		// FIXME: this warning breaks some tests that expect clean
 		// FIXME: stdout/stderr
@@ -5200,7 +5167,6 @@ linkmap_add(Obj_Entry *obj)
 {
 	struct link_map *l, *prev;
 
-	dbg("Adding %s to linkmap", printable_path(obj->path));
 	l = &obj->linkmap;
 	l->l_name = obj->path;
 	l->l_base = obj->mapbase;
@@ -6957,8 +6923,6 @@ obj_remap_relro(Obj_Entry *obj, int prot)
 		relro_page = obj->relocbase + rtld_trunc_page(ph->p_vaddr);
 		relro_size = rtld_round_page(ph->p_vaddr + ph->p_memsz) -
 		    rtld_trunc_page(ph->p_vaddr);
-		dbg("Enforcing RELRO for %s (%p -> %p)", obj->path, relro_page,
-		    relro_page + relro_size);
 		if (mprotect(relro_page, relro_size, prot) == -1) {
 			_rtld_error(
 			    "%s: Cannot set relro protection to %#x: %s",
