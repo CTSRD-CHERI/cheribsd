@@ -52,7 +52,6 @@ __<bsd.opts.mk>__:
 
 __DEFAULT_YES_OPTIONS = \
     ASSERT_DEBUG \
-    CHERI_CODEPTR_RELOCS \
     DEBUG_FILES \
     DOCCOMPRESS \
     INCLUDES \
