@@ -331,15 +331,9 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 			bss_vlimit = rtld_round_page(segs[i]->p_vaddr +
 			    segs[i]->p_memsz);
 			bss_addr = mapbase + (bss_vaddr - base_vaddr);
-
-			/*
-			 * Map a bit more than required for CheriABI if it is
-			 * not representable.
-			 */
-			size_t bss_len = bss_vlimit - bss_vaddr;
 			if (bss_vlimit > bss_vaddr) {
 				/* There is something to do */
-				if (mmap(bss_addr, bss_len,
+				if (mmap(bss_addr, bss_vlimit - bss_vaddr,
 				    data_prot, data_flags | MAP_ANON, -1,
 				    0) == MAP_FAILED) {
 					_rtld_error(
