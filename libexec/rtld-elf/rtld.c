@@ -3688,9 +3688,6 @@ objlist_call_fini(Objlist *list, Obj_Entry *root, RtldLockState *lockstate)
 			 * It is legal to have both DT_FINI and DT_FINI_ARRAY
 			 * defined. When this happens, DT_FINI_ARRAY is
 			 * processed first.
-			 *
-			 * TODO: we should do a CSetBounds after parsing
-			 * .dynamic.
 			 */
 			fini_addr = elm->obj->fini_array;
 			if (fini_addr != NULL && elm->obj->fini_array_num > 0) {
