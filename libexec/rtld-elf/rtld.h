@@ -129,13 +129,6 @@ typedef struct Struct_Objlist_Entry {
 typedef STAILQ_HEAD(Struct_Objlist, Struct_Objlist_Entry) Objlist;
 
 /* Types of init and fini functions */
-#ifdef __CHERI_PURE_CAPABILITY__
-typedef struct { uintcap_t value; } InitArrayEntry;
-#define initfini_array_addr(entry)	((entry).value)
-#else
-typedef struct { Elf_Addr value; } InitArrayEntry;
-#define initfini_array_addr(entry)	(entry)
-#endif
 typedef void (*InitFunc)(void);
 typedef void (*InitArrFunc)(int, char **, char **);
 
@@ -328,11 +321,11 @@ typedef struct Struct_Obj_Entry {
     const struct func_sig *sigtab;
 #endif
 
-    void *init;			/* Initialization function to call */
-    void *fini;			/* Termination function to call */
-    InitArrayEntry *preinit_array;	/* Pre-initialization array of functions */
-    InitArrayEntry *init_array;	/* Initialization array of functions */
-    InitArrayEntry *fini_array;	/* Termination array of functions */
+    uintptr_t init;		/* Initialization function to call */
+    uintptr_t fini;		/* Termination function to call */
+    uintptr_t *preinit_array;	/* Pre-initialization array of functions */
+    uintptr_t *init_array;	/* Initialization array of functions */
+    uintptr_t *fini_array;	/* Termination array of functions */
     int preinit_array_num;	/* Number of entries in preinit_array */
     int init_array_num; 	/* Number of entries in init_array */
     int fini_array_num; 	/* Number of entries in fini_array */
@@ -571,11 +564,11 @@ __END_DECLS
 
 /* Architectures other than CHERI can just call the pointer */
 #ifndef call_init_array_pointer
-#define call_init_array_pointer(obj, target) call_init_pointer(obj, (target).value)
+#define call_init_array_pointer(obj, target) call_init_pointer(obj, (target))
 #endif
 
 #ifndef call_fini_array_pointer
-#define call_fini_array_pointer(obj, target) call_initfini_pointer(obj, (target).value)
+#define call_fini_array_pointer(obj, target) call_initfini_pointer(obj, (target))
 #endif
 
 #ifndef make_rtld_function_pointer
