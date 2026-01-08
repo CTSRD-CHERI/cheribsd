@@ -155,6 +155,7 @@ CFLAGS+=	-march=morello
 CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs
 CFLAGS+=	-cheri-codeptr-relocs
 LDFLAGS+=	-cheri-codeptr-relocs
+LDFLAGS+=	-Wl,--local-caprelocs=elf
 .endif
 
 .if ${MACHINE_ARCH:Maarch*c*}
