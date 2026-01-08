@@ -79,16 +79,11 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
 #define make_function_pointer(def, defobj) \
 	make_function_cap(def, defobj)
 
-/* ignore _init/_fini */
-#define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
-#define call_init_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
-
-/* TODO: Per-function captable/PLT/FNDESC support (needs CGP) */
-#define call_init_array_pointer(obj, target)				\
-	(((InitArrFunc)(target))(main_argc, main_argv, environ))
-
-#define call_fini_array_pointer(obj, target)				\
+#define call_initfini_pointer(obj, target)				\
 	(((InitFunc)(target))())
+
+#define call_init_pointer(obj, target)					\
+	(((InitArrFunc)(target))(main_argc, main_argv, environ))
 
 #else /* __CHERI_PURE_CAPABILITY__ */
 

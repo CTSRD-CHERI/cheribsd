@@ -79,29 +79,18 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
 #define make_function_pointer(def, defobj) \
 	make_function_cap(def, defobj)
 
-/* ignore _init/_fini */
-#define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
-#define call_init_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
-
-/* TODO: Per-function captable/PLT/FNDESC support */
-#define call_init_array_pointer(obj, target)				\
-	(((InitArrFunc)(target))(main_argc, main_argv, environ))
-
-#define call_fini_array_pointer(obj, target)				\
-	(((InitFunc)(target))())
-
 #else /* __CHERI_PURE_CAPABILITY__ */
 
 #define	make_function_pointer(def, defobj) \
 	((defobj)->relocbase + (def)->st_value)
+
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 #define	call_initfini_pointer(obj, target) \
 	(((InitFunc)(target))())
 
 #define	call_init_pointer(obj, target) \
 	(((InitArrFunc)(target))(main_argc, main_argv, environ))
-
-#endif /* __CHERI_PURE_CAPABILITY__ */
 
 /*
  * Pass zeros into the ifunc resolver so we can change them later. The first
