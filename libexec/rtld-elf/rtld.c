@@ -1168,9 +1168,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		 * functions for binaries linked with old crt1 which calls
 		 * _init itself.
 		 */
-		obj_main->init_ptr = obj_main->fini_ptr = NULL;
-		obj_main->preinit_array_ptr = obj_main->init_array_ptr =
-		    obj_main->fini_array_ptr = NULL;
+		obj_main->init = obj_main->fini = NULL;
+		obj_main->preinit_array = obj_main->init_array =
+		    obj_main->fini_array = NULL;
 	}
 #endif /* #ifndef __CHERI_PURE_CAPABILITY__ */
 
@@ -1901,13 +1901,12 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 			break;
 
 		case DT_INIT:
-			obj->init_ptr = (void *)(obj->relocbase +
+			obj->init = (void *)(obj->relocbase +
 			    dynp->d_un.d_ptr);
 			break;
 
 		case DT_PREINIT_ARRAY:
-			obj->preinit_array_ptr =
-			    (InitArrayEntry *)(obj->relocbase +
+			obj->preinit_array = (InitArrayEntry *)(obj->relocbase +
 				dynp->d_un.d_ptr);
 			break;
 
@@ -1917,8 +1916,7 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 			break;
 
 		case DT_INIT_ARRAY:
-			obj->init_array_ptr =
-			    (InitArrayEntry *)(obj->relocbase +
+			obj->init_array = (InitArrayEntry *)(obj->relocbase +
 				dynp->d_un.d_ptr);
 			break;
 
@@ -1928,12 +1926,12 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 			break;
 
 		case DT_FINI:
-			obj->fini_ptr = (void *)(obj->relocbase +
+			obj->fini = (void *)(obj->relocbase +
 			    dynp->d_un.d_ptr);
 			break;
 
 		case DT_FINI_ARRAY:
-			obj->fini_array_ptr =
+			obj->fini_array =
 			    (InitArrayEntry *)(obj->relocbase +
 				dynp->d_un.d_ptr);
 			break;
@@ -2105,11 +2103,11 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	set_bounds_if_nonnull(obj->strtab, obj->strsize);
 	set_bounds_if_nonnull(obj->phdr, obj->phnum * sizeof(*obj->phdr));
 
-	set_bounds_if_nonnull(obj->preinit_array_ptr,
+	set_bounds_if_nonnull(obj->preinit_array,
 	    obj->preinit_array_num * sizeof(InitArrayEntry));
-	set_bounds_if_nonnull(obj->init_array_ptr,
+	set_bounds_if_nonnull(obj->init_array,
 	    obj->init_array_num * sizeof(InitArrayEntry));
-	set_bounds_if_nonnull(obj->fini_array_ptr,
+	set_bounds_if_nonnull(obj->fini_array,
 	    obj->fini_array_num * sizeof(InitArrayEntry));
 
 #ifdef RTLD_HAS_CAPRELOCS
@@ -3186,7 +3184,7 @@ initlist_add_objects(Obj_Entry *obj, Obj_Entry *tail, Objlist *list)
 	objlist_push_tail(list, obj);
 
 	/* Add the object to the global fini list in the reverse order. */
-	if ((obj->fini_ptr != NULL || obj->fini_array_ptr != NULL) &&
+	if ((obj->fini != NULL || obj->fini_array != NULL) &&
 	    !obj->on_fini_list) {
 		objlist_push_head(&list_fini, obj);
 		obj->on_fini_list = true;
@@ -3620,7 +3618,7 @@ preinit_main(void)
 	InitArrayEntry *preinit_addr;
 	int index;
 
-	preinit_addr = obj_main->preinit_array_ptr;
+	preinit_addr = obj_main->preinit_array;
 	if (preinit_addr == NULL || ld_skip_init_funcs)
 		return;
 
@@ -3686,7 +3684,7 @@ objlist_call_fini(Objlist *list, Obj_Entry *root, RtldLockState *lockstate)
 			 * TODO: we should do a CSetBounds after parsing
 			 * .dynamic.
 			 */
-			fini_addr = elm->obj->fini_array_ptr;
+			fini_addr = elm->obj->fini_array;
 			if (fini_addr != NULL && elm->obj->fini_array_num > 0) {
 				for (index = elm->obj->fini_array_num - 1;
 				    index >= 0; index--) {
@@ -3706,15 +3704,15 @@ objlist_call_fini(Objlist *list, Obj_Entry *root, RtldLockState *lockstate)
 					}
 				}
 			}
-			if (elm->obj->fini_ptr != NULL) {
+			if (elm->obj->fini != NULL) {
 				dbg("calling fini function for %s at " PTR_FMT,
 				    elm->obj->path,
-				    (void *)(uintptr_t)elm->obj->fini_ptr);
+				    (void *)(uintptr_t)elm->obj->fini);
 				LD_UTRACE(UTRACE_FINI_CALL, elm->obj,
-				    (void *)(intptr_t)elm->obj->fini_ptr, 0, 0,
+				    (void *)(intptr_t)elm->obj->fini, 0, 0,
 				    elm->obj->path);
 				call_initfini_pointer(elm->obj,
-				    elm->obj->fini_ptr);
+				    elm->obj->fini);
 			}
 			wlock_acquire(rtld_bind_lock, lockstate);
 			unhold_object(elm->obj);
@@ -3795,16 +3793,16 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 		 * It is legal to have both DT_INIT and DT_INIT_ARRAY defined.
 		 * When this happens, DT_INIT is processed first.
 		 */
-		if (elm->obj->init_ptr != NULL) {
+		if (elm->obj->init != NULL) {
 			dbg("calling init function for %s at " PTR_FMT,
 			    elm->obj->path,
-			    (void *)(uintptr_t)elm->obj->init_ptr);
+			    (void *)(uintptr_t)elm->obj->init);
 			LD_UTRACE(UTRACE_INIT_CALL, elm->obj,
-			    (void *)(intptr_t)elm->obj->init_ptr, 0, 0,
+			    (void *)(intptr_t)elm->obj->init, 0, 0,
 			    elm->obj->path);
-			call_init_pointer(elm->obj, elm->obj->init_ptr);
+			call_init_pointer(elm->obj, elm->obj->init);
 		}
-		init_addr = elm->obj->init_array_ptr;
+		init_addr = elm->obj->init_array;
 		if (init_addr != NULL) {
 			for (index = 0; index < elm->obj->init_array_num;
 			    index++) {
