@@ -46,8 +46,8 @@ unwind_frame(struct thread *td, struct unwind_state *frame)
 	fp = frame->fp;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	if (!cheri_can_access((void *)fp, CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
-	    (ptraddr_t)fp - sizeof(fp) * 2, sizeof(fp) * 2))
+	if (!cheri_can_access((void *)(fp - sizeof(fp) * 2),
+	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP, sizeof(fp) * 2))
 		return (false);
 #endif
 

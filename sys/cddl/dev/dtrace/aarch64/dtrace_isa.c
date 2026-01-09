@@ -146,7 +146,7 @@ dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t pc,
 #if __has_feature(capabilities)
 		if (!cheri_can_access((void * __capability)fp,
 		    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
-		    (ptraddr_t)fp, sizeof (struct unwind_state)))
+		    sizeof(struct unwind_state)))
 			break;
 		pc = dtrace_fucap(
 		    (void * __capability)(fp + sizeof (uintcap_t)));

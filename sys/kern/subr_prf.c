@@ -984,8 +984,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			if (p == NULL)
 				p = "(null)";
 #ifdef __CHERI_PURE_CAPABILITY__
-			else if (!cheri_can_access(p, CHERI_PERM_LOAD,
-			    (ptraddr_t)p, 1))
+			else if (!cheri_can_access(p, CHERI_PERM_LOAD, 1))
 				p = "(invalid)";
 #endif
 			if (!dot)
