@@ -610,35 +610,6 @@
 #define	__DEQUALIFY_CAP		__DEQUALIFY
 #endif
 
-#ifndef __CAP_CHECK
-#if __has_feature(capabilities)
-#define __CAP_CHECK(cap, len) ({					\
-	int ret = __builtin_cheri_tag_get(cap);				\
-	size_t caplen = __builtin_cheri_length_get(cap);		\
-	size_t capoff = __builtin_cheri_offset_get(cap);		\
-	if (capoff < 0 || capoff > caplen || caplen - capoff < (len))	\
-		ret = 0;						\
-	ret;								\
-})
-#else
-#define	__CAP_CHECK(cap, len)	1
-#endif
-#endif
-
-#ifndef __DECAP_CHECK
-#if __has_feature(capabilities)
-#define __DECAP_CHECK(cap, len)						\
-({									\
-	void * __capability tmpcap = (cap);				\
-	if (!__CAP_CHECK((cap), (len)))					\
-		tmpcap = NULL;						\
-	(__cheri_fromcap void *)(tmpcap);				\
-})
-#else
-#define __DECAP_CHECK(cap, len) (cap)
-#endif
-#endif
-
 #if !defined(_STANDALONE) && !defined(_KERNEL)
 #define	__RENAME(x)	__asm(__STRING(x))
 #else /* _STANDALONE || _KERNEL */
