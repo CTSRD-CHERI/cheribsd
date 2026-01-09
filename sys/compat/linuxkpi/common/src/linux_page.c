@@ -240,7 +240,7 @@ __get_user_pages_fast(void * __capability addr, int nr_pages, int write,
 	prot = write ? (VM_PROT_READ | VM_PROT_WRITE) : VM_PROT_READ;
 	len = ptoa((vm_offset_t)nr_pages);
 #if __has_feature(capabilities)
-	if (!__CAP_CHECK(addr, len) || !vm_cap_allows_prot(addr, prot))
+	if (!cheri_can_access(addr, vm_map_prot2perms(prot), len))
 		return (-1);
 #endif
 	MPASS(pages != NULL);
