@@ -1940,8 +1940,11 @@ kern_aio_return(struct thread *td, void * __capability ujob,
 	struct kaioinfo *ki;
 	long status, error;
 
-	if (!__CAP_CHECK(ujob, ops->size()))
+#if __has_feature(capabilities)
+	if (!cheri_can_access(ujob, CHERI_PERM_LOAD | CHERI_PERM_STORE,
+	    ops->size()))
 		return (EINVAL);
+#endif
 	ki = p->p_aioinfo;
 	if (ki == NULL)
 		return (EINVAL);
@@ -2099,10 +2102,13 @@ kern_aio_cancel(struct thread *td, int fd, void * __capability ujob,
 		}
 	}
 
-	if (!__CAP_CHECK(ujob, ops->size())) {
+#if __has_feature(capabilities)
+	if (ujob != NULL && !cheri_can_access(ujob,
+	    CHERI_PERM_LOAD | CHERI_PERM_STORE, ops->size())) {
 		td->td_retval[0] = AIO_NOTCANCELED;
 		return (0);
 	}
+#endif
 	AIO_LOCK(ki);
 	TAILQ_FOREACH_SAFE(job, &ki->kaio_jobqueue, plist, jobn) {
 		if ((fd == job->uaiocb.aio_fildes) &&
@@ -2171,10 +2177,13 @@ kern_aio_error(struct thread *td, struct aiocb * __capability ujob,
 		return (0);
 	}
 
-	if (!__CAP_CHECK(ujob, ops->size())) {
+#if __has_feature(capabilities)
+	if (!cheri_can_access(ujob, CHERI_PERM_LOAD | CHERI_PERM_STORE,
+	    ops->size())) {
 		td->td_retval[0] = EINVAL;
 		return (0);
 	}
+#endif
 	AIO_LOCK(ki);
 	TAILQ_FOREACH(job, &ki->kaio_all, allist) {
 		if (job->ujob == ujob) {

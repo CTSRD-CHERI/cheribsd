@@ -138,7 +138,8 @@ cap_covers_pages(const void * __capability cap, size_t size)
 	size += pageoff;
 	size = (vm_size_t)round_page(size);
 
-	return (__CAP_CHECK(__DECONST_CAP(void * __capability, addr), size));
+	/* Individual syscalls check perms */
+	return (cheri_can_access(addr, 0, size));
 }
 
 static uintcap_t

@@ -894,13 +894,15 @@ umtx_key_get(const void * __capability addr, int type, int share,
 	vm_prot_t prot;
 	boolean_t wired;
 
+#if __has_feature(capabilities)
 	/*
 	 * Make sure the capability point to something valid.  This
 	 * ensures that capabilities from non-CheriABI binaries are
 	 * inside the bounds of the correct DDC.
 	 */
-	if (!__CAP_CHECK(__DECONST_CAP(void * __capability, addr), 0))
+	if (!cheri_can_access(addr, CHERI_PERM_LOAD, 1))
 		return (EPROT);
+#endif
 	key->type = type;
 	if (share == THREAD_SHARE) {
 		key->shared = 0;
