@@ -186,21 +186,6 @@ cheri_is_address_inbounds(const void * __capability cap, ptraddr_t addr)
 	return (addr >= cheri_base_get(cap) && addr < cheri_top_get(cap));
 }
 
-#ifdef _KERNEL
-/*
- * Check if the capability is valid, unsealed, has the given permissions and
- * grants access to length bytes at address base.
- */
-static inline bool
-cheri_can_access(const void * __capability cap, ptraddr_t perms, ptraddr_t base,
-    size_t length)
-{
-	return (cheri_tag_get(cap) && !cheri_is_sealed(cap) &&
-	    (cheri_perms_get(cap) & perms) == perms &&
-	    base >= cheri_base_get(cap) && base + length <= cheri_top_get(cap));
-}
-#endif
-
 static inline size_t
 cheri_bytes_remaining(const void * __capability cap)
 {
@@ -208,6 +193,22 @@ cheri_bytes_remaining(const void * __capability cap)
 		return 0;
 	return cheri_length_get(cap) - cheri_offset_get(cap);
 }
+
+#ifdef _KERNEL
+/*
+ * Check if the capability is valid, unsealed, has the given permissions and
+ * grants access to length bytes at the current address
+ */
+static inline bool
+cheri_can_access(const void * __capability cap, ptraddr_t perms,
+    size_t length)
+{
+	return (cheri_tag_get(cap) && !cheri_is_sealed(cap) &&
+	    (cheri_perms_get(cap) & perms) == perms &&
+	    cheri_address_get(cap) >= cheri_base_get(cap) &&
+	    length <= cheri_bytes_remaining(cap));
+}
+#endif
 
 #define	cheri_stack_get()	__builtin_cheri_stack_get()
 

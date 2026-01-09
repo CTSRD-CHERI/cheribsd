@@ -86,7 +86,7 @@ db_stack_trace_cmd(struct thread *td, struct unwind_state *frame)
 #ifdef __CHERI_PURE_CAPABILITY__
 			if (!cheri_can_access(tf,
 			    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
-			    (ptraddr_t)tf, sizeof(*tf))) {
+			    sizeof(*tf))) {
 				db_printf("--- invalid trapframe %#p\n", tf);
 				break;
 			}

@@ -2545,8 +2545,7 @@ sysctl_kern_proc_c18n(SYSCTL_HANDLER_ARGS)
 		goto out;
 	}
 
-	if (!cheri_can_access(info.stats, CHERI_PERM_LOAD,
-	    (__cheri_addr ptraddr_t)info.stats, info.stats_size)) {
+	if (!cheri_can_access(info.stats, CHERI_PERM_LOAD, info.stats_size)) {
 		error = EPROT;
 		goto out;
 	}
@@ -2578,8 +2577,7 @@ proc_read_string_properly(struct thread *td, struct proc *p,
 	if (len < 1)
 		return (EFAULT);
 	valid = MIN(len, cheri_bytes_remaining(sptr));
-	if (!cheri_can_access(sptr, CHERI_PERM_LOAD,
-	    (__cheri_addr ptraddr_t)sptr, valid))
+	if (!cheri_can_access(sptr, CHERI_PERM_LOAD, valid))
 		return (EPROT);
 	readlen = proc_readmem(td, p, (__cheri_addr ptraddr_t)sptr, buf, valid);
 	if (readlen <= 0)
@@ -2665,7 +2663,6 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	 */
 	if (!cheri_can_access(info.comparts,
 	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
-	    (__cheri_addr vm_offset_t)info.comparts,
 	    info.comparts_size * info.comparts_entry_size)) {
 		error = EPROT;
 		goto out;
