@@ -1438,8 +1438,7 @@ linux_file_read(struct file *file, struct uio *uio, struct ucred *active_cred,
 	linux_get_fop(filp, &fop, &ldev);
 	if (fop->read != NULL) {
 		bytes = OPW(file, td, fop->read(filp,
-		    __DECAP_CHECK(uio->uio_iov->iov_base,
-		    uio->uio_iov->iov_len),
+		    (__cheri_fromcap void *)uio->uio_iov->iov_base,
 		    uio->uio_iov->iov_len, &uio->uio_offset));
 		if (bytes >= 0) {
 			IOVEC_ADVANCE(uio->uio_iov, bytes);
@@ -1478,8 +1477,7 @@ linux_file_write(struct file *file, struct uio *uio, struct ucred *active_cred,
 	linux_get_fop(filp, &fop, &ldev);
 	if (fop->write != NULL) {
 		bytes = OPW(file, td, fop->write(filp,
-		    __DECAP_CHECK(uio->uio_iov->iov_base,
-		    uio->uio_iov->iov_len),
+		    (__cheri_fromcap void *)uio->uio_iov->iov_base,
 		    uio->uio_iov->iov_len, &uio->uio_offset));
 		if (bytes >= 0) {
 			IOVEC_ADVANCE(uio->uio_iov, bytes);
