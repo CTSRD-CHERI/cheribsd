@@ -307,7 +307,16 @@ _bus_dmamap_load_uio(bus_dma_tag_t dmat, bus_dmamap_t map, struct uio *uio,
 		 */
 
 		minlen = resid < iov[i].iov_len ? resid : iov[i].iov_len;
-		addr = __DECAP_CHECK(iov[i].iov_base, minlen);
+#if __has_feature(capabilities)
+		/*
+		 * XXX: In principle, we could derive required permissions
+		 * from uio_rw, but callers don't (and some cases e.g.,
+		 * mpt(4) can't) set uio_rw to a sensible value.
+		 */
+		if (!cheri_can_access(iov[i].iov_base, 0, minlen))
+			return (EPROT);
+#endif
+		addr = (__cheri_fromcap char *)iov[i].iov_base;
 		if (minlen > 0) {
 			error = _bus_dmamap_load_buffer(dmat, map, addr,
 			    minlen, pmap, flags, NULL, nsegs);
