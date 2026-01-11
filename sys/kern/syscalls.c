@@ -267,7 +267,7 @@ const char *syscallnames[] = {
 	"flag_captured",			/* 259 = flag_captured */
 	"cheri_revoke_get_shadow",			/* 260 = cheri_revoke_get_shadow */
 	"cheri_revoke",			/* 261 = cheri_revoke */
-	"#262",			/* 262 = reserved for local use */
+	"msetname",			/* 262 = msetname */
 	"#263",			/* 263 = reserved for local use */
 	"#264",			/* 264 = reserved for local use */
 	"#265",			/* 265 = reserved for local use */
@@ -597,5 +597,4 @@ const char *syscallnames[] = {
 	"getrlimitusage",			/* 589 = getrlimitusage */
 	"fchroot",			/* 590 = fchroot */
 	"setcred",			/* 591 = setcred */
-	"msetname",			/* 592 = msetname */
 };

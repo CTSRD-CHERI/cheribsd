@@ -727,6 +727,11 @@ struct cheri_revoke_args {
 	char start_epoch_l_[PADL_(uint64_t)]; uint64_t start_epoch; char start_epoch_r_[PADR_(uint64_t)];
 	char crsi_l_[PADL_(struct cheri_revoke_syscall_info * __kerncap)]; struct cheri_revoke_syscall_info * __kerncap crsi; char crsi_r_[PADR_(struct cheri_revoke_syscall_info * __kerncap)];
 };
+struct msetname_args {
+	char addr_l_[PADL_(void * __kerncap)]; void * __kerncap addr; char addr_r_[PADR_(void * __kerncap)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char name_l_[PADL_(const char * __kerncap)]; const char * __kerncap name; char name_r_[PADR_(const char * __kerncap)];
+};
 struct lchmod_args {
 	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
@@ -1909,11 +1914,6 @@ struct setcred_args {
 	char wcred_l_[PADL_(const struct setcred * __kerncap)]; const struct setcred * __kerncap wcred; char wcred_r_[PADR_(const struct setcred * __kerncap)];
 	char size_l_[PADL_(size_t)]; size_t size; char size_r_[PADR_(size_t)];
 };
-struct msetname_args {
-	char addr_l_[PADL_(void * __kerncap)]; void * __kerncap addr; char addr_r_[PADR_(void * __kerncap)];
-	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
-	char name_l_[PADL_(const char * __kerncap)]; const char * __kerncap name; char name_r_[PADR_(const char * __kerncap)];
-};
 int	sys_exit(struct thread *, struct exit_args *);
 int	sys_fork(struct thread *, struct fork_args *);
 int	sys_read(struct thread *, struct read_args *);
@@ -2071,6 +2071,7 @@ int	sys_kbounce(struct thread *, struct kbounce_args *);
 int	sys_flag_captured(struct thread *, struct flag_captured_args *);
 int	sys_cheri_revoke_get_shadow(struct thread *, struct cheri_revoke_get_shadow_args *);
 int	sys_cheri_revoke(struct thread *, struct cheri_revoke_args *);
+int	sys_msetname(struct thread *, struct msetname_args *);
 int	sys_lchmod(struct thread *, struct lchmod_args *);
 int	sys_lutimes(struct thread *, struct lutimes_args *);
 int	sys_preadv(struct thread *, struct preadv_args *);
@@ -2320,7 +2321,6 @@ int	sys_kcmp(struct thread *, struct kcmp_args *);
 int	sys_getrlimitusage(struct thread *, struct getrlimitusage_args *);
 int	sys_fchroot(struct thread *, struct fchroot_args *);
 int	sys_setcred(struct thread *, struct setcred_args *);
-int	sys_msetname(struct thread *, struct msetname_args *);
 
 #ifdef COMPAT_43
 
@@ -3034,6 +3034,7 @@ int	freebsd13_swapoff(struct thread *, struct freebsd13_swapoff_args *);
 #define	SYS_AUE_flag_captured	AUE_NULL
 #define	SYS_AUE_cheri_revoke_get_shadow	AUE_NULL
 #define	SYS_AUE_cheri_revoke	AUE_NULL
+#define	SYS_AUE_msetname	AUE_MSETNAME
 #define	SYS_AUE_freebsd11_getdents	AUE_O_GETDENTS
 #define	SYS_AUE_lchmod	AUE_LCHMOD
 #define	SYS_AUE_lutimes	AUE_LUTIMES
@@ -3307,7 +3308,6 @@ int	freebsd13_swapoff(struct thread *, struct freebsd13_swapoff_args *);
 #define	SYS_AUE_getrlimitusage	AUE_NULL
 #define	SYS_AUE_fchroot	AUE_NULL
 #define	SYS_AUE_setcred	AUE_SETCRED
-#define	SYS_AUE_msetname	AUE_MSETNAME
 
 #undef PAD_
 #undef PADL_

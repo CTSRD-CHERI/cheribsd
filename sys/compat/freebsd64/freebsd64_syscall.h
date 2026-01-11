@@ -236,6 +236,7 @@
 #define	FREEBSD64_SYS_freebsd64_lio_listio	257
 #define	FREEBSD64_SYS_freebsd64_kbounce	258
 #define	FREEBSD64_SYS_freebsd64_flag_captured	259
+#define	FREEBSD64_SYS_freebsd64_msetname	262
 #define	FREEBSD64_SYS_freebsd11_freebsd64_getdents	272
 #define	FREEBSD64_SYS_freebsd64_lchmod	274
 				/* 275 is obsolete netbsd_lchown */
@@ -531,5 +532,4 @@
 #define	FREEBSD64_SYS_freebsd64_getrlimitusage	589
 #define	FREEBSD64_SYS_fchroot	590
 #define	FREEBSD64_SYS_freebsd64_setcred	591
-#define	FREEBSD64_SYS_freebsd64_msetname	592
-#define	FREEBSD64_SYS_MAXSYSCALL	593
+#define	FREEBSD64_SYS_MAXSYSCALL	592

@@ -267,7 +267,7 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_flag_captured",			/* 259 = freebsd64_flag_captured */
 	"#260",			/* 260 = cheri_revoke_get_shadow */
 	"#261",			/* 261 = cheri_revoke */
-	"#262",			/* 262 = reserved for local use */
+	"freebsd64_msetname",			/* 262 = freebsd64_msetname */
 	"#263",			/* 263 = reserved for local use */
 	"#264",			/* 264 = reserved for local use */
 	"#265",			/* 265 = reserved for local use */
@@ -597,5 +597,4 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_getrlimitusage",			/* 589 = freebsd64_getrlimitusage */
 	"fchroot",			/* 590 = fchroot */
 	"freebsd64_setcred",			/* 591 = freebsd64_setcred */
-	"freebsd64_msetname",			/* 592 = freebsd64_msetname */
 };

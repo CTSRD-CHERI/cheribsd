@@ -222,6 +222,7 @@ typedef int (__sys_lio_listio_t)(int, struct aiocb * __kerncap const * __kerncap
 typedef int (__sys_kbounce_t)(const void * __kerncap, void * __kerncap, size_t, int);
 typedef int (__sys_cheri_revoke_get_shadow_t)(int, void * __kerncap, void * __kerncap);
 typedef void * (__sys_cheri_revoke_t)(int, uint64_t, struct cheri_revoke_syscall_info * __kerncap);
+typedef int (__sys_msetname_t)(void * __kerncap, size_t, const char * __kerncap);
 typedef int (__sys_lchmod_t)(const char * __kerncap, mode_t);
 typedef int (__sys_lutimes_t)(const char * __kerncap, const struct timeval * __kerncap);
 typedef ssize_t (__sys_preadv_t)(int, struct iovec * __kerncap, u_int, off_t);
@@ -470,7 +471,6 @@ typedef int (__sys_kcmp_t)(pid_t, pid_t, int, kuintcap_t, kuintcap_t);
 typedef int (__sys_getrlimitusage_t)(u_int, int, rlim_t * __kerncap);
 typedef int (__sys_fchroot_t)(int);
 typedef int (__sys_setcred_t)(u_int, const struct setcred * __kerncap, size_t);
-typedef int (__sys_msetname_t)(void * __kerncap, size_t, const char * __kerncap);
 
 void __sys_exit(int rval);
 int __sys_fork(void);
@@ -628,6 +628,7 @@ int __sys_lio_listio(int mode, struct aiocb * __kerncap const * __kerncap acb_li
 int __sys_kbounce(const void * __kerncap src, void * __kerncap dst, size_t len, int flags);
 int __sys_cheri_revoke_get_shadow(int flags, void * __kerncap arena, void * __kerncap shadow);
 void * __sys_cheri_revoke(int flags, uint64_t start_epoch, struct cheri_revoke_syscall_info * __kerncap crsi);
+int __sys_msetname(void * __kerncap addr, size_t len, const char * __kerncap name);
 int __sys_lchmod(const char * __kerncap path, mode_t mode);
 int __sys_lutimes(const char * __kerncap path, const struct timeval * __kerncap tptr);
 ssize_t __sys_preadv(int fd, struct iovec * __kerncap iovp, u_int iovcnt, off_t offset);
@@ -876,7 +877,6 @@ int __sys_kcmp(pid_t pid1, pid_t pid2, int type, kuintcap_t idx1, kuintcap_t idx
 int __sys_getrlimitusage(u_int which, int flags, rlim_t * __kerncap res);
 int __sys_fchroot(int fd);
 int __sys_setcred(u_int flags, const struct setcred * __kerncap wcred, size_t size);
-int __sys_msetname(void * __kerncap addr, size_t len, const char * __kerncap name);
 __END_DECLS
 
 #endif /* __LIBSYS_H_ */

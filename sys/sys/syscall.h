@@ -238,6 +238,7 @@
 #define	SYS_flag_captured	259
 #define	SYS_cheri_revoke_get_shadow	260
 #define	SYS_cheri_revoke	261
+#define	SYS_msetname	262
 #define	SYS_freebsd11_getdents	272
 #define	SYS_lchmod	274
 				/* 275 is obsolete netbsd_lchown */
@@ -533,5 +534,4 @@
 #define	SYS_getrlimitusage	589
 #define	SYS_fchroot	590
 #define	SYS_setcred	591
-#define	SYS_msetname	592
-#define	SYS_MAXSYSCALL	593
+#define	SYS_MAXSYSCALL	592

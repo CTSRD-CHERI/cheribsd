@@ -165,6 +165,7 @@ static int sysargmask[] = {
 	[SYS_flag_captured] = (0x0 | 0x1),
 	[SYS_cheri_revoke_get_shadow] = (0x0 | 0x2 | 0x4),
 	[SYS_cheri_revoke] = (0x0 | 0x4),
+	[SYS_msetname] = (0x0 | 0x1 | 0x4),
 	[SYS_lchmod] = (0x0 | 0x1),
 	[SYS_lutimes] = (0x0 | 0x1 | 0x2),
 	[SYS_preadv] = (0x0 | 0x2),
@@ -414,7 +415,6 @@ static int sysargmask[] = {
 	[SYS_getrlimitusage] = (0x0 | 0x4),
 	[SYS_fchroot] = (0x0),
 	[SYS_setcred] = (0x0 | 0x2),
-	[SYS_msetname] = (0x0 | 0x1 | 0x4),
 };
 
 #endif /* !_SYSARGMAP_H_ */

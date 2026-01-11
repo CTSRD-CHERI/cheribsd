@@ -173,6 +173,7 @@ MIASM =  \
 	kbounce.o \
 	cheri_revoke_get_shadow.o \
 	cheri_revoke.o \
+	msetname.o \
 	freebsd11_getdents.o \
 	lchmod.o \
 	lutimes.o \
@@ -437,5 +438,4 @@ MIASM =  \
 	kcmp.o \
 	getrlimitusage.o \
 	fchroot.o \
-	setcred.o \
-	msetname.o
+	setcred.o
