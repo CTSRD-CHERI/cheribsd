@@ -117,9 +117,6 @@
  */
 	.globl _alt_start
 _alt_start:
-	li	a0, 0
-	li	a1, 0
-
 #if 0
 #ifdef __riscv_zcheripurecap
 //.option push
@@ -235,6 +232,35 @@ _alt_start:
  */
 	.globl _start
 _start:
+
+#if 0
+#ifdef __riscv_zcheripurecap
+//.option push
+//.option capmode
+//modesw.cap
+       csrr    ct0, ddc
+       li      t1, 0x10101000
+       scaddr  ct0, ct0, t1
+       li      t1, 0x61
+       sb      t1, 0(ct0)
+//modesw.int
+//.option nocapmode
+//.option pop
+#endif
+#endif
+
+#ifdef __riscv_zcheripurecap
+	modesw.cap
+#endif
+
+#if 0
+	li	a0, 0x66
+	li	a6, 0
+	li	a7, 1 // sbi console putc
+	ecall
+	li	a0, 0
+#endif
+
 	/* Set the global pointer */
 #ifdef __CHERI_PURE_CAPABILITY__
 	_CMV	PTR(gp), PTR(null)
@@ -363,6 +389,14 @@ pagetables:
 	_CADD	PTR(t0), PTR(t0), t1
 	_CSRW	CSR_STVEC, PTR(t0)
 
+#if 0
+       csrr    ct0, ddc
+       li      t1, 0x10101000
+       scaddr  ct0, ct0, t1
+       li      t1, 0x62
+       sb      t1, 0(ct0)
+#endif
+
 	/* Set page tables base register */
 	_LLC	PTR(s2), bootstrap_pt_l1
 	srli	s2, s2, PAGE_SHIFT
@@ -403,6 +437,14 @@ va:
 1:
 #endif
 
+#if 0
+	li	a0, 0x67
+	li	a6, 0
+	li	a7, 1 // sbi console putc
+	ecall
+	li	a0, 0
+#endif
+
 	/* Set the trap vector to the real handler. */
 	set_exception_handler
 
@@ -427,6 +469,15 @@ va:
 	/* Allocate space for thread0 PCB and riscv_bootparams */
 	_CADDI	PTR(sp), PTR(sp), -(PCB_SIZE + RISCV_BOOTPARAMS_SIZE) & ~STACKALIGNBYTES
 
+#if 0
+	li	a0, 0x68
+	li	a6, 0
+	li	a7, 1 // sbi console putc
+	ecall
+	li	a0, 0
+#endif
+
+#if 0
 	/* Clear BSS */
 	_LLC	PTR(s0), _C_LABEL(__bss_start)
 	_LLC	PTR(s1), _C_LABEL(_end)
@@ -434,11 +485,33 @@ va:
 	_SD	zero, 0(PTR(s0))
 	_CADDI	PTR(s0), PTR(s0), 8
 	bltu	s0, s1, 1b
+#endif
+
+#if 0
+	li	a0, 0x69
+	li	a6, 0
+	li	a7, 1 // sbi console putc
+	ecall
+	li	a0, 0
+#endif
 
 	/* Save omnipotent DDC and clear kernel's DDC. */
 	_CSRR	PTR(s0), ddc
 	_CMV	PTR(t0), cnull
 	_CSRW	ddc, PTR(t0)
+
+#if 0
+	li	a0, 0x70
+	li	a6, 0
+	li	a7, 1 // sbi console putc
+	ecall
+	li	a0, 0
+#endif
+
+#if 0
+	slti zero, zero, 0x1e // To end tracing
+	slti zero, zero, 0x1b // To start tracing
+#endif
 
 	/* Initialize cap relocs. */
 	li	t0, CHERI_PERMS_KERNEL_DATA
@@ -460,10 +533,26 @@ va:
 	_LLC	PTR(ra), _C_LABEL(init_linker_file_cap_relocs)
 	_JALR	PTR(ra)
 
+#if 0
+	li	a0, 0x72
+	li	a6, 0
+	li	a7, 1 // sbi console putc
+	ecall
+	li	a0, 0
+#endif
+
 	/* Initialize capabilities. */
 	_CMV	PTR(a0), PTR(s0)
 	_LGC	PTR(ra), _C_LABEL(cheri_init_capabilities)
 	_JALR	PTR(ra)
+
+#if 0
+	li	a0, 0x73
+	li	a6, 0
+	li	a7, 1 // sbi console putc
+	ecall
+	li	a0, 0
+#endif
 
 	/* Fill riscv_bootparams */
 	_SD	s9, RISCV_BOOTPARAMS_KERN_PHYS(PTR(sp))
@@ -479,6 +568,14 @@ va:
 	_CMV	PTR(s1), cnull
 	_CMV	PTR(s2), cnull
 	_CMV	PTR(s3), cnull
+
+#if 0
+	li	a0, 0x73
+	li	a6, 0
+	li	a7, 1 // sbi console putc
+	ecall
+	li	a0, 0
+#endif
 
 	li	t0, RISCV_BOOTPARAMS_SIZE
 	_SCBNDSR	PTR(a0), PTR(sp), t0
