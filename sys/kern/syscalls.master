@@ -969,6 +969,8 @@
 		    _Inout_ __socklen_t *alen
 		);
 	}
+; 151 coexecve
+; 152 coexecvec
 151-153	AUE_NULL	RESERVED
 ; 154 is initialised by the NLM code, if present.
 154	AUE_NULL	NOSTD {
@@ -1049,6 +1051,8 @@
 		    _Inout_ struct rtprio *rtp
 		);
 	}
+; 167 capfromfd
+; 168 captofd
 167-168	AUE_NULL	RESERVED
 169	AUE_SEMSYS	NOSTD {
 		int semsys(
@@ -1106,6 +1110,10 @@
 		    _Inout_ _Contains_long_ struct timex *tp
 		);
 	}
+; 177 _cosetup
+; 178 coregister
+; 179 colookup
+; 180 copark
 177-180	AUE_NULL	RESERVED
 181	AUE_SETGID	STD|CAPENABLED {
 		int setgid(
@@ -1156,6 +1164,7 @@
 		    int name
 		);
 	}
+; 193 cogetpid
 193	AUE_NULL	RESERVED
 194	AUE_GETRLIMIT	STD|CAPENABLED {
 		int getrlimit(
@@ -3076,7 +3085,9 @@
 		    int flag
 		);
 	}
+; 548 cocall_slow
 548	AUE_NULL	OBSOL	numa_getaffinity
+; 549 coaccept_slow
 549	AUE_NULL	OBSOL	numa_setaffinity
 550	AUE_FSYNC	STD|CAPENABLED {
 		int fdatasync(
