@@ -679,10 +679,16 @@ elf_init(elf_file_t ef, Elf_Dyn *dynp, void *relocbase, ptraddr_t baseend,
 	code_cap = cheri_setbounds(code_cap, baseend - KERNBASE);
 #endif
 	data_cap = cheri_setbounds(data_cap, cheri_getlength(code_cap));
+#if defined(__aarch64__)
 	elf_reloc_self(dynp, data_cap, code_cap);
-#else
+#elif defined(__riscv)
+	code_cap = cheri_capmode(code_cap);
+	init_cap_relocs(data_cap, code_cap);
 	elf_init_data();
 #endif
+#else /* !__CHERI_PURE_CAPABILITY__ */
+	elf_init_data();
+#endif /* __CHERI_PURE_CAPABILITY__ */
 }
 
 void

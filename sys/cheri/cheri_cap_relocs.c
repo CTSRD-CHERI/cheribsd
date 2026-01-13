@@ -33,7 +33,7 @@
 #include <sys/types.h>
 #include <cheri_init_globals.h>
 
-/* Invoked from locore. */
+/* Invoked from link_elf. */
 extern void init_cap_relocs(void *data_cap, void *code_cap);
 
 void

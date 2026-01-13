@@ -378,12 +378,35 @@ va:
 	/* Save DTB physical pointer in s1. */
 	mv	s1, a1
 
-	/* Initialize cap relocs. */
-	li	t0, CHERI_PERMS_KERNEL_DATA
-	candperm ca0, cs0, t0
-	cllc	cra, _C_LABEL(init_cap_relocs)
-	li	t0, CHERI_PERMS_KERNEL_CODE
-	candperm ca1, cra, t0
+	/*
+	 * Initialize kernel's ELF file.
+	 *
+	 * Statically relocate dependencies of dynamic relocation routines and
+	 * pass them as arguments to the relocation routines. The dependencies
+	 * must be reachable from DDC and PCC at this stage.
+	 *
+	 * Also, relocate the kernel itself to construct valid capabilities.
+	 */
+
+	li	a2, CHERI_PERMS_KERNEL_DATA
+	candperm ca2, cs0, a2
+
+	cllc	ca0, _C_LABEL(elf_kernel_file)
+	cllc	ca1, _C_LABEL(_DYNAMIC)
+	cllc	ca3, _C_LABEL(_end)
+	cllc	ca4, _C_LABEL(elf_kernel_plts)
+
+	csetaddr ca0, ca2, a0
+	csetaddr ca1, ca2, a1
+	csetaddr ca4, ca2, a4
+
+	/*
+	 * Pass DDC without restrictions. We use it as a relocation base that
+	 * must be both executable and writable.
+	 */
+	cmove	ca2, cs0
+
+	cllc	cra, _C_LABEL(elf_init)
 	cjalr	cra
 
 	/* Initialize capabilities. */
@@ -434,6 +457,16 @@ va:
 
 	/* Save DTB physical pointer in s1. */
 	mv	s1, a1
+
+	/*
+	 * Initialize kernel's ELF file.
+	 */
+	la	a0, _C_LABEL(elf_kernel_file)
+	la	a1, _C_LABEL(_DYNAMIC)
+	mv	a2, zero
+	la	a3, _C_LABEL(_end)
+	la	a4, _C_LABEL(elf_kernel_plts)
+	call	_C_LABEL(elf_init)
 
 #if __has_feature(capabilities)
 	/* Initialize capabilities. */
