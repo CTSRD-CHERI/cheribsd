@@ -42,7 +42,9 @@ if (!env.CHANGE_ID && (archiveBranches.contains(env.BRANCH_NAME) || env.BRANCH_N
 }
 // Add an architecture selector for manual builds
 def allArchitectures = [
-        "morello-hybrid", "morello-purecap"
+        "aarch64",
+        "morello-hybrid", "morello-purecap",
+        "riscv64", "riscv64-hybrid", "riscv64-purecap"
 ]
 jobProperties.add(parameters([
         text(defaultValue: allArchitectures.join('\n'),
