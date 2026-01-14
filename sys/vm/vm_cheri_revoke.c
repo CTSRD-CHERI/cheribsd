@@ -1131,7 +1131,7 @@ out:
 	if (pinned)
 		sched_unpin();
 
-	vm_map_lock(crc->map);
+	vm_map_lock(map);
 
 	return (res);
 }
