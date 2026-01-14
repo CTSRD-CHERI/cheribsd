@@ -40,17 +40,6 @@
 MALLOC_DECLARE(M_LINKER);
 #endif
 
-/* Maximum number of PLTs in the kernel binary. */
-#define	KERNEL_MAXPLTS		11
-/* Maximum number of PCCs in the kernel binary. */
-#define	KERNEL_MAXPCCS		KERNEL_MAXPLTS
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-/*
- * Maximum number of compartments (except for the default) in the kernel binary.
- */
-#define	KERNEL_MAXC18NS		(KERNEL_MAXPLTS - 1)
-#endif
-
 struct mod_depend;
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 struct thread;
