@@ -375,10 +375,10 @@ kern_cheri_revoke(struct thread *td, int flags,
 		return (EINVAL);
 	}
 
-	/* Serialize and figure out what we're supposed to do */
-	vm_map_lock(map);
+	vm_map_lock_read(map);
 	{
 		int ires = 0;
+		bool readlocked = true;
 
 		KASSERT(!vm_map_is_system(map), ("%s: system map?", __func__));
 
@@ -391,9 +391,6 @@ kern_cheri_revoke(struct thread *td, int flags,
 			start_epoch = cheri_revoke_st_get_epoch(
 			    map->vm_cheri_revoke_st);
 		}
-
-		if (!map->vm_cheri_revoke_quarantining)
-			map->vm_cheri_revoke_quarantining = true;
 
 reentry:
 		epoch = cheri_revoke_st_get_epoch(map->vm_cheri_revoke_st);
@@ -423,7 +420,10 @@ fast_out:
 				    &map->vm_cheri_revoke_stats;
 			}
 #endif
-			vm_map_unlock(map);
+			if (readlocked)
+				vm_map_unlock_read(map);
+			else
+				vm_map_unlock(map);
 			cv_signal(&map->vm_cheri_revoke_cv);
 
 			return (cheri_revoke_fini(crsi, ires, crstp,
@@ -469,6 +469,13 @@ fast_out:
 					goto fast_out;
 				}
 
+				if (readlocked && vm_map_lock_upgrade(map)) {
+					readlocked = false;
+					vm_map_lock(map);
+					goto reentry;
+				}
+				readlocked = false;
+
 				if (map->vm_cheri_async_revoke_status ==
 				    KERN_SUCCESS) {
 					/*
@@ -500,7 +507,10 @@ fast_out:
 			ires = cv_wait_sig(&map->vm_cheri_revoke_cv,
 			    &map->lock);
 			if (ires != 0) {
-				vm_map_unlock(map);
+				if (readlocked)
+					vm_map_unlock_read(map);
+				else
+					vm_map_unlock(map);
 				cv_signal(&map->vm_cheri_revoke_cv);
 				return (ires);
 			}
@@ -514,6 +524,16 @@ fast_out:
 		KASSERT((myst == CHERI_REVOKE_ST_INITING) ||
 			(myst == CHERI_REVOKE_ST_CLOSING),
 		    ("Beginning revocation with bad current state"));
+
+		if (readlocked && vm_map_lock_upgrade(map)) {
+			readlocked = false;
+			vm_map_lock(map);
+			goto reentry;
+		}
+		readlocked = false;
+
+		if (!map->vm_cheri_revoke_quarantining)
+			map->vm_cheri_revoke_quarantining = true;
 
 		if (entryst == CHERI_REVOKE_ST_NONE) {
 			int test_flags =
