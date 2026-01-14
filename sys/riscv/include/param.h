@@ -106,6 +106,11 @@
 #define	KSTACK_GUARD_PAGES	1	/* pages of kstack guard; 0 disables */
 #define	PCPU_PAGES		1
 
+/* Maximum number of PLTs in the kernel binary. */
+#define	KERNEL_MAXPLTS		11
+/* Maximum number of PCCs in the kernel binary. */
+#define	KERNEL_MAXPCCS		KERNEL_MAXPLTS
+
 /*
  * Mach derived conversion macros
  */
