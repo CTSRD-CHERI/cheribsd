@@ -357,6 +357,9 @@ cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t size)
 
 	pcpu->pc_acpi_id = 0xffffffff;
 	pcpu->pc_mpidr = UINT64_MAX;
+#ifdef CHERI_CAPREVOKE_KERNEL
+	pcpu->pc_kmem_revoke_state = NULL;
+#endif
 }
 
 void
@@ -783,11 +786,10 @@ init_cpu_pcpup(struct pcpu *pcpup)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
 #ifdef CHERI_CAPREVOKE_KERNEL
-	kmem_revoke_root_page[pcpup->pc_cpuid].pcpup = pcpup;
 	__asm __volatile(
 		"mov c18, %0 \n"
 		"msr ctpidr_el1, %1"
-		:: "C"(pcpup), "C"(&kmem_revoke_root_page[pcpup->pc_cpuid]));
+		:: "C"(pcpup), "C"(pcpup->pc_kmem_revoke_state));
 #else /* ! CHERI_CAPREVOKE_MACHDEP */
 	__asm __volatile(
 		"mov c18, %0 \n"
@@ -907,6 +909,13 @@ initarm(struct arm64_bootparams *abp)
 #endif
 #ifdef CHERI_CAPREVOKE_KERNEL
 	pmap_krevoke_bootstrap();
+	/*
+	 * XXX-AM: Note that we delay the initialization of the pcpup
+	 * kmem revoke state until we have the pmap and DMAP bootstrapped.
+	 * This means that between init_cpu_pcpup() and here the ctpidr_el1
+	 * register is NULL, but the pcpu pointer in c18 is valid.
+	 */
+	WRITE_SPECIALREG_CAP(ctpidr_el1, kmem_revoke_md_init_pcpu0(pcpup));
 #endif
 	physmem_init_kernel_globals();
 

@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/malloc.h>
 #include <sys/unistd.h>
 #include <sys/proc.h>
 
@@ -401,6 +402,11 @@ vm_cheri_revoke_page_ro(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 
 #ifdef CHERI_CAPREVOKE_KERNEL
 /*
+ * Static .bss storage for the CPU0 revocation trap handler state.
+ */
+static char _Alignas(PAGE_SIZE) kmem_revoke_pcpu0_store[PAGE_SIZE];
+
+/*
  * Paint the first word of the shadow bitmap corresponding to an object
  * to be revoked.
  *
@@ -455,5 +461,77 @@ kmem_shadow_set_first_word(uint64_t *shadow, void *obj, uint64_t mask)
 	);
 
 	return (stxr_status == 0);
+}
+
+/*
+ * Allocate a page for the revoker per-CPU state and initialize it.
+ *
+ * The per-CPU state is used to bootstrap a small non-faulting environment
+ * for the kernel CLG fault handler.
+ * This also (re)initializes the ctpidr_el1 register with the DMAP capability
+ * to the revoker per-CPU state.
+ *
+ * Note: this must be called after vm_page_startup().
+ */
+struct kmem_revoke_pcpu *
+kmem_revoke_md_alloc_pcpu(int domain, struct pcpu *pcpup)
+{
+	struct kmem_revoke_pcpu *pcpu_state;
+	vm_page_t m;
+	vm_paddr_t paddr;
+
+	m = vm_page_alloc_noobj_domain(domain, VM_ALLOC_ZERO |
+	    VM_ALLOC_NOFREE | M_WAITOK);
+	if (m == NULL) {
+		/* Fall back to any domain */
+		m = vm_page_alloc_noobj(VM_ALLOC_ZERO | VM_ALLOC_NOFREE |
+		    M_WAITOK);
+		if (m == NULL)
+			panic("Can not allocate pcpu kmem revoke state");
+	}
+
+	paddr = VM_PAGE_TO_PHYS(m);
+	pcpu_state = (struct kmem_revoke_pcpu *)PHYS_TO_DMAP_LEN(
+	    paddr + PAGE_SIZE - sizeof(*pcpu_state), sizeof(*pcpu_state));
+
+	pcpu_state->pcpup = pcpup;
+	pcpu_state->dmap_cap = dmap_base_cap;
+	pcpu_state->dmap_phys_base = dmap_phys_base;
+	pcpu_state->shadow_cap = kernel_shadow_root_cap;
+	pcpu_state->clg_fault_kstack = (void *)PHYS_TO_DMAP_LEN(paddr,
+	    PAGE_SIZE - sizeof(*pcpu_state));
+	pcpup->pc_kmem_revoke_state = pcpu_state;
+
+	return (pcpu_state);
+}
+
+/*
+ * Initialize the boot CPU revoker state.
+ *
+ * We can't allocate a page because vm_page is not yet bootstrapped,
+ * use a pre-allocated page instead.
+ * XXX-AM: We could steal a page from an appropriate physmem segment,
+ * this is more complicated but likely it would be a cleaner
+ * thing to do.
+ */
+struct kmem_revoke_pcpu *
+kmem_revoke_md_init_pcpu0(struct pcpu *pcpup)
+{
+	struct kmem_revoke_pcpu *pcpu_state;
+	vm_paddr_t paddr;
+
+	paddr = pmap_kextract((ptraddr_t)kmem_revoke_pcpu0_store);
+	pcpu_state = (struct kmem_revoke_pcpu *)PHYS_TO_DMAP_LEN(
+	    paddr + PAGE_SIZE - sizeof(*pcpu_state), sizeof(*pcpu_state));
+
+	pcpu_state->pcpup = pcpup;
+	pcpu_state->dmap_cap = dmap_base_cap;
+	pcpu_state->dmap_phys_base = dmap_phys_base;
+	pcpu_state->shadow_cap = kernel_shadow_root_cap;
+	pcpu_state->clg_fault_kstack = (void *)PHYS_TO_DMAP_LEN(paddr,
+	    PAGE_SIZE - sizeof(*pcpu_state));
+	pcpup->pc_kmem_revoke_state = pcpu_state;
+
+	return (pcpu_state);
 }
 #endif

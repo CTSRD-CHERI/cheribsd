@@ -515,6 +515,9 @@ start_cpu(u_int cpuid, uint64_t target_cpu, int domain, vm_paddr_t release_addr)
 	pcpu_init(pcpup, cpuid, sizeof(struct pcpu));
 	pcpup->pc_mpidr = target_cpu & CPU_AFF_MASK;
 	bootpcpu = pcpup;
+#ifdef CHERI_CAPREVOKE_KERNEL
+	kmem_revoke_md_alloc_pcpu(domain, pcpup);
+#endif
 
 	dpcpu[cpuid - 1] = (void *)(pcpup + 1);
 	dpcpu_init(dpcpu[cpuid - 1], cpuid);

@@ -7054,18 +7054,12 @@ pmap_krevoke_bootstrap_allocate_l2(vm_paddr_t plow, vm_paddr_t phigh,
 void
 pmap_krevoke_bootstrap(void)
 {
-	void *pcpu_root;
 	pd_entry_t *l0, *l1;
 	vm_paddr_t l1_pa, l2_pa;
 	vm_paddr_t plow, phigh;
 	vm_offset_t kva;
 	vm_offset_t shadow_va;
 	int i;
-
-	__asm __volatile("mrs %0, ctpidr_el1" : "=C"(pcpu_root) :);
-	pcpu_root = (void *)PHYS_TO_DMAP_LEN(vtophys(pcpu_root),
-	    sizeof(struct kmem_revoke_pcpu_root));
-	__asm __volatile("msr ctpidr_el1, %0" :: "C"(pcpu_root));
 
 	/*
 	 * Rebuild physmap, we may have excluded more regions from

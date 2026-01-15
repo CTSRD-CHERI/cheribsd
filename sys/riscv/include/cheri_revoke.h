@@ -27,29 +27,4 @@
 #ifndef _MACHINE_CHERI_REVOKE_H_
 #define _MACHINE_CHERI_REVOKE_H_
 
-#include <sys/kassert.h>
-#include <machine/param.h>
-
-#ifdef _KERNEL
-#ifdef CHERI_CAPREVOKE_KERNEL
-/*
- * Kernel revocation per-CPU state.
- * These are accessed via non-CLG trapping memory in the fault handlers.
- * Note that a whole page is allocated for each CPU and it includes
- * non-CLG trapping stack space for the CLG fault handler.
- */
-struct kmem_revoke_pcpu {
-	struct pcpu *pcpup;		/* Kernel pcpu data (not in DMAP) */
-	void *dmap_cap;			/* Direct map capability */
-	vm_paddr_t dmap_phys_base;	/* DMAP base phys addr */
-	void *shadow_cap;		/* Kernel shadow bitmap capability */
-	void *clg_fault_kstack;		/* CLG fault handler stack (DMAP cap) */
-};
-
-struct kmem_revoke_pcpu *kmem_revoke_md_init_pcpu0(struct pcpu *pcpup);
-struct kmem_revoke_pcpu *kmem_revoke_md_alloc_pcpu(int domain,
-    struct pcpu *pcpup);
-#endif /* CHERI_CAPREVOKE_KERNEL */
-#endif /* _KERNEL */
-
 #endif	/* !_MACHINE_CHERI_REVOKE_H_ */

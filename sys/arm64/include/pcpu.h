@@ -46,6 +46,13 @@ struct debug_monitor_state;
 #define	PCPU_MD_FIELDS_PAD 197
 #endif
 
+#ifdef CHERI_CAPREVOKE_KERNEL
+struct kmem_revoke_pcpu;
+#define	KMEM_REVOKE_PCPU_STATE struct kmem_revoke_pcpu *pc_kmem_revoke_state
+#else
+#define	KMEM_REVOKE_PCPU_STATE
+#endif
+
 #define	PCPU_MD_FIELDS							\
 	u_int	pc_acpi_id;	/* ACPI CPU id */			\
 	u_int	pc_midr;	/* stored MIDR value */			\
@@ -56,6 +63,7 @@ struct debug_monitor_state;
 	struct pmap *pc_curvmpmap;					\
 	uint64_t pc_mpidr;						\
 	u_int	pc_bcast_tlbi_workaround;				\
+	KMEM_REVOKE_PCPU_STATE;						\
 	char __pad[PCPU_MD_FIELDS_PAD]	/* Pad to factor of PAGE_SIZE */
 
 #ifdef _KERNEL
