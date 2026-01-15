@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2025 Alfredo Mazzinghi <alfredo@capabilitieslimited.co.uk>
- * Copyright (c) 2025 Capabilities Limited
+ * Copyright (c) 2025-2026 Alfredo Mazzinghi <alfredo@capabilitieslimited.co.uk>
+ * Copyright (c) 2025-2026 Capabilities Limited
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,22 +31,25 @@
 #include <machine/param.h>
 
 #ifdef _KERNEL
-
+#ifdef CHERI_CAPREVOKE_KERNEL
 /*
- * Per-CPU structures in the root page.
- * These are accessed via non CLG-trapping memory in the fault handlers.
+ * Kernel revocation per-CPU state.
+ * These are accessed via non-CLG trapping memory in the fault handlers.
+ * Note that a whole page is allocated for each CPU and it includes
+ * non-CLG trapping stack space for the CLG fault handler.
  */
-struct kmem_revoke_pcpu_root {
-	struct pcpu *pcpup;
-	void *dmap_cap;
-	void *shadow_cap;
+struct kmem_revoke_pcpu {
+	struct pcpu *pcpup;		/* Kernel pcpu data (not in DMAP) */
+	void *dmap_cap;			/* Direct map capability */
+	vm_paddr_t dmap_phys_base;	/* DMAP base phys addr */
+	void *shadow_cap;		/* Kernel shadow bitmap capability */
+	void *clg_fault_kstack;		/* CLG fault handler stack (DMAP cap) */
 };
 
-extern struct kmem_revoke_pcpu_root kmem_revoke_root_page[MAXCPU];
-
-/* XXX-AM: Keep in sync with locore.S kmem_revoke_root_page space */
-CTASSERT(sizeof(kmem_revoke_root_page) <= (12 * PAGE_SIZE));
-
+struct kmem_revoke_pcpu *kmem_revoke_md_init_pcpu0(struct pcpu *pcpup);
+struct kmem_revoke_pcpu *kmem_revoke_md_alloc_pcpu(int domain,
+    struct pcpu *pcpup);
+#endif /* CHERI_CAPREVOKE_KERNEL */
 #endif /* _KERNEL */
 
 #endif	/* !_MACHINE_CHERI_REVOKE_H_ */
