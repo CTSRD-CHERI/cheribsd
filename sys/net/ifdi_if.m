@@ -364,12 +364,3 @@ METHOD bool needs_restart {
 	if_ctx_t _ctx;
 	enum iflib_restart_event _event;
 } DEFAULT null_needs_restart;
-# CHERI CHANGES START
-# {
-#   "updated": 20230509,
-#   "target_type": "kernel",
-#   "changes": [
-#     "user_capabilities"
-#   ]
-# }
-# CHERI CHANGES END
