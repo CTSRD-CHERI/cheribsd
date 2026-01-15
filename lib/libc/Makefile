@@ -35,11 +35,11 @@ CFLAGS+=-D_FORTIFY_SOURCE_read=_read
 # To include RCS ID strings from other BSD projects, remove -DNO__RCSID from CFLAGS.
 CFLAGS+=-DNO__SCCSID -DNO__RCSID
 
-.ifdef CHERI_LIB_C18N
-SHLIB=c
-.else
-LIB?=c
+.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
+SHARED_CFLAGS+=-DCHERI_LIB_C18N
 .endif
+
+LIB?=c
 SHLIB_MAJOR= 7
 .if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap} && \
     (${LIBC_ARCH} == "i386" || ${LIBC_ARCH:Mpowerpc*} != "")
@@ -204,16 +204,8 @@ libkern.${LIBC_ARCH}:: ${KMSRCS}
 	${CP} ${.ALLSRC} ${DESTDIR}/sys/libkern/${LIBC_ARCH}
 .endif
 
-.if !defined(CHERI_LIB_C18N)
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
-.endif
-
-.if defined(CHERI_LIB_C18N)
-MAN:=
-MLINKS:=
-NLS:=
-.endif
 
 .include <bsd.lib.mk>
 

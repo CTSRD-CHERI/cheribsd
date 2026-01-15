@@ -65,10 +65,6 @@
 extern bool ld_compartment_enable;
 
 #define	C18N_ENABLED	ld_compartment_enable
-
-extern bool ld_compartment_fptr;
-
-#define C18N_FPTR_ENABLED	ld_compartment_fptr
 #endif
 
 #include "rtld_lock.h"
@@ -198,7 +194,7 @@ typedef struct Struct_Plt_Entry {
 #ifdef CHERI_LIB_C18N
     uint16_t compart_id;
 #endif
-    MD_PLT_ENTRY;
+    MD_PLT_ENTRY
 } Plt_Entry;
 
 #ifdef CHERI_LIB_C18N
@@ -388,9 +384,10 @@ typedef struct Struct_Obj_Entry {
     bool doomed : 1;		/* Object cannot be referenced */
 #if __has_feature(capabilities)
     bool cap_relocs_processed : 1; /* __cap_relocs section has been processed */
+    bool irelative_cap_relocs : 1; /* __cap_relocs has IRELATIVE relocs */
 #endif
 
-    MD_OBJ_ENTRY;
+    MD_OBJ_ENTRY
 
     struct link_map linkmap;	/* For GDB and dlinfo() */
     Objlist dldags;		/* Object belongs to these dlopened DAGs (%) */
@@ -513,7 +510,6 @@ enum {
 	LD_COMPARTMENT_UNWIND,
 	LD_COMPARTMENT_STATS,
 	LD_COMPARTMENT_SWITCH_COUNT,
-	LD_COMPARTMENT_FPTR,
 #endif
 };
 
@@ -656,7 +652,8 @@ void init_pltgot(Plt_Entry *);
 void allocate_initial_tls(Obj_Entry *);
 
 #ifdef RTLD_HAS_CAPRELOCS
-void process___cap_relocs(Obj_Entry*);
+int process___cap_relocs(Obj_Entry *);
+int process_ifunc___cap_relocs(Obj_Entry *);
 #endif
 
 __END_DECLS

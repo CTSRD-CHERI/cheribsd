@@ -357,7 +357,7 @@ reloc_gnu_ifunc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 				continue;
 
 			lock_release(rtld_bind_lock, lockstate);
-			target = (Elf_Addr)rtld_resolve_ifunc(defobj, def);
+			target = (uintptr_t)rtld_resolve_ifunc(defobj, def);
 			wlock_acquire(rtld_bind_lock, lockstate);
 			reloc_jmpslot(where, target, defobj, obj,
 			    (const Elf_Rel *)rela);
@@ -528,6 +528,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    defobj->tlsoffset - TLS_TP_OFFSET - TLS_TCB_SIZE);
 			break;
 		case R_RISCV_RELATIVE:
+		case R_RISCV_FUNC_RELATIVE:
 			*where = (Elf_Addr)(obj->relocbase + rela->r_addend);
 			break;
 		case R_RISCV_IRELATIVE:

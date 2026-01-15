@@ -62,8 +62,26 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 	dbg("%s: found %s from obj=%s in defobj=%s", __func__,
 	    symname(obj, r_symndx), obj->path, defobj->path);
 #endif
-	assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
-	    "IFUNC not implemented!");
+
+	/*
+	 * If symbol is IFUNC, only perform relocation
+	 * when caller allowed it by passing
+	 * SYMLOOK_IFUNC flag.  Skip the relocations
+	 * otherwise.
+	 */
+	if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
+#ifndef __CHERI_PURE_CAPABILITY__
+		_rtld_error("%s: unsupported IFUNC capability in hybrid: %s",
+		    obj->path, symname(obj, r_symndx));
+		return (-1);
+#else
+		if ((flags & SYMLOOK_IFUNC) == 0) {
+			obj->non_plt_gnu_ifunc = true;
+			return (0);
+		}
+#endif
+	} else if ((flags & SYMLOOK_IFUNC) != 0)
+		return (0);
 
 	const void * __capability symval = NULL;
 	bool is_undef_weak = false;
@@ -113,14 +131,24 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 			return -1;
 		}
 #ifdef CHERI_LIB_C18N
-		if (C18N_FPTR_ENABLED)
-			symval = tramp_intern(NULL, RTLD_COMPART_ID,
-			    &(struct tramp_data) {
-				.target = __DECONST(void *, symval),
-				.defobj = defobj,
-				.def = def,
-				.sig = sigtab_get(obj, r_symndx)
-			});
+		symval = tramp_intern(NULL,
+		    compart_id_for_address(obj, (Elf_Addr)where),
+		    &(struct tramp_data) {
+			.target = __DECONST(void *, symval),
+			.defobj = defobj,
+			.def = def,
+			.sig = sigtab_get(obj, r_symndx)
+		});
+#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
+		if (addend != 0) {
+			_rtld_error("%s: unsupported IFUNC addend: %s+%jd",
+			    obj->path, symname(obj, r_symndx),
+			    (intmax_t)addend);
+			return -1;
+		}
+		symval = rtld_resolve_ifunc(defobj, def);
 #endif
 	} else {
 		/* Remove execute permissions and set bounds */

@@ -1425,15 +1425,9 @@ typedef struct {
 #define	R_RISCV_32_PCREL	57
 #define	R_RISCV_IRELATIVE	58
 
-/* Relocation types added by CHERI used by the dynamic linker */
-#define	R_RISCV_CHERI_CAPABILITY		193
-#define	R_RISCV_CHERI_CAPABILITY_CALL		194
-
-/* Relocation types added by CHERI not used by the dynamic linker */
-#define	R_RISCV_CHERI_SIZE			195
-#define	R_RISCV_CHERI_TPREL_CINCOFFSET		196
-#define	R_RISCV_CHERI_TLS_IE_CAPTAB_PCREL_HI20	197
-#define	R_RISCV_CHERI_TLS_GD_CAPTAB_PCREL_HI20	198
+/* Relocation types added by CHERI */
+#define	R_RISCV_CHERI_CAPABILITY	193
+#define	R_RISCV_FUNC_RELATIVE		194
 
 #define	R_SPARC_NONE		0
 #define	R_SPARC_8		1
@@ -1561,7 +1555,6 @@ typedef struct {
 
 #define	ELF_BSDF_SIGFASTBLK	0x0001	/* Kernel supports fast sigblock */
 #define	ELF_BSDF_VMNOOVERCOMMIT	0x0002
-#define	ELF_BSDF_CHERI_C18N_FPTR	0x8000000
 #define	ELF_BSDF_CHERI_C18N	0x10000000
 #define	ELF_BSDF_CHERI_REVOKE_ASYNC	0x20000000	/* Async revocation */
 #define	ELF_BSDF_CHERI_REVOKE_EVERY_FREE	0x40000000

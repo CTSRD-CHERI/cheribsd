@@ -97,7 +97,7 @@
 
 #ifndef KSTACK_PAGES
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	KSTACK_PAGES	5	/* pages of kernel stack (with pcb) */
+#define	KSTACK_PAGES	6	/* pages of kernel stack (with pcb) */
 #else
 #define	KSTACK_PAGES	4	/* pages of kernel stack (with pcb) */
 #endif

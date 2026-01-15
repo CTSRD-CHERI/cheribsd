@@ -104,9 +104,6 @@ MTREES=		mtree/BSD.root.dist		/		\
 		mtree/BSD.usr.dist		/usr		\
 		mtree/BSD.include.dist		/usr/include	\
 		mtree/BSD.debug.dist		/usr/lib
-.if ${MACHINE_ABI:Mpurecap}
-MTREES+=	mtree/BSD.c18n.dist		/
-.endif
 .for LIBCOMPAT libcompat in ${_ALL_LIBCOMPATS_libcompats}
 .if ${MK_LIB${LIBCOMPAT}} != "no"
 MTREES+=	mtree/BSD.lib${libcompat}.dist	/usr

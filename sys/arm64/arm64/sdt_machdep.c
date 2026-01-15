@@ -48,8 +48,8 @@ sdt_tracepoint_patch(uintptr_t patchpoint, uintptr_t target)
 	uint32_t instr;
 
 	KASSERT(sdt_tracepoint_valid(patchpoint, target),
-	    ("%s: invalid tracepoint %#lx -> %#lx",
-	    __func__, patchpoint, target));
+	    ("%s: invalid tracepoint %#jx -> %#jx",
+	    __func__, (uintmax_t)patchpoint, (uintmax_t)target));
 
 	if (!arm64_get_writable_addr((void *)patchpoint, &addr))
 		panic("%s: Unable to write new instruction", __func__);

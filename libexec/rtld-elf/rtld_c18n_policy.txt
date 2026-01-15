@@ -39,7 +39,6 @@ trust
 	strsep
 	strstr
 	strnstr
-	__libc_start1
 	setjmp
 	_setjmp
 	sigsetjmp
@@ -49,6 +48,7 @@ trust
 
 callee [RTLD]
 export to [TCB]
+	_rtld_c18n_is_enabled
 	_rtld_tramp_reflect
 	_rtld_thread_start_init
 	_rtld_thread_start
@@ -57,19 +57,3 @@ export to [TCB]
 	_rtld_sighandler
 	_rtld_siginvoke
 	_rtld_sigaction
-	_rtld_setjmp
-	_rtld_longjmp
-
-callee [RTLD]
-export to [TCB]
-export to [libunwind]
-	dl_c18n_get_trusted_stack
-	dl_c18n_unwind_trusted_stack
-
-callee [RTLD]
-export to [libunwind]
-	_rtld_unw_getcontext
-	_rtld_unw_setcontext
-	_rtld_unw_getsealer
-	dl_c18n_is_trampoline
-	dl_c18n_pop_trusted_stack

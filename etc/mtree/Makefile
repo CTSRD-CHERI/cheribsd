@@ -9,16 +9,12 @@ FILES=	\
 	BSD.debug.dist \
 	BSD.include.dist \
 	BSD.root.dist \
-	${_BSD.c18n.dist} \
 	${_BSD.libcompats.dist} \
 	${_BSD.sendmail.dist} \
 	${_BSD.tests.dist} \
 	BSD.usr.dist \
 	BSD.var.dist
 
-.if ${MACHINE_ABI:Mpurecap}
-_BSD.c18n.dist=		BSD.c18n.dist
-.endif
 .for LIBCOMPAT libcompat in ${_ALL_LIBCOMPATS_libcompats}
 .if ${MK_LIB${LIBCOMPAT}} != "no"
 _BSD.libcompats.dist+=	BSD.lib${libcompat}.dist

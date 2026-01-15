@@ -114,12 +114,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	ncurses \
 	nss_tacplus
 
-.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
-.if !defined(COMPAT_LIBCOMPAT) || ${COMPAT_LIBCOMPAT} == "64CB"
-SUBDIR+=	c18n
-.endif
-.endif
-
 .if !${MACHINE_ABI:Mpurecap}
 # Needs changes to be useful for purecap and not used by anything (yet)
 SUBDIR+=	libthread_db
@@ -232,8 +226,8 @@ SUBDIR.${MK_PMC}+=	libopencsd
 SUBDIR.${MK_PMC}+=	libipt
 .endif
 
-.if (${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "aarch64") && \
-    !defined(COMPAT_LIBCOMPAT)
+.if (${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "aarch64" || \
+    ${MACHINE_CPUARCH} == "riscv") && !defined(COMPAT_LIBCOMPAT)
 SUBDIR.${MK_BHYVE}+=	libvmmapi
 .endif
 

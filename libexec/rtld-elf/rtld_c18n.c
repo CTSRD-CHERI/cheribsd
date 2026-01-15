@@ -119,15 +119,10 @@ _Static_assert(
 static uintptr_t sealer_tcb;
 static uintptr_t sealer_trusted_stk;
 
-uintptr_t sealer_pltgot, sealer_tramp;
+uintptr_t sealer_pltgot;
 
 /* Enable compartmentalisation */
 bool ld_compartment_enable;
-
-#ifdef __aarch64__
-/* Enable wrapping function pointers in trampolines */
-bool ld_compartment_fptr;
-#endif
 
 /* Use utrace() to log compartmentalisation-related events */
 const char *ld_compartment_utrace;
@@ -595,10 +590,6 @@ tramp_should_include(const Plt_Entry *plt, compart_id_t caller,
 	compart_id_t callee;
 	const char *sym;
 
-	/* XXX: This will not be needed once function pointers are wrapped. */
-	if (data->target == NULL)
-		return (false);
-
 	if (data->def == NULL)
 		return (true);
 
@@ -826,15 +817,15 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 	/*
 	 * RTLD's actual stack is the Executive stack which does not need to be
 	 * stored in the stack lookup table. Instead, fill the table entry with
-	 * a one-byte dummy stack.
+	 * a minimal dummy stack.
 	 *
 	 * Note that NULL cannot be used here because a compartment can then
 	 * pretend to be RTLD when a signal is delivered. Nor can a zero-length
 	 * stack be used because the signal handler uses the recorded size of
 	 * the stack to determine whether it has been allocated.
 	 */
-	static char dummy_stk;
-	sp = &dummy_stk;
+	static _Alignas(16) char dummy_stk[16];
+	sp = dummy_stk;
 	set_untrusted_stk(sp);
 #endif
 	size = cheri_getlen(sp);
@@ -936,13 +927,6 @@ resolve_untrusted_stk_impl(stk_table_index index)
  *
  * APIs exposed to stack unwinders (e.g., libc setjmp/longjmp and libunwind)
  */
-/*
- * Assembly functions that are tail-called when compartmentalisation is
- * disabled.
- */
-uintptr_t _rtld_unw_getcontext_epilogue(uintptr_t, void **);
-struct jmp_args _rtld_unw_setcontext_epilogue(struct jmp_args, void *, void **);
-
 int
 c18n_is_tramp(uintptr_t pc, const struct trusted_frame *tf)
 {
@@ -955,10 +939,12 @@ void *
 dl_c18n_get_trusted_stack(uintptr_t pc)
 {
 	/*
-	 * Return a sealed capability to the caller's trusted frame. But if the
-	 * caller is entered via a trampoline and a return capability to said
-	 * trampoline is passed as the argument, return a sealed capability to
-	 * the trusted frame of the caller's own caller.
+	 * Return a sealed capability to the caller's trusted frame (which is
+	 * the previous trusted frame unless we were not called via a
+	 * trampoline). But if the caller is entered via a trampoline and a
+	 * return capability to said trampoline is passed as the argument,
+	 * return a sealed capability to the trusted frame of the caller's own
+	 * caller.
 	 */
 
 	struct trusted_frame *tf;
@@ -966,43 +952,15 @@ dl_c18n_get_trusted_stack(uintptr_t pc)
 	if (!C18N_ENABLED)
 		return (NULL);
 
-	tf = get_trusted_stk()->previous;
+	tf = get_trusted_stk();
+	if (c18n_is_tramp((uintptr_t)__builtin_return_address(0), tf))
+		tf = tf->previous;
+
 	if (c18n_is_tramp(pc, tf))
 		tf = tf->previous;
 
 	return (cheri_seal(tf, sealer_trusted_stk));
 }
-
-/*
- * XXX Dapeng: These functions are kept here for compatibility with old libc and
- * libunwind.
- */
-uintptr_t _rtld_setjmp(uintptr_t, void **);
-uintptr_t _rtld_unw_getcontext(uintptr_t, void **);
-
-uintptr_t
-_rtld_setjmp(uintptr_t ret, void **buf)
-{
-	*buf = dl_c18n_get_trusted_stack(0);
-	return (ret);
-}
-
-uintptr_t
-_rtld_unw_getcontext(uintptr_t ret, void **buf)
-{
-	if (!C18N_ENABLED) {
-		__attribute__((musttail))
-		return (_rtld_unw_getcontext_epilogue(ret, buf));
-	}
-	*buf = dl_c18n_get_trusted_stack(0);
-	return (ret);
-}
-
-/*
- * Returning this struct allows us to control the content of unused return value
- * registers.
- */
-struct jmp_args { uintptr_t ret1; uintptr_t ret2; };
 
 void
 dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
@@ -1033,8 +991,10 @@ dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
 	tf = get_trusted_stk();
 	target = cheri_unseal(target, sealer_trusted_stk);
 
-	if (!cheri_is_subset(tf, target) ||
-	    (ptraddr_t)tf->previous >= (ptraddr_t)target) {
+	/*
+	 * If the trusted frame is not a subset of the target, abort.
+	 */
+	if (!cheri_is_subset(target, tf)) {
 		rtld_fdprintf(STDERR_FILENO,
 		    "c18n: Illegal unwind from %#p to %#p\n", tf, target);
 		abort();
@@ -1045,21 +1005,21 @@ dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
 	 */
 	cur = tf;
 	table = get_stk_table();
-	do {
+	while ((ptraddr_t)cur < (ptraddr_t)target) {
 		index = cur->caller;
 		cid = index_to_cid(index);
 		ospp = &table->entries[cid].stack;
 
-		if ((ptraddr_t)*ospp > (ptraddr_t)cur->osp) {
+		if ((ptraddr_t)*ospp > (ptraddr_t)cur->state.osp) {
 			rtld_fdprintf(STDERR_FILENO,
 			    "c18n: Cannot unwind %s from %#p to %#p\n",
-			    comparts.data[cid].name, *ospp, cur->osp);
+			    comparts.data[cid].name, *ospp, cur->state.osp);
 			abort();
 		}
 
-		*ospp = cur->osp;
+		*ospp = cur->state.osp;
 		cur = cur->previous;
-	} while ((ptraddr_t)cur < (ptraddr_t)target);
+	}
 
 	if ((ptraddr_t)cur != (ptraddr_t)target) {
 		rtld_fdprintf(STDERR_FILENO,
@@ -1068,22 +1028,35 @@ dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
 	}
 
 	/*
-	 * Link the topmost trusted frame to the target frame. Modify the
-	 * topmost trusted frame to restore the untrusted stack when it is
-	 * popped.
+	 * If we were called via a trampoline, link the topmost trusted frame
+	 * to the target frame and modify it to restore the untrusted stack
+	 * when it is popped.
+	 *
+	 * If we were not called via a trampoline, directly set the trusted
+	 * stack to the target frame and let the caller restore the untrusted
+	 * stack.
 	 */
-	if ((ptraddr_t)rcsp > (ptraddr_t)*ospp) {
-		rtld_fdprintf(STDERR_FILENO,
-		    "c18n: Cannot complete unwind %s from %#p to %#p, ",
-		    "tf: %#p -> %#p\n", comparts.data[cid].name, rcsp, *ospp,
-		    tf, target);
-		abort();
-	}
+	if (c18n_is_tramp((uintptr_t)__builtin_return_address(0), tf)) {
+		/*
+		 * Since we were called via a trampoline, the topmost trusted
+		 * frame should be at least one frame away from the target
+		 * frame, which ensures that ospp is initialised.
+		 */
+		if ((ptraddr_t)tf == (ptraddr_t)cur ||
+		    (ptraddr_t)rcsp > (ptraddr_t)*ospp) {
+			rtld_fdprintf(STDERR_FILENO,
+			    "c18n: Cannot complete unwind %s from %#p to %#p, ",
+			    "tf: %#p -> %#p\n",
+			    comparts.data[cid].name, rcsp, *ospp, tf, target);
+			abort();
+		}
 
-	tf->state.sp = rcsp;
-	tf->osp = *ospp;
-	tf->previous = cur;
-	tf->caller = index;
+		tf->state.sp = rcsp;
+		tf->state.osp = *ospp;
+		tf->previous = cur;
+		tf->caller = index;
+	} else
+		set_trusted_stk(cur);
 
 	sigprocmask(SIG_SETMASK, &oset, NULL);
 }
@@ -1103,6 +1076,26 @@ dl_c18n_is_trampoline(uintptr_t pc, void *tfs)
 	return (c18n_is_tramp(pc, tf));
 }
 
+/*
+ * XXX Dapeng: Older libunwind assumes a smaller struct dl_c18n_compart_state
+ * that ends at sp.
+ */
+__sym_compat(dl_c18n_pop_trusted_stack, dl_c18n_pop_trusted_stack_v1, FBSD_1.0);
+void *dl_c18n_pop_trusted_stack_v1(struct dl_c18n_compart_state *, void *);
+
+void *
+dl_c18n_pop_trusted_stack_v1(struct dl_c18n_compart_state *state, void *tfs)
+{
+	struct trusted_frame *tf;
+
+	if (!C18N_ENABLED)
+		return (NULL);
+
+	tf = cheri_unseal(tfs, sealer_trusted_stk);
+	memcpy(state, &tf->state, offsetof(struct dl_c18n_compart_state, osp));
+	return (cheri_seal(tf->previous, sealer_trusted_stk));
+}
+
 void *
 dl_c18n_pop_trusted_stack(struct dl_c18n_compart_state *state, void *tfs)
 {
@@ -1114,34 +1107,6 @@ dl_c18n_pop_trusted_stack(struct dl_c18n_compart_state *state, void *tfs)
 	tf = cheri_unseal(tfs, sealer_trusted_stk);
 	*state = tf->state;
 	return (cheri_seal(tf->previous, sealer_trusted_stk));
-}
-
-/*
- * XXX Dapeng: These functions are kept here for compatibility with old libc and
- * libunwind.
- */
-struct jmp_args _rtld_longjmp(struct jmp_args, void *, void **);
-struct jmp_args _rtld_unw_setcontext_impl(struct jmp_args, void *, void **);
-
-struct jmp_args
-_rtld_longjmp(struct jmp_args ret, void *rcsp, void **buf)
-{
-	dl_c18n_unwind_trusted_stack(rcsp, *buf);
-	return (ret);
-}
-
-struct jmp_args
-_rtld_unw_setcontext_impl(struct jmp_args ret, void *rcsp, void **buf)
-{
-	dl_c18n_unwind_trusted_stack(rcsp, *buf);
-	return (ret);
-}
-
-uintptr_t _rtld_unw_getsealer(void);
-uintptr_t
-_rtld_unw_getsealer(void)
-{
-	return (sealer_trusted_stk);
 }
 
 /*
@@ -1335,7 +1300,7 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 		ut.fp = tf->state.fp;
 		ut.pc = tf->state.pc;
 		ut.sp = tf->state.sp;
-		ut.osp = tf->osp;
+		ut.osp = tf->state.osp;
 		ut.previous = tf->previous;
 		memcpy(&ut.fsig, &hdr->sig, sizeof(ut.fsig));
 		strlcpy(ut.symbol, sym, sizeof(ut.symbol));
@@ -1702,6 +1667,9 @@ _rtld_tramp_reflect(const void *addr)
 {
 	struct tramp_header *header;
 
+	if (!C18N_ENABLED)
+		return (0);
+
 	header = tramp_reflect(addr);
 	if (header == NULL)
 		return (0);
@@ -1712,7 +1680,13 @@ _rtld_tramp_reflect(const void *addr)
 /*
  * APIs
  */
-#define	C18N_FUNC_SIG_COUNT	72
+bool _rtld_c18n_is_enabled(void);
+
+bool
+_rtld_c18n_is_enabled(void)
+{
+	return (C18N_ENABLED);
+}
 
 static void *
 make_restricted(void *fptr)
@@ -1801,14 +1775,6 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
  */
 #define	MAX_TRAMP_PG_SIZE		(4 * 1024 * 1024)
 
-/*
- * XXX: Manually wrap _rtld_unw_setcontext_impl in a trampoline for now because
- * it is called via a function pointer.
- */
-extern struct jmp_args (*_rtld_unw_setcontext_ptr)(struct jmp_args, void *,
-    void **);
-struct jmp_args (*_rtld_unw_setcontext_ptr)(struct jmp_args, void *, void **);
-
 void
 c18n_init2(Obj_Entry *obj_rtld)
 {
@@ -1829,9 +1795,6 @@ c18n_init2(Obj_Entry *obj_rtld)
 
 	sealer_trusted_stk = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
-
-	sealer_tramp = cheri_setboundsexact(sealer, C18N_FUNC_SIG_COUNT);
-	sealer += C18N_FUNC_SIG_COUNT;
 
 	/*
 	 * All libraries have been loaded. Create and initialise a stack lookup
@@ -1889,20 +1852,6 @@ c18n_init2(Obj_Entry *obj_rtld)
 			.reg_args = 3, .mem_args = false, .ret_args = ONE
 		}
 	});
-
-	/*
-	 * XXX: Manually wrap _rtld_unw_setcontext_impl in a trampoline for now
-	 * because it is called via a function pointer.
-	*/
-	_rtld_unw_setcontext_ptr = tramp_intern(NULL, RTLD_COMPART_ID,
-	    &(struct tramp_data) {
-		.target = &_rtld_unw_setcontext_impl,
-		.defobj = obj_rtld,
-		.sig = (struct func_sig) {
-			.valid = true,
-			.reg_args = 4, .mem_args = false, .ret_args = TWO
-		}
-	});
 }
 
 /*
@@ -1917,19 +1866,9 @@ void _rtld_thr_exit(long *);
 void
 _rtld_thread_start_init(void (*p)(struct pthread *))
 {
-	assert(((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) != 0) ==
-	    C18N_FPTR_ENABLED);
+	assert(!C18N_ENABLED ||
+	    (cheri_getperm(p) & CHERI_PERM_EXECUTIVE) != 0);
 	assert(thr_thread_start == NULL);
-	if (!C18N_FPTR_ENABLED)
-		p = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
-			.target = p,
-			.defobj = obj_from_addr(p),
-			.sig = (struct func_sig) {
-				.valid = true,
-				.reg_args = 1, .mem_args = false,
-				.ret_args = NONE
-			}
-		});
 	thr_thread_start = p;
 }
 
@@ -1940,19 +1879,22 @@ _rtld_thread_start(struct pthread *curthread)
 	struct stk_table *table;
 	struct tcb_wrapper *wrap;
 
-	/*
-	 * The thread pointer register contains the fake tcb upon entering the
-	 * new thread. Extract and install the actual tcb and stack lookup
-	 * table.
-	 */
-	wrap = __containerof(get_trusted_tp(), struct tcb_wrapper, header);
+	if (C18N_ENABLED) {
+		/*
+		 * The thread pointer register contains the fake tcb upon
+		 * entering the new thread. Extract and install the actual tcb
+		 * and stack lookup table.
+		 */
+		tcb = get_trusted_tp();
+		wrap = __containerof(tcb, struct tcb_wrapper, header);
 
-	tcb = cheri_unseal(wrap->tcb, sealer_tcb);
-	*tcb = wrap->header;
-	_tcb_set(tcb);
+		tcb = cheri_unseal(wrap->tcb, sealer_tcb);
+		*tcb = wrap->header;
+		_tcb_set(tcb);
 
-	table = cheri_unseal(wrap->table, sealer_tcb);
-	init_stk_table(table, wrap);
+		table = cheri_unseal(wrap->table, sealer_tcb);
+		init_stk_table(table, wrap);
+	}
 
 	thr_thread_start(curthread);
 }
@@ -1971,6 +1913,9 @@ _rtld_thr_exit(long *state)
 	sigset_t nset;
 	struct stk_table_stk_info *data;
 	struct stk_table *table = get_stk_table();
+
+	if (!C18N_ENABLED)
+		goto out;
 
 	/*
 	 * Block all signals before destroying thread-specific data structures.
@@ -2037,6 +1982,7 @@ _rtld_thr_exit(long *state)
 	 */
 	push_stk_table(&dead_stk_tables, table);
 
+out:
 	__sys_thr_exit(state);
 }
 
@@ -2072,20 +2018,9 @@ static __siginfohandler_t *signal_dispatcher = sigdispatch;
 void
 _rtld_sighandler_init(__siginfohandler_t *handler)
 {
-	assert(((cheri_getperm(handler) & CHERI_PERM_EXECUTIVE) != 0) ==
-	    C18N_FPTR_ENABLED);
+	assert(!C18N_ENABLED ||
+	    (cheri_getperm(handler) & CHERI_PERM_EXECUTIVE) != 0);
 	assert(signal_dispatcher == sigdispatch);
-	if (!C18N_FPTR_ENABLED)
-		handler = tramp_intern(NULL, RTLD_COMPART_ID,
-		    &(struct tramp_data) {
-			.target = handler,
-			.defobj = obj_from_addr(handler),
-			.sig = (struct func_sig) {
-				.valid = true,
-				.reg_args = 3, .mem_args = false,
-				.ret_args = NONE
-			}
-		});
 	signal_dispatcher = handler;
 }
 
@@ -2223,9 +2158,9 @@ found:
 	ntf = tf - 2;
 	*ntf = (struct trusted_frame) {
 		.state = (struct dl_c18n_compart_state) {
-			.sp = nsp
+			.sp = nsp,
+			.osp = osp
 		},
-		.osp = osp,
 		.previous = tf,
 		.caller = intr_idx,
 		/*
@@ -2270,7 +2205,7 @@ found:
 	 * compartment. Pop the dummy frame from the trusted stack.
 	 */
 	assert(get_trusted_stk() == ntf);
-	table->entries[index_to_cid(ntf->caller)].stack = ntf->osp;
+	table->entries[index_to_cid(ntf->caller)].stack = ntf->state.osp;
 	set_trusted_stk(ntf->previous);
 	/*
 	 * Under the benchmark ABI, do not set the untrusted stack because the
@@ -2290,7 +2225,6 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	bool siginfo;
 	void *sigfunc;
 	struct tramp_header *header;
-	const Obj_Entry *defobj;
 	compart_id_t callee;
 	stk_table_index callee_idx;
 	struct stk_table *table;
@@ -2310,8 +2244,7 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	 * The signal handler must be wrapped by a trampoline if function
 	 * pointer wrapping is enabled.
 	 */
-	if (!cheri_gettag(sigfunc) ||
-	    (C18N_FPTR_ENABLED && header == NULL)) {
+	if (header == NULL) {
 		rtld_fdprintf(STDERR_FILENO,
 		    "c18n: Invalid handler %#p for signal %d\n",
 		    sigfunc, sig);
@@ -2322,18 +2255,8 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	 * If the signal handler is not already wrapped by a trampoline, wrap it
 	 * in one.
 	 */
-	if (!C18N_FPTR_ENABLED && header == NULL) {
-		defobj = obj_from_addr(sigfunc);
-		callee = compart_id_for_address(defobj, (ptraddr_t)sigfunc);
-		sigfunc = tramp_intern(NULL, RTLD_COMPART_ID,
-		    &(struct tramp_data) {
-		    .target = sigfunc,
-		    .defobj = defobj
-		});
-	} else {
-		callee = compart_id_for_address(header->defobj,
-		    (ptraddr_t)header->target);
-	}
+	callee = compart_id_for_address(header->defobj,
+	    (ptraddr_t)header->target);
 	callee_idx = cid_to_index(callee);
 
 	/*
@@ -2355,7 +2278,9 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	tf = get_trusted_stk();
 	ntf = tf - 1;
 	*ntf = (struct trusted_frame) {
-		.osp = osp,
+		.state = (struct dl_c18n_compart_state) {
+			.osp = osp,
+		},
 		.previous = tf,
 		.caller = callee_idx,
 		/*
@@ -2398,7 +2323,7 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	 * Pop the dummy frame from the trusted stack.
 	 */
 	assert(get_trusted_stk() == ntf);
-	table->entries[index_to_cid(ntf->caller)].stack = ntf->osp;
+	table->entries[index_to_cid(ntf->caller)].stack = ntf->state.osp;
 	set_trusted_stk(ntf->previous);
 }
 
@@ -2409,6 +2334,9 @@ _rtld_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 	const struct sigaction *nactp = act;
 	sigset_t nset, oset;
 	int ret;
+
+	if (!C18N_ENABLED)
+		return (__sys_sigaction(sig, act, oact));
 
 	/*
 	 * Make the function re-entrant by blocking all signals.

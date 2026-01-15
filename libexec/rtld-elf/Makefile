@@ -151,6 +151,7 @@ SRCS+= \
 	rtld_c18n_mi.S \
 	rtld_c18n_machdep.c \
 	rtld_c18n_asm.S
+rtld_c18n_mi.o: rtld_c18n_policy.txt
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}

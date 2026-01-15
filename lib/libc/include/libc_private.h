@@ -39,6 +39,8 @@
 
 #include <libsys.h>
 
+#include <stdbool.h>
+
 extern char **environ;
 
 /*
@@ -247,7 +249,7 @@ enum {
 	INTERPOS_map_stacks_exec,
 	INTERPOS_fdatasync,
 	INTERPOS_clock_nanosleep,
-	INTERPOS_distribute_static_tls,
+	INTERPOS__reserved0, /* was distribute_static_tls */
 	INTERPOS_pdfork,
 	INTERPOS_MAX
 };
@@ -374,8 +376,6 @@ void __init_elf_aux_vector(void);
 #ifndef __CHERI_PURE_CAPABILITY__
 void __libc_map_stacks_exec(void);
 #endif
-void __libc_distribute_static_tls(__size_t, void *, __size_t, __size_t);
-__uintptr_t __libc_static_tls_base(__size_t);
 
 void	_pthread_cancel_enter(int);
 void	_pthread_cancel_leave(int);
@@ -395,7 +395,9 @@ int __strerror_rl(int errnum, char *strerrbuf, size_t buflen,
 	    struct _xlocale *locale);
 
 #ifdef CHERI_LIB_C18N
-__pid_t		__sys_rfork(int);
+bool	_rtld_c18n_is_enabled(void);
+ptraddr_t	_rtld_tramp_reflect(const void *);
+void	_rtld_thr_exit(long *);
 int	_rtld_sigaction(int, const struct sigaction *, struct sigaction *);
 #endif
 

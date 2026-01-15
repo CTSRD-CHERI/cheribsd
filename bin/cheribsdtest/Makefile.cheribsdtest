@@ -11,6 +11,7 @@ SRCS+=	cheribsdtest_bounds_globals.c					\
 	cheribsdtest_fault.c						\
 	cheribsdtest_flag_captured.c					\
 	cheribsdtest_fs.c						\
+	cheribsdtest_ifunc.c						\
 	cheribsdtest_kbounce.c						\
 	cheribsdtest_ipc.c						\
 	cheribsdtest_internal.c 					\
@@ -75,10 +76,6 @@ SRCS+=		cheribsdtest_fptr_canon.c				\
 		cheribsdtest_lazy_bind.c
 .else
 NO_SHARED?=	YES
-.endif
-
-.ifdef CHERIBSD_IFUNC_TESTS
-SRCS+=		cheribsdtest_ifunc.c
 .endif
 
 # Both variants exist so we can test with and without libthr's interposition on

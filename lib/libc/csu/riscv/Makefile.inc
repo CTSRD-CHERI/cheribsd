@@ -1,3 +1,6 @@
 #
 
 CFLAGS+=	-DCRT_IRELOC_RELA
+.if ${MACHINE_ABI:Mpurecap}
+CFLAGS+=	-DCRT_IRELOC_CAPRELOC
+.endif
