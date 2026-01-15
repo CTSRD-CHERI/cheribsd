@@ -187,7 +187,7 @@ useracc(void * __capability cap, int len, int rw)
 }
 
 int
-vslock(void * __capability addr, size_t len)
+vslock(void * __capability addr, size_t len, vm_prot_t prot __unused)
 {
 	vm_offset_t end, last, start, vaddr;
 	vm_size_t npages;

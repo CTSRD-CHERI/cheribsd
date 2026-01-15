@@ -128,7 +128,7 @@ uint64_t vmspace_cid_alloc(struct vmspace *);
 #endif
 void vnode_pager_setsize(struct vnode *, vm_ooffset_t);
 void vnode_pager_purge_range(struct vnode *, vm_ooffset_t, vm_ooffset_t);
-int vslock(void * __capability, size_t);
+int vslock(void * __capability, size_t, vm_prot_t);
 void vsunlock(void * __capability, size_t);
 struct sf_buf *vm_imgact_map_page(vm_object_t object, vm_ooffset_t offset);
 void vm_imgact_unmap_page(struct sf_buf *sf);
