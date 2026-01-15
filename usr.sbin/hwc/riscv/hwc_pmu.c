@@ -150,7 +150,9 @@ pmu_parse_counter(struct hwc_context *tc __unused, const ucl_object_t *top)
 	int event_id;
 	int mhpm_id;
 	const char *name;
-	bool enabled __unused;
+	bool enabled;
+
+	enabled = false;
 
 	while ((obj = ucl_iterate_object (top, &it, true))) {
 		k = ucl_object_key(obj);
@@ -163,6 +165,9 @@ pmu_parse_counter(struct hwc_context *tc __unused, const ucl_object_t *top)
 		if (strcmp(k, "enabled") == 0)
 			enabled = ucl_object_toboolean(obj);
 	}
+
+	if (enabled == false)
+		return (0);
 
 	counters[mhpm_id].event_id = event_id;
 	counters[mhpm_id].name = strdup(name);
