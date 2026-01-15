@@ -1,9 +1,15 @@
 DEVRTW89DIR=	${SRCTOP}/sys/contrib/dev/rtw89
 
+.include <kmod.opts.mk>
+
 .PATH: ${DEVRTW89DIR}
 
 WITH_CONFIG_PM=	0
+.if ${MACHINE_CPU:Mcheri} && !${MACHINE_ABI:Mpurecap}
+WITH_DEBUGFS=	0
+.else
 WITH_DEBUGFS=	1
+.endif
 
 KMOD=	if_rtw89
 
