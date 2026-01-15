@@ -10,6 +10,7 @@
 
 		stdout-path = "serial0:115200n8";
 		bootargs = "earlycon console=ttyS0,115200n8";
+		boot-hartid = <0>;
 	};
 	cpus {
 
