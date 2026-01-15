@@ -871,13 +871,3 @@ ilog2(int val)
 			return (n);
 	errx(1, "%s: %d is not a power of 2", __func__, val);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20190628,
-//   "target_type": "prog",
-//   "changes_purecap": [
-//     "pointer_shape"
-//   ],
-//   "change_comment": "embedded pointer storage in superblock"
-// }
-// CHERI CHANGES END

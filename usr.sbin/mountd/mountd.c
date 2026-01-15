@@ -31,17 +31,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-// CHERI CHANGES START
-// {
-//   "updated": 20200721,
-//   "target_type": "prog",
-//   "changes": [
-//     "other"
-//   ],
-//   "change_comment": "Fix buffer underread"
-// }
-// CHERI CHANGES END
-
 
 #include <sys/param.h>
 #include <sys/conf.h>

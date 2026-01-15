@@ -6,17 +6,6 @@
  *
  * For more information, see the README file.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20221129,
- *   "target_type": "prog",
- *   "changes": [
- *     "calling_convention"
- *   ]
- * }
- * CHERI CHANGES END
- */
 
 #define NEWBOT 1
 

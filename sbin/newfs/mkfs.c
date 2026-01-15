@@ -1228,13 +1228,3 @@ newfs_random(void)
 		return (nextnum++);
 	return (arc4random());
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20221129,
-//   "target_type": "prog",
-//   "changes_purecap": [
-//     "pointer_shape"
-//   ],
-//   "change_comment": "embedded pointer storage in superblock"
-// }
-// CHERI CHANGES END
