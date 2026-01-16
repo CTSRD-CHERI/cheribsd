@@ -133,6 +133,7 @@ extern int *end;
 static char static_kenv[PAGE_SIZE];
 #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
 #define MD_FETCH_PTR(mdp, info, type) ({			\
 	type __r;						\
 	ptraddr_t __res;					\
@@ -140,6 +141,9 @@ static char static_kenv[PAGE_SIZE];
 	__r = (type)cheri_setaddress(kernel_root_cap, __res);	\
 	__r;							\
 })
+#else
+#define MD_FETCH_PTR(mdp, info, type)	MD_FETCH(mdp, info, type)
+#endif
 
 /*
  * When emulating RISC-V boards under QEMU, ISA-level tracing can be enabled and
