@@ -13,6 +13,7 @@
 #define	_SYS_DEV_SIFT_ACE2_SYNCPOINT_INTERNAL_H_
 
 #ifdef _KERNEL
+#include <sys/_lock.h>
 #include <sys/_mutex.h>
 #include <sys/condvar.h>
 #include <sys/queue.h>
