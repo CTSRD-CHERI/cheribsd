@@ -305,7 +305,8 @@ selectedArchitectures.each { arch ->
             // Build GENERIC-MORELLO-PURECAP-COMPARTMENTS in addition to
             // other kernels that we build for dev, and make it the default
             // kernel.
-            cheribuildArgs.add('--kernel-config "GENERIC-MORELLO-PURECAP-COMPARTMENTS GENERIC-MORELLO GENERIC-MORELLO-PURECAP GENERIC-MORELLO-PURECAP-BENCHMARK GENERIC-MORELLO-NODEBUG GENERIC-MORELLO-PURECAP-NODEBUG GENERIC-MORELLO-PURECAP-BENCHMARK-NODEBUG"')
+            cheribuildArgs.add('--kernel-config')
+            cheribuildArgs.add('GENERIC-MORELLO-PURECAP-COMPARTMENTS GENERIC-MORELLO GENERIC-MORELLO-PURECAP GENERIC-MORELLO-PURECAP-BENCHMARK GENERIC-MORELLO-NODEBUG GENERIC-MORELLO-PURECAP-NODEBUG GENERIC-MORELLO-PURECAP-BENCHMARK-NODEBUG')
         }
     }
     archArgs[arch] = [
