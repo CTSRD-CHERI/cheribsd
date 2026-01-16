@@ -214,6 +214,9 @@ _start:
 	 * Stash modulep in the callee-saved register s3, and zero s4 to
 	 * indicate that we have no DTB pointer. It is already included in the
 	 * loader(8) metadata.
+	 *
+	 * The EFI loader is always Hybrid so convert metadata poiner to a
+	 * capability in purecap mode.
 	 */
 #ifdef __CHERI_PURE_CAPABILITY__
 	csrr	ct0, ddc
