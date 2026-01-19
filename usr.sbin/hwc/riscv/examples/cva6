@@ -1,6 +1,6 @@
-# 
+#
 # CVA6 event id table.
-# 
+#
 mhpmcounters {
 	mhpmcounter = {
 		id = 3;
