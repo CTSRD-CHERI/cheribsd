@@ -131,6 +131,18 @@ extern int *end;
 
 static char static_kenv[PAGE_SIZE];
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define MD_FETCH_PTR(mdp, info, type) ({			\
+	type __r;						\
+	ptraddr_t __res;					\
+	__res = MD_FETCH(mdp, info, ptraddr_t);			\
+	__r = (type)cheri_setaddress(kernel_root_cap, __res);	\
+	__r;							\
+})
+#else
+#define MD_FETCH_PTR(mdp, info, type)	MD_FETCH(mdp, info, type)
+#endif
+
 /*
  * When emulating RISC-V boards under QEMU, ISA-level tracing can be enabled and
  * disabled using special NOP instructions. By default this is a simple global
@@ -527,14 +539,14 @@ parse_metadata(void)
 	/* Read the boot metadata */
 	boothowto = MD_FETCH(preload_kmdp, MODINFOMD_HOWTO, int);
 	lastaddr = MD_FETCH(preload_kmdp, MODINFOMD_KERNEND, vm_offset_t);
-	kern_envp = MD_FETCH(preload_kmdp, MODINFOMD_ENVP, char *);
+	kern_envp = MD_FETCH_PTR(preload_kmdp, MODINFOMD_ENVP, char *);
 	if (kern_envp != NULL)
 		init_static_kenv(kern_envp, 0);
 	else
 		init_static_kenv(static_kenv, sizeof(static_kenv));
 #ifdef DDB
-	ksym_start = MD_FETCH(preload_kmdp, MODINFOMD_SSYM, uintptr_t);
-	ksym_end = MD_FETCH(preload_kmdp, MODINFOMD_ESYM, uintptr_t);
+	ksym_start = MD_FETCH_PTR(preload_kmdp, MODINFOMD_SSYM, uintptr_t);
+	ksym_end = MD_FETCH_PTR(preload_kmdp, MODINFOMD_ESYM, uintptr_t);
 	db_fetch_ksymtab(ksym_start, ksym_end, 0);
 #endif
 #ifdef FDT

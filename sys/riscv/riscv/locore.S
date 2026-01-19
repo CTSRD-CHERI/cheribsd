@@ -143,6 +143,30 @@ _alt_start:
  */
 	.globl _start
 _start:
+
+#ifdef __CHERI_PURE_CAPABILITY__
+.option push
+.option nocapmode
+
+	/*
+	 * The boot loader may enter in non-capmode even though
+	 * our ELF header requests capmode.  The instructions below
+	 * should work in both modes.
+	 */
+	lla	t0, 1f
+	cspecialr ct1, pcc
+	csetaddr ct1, ct1, t0
+	li	t0, 1
+	csetflags ct1, ct1, t0
+#ifdef __riscv_xcheri_mode_dependent_jumps
+	jr.cap	ct1
+#else
+	cjr	ct1
+#endif
+1:
+.option pop
+#endif
+
 	/* Set the global pointer */
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	cgp, cnull
@@ -157,9 +181,13 @@ _start:
 	 * Stash modulep in the callee-saved register s3, and zero s4 to
 	 * indicate that we have no DTB pointer. It is already included in the
 	 * loader(8) metadata.
+	 *
+	 * The EFI loader is always Hybrid so convert metadata poiner to a
+	 * capability in purecap mode.
 	 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	cmove	cs3, ca0
+	cspecialr	ct0, ddc
+	csetaddr	cs3, ct0, a0
 #else	
 	mv	s3, a0
 #endif
