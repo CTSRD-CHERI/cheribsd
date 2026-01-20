@@ -454,14 +454,14 @@ pmu_print(struct hwc_context *tc __unused)
 	int i;
 
 	/* Print out standard counters. */
-	printf(" time == %ld\n", csr_read(time));
-	printf(" cycle == %ld\n", csr_read(cycle));
-	printf(" instructions == %ld\n", csr_read(instret));
+	printf("      time == %ld\n", csr_read(time));
+	printf("      cycle == %ld\n", csr_read(cycle));
+	printf("      instructions == %ld\n", csr_read(instret));
 
 	for (i = 0; i < RISCV_NCOUNTERS; i++) {
 		c = &counters[i];
 		if (c->enabled == true)
-			printf(" %s == %ld\n", c->name,
+			printf("   %d: %s == %ld\n", i, c->name,
 			    csr_read_num(CSR_HPMCOUNTER3 - 3 + i));
 	}
 }

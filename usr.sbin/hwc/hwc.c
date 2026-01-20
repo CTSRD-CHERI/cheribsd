@@ -164,7 +164,7 @@ usage(void)
 	errx(EX_USAGE,
 		"hwc [-c devname] [path to executable]\n"
 		"\t -c\tname\t\tName of tracing device, e.g. 'coresight'.\n"
-		"\t -o\toutput-file\t\tFile name to store results into.\n"
+		"\t -f\tconfig-file\tHW counters configuration file.\n"
 		"\t -h\tHelp."
         );
 }
