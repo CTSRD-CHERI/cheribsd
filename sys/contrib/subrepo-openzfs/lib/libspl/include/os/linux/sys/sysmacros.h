@@ -99,4 +99,16 @@
 #define	offsetof(s, m)	((size_t)(&(((s *)0)->m)))
 #endif
 
+#if !defined(__CHERI__) && !defined(__CHERI_HYBRID__)
+#ifndef __capability
+#define	__capability
+#endif
+#ifndef __cheri_fromcap
+#define	__cheri_fromcap
+#endif
+#ifndef PTR2CAP
+#define	PTR2CAP(x)	(x)
+#endif
+#endif
+
 #endif /* _LIBSPL_SYS_SYSMACROS_H */

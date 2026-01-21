@@ -56,7 +56,7 @@
 
 #define	skip_whitespace(p)	while ((*(p) == ' ') || (*(p) == '\t')) (p)++
 
-#if __has_feature(capabilities)
+#if defined(__CHERI__) || defined(__CHERI_HYBRID__)
 #define NVPAIR_OVER_ALLOCATE_DECODE
 #endif
 
@@ -3263,7 +3263,7 @@ nvs_xdr_nvp_##type(XDR *xdrs, void *ptr)	\
 	return (xdr_##type(xdrs, ptr));		\
 }
 
-#elif !defined(_KERNEL) && defined(__FreeBSD__)
+#elif !defined(_KERNEL) && defined(__FreeBSD__) && defined(__CheriBSD_version)
 
 #define	NVS_BUILD_XDRPROC_T(type)				\
 static int							\
