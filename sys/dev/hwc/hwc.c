@@ -42,7 +42,6 @@
 #include <dev/hwc/hwc_ownerhash.h>
 #include <dev/hwc/hwc_backend.h>
 #include <dev/hwc/hwc_ioctl.h>
-#include <dev/hwc/hwc_hook.h>
 
 #define	HWC_DEBUG
 #undef	HWC_DEBUG
@@ -99,8 +98,6 @@ hwc_load(void)
 	hwc_exit_tag = EVENTHANDLER_REGISTER(process_exit, hwc_process_exit,
 	    NULL, EVENTHANDLER_PRI_ANY);
 
-	hwc_hook_load();
-
 	return (0);
 }
 
@@ -108,7 +105,6 @@ static int
 hwc_unload(void)
 {
 
-	hwc_hook_unload();
 	EVENTHANDLER_DEREGISTER(process_exit, hwc_exit_tag);
 	destroy_dev(hwc_cdev);
 #if 0

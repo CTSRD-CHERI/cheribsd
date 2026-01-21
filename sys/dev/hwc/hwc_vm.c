@@ -51,7 +51,6 @@
 #include <vm/vm_pageout.h>
 #include <vm/vm_phys.h>
 
-#include <dev/hwc/hwc_hook.h>
 #include <dev/hwc/hwc_context.h>
 #include <dev/hwc/hwc_contexthash.h>
 #include <dev/hwc/hwc_owner.h>

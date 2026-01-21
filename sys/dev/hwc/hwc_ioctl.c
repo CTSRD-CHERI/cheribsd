@@ -42,7 +42,6 @@
 #include <sys/smp.h>
 #include <sys/hwc.h>
 
-#include <dev/hwc/hwc_hook.h>
 #include <dev/hwc/hwc_context.h>
 #include <dev/hwc/hwc_contexthash.h>
 #if 0

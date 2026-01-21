@@ -36,7 +36,6 @@
 #include <sys/mutex.h>
 #include <sys/hwc.h>
 
-#include <dev/hwc/hwc_hook.h>
 #include <dev/hwc/hwc_context.h>
 #if 0
 #include <dev/hwc/hwc_config.h>
