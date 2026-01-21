@@ -48,14 +48,10 @@
 #if 0
 #include <dev/hwc/hwc_config.h>
 #include <dev/hwc/hwc_cpu.h>
-#include <dev/hwc/hwc_thread.h>
 #endif
 #include <dev/hwc/hwc_owner.h>
 #include <dev/hwc/hwc_ownerhash.h>
 #include <dev/hwc/hwc_backend.h>
-#if 0
-#include <dev/hwc/hwc_record.h>
-#endif
 #include <dev/hwc/hwc_ioctl.h>
 #include <dev/hwc/hwc_vm.h>
 
@@ -135,24 +131,10 @@ static int
 hwc_ioctl_alloc_mode_thread(struct thread *td, struct hwc_owner *ho,
     struct hwc_backend *backend, struct hwc_alloc *halloc)
 {
-#if 0
-	struct thread **threads, *td1;
-	struct hwc_record_entry *entry;
-#endif
 	struct hwc_context *ctx, *ctx1;
-#if 0
-	struct hwc_thread *thr;
-#endif
 	char path[MAXPATHLEN];
 	struct proc *p;
-#if 0
-	int thread_id;
-#endif
 	int error;
-#if 0
-	int cnt;
-	int i;
-#endif
 	struct hwc_vm *vm;
 
 	/* Check if the owner have this pid configured already. */
@@ -201,32 +183,6 @@ hwc_ioctl_alloc_mode_thread(struct thread *td, struct hwc_owner *ho,
 		return (EEXIST);
 	}
 
-#if 0
-	/* Allocate hwc threads and buffers. */
-
-	cnt = 0;
-
-	FOREACH_THREAD_IN_PROC(p, td1) {
-		cnt += 1;
-	}
-
-	KASSERT(cnt > 0, ("no threads"));
-
-	threads = malloc(sizeof(struct thread *) * cnt, M_HWC_IOCTL,
-	    M_NOWAIT | M_ZERO);
-	if (threads == NULL) {
-		PROC_UNLOCK(p);
-		hwc_ctx_free(ctx);
-		return (ENOMEM);
-	}
-
-	i = 0;
-
-	FOREACH_THREAD_IN_PROC(p, td1) {
-		threads[i++] = td1;
-	}
-#endif
-
 	ctx->proc = p;
 	PROC_UNLOCK(p);
 
@@ -240,50 +196,6 @@ hwc_ioctl_alloc_mode_thread(struct thread *td, struct hwc_owner *ho,
 
 	ctx->vm = vm;
 	vm->ctx = ctx;
-
-#if 0
-	for (i = 0; i < cnt; i++) {
-		thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
-		sprintf(path, "hwc_%d_%d", ctx->ident, thread_id);
-
-		error = hwc_thread_alloc(&thr, path, ctx->bufsize,
-		    ctx->hwc_backend->kva_req);
-		if (error) {
-			free(threads, M_HWC_IOCTL);
-			hwc_ctx_free(ctx);
-			return (error);
-		}
-		/* Allocate backend-specific thread data. */
-		error = hwc_backend_thread_alloc(ctx, thr);
-		if (error != 0) {
-			dprintf("%s: failed to allocate thread backend data\n",
-			    __func__);
-			free(threads, M_HWC_IOCTL);
-			hwc_ctx_free(ctx);
-			return (error);
-		}
-
-		/*
-		 * Insert a THREAD_CREATE record so userspace picks up
-		 * the thread's tracing buffers.
-		 */
-		entry = hwc_record_entry_alloc();
-		entry->record_type = HWC_RECORD_THREAD_CREATE;
-		entry->thread_id = thread_id;
-
-		thr->vm->ctx = ctx;
-		thr->td = threads[i];
-		thr->ctx = ctx;
-		thr->backend = ctx->hwc_backend;
-		thr->thread_id = thread_id;
-
-		HWC_CTX_LOCK(ctx);
-		hwc_thread_insert(ctx, thr, entry);
-		HWC_CTX_UNLOCK(ctx);
-	}
-
-	free(threads, M_HWC_IOCTL);
-#endif
 
 	error = hwc_backend_init(ctx);
 	if (error) {

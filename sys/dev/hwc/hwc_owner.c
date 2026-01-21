@@ -44,16 +44,10 @@
 #include <dev/hwc/hwc_config.h>
 #endif
 #include <dev/hwc/hwc_cpu.h>
-#if 0
-#include <dev/hwc/hwc_thread.h>
-#endif
 #include <dev/hwc/hwc_owner.h>
 #include <dev/hwc/hwc_ownerhash.h>
 #include <dev/hwc/hwc_backend.h>
 #include <dev/hwc/hwc_vm.h>
-#if 0
-#include <dev/hwc/hwc_record.h>
-#endif
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG
@@ -154,9 +148,6 @@ hwc_owner_shutdown(struct hwc_owner *ho)
 		 */
 
 		hwc_backend_deinit(ctx);
-#if 0
-		hwc_record_free_all(ctx);
-#endif
 		hwc_ctx_free(ctx);
 	}
 

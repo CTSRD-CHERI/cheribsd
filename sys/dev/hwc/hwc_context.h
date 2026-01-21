@@ -35,8 +35,6 @@ enum hwc_ctx_state {
 };
 
 struct hwc_context {
-	TAILQ_HEAD(, hwc_record_entry)	records;
-
 	LIST_ENTRY(hwc_context)		next_hch; /* Entry in contexthash. */
 	LIST_ENTRY(hwc_context)		next_hwcs; /* Entry in ho->hwcs. */
 
@@ -53,9 +51,6 @@ struct hwc_context {
 	/* Thread mode. */
 	struct proc			*proc; /* Target proc. */
 	pid_t				pid; /* Target pid. */
-	TAILQ_HEAD(, hwc_thread)	threads;
-	int				thread_counter;
-	int				pause_on_mmap;
 
 	size_t				bufsize; /* Trace bufsize for each vm.*/
 

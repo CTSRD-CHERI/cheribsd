@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2023-2025 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2023-2026 Ruslan Bukin <br@bsdpad.com>
  *
  * This work was supported by Innovate UK project 105694, "Digital Security
  * by Design (DSbD) Technology Platform Prototype".
@@ -274,35 +274,3 @@ hwc_backend_svc_buf(struct hwc_context *ctx, void *data, size_t data_size,
 
 	return (error);
 }
-
-#if 0
-int
-hwc_backend_thread_alloc(struct hwc_context *ctx, struct hwc_thread *thr)
-{
-	int error;
-
-	dprintf("%s\n", __func__);
-
-	if (ctx->hwc_backend->ops->hwc_backend_thread_alloc == NULL)
-		return (0);
-	KASSERT(thr->private == NULL,
-		    ("%s: thread private data is not NULL\n", __func__));
-	error = ctx->hwc_backend->ops->hwc_backend_thread_alloc(thr);
-
-	return (error);
-}
-
-void
-hwc_backend_thread_free(struct hwc_thread *thr)
-{
-	dprintf("%s\n", __func__);
-
-	if (thr->backend->ops->hwc_backend_thread_free == NULL)
-		return;
-	KASSERT(thr->private != NULL,
-		    ("%s: thread private data is NULL\n", __func__));
-	thr->backend->ops->hwc_backend_thread_free(thr);
-
-	return;
-}
-#endif

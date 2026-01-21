@@ -44,7 +44,6 @@
 #include <dev/hwc/hwc_context.h>
 #if 0
 #include <dev/hwc/hwc_config.h>
-#include <dev/hwc/hwc_thread.h>
 #endif
 #include <dev/hwc/hwc_owner.h>
 #include <dev/hwc/hwc_vm.h>
@@ -98,8 +97,6 @@ hwc_ctx_alloc(struct hwc_context **ctx0)
 
 	ctx = malloc(sizeof(struct hwc_context), M_HWT_CTX, M_WAITOK | M_ZERO);
 
-	TAILQ_INIT(&ctx->records);
-	TAILQ_INIT(&ctx->threads);
 	TAILQ_INIT(&ctx->cpus);
 	mtx_init(&ctx->mtx, "ctx", NULL, MTX_SPIN);
 	mtx_init(&ctx->rec_mtx, "ctx_rec", NULL, MTX_DEF);
@@ -137,35 +134,6 @@ hwc_ctx_free_cpus(struct hwc_context *ctx)
 	} while (1);
 }
 
-#if 0
-static void
-hwc_ctx_free_threads(struct hwc_context *ctx)
-{
-	struct hwc_thread *thr;
-
-	dprintf("%s: remove threads\n", __func__);
-
-	do {
-		HWT_CTX_LOCK(ctx);
-		thr = TAILQ_FIRST(&ctx->threads);
-		if (thr)
-			TAILQ_REMOVE(&ctx->threads, thr, next);
-		HWT_CTX_UNLOCK(ctx);
-
-		if (thr == NULL)
-			break;
-
-		HWT_THR_LOCK(thr);
-		/* TODO: check if thr is sleeping before waking it up. */
-		wakeup(thr);
-		HWT_THR_UNLOCK(thr);
-
-		if (refcount_release(&thr->refcnt))
-			hwc_thread_free(thr);
-	} while (1);
-}
-#endif
-
 void
 hwc_ctx_free(struct hwc_context *ctx)
 {
@@ -173,9 +141,6 @@ hwc_ctx_free(struct hwc_context *ctx)
 	if (ctx->mode == HWC_MODE_CPU)
 		hwc_ctx_free_cpus(ctx);
 #if 0
-	else
-		hwc_ctx_free_threads(ctx);
-
 	hwc_config_free(ctx);
 #else
 	hwc_vm_free(ctx->vm);

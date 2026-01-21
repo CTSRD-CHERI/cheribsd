@@ -50,9 +50,6 @@ struct hwc_backend_ops {
 	/* For backends that are tied to local CPU registers */
 	int (*hwc_backend_enable_smp)(struct hwc_context *);
 	int (*hwc_backend_disable_smp)(struct hwc_context *);
-	/* Allocation and initialization of backend-specific thread data. */
-	int (*hwc_backend_thread_alloc)(struct hwc_thread *);
-	void (*hwc_backend_thread_free)(struct hwc_thread *);
 	/* Debugging only. */
 	void (*hwc_backend_dump)(int cpu_id);
 };
@@ -81,8 +78,6 @@ int hwc_backend_start(struct hwc_context *, struct hwc_start *);
 int hwc_backend_svc_buf(struct hwc_context *ctx, void *data, size_t data_size,
     int data_version);
 struct hwc_backend * hwc_backend_lookup(const char *name);
-int hwc_backend_thread_alloc(struct hwc_context *ctx, struct hwc_thread *);
-void hwc_backend_thread_free(struct hwc_thread *);
 
 void hwc_backend_load(void);
 void hwc_backend_unload(void);

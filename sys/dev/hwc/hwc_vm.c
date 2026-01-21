@@ -60,14 +60,8 @@
 #endif
 #include <dev/hwc/hwc_owner.h>
 #include <dev/hwc/hwc_ownerhash.h>
-#if 0
-#include <dev/hwc/hwc_thread.h>
-#endif
 #include <dev/hwc/hwc_backend.h>
 #include <dev/hwc/hwc_vm.h>
-#if 0
-#include <dev/hwc/hwc_record.h>
-#endif
 
 #define	HWT_THREAD_DEBUG
 #undef	HWT_THREAD_DEBUG
@@ -246,7 +240,6 @@ hwc_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
 {
 #if 0
-	struct hwc_record_get *rget;
 	struct hwc_set_config *sconf;
 	struct hwc_bufptr_get *ptr_get;
 	struct hwc_svc_buf *sbuf;
@@ -330,13 +323,6 @@ hwc_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		hwc_backend_configure(ctx, hc);
 		break;
 #if 0
-	case HWT_IOC_RECORD_GET:
-		rget = (struct hwc_record_get *)addr;
-		error = hwc_record_send(ctx, rget);
-		if (error)
-			return (error);
-		break;
-
 	case HWT_IOC_SET_CONFIG:
 		if (ctx->state == CTX_STATE_RUNNING) {
 			return (ENXIO);

@@ -69,7 +69,7 @@ static u_long hwc_contexthashmask;
 static LIST_HEAD(hwc_contexthash, hwc_context)	*hwc_contexthash;
 
 /*
- * To use by hwc_switch_in/out() and hwc_record() only.
+ * To use by hwc_switch_in/out() only.
  * This function returns with refcnt acquired.
  */
 struct hwc_context *
