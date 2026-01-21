@@ -296,7 +296,7 @@ main(int argc, char **argv, char **env)
 	if (argc < 0)
 		exit(EXIT_FAILURE);
 
-	while ((option = getopt(argc, argv, "P:R:gs:hc:b:rw:t:i:f:o:")) != -1)
+	while ((option = getopt(argc, argv, "P:R:hc:f:o:")) != -1)
 		switch (option) {
 		case 'P':
 			tc->attach = 1;
