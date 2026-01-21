@@ -26,23 +26,11 @@
  * SUCH DAMAGE.
  */
 
-#if 0
-#include <sys/hwc_record.h>
-#endif
-
 #ifndef _DEV_HWC_HWC_HOOK_H_
 #define _DEV_HWC_HWC_HOOK_H_
 
 #define	HWC_SWITCH_IN		0
 #define	HWC_SWITCH_OUT		1
-#if 0
-#define	HWC_THREAD_EXIT		2
-#define	HWC_THREAD_CREATE	3
-#define	HWC_THREAD_SET_NAME	4
-#define	HWC_RECORD		5
-#define	HWC_MMAP		6
-#define	HWC_EXEC		7
-#endif
 
 #define	HWC_CALL_HOOK(td, func, arg)			\
 do {							\

@@ -43,8 +43,6 @@
 #include <dev/hwc/hwc_contexthash.h>
 #if 0
 #include <dev/hwc/hwc_config.h>
-#include <dev/hwc/hwc_thread.h>
-#include <dev/hwc/hwc_record.h>
 #endif
 #include <dev/hwc/hwc_cpu.h>
 
