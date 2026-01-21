@@ -72,25 +72,6 @@ hwc_owner_lookup_ctx(struct hwc_owner *ho, pid_t pid)
 	return (NULL);
 }
 
-#if 0
-struct hwc_context *
-hwc_owner_lookup_ctx_by_cpu(struct hwc_owner *ho, int cpu)
-{
-	struct hwc_context *ctx;
-
-	mtx_lock(&ho->mtx);
-	LIST_FOREACH(ctx, &ho->hwcs, next_hwcs) {
-		if (ctx->cpu == cpu) {
-			mtx_unlock(&ho->mtx);
-			return (ctx);
-		}
-	}
-	mtx_unlock(&ho->mtx);
-
-	return (NULL);
-}
-#endif
-
 struct hwc_owner *
 hwc_owner_alloc(struct proc *p)
 {
