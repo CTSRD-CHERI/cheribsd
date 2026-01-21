@@ -38,7 +38,6 @@
 
 #include <dev/hwc/hwc_context.h>
 #if 0
-#include <dev/hwc/hwc_config.h>
 #include <dev/hwc/hwc_thread.h>
 #endif
 #include <dev/hwc/hwc_backend.h>
@@ -256,20 +255,6 @@ hwc_backend_start(struct hwc_context *ctx, struct hwc_start *hs)
 	dprintf("%s\n", __func__);
 
 	error = ctx->hwc_backend->ops->hwc_backend_start(ctx, hs);
-
-	return (error);
-}
-
-int
-hwc_backend_svc_buf(struct hwc_context *ctx, void *data, size_t data_size,
-    int data_version)
-{
-	int error;
-
-	dprintf("%s\n", __func__);
-
-	error = ctx->hwc_backend->ops->hwc_backend_svc_buf(ctx, data, data_size,
-	    data_version);
 
 	return (error);
 }
