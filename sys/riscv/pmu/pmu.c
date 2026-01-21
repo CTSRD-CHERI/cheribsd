@@ -41,8 +41,6 @@
 
 #define	dprintf(fmt, ...)
 
-#define	SBI_PMU_EVENT_RAW_IDX	0x20000
-
 static struct ofw_compat_data compat_data[] = {
 	{ "riscv,pmu",			1 },
 	{ NULL,				0 }
