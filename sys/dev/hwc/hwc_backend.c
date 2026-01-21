@@ -37,9 +37,6 @@
 #include <sys/hwc.h>
 
 #include <dev/hwc/hwc_context.h>
-#if 0
-#include <dev/hwc/hwc_thread.h>
-#endif
 #include <dev/hwc/hwc_backend.h>
 
 #define	HWT_BACKEND_DEBUG

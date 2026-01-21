@@ -254,13 +254,6 @@ hwc_ioctl_alloc(struct thread *td, struct hwc_alloc *halloc)
 	case HWC_MODE_THREAD:
 		error = hwc_ioctl_alloc_mode_thread(td, ho, backend, halloc);
 		break;
-	case HWC_MODE_CPU:
-#if 0
-		error = hwc_ioctl_alloc_mode_cpu(td, ho, backend, halloc);
-#else
-		error = -1;
-#endif
-		break;
 	default:
 		error = ENXIO;
 	};

@@ -38,9 +38,6 @@
 
 #include <dev/hwc/hwc_context.h>
 #include <dev/hwc/hwc_contexthash.h>
-#if 0
-#include <dev/hwc/hwc_config.h>
-#endif
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG

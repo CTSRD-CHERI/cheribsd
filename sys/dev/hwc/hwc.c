@@ -107,12 +107,10 @@ hwc_unload(void)
 
 	EVENTHANDLER_DEREGISTER(process_exit, hwc_exit_tag);
 	destroy_dev(hwc_cdev);
-#if 0
 	hwc_ownerhash_unload();
 	hwc_contexthash_unload();
 	hwc_ctx_unload();
 	hwc_backend_unload();
-#endif
 
 	return (0);
 }

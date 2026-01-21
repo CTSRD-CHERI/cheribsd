@@ -108,41 +108,11 @@ hwc_ctx_alloc(struct hwc_context **ctx0)
 	return (0);
 }
 
-#if 0
-static void
-hwc_ctx_free_cpus(struct hwc_context *ctx)
-{
-	struct hwc_cpu *cpu;
-
-	do {
-		HWT_CTX_LOCK(ctx);
-		cpu = TAILQ_FIRST(&ctx->cpus);
-		if (cpu)
-			TAILQ_REMOVE(&ctx->cpus, cpu, next);
-		HWT_CTX_UNLOCK(ctx);
-
-		if (cpu == NULL)
-			break;
-
-		/* TODO: move vm_free() to cpu_free()? */
-		hwc_vm_free(cpu->vm);
-		hwc_cpu_free(cpu);
-	} while (1);
-}
-#endif
-
 void
 hwc_ctx_free(struct hwc_context *ctx)
 {
 
-#if 0
-	if (ctx->mode == HWC_MODE_CPU)
-		hwc_ctx_free_cpus(ctx);
-	hwc_config_free(ctx);
-#else
 	hwc_vm_free(ctx->vm);
-#endif
-
 	hwc_ctx_ident_free(ctx->ident);
 	free(ctx, M_HWT_CTX);
 }
