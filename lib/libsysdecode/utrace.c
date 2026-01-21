@@ -82,6 +82,9 @@ print_utrace_mrs(FILE *fp, void *p)
 	case UTRACE_MRS_QUARANTINE_REVOKE_DONE:
 		fprintf(fp, "quarantine_revoke() done");
 		break;
+	case UTRACE_MRS_POISON: 
+		fprintf(fp, "%p = mrs_poison(%zu)", ut->r, ut->s);
+		break;	
 	default:
 		return (0);
 	}

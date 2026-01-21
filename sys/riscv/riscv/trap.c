@@ -83,9 +83,9 @@
 #endif
 
 #if __has_feature(capabilities)
-int log_user_cheri_exceptions = 0;
+int log_user_cheri_exceptions = 1;
 SYSCTL_INT(_machdep, OID_AUTO, log_user_cheri_exceptions, CTLFLAG_RWTUN,
-    &log_user_cheri_exceptions, 0,
+    &log_user_cheri_exceptions, 1,
     "Print registers and process details on user CHERI exceptions");
 #endif
 
