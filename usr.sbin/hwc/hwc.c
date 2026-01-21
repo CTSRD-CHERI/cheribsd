@@ -106,12 +106,8 @@ hwc_ctx_alloc(struct hwc_context *tc)
 	al.mode = tc->mode;
 	if (tc->mode == HWC_MODE_THREAD)
 		al.pid = tc->pid;
-	else {
-#if 0
-		al.cpu_map = &tc->cpu_map;
-		al.cpusetsize = sizeof(cpuset_t);
-#endif
-	}
+	else
+		return (-1);
 
 	al.pid = tc->pid;
 	al.backend_name = tc->backend->name;
