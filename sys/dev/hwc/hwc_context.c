@@ -47,7 +47,6 @@
 #endif
 #include <dev/hwc/hwc_owner.h>
 #include <dev/hwc/hwc_vm.h>
-#include <dev/hwc/hwc_cpu.h>
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG
@@ -113,6 +112,7 @@ hwc_ctx_alloc(struct hwc_context **ctx0)
 	return (0);
 }
 
+#if 0
 static void
 hwc_ctx_free_cpus(struct hwc_context *ctx)
 {
@@ -133,14 +133,15 @@ hwc_ctx_free_cpus(struct hwc_context *ctx)
 		hwc_cpu_free(cpu);
 	} while (1);
 }
+#endif
 
 void
 hwc_ctx_free(struct hwc_context *ctx)
 {
 
+#if 0
 	if (ctx->mode == HWC_MODE_CPU)
 		hwc_ctx_free_cpus(ctx);
-#if 0
 	hwc_config_free(ctx);
 #else
 	hwc_vm_free(ctx->vm);
