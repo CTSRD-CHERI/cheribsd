@@ -146,7 +146,6 @@ hwc_ioctl_alloc_mode_thread(struct thread *td, struct hwc_owner *ho,
 	ctx->hwc_owner = ho;
 	ctx->mode = HWC_MODE_THREAD;
 	ctx->hwc_td = td;
-	ctx->kqueue_fd = halloc->kqueue_fd;
 
 	error = copyout(&ctx->ident, halloc->ident, sizeof(int));
 	if (error) {
