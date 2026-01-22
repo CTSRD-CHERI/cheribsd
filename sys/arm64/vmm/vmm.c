@@ -324,6 +324,10 @@ static void
 vcpu_init(struct vcpu *vcpu)
 {
 	vcpu->cookie = vmmops_vcpu_init(vcpu->vm->cookie, vcpu, vcpu->vcpuid);
+#if __has_feature(capabilities)
+	(void)vmmops_getreg(vcpu->cookie, VM_REG_GUEST_PCC,
+	    &vcpu->nextpc);
+#endif
 	MPASS(vcpu->cookie != NULL);
 	fpu_save_area_reset(vcpu->guestfpu);
 	vmm_stat_init(vcpu->stats);
