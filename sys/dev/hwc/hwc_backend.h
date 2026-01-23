@@ -65,7 +65,7 @@ int hwc_backend_register(struct hwc_backend *);
 int hwc_backend_unregister(struct hwc_backend *);
 int hwc_backend_stop(struct hwc_context *, struct hwc_stop *);
 int hwc_backend_start(struct hwc_context *, struct hwc_start *);
-struct hwc_backend *hwc_backend_lookup(const char *name);
+struct hwc_backend * hwc_backend_lookup(const char *name);
 
 void hwc_backend_load(void);
 void hwc_backend_unload(void);
