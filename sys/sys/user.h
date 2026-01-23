@@ -44,7 +44,6 @@
 #include <sys/ucred.h>
 #include <sys/uio.h>
 #include <sys/queue.h>
-#include <sys/stddef.h>
 #include <sys/_lock.h>
 #include <sys/_mutex.h>
 #include <sys/proc.h>
@@ -53,6 +52,7 @@
 #include <vm/pmap.h>		/* XXX */
 #include <vm/vm_map.h>		/* XXX */
 #endif /* !_KERNEL */
+#include <sys/stddef.h>
 #ifndef _SYS_RESOURCEVAR_H_
 #include <sys/resourcevar.h>
 #endif
