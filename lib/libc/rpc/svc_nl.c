@@ -368,5 +368,5 @@ svc_nl_freeargs(SVCXPRT *xprt, xdrproc_t xdr_args, void *args_ptr)
 	struct nl_softc *sc = xprt->xp_p1;
 
 	sc->xdrs.x_op = XDR_FREE;
-	return ((*xdr_args)(&sc->xdrs, args_ptr, 0));
+	return ((*xdr_args)(&sc->xdrs, args_ptr));
 }

@@ -61,18 +61,6 @@
 
   $Id: svc_auth_gss.c,v 1.27 2002/01/15 15:43:00 andros Exp $
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "sunrpc"
- * }
- * CHERI CHANGES END
- */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1218,7 +1206,7 @@ svc_rpc_gss_wrap(SVCAUTH *auth, XDR *xdrs, xdrproc_t xdr_func, caddr_t xdr_ptr)
 	client = (struct svc_rpc_gss_client *) auth->svc_ah_private;
 	if (client->cl_state != CLIENT_ESTABLISHED
 	    || client->cl_rawcred.service == rpc_gss_svc_none) {
-		return xdr_func(xdrs, xdr_ptr, 0);
+		return xdr_func(xdrs, xdr_ptr);
 	}
 	return (xdr_rpc_gss_wrap_data(xdrs, xdr_func, xdr_ptr,
 		client->cl_ctx, client->cl_qop,
@@ -1235,7 +1223,7 @@ svc_rpc_gss_unwrap(SVCAUTH *auth, XDR *xdrs, xdrproc_t xdr_func, caddr_t xdr_ptr
 	client = (struct svc_rpc_gss_client *) auth->svc_ah_private;
 	if (client->cl_state != CLIENT_ESTABLISHED
 	    || client->cl_rawcred.service == rpc_gss_svc_none) {
-		return xdr_func(xdrs, xdr_ptr, 0);
+		return xdr_func(xdrs, xdr_ptr);
 	}
 	return (xdr_rpc_gss_unwrap_data(xdrs, xdr_func, xdr_ptr,
 		client->cl_ctx, client->cl_qop,

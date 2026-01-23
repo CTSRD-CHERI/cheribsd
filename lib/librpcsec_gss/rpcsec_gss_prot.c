@@ -36,18 +36,6 @@
 
   $Id: authgss_prot.c,v 1.18 2000/09/01 04:14:03 dugsong Exp $
 */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "sunrpc"
- * }
- * CHERI CHANGES END
- */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -121,7 +109,7 @@ xdr_rpc_gss_wrap_data(XDR *xdrs, xdrproc_t xdr_func, caddr_t xdr_ptr,
 	XDR_SETPOS(xdrs, start + 4);
 	
 	/* Marshal rpc_gss_data_t (sequence number + arguments). */
-	if (!xdr_u_int(xdrs, &seq) || !xdr_func(xdrs, xdr_ptr, 0))
+	if (!xdr_u_int(xdrs, &seq) || !xdr_func(xdrs, xdr_ptr))
 		return (FALSE);
 	end = XDR_GETPOS(xdrs);
 
@@ -229,7 +217,7 @@ xdr_rpc_gss_unwrap_data(XDR *xdrs, xdrproc_t xdr_func, caddr_t xdr_ptr,
 	/* Decode rpc_gss_data_t (sequence number + arguments). */
 	xdrmem_create(&tmpxdrs, databuf.value, databuf.length, XDR_DECODE);
 	xdr_stat = (xdr_u_int(&tmpxdrs, &seq_num) &&
-	    xdr_func(&tmpxdrs, xdr_ptr, 0));
+	    xdr_func(&tmpxdrs, xdr_ptr));
 	XDR_DESTROY(&tmpxdrs);
 
 	/*
