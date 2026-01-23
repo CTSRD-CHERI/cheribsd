@@ -126,7 +126,7 @@ xdr_array(XDR *xdrs, caddr_t *addrp, u_int *sizep, u_int maxsize, u_int elsize, 
 	 * now we xdr each element of array
 	 */
 	for (i = 0; (i < c) && stat; i++) {
-		stat = (*elproc)(xdrs, target, 0);
+		stat = (*elproc)(xdrs, target);
 		target += elsize;
 	}
 
@@ -158,7 +158,7 @@ xdr_vector(XDR *xdrs, char *basep, u_int nelem, u_int elemsize, xdrproc_t xdr_el
 
 	elptr = basep;
 	for (i = 0; i < nelem; i++) {
-		if (!(*xdr_elem)(xdrs, elptr, 0)) {
+		if (!(*xdr_elem)(xdrs, elptr)) {
 			return(FALSE);
 		}
 		elptr += elemsize;

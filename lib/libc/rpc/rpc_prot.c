@@ -29,18 +29,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
  * POSSIBILITY OF SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "sunrpc"
- * }
- * CHERI CHANGES END
- */
 
 /*
  * rpc_prot.c
@@ -123,8 +111,7 @@ xdr_accepted_reply(XDR *xdrs, struct accepted_reply *ar)
 	switch (ar->ar_stat) {
 
 	case SUCCESS:
-		return ((*(ar->ar_results.proc))(xdrs, ar->ar_results.where,
-		    0));
+		return ((*(ar->ar_results.proc))(xdrs, ar->ar_results.where));
 
 	case PROG_MISMATCH:
 		if (!xdr_rpcvers(xdrs, &(ar->ar_vers.low)))
