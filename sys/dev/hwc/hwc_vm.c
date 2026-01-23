@@ -58,16 +58,16 @@
 #include <dev/hwc/hwc_backend.h>
 #include <dev/hwc/hwc_vm.h>
 
-#define	HWT_THREAD_DEBUG
-#undef	HWT_THREAD_DEBUG
+#define	HWC_THREAD_DEBUG
+#undef	HWC_THREAD_DEBUG
 
-#ifdef	HWT_THREAD_DEBUG
+#ifdef	HWC_THREAD_DEBUG
 #define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
 #else
 #define	dprintf(fmt, ...)
 #endif
 
-static MALLOC_DEFINE(M_HWT_VM, "hwc_vm", "Hardware Counters");
+static MALLOC_DEFINE(M_HWC_VM, "hwc_vm", "Hardware Counters");
 
 static int
 hwc_vm_open(struct cdev *cdev, int oflags, int devtype, struct thread *td)
@@ -95,7 +95,7 @@ hwc_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 	ctx = vm->ctx;
 
-	/* Ensure process is registered owner of this HWT. */
+	/* Ensure process is registered owner of this HWC. */
 	ho = hwc_ownerhash_lookup(td->td_proc);
 	if (ho == NULL)
 		return (ENXIO);
@@ -107,14 +107,14 @@ hwc_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	case HWC_IOC_START:
 		dprintf("%s: start tracing\n", __func__);
 
-		HWT_CTX_LOCK(ctx);
+		HWC_CTX_LOCK(ctx);
 		if (ctx->state == CTX_STATE_RUNNING) {
 			/* Already running ? */
-			HWT_CTX_UNLOCK(ctx);
+			HWC_CTX_UNLOCK(ctx);
 			return (ENXIO);
 		}
 		ctx->state = CTX_STATE_RUNNING;
-		HWT_CTX_UNLOCK(ctx);
+		HWC_CTX_UNLOCK(ctx);
 
 		hstart = (struct hwc_start *)addr;
 		error = hwc_backend_start(ctx, hstart);
@@ -178,7 +178,7 @@ hwc_vm_free(struct hwc_vm *vm)
 
 	if (vm->cdev)
 		destroy_dev_sched(vm->cdev);
-	free(vm, M_HWT_VM);
+	free(vm, M_HWC_VM);
 }
 
 int
@@ -187,7 +187,7 @@ hwc_vm_alloc(size_t bufsize, int kva_req, char *path, struct hwc_vm **vm0)
 	struct hwc_vm *vm;
 	int error;
 
-	vm = malloc(sizeof(struct hwc_vm), M_HWT_VM, M_WAITOK | M_ZERO);
+	vm = malloc(sizeof(struct hwc_vm), M_HWC_VM, M_WAITOK | M_ZERO);
 
 	error = hwc_vm_create_cdev(vm, path);
 	if (error) {

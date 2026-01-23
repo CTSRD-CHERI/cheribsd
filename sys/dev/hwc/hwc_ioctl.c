@@ -28,7 +28,7 @@
  * SUCH DAMAGE.
  */
 
-/* Hardware Trace (HWC) framework. */
+/* Hardware Counters (HWC) framework. */
 
 #include <sys/param.h>
 #include <sys/proc.h>

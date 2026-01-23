@@ -39,18 +39,18 @@
 #include <dev/hwc/hwc_owner.h>
 #include <dev/hwc/hwc_ownerhash.h>
 
-#define	HWT_DEBUG
-#undef	HWT_DEBUG
+#define	HWC_DEBUG
+#undef	HWC_DEBUG
 
-#ifdef	HWT_DEBUG
+#ifdef	HWC_DEBUG
 #define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
 #else
 #define	dprintf(fmt, ...)
 #endif
 
-#define	HWT_OWNERHASH_SIZE	1024
+#define	HWC_OWNERHASH_SIZE	1024
 
-static MALLOC_DEFINE(M_HWT_OWNERHASH, "hwc_ohash", "Hardware Trace");
+static MALLOC_DEFINE(M_HWC_OWNERHASH, "hwc_ohash", "Hardware Counters");
 
 /*
  * Hash function.  Discard the lower 2 bits of the pointer since
@@ -58,8 +58,8 @@ static MALLOC_DEFINE(M_HWT_OWNERHASH, "hwc_ohash", "Hardware Trace");
  * round((2^LONG_BIT) * ((sqrt(5)-1)/2)).
  */
 
-#define	_HWT_HM	11400714819323198486u	/* hash multiplier */
-#define	HWT_HASH_PTR(P, M)	((((unsigned long) (P) >> 2) * _HWT_HM) & (M))
+#define	_HWC_HM	11400714819323198486u	/* hash multiplier */
+#define	HWC_HASH_PTR(P, M)	((((unsigned long) (P) >> 2) * _HWC_HM) & (M))
 
 static struct mtx hwc_ownerhash_mtx;
 static u_long hwc_ownerhashmask;
@@ -72,17 +72,17 @@ hwc_ownerhash_lookup(struct proc *p)
 	struct hwc_owner *ho;
 	int hindex;
 
-	hindex = HWT_HASH_PTR(p, hwc_ownerhashmask);
+	hindex = HWC_HASH_PTR(p, hwc_ownerhashmask);
 	hoh = &hwc_ownerhash[hindex];
 
-	HWT_OWNERHASH_LOCK();
+	HWC_OWNERHASH_LOCK();
 	LIST_FOREACH(ho, hoh, next) {
 		if (ho->p == p) {
-			HWT_OWNERHASH_UNLOCK();
+			HWC_OWNERHASH_UNLOCK();
 			return (ho);
 		}
 	}
-	HWT_OWNERHASH_UNLOCK();
+	HWC_OWNERHASH_UNLOCK();
 
 	return (NULL);
 }
@@ -93,12 +93,12 @@ hwc_ownerhash_insert(struct hwc_owner *ho)
 	struct hwc_ownerhash *hoh;
 	int hindex;
 
-	hindex = HWT_HASH_PTR(ho->p, hwc_ownerhashmask);
+	hindex = HWC_HASH_PTR(ho->p, hwc_ownerhashmask);
 	hoh = &hwc_ownerhash[hindex];
 
-	HWT_OWNERHASH_LOCK();
+	HWC_OWNERHASH_LOCK();
 	LIST_INSERT_HEAD(hoh, ho, next);
-	HWT_OWNERHASH_UNLOCK();
+	HWC_OWNERHASH_UNLOCK();
 }
 
 void
@@ -106,16 +106,16 @@ hwc_ownerhash_remove(struct hwc_owner *ho)
 {
 
 	/* Destroy hwc owner. */
-	HWT_OWNERHASH_LOCK();
+	HWC_OWNERHASH_LOCK();
 	LIST_REMOVE(ho, next);
-	HWT_OWNERHASH_UNLOCK();
+	HWC_OWNERHASH_UNLOCK();
 }
 
 void
 hwc_ownerhash_load(void)
 {
 
-	hwc_ownerhash = hashinit(HWT_OWNERHASH_SIZE, M_HWT_OWNERHASH,
+	hwc_ownerhash = hashinit(HWC_OWNERHASH_SIZE, M_HWC_OWNERHASH,
 	    &hwc_ownerhashmask);
         mtx_init(&hwc_ownerhash_mtx, "hwc-owner-hash", "hwc-owner", MTX_DEF);
 }
@@ -126,7 +126,7 @@ hwc_ownerhash_unload(void)
 	struct hwc_ownerhash *hoh;
 	struct hwc_owner *ho, *tmp;
 
-	HWT_OWNERHASH_LOCK();
+	HWC_OWNERHASH_LOCK();
 	for (hoh = hwc_ownerhash;
 	    hoh <= &hwc_ownerhash[hwc_ownerhashmask];
 	    hoh++) {
@@ -134,8 +134,8 @@ hwc_ownerhash_unload(void)
 			/* TODO: module is in use ? */
 		}
 	}
-	HWT_OWNERHASH_UNLOCK();
+	HWC_OWNERHASH_UNLOCK();
 
 	mtx_destroy(&hwc_ownerhash_mtx);
-	hashdestroy(hwc_ownerhash, M_HWT_OWNERHASH, hwc_ownerhashmask);
+	hashdestroy(hwc_ownerhash, M_HWC_OWNERHASH, hwc_ownerhashmask);
 }

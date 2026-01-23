@@ -26,8 +26,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _DEV_HWT_HWT_OWNERHASH_H_
-#define _DEV_HWT_HWT_OWNERHASH_H_
+#ifndef _DEV_HWC_HWC_OWNERHASH_H_
+#define _DEV_HWC_HWC_OWNERHASH_H_
 
 struct hwc_owner * hwc_ownerhash_lookup(struct proc *p);
 void hwc_ownerhash_insert(struct hwc_owner *ho);
@@ -36,7 +36,7 @@ void hwc_ownerhash_remove(struct hwc_owner *ho);
 void hwc_ownerhash_load(void);
 void hwc_ownerhash_unload(void);
 
-#define	HWT_OWNERHASH_LOCK()		mtx_lock(&hwc_ownerhash_mtx)
-#define	HWT_OWNERHASH_UNLOCK()		mtx_unlock(&hwc_ownerhash_mtx)
+#define	HWC_OWNERHASH_LOCK()		mtx_lock(&hwc_ownerhash_mtx)
+#define	HWC_OWNERHASH_UNLOCK()		mtx_unlock(&hwc_ownerhash_mtx)
 
-#endif /* !_DEV_HWT_HWT_OWNERHASH_H_ */
+#endif /* !_DEV_HWC_HWC_OWNERHASH_H_ */

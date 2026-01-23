@@ -44,16 +44,16 @@
 #include <dev/hwc/hwc_backend.h>
 #include <dev/hwc/hwc_vm.h>
 
-#define	HWT_DEBUG
-#undef	HWT_DEBUG
+#define	HWC_DEBUG
+#undef	HWC_DEBUG
 
-#ifdef	HWT_DEBUG
+#ifdef	HWC_DEBUG
 #define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
 #else
 #define	dprintf(fmt, ...)
 #endif
 
-static MALLOC_DEFINE(M_HWT_OWNER, "hwc_owner", "Hardware Trace");
+static MALLOC_DEFINE(M_HWC_OWNER, "hwc_owner", "Hardware Counters");
 
 struct hwc_context *
 hwc_owner_lookup_ctx(struct hwc_owner *ho, pid_t pid)
@@ -77,7 +77,7 @@ hwc_owner_alloc(struct proc *p)
 {
 	struct hwc_owner *ho;
 
-	ho = malloc(sizeof(struct hwc_owner), M_HWT_OWNER,
+	ho = malloc(sizeof(struct hwc_owner), M_HWC_OWNER,
 	    M_WAITOK | M_ZERO);
 	ho->p = p;
 
@@ -111,9 +111,9 @@ hwc_owner_shutdown(struct hwc_owner *ho)
 		 * A hook could be still dealing with this ctx right here.
 		 */
 
-		HWT_CTX_LOCK(ctx);
+		HWC_CTX_LOCK(ctx);
 		ctx->state = 0;
-		HWT_CTX_UNLOCK(ctx);
+		HWC_CTX_UNLOCK(ctx);
 
 		/* Ensure hooks invocation is now completed. */
 		while (refcount_load(&ctx->refcnt) > 0)
@@ -128,5 +128,5 @@ hwc_owner_shutdown(struct hwc_owner *ho)
 	}
 
 	hwc_ownerhash_remove(ho);
-	free(ho, M_HWT_OWNER);
+	free(ho, M_HWC_OWNER);
 }

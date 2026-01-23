@@ -26,8 +26,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _DEV_HWT_HWT_CONTEXTHASH_H_
-#define _DEV_HWT_HWT_CONTEXTHASH_H_
+#ifndef _DEV_HWC_HWC_CONTEXTHASH_H_
+#define _DEV_HWC_HWC_CONTEXTHASH_H_
 
 struct hwc_context * hwc_contexthash_lookup(struct proc *p);
 void hwc_contexthash_insert(struct hwc_context *ctx);
@@ -36,7 +36,7 @@ void hwc_contexthash_remove(struct hwc_context *ctx);
 void hwc_contexthash_load(void);
 void hwc_contexthash_unload(void);
 
-#define	HWT_CTXHASH_LOCK()	mtx_lock_spin(&hwc_contexthash_mtx)
-#define	HWT_CTXHASH_UNLOCK()	mtx_unlock_spin(&hwc_contexthash_mtx)
+#define	HWC_CTXHASH_LOCK()	mtx_lock_spin(&hwc_contexthash_mtx)
+#define	HWC_CTXHASH_UNLOCK()	mtx_unlock_spin(&hwc_contexthash_mtx)
 
-#endif /* !_DEV_HWT_HWT_CONTEXTHASH_H_ */
+#endif /* !_DEV_HWC_HWC_CONTEXTHASH_H_ */

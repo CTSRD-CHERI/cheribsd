@@ -28,7 +28,7 @@
  * SUCH DAMAGE.
  */
 
-/* Hardware Trace (HWT) framework. */
+/* Hardware Counters (HWC) framework. */
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -39,10 +39,10 @@
 #include <dev/hwc/hwc_context.h>
 #include <dev/hwc/hwc_backend.h>
 
-#define	HWT_BACKEND_DEBUG
-#undef	HWT_BACKEND_DEBUG
+#define	HWC_BACKEND_DEBUG
+#undef	HWC_BACKEND_DEBUG
 
-#ifdef	HWT_BACKEND_DEBUG
+#ifdef	HWC_BACKEND_DEBUG
 #define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
 #else
 #define	dprintf(fmt, ...)
@@ -57,7 +57,7 @@ struct hwc_backend_entry {
 
 static LIST_HEAD(, hwc_backend_entry)	hwc_backends;
 
-static MALLOC_DEFINE(M_HWT_BACKEND, "hwc_backend", "HWT backend");
+static MALLOC_DEFINE(M_HWC_BACKEND, "hwc_backend", "HWC backend");
 
 int
 hwc_backend_init(struct hwc_context *ctx)
@@ -110,62 +110,21 @@ hwc_backend_disable(struct hwc_context *ctx, int cpu_id)
 	ctx->hwc_backend->ops->hwc_backend_disable(ctx, cpu_id);
 }
 
-void
-hwc_backend_enable_smp(struct hwc_context *ctx)
-{
-
-	dprintf("%s\n", __func__);
-
-	ctx->hwc_backend->ops->hwc_backend_enable_smp(ctx);
-}
-
-void
-hwc_backend_disable_smp(struct hwc_context *ctx)
-{
-
-	dprintf("%s\n", __func__);
-
-	ctx->hwc_backend->ops->hwc_backend_disable_smp(ctx);
-}
-
-void __unused
-hwc_backend_dump(struct hwc_context *ctx, int cpu_id)
-{
-
-	dprintf("%s\n", __func__);
-
-	ctx->hwc_backend->ops->hwc_backend_dump(cpu_id);
-}
-
-int
-hwc_backend_read(struct hwc_context *ctx, struct hwc_vm *vm, int *ident,
-    vm_offset_t *offset, uint64_t *data)
-{
-	int error;
-
-	dprintf("%s\n", __func__);
-
-	error = ctx->hwc_backend->ops->hwc_backend_read(vm, ident,
-	    offset, data);
-
-	return (error);
-}
-
 struct hwc_backend *
 hwc_backend_lookup(const char *name)
 {
 	struct hwc_backend_entry *entry;
 	struct hwc_backend *backend;
 
-	HWT_BACKEND_LOCK();
+	HWC_BACKEND_LOCK();
 	LIST_FOREACH(entry, &hwc_backends, next) {
 		backend = entry->backend;
 		if (strcmp(backend->name, name) == 0) {
-			HWT_BACKEND_UNLOCK();
+			HWC_BACKEND_UNLOCK();
 			return (backend);
 		}
 	}
-	HWT_BACKEND_UNLOCK();
+	HWC_BACKEND_UNLOCK();
 
 	return (NULL);
 }
@@ -180,13 +139,13 @@ hwc_backend_register(struct hwc_backend *backend)
 	    backend->ops == NULL)
 		return (EINVAL);
 
-	entry = malloc(sizeof(struct hwc_backend_entry), M_HWT_BACKEND,
+	entry = malloc(sizeof(struct hwc_backend_entry), M_HWC_BACKEND,
 	    M_WAITOK | M_ZERO);
 	entry->backend = backend;
 
-	HWT_BACKEND_LOCK();
+	HWC_BACKEND_LOCK();
 	LIST_INSERT_HEAD(&hwc_backends, entry, next);
-	HWT_BACKEND_UNLOCK();
+	HWC_BACKEND_UNLOCK();
 
 	return (0);
 }
@@ -201,16 +160,16 @@ hwc_backend_unregister(struct hwc_backend *backend)
 
 	/* TODO: check if not in use */
 
-	HWT_BACKEND_LOCK();
+	HWC_BACKEND_LOCK();
 	LIST_FOREACH_SAFE(entry, &hwc_backends, next, tmp) {
 		if (entry->backend == backend) {
 			LIST_REMOVE(entry, next);
-			HWT_BACKEND_UNLOCK();
-			free(entry, M_HWT_BACKEND);
+			HWC_BACKEND_UNLOCK();
+			free(entry, M_HWC_BACKEND);
 			return (0);
 		}
 	}
-	HWT_BACKEND_UNLOCK();
+	HWC_BACKEND_UNLOCK();
 
 	return (ENOENT);
 }
