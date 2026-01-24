@@ -170,7 +170,7 @@
  * User and kernel software should be written so as to not place assumptions
  * about the specific values used here, as they may change.
  */
-#define	CHERI_OTYPE_BITS	(18)
+#define	CHERI_OTYPE_BITS	(10)
 #define	CHERI_OTYPE_USER_MIN	(0)
 #define	CHERI_OTYPE_USER_MAX	((1 << (CHERI_OTYPE_BITS - 1)) - 1)
 #define	CHERI_OTYPE_KERN_MIN	(1 << (CHERI_OTYPE_BITS - 1))
