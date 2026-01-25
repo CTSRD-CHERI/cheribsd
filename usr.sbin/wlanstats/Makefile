@@ -3,7 +3,7 @@
 PROG=	wlanstats
 MAN=
 
-CFLAGS=	-I${SRCTOP}/lib/libbsdstat
+CFLAGS+= -I${SRCTOP}/lib/libbsdstat
 LIBADD=	bsdstat
 
 SRCS=	main.c \
