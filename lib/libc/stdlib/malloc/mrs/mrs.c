@@ -127,6 +127,9 @@ extern void snmalloc_flush_message_queue(void);
 #define	MALLOC_ABORT_ENABLE_ENV		"_RUNTIME_ABORT_ENABLE"
 #define	MALLOC_ZERO_DISABLE_ENV	"_RUNTIME_ZERO_DISABLE"
 #define	MALLOC_ZERO_ENABLE_ENV	"_RUNTIME_ZERO_ENABLE"
+#define	MALLOC_POISON_DISABLE_ENV	"_RUNTIME_POISON_DISABLE"
+#define	MALLOC_POISON_ENABLE_ENV	"_RUNTIME_POISON_ENABLE"
+
 
 #define	MALLOC_REVOKE_EVERY_FREE_DISABLE_ENV \
 	"_RUNTIME_REVOCATION_EVERY_FREE_DISABLE"
@@ -331,7 +334,8 @@ static size_t page_size;
 /* Flags are constant after initialization. */
 static void *entire_shadow;
 static bool quarantining = true;
-static bool zeroing = true;
+static bool zeroing = false;
+static bool poisoning = true;
 static bool revoke_every_free = false;
 static bool revoke_async = false;
 static bool bound_pointers = false;
@@ -661,12 +665,6 @@ quarantine_insert(struct mrs_quarantine *quarantine, void *ptr, size_t size)
 	if ((__builtin_cheri_perms_get(ptr) & CHERI_PERM_SW_VMEM) == 0) {
 		mrs_printf("fatal error: can't insert pointer without SW_VMEM");
 		exit(7);
-	}
-
-	if(size>= MALLOC_CACHELINE_ALIGNMENT){
-		for(size_t i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT){
-			cpoison((char*)(ptr+i));
-		}
 	}
 
 	quarantine->list->slab[quarantine->list->num_descriptors].ptr = ptr;
@@ -1414,6 +1412,11 @@ mrs_init_impl_locked(void)
 		} else if (getenv(MALLOC_ZERO_ENABLE_ENV) != NULL) {
 			zeroing = true;
 		}
+		if (getenv(MALLOC_POISON_DISABLE_ENV) != NULL) {
+			poisoning = false;
+		} else if (getenv(MALLOC_POISON_ENABLE_ENV) != NULL) {
+			poisoning = true;
+		}
 		if (getenv(MALLOC_ABORT_DISABLE_ENV) != NULL)
 			abort_on_validation_failure = false;
 		else if (getenv(MALLOC_ABORT_ENABLE_ENV) != NULL)
@@ -1830,9 +1833,16 @@ mrs_free(void *ptr)
 #ifdef CLEAR_ON_FREE
 	bzero(cheri_setoffset(ptr, 0), cheri_getlen(ptr));
 #endif
-
+	int size = cheri_getlen(ins);
 	mrs_lock(&app_quarantine_lock);
-	quarantine_insert(app_quarantine, ins, cheri_getlen(ins));
+	if(poisoning){
+		if(size>= MALLOC_CACHELINE_ALIGNMENT){
+			for(size_t i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT){
+				cpoison((char*)(ptr+i));
+			}
+		}
+	}
+	quarantine_insert(app_quarantine, ins, size);
 	mrs_unlock(&app_quarantine_lock);
 
 	check_and_perform_flush(true);
