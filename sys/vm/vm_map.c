@@ -194,6 +194,8 @@ static int vm_map_clip_start(vm_map_t map, vm_map_entry_t entry,
 			start = end;			\
 		}
 
+FEATURE(vm_msetname, "Kernel support for msetname(2)");
+
 #ifdef CHERI_CAPREVOKE
 SYSCTL_DECL(_vm_cheri_revoke);
 static bool quarantine_unmapped_reservations = true;
