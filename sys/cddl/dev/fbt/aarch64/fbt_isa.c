@@ -244,6 +244,10 @@ again:
 	for (; instr < limit; instr++) {
 		if (*instr == RET_INSTR)
 			break;
+#ifdef __CHERI_PURE_CAPABILITY__
+		else if (*instr == RETC_INSTR)
+			break;
+#endif
 		else if ((*instr & B_MASK) == B_INSTR) {
 			offs = (*instr & B_DATA_MASK);
 			target = instr + offs;
@@ -280,6 +284,10 @@ again:
 	fbt->fbtp_symindx = symindx;
 	if ((*instr & B_MASK) == B_INSTR)
 		fbt->fbtp_rval = DTRACE_INVOP_B;
+#ifdef __CHERI_PURE_CAPABILITY__
+	else if (*instr == RETC_INSTR)
+		fbt->fbtp_rval = DTRACE_INVOP_RETC;
+#endif
 	else
 		fbt->fbtp_rval = DTRACE_INVOP_RET;
 	fbt->fbtp_roffset = (uintptr_t)instr - symval;
