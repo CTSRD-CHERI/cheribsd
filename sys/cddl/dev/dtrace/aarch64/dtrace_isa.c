@@ -26,10 +26,14 @@
 #include <sys/cdefs.h>
 
 #include <sys/param.h>
+#if __has_feature(capabilities)
+#include <sys/abi_compat.h>
+#endif
 #include <sys/systm.h>
 #include <sys/dtrace_impl.h>
 #include <sys/kernel.h>
 #include <sys/stack.h>
+#include <sys/sysent.h>
 #include <sys/pcpu.h>
 
 #include <machine/frame.h>
@@ -119,6 +123,9 @@ dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t pc,
 	    (volatile uint16_t *)&cpu_core[curcpu].cpuc_dtrace_flags;
 	int ret = 0;
 	uintptr_t oldfp = fp;
+#if __has_feature(capabilities)
+	bool cheri = SV_CURPROC_FLAG(SV_CHERI);
+#endif
 
 	ASSERT(pcstack == NULL || pcstack_limit > 0);
 
@@ -144,13 +151,26 @@ dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t pc,
 			break;
 
 #if __has_feature(capabilities)
-		if (!cheri_can_access((void * __capability)fp,
-		    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
-		    sizeof(struct unwind_state)))
-			break;
-		pc = dtrace_fucap(
-		    (void * __capability)(fp + sizeof (uintcap_t)));
-		fp = dtrace_fucap((void * __capability)fp);
+		if (cheri) {
+			if (!cheri_can_access((void * __capability)fp,
+			    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
+			    2 * sizeof (uintcap_t)))
+				break;
+			pc = dtrace_fucap(
+			    (void * __capability)(fp + sizeof (uintcap_t)));
+			fp = dtrace_fucap((void * __capability)fp);
+		} else {
+			void * __capability cfp;
+
+			cfp = USER_PTR_UNBOUND(fp);
+			if (!cheri_can_access(cfp,
+			    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
+			    2 * sizeof (uint64_t)))
+				break;
+			pc = dtrace_fuword64((void * __capability)
+			    ((uintcap_t)cfp + sizeof (uint64_t)));
+			fp = dtrace_fuword64(cfp);
+		}
 #else
 		pc = dtrace_fuword64((void *)(fp +
 		    offsetof(struct unwind_state, pc)));
