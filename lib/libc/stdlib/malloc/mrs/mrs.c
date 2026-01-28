@@ -353,7 +353,6 @@ mrs_bound_pointer(void *p, size_t size)
 
 struct mrs_descriptor_slab_entry {
 	void *ptr;
-	size_t size;
 };
 
 struct mrs_descriptor_slab {
@@ -624,8 +623,11 @@ clear_region(void *mem, size_t len)
  * quarantine size by the length of the allocation's capability.
  */
 static inline void
-quarantine_insert(struct mrs_quarantine *quarantine, void *ptr, size_t size)
+quarantine_insert(struct mrs_quarantine *quarantine, void *ptr)
 {
+	size_t size;
+
+	size = cheri_length_get(ptr);
 	MRS_UTRACE(UTRACE_MRS_QUARANTINE_INSERT, ptr, size, 0, NULL);
 	if (quarantine->list == NULL ||
 	    quarantine->list->num_descriptors == DESCRIPTOR_SLAB_ENTRIES) {
@@ -644,7 +646,6 @@ quarantine_insert(struct mrs_quarantine *quarantine, void *ptr, size_t size)
 	}
 
 	quarantine->list->slab[quarantine->list->num_descriptors].ptr = ptr;
-	quarantine->list->slab[quarantine->list->num_descriptors].size = size;
 	quarantine->list->num_descriptors++;
 
 	quarantine->size += size;
@@ -1770,7 +1771,7 @@ mrs_free(void *ptr)
 #endif
 
 	mrs_lock(&app_quarantine_lock);
-	quarantine_insert(app_quarantine, ins, cheri_length_get(ins));
+	quarantine_insert(app_quarantine, ins);
 	mrs_unlock(&app_quarantine_lock);
 
 	check_and_perform_flush(true);
