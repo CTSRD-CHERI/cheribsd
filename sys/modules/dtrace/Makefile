@@ -34,5 +34,8 @@ SUBDIR+=	systrace_freebsd32
 .if ${MACHINE_CPUARCH} != "powerpc" || ${MACHINE_ARCH} == "powerpc64"
 SUBDIR+=	sdt
 .endif
+.if ${MACHINE_ARCH:Maarch64*c*}
+SUBDIR+=	systrace_freebsd64
+.endif
 
 .include <bsd.subdir.mk>

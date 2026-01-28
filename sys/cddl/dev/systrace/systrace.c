@@ -103,6 +103,20 @@ extern const char *freebsd32_syscallnames[];
 #define	MAXSYSCALL	FREEBSD32_SYS_MAXSYSCALL
 #define	SYSCALLNAMES	freebsd32_syscallnames
 #define	SYSENT		freebsd32_sysent
+#elif defined(FREEBSD64_SYSTRACE)
+/*
+ * The syscall arguments are processed into a DTrace argument array
+ * using a generated function. See sys/tools/syscalls/README.md.
+ */
+#include <compat/freebsd64/freebsd64_proto.h>
+#include <compat/freebsd64/freebsd64_util.h>
+#include <compat/freebsd64/freebsd64_syscall.h>
+#include <compat/freebsd64/freebsd64_systrace_args.c>
+extern const char *freebsd64_syscallnames[];
+#define	MODNAME		"freebsd64"
+#define	MAXSYSCALL	FREEBSD64_SYS_MAXSYSCALL
+#define	SYSCALLNAMES	freebsd64_syscallnames
+#define	SYSENT		freebsd64_sysent
 #else
 /*
  * The syscall arguments are processed into a DTrace argument array
@@ -401,6 +415,11 @@ MODULE_VERSION(systrace_linux32, 1);
 MODULE_DEPEND(systrace_linux32, linux, 1, 1, 1);
 MODULE_DEPEND(systrace_linux32, dtrace, 1, 1, 1);
 MODULE_DEPEND(systrace_linux32, opensolaris, 1, 1, 1);
+#elif defined(FREEBSD64_SYSTRACE)
+DEV_MODULE(systrace_freebsd64, systrace_modevent, NULL);
+MODULE_VERSION(systrace_freebsd64, 1);
+MODULE_DEPEND(systrace_freebsd64, dtrace, 1, 1, 1);
+MODULE_DEPEND(systrace_freebsd64, opensolaris, 1, 1, 1);
 #elif defined(FREEBSD32_SYSTRACE)
 DEV_MODULE(systrace_freebsd32, systrace_modevent, NULL);
 MODULE_VERSION(systrace_freebsd32, 1);
