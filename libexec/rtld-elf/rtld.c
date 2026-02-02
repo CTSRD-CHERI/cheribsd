@@ -1486,23 +1486,10 @@ create_pcc_caps(Obj_Entry *obj, const char *name)
 		switch (ph->p_type) {
 		case PT_CHERI_PCC:
 			pcc_cap = obj->text_rodata_cap + ph->p_vaddr;
-			pcc_cap = cheri_bounds_set(pcc_cap, ph->p_memsz);
-
-			/*
-			 * TODO: Use cheri_bounds_set_exact once we can
-			 * assume that never traps (ISAv9).
-			 */
-			if (cheri_base_get(pcc_cap) !=
-			    cheri_address_get(pcc_cap)) {
-				_rtld_error(
-				    "pcc_cap %#p start is not aligned for %s",
+			pcc_cap = cheri_bounds_set_exact(pcc_cap, ph->p_memsz);
+			if (!cheri_tag_get(pcc_cap)) {
+				_rtld_error("pcc_cap %#p is not exact for %s",
 				    pcc_cap, name);
-				return (false);
-			}
-			if (cheri_length_get(pcc_cap) != ph->p_memsz) {
-				_rtld_error(
-				    "pcc_cap %#p length is not %zu for %s",
-				    pcc_cap, (size_t)ph->p_memsz, name);
 				return (false);
 			}
 			obj->pcc_caps[i] = pcc_cap;
