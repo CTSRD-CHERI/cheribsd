@@ -680,7 +680,7 @@ readmap(pid_t pid)
 		if ((kve->kve_protection & KVME_PROT_EXEC) != 0)
 			ent->protection |= VM_PROT_EXECUTE;
 #if __has_feature(capabilities)
-		if ((kve->kve_protection & (KVME_PROT_READ_CAP | KVME_PROT_WRITE_CAP)) != 0)
+		if ((kve->kve_protection & KVME_PROT_CAP) != 0)
 			ent->protection |= VM_PROT_CAP;
 #endif
 
