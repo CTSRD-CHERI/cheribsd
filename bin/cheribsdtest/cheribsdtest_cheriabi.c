@@ -194,6 +194,22 @@ CHERIBSDTEST(cheriabi_mmap_fixed,
 	cheribsdtest_success();
 }
 
+CHERIBSDTEST(cheriabi_mmap_perms,
+    "Verify that mmap returns the correct permissions on capabilities")
+{
+	void *cap;
+
+	cap = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE, PROT_READ,
+		MAP_ANON | MAP_PRIVATE, -1, 0));
+	CHERIBSDTEST_VERIFY((cheri_perms_get(cap) & CHERI_PERM_LOAD) != 0);
+	CHERIBSDTEST_VERIFY((cheri_perms_get(cap) & CHERI_PERM_STORE) == 0);
+	CHERIBSDTEST_VERIFY((cheri_perms_get(cap) & CHERI_PERM_LOAD_CAP) != 0);
+	CHERIBSDTEST_VERIFY((cheri_perms_get(cap) & CHERI_PERM_STORE_CAP) == 0);
+	CHERIBSDTEST_CHECK_SYSCALL(munmap(cap, PAGE_SIZE));
+
+	cheribsdtest_success();
+}
+
 struct adjacent_mappings {
 	char *first;
 	char *middle;
