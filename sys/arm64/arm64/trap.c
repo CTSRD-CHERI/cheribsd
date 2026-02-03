@@ -505,14 +505,14 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 
 #if __has_feature(capabilities)
 			if ((esr & ISS_DATA_DFSC_MASK) == ISS_DATA_DFSC_LC_SC)
-				ftype |= VM_PROT_READ_CAP;
+				ftype |= VM_PROT_CAP;
 #endif
 		} else {
 			ftype = VM_PROT_WRITE;
 
 #if __has_feature(capabilities)
 			if ((esr & ISS_DATA_DFSC_MASK) == ISS_DATA_DFSC_LC_SC)
-				ftype |= VM_PROT_WRITE_CAP;
+				ftype |= VM_PROT_CAP;
 #endif
 		}
 		break;

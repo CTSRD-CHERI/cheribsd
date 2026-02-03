@@ -1840,17 +1840,6 @@ vm_map_lookup_entry(
 	return (FALSE);
 }
 
-#define	VM_PROT_SANITY(prot) do {					\
-	if (((prot) & VM_PROT_WRITE_CAP) != 0)				\
-		KASSERT(((prot) & VM_PROT_WRITE) != 0,			\
-		    ("%s: VM_PROT_WRITE_CAP without VM_PROT_WRITE",	\
-		    __func__));						\
-	if (((prot) & VM_PROT_READ_CAP) != 0)				\
-		KASSERT(((prot) & VM_PROT_READ) != 0,			\
-		    ("%s: VM_PROT_READ_CAP without VM_PROT_READ",	\
-		    __func__));						\
-	} while (0)
-
 /*
  * vm_map_insert1() is identical to vm_map_insert() except that it
  * returns the newly inserted map entry in '*res'.  In case the new
@@ -1881,8 +1870,6 @@ vm_map_insert1(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    object, cow));
 	KASSERT((prot & ~max) == 0,
 	    ("prot %#x is not subset of max_prot %#x", prot, max));
-	VM_PROT_SANITY(prot);
-	VM_PROT_SANITY(max);
 
 	/*
 	 * Check that the start and end points are not bogus.
@@ -3188,7 +3175,7 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 	/*
 	 * NB: The lack of VM_OBJECT_ASSERT_CAP() is intentional.
 	 * pmap_enter_object() only establishes read-only mappings, so
-	 * VM_PROT_WRITE_CAP is ignored.
+	 * capability writes are disallowed with the lack of VM_PROT_WRITE.
 	 */
 	prot = VM_OBJECT_MASK_CAP_PROT(object, prot);
 
@@ -3280,8 +3267,6 @@ vm_map_protect(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	vm_offset_t orig_start;
 	vm_prot_t check_prot, max_prot, old_prot;
 	int rv;
-
-	VM_PROT_SANITY(new_prot);
 
 	if (start == end)
 		return (KERN_SUCCESS);
@@ -3516,7 +3501,7 @@ restart_checks:
 		 * about copy-on-write here.
 		 */
 		if ((old_prot & ~entry->protection) != 0) {
-#define MASK(entry)	(((entry)->eflags & MAP_ENTRY_COW) ? ~(VM_PROT_WRITE | VM_PROT_WRITE_CAP) : \
+#define MASK(entry)	(((entry)->eflags & MAP_ENTRY_COW) ? ~VM_PROT_WRITE : \
 							VM_PROT_ALL)
 			pmap_protect(map->pmap, entry->start,
 			    entry->end,
@@ -6019,7 +6004,7 @@ RetryLookupLocked:
 			 * We're attempting to read a copy-on-write page --
 			 * don't allow writes.
 			 */
-			prot &= ~(VM_PROT_WRITE | VM_PROT_WRITE_CAP);
+			prot &= ~VM_PROT_WRITE;
 		}
 	}
 
@@ -6087,7 +6072,7 @@ vm_map_lookup_locked(vm_map_t *var_map,		/* IN/OUT */
 	 */
 	prot = entry->protection;
 	fault_type &= VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE |
-	    VM_PROT_READ_CAP | VM_PROT_WRITE_CAP;
+	    VM_PROT_CAP;
 	if ((fault_type & prot) != fault_type)
 		return (KERN_PROTECTION_FAILURE);
 
@@ -6109,7 +6094,7 @@ vm_map_lookup_locked(vm_map_t *var_map,		/* IN/OUT */
 		 * We're attempting to read a copy-on-write page --
 		 * don't allow writes.
 		 */
-		prot &= ~(VM_PROT_WRITE | VM_PROT_WRITE_CAP);
+		prot &= ~VM_PROT_WRITE;
 	}
 
 	/*

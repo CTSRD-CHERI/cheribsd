@@ -2309,7 +2309,7 @@ sysctl_wire_old_buffer(struct sysctl_req *req, size_t len)
 		if (wiredlen != 0) {
 			ret = vslock(req->oldptr, wiredlen, VM_PROT_WRITE |
 			    ((req->flags & SCTL_PTROUT) != 0 ?
-			    VM_PROT_WRITE_CAP : 0));
+			    VM_PROT_CAP : 0));
 			if (ret != 0) {
 				if (ret != ENOMEM)
 					return (ret);

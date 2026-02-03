@@ -3166,27 +3166,30 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 		kve->kve_offset += entry->offset;
 		kve->kve_reservation = entry->reservation;
 
-		if (entry->protection & VM_PROT_READ)
+		if (entry->protection & VM_PROT_READ) {
 			kve->kve_protection |= KVME_PROT_READ;
-		if (entry->protection & VM_PROT_WRITE)
+                        if (entry->protection & VM_PROT_CAP)
+                                kve->kve_protection |= KVME_PROT_READ_CAP;
+                }
+		if (entry->protection & VM_PROT_WRITE) {
 			kve->kve_protection |= KVME_PROT_WRITE;
+                        if (entry->protection & VM_PROT_CAP)
+                                kve->kve_protection |= KVME_PROT_WRITE_CAP;
+                }
 		if (entry->protection & VM_PROT_EXECUTE)
 			kve->kve_protection |= KVME_PROT_EXEC;
-		if (entry->protection & VM_PROT_READ_CAP)
-			kve->kve_protection |= KVME_PROT_READ_CAP;
-		if (entry->protection & VM_PROT_WRITE_CAP)
-			kve->kve_protection |= KVME_PROT_WRITE_CAP;
-		if (entry->max_protection & VM_PROT_READ)
+		if (entry->max_protection & VM_PROT_READ) {
 			kve->kve_protection |= KVME_MAX_PROT_READ;
-		if (entry->max_protection & VM_PROT_WRITE)
+                        if (entry->max_protection & VM_PROT_CAP)
+                                kve->kve_protection |= KVME_MAX_PROT_READ_CAP;
+                }
+		if (entry->max_protection & VM_PROT_WRITE) {
 			kve->kve_protection |= KVME_MAX_PROT_WRITE;
+                        if (entry->max_protection & VM_PROT_CAP)
+                                kve->kve_protection |= KVME_MAX_PROT_WRITE_CAP;
+                }
 		if (entry->max_protection & VM_PROT_EXECUTE)
 			kve->kve_protection |= KVME_MAX_PROT_EXEC;
-		if (entry->max_protection & VM_PROT_READ_CAP)
-			kve->kve_protection |= KVME_MAX_PROT_READ_CAP;
-		if (entry->max_protection & VM_PROT_WRITE_CAP)
-			kve->kve_protection |= KVME_MAX_PROT_WRITE_CAP;
-
 		if (entry->eflags & MAP_ENTRY_COW)
 			kve->kve_flags |= KVME_FLAG_COW;
 		if (entry->eflags & MAP_ENTRY_NEEDS_COPY)

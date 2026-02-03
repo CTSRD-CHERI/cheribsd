@@ -1550,7 +1550,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		if (segs[i]->p_type != PT_LOAD)
 			continue;
 
-		/* XXX: VM_PROT_READ_CAP or VM_PROT_WRITE_CAP? */
+		/* XXX: VM_PROT_CAP? */
 		prot = VM_PROT_READ;
 		if ((segs[i]->p_flags & PF_W) != 0)
 			prot |= VM_PROT_WRITE;

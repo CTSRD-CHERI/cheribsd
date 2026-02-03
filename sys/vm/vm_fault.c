@@ -352,7 +352,7 @@ vm_fault_must_cheri_revoke(vm_map_t map, vm_prot_t prot, vm_page_t m,
 		return (false);
 
 	/* Or we're not mapping with capability read access */
-	if ((prot & VM_PROT_READ_CAP) == 0)
+	if ((prot & VM_PROT_READ) == 0 || (prot & VM_PROT_CAP) == 0)
 		return (false);
 
 	/* Or the page is known to not have capabilities */
@@ -420,7 +420,7 @@ vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 	/*
 	 * TODO: Well, this is kind of awkward.  We should, on the load side, be
 	 * leaving pages marked capdirty if VM_CHERI_REVOKE_PAGE_HASCAPS here.
-	 * While that generally takes the form of OR-ing VM_PROT_WRITE_CAP to
+	 * While that generally takes the form of OR-ing VM_PROT_CAP to
 	 * the flags (not prot!) passed to pmap_enter (mostly derived from
 	 * fs->fault_type, at that, even), there's more nuance here than just
 	 * that.  This routine is called while looking within superpages, and so
@@ -564,7 +564,7 @@ vm_fault_soft_fast(struct faultstate *fs)
 
 	/*
 	 * We might be upgrading a page previously mapped VM_PROT_WRITE to one
-	 * now mapped VM_PROT_WRITE | VM_PROT_WRITE_CAP.  Flag it as such.
+	 * now mapped VM_PROT_WRITE | VM_PROT_CAP.  Flag it as such.
 	 *
 	 * Importantly, realprot is exempt from vm_page_mask_cap_prot()!
 	 */
@@ -2002,7 +2002,7 @@ found:
 				faultcount = 1;
 
 		} else {
-			fs.prot &= ~(VM_PROT_WRITE | VM_PROT_WRITE_CAP);
+			fs.prot &= ~VM_PROT_WRITE;
 		}
 	}
 
@@ -2101,7 +2101,7 @@ found:
 	VM_OBJECT_ASSERT_CAP(fs.object, fs.prot);
 
 	/*
-	 * Modulate VM_PROT_WRITE_CAP by fs.object's OBJ_HASCAP and fs.m's
+	 * Modulate VM_PROT_CAP by fs.object's OBJ_HASCAP and fs.m's
 	 * PGA_CAPSTORE.
 	 */
 	vm_prot_t realprot = VM_OBJECT_MASK_CAP_PROT(fs.object, fs.prot);
@@ -2333,7 +2333,7 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 			 * NB: The lack of VM_OBJECT_ASSERT_CAP() is
 			 * intentional.  pmap_enter_quick() only
 			 * establishes read-only mappings, so
-			 * VM_PROT_WRITE_CAP is ignored.
+			 * VM_PROT_CAP is ignored.
 			 */
 			pmap_enter_quick(pmap, addr, m,
 			    VM_OBJECT_MASK_CAP_PROT(lobject, prot));

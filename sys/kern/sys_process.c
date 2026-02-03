@@ -689,7 +689,7 @@ proc_write_cheri_cap_page(struct proc *p, vm_map_t map, vm_offset_t va,
 	todo = MIN(todo, uio->uio_resid);
 	va = trunc_page(va);
 
-	error = vm_fault(map, va, VM_PROT_WRITE | VM_PROT_WRITE_CAP,
+	error = vm_fault(map, va, VM_PROT_WRITE | VM_PROT_CAP,
 	    VM_FAULT_NOPMAP, &m);
 	if (error != KERN_SUCCESS)
 		return (EFAULT);
