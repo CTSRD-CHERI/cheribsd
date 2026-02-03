@@ -252,10 +252,7 @@ vm_prot2vmprot(vm_prot_t *prot, const char *func, const char *protname)
 
 	vm_prot = (*prot & ~_PROT_CAP);
 	if ((*prot & PROT_CAP) != 0) {
-		if ((*prot & PROT_READ) != 0)
-			vm_prot |= VM_PROT_READ_CAP;
-		if ((*prot & PROT_WRITE) != 0)
-			vm_prot |= VM_PROT_WRITE_CAP;
+		vm_prot |= VM_PROT_CAP;
 	}
 	if ((*prot & PROT_NO_CAP) != 0)
 		vm_prot |= VM_PROT_NO_IMPLY_CAP;
@@ -726,7 +723,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 			error = EINVAL;
 			goto done;
 		}
-		if ((cap_prot & (VM_PROT_READ_CAP | VM_PROT_WRITE_CAP)) != 0)
+		if ((cap_prot & VM_PROT_CAP) != 0)
 			cap_maxprot = VM_PROT_ADD_CAP(cap_maxprot);
 		if ((cap_prot & cap_maxprot) != cap_prot) {
 			SYSERRCAUSE("%s: unable to map file with "

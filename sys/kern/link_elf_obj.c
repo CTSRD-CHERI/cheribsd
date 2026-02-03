@@ -283,7 +283,7 @@ link_elf_protect(elf_file_t ef)
 		segend = round_page((vm_offset_t)ef->progtab[i].addr +
 		    ef->progtab[i].size);
 
-		/* XXX: VM_PROT_READ_CAP or VM_PROT_WRITE_CAP? */
+		/* XXX: VM_PROT_CAP? */
 		segprot = VM_PROT_READ;
 		if ((ef->progtab[i].flags & SHF_WRITE) != 0)
 			segprot |= VM_PROT_WRITE;

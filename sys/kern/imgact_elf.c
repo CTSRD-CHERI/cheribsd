@@ -3497,9 +3497,9 @@ __elfN(trans_prot)(Elf_Word flags)
 	if (flags & PF_X)
 		prot |= VM_PROT_EXECUTE;
 	if (flags & PF_W)
-		prot |= VM_PROT_WRITE | VM_PROT_WRITE_CAP;
+		prot |= VM_PROT_WRITE | VM_PROT_CAP;
 	if (flags & PF_R)
-		prot |= VM_PROT_READ | VM_PROT_READ_CAP;
+		prot |= VM_PROT_READ | VM_PROT_CAP;
 #if __ELF_WORD_SIZE == 32 && (defined(__amd64__) || defined(__i386__))
 	if (i386_read_exec && (flags & PF_R))
 		prot |= VM_PROT_EXECUTE;
@@ -3529,10 +3529,12 @@ __elfN(untrans_capprot)(vm_prot_t prot)
 	Elf_Word flags;
 
 	flags = 0;
-	if (prot & VM_PROT_READ_CAP)
-		flags |= PF_R;
-	if (prot & VM_PROT_WRITE_CAP)
-		flags |= PF_W;
+        if (prot & VM_PROT_CAP) {
+                if (prot & VM_PROT_READ)
+                        flags |= PF_R;
+                if (prot & VM_PROT_WRITE)
+                        flags |= PF_W;
+        }
 	return (flags);
 }
 #endif

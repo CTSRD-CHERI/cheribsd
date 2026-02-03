@@ -62,7 +62,7 @@
  * This would previously panic the kernel with a fatal capability page fault as
  * uiomove_fromphys called from pipe_clone_write_buffer would use a plain bcopy
  * and so not strip tags, but the kernel buffer was allocated without
- * VM_PROT_WRITE_CAP.
+ * VM_PROT_CAP.
  */
 
 #define	BUFFER_SIZE	8192

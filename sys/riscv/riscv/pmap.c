@@ -2950,13 +2950,13 @@ pmap_fault(pmap_t pmap, vm_offset_t va, vm_prot_t ftype)
 		goto done;
 
 	bits = PTE_A;
-	if ((ftype & VM_PROT_WRITE) != 0)
+	if ((ftype & VM_PROT_WRITE) != 0) {
 		bits |= PTE_D;
-
 #if __has_feature(capabilities)
-	if ((ftype & VM_PROT_WRITE_CAP) != 0)
-		bits |= PTE_CD;
+		if ((ftype & VM_PROT_CAP) != 0)
+			bits |= PTE_CD;
 #endif
+	}
 
 	/*
 	 * Spurious faults can occur if the implementation caches invalid
@@ -3294,7 +3294,6 @@ cheri_pte_cr(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 	 * the moment, just leave it be, but this merits more investigation.
 	 * See also pmap_caploadgen_test_all_clean.
 	 */
-
 	if (VM_PROT_HAS_READ_CAP(prot)) {
 #ifdef CHERI_CAPREVOKE
 		if (va < VM_MAX_USER_ADDRESS) {
@@ -3350,17 +3349,23 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	new_l3 = PTE_V | PTE_R | PTE_A;
 	if (prot & VM_PROT_EXECUTE)
 		new_l3 |= PTE_X;
-	if (flags & VM_PROT_WRITE)
+	if (flags & VM_PROT_WRITE) {
 		new_l3 |= PTE_D;
-	if (prot & VM_PROT_WRITE)
+#if __has_feature(capabilities)
+		if (flags & VM_PROT_CAP)
+			new_l3 |= PTE_CD;
+#endif
+	}
+	if (prot & VM_PROT_WRITE) {
 		new_l3 |= PTE_W;
+#if __has_feature(capabilities)
+		if (prot & VM_PROT_CAP)
+			new_l3 |= PTE_CW;
+#endif
+	}
 	if (va < VM_MAX_USER_ADDRESS)
 		new_l3 |= PTE_U;
 #if __has_feature(capabilities)
-	if (prot & VM_PROT_WRITE_CAP)
-		new_l3 |= PTE_CW;
-	if (flags & VM_PROT_WRITE_CAP)
-		new_l3 |= PTE_CD;
 	new_l3 |= cheri_pte_cr(pmap, va, m, prot);
 #endif
 
@@ -3375,12 +3380,13 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	 * to do the dirty bit accounting for these mappings.
 	 */
 	if ((m->oflags & VPO_UNMANAGED) != 0) {
-		if (prot & VM_PROT_WRITE)
+		if (prot & VM_PROT_WRITE) {
 			new_l3 |= PTE_D;
 #if __has_feature(capabilities)
-		if (prot & VM_PROT_WRITE_CAP)
-			new_l3 |= PTE_CD;
+			if (prot & VM_PROT_CAP)
+				new_l3 |= PTE_CD;
 #endif
+		}
 	} else
 		new_l3 |= PTE_SW_MANAGED;
 

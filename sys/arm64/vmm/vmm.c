@@ -1420,7 +1420,7 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 	case EXCP_DATA_ABORT_L:
 		ftype = VM_PROT_EXECUTE | VM_PROT_READ | VM_PROT_WRITE;
 #if __has_feature(capabilities)
-		ftype |= VM_PROT_READ_CAP | VM_PROT_WRITE_CAP;
+		ftype |= VM_PROT_CAP;
 #endif
 		break;
 	default:

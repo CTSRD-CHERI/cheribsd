@@ -5966,10 +5966,9 @@ vm_page_assert_pga_capmeta_copy(vm_page_t msrc, vm_page_t mdst)
 /*
  * When entering a page into a pmap, ensure that
  *
- *   1) prot & VM_PROT_WRITE_CAP implies PGA_CAPSTORE
+ *   1) prot & (VM_PROT_WRITE | VM_PROT_CAP) implies PGA_CAPSTORE
  *   2) PGA_CAPDIRTY implies PGA_CAPSTORE
- *   3) prot & VM_PROT_WRITE_CAP implies prot & VM_PROT_WRITE
- *      (which is not strictly PGA_CAP*, but this is a convenient place)
+ *   2) prot & VM_PROT_CAP implies VM_PROT_WRITE or VM_PROT_READ
  */
 void
 vm_page_assert_pga_capmeta_pmap_enter(vm_page_t m, vm_prot_t prot)

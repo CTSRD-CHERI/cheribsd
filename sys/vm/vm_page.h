@@ -929,10 +929,11 @@ static inline vm_prot_t
 vm_page_mask_cap_prot(vm_page_t m, vm_prot_t prot)
 {
 
-	if (vm_page_astate_load(m).flags & PGA_CAPSTORE) {
+	if ((vm_page_astate_load(m).flags & PGA_CAPSTORE) != 0 ||
+	    (prot & VM_PROT_WRITE) == 0) {
 		return prot;
 	} else {
-		return prot & ~VM_PROT_WRITE_CAP;
+		return prot & ~VM_PROT_CAP;
 	}
 }
 
