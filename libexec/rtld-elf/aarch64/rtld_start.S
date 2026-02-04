@@ -194,12 +194,17 @@ ENTRY(_rtld_bind_start)
 END(_rtld_bind_start)
 
 /*
- * struct rel_tlsdesc {
- *  uint64_t resolver_fnc;
- *  uint64_t resolver_arg;
+ * See reloc.c for struct tlsdesc_entry's layout.
  *
+ * On non-Morello:
  *
- * uint64_t _rtld_tlsdesc_static(struct rel_tlsdesc *);
+ *   uint64_t _rtld_tlsdesc_static(struct tlsdesc_entry *);
+ *
+ * On Morello:
+ *
+ *   void *_rtld_tlsdesc_static(struct tlsdesc_entry *);
+ *
+ *   c1 is clobbered. ctpidr_el0 is passed in c2 and preserved.
  *
  * Resolver function for TLS symbols resolved at load time
  */
@@ -216,7 +221,15 @@ ENTRY(_rtld_tlsdesc_static)
 END(_rtld_tlsdesc_static)
 
 /*
- * uint64_t _rtld_tlsdesc_undef(void);
+ * On non-Morello:
+ *
+ *   uint64_t _rtld_tlsdesc_undef(struct tlsdesc_entry *);
+ *
+ * On Morello:
+ *
+ *   void *_rtld_tlsdesc_undef(struct tlsdesc_entry *);
+ *
+ *   c1 is clobbered. ctpidr_el0 is passed in c2 and preserved.
  *
  * Resolver function for weak and undefined TLS symbols
  */
@@ -239,7 +252,15 @@ ENTRY(_rtld_tlsdesc_undef)
 END(_rtld_tlsdesc_undef)
 
 /*
- * uint64_t _rtld_tlsdesc_dynamic(struct rel_tlsdesc *);
+ * On non-Morello:
+ *
+ *   uint64_t _rtld_tlsdesc_dynamic(struct tlsdesc_entry *);
+ *
+ * On Morello:
+ *
+ *   void *_rtld_tlsdesc_dynamic(struct tlsdesc_entry *);
+ *
+ *   c1 is clobbered. ctpidr_el0 is passed in c2 and preserved.
  *
  * Resolver function for TLS symbols from dlopen()
  */
