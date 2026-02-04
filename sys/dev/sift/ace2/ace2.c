@@ -24,6 +24,13 @@
 #include <vm/vm_param.h>
 
 /*
+ * Offsets in device files are treated as a relative offset to this
+ * base address.  Since ACE2 should only access kernel addresses, use
+ * the start of the kernel's address space as the base.
+ */
+#define	ACE2_BASE		VM_MIN_KERNEL_ADDRESS
+
+/*
  * Wrapper for printf() that outputs an "ace2: " prefix for each
  * message.
  */
@@ -104,11 +111,13 @@ static int
 ace2_data_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	void *kva;
+	ptraddr_t addr;
 	int error;
 	bool read = uio->uio_rw == UIO_READ;
 	size_t len = uio->uio_resid;
 
-	error = validate_kva_range(uio->uio_offset, len, read ? VM_PROT_READ :
+	addr = ACE2_BASE + uio->uio_offset;
+	error = validate_kva_range(addr, len, read ? VM_PROT_READ :
 	    VM_PROT_WRITE);
 	if (error != 0)
 		return (error);
@@ -123,10 +132,10 @@ ace2_data_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 	 * and may end up overly-broad.
 	 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	kva = cheri_setaddress(kernel_root_cap, uio->uio_offset);
+	kva = cheri_setaddress(kernel_root_cap, addr);
 	kva = cheri_setbounds(kva, len);
 #else
-	kva = (void *)(uintptr_t)uio->uio_offset;
+	kva = (void *)(uintptr_t)addr;
 #endif
 	error = uiomove(kva, uio->uio_resid, uio);
 	if (error != 0) {
@@ -143,6 +152,7 @@ static int
 ace2_capability_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	uintptr_t *kva;
+	ptraddr_t addr;
 	int error;
 	bool read = uio->uio_rw == UIO_READ;
 	size_t len = uio->uio_resid;
@@ -152,16 +162,17 @@ ace2_capability_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 	    !is_aligned(uio->uio_offset, sizeof(void *)))
 		return (EINVAL);
 
+	addr = ACE2_BASE + uio->uio_offset;
 	nptrs = len / sizeof(ptraddr_t);
 	len = nptrs * sizeof(void *);
-	error = validate_kva_range(uio->uio_offset, len, read ? VM_PROT_READ :
+	error = validate_kva_range(addr, len, read ? VM_PROT_READ :
 	    VM_PROT_WRITE);
 	if (error != 0)
 		return (error);
 
 	/* Comments in ace2_data_rdwr apply here as well. */
 #ifdef __CHERI_PURE_CAPABILITY__
-	kva = cheri_setaddress(kernel_root_cap, uio->uio_offset);
+	kva = cheri_setaddress(kernel_root_cap, addr);
 	kva = cheri_setbounds(kva, len);
 	for (size_t i = 0; i < nptrs; i++) {
 		ptraddr_t addr;
@@ -177,7 +188,7 @@ ace2_capability_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 			kva[i] = cheri_setaddress(kva[i], addr);
 	}
 #else
-	kva = (void *)(uintptr_t)uio->uio_offset;
+	kva = (void *)(uintptr_t)addr;
 	error = uiomove(kva, uio->uio_resid, uio);
 #endif
 	if (error != 0) {
@@ -203,16 +214,16 @@ ace2_copycap_write(struct cdev *dev, struct uio *uio, int ioflag)
 	    !is_aligned(uio->uio_offset, sizeof(void *)))
 		return (EINVAL);
 
-	error = validate_kva_range(uio->uio_offset, sizeof(void *),
-	    VM_PROT_WRITE);
+	addr = ACE2_BASE + uio->uio_offset;
+	error = validate_kva_range(addr, sizeof(void *), VM_PROT_WRITE);
 	if (error != 0)
 		return (error);
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	dst = cheri_setaddress(kernel_root_cap, uio->uio_offset);
+	dst = cheri_setaddress(kernel_root_cap, addr);
 	dst = cheri_setboundsexact(dst, sizeof(void *));
 #else
-	dst = (void *)(uintptr_t)uio->uio_offset;
+	dst = (void *)(uintptr_t)addr;
 #endif
 
 	error = uiomove(&addr, sizeof(addr), uio);
@@ -249,6 +260,8 @@ ace2_modevent(module_t mod, int type, void *data)
 		    UID_ROOT, GID_WHEEL, 0600, "ace2-ace-capability");
 		ace2_copycap = make_dev(&ace2_copycap_cdevsw, 0,
 		    UID_ROOT, GID_WHEEL, 0600, "ace2-ace-copycap");
+
+		pr_sift("ACE2_BASE %p\n", (void *)(uintptr_t)ACE2_BASE);
 		return (0);
 	case MOD_UNLOAD:
 		destroy_dev(ace2_data);
