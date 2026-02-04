@@ -194,18 +194,239 @@ CHERIBSDTEST(cheriabi_mmap_fixed,
 	cheribsdtest_success();
 }
 
+static int
+mmap_and_get_perms(int prot)
+{
+	void *cap;
+	int perms;
+
+	cap = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE, prot,
+		MAP_ANON | MAP_PRIVATE, -1, 0));
+	perms = cheri_perms_get(cap);
+	CHERIBSDTEST_CHECK_SYSCALL(munmap(cap, PAGE_SIZE));
+
+	return (perms);
+}
+
 CHERIBSDTEST(cheriabi_mmap_perms,
     "Verify that mmap returns the correct permissions on capabilities")
 {
-	void *cap;
+	int perms;
 
-	cap = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE, PROT_READ,
-		MAP_ANON | MAP_PRIVATE, -1, 0));
-	CHERIBSDTEST_VERIFY((cheri_perms_get(cap) & CHERI_PERM_LOAD) != 0);
-	CHERIBSDTEST_VERIFY((cheri_perms_get(cap) & CHERI_PERM_STORE) == 0);
-	CHERIBSDTEST_VERIFY((cheri_perms_get(cap) & CHERI_PERM_LOAD_CAP) != 0);
-	CHERIBSDTEST_VERIFY((cheri_perms_get(cap) & CHERI_PERM_STORE_CAP) == 0);
-	CHERIBSDTEST_CHECK_SYSCALL(munmap(cap, PAGE_SIZE));
+	/* RO and RW with implied cap perms */
+	perms = mmap_and_get_perms(PROT_READ);
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD) != 0,
+	    "Missing PERM_LOAD on PROT_READ mapping");
+#ifdef CHERI_PERM_MUTABLE_LOAD
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_MUTABLE_LOAD) != 0,
+	    "Missing PERM_MUTABLE_LOAD on PROT_READ mapping");
+#endif
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE) == 0,
+	    "Found PERM_STORE on PROT_READ mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD_CAP) != 0,
+	    "Missing PERM_LOAD_CAP on PROT_READ mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) == 0,
+	    "Found PERM_STORE_CAP on PROT_READ mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_EXECUTE) == 0,
+	    "Found PERM_EXEC on PROT_READ mapping");
+
+	perms = mmap_and_get_perms(PROT_READ | PROT_WRITE);
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD) != 0,
+	    "Missing PERM_LOAD on PROT_RW mapping");
+#ifdef CHERI_PERM_MUTABLE_LOAD
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_MUTABLE_LOAD) != 0,
+	    "Missing PERM_MUTABLE_LOAD on PROT_RW mapping");
+#endif
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE) != 0,
+	    "Missing PERM_STORE on PROT_RW mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD_CAP) != 0,
+	    "Missing PERM_LOAD_CAP on PROT_RW mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) != 0,
+	    "Missing PERM_STORE_CAP on PROT_RW mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_EXECUTE) == 0,
+	    "Found PERM_EXEC on PROT_RW mapping");
+
+	perms = mmap_and_get_perms(PROT_READ | PROT_WRITE | PROT_EXEC);
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD) != 0,
+	    "Missing PERM_LOAD on PROT_RWX mapping");
+#ifdef CHERI_PERM_MUTABLE_LOAD
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_MUTABLE_LOAD) != 0,
+	    "Missing PERM_MUTABLE_LOAD on PROT_RWX mapping");
+#endif
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE) != 0,
+	    "Missing PERM_STORE on PROT_RWX mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD_CAP) != 0,
+	    "Missing PERM_LOAD_CAP on PROT_RWX mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) != 0,
+	    "Missing PERM_STORE_CAP on PROT_RWX mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_EXECUTE) != 0,
+	    "Missing PERM_EXEC on PROT_RWX mapping");
+
+	/* RO and RW with explicit cap perms */
+	perms = mmap_and_get_perms(PROT_READ | PROT_CAP);
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD) != 0,
+	    "Missing PERM_LOAD on PROT_READ | PROT_CAP mapping");
+#ifdef CHERI_PERM_MUTABLE_LOAD
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_MUTABLE_LOAD) != 0,
+	    "Missing PERM_MUTABLE_LOAD on PROT_READ | PROT_CAP mapping");
+#endif
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE) == 0,
+	    "Found PERM_STORE on PROT_READ | PROT_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD_CAP) != 0,
+	    "Missing PERM_LOAD_CAP on PROT_READ | PROT_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) == 0,
+	    "Found PERM_STORE_CAP on PROT_READ | PROT_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_EXECUTE) == 0,
+	    "Found PERM_EXEC on PROT_READ | PROT_CAP mapping");
+
+	perms = mmap_and_get_perms(PROT_READ | PROT_WRITE | PROT_CAP);
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD) != 0,
+	    "Missing PERM_LOAD on PROT_RW | PROT_CAP mapping");
+#ifdef CHERI_PERM_MUTABLE_LOAD
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_MUTABLE_LOAD) != 0,
+	    "Missing PERM_MUTABLE_LOAD on PROT_RW | PROT_CAP mapping");
+#endif
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE) != 0,
+	    "Missing PERM_STORE on PROT_RW | PROT_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD_CAP) != 0,
+	    "Missing PERM_LOAD_CAP on PROT_RW | PROT_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) != 0,
+	    "Missing PERM_STORE_CAP on PROT_RW | PROT_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_EXECUTE) == 0,
+	    "Found PERM_EXEC on PROT_RW | PROT_CAP mapping");
+
+	perms = mmap_and_get_perms(PROT_READ | PROT_WRITE | PROT_EXEC |
+	    PROT_CAP);
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD) != 0,
+	    "Missing PERM_LOAD on PROT_RWX | PROT_CAP mapping");
+#ifdef CHERI_PERM_MUTABLE_LOAD
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_MUTABLE_LOAD) != 0,
+	    "Missing PERM_MUTABLE_LOAD on PROT_RWX | PROT_CAP mapping");
+#endif
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE) != 0,
+	    "Missing PERM_STORE on PROT_RWX | PROT_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD_CAP) != 0,
+	    "Missing PERM_LOAD_CAP on PROT_RWX | PROT_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) != 0,
+	    "Missing PERM_STORE_CAP on PROT_RWX | PROT_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_EXECUTE) != 0,
+	    "Missing PERM_EXEC on PROT_RWX | PROT_CAP mapping");
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(cheriabi_mmap_no_cap_perms,
+    "Verify that mmap PROT_NO_CAP does not return capability permissions")
+{
+	int perms;
+
+	perms = mmap_and_get_perms(PROT_READ | PROT_NO_CAP);
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD) != 0,
+	    "Missing PERM_LOAD on PROT_READ | PROT_NO_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE) == 0,
+	    "Found PERM_STORE on PROT_READ | PROT_NO_CAP mapping");
+#ifdef CHERI_PERM_MUTABLE_LOAD
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_MUTABLE_LOAD) == 0,
+	    "Found PERM_MUTABLE_LOAD on PROT_READ | PROT_NO_CAP mapping");
+#endif
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD_CAP) == 0,
+	    "Found PERM_LOAD_CAP on PROT_READ | PROT_NO_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) == 0,
+	    "Found PERM_STORE_CAP on PROT_READ | PROT_NO_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_EXECUTE) == 0,
+	    "Found PERM_EXEC on PROT_READ | PROT_NO_CAP mapping");
+
+	perms = mmap_and_get_perms(PROT_READ | PROT_WRITE | PROT_NO_CAP);
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD) != 0,
+	    "Missing PERM_LOAD on PROT_RW | PROT_NO_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE) != 0,
+	    "Missing PERM_STORE on PROT_RW | PROT_NO_CAP mapping");
+#ifdef CHERI_PERM_MUTABLE_LOAD
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_MUTABLE_LOAD) == 0,
+	    "Found PERM_MUTABLE_LOAD on PROT_RW | PROT_NO_CAP mapping");
+#endif
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD_CAP) == 0,
+	    "Found PERM_LOAD_CAP on PROT_RW | PROT_NO_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) == 0,
+	    "Found PERM_STORE_CAP on PROT_RW | PROT_NO_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_EXECUTE) == 0,
+	    "Found PERM_EXEC on PROT_RW | PROT_NO_CAP mapping");
+
+	perms = mmap_and_get_perms(PROT_READ | PROT_WRITE | PROT_EXEC |
+	    PROT_NO_CAP);
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD) != 0,
+	    "Missing PERM_LOAD on PROT_RWX | PROT_NO_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE) != 0,
+	    "Missing PERM_STORE on PROT_RWX | PROT_NO_CAP mapping");
+#ifdef CHERI_PERM_MUTABLE_LOAD
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_MUTABLE_LOAD) == 0,
+	    "Found PERM_MUTABLE_LOAD on PROT_RWX | PROT_NO_CAP mapping");
+#endif
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD_CAP) == 0,
+	    "Found PERM_LOAD_CAP on PROT_RWX | PROT_NO_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) == 0,
+	    "Found PERM_STORE_CAP on PROT_RWX | PROT_NO_CAP mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_EXECUTE) != 0,
+	    "Missing PERM_EXEC on PROT_RWX | PROT_NO_CAP mapping");
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(cheriabi_mmap_maxprot_perms,
+    "Verify that mmap PROT_MAX are honored for capability permissions")
+{
+	int perms;
+
+	perms = mmap_and_get_perms(PROT_MAX(PROT_READ | PROT_CAP) |
+	    PROT_READ | PROT_NO_CAP);
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD) != 0,
+	    "Missing PERM_LOAD on PROT_MAX(PROT_READ | PROT_CAP) mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE) == 0,
+	    "Found PERM_STORE on PROT_MAX(PROT_READ | PROT_CAP) mapping");
+#ifdef CHERI_PERM_MUTABLE_LOAD
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_MUTABLE_LOAD) != 0,
+	    "Missing PERM_MUTABLE_LOAD on PROT_MAX(PROT_READ | PROT_CAP) mapping");
+#endif
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD_CAP) != 0,
+	    "Missing PERM_LOAD_CAP on PROT_MAX(PROT_READ | PROT_CAP) mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) == 0,
+	    "Found PERM_STORE_CAP on PROT_MAX(PROT_READ | PROT_CAP) mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_EXECUTE) == 0,
+	    "Found PERM_EXEC on PROT_MAX(PROT_READ | PROT_CAP) mapping");
+
+	perms = mmap_and_get_perms(PROT_MAX(PROT_READ | PROT_WRITE | PROT_CAP) |
+	    PROT_READ | PROT_WRITE | PROT_NO_CAP);
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD) != 0,
+	    "Missing PERM_LOAD on PROT_MAX(PROT_RW | PROT_CAP) mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE) != 0,
+	    "Missing PERM_STORE on PROT_MAX(PROT_RW | PROT_CAP) mapping");
+#ifdef CHERI_PERM_MUTABLE_LOAD
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_MUTABLE_LOAD) != 0,
+	    "Missing PERM_MUTABLE_LOAD on PROT_MAX(PROT_RW | PROT_CAP) mapping");
+#endif
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD_CAP) != 0,
+	    "Missing PERM_LOAD_CAP on PROT_MAX(PROT_RW | PROT_CAP) mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) != 0,
+	    "Missing PERM_STORE_CAP on PROT_MAX(PROT_RW | PROT_CAP) mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_EXECUTE) == 0,
+	    "Found PERM_EXEC on PROT_MAX(PROT_RW | PROT_CAP) mapping");
+
+	perms = mmap_and_get_perms(PROT_MAX(PROT_READ | PROT_WRITE | PROT_EXEC |
+	    PROT_CAP) | PROT_READ | PROT_WRITE | PROT_EXEC | PROT_NO_CAP);
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD) != 0,
+	    "Missing PERM_LOAD on PROT_MAX(PROT_RWX | PROT_CAP) mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE) != 0,
+	    "Missing PERM_STORE on PROT_MAX(PROT_RWX | PROT_CAP) mapping");
+#ifdef CHERI_PERM_MUTABLE_LOAD
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_MUTABLE_LOAD) != 0,
+	    "Missing PERM_MUTABLE_LOAD on PROT_MAX(PROT_RWX | PROT_CAP) mapping");
+#endif
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_LOAD_CAP) != 0,
+	    "Missing PERM_LOAD_CAP on PROT_MAX(PROT_RWX | PROT_CAP) mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) != 0,
+	    "Missing PERM_STORE_CAP on PROT_MAX(PROT_RWX | PROT_CAP) mapping");
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_EXECUTE) != 0,
+	    "Missing PERM_EXEC on PROT_MAX(PROT_RWX | PROT_CAP) mapping");
 
 	cheribsdtest_success();
 }
