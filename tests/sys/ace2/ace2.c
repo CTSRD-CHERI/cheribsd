@@ -63,7 +63,8 @@ ATF_TC_BODY(read_version, tc)
 	    "sysctl(kern.version): %s", strerror(errno));
 
 	buf2 = malloc(len);
-	nread = pread(fd, buf2, len, symbol_address("version"));
+	nread = pread(fd, buf2, len, symbol_address("version") -
+	    VM_MIN_KERNEL_ADDRESS);
 	ATF_REQUIRE_MSG(nread != -1, "pread: %s", strerror(errno));
 	ATF_REQUIRE_INTEQ(len, nread);
 	ATF_REQUIRE_INTEQ(0, memcmp(buf1, buf2, len));
@@ -89,7 +90,8 @@ ATF_TC_BODY(toggle_bootverbose, tc)
 	ATF_REQUIRE_INTEQ(sizeof(old), len);
 
 	new = old ^ 1;
-	nwritten = pwrite(fd, &new, sizeof(new), symbol_address("bootverbose"));
+	nwritten = pwrite(fd, &new, sizeof(new), symbol_address("bootverbose") -
+	    VM_MIN_KERNEL_ADDRESS);
 	ATF_REQUIRE_MSG(nwritten != -1, "pwrite: %s", strerror(errno));
 	ATF_REQUIRE_INTEQ(sizeof(new), nwritten);
 
@@ -150,7 +152,8 @@ ATF_TC_BODY(adjust_malloc_description, tc)
 	memstat_mtl_free(mtlp);
 
 	/* Read the current address of ks_shortdesc. */
-	rv = pread(fd[1], &desc_addr, sizeof(desc_addr), cap_addr);
+	rv = pread(fd[1], &desc_addr, sizeof(desc_addr), cap_addr -
+	    VM_MIN_KERNEL_ADDRESS);
 	ATF_REQUIRE_MSG(rv != -1, "cap pread: %s", strerror(errno));
 	ATF_REQUIRE_INTEQ(sizeof(desc_addr), rv);
 	printf("Original address: %p\n", (void *)(uintptr_t)desc_addr);
@@ -161,7 +164,7 @@ ATF_TC_BODY(adjust_malloc_description, tc)
 	 */
 	len = strlen(descr) + 1;
 	data_descr = malloc(len);
-	rv = pread(fd[0], data_descr, len, desc_addr);
+	rv = pread(fd[0], data_descr, len, desc_addr - VM_MIN_KERNEL_ADDRESS);
 	ATF_REQUIRE_MSG(rv != -1, "data pread: %s", strerror(errno));
 	ATF_REQUIRE_INTEQ(len, rv);
 
@@ -170,7 +173,8 @@ ATF_TC_BODY(adjust_malloc_description, tc)
 
 	/* Move the ks_shortdesc address one byte forward. */
 	desc_addr++;
-	rv = pwrite(fd[1], &desc_addr, sizeof(desc_addr), cap_addr);
+	rv = pwrite(fd[1], &desc_addr, sizeof(desc_addr), cap_addr -
+	    VM_MIN_KERNEL_ADDRESS);
 	ATF_REQUIRE_MSG(rv != -1, "cap pwrite: %s", strerror(errno));
 	ATF_REQUIRE_INTEQ(sizeof(desc_addr), rv);
 
@@ -184,7 +188,8 @@ ATF_TC_BODY(adjust_malloc_description, tc)
 
 	/* Restore the ks_shortdesc address. */
 	desc_addr--;
-	rv = pwrite(fd[1], &desc_addr, sizeof(desc_addr), cap_addr);
+	rv = pwrite(fd[1], &desc_addr, sizeof(desc_addr), cap_addr -
+	    VM_MIN_KERNEL_ADDRESS);
 	ATF_REQUIRE_MSG(rv != -1, "cap pwrite: %s", strerror(errno));
 	ATF_REQUIRE_INTEQ(sizeof(desc_addr), rv);
 }
@@ -234,12 +239,14 @@ ATF_TC_BODY(swap_malloc_description, tc)
 	memstat_mtl_free(mtlp);
 
 	/* Copy the current pointer to the kernel stack. */
-	rv = pwrite(fd, &cap_addr, sizeof(cap_addr), stack_addr);
+	rv = pwrite(fd, &cap_addr, sizeof(cap_addr), stack_addr -
+	    VM_MIN_KERNEL_ADDRESS);
 	ATF_REQUIRE_MSG(rv != -1, "copycap to stack: %s", strerror(errno));
 	ATF_REQUIRE_INTEQ(sizeof(cap_addr), rv);
 
 	/* Copy the Giant name to the M_LINKER description. */
-	rv = pwrite(fd, &giant_addr, sizeof(giant_addr), cap_addr);
+	rv = pwrite(fd, &giant_addr, sizeof(giant_addr), cap_addr -
+	    VM_MIN_KERNEL_ADDRESS);
 	ATF_REQUIRE_MSG(rv != -1, "copycap from Giant: %s", strerror(errno));
 	ATF_REQUIRE_INTEQ(sizeof(giant_addr), rv);
 
@@ -252,7 +259,8 @@ ATF_TC_BODY(swap_malloc_description, tc)
 	memstat_mtl_free(mtlp);
 
 	/* Restore the ks_shortdesc address. */
-	rv = pwrite(fd, &stack_addr, sizeof(stack_addr), cap_addr);
+	rv = pwrite(fd, &stack_addr, sizeof(stack_addr), cap_addr -
+	    VM_MIN_KERNEL_ADDRESS);
 	ATF_REQUIRE_MSG(rv != -1, "copycap from stack: %s", strerror(errno));
 	ATF_REQUIRE_INTEQ(sizeof(stack_addr), rv);
 }
