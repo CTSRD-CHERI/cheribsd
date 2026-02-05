@@ -23,6 +23,13 @@
 #include <vm/vm_extern.h>
 #include <vm/vm_param.h>
 
+/*
+ * Wrapper for printf() that outputs an "ace2: " prefix for each
+ * message.
+ */
+#define	pr_sift(fmt, ...)						\
+	printf("ace2: " fmt, ##__VA_ARGS__)
+
 static d_open_t ace2_open;
 static d_read_t ace2_data_rdwr;
 static d_read_t ace2_capability_rdwr;
@@ -123,10 +130,10 @@ ace2_data_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 #endif
 	error = uiomove(kva, uio->uio_resid, uio);
 	if (error != 0) {
-		printf("%s EFAULT %zu bytes at %p\n", read ? "ACE2_READ_DATA" :
+		pr_sift("%s EFAULT %zu bytes at %p\n", read ? "ACE2_READ_DATA" :
 		    "ACE2_WRITE_DATA", len, kva);
 	} else {
-		printf("%s %zu bytes at %p\n", read ? "ACE2_READ_DATA" :
+		pr_sift("%s %zu bytes at %p\n", read ? "ACE2_READ_DATA" :
 		    "ACE2_WRITE_DATA", len, kva);
 	}
 	return (error);
@@ -174,11 +181,11 @@ ace2_capability_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 	error = uiomove(kva, uio->uio_resid, uio);
 #endif
 	if (error != 0) {
-		printf("%s EFAULT %zu pointers at %p\n",
+		pr_sift("%s EFAULT %zu pointers at %p\n",
 		    read ? "ACE2_READ_CAPABILITY" : "ACE2_WRITE_CAPABILITY",
 		    nptrs, kva);
 	} else {
-		printf("%s %zu pointers at %p\n",
+		pr_sift("%s %zu pointers at %p\n",
 		    read ? "ACE2_READ_CAPABILITY" : "ACE2_WRITE_CAPABILITY",
 		    nptrs, kva);
 	}
@@ -223,7 +230,7 @@ ace2_copycap_write(struct cdev *dev, struct uio *uio, int ioflag)
 	src = (void *)(uintptr_t)addr;
 #endif
 	*dst = *src;
-	printf("ACE2_COPY_CAPABILITY from %p to %p\n", src, dst);
+	pr_sift("ACE2_COPY_CAPABILITY from %p to %p\n", src, dst);
 	return (0);
 }
 
