@@ -412,19 +412,17 @@ __cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
 
 	/* permissions */
 	ujval = cheri_perms_get(pointer);
-#ifdef CHERI_PERM_STORE_CAP
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	if (ujval & CHERI_PERM_STORE_CAP)
 		*--cp = 'W';
-#endif
-#ifdef CHERI_PERM_LOAD_CAP
 	if (ujval & CHERI_PERM_LOAD_CAP)
 		*--cp = 'R';
 #endif
-#ifdef CHERI_PERM_CAP
+#ifdef HAS_CHERI_PERM_CAP
 	if (ujval & CHERI_PERM_CAP)
 		*--cp = 'C';
 #endif
-#ifdef CHERI_PERM_LOAD_MUTABLE
+#ifdef HAS_CHERI_PERM_LOAD_MUTABLE
 	if (ujval & CHERI_PERM_LOAD_MUTABLE)
 		*--cp = 'l';
 #endif
