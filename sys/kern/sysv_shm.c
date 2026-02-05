@@ -579,7 +579,11 @@ kern_shmat_locked(struct thread *td, int shmid,
 		     attach_va), size);
 		/* Remove inappropriate permissions. */
 		shmaddr = cheri_perms_and(shmaddr, ~(CHERI_PERM_EXECUTE |
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 		    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
+#elif defined(HAS_CHERI_PERM_CAP)
+		    CHERI_PERM_CAP |
+#endif
 		    ((shmflg & SHM_RDONLY) != 0 ? CHERI_PERM_STORE : 0)));
 		td->td_retval[0] = (uintcap_t)__DECONST_CAP(void * __capability,
 		    shmaddr);
