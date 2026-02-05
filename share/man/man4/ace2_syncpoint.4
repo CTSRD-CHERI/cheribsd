@@ -7,7 +7,7 @@
 .\" Technology), and Capabilities Limited under Defense Advanced Research
 .\" Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
 .\"
-.Dd December 9, 2025
+.Dd February 5, 2026
 .Dt ACE2_SYNCPOINT 4
 .Os
 .Sh NAME
@@ -96,7 +96,7 @@ id = ace2_syncpoint("example1", "example %d\n", 1);
 This will generate the following output:
 .Pp
 .Bd -literal -offset indent
-ACE2_SYNC_BARRIER example1:1 /usr/src/sys/dev/sift/ace2_syncpoint/ace2_syncpoint_test.c:35:syncpoint_example1 example 1
+ace2: ACE2_SYNC_BARRIER example1:1 /usr/src/sys/dev/sift/ace2_syncpoint/ace2_syncpoint_test.c:35:syncpoint_example1 example 1
 .Ed
 .Pp
 .Ss ace2_observe
@@ -128,7 +128,7 @@ ace2_observe(id, "example1", "%d", 1);
 This will generate the following output:
 .Pp
 .Bd -literal -offset indent
-ACE2_SYNC_PASSED example1:1 /usr/src/sys/dev/sift/ace2_syncpoint/ace2_syncpoint_test.c:35:syncpoint_example1 example 1
+ace2: ACE2_SYNC_PASSED example1:1 /usr/src/sys/dev/sift/ace2_syncpoint/ace2_syncpoint_test.c:35:syncpoint_example1 example 1
 .Ed
 .Sh DEVICE NODES
 When
