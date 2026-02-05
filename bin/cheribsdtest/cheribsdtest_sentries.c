@@ -63,7 +63,7 @@ check_fptr(uintptr_t fptr)
 	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) == 0,
 	    "perms %jx (storecap present)", (uintmax_t)perms);
 #endif
-#ifdef CHERI_PERM_CAP
+#ifdef HAS_CHERI_PERM_CAP
 	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_CAP) != 0,
 	    "perms %jx (cap present)", (uintmax_t)perms);
 #endif

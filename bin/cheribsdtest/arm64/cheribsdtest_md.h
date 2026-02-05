@@ -59,6 +59,11 @@
 #define	TLS_EXACT_BOUNDS
 #endif
 
+/* Supported architecture permission bits feature flags */
+#define	HAS_CHERI_PERM_LOAD_STORE_CAP
+#define	HAS_CHERI_PERM_LOAD_MUTABLE
+#define	HAS_CHERI_PERM_EXECUTIVE
+
 #define	CAPREG_PCC(capreg)	((capreg)->celr)
 
 #endif /* !_CHERIBSDTEST_H_ */

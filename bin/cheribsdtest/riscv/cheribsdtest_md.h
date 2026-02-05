@@ -55,6 +55,14 @@
 #define	XFAIL_VARARG_BOUNDS	"varargs bounds known to be unimplemented"
 #endif
 
+/* Supported architecture permission bits feature flags */
+#ifdef __riscv_xcheri
+#define	HAS_CHERI_PERM_LOAD_STORE_CAP
+#else
+#define	HAS_CHERI_PERM_CAP
+#define	HAS_CHERI_PERM_LOAD_MUTABLE
+#endif
+
 #define	CAPREG_PCC(capreg)	((capreg)->sepcc)
 
 #endif /* !_CHERIBSDTEST_MD_H_ */

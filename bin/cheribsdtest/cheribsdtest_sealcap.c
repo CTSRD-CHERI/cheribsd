@@ -100,7 +100,7 @@ CHERIBSDTEST(sealcap_sysctl, "Retrieve sealcap using sysctl(3)")
 	if ((v & CHERI_PERM_STORE) != 0)
 		cheribsdtest_failure_errx("perms %jx (store present)", v);
 
-#ifdef CHERI_PERM_LOAD_CAP
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	if ((v & CHERI_PERM_LOAD_CAP) != 0)
 		cheribsdtest_failure_errx("perms %jx (loadcap present)", v);
 #endif
@@ -108,7 +108,7 @@ CHERIBSDTEST(sealcap_sysctl, "Retrieve sealcap using sysctl(3)")
 	if ((v & CHERI_PERM_STORE_CAP) != 0)
 		cheribsdtest_failure_errx("perms %jx (storecap present)", v);
 #endif
-#ifdef CHERI_PERM_CAP
+#ifdef HAS_CHERI_PERM_CAP
         if ((v & CHERI_PERM_CAP) != 0)
 		cheribsdtest_failure_errx("perms %jx (cap permission present)", v);
 #endif
