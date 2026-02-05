@@ -7,7 +7,7 @@
 .\" Technology), and Capabilities Limited under Defense Advanced Research
 .\" Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
 .\"
-.Dd December 2, 2025
+.Dd February 5, 2026
 .Dt ACE2 4
 .Os
 .Sh NAME
@@ -53,4 +53,27 @@ value) of the capability to copy.
 .It Pa /dev/ace2-ace-capability
 .It Pa /dev/ace2-ace-copycap
 .It Pa /dev/ace2-ace-data
+.Sh DIAGNOSTICS
+.Bl -diag
+.It "ace2: ACE2_COPY_CAPABILITY from %p to %p"
+A capability was copied from the first address to the second address.
+.It "ace2: ACE2_READ_CAPABILITY %zu pointers at %p"
+The addresses for an array of capabilities were read from the given address.
+.It "ace2: ACE2_READ_CAPABILITY EFAULT %zu pointers at %p"
+An attempt to read the addresses of an array of capabilities from the given
+address failed.
+.It "ace2: ACE2_READ_DATA %zu bytes at %p"
+An array of bytes were read from the given address.
+.It "ace2: ACE2_READ_DATA EFAULT %zu bytes at %p"
+An attempt to read an array of bytes from the given address failed.
+.It "ace2: ACE2_WRITE_CAPABILITY %zu pointers at %p"
+New addresses were set for an array of capabilities at the given address.
+.It "ace2: ACE2_WRITE_CAPABILITY EFAULT %zu pointers at %p"
+An attempt to set the addresses for an array of capabilities at the given
+address failed.
+.It "ace2: ACE2_WRITE_DATA %zu bytes at %p"
+An array of bytes were written to the given address.
+.It "ace2: ACE2_WRITE_DATA EFAULT %zu bytes at %p"
+An attempt to write an array of bytes to the given address failed.
+.El
 .El
