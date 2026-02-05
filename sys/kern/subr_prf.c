@@ -876,7 +876,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 					PCHAR('w');
 				if (num & CHERI_PERM_EXECUTE)
 					PCHAR('x');
-#ifdef CHERI_PERM_LOAD_CAP
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 				if (num & CHERI_PERM_LOAD_CAP)
 					PCHAR('R');
 #endif
@@ -884,7 +884,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				if (num & CHERI_PERM_STORE_CAP)
 					PCHAR('W');
 #endif
-#ifdef CHERI_PERM_CAP
+#ifdef HAS_CHERI_PERM_CAP
 				if (num & CHERI_PERM_CAP)
 					PCHAR('C');
 #endif

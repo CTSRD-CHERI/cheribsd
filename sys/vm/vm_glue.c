@@ -870,7 +870,7 @@ vm_cap_allows_prot(const void * __capability cap, vm_prot_t prot)
 	reqperm = 0;
 	if (prot & VM_PROT_READ)
 		reqperm |= CHERI_PERM_LOAD;
-#ifdef CHERI_PERM_LOAD_CAP
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	if (prot & VM_PROT_READ_CAP)
 		reqperm |= CHERI_PERM_LOAD_CAP;
 #endif
@@ -880,7 +880,7 @@ vm_cap_allows_prot(const void * __capability cap, vm_prot_t prot)
 	if (prot & VM_PROT_WRITE_CAP)
 		reqperm |= CHERI_PERM_STORE_CAP;
 #endif
-#ifdef CHERI_PERM_CAP
+#ifdef HAS_CHERI_PERM_CAP
 	if (prot & (VM_PROT_WRITE_CAP | VM_PROT_READ_CAP))
 		reqperm |= CHERI_PERM_CAP;
 #endif

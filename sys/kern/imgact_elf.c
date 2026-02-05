@@ -613,7 +613,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 #ifdef CHERI_PERM_STORE_CAP
 	    CHERI_PERM_STORE_CAP |
 #endif
-#ifdef CHERI_PERM_CAP
+#ifdef HAS_CHERI_PERM_CAP
 	    CHERI_PERM_CAP |
 #endif
 	    CHERI_PERM_GLOBAL;

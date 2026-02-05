@@ -143,10 +143,10 @@ void * __capability
 memcpy_data_c(void * __capability dst, const void *  __capability src,
     size_t len)
 {
-#ifdef CHERI_PERM_LOAD_CAP
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	src = cheri_perms_and(src, ~CHERI_PERM_LOAD_CAP);
 #endif
-#ifdef CHERI_PERM_CAP
+#ifdef HAS_CHERI_PERM_CAP
 	src = cheri_perms_and(src, ~CHERI_PERM_CAP);
 #endif
 

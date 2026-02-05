@@ -1551,9 +1551,9 @@ vm_cheri_revoke_shadow_cap(struct sysentvec *sv, int sel, vm_offset_t base,
 	}
 	case CHERI_REVOKE_SHADOW_INFO_STRUCT: {
 		return (cheri_capability_build_user_data(
-#ifdef CHERI_PERM_LOAD_CAP
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 		    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | CHERI_PERM_GLOBAL,
-#elif defined(CHERI_PERM_CAP)
+#elif defined(HAS_CHERI_PERM_CAP)
 		    CHERI_PERM_LOAD | CHERI_PERM_CAP | CHERI_PERM_GLOBAL,
 #else
 		    CHERI_PERM_LOAD | CHERI_PERM_GLOBAL,
@@ -1587,9 +1587,9 @@ vm_cheri_revoke_info_page(struct vm_map *map, struct sysentvec *sv,
 
 	*ifp = cheri_capability_build_user_data(CHERI_PERM_LOAD |
 	    CHERI_PERM_STORE |
-#if defined(CHERI_PERM_LOAD_CAP) && defined(CHERI_PERM_STORE_CAP)
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
-#elif defined(CHERI_PERM_CAP)
+#elif defined(HAS_CHERI_PERM_CAP)
 	    CHERI_PERM_CAP |
 #endif
 	    CHERI_PERM_GLOBAL,

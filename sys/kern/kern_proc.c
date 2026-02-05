@@ -2662,9 +2662,9 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	 * out.
 	 */
 	if (!cheri_can_access(info.comparts,
-#ifdef CHERI_PERM_LOAD_CAP
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
-#elif defined(CHERI_PERM_CAP)
+#elif defined(HAS_CHERI_PERM_CAP)
 	    CHERI_PERM_LOAD | CHERI_PERM_CAP,
 #endif
 	    info.comparts_size * info.comparts_entry_size)) {

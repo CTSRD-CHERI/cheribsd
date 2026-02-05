@@ -47,9 +47,9 @@ unwind_frame(struct thread *td, struct unwind_state *frame)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (!cheri_can_access((void *)(fp - sizeof(fp) * 2),
-#ifdef CHERI_PERM_LOAD_CAP
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
-#elif defined(CHERI_PERM_CAP)
+#elif defined(HAS_CHERI_PERM_CAP)
 	    CHERI_PERM_LOAD | CHERI_PERM_CAP,
 #else
 	    CHERI_PERM_LOAD
