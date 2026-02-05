@@ -52,18 +52,18 @@
  * but perhaps it should be.
  */
 #ifdef __riscv_xcheri
-#define	CHERI_PERM_GLOBAL			(1 << 0)	/* 0x00000001 */
-#define	CHERI_PERM_EXECUTE			(1 << 1)	/* 0x00000002 */
-#define	CHERI_PERM_LOAD				(1 << 2)	/* 0x00000004 */
-#define	CHERI_PERM_STORE			(1 << 3)	/* 0x00000008 */
-#define	CHERI_PERM_LOAD_CAP			(1 << 4)	/* 0x00000010 */
-#define	CHERI_PERM_STORE_CAP			(1 << 5)	/* 0x00000020 */
-#define	CHERI_PERM_STORE_LOCAL_CAP		(1 << 6)	/* 0x00000040 */
-#define	CHERI_PERM_SEAL				(1 << 7)	/* 0x00000080 */
-#define	CHERI_PERM_INVOKE			(1 << 8)	/* 0x00000100 */
-#define	CHERI_PERM_UNSEAL			(1 << 9)	/* 0x00000200 */
-#define	CHERI_PERM_SYSTEM_REGS			(1 << 10)	/* 0x00000400 */
-#define	CHERI_PERM_SET_CID			(1 << 11)	/* 0x00000800 */
+#define	CHERI_PERM_GLOBAL		(1 << 0)	/* 0x00000001 */
+#define	CHERI_PERM_EXECUTE		(1 << 1)	/* 0x00000002 */
+#define	CHERI_PERM_LOAD			(1 << 2)	/* 0x00000004 */
+#define	CHERI_PERM_STORE		(1 << 3)	/* 0x00000008 */
+#define	CHERI_PERM_LOAD_CAP		(1 << 4)	/* 0x00000010 */
+#define	CHERI_PERM_STORE_CAP		(1 << 5)	/* 0x00000020 */
+#define	CHERI_PERM_STORE_LOCAL_CAP	(1 << 6)	/* 0x00000040 */
+#define	CHERI_PERM_SEAL			(1 << 7)	/* 0x00000080 */
+#define	CHERI_PERM_INVOKE		(1 << 8)	/* 0x00000100 */
+#define	CHERI_PERM_UNSEAL		(1 << 9)	/* 0x00000200 */
+#define	CHERI_PERM_SYSTEM_REGS		(1 << 10)	/* 0x00000400 */
+#define	CHERI_PERM_SET_CID		(1 << 11)	/* 0x00000800 */
 
 /* User-defined permission bits. */
 #define	CHERI_PERM_SW0			(1 << 15)	/* 0x00008000 */
@@ -80,14 +80,15 @@
 #define	CHERI_PERM_SYSTEM_REGS		(1 << 16)	/* 0x00010000 */
 #define	CHERI_PERM_EXECUTE		(1 << 17)	/* 0x00020000 */
 #define	CHERI_PERM_LOAD			(1 << 18)	/* 0x00040000 */
-#define	CHERI_PERM_GLOBAL		CHERI_PERM_LEVEL
-#define	CHERI_PERM_STORE_LOCAL_CAP	CHERI_PERM_STORE_LEVEL
 
 /* User-defined permission bits. */
 #define	CHERI_PERM_SW0			(1 << 6)	/* 0x00000040 */
 #define	CHERI_PERM_SW1			(1 << 7)	/* 0x00000080 */
 #define	CHERI_PERM_SW2			(1 << 8)	/* 0x00000100 */
 #define	CHERI_PERM_SW3			(1 << 9)	/* 0x00000200 */
+
+#define	CHERI_PERM_GLOBAL		CHERI_PERM_LEVEL
+#define	CHERI_PERM_STORE_LOCAL_CAP	CHERI_PERM_STORE_LEVEL
 #endif /* !defined(__riscv_xcheri) */
 
 #else /* !_KERNEL */
