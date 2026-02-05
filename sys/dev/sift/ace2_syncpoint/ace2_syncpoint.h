@@ -14,7 +14,7 @@
 
 #ifdef _KERNEL
 
-#define	pr_sift(fmt, ...)	printf((fmt), ##__VA_ARGS__)
+#define	pr_sift(fmt, ...)	printf("ace2: " fmt, ##__VA_ARGS__)
 
 #define	ace2_syncpoint(label, fmt, ...)					\
 	__ace2_syncpoint(label, __FILE__, __LINE__, __func__, (fmt),	\
