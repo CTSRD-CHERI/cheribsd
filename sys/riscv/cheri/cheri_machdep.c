@@ -106,23 +106,31 @@ int
 vm_prot2perms(int base, vm_prot_t prot)
 {
 	int perms = 0;
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
+	const int perm_load_cap = CHERI_PERM_LOAD_CAP;
+	const int perm_store_cap = CHERI_PERM_STORE_CAP |
+	    CHERI_PERM_STORE_LOCAL_CAP;
+#else
+	const int perm_load_cap = CHERI_PERM_CAP |
+	    CHERI_PERM_LOAD_MUTABLE;
+	const int perm_store_cap = CHERI_PERM_CAP |
+	    CHERI_PERM_STORE_LOCAL_CAP;
+#endif
 
 	if (prot & (VM_PROT_CAP | VM_PROT_NO_IMPLY_CAP)) {
 		if (prot & (VM_PROT_READ | VM_PROT_COPY))
 			perms |= CHERI_PERM_LOAD;
 		if (VM_PROT_HAS_READ_CAP(prot))
-			perms |= CHERI_PERM_LOAD_CAP;
+			perms |= perm_load_cap;
 		if (prot & VM_PROT_WRITE)
 			perms |= CHERI_PERM_STORE;
 		if (VM_PROT_HAS_WRITE_CAP(prot))
-			perms |= CHERI_PERM_STORE_CAP |
-			    CHERI_PERM_STORE_LOCAL_CAP;
+			perms |= perm_store_cap;
 	} else {
 		if (prot & (VM_PROT_READ | VM_PROT_COPY))
-			perms |= CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP;
+			perms |= CHERI_PERM_LOAD | perm_load_cap;
 		if (prot & VM_PROT_WRITE)
-			perms |= CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
-			    CHERI_PERM_STORE_LOCAL_CAP;
+			perms |= CHERI_PERM_STORE | perm_store_cap;
 	}
 	if (prot & VM_PROT_EXECUTE)
 		perms |= CHERI_PERM_EXECUTE | CHERI_PERM_LOAD |
