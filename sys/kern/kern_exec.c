@@ -1169,6 +1169,8 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 
 	EVENTHANDLER_DIRECT_INVOKE(process_exec, p, imgp);
 
+	p->p_sysent = sv;
+
 	/*
 	 * Blow away entire process VM, if address space not shared,
 	 * otherwise, create a new VM space so that other threads are
