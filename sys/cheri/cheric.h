@@ -86,17 +86,7 @@
 #define cheri_seal_conditionally(x, y)				 	\
     __builtin_cheri_conditional_seal((x), (y))
 #define cheri_sentry_create(x)	__builtin_cheri_seal_entry(x)
-/* XXX-AM
- * Work around lack of cheri_tag_clear built-in for zcheri.
- * This should be removed once the compiler supports this.
- */
-#ifdef __riscv_zcheripurecap
-#define	cheri_tag_clear(x)	__extension__({			\
-	__typeof__(((void)0, (x))) t = (x);			\
-	__PTRADDR_TYPE__ h = __builtin_cheri_high_get(t);	\
-	__builtin_cheri_high_set(t, h);				\
-})
-#else
+#ifndef __riscv_zcheripurecap
 #define	cheri_tag_clear(x)	__builtin_cheri_tag_clear((x))
 #endif
 #define cheri_tag_get(x)	__builtin_cheri_tag_get(x)
@@ -189,6 +179,28 @@
 	__builtin_cheri_cap_load_tags((__cheri_tocap void * __capability)(m))
 #else
 #define	cheri_loadtags(m)	__builtin_cheri_cap_load_tags((m))
+#endif
+
+/*
+ * Define cheri_flags and cheri_tag_clear intrinsics if not existing.
+ * XXX-AM: These are missing from the RVY toolchain cheriintrin.h
+ */
+#ifndef cheri_flags_set
+#define	cheri_flags_set(x, y)	__builtin_cheri_flags_set((x), (y))
+#endif
+#ifndef cheri_flags_get
+#define	cheri_flags_get(x)	__builtin_cheri_flags_get((x))
+#endif
+#ifndef cheri_tag_clear
+/*
+ * XXX-AM Work around lack of cheri_tag_clear built-in for zcheri.
+ * This should be removed once the compiler supports this.
+ */
+#define	cheri_tag_clear(x)	__extension__({			\
+	__typeof__(((void)0, (x))) t = (x);			\
+	__PTRADDR_TYPE__ h = __builtin_cheri_high_get(t);	\
+	__builtin_cheri_high_set(t, h);				\
+})
 #endif
 
 /*
