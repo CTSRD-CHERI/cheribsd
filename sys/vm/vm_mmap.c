@@ -354,7 +354,8 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		if (flags & MAP_FIXED)
 			flags |= MAP_EXCL;
 
-		source_cap = userspace_root_cap;
+		source_cap = (void * __capability)vm_map_rootcap(
+		    &td->td_proc->p_vmspace->vm_map);
 	}
 	KASSERT(cheri_tag_get(source_cap),
 	    ("td->td_cheri_mmap_cap is untagged!"));
