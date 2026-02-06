@@ -75,9 +75,6 @@ void * __capability	_cheri_capability_build_user_rwx_unchecked(
  * Global capabilities used to construct other capabilities.
  */
 
-/* Root of all unsealed userspace capabilities. */
-extern void * __capability userspace_root_cap;
-
 /* Root of all sealed userspace capabilities. */
 extern void * __capability userspace_root_sealcap;
 

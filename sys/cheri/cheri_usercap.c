@@ -42,7 +42,8 @@
 #include <cheri/cheric.h>
 
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
-void * __capability userspace_root_cap = (void * __capability)(intcap_t)-1;
+static void * __capability userspace_root_cap =
+    (void * __capability)(intcap_t)-1;
 
 static u_int cheri_ptrace_caps;
 SYSCTL_UINT(_security_cheri, OID_AUTO, ptrace_caps, CTLFLAG_RWTUN,
