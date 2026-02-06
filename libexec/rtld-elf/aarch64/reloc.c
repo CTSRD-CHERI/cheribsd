@@ -1226,7 +1226,7 @@ reloc_tgot(Obj_Entry *obj, struct tcb *tcb, void *tgot, int flags,
 			if (tls == NULL)
 				tls = get_block(tcb, obj->tlsindex);
 			val = init_cap_from_fragment(fragment, tls, NULL,
-			    (Elf_Addr)tls, 0);
+			    (Elf_Addr)tls, 0, true);
 		}
 		*where = val;
 	}
