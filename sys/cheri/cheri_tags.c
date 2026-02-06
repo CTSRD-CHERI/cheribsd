@@ -90,6 +90,7 @@ static void
 measure_cloadtags_stride(void *dummy __unused)
 {
 	void * __capability *buf;
+	void * __capability cap;
 	uint64_t tags;
 	u_int i;
 
@@ -103,6 +104,7 @@ measure_cloadtags_stride(void *dummy __unused)
 	 */
 	buf = malloc_aligned(sizeof(*buf) * 64, sizeof(*buf) * 64,
 	    M_TEMP, M_WAITOK | M_ZERO);
+	cap = (__cheri_tocap void * __capability)&tags;
 
 #ifdef INVARIANTS
 	tags = cheri_loadtags(buf);
@@ -112,7 +114,7 @@ measure_cloadtags_stride(void *dummy __unused)
 
 	/* CLoadTags can't return more than 64 bits. */
 	for (i = 0; i < 64; i++)
-		buf[i] = userspace_root_cap;
+		buf[i] = cap;
 
 	tags = cheri_loadtags(buf);
 
