@@ -62,6 +62,8 @@
 
 #include <sys/elf.h>
 
+#include <cheri/cheric.h>
+
 #include "libc_private.h"
 #include "mrs_utrace.h"
 
