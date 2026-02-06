@@ -109,6 +109,12 @@ extern void * __capability vmm_el2_root_cap;
 #endif
 
 /*
+ * Construct capabilities in the sysvec.
+ */
+struct sysentvec;
+void cheri_sysvec_init(struct sysentvec *sv);
+
+/*
  * Functions to create capabilities used in exec.
  */
 struct image_params;

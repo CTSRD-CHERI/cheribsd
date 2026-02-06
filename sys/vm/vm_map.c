@@ -5755,39 +5755,19 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 	struct vmspace *oldvmspace = p->p_vmspace;
 	struct vmspace *newvmspace;
 #if __has_feature(capabilities)
-	vm_offset_t padded_minuser;
 	uintcap_t minuser_cap;
 	uintcap_t maxuser_cap;
-	vm_offset_t user_length;
 #endif
 
 	KASSERT((curthread->td_pflags & TDP_EXECVMSPC) == 0,
 	    ("vmspace_exec recursed"));
 #if __has_feature(capabilities)
-	/*
-	 * We create a new userspace capability for this map
-	 * Only allow non-representable map capability if the minuser
-	 * excludes the first page.
-	 */
-	user_length = MIN(maxuser - minuser,
-	    VM_MAXUSER_ADDRESS - VM_MINUSER_ADDRESS);
-	padded_minuser = CHERI_REPRESENTABLE_ALIGN_DOWN(minuser, user_length);
-	KASSERT(padded_minuser == minuser || minuser <= PAGE_SIZE,
-	    ("Unrepresentable base for new vmspace"));
-	KASSERT(maxuser - padded_minuser ==
-	    CHERI_REPRESENTABLE_LENGTH(user_length),
-	    ("Unrepresentable length for new vmspace"));
-
-	user_length = CHERI_REPRESENTABLE_LENGTH(user_length);
-	/*
-	 * XXX: Use the unchecked version here because the map is empty
-	 * at this point.
-	 *
-	 * XXX: It seems like this should be an sv_* member.
-	 */
-	minuser_cap = (uintcap_t)cheri_capability_build_user_rwx_unchecked(
-	    CHERI_CAP_USER_CODE_PERMS | CHERI_CAP_USER_DATA_PERMS |
-	    CHERI_PERMS_SWALL, padded_minuser, user_length, minuser);
+	KASSERT(cheri_tag_get(p->p_sysent->sv_vmspace_cap),
+	    ("expected valid vmspace cap in sysvec %s, got %#lp",
+	     p->p_sysent->sv_name,
+	     (void * __capability)p->p_sysent->sv_vmspace_cap));
+	minuser_cap = cheri_address_set(p->p_sysent->sv_vmspace_cap,
+	    minuser);
 	maxuser_cap = cheri_address_set(minuser_cap, maxuser);
 	newvmspace = vmspace_alloc(minuser_cap, maxuser_cap, pmap_pinit);
 #else
