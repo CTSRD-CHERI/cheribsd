@@ -210,47 +210,6 @@ disable_user_memory_access(void)
 	);
 }
 
-#ifdef CHERI_CAPREVOKE_CLOADTAGS
-uint8_t cloadtags_stride;
-SYSCTL_U8(_vm, OID_AUTO, cloadtags_stride, 0, &cloadtags_stride, 0, "XXX");
-
-static void
-measure_cloadtags_stride(void *ignored __unused)
-{
-	/* A 256-byte cache-line is probably beyond the pale, so use that */
-	void * __capability buf[16] __attribute__((aligned(256)));
-	int i;
-
-	/* Fill with capabilities */
-	for (i = 0; i < sizeof(buf)/sizeof(buf[0]); i++) {
-		buf[i] = userspace_root_cap;
-	}
-
-	uint64_t tags = __builtin_cheri_cap_load_tags(buf);
-	switch (tags) {
-	case 0x0001:
-		cloadtags_stride = 1;
-		break;
-	case 0x0003:
-		cloadtags_stride = 2;
-		break;
-	case 0x000F:
-		cloadtags_stride = 4;
-		break;
-	case 0x00FF:
-		cloadtags_stride = 8;
-		break;
-	case 0xFFFF:
-		cloadtags_stride = 16;
-		break;
-	default:
-		panic("Bad cloadtags result 0x%" PRIx64, tags);
-	}
-}
-SYSINIT(
-    cloadtags_stride, SI_SUB_VM, SI_ORDER_ANY, measure_cloadtags_stride, NULL);
-#endif
-
 // TODO: CPREFETCH()
 
 static inline int
@@ -276,7 +235,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 	vm_cheri_revoke_test_fn ctp = crc->map->vm_cheri_revoke_test;
 	const uint8_t * __capability crshadow = crc->crshadow;
 #ifdef CHERI_CAPREVOKE_CLOADTAGS
-	uint8_t _cloadtags_stride = cloadtags_stride;
+	uint8_t _cloadtags_stride = cheri_cloadtags_stride;
 	uint64_t tags, nexttags;
 #endif
 
