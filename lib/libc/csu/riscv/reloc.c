@@ -23,17 +23,45 @@
 
 static unsigned long elf_hwcap;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <stdbool.h>
+
+static bool use_code_bounds;
+#endif
+
 static void
 ifunc_init(const Elf_Auxinfo *aux)
 {
+#ifdef __CHERI_PURE_CAPABILITY__
+	const Elf_Phdr *phdr;
+	long phnum;
+#endif
+
 	/* Digest the auxiliary vector. */
 	for (; aux->a_type != AT_NULL; aux++) {
 		switch (aux->a_type) {
 		case AT_HWCAP:
 			elf_hwcap = (uint32_t)aux->a_un.a_val;
 			break;
+#ifdef __CHERI_PURE_CAPABILITY__
+		case AT_PHDR:
+			phdr = aux->a_un.a_ptr;
+			break;
+		case AT_PHNUM:
+			phnum = aux->a_un.a_val;
+			break;
+#endif
 		}
 	}
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	for (const Elf_Phdr *ph = phdr; ph < phdr + phnum; ph++) {
+		if (ph->p_type == PT_CHERI_PCC) {
+			use_code_bounds = true;
+			break;
+		}
+	}
+#endif
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -61,7 +89,8 @@ crt1_handle_capreloc(const struct capreloc *r, void *data_cap,
 		ptr = (uintptr_t)cheri_perms_and(code_cap,
 		    function_pointer_permissions_mask);
 		ptr = cheri_address_set(ptr, r->object);
-		/* TODO: tight bounds */
+		if (use_code_bounds && r->size != 0)
+			ptr = cheri_bounds_set(ptr, r->size);
 		ptr += r->offset;
 		ptr = cheri_sentry_create(ptr);
 		target = ((ifunc_resolver_t)ptr)(elf_hwcap,
