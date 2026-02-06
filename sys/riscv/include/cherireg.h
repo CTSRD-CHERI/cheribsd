@@ -75,7 +75,7 @@
 #define	CHERI_PERM_LOAD_MUTABLE		(1 << 1)	/* 0x00000002 */
 #define	CHERI_PERM_ELEVATE_LEVEL	(1 << 2)	/* 0x00000004 */
 #define	CHERI_PERM_STORE_LEVEL		(1 << 3)	/* 0x00000008 */
-#define	CHERI_PERM_LEVEL		(1 << 4)	/* 0x00000010 */
+#define	CHERI_PERM_CAPABILITY_LEVEL	(1 << 4)	/* 0x00000010 */
 #define	CHERI_PERM_CAP			(1 << 5)	/* 0x00000020 */
 #define	CHERI_PERM_SYSTEM_REGS		(1 << 16)	/* 0x00010000 */
 #define	CHERI_PERM_EXECUTE		(1 << 17)	/* 0x00020000 */
@@ -87,7 +87,7 @@
 #define	CHERI_PERM_SW2			(1 << 8)	/* 0x00000100 */
 #define	CHERI_PERM_SW3			(1 << 9)	/* 0x00000200 */
 
-#define	CHERI_PERM_GLOBAL		CHERI_PERM_LEVEL
+#define	CHERI_PERM_GLOBAL		CHERI_PERM_CAPABILITY_LEVEL
 #define	CHERI_PERM_STORE_LOCAL_CAP	CHERI_PERM_STORE_LEVEL
 #endif /* !defined(__riscv_xcheri) */
 
