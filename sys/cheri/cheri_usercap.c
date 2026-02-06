@@ -59,6 +59,12 @@ SYSCTL_ULONG(_security_cheri_stats, OID_AUTO, untagged_ptrace_caps, CTLFLAG_RD,
     &cheri_untagged_ptrace_caps, 0,
     "Number of capabilities injected via ptrace that failed to tag");
 
+void
+userspace_root_cap_init(void * __capability cap)
+{
+	userspace_root_cap = cap;
+}
+
 /*
  * Build a new userspace capability derived from userspace_root_cap.
  * The resulting capability may include both read and execute permissions,

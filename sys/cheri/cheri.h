@@ -109,6 +109,11 @@ extern void * __capability vmm_el2_root_cap;
 #endif
 
 /*
+ * Initialize root caps.
+ */
+void userspace_root_cap_init(void * __capability);
+
+/*
  * Construct capabilities in the sysvec.
  */
 struct sysentvec;
