@@ -181,6 +181,51 @@ _cheri_capability_build_user_rwx_unchecked(uint32_t perms, ptraddr_t basep,
 	    cheri_offset_set(userspace_root_cap, basep), length), perms), off));
 }
 
+void
+cheri_sysvec_init(struct sysentvec *sv)
+{
+	ptraddr_t minuser, maxuser, padded_minuser;
+	size_t user_length;
+
+	KASSERT(sv->sv_vmspace_cap == 0, ("sv_vmspace_cap already set"));
+
+	minuser = sv->sv_minuser;
+	maxuser = sv->sv_maxuser;
+
+	KASSERT(minuser >= VM_MINUSER_ADDRESS,
+	    ("sv_minuser < VM_MINUSER_ADDRESS"));
+	KASSERT(maxuser <= VM_MAXUSER_ADDRESS,
+	    ("sv_maxuser > VM_MAXUSER_ADDRESS"));
+	KASSERT("maxuser > minuser", ("sv_maxuser <= sv_minuser"));
+
+	/*
+	 * Create a userspace capability for maps created for this
+	 * sysvec, nominally bounded by sv_minuser and sv_maxuser.
+	 * Allow the lower bound to be imprecise if sv_minuser excludes
+	 * the first page.
+	 */
+	user_length = maxuser - minuser;
+	padded_minuser = CHERI_REPRESENTABLE_ALIGN_DOWN(minuser,
+	    user_length);
+	KASSERT(padded_minuser == minuser ||
+	    minuser <= PAGE_SIZE, ("Unrepresentable base"));
+	user_length = CHERI_REPRESENTABLE_LENGTH(user_length);
+	KASSERT(maxuser - padded_minuser == user_length,
+	    ("Unrepresentable length"));
+	/*
+	 * Use the unchecked version here because we're not in a syscall
+	 * and the associated map is probably the kernel map.
+	 */
+	sv->sv_vmspace_cap = (uintcap_t)
+	    cheri_capability_build_user_rwx_unchecked(
+	    CHERI_CAP_USER_CODE_PERMS | CHERI_CAP_USER_DATA_PERMS |
+	    CHERI_PERMS_SWALL, padded_minuser, user_length,
+	    minuser - padded_minuser);
+	KASSERT(cheri_tag_get(sv->sv_vmspace_cap),
+	    ("sv_vmspace_cap untagged %#lp",
+	     (void * __capability)sv->sv_vmspace_cap));
+}
+
 /*
  * Try to store a tagged capability in *out, derived from an untagged
  * "bag of bits" in in.  If a tagged capability cannot be derived,
