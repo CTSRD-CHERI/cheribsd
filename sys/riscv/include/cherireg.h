@@ -86,9 +86,6 @@
 #define	CHERI_PERM_SW1			(1 << 7)	/* 0x00000080 */
 #define	CHERI_PERM_SW2			(1 << 8)	/* 0x00000100 */
 #define	CHERI_PERM_SW3			(1 << 9)	/* 0x00000200 */
-
-#define	CHERI_PERM_GLOBAL		CHERI_PERM_CAPABILITY_LEVEL
-#define	CHERI_PERM_STORE_LOCAL_CAP	CHERI_PERM_STORE_LEVEL
 #endif /* !defined(__riscv_xcheri) */
 
 #else /* !_KERNEL */
@@ -102,6 +99,16 @@
 #define	CHERI_PERM_SW2			(1 << 17)	/* 0x00020000 */
 #define	CHERI_PERM_SW3			(1 << 18)	/* 0x00040000 */
 #else
+
+/*
+ * XXX-AM: HACK
+ * Re-define these because RVY cheriintrin.h decided to use different names...
+ */
+#define	CHERI_PERM_STORE		(1 << 0)	/* 0x00000001 */
+#define	CHERI_PERM_LOAD			(1 << 18)	/* 0x00040000 */
+#define	CHERI_PERM_GLOBAL		CHERI_PERM_CAPABILITY_LEVEL
+#define	CHERI_PERM_STORE_LOCAL_CAP	CHERI_PERM_STORE_LEVEL
+
 #define	CHERI_PERM_SW0			(1 << 6)	/* 0x00000040 */
 #define	CHERI_PERM_SW1			(1 << 7)	/* 0x00000080 */
 #define	CHERI_PERM_SW2			(1 << 8)	/* 0x00000100 */
