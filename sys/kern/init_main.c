@@ -652,11 +652,10 @@ proc0_init(void *dummy __unused)
 	 * we strip all access permission because proc0 is not
 	 * expected to enter usermode.
 	 */
-	uintcap_t minuser_cap = (uintcap_t)cheri_address_set(userspace_root_cap,
-	    p->p_sysent->sv_minuser);
-	minuser_cap = cheri_bounds_set(minuser_cap,
-	    p->p_sysent->sv_maxuser - p->p_sysent->sv_minuser);
-	minuser_cap = cheri_perms_and(minuser_cap, 0);
+	uintcap_t minuser_cap =
+	    (uintcap_t)cheri_capability_build_user_rwx_unchecked(
+	    0, p->p_sysent->sv_minuser,
+	    p->p_sysent->sv_maxuser - p->p_sysent->sv_minuser, 0);
 
 	vm_map_init(&vmspace0.vm_map, vmspace_pmap(&vmspace0),
 	    minuser_cap,
