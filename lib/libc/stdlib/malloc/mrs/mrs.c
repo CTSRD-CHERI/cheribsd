@@ -106,6 +106,8 @@
 #define	QUARANTINE_NUMERATOR	1
 #endif
 
+//#define QEMU_TARGET 1
+#define ZERO_POISON_ON_FLUSH 1
 #define	MALLOCX_LG_ALIGN_BITS	6
 #define	MALLOCX_LG_ALIGN_MASK	((1 << MALLOCX_LG_ALIGN_BITS) - 1)
 /* Use MALLOCX_ALIGN_GET() if alignment may not be specified in flags. */
@@ -129,7 +131,8 @@ extern void snmalloc_flush_message_queue(void);
 #define	MALLOC_ZERO_ENABLE_ENV	"_RUNTIME_ZERO_ENABLE"
 #define	MALLOC_POISON_DISABLE_ENV	"_RUNTIME_POISON_DISABLE"
 #define	MALLOC_POISON_ENABLE_ENV	"_RUNTIME_POISON_ENABLE"
-
+#define	MALLOC_PTRAP_DISABLE_ENV	"_RUNTIME_PTRAP_DISABLE"
+#define	MALLOC_PTRAP_ENABLE_ENV	"_RUNTIME_PTRAP_ENABLE"
 
 #define	MALLOC_REVOKE_EVERY_FREE_DISABLE_ENV \
 	"_RUNTIME_REVOCATION_EVERY_FREE_DISABLE"
@@ -148,6 +151,9 @@ extern void snmalloc_flush_message_queue(void);
 	"_RUNTIME_QUARANTINE_DENOMINATOR"
 #define	MALLOC_QUARANTINE_NUMERATOR_ENV \
 	"_RUNTIME_QUARANTINE_NUMERATOR"
+
+#define	MALLOC_REVOKE_SKIP_KERNEL_REVOCATION \
+	"_RUNTIME_REVOCATION_SKIP_KERNEL_REVOCATION"
 
 /*
  * Different allocators give their strong symbols different names.  Hide
@@ -200,8 +206,30 @@ static inline void cpoison(char * a){
   asm volatile("cpoison %0, 0(%1)": :"C"(a),"C"(a));
 }
 
-static void csetpver(char * a, int ver){
+static void csetpver(void  * a, int ver){
     asm volatile("csetcappver %0, %1, %2": :"C"(a), "C"(a), "r"(ver));
+}
+
+static inline int cgetpver(void * a){
+       int ver= 0 ;
+       asm volatile("cgetcappver %0,%1" : "=r"(ver) : "C"(a));
+       return ver;
+}
+
+#ifdef QEMU_TARGET
+static inline void* csetcappoison(void * a){
+   void * ptr;
+   asm volatile("csetcappermpoison %0, %1" :"=C"(ptr) : "C"(a));
+   return ptr;
+}
+#endif 
+
+void * cclearpoisonperm(void * a){
+	void *ptr ;
+	uint64_t mask = ~(1ull << 12);
+    ptr = cheri_andperm(a, mask);
+
+	return ptr;
 }
 
 
@@ -324,7 +352,7 @@ void *REAL(malloc_underlying_allocation)(void *);
  * XXX VM_CAPREVOKE_GSZ_MEM_NOMAP from machine/vmparam.h
  */
 static const size_t CAPREVOKE_BITMAP_ALIGNMENT = sizeof(void *);
-static const size_t MALLOC_CACHELINE_ALIGNMENT = 64;
+static const size_t MALLOC_CACHELINE_ALIGNMENT = 16;
 static const size_t DESCRIPTOR_SLAB_ENTRIES = 10000;
 static const size_t MIN_REVOKE_HEAP_SIZE = 8 * 1024 * 1024;
 
@@ -335,12 +363,19 @@ static size_t page_size;
 static void *entire_shadow;
 static bool quarantining = true;
 static bool zeroing = false;
+#ifdef QEMU_TARGET
 static bool poisoning = true;
+static bool trapping = true;
+#else 
+static bool poisoning = false;
+static bool trapping = false;
+#endif
 static bool revoke_every_free = false;
 static bool revoke_async = false;
 static bool bound_pointers = false;
 static bool abort_on_validation_failure = true;
 static bool mrs_initialized = false;
+static bool skip_kernel_revocation = false;
 
 static unsigned int quarantine_denominator = QUARANTINE_DENOMINATOR;
 static unsigned int quarantine_numerator = QUARANTINE_NUMERATOR;
@@ -666,7 +701,6 @@ quarantine_insert(struct mrs_quarantine *quarantine, void *ptr, size_t size)
 		mrs_printf("fatal error: can't insert pointer without SW_VMEM");
 		exit(7);
 	}
-
 	quarantine->list->slab[quarantine->list->num_descriptors].ptr = ptr;
 	quarantine->list->slab[quarantine->list->num_descriptors].size = size;
 	quarantine->list->num_descriptors++;
@@ -704,10 +738,12 @@ validate_freed_pointer(void *ptr)
 	}
 
 	void *underlying_allocation = REAL(malloc_underlying_allocation)(ptr);
+	
 	if (underlying_allocation == NULL) {
 		mrs_debug_printf("validate_freed_pointer: not allocated by underlying allocator\n");
 		return (NULL);
 	}
+	//csetpver((char *)underlying_allocation, 0);
 	/*mrs_debug_printf("freed underlying allocation %#p\n", underlying_allocation);*/
 
 	/*
@@ -851,14 +887,16 @@ app_quarantine_revoke_async(void)
 	epoch = TAILQ_FIRST(&app_quarantine_revoke_list)->epoch;
 	mrs_unlock(&app_quarantine_lock);
 
-	(void)cheri_revoke(CHERI_REVOKE_ASYNC, epoch, NULL);
+	if (!skip_kernel_revocation)
+		(void)cheri_revoke(CHERI_REVOKE_ASYNC, epoch, NULL);
 
 	/*
 	 * Is it possible that some of the pending revocation work has finished?
 	 * Flush some of the revoked memory back to the underlying allocator if
 	 * so.
 	 */
-	if (cheri_revoke_epoch_clears(cri->epochs.dequeue, epoch)) {
+	if (skip_kernel_revocation ||
+	    cheri_revoke_epoch_clears(cri->epochs.dequeue, epoch)) {
 		struct mrs_quarantine tmp;
 
 		mrs_lock(&app_quarantine_lock);
@@ -868,7 +906,8 @@ app_quarantine_revoke_async(void)
 			return;
 		}
 		assert(next->revoking);
-		if (!cheri_revoke_epoch_clears(cri->epochs.dequeue,
+		if (skip_kernel_revocation ||
+		    !cheri_revoke_epoch_clears(cri->epochs.dequeue,
 		    next->epoch)) {
 			mrs_unlock(&app_quarantine_lock);
 			return;
@@ -1009,6 +1048,16 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 			size_t len = __builtin_align_up(
 			    cheri_getlen(iter->slab[i].ptr),
 			    CAPREVOKE_BITMAP_ALIGNMENT);
+#ifdef ZERO_POISON_ON_FLUSH
+			int size = cheri_getlen(iter->slab[i].ptr);	
+			if(size >= 16){
+				if(zeroing){
+					for(size_t j =0; j< size;j+=MALLOC_CACHELINE_ALIGNMENT){
+						dczero((char*)(iter->slab[i].ptr+j));
+					}
+				}
+			}
+#endif 
 			caprev_shadow_nomap_clear_len(
 			    cri->base_mem_nomap, entire_shadow,
 			    cheri_getbase(iter->slab[i].ptr), len);
@@ -1074,11 +1123,14 @@ static void
 quarantine_revoke(struct mrs_quarantine *quarantine)
 {
 	/* Don't read epoch until all bitmap painting is done. */
+
 	atomic_thread_fence(memory_order_acq_rel);
+
 	cheri_revoke_epoch_t start_epoch = cri->epochs.enqueue;
 
 	MRS_UTRACE(UTRACE_MRS_QUARANTINE_REVOKE, NULL, 0, 0, NULL);
-	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
+	while (!skip_kernel_revocation &&
+	    !cheri_revoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
 # ifdef PRINT_CAPREVOKE
 		struct cheri_revoke_syscall_info crsi = { 0 };
 		uint64_t cyc_init, cyc_fini;
@@ -1105,6 +1157,7 @@ quarantine_revoke(struct mrs_quarantine *quarantine)
 # endif /* !PRINT_CAPREVOKE */
 	}
 	MRS_UTRACE(UTRACE_MRS_QUARANTINE_REVOKE_DONE, NULL, 0, 0, NULL);
+
 	quarantine_flush(quarantine);
 }
 
@@ -1417,6 +1470,11 @@ mrs_init_impl_locked(void)
 		} else if (getenv(MALLOC_POISON_ENABLE_ENV) != NULL) {
 			poisoning = true;
 		}
+		if (getenv(MALLOC_PTRAP_DISABLE_ENV) != NULL) {
+			trapping = false;
+		} else if (getenv(MALLOC_PTRAP_ENABLE_ENV) != NULL) {
+			trapping = true;
+		}
 		if (getenv(MALLOC_ABORT_DISABLE_ENV) != NULL)
 			abort_on_validation_failure = false;
 		else if (getenv(MALLOC_ABORT_ENABLE_ENV) != NULL)
@@ -1426,6 +1484,8 @@ mrs_init_impl_locked(void)
 			revoke_every_free = false;
 		else if (getenv(MALLOC_REVOKE_EVERY_FREE_ENABLE_ENV) != NULL)
 			revoke_every_free = true;
+		if (getenv(MALLOC_REVOKE_SKIP_KERNEL_REVOCATION) != NULL)
+			skip_kernel_revocation = true;
 
 #ifndef OFFLOAD_QUARANTINE
 		if (getenv(MALLOC_REVOKE_SYNC_ENV) != NULL)
@@ -1529,18 +1589,17 @@ static void *
 mrs_malloc(size_t size)
 {
 	mrs_init();
-
+	int size_aligned = __builtin_align_up(
+			    size,
+			    MALLOC_CACHELINE_ALIGNMENT);
 	if (!quarantining)
-		return (mrs_real_malloc(size));
+		return (mrs_real_malloc(size_aligned));
 
 	/*mrs_debug_printf("mrs_malloc: called\n");*/
 
 	check_and_perform_flush(false);
 
 	void *allocated_region;
-	size = __builtin_align_up(
-			    size,
-			    MALLOC_CACHELINE_ALIGNMENT);
 	/*
 	 * Round up here to make sure there is only one allocation per
 	 * granule without requiring modifications to the underlying
@@ -1550,18 +1609,14 @@ mrs_malloc(size_t size)
 	 * for size=0 we might want to pass those calls through, but none
 	 * of the currently supported allocators do.
 	 */
-	if (size < CAPREVOKE_BITMAP_ALIGNMENT)
+	if (size_aligned < CAPREVOKE_BITMAP_ALIGNMENT)
 		allocated_region = mrs_real_malloc(CAPREVOKE_BITMAP_ALIGNMENT);
 	else
-		allocated_region = mrs_real_malloc(size);
-	csetpver((char *)allocated_region, 0);
-	if(zeroing){
-		for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT){
-			dczero((char*)(allocated_region+i));
-		}
-	}
+		allocated_region = mrs_real_malloc(size_aligned);
+	
+
 	if (allocated_region == NULL) {
-		MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0,
+		MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size_aligned, 0,
 		    allocated_region);
 		return (allocated_region);
 	}
@@ -1576,6 +1631,27 @@ mrs_malloc(size_t size)
 	    size, allocated_region);*/
 
 	MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, allocated_region);
+	
+	//int pver = cgetpver((char *)allocated_region);
+	//if (pver <254){
+	//	csetpver((char *)allocated_region, pver+1);
+	//}
+	//else{
+	//	for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
+	//		dczero((char*)(allocated_region+i));
+	//	}
+	//	printf("zero poison on mrs_malloc\n");
+	//	csetpver((char *)allocated_region, 1);
+	//}
+#ifdef ZERO_POISON_ON_ALLOC
+	if(zeroing){
+		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
+			dczero((char*)(allocated_region+i));
+		}
+	}
+#endif 
+	if(trapping)
+		allocated_region = cclearpoisonperm(allocated_region);
 	return (allocated_region);
 }
 
@@ -1591,9 +1667,11 @@ mrs_calloc(size_t number, size_t size)
 	size_t tmpsize;
 
 	mrs_init();
-
+	int size_aligned = __builtin_align_up(
+		    size,
+		    MALLOC_CACHELINE_ALIGNMENT);
 	if (!quarantining)
-		return (mrs_real_calloc(number, size));
+		return (mrs_real_calloc(number, size_aligned));
 
 	/*
 	 * This causes problems if our library is initialized before
@@ -1614,33 +1692,45 @@ mrs_calloc(size_t number, size_t size)
 	 * the alignment requirement for small sizes but that seems like an
 	 * extraordinarily unlikely and highly questionable optimization.
 	 */
-	size = __builtin_align_up(
-		    size,
-		    MALLOC_CACHELINE_ALIGNMENT);
-	if (!__builtin_mul_overflow(number, size, &tmpsize) &&
+	if (!__builtin_mul_overflow(number, size_aligned, &tmpsize) &&
 	    tmpsize < CAPREVOKE_BITMAP_ALIGNMENT)
 		allocated_region = mrs_real_calloc(1, CAPREVOKE_BITMAP_ALIGNMENT);
 	else
-		allocated_region = mrs_real_calloc(number, size);
+		allocated_region = mrs_real_calloc(number, size_aligned);
 	if (allocated_region == NULL) {
-		MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number,
+		MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size_aligned, number,
 		    allocated_region);
 		return (allocated_region);
 	}
-	
-	increment_allocated_size(allocated_region);
-	csetpver((char *)allocated_region, 0);
+#ifdef ZERO_POISON_ON_ALLOC
 	if(zeroing){
-		for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
+		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
 			dczero((char*)(allocated_region+i));
+		}
 	}
+#endif 
+	increment_allocated_size(allocated_region);
+
 	/*
 	 * This causes problems if our library is initialized before
 	 * the thread library.
 	 */
 	/*mrs_debug_printf("mrs_calloc: exit called %d size 0x%zx address %p\n", number, size, allocated_region);*/
 
-	MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number, allocated_region);
+	MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size_aligned, number, allocated_region);
+	//int pver = cgetpver((char *)allocated_region);
+	//if (pver <254){
+	//	csetpver((char *)allocated_region, pver+1);
+	//}
+	//else{
+	//	printf("zero poison on calloc\n");
+	//	for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
+	//		dczero((char*)(allocated_region+i));
+	//	}
+	//	csetpver((char *)allocated_region, 1);
+	//}
+	if(trapping)
+		allocated_region = cclearpoisonperm(allocated_region);
 	return (allocated_region);
 }
 
@@ -1648,12 +1738,12 @@ static int
 mrs_real_posix_memalign(void **ptr, size_t alignment, size_t size)
 {
 	int ret;
-	size = __builtin_align_up(
+	int size_aligned = __builtin_align_up(
 		    size,
 		    MALLOC_CACHELINE_ALIGNMENT);
-	ret = REAL(posix_memalign)(ptr, alignment, size);
+	ret = REAL(posix_memalign)(ptr, alignment, size_aligned);
 	if (ret == 0)
-		*ptr = mrs_bound_pointer(*ptr, size);
+		*ptr = mrs_bound_pointer(*ptr, size_aligned);
 
 	return (ret);
 }
@@ -1662,19 +1752,21 @@ static int
 mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 {
 	mrs_init();
-
+	int size_aligned = __builtin_align_up(
+		    size,
+		    MALLOC_CACHELINE_ALIGNMENT);
 	if (!quarantining)
-		return (mrs_real_posix_memalign(ptr, alignment, size));
+		return (mrs_real_posix_memalign(ptr, alignment, size_aligned));
 
 	mrs_debug_printf("mrs_posix_memalign: called ptr %p alignment %zu size %zu\n",
-	    ptr, alignment, size);
+	    ptr, alignment, size_aligned);
 
 	check_and_perform_flush(false);
 
 	if (alignment < MALLOC_CACHELINE_ALIGNMENT)
 		alignment = MALLOC_CACHELINE_ALIGNMENT;
 
-	int ret = mrs_real_posix_memalign(ptr, alignment, size);
+	int ret = mrs_real_posix_memalign(ptr, alignment, size_aligned);
 	
 	if (ret != 0) {
 
@@ -1687,7 +1779,7 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 
 	increment_allocated_size(*ptr);
 
-	MRS_UTRACE(UTRACE_MRS_POSIX_MEMALIGN, NULL, size, alignment, *ptr);
+	MRS_UTRACE(UTRACE_MRS_POSIX_MEMALIGN, NULL, size_aligned, alignment, *ptr);
 
 	return (ret);
 }
@@ -1703,24 +1795,32 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 {
 	mrs_init();
 
+	int size_aligned = __builtin_align_up(
+		    size,
+		    MALLOC_CACHELINE_ALIGNMENT);
 	if (!quarantining)
-		return (mrs_real_aligned_alloc(alignment, size));
+		return (mrs_real_aligned_alloc(alignment, size_aligned));
 
 	mrs_debug_printf("mrs_aligned_alloc: called alignment %zu size %zu\n",
-	    alignment, size);
-
+	    alignment, size_aligned);
 	check_and_perform_flush(false);
 
 	if (alignment < MALLOC_CACHELINE_ALIGNMENT)
 		alignment = MALLOC_CACHELINE_ALIGNMENT;
 
-	void *allocated_region = mrs_real_aligned_alloc(alignment, size);
+	void *allocated_region = mrs_real_aligned_alloc(alignment, size_aligned);
 	if (allocated_region == NULL) {
-		MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
+		MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size_aligned, alignment,
 		    allocated_region);
 		return (allocated_region);
 	}
-
+#ifdef ZERO_POISON_ON_ALLOC
+	if(zeroing){
+		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
+			dczero((char*)(allocated_region+i));
+		}
+	}
+#endif 
 #ifdef CLEAR_ON_ALLOC
 	clear_region(allocated_region, cheri_getlen(allocated_region));
 #endif /* CLEAR_ON_ALLOC */
@@ -1729,11 +1829,21 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 
 	MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 	    allocated_region);
-	csetpver((char *) allocated_region,0);
-	if(zeroing){
-		for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
-			dczero((char*)(allocated_region+i));
-	}
+	
+	//int pver = cgetpver((char *)allocated_region);
+	//if (pver <254){
+	//	csetpver((char *)allocated_region, pver+1);
+	//}
+	//else{
+	//	for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
+	//		dczero((char*)(allocated_region+i));
+	//	}
+	//	printf("zero poison on mrs_aligned_alloc\n");
+	//	csetpver((char *)allocated_region, 1);
+	//}
+	//}
+	if(trapping)
+		allocated_region = cclearpoisonperm(allocated_region); 
 	return (allocated_region);
 }
 
@@ -1753,16 +1863,15 @@ static void *
 mrs_realloc(void *ptr, size_t size)
 {
 	mrs_init();
-
+	int size_aligned = __builtin_align_up(
+		    size,
+		    MALLOC_CACHELINE_ALIGNMENT);
 	if (!quarantining)
-		return (mrs_real_realloc(ptr, size));
+		return (mrs_real_realloc(ptr, size_aligned));
 
 	size_t old_size = cheri_getlen(ptr);
 	mrs_debug_printf("mrs_realloc: called ptr %p ptr size %zu new size %zu\n",
-	    ptr, old_size, size);
-	size = __builtin_align_up(
-		    size,
-		    MALLOC_CACHELINE_ALIGNMENT);
+	    ptr, old_size, size_aligned);
 	/*
 	 * If the new size fits in the current allocation and we won't
 	 * be wasting too much space, just return the existing pointer.
@@ -1774,25 +1883,44 @@ mrs_realloc(void *ptr, size_t size)
 	 * power-of-two buckets by 1K) and we especially want to avoid
 	 * copying such cases.
 	 */
+
 	if (ptr != NULL && cheri_gettag(ptr) && cheri_getoffset(ptr) == 0 &&
-	    size <= old_size && old_size - size <= (old_size >> 1))
+	    size_aligned <= old_size && old_size - size_aligned <= (old_size >> 1))
 		return (ptr);
 	
-	void *new_alloc = mrs_malloc(size);
-	csetpver((char *) new_alloc,0);
-	if(zeroing){
-		for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
-			dczero((char*)(new_alloc+i));
-	}
+	void *new_alloc = mrs_malloc(size_aligned);
 	/*
 	 * Per the C standard, copy and free IFF the old pointer is valid
 	 * and allocation succeeds.
 	 */
+
 	if (ptr != NULL && new_alloc != NULL) {
-		memcpy(new_alloc, ptr, size < old_size ? size : old_size);
+				
+		memcpy(new_alloc, ptr, size_aligned < old_size ? size_aligned : old_size);
 		mrs_free(ptr);
 	}
-	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size, 0, new_alloc);
+	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size_aligned, 0, new_alloc);
+	
+	//int pver = cgetpver((char *)new_alloc);
+	//if (pver <254){
+	//	csetpver((char *)new_alloc, pver+1);
+	//}
+	//else{
+	//	for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
+	//		dczero((char*)(new_alloc+i));
+	//	}
+	//	printf("zero poison on mrs_realloc\n");
+	//	csetpver((char *)new_alloc, 1);
+	//}
+#ifdef ZERO_POISON_ON_ALLOC
+	if(zeroing){
+		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT)
+			dczero((char*)(new_alloc+i));	
+	}
+#endif 
+
+	if(trapping)
+		new_alloc = cclearpoisonperm(new_alloc);
 	return (new_alloc);
 }
 
@@ -1834,14 +1962,14 @@ mrs_free(void *ptr)
 	bzero(cheri_setoffset(ptr, 0), cheri_getlen(ptr));
 #endif
 	int size = cheri_getlen(ins);
-	mrs_lock(&app_quarantine_lock);
 	if(poisoning){
 		if(size>= MALLOC_CACHELINE_ALIGNMENT){
 			for(size_t i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT){
-				cpoison((char*)(ptr+i));
+				cpoison(((char *) ptr) + i);
 			}
 		}
 	}
+	mrs_lock(&app_quarantine_lock);
 	quarantine_insert(app_quarantine, ins, size);
 	mrs_unlock(&app_quarantine_lock);
 
@@ -1861,27 +1989,45 @@ mrs_mallocx(size_t size, int flags)
 	void *ret;
 
 	mrs_init();
-
-	if (!quarantining)
-		return (mrs_real_mallocx(size, flags));
-	size = __builtin_align_up(
+	int size_aligned = __builtin_align_up(
 		    size,
 		    MALLOC_CACHELINE_ALIGNMENT);
+	if (!quarantining)
+		return (mrs_real_mallocx(size_aligned, flags));
 	if (align <= CAPREVOKE_BITMAP_ALIGNMENT)
-		ret = mrs_malloc(size);
-	else if (mrs_posix_memalign(&ret, size, align) != 0)
+		ret = mrs_malloc(size_aligned);
+	else if (mrs_posix_memalign(&ret, size_aligned, align) != 0)
 		ret = NULL;
-
+#ifdef ZERO_POISON_ON_ALLOC
+	if(zeroing){
+		if(size>= MALLOC_CACHELINE_ALIGNMENT){
+			if (ret != NULL) {
+				for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT)
+					dczero(((char *) ret) + i);	
+			}
+		}
+	}
+#endif 
 #ifndef CLEAR_ON_ALLOC
 	/* Clear if requested and we aren't clearing above. */
 	if (ret != NULL && (flags & MALLOCX_ZERO) != 0)
 		clear_region(ret, cheri_getlen(ret));
 #endif
-	csetpver((char *)ret, 0);
-	if(zeroing){
-		for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
-			dczero((char*)(ret+i));
-	}
+
+	
+	//int pver = cgetpver((char *)ret);
+	//if (pver <254){
+	//	csetpver((char *)ret, pver+1);
+	//}
+	//else{
+	//	for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT)
+	//		dczero((char*)(ret+i));
+	//	
+	//	printf("zero poison on mrs_mallocx\n");
+	//	csetpver((char *)ret, 1);
+	//}
+	if(trapping)
+		ret = cclearpoisonperm(ret);
 	return (ret);
 }
 
@@ -1898,14 +2044,16 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 	size_t old_size;
 
 	mrs_init();
-
+	int size_aligned = __builtin_align_up(
+	    size,
+	    MALLOC_CACHELINE_ALIGNMENT);
 	if (!quarantining)
-		return (mrs_real_rallocx(ptr, size, flags));
+		return (mrs_real_rallocx(ptr, size_aligned, flags));
 
 	old_size = cheri_getlen(ptr);
 
 	mrs_debug_printf("%s: called ptr %p ptr size %zu new size %zu\n",
-	    __func__, ptr, old_size, size);
+	    __func__, ptr, old_size, size_aligned);
 
 	/*
 	 * Allocate an appropriately-aligned, potentially-zeroed space.
@@ -1913,17 +2061,17 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 	 * this isn't a widly used API so just waste a little memory
 	 * bandwidth to make things similar.
 	 */
-	new_alloc = mrs_mallocx(size, flags);
+	new_alloc = mrs_mallocx(size_aligned, flags);
 
 	/*
 	 * Per the C standard, copy and free IFF the old pointer is valid
 	 * and allocation succeeds.
 	 */
 	if (ptr != NULL && new_alloc != NULL) {
-		memcpy(new_alloc, ptr, size < old_size ? size : old_size);
+		memcpy(new_alloc, ptr, size_aligned < old_size ? size_aligned : old_size);
 		mrs_free(ptr);
 	}
-	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size, 0, new_alloc);
+	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size_aligned, 0, new_alloc);
 	return (new_alloc);
 }
 
