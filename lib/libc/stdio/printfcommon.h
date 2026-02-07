@@ -64,6 +64,10 @@
 #include "floatio.h"
 #include "gdtoa.h"
 
+#if __has_feature(capabilities)
+#include <cheri/cherireg.h>
+#endif
+
 #define	DEFPREC		6
 
 static int exponent(CHAR *, int, CHAR);
@@ -412,6 +416,10 @@ __cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
 
 	/* permissions */
 	ujval = cheri_perms_get(pointer);
+#ifdef HAS_CHERI_PERM_LOAD_MUTABLE
+	if (ujval & CHERI_PERM_LOAD_MUTABLE)
+		*--cp = 'l';
+#endif
 #ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	if (ujval & CHERI_PERM_STORE_CAP)
 		*--cp = 'W';
@@ -421,10 +429,6 @@ __cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
 #ifdef HAS_CHERI_PERM_CAP
 	if (ujval & CHERI_PERM_CAP)
 		*--cp = 'C';
-#endif
-#ifdef HAS_CHERI_PERM_LOAD_MUTABLE
-	if (ujval & CHERI_PERM_LOAD_MUTABLE)
-		*--cp = 'l';
 #endif
 	if (ujval & CHERI_PERM_EXECUTE)
 		*--cp = 'x';

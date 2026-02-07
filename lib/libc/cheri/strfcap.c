@@ -220,13 +220,13 @@ more_spec:
 			if (cheri_perms_get(cap) & CHERI_PERM_STORE_CAP)
 				OUT("W");
 #endif
-#ifdef HAS_CHERI_PERM_LOAD_MUTABLE
-			if (cheri_getperm(cap) & CHERI_PERM_LOAD_MUTABLE)
-				OUT("l");
-#endif
 #ifdef HAS_CHERI_PERM_CAP
 			if (cheri_perms_get(cap) & CHERI_PERM_CAP)
 				OUT("C");
+#endif
+#ifdef HAS_CHERI_PERM_LOAD_MUTABLE
+			if (cheri_getperm(cap) & CHERI_PERM_LOAD_MUTABLE)
+				OUT("l");
 #endif
 #ifdef HAS_CHERI_PERM_EXECUTIVE
 			if (cheri_perms_get(cap) & CHERI_PERM_EXECUTIVE)
