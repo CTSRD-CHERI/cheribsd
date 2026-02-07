@@ -308,10 +308,10 @@ vmmpmap_enter(vm_offset_t va, vm_size_t size, vm_paddr_t pa, vm_prot_t prot)
 		l3e |= ATTR_S1_AP(ATTR_S1_AP_RO);
 	}
 #if __has_feature(capabilities)
-	if ((prot & VM_PROT_READ_CAP) != 0) {
+	if (VM_PROT_HAS_READ_CAP(prot)) {
 		l3e |= ATTR_LC_ENABLED;
 	}
-	if ((prot & VM_PROT_WRITE_CAP) != 0) {
+	if (VM_PROT_HAS_WRITE_CAP(prot)) {
 		l3e |= ATTR_SC;
 	}
 #endif

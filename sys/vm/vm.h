@@ -90,7 +90,12 @@ typedef u_char vm_prot_t;	/* protection codes */
 #define	VM_PROT_RW_CAP		(VM_PROT_RW|VM_PROT_CAP)
 #define	VM_PROT_ALL		(VM_PROT_RWX|VM_PROT_CAP|VM_PROT_NO_IMPLY_CAP)
 
-#define	VM_PROT_ADD_CAP(prot)	 __extension__ ({			\
+#define	VM_PROT_HAS_READ_CAP(prot)                                      \
+  (((prot) & (VM_PROT_READ_CAP)) != 0)
+#define	VM_PROT_HAS_WRITE_CAP(prot)                                     \
+  (((prot) & (VM_PROT_WRITE_CAP)) != 0)
+
+#define	VM_PROT_ADD_CAP(prot)    __extension__ ({			\
 	vm_prot_t cp, p;						\
 									\
 	cp = p = (prot);						\

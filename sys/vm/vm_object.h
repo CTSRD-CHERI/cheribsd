@@ -229,7 +229,7 @@ struct vm_object {
  * capabilities.
  */
 #define	VM_OBJECT_ASSERT_CAP(object, prot)				\
-	KASSERT(((prot) & VM_PROT_WRITE_CAP) == 0 ||			\
+	    KASSERT(!VM_PROT_HAS_WRITE_CAP(prot) ||			\
 	    ((object)->flags & OBJ_HASCAP) != 0,			\
 	    ("%s: enabling WRITE_CAP on object %p without HASCAP",	\
 	    __func__, (object)))

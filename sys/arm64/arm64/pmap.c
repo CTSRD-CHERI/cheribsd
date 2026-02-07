@@ -900,7 +900,7 @@ pmap_pte_memattr(pmap_t pmap, vm_memattr_t memattr)
 static inline uint64_t
 pmap_pte_cr(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 {
-	if (prot & VM_PROT_READ_CAP) {
+	if (VM_PROT_HAS_READ_CAP(prot)) {
 #ifdef CHERI_CAPREVOKE
 		if ((va < VM_MAX_USER_ADDRESS) &&
 		    (pmap->pm_stage == PM_STAGE1)) {
@@ -948,7 +948,7 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 	val |= pmap_pte_cr(pmap, va, prot);
 
 	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
-	if ((prot & VM_PROT_WRITE_CAP) != 0) {
+	if (VM_PROT_HAS_WRITE_CAP(prot)) {
 		KASSERT((vm_page_astate_load(m).flags & PGA_CAPSTORE) != 0,
 		    ("%s: page %p does not have CAPSTORE set", __func__, m));
 

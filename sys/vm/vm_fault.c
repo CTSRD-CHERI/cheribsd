@@ -514,7 +514,7 @@ vm_fault_soft_fast(struct faultstate *fs)
 			if ((fs->first_object->flags & OBJ_UNMANAGED) == 0)
 				flags |= PS_ALL_DIRTY;
 		}
-		if ((fs->prot & VM_PROT_WRITE_CAP) != 0) {
+		if (VM_PROT_HAS_WRITE_CAP(fs->prot)) {
 			/*
 			 * Similarly, if we're permitting capability stores,
 			 * require all pages to be tracked by the revoker
@@ -568,8 +568,7 @@ vm_fault_soft_fast(struct faultstate *fs)
 	 *
 	 * Importantly, realprot is exempt from vm_page_mask_cap_prot()!
 	 */
-	if ((realprot & (VM_PROT_WRITE | VM_PROT_WRITE_CAP)) ==
-	    (VM_PROT_WRITE | VM_PROT_WRITE_CAP))
+	if (VM_PROT_HAS_WRITE_CAP(realprot))
 		vm_page_aflag_set(m_map, PGA_CAPSTORE);
 
 	if ((fs->fault_flags & VM_FAULT_NOPMAP) == 0 &&
@@ -739,7 +738,7 @@ vm_fault_populate(struct faultstate *fs)
 		KASSERT((VM_PAGE_TO_PHYS(m) & (pagesizes[bdry_idx] - 1)) == 0,
 		    ("unaligned superpage m %p %#jx", m,
 		    (uintmax_t)VM_PAGE_TO_PHYS(m)));
-		if (fs->prot & VM_PROT_WRITE_CAP)
+		if (VM_PROT_HAS_WRITE_CAP(fs->prot))
 			vm_page_aflag_set(m, PGA_CAPSTORE);
 		if (fs->fault_flags & VM_FAULT_NOPMAP) {
 			rv = KERN_SUCCESS;
@@ -802,7 +801,7 @@ skip_pmap_bdry:
 		npages = atop(pagesizes[psind]);
 		for (i = 0; i < npages; i++) {
 			vm_fault_populate_check_page(&m[i]);
-			if (prot & VM_PROT_WRITE_CAP)
+			if (VM_PROT_HAS_WRITE_CAP(prot))
 				vm_page_aflag_set(&m[i], PGA_CAPSTORE);
 			vm_fault_dirty(fs, &m[i]);
 
@@ -965,9 +964,9 @@ vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 			*ucode = BUS_OBJERR;
 			break;
 		case KERN_PROTECTION_FAILURE:
-			if ((fault_type & VM_PROT_WRITE_CAP) != 0)
+			if (VM_PROT_HAS_WRITE_CAP(fault_type))
 				segv_ucode = SEGV_STORETAG;
-			else if ((fault_type & VM_PROT_READ_CAP) != 0)
+			else if (VM_PROT_HAS_READ_CAP(fault_type))
 				segv_ucode = SEGV_LOADTAG;
 			else
 				segv_ucode = SEGV_ACCERR;
@@ -1576,7 +1575,7 @@ vm_fault_allocate(struct faultstate *fs)
 	}
 	fs->oom_started = false;
 
-	if (capstore_on_alloc && (fs->prot & VM_PROT_WRITE_CAP))
+	if (capstore_on_alloc && VM_PROT_HAS_WRITE_CAP(fs->prot))
 		vm_page_aflag_set(fs->m, PGA_CAPSTORE);
 
 	return (FAULT_CONTINUE);
