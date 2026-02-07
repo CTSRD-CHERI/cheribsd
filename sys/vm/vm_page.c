@@ -5976,17 +5976,16 @@ vm_page_assert_pga_capmeta_pmap_enter(vm_page_t m, vm_prot_t prot)
 {
 	vm_page_astate_t mas = vm_page_astate_load(m);
 
-	KASSERT((prot & VM_PROT_WRITE_CAP) == 0 ||
-	    (mas.flags & PGA_CAPSTORE) != 0,
-	    ("pmap inserting VM_PROT_WRITE_CAP w/o PGA_CAPSTORE m=%p", m));
+	KASSERT(!VM_PROT_HAS_WRITE_CAP(prot) || (mas.flags & PGA_CAPSTORE) != 0,
+	    ("pmap inserting VM_PROT_WRITE|VM_PROT_CAP w/o PGA_CAPSTORE m=%p",
+		m));
 
 	KASSERT((mas.flags & PGA_CAPDIRTY) == 0 ||
 	    (mas.flags & PGA_CAPSTORE) != 0,
 	    ("pmap inserting CAPDIRTY w/o CAPSTORE m=%p", m));
 
-	KASSERT((prot & VM_PROT_WRITE_CAP) == 0 ||
-	    (prot & VM_PROT_WRITE) != 0,
-	    ("pmap inserting VM_PROT_WRITE_CAP w/o VM_PROT_WRITE m=%p", m));
+	KASSERT((prot & VM_PROT_CAP) == 0 || (prot & VM_PROT_RW) != 0,
+	    ("pmap inserting VM_PROT_CAP w/o VM_PROT_RW m=%p", m));
 }
 #endif
 #endif

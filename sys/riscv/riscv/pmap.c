@@ -1215,9 +1215,9 @@ pmap_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 		if ((prot & VM_PROT_WRITE) != 0 && (l3 & PTE_W) == 0)
 			use = false;
 #if __has_feature(capabilities)
-		if ((prot & VM_PROT_READ_CAP) != 0 && (l3 & PTE_CR) == 0)
+		if (VM_PROT_HAS_READ_CAP(prot) && (l3 & PTE_CR) == 0)
 			use = false;
-		if ((prot & VM_PROT_WRITE_CAP) != 0 && (l3 & PTE_CW) == 0)
+		if (VM_PROT_HAS_WRITE_CAP(prot) && (l3 & PTE_CW) == 0)
 			use = false;
 #endif
 		if (use) {
@@ -2943,7 +2943,7 @@ pmap_fault(pmap_t pmap, vm_offset_t va, vm_prot_t ftype)
 	if ((pmap != kernel_pmap && (oldpte & PTE_U) == 0) ||
 	    ((ftype & VM_PROT_WRITE) != 0 && (oldpte & PTE_W) == 0) ||
 #if __has_feature(capabilities)
-	    ((ftype & VM_PROT_WRITE_CAP) != 0 && (oldpte & PTE_CW) == 0) ||
+	    (VM_PROT_HAS_WRITE_CAP(ftype) && (oldpte & PTE_CW) == 0) ||
 #endif
 	    (ftype == VM_PROT_EXECUTE && (oldpte & PTE_X) == 0) ||
 	    (ftype == VM_PROT_READ && (oldpte & PTE_R) == 0))
@@ -3295,7 +3295,7 @@ cheri_pte_cr(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 	 * See also pmap_caploadgen_test_all_clean.
 	 */
 
-	if (prot & VM_PROT_READ_CAP) {
+	if (VM_PROT_HAS_READ_CAP(prot)) {
 #ifdef CHERI_CAPREVOKE
 		if (va < VM_MAX_USER_ADDRESS) {
 			/* User pages' tags gated by CLG */

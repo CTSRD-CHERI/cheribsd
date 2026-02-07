@@ -6204,11 +6204,11 @@ vm_map_prot2perms(vm_prot_t prot)
 	if (prot & (VM_PROT_CAP | VM_PROT_NO_IMPLY_CAP)) {
 		if (prot & (VM_PROT_READ | VM_PROT_COPY))
 			perms |= CHERI_PROT2PERM_READ_PERMS;
-		if (prot & VM_PROT_READ_CAP)
+		if (VM_PROT_HAS_READ_CAP(prot))
 			perms |= CHERI_PROT2PERM_READ_CAP_PERMS;
 		if (prot & VM_PROT_WRITE)
 			perms |= CHERI_PROT2PERM_WRITE_PERMS;
-		if (prot & VM_PROT_WRITE_CAP)
+		if (VM_PROT_HAS_WRITE_CAP(prot))
 			perms |= CHERI_PROT2PERM_WRITE_CAP_PERMS;
 	} else {
 		if (prot & (VM_PROT_READ | VM_PROT_COPY))
