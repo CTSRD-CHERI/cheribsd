@@ -102,7 +102,7 @@ CHERIBSDTEST(store_local_disallowed,
 	*targetp = cap;
 
 #ifdef __riscv_zcheripurecap
-        CHERIBSDTEST_VERIFY(cheri_gettag(*targetp) == 0);
+        CHERIBSDTEST_VERIFY(cheri_tag_get(*targetp) == 0);
         cheribsdtest_success();
 #else
 	cheribsdtest_failure_errx(
