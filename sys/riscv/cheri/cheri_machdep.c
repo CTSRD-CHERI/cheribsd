@@ -53,6 +53,8 @@ cheri_init_capabilities(void * __capability kroot)
 {
 	void * __capability ctemp;
 
+        kroot = cheri_flags_set(kroot, CHERI_FLAGS_CAP_MODE);
+
 #ifdef HAS_CHERI_PERM_SEAL
 	ctemp = cheri_address_set(kroot, CHERI_SEALCAP_KERNEL_BASE);
 	ctemp = cheri_bounds_set(ctemp, CHERI_SEALCAP_KERNEL_LENGTH);
