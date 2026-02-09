@@ -910,7 +910,7 @@ free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 	 * malloc_type, not a capability to it.
 	 */
 	mtpp = (ptraddr_t *)roundup2(mtpp, sizeof(ptraddr_t));
-	if (cheri_length_get(mtpp) - cheri_offset_get(mtpp) >= sizeof(ptraddr_t))
+	if (cheri_bytes_remaining(mtpp) >= sizeof(ptraddr_t))
 		*mtpp = (ptraddr_t)mtp;
 #else
 	mtpp = (struct malloc_type **)rounddown2(mtpp, sizeof(struct malloc_type *));
