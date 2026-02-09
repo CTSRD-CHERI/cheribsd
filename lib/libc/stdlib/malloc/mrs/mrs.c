@@ -198,8 +198,7 @@ void mrs_sdallocx(void *, size_t, int);
 
 static inline void dczero(char * a){
   //asm volatile("dczero %0, 0(%1)": :"C"(a),"C"(a));
-  //asm volatile("cclearpoison %0, 0(%1)": :"C"(a),"C"(a));
-
+  asm volatile("cclearpoison %0, 0(%1)": :"C"(a),"C"(a));
 }
 
 static inline void cpoison(char * a){
@@ -1896,8 +1895,8 @@ mrs_realloc(void *ptr, size_t size)
 	 */
 
 	if (ptr != NULL && new_alloc != NULL) {
-				
-		memcpy(new_alloc, ptr, size_aligned < old_size ? size_aligned : old_size);
+		void *underlying_allocation = REAL(malloc_underlying_allocation)(ptr);	
+		memcpy(new_alloc, underlying_allocation, size_aligned < old_size ? size_aligned : old_size);
 		mrs_free(ptr);
 	}
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size_aligned, 0, new_alloc);
@@ -2071,7 +2070,8 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 	 * and allocation succeeds.
 	 */
 	if (ptr != NULL && new_alloc != NULL) {
-		memcpy(new_alloc, ptr, size_aligned < old_size ? size_aligned : old_size);
+		void *underlying_allocation = REAL(malloc_underlying_allocation)(ptr);	
+		memcpy(new_alloc, underlying_allocation, size_aligned < old_size ? size_aligned : old_size);
 		mrs_free(ptr);
 	}
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size_aligned, 0, new_alloc);
