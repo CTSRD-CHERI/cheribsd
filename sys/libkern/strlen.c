@@ -108,7 +108,7 @@ size_t
 
 	/* Scan the rest of the string using word sized operation */
 #ifdef __CHERI_PURE_CAPABILITY__
-	for (; cheri_length_get(lp) - cheri_offset_get(lp) >= sizeof(long); lp++)
+	for (; cheri_bytes_remaining(lp) >= sizeof(long); lp++)
 #else
 	for (; ; lp++)
 #endif

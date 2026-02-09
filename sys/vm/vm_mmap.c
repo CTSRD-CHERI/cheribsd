@@ -372,7 +372,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	    cheri_address_get(source_cap) + cheri_length_get(source_cap))) {
 		SYSERRCAUSE("MAP_FIXED and too little space in "
 		    "capablity (0x%zx < 0x%zx)",
-		    cheri_length_get(source_cap) - cheri_offset_get(source_cap),
+		    cheri_bytes_remaining(source_cap),
 		    roundup2(uap->len, PAGE_SIZE));
 		return (EPROT);
 	}
