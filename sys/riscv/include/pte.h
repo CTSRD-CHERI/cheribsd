@@ -69,31 +69,36 @@ typedef	uint64_t	pn_t;			/* page number */
 #if __has_feature(capabilities)
 #ifdef __riscv_xcheri
 /* CHERI uses reserved bits in 55:63 */
-#define	PTE_CW		(1UL << 63) /* Capability Write */
-#define	PTE_CR		(1UL << 62) /* Capability Read */
-#define	PTE_CD		(1UL << 61) /* Capability Dirty */
+#define	PTE_YW		(1UL << 63) /* Capability Write */
+#define	PTE_YR		(1UL << 62) /* Capability Read */
+#define	PTE_YD		(1UL << 61) /* Capability Dirty */
 #define	PTE_CRM		(1UL << 60) /* Cap Read Modifier */
-#define	PTE_CRG		(1UL << 59) /* Cap Read Generation */
+#define	PTE_YRG		(1UL << 59) /* Cap Read Generation */
 
-#define	PTE_CR_CLEAR	0			/* clear tags on load */
-#define	PTE_CR_TRAP	PTE_CRM			/* trap on tag load */
-#define	PTE_CR_OK	PTE_CR			/* tags load OK */
-#define	PTE_CR_GEN	(PTE_CR | PTE_CRM)	/* tags gated by generation */
+#define	PTE_YR_CLEAR	0			/* clear tags on load */
+#define	PTE_YR_OK	PTE_YR			/* tags load OK */
+#define	PTE_YR_GEN	(PTE_YR | PTE_CRM)	/* tags gated by generation */
 
-#define	PTE_KERN_CHERI	(PTE_CR | PTE_CW | PTE_CD)
-#define	PTE_PROMOTE_CHERI (PTE_CR | PTE_CW | PTE_CD | PTE_CRM | PTE_CRG)
+#define	PTE_YR_MASK	(PTE_YR | PTE_CRM)
+#define	PTE_YW_MASK	(PTE_YW | PTE_YD)
+#define	PTE_PROMOTE_CHERI (PTE_YR | PTE_YRG | PTE_CRM | PTE_YW_MASK)
 #else /* !defined(__riscv_xcheri) */
-#define	PTE_CW		(1UL << 60) /* Capability Read/Write */
-#define	PTE_CRG		(1UL << 59) /* Cap Read Generation */
-#define	PTE_CHERI_MASK	(PTE_CW | PTE_CRG)
+#define	PTE_YD		(1UL << 58) /* Capability Dirty */
+#define	PTE_YW		(1UL << 57) /* Capability Write */
+#define	PTE_YRG		(1UL << 56) /* Cap Read Generation */
+#define	PTE_YR		(1UL << 55) /* Capability Read */
 
-#define	PTE_CR_CLEAR	0
-#define	PTE_CR_OK	PTE_CW
-#define	PTE_CR_GEN	PTE_CW
+#define	PTE_CHERI_MASK	(PTE_YW | PTE_CRG)
 
-#define	PTE_KERN_CHERI	PTE_CW
-#define	PTE_PROMOTE_CHERI (PTE_CW | PTE_CRG)
+#define	PTE_YR_CLEAR	0			/* clear tags on load */
+#define	PTE_YR_OK	PTE_YRG			/* tags load OK */
+#define	PTE_YR_GEN	PTE_YR			/* tags gated by generation */
+
+#define	PTE_YR_MASK	(PTE_YR | PTE_YRG)
+#define	PTE_YW_MASK	(PTE_YW | PTE_YD)
+#define	PTE_PROMOTE_CHERI (PTE_YR | PTE_YRG | PTE_YW_MASK)
 #endif  /* !defined(__riscv_xcheri) */
+#define	PTE_KERN_CHERI	(PTE_YR_OK | PTE_YW | PTE_YD)
 #else
 #define	PTE_KERN_CHERI	0
 #define	PTE_PROMOTE_CHERI 0

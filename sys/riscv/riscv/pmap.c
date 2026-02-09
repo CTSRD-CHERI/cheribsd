@@ -220,8 +220,8 @@
 #define	VM_PAGE_TO_PV_LIST_LOCK(m)	\
 			PHYS_TO_PV_LIST_LOCK(VM_PAGE_TO_PHYS(m))
 
-#if __has_feature(capabilities) && defined(__riscv_xcheri)
-#define	PTE_DIRTY_BITS	(PTE_D | PTE_CD)
+#if __has_feature(capabilities)
+#define	PTE_DIRTY_BITS	(PTE_D | PTE_YD)
 #else
 #define	PTE_DIRTY_BITS	(PTE_D)
 #endif
@@ -1215,16 +1215,10 @@ pmap_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 		if ((prot & VM_PROT_WRITE) != 0 && (l3 & PTE_W) == 0)
 			use = false;
 #if __has_feature(capabilities)
-#if defined(__riscv_xcheri)
-		if ((prot & VM_PROT_READ_CAP) != 0 && (l3 & PTE_CR) == 0)
+		if ((prot & VM_PROT_READ_CAP) != 0 && (l3 & PTE_YR) == 0)
 			use = false;
-		if ((prot & VM_PROT_WRITE_CAP) != 0 && (l3 & PTE_CW) == 0)
+		if ((prot & VM_PROT_WRITE_CAP) != 0 && (l3 & PTE_YW) == 0)
 			use = false;
-#elif defined(__riscv_zcheripurecap)
-		if ((prot & (VM_PROT_READ_CAP | VM_PROT_WRITE_CAP)) != 0 &&
-		    (l3 & PTE_CW) == 0)
-			use = false;
-#endif
 #endif
 		if (use) {
 			m = PTE_TO_VM_PAGE(l3);
@@ -2509,14 +2503,14 @@ pmap_page_dirty(pt_entry_t entry, vm_page_t m)
 #if __has_feature(capabilities)
 	/*
 	 * In its quest to avoid TLB shootdowns, the revoker sweep can create
-	 * CD-clear CW-set PTEs that nevertheless have CD-set TLBEs fronting
-	 * them.  Therefore, we must consider PTE_CW alone grounds for being
-	 * capability dirty when we remove a PTE.  (PTE_CD can be set only when
-	 * PTE_CW is also set, so we ignore it here.)
+	 * YD-clear YW-set PTEs that nevertheless have YD-set TLBEs fronting
+	 * them.  Therefore, we must consider PTE_YW alone grounds for being
+	 * capability dirty when we remove a PTE.  (PTE_YD can be set only when
+	 * PTE_YW is also set, so we ignore it here.)
 	 *
 	 * TODO This is pretty heavy-handed.  Can we do better?
 	 */
-	if ((entry & PTE_CW) != 0)
+	if ((entry & PTE_YW) != 0)
 		vm_page_capdirty(m);
 #endif
 }
@@ -2949,7 +2943,7 @@ pmap_fault(pmap_t pmap, vm_offset_t va, vm_prot_t ftype)
 	if ((pmap != kernel_pmap && (oldpte & PTE_U) == 0) ||
 	    ((ftype & VM_PROT_WRITE) != 0 && (oldpte & PTE_W) == 0) ||
 #if __has_feature(capabilities)
-	    ((ftype & VM_PROT_WRITE_CAP) != 0 && (oldpte & PTE_CW) == 0) ||
+	    ((ftype & VM_PROT_WRITE_CAP) != 0 && (oldpte & PTE_YW) == 0) ||
 #endif
 	    (ftype == VM_PROT_EXECUTE && (oldpte & PTE_X) == 0) ||
 	    (ftype == VM_PROT_READ && (oldpte & PTE_R) == 0))
@@ -2959,9 +2953,9 @@ pmap_fault(pmap_t pmap, vm_offset_t va, vm_prot_t ftype)
 	if ((ftype & VM_PROT_WRITE) != 0)
 		bits |= PTE_D;
 
-#if __has_feature(capabilities) && defined(__riscv_xcheri)
+#if __has_feature(capabilities)
 	if ((ftype & VM_PROT_WRITE_CAP) != 0)
-		bits |= PTE_CD;
+		bits |= PTE_YD;
 #endif
 
 	/*
@@ -3180,22 +3174,16 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va, vm_page_t ml3,
 	}
 
 #if __has_feature(capabilities)
-#ifdef __riscv_xcheri
-	/*
-	 * XXX-AM: No special promotion logic for Zcheri.
-	 * We do not use dirty tracking for now, so we never have state transitions
-	 * outside CRG updates.
-	 */
-	if ((firstl3e & (PTE_CW | PTE_CD)) == PTE_CW) {
+	if ((firstl3e & (PTE_YW | PTE_YD)) == PTE_YW) {
 		/*
-		 * Prohibit superpages involving CW-set CD-clear PTEs.  The
+		 * Prohibit superpages involving YW-set YD-clear PTEs.  The
 		 * revoker creates these without TLB shootdown, and so there
 		 * may be a CAP-DIRTY TLBE still in the system.  Thankfully,
-		 * these are ephemera: either they'll transition to CD-set
-		 * or CW-clear in the next revocation epoch.
+		 * these are ephemera: either they'll transition to YD-set
+		 * or YW-clear in the next revocation epoch.
 		 *
-		 * We need only explicitly exclude this on firstl3e, as CW and
-		 * CD are both in the PTE_PROMOTE mask used to test equivalence
+		 * We need only explicitly exclude this on firstl3e, as YW and
+		 * YD are both in the PTE_PROMOTE mask used to test equivalence
 		 * below.
 		 */
 		CTR2(KTR_PMAP, "pmap_promote_l2: fail CW for va %#lx pmap %p",
@@ -3203,7 +3191,6 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va, vm_page_t ml3,
 		atomic_add_long(&pmap_l2_p_failures, 1);
 		return (false);
 	}
-#endif
 #endif
 
 	/*
@@ -3300,28 +3287,29 @@ cheri_pte_cr(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 	/*
 	 * XXX NWF
 	 *
-	 * We'd like to take m having clear PGA_CAPSTORE as grounds to set
-	 * PTE_CR_TRAP, but we don't promise data dependence (well, tag
-	 * dependence) of capload faults, and there's no great way to let just
-	 * the one operation through, and trap-and-emulate is slow anyway.  For
-	 * the moment, just leave it be, but this merits more investigation.
+	 * We'd like to take m having clear PGA_CAPSTORE as grounds to
+	 * trap on all capability loads (PTE_CRM=1 PTE_YR=0 on Xcheri only),
+	 * but we don't promise data dependence (well, tag dependence) of capload
+	 * faults, and there's no great way to let just the one operation through,
+	 * and trap-and-emulate is slow anyway.
+	 * For the moment, just leave it be, but this merits more investigation.
 	 * See also pmap_caploadgen_test_all_clean.
 	 */
 
 	if (prot & VM_PROT_READ_CAP) {
 #ifdef CHERI_CAPREVOKE
 		if (va < VM_MAX_USER_ADDRESS) {
-			/* User pages' tags gated by CLG */
-			return PTE_CR_GEN | (pmap->flags.uclg ? PTE_CRG : 0);
+			/* User pages' tags gated by YRG */
+			return PTE_YR_GEN | (pmap->flags.uclg ? PTE_YRG : 0);
 		} else {
 			/* Kernel mappings' tags always load OK */
-			return PTE_CR_OK;
+			return PTE_YR_OK;
 		}
 #else
-		return PTE_CR_OK;
+		return PTE_YR_OK;
 #endif
 	} else {
-		return PTE_CR_CLEAR;
+		return PTE_YR_CLEAR;
 	}
 }
 #endif
@@ -3371,15 +3359,9 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 		new_l3 |= PTE_U;
 #if __has_feature(capabilities)
 	if (prot & VM_PROT_WRITE_CAP)
-		new_l3 |= PTE_CW;
-#ifdef __riscv_zcheripurecap
-	if (prot & VM_PROT_READ_CAP)
-		new_l3 |= PTE_CW;
-#endif
-#ifdef __riscv_xcheri
+		new_l3 |= PTE_YW;
 	if (flags & VM_PROT_WRITE_CAP)
-		new_l3 |= PTE_CD;
-#endif
+		new_l3 |= PTE_YD;
 	new_l3 |= cheri_pte_cr(pmap, va, m, prot);
 #endif
 
@@ -3396,15 +3378,17 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if ((m->oflags & VPO_UNMANAGED) != 0) {
 		if (prot & VM_PROT_WRITE)
 			new_l3 |= PTE_D;
-#if __has_feature(capabilities) && defined(__riscv_xcheri)
-		// XXX-AM: Is this redundant? PTE_CD is set unconditionally above.
+#if __has_feature(capabilities)
+		// XXX-AM: Is this redundant? PTE_YD is set unconditionally above.
 		if (prot & VM_PROT_WRITE_CAP)
-			new_l3 |= PTE_CD;
+			new_l3 |= PTE_YD;
 #endif
 	} else
 		new_l3 |= PTE_SW_MANAGED;
 
 	CTR2(KTR_PMAP, "pmap_enter: %.16lx -> %.16lx", va, pa);
+	CTR2(KTR_CAPREVOKE, "pmap_enter: %.16lx -> Y=%#lx",
+	    va, new_l3 & PTE_PROMOTE_CHERI);
 
 	lock = NULL;
 	mpte = NULL;
@@ -4093,7 +4077,7 @@ restart:
 		PMAP_UNLOCK(pmap);
 
 		KASSERT(l3e & PTE_V, ("!PTE_V on pv_list?"));
-		if (l3e & PTE_CW) {
+		if (l3e & PTE_YW) {
 			rv = false;
 			goto out;
 		}
@@ -4117,7 +4101,7 @@ restart:
 		l2e = pmap_load(pmap_l2(pmap, pv->pv_va));
 		PMAP_UNLOCK(pmap);
 
-		if (l2e & PTE_CW) {
+		if (l2e & PTE_YW) {
 			rv = false;
 			goto out;
 		}
@@ -4144,25 +4128,24 @@ static inline void
 pmap_caploadgen_update_crg(pmap_t pmap, pt_entry_t *pte)
 {
 	if (pmap->flags.uclg) {
-		pmap_store_bits(pte, PTE_CRG);
+		pmap_store_bits(pte, PTE_YRG);
 	} else {
-		pmap_clear_bits(pte, PTE_CRG);
+		pmap_clear_bits(pte, PTE_YRG);
 	}
 }
 
-#ifdef __riscv_xcheri
 static inline void
 pmap_caploadgen_update_clear_cw(pt_entry_t *pte, pt_entry_t oldpte)
 {
 	/*
 	 * We don't do a TLB shootdown here because we're guaranteed that any
-	 * TLB caching a PTE_CW-but-not-PTE_CD entry will attempt a CAS, and
-	 * not just a blind AMO OR, to set PTE_CD.  The barrier at the start of
-	 * a revocation epoch ensures that no TLB can have a PTE_CW-and-PTE_CD
+	 * TLB caching a PTE_YW-but-not-PTE_YD entry will attempt a CAS, and
+	 * not just a blind AMO OR, to set PTE_YD.  The barrier at the start of
+	 * a revocation epoch ensures that no TLB can have a PTE_YW-and-PTE_YD
 	 * entry for this mapping if we've gotten here.
 	 *
 	 * On the other hand, we do have to do this as a CAS, to ensure that we
-	 * don't end up with PTE_CD set (by a racing PTW) and no PTE_CW.
+	 * don't end up with PTE_YD set (by a racing PTW) and no PTE_YW.
 	 * Spurious failures are fine, so we can use fcmpset here.
 	 *
 	 * TODO: Should we mark the page as cap-load-faulting as a debugging
@@ -4172,18 +4155,17 @@ pmap_caploadgen_update_clear_cw(pt_entry_t *pte, pt_entry_t oldpte)
 	 */
 	pt_entry_t exppte = oldpte;
 
-	if (!pmap_fcmpset(pte, &exppte, exppte & ~PTE_CW)) {
+	if (!pmap_fcmpset(pte, &exppte, exppte & ~PTE_YW)) {
 		/*
 		 * Failure must have preserved all non-PTW-updatable bits;
-		 * notably, PTE_CW must remain set.
+		 * notably, PTE_YW must remain set.
 		 */
-		KASSERT((exppte & ~(PTE_CD|PTE_D|PTE_A)) ==
-		    (oldpte & ~(PTE_CD|PTE_D|PTE_A)),
+		KASSERT((exppte & ~(PTE_YD|PTE_D|PTE_A)) ==
+		    (oldpte & ~(PTE_YD|PTE_D|PTE_A)),
 		    ("pmap_caploadgen_update_clear_cw botch"));
 	}
 
 }
-#endif
 
 static inline bool
 pmap_caploadgen_get_ucrg(void)
@@ -4191,7 +4173,7 @@ pmap_caploadgen_get_ucrg(void)
 #ifdef __riscv_xcheri
 	return ((csr_read(sccsr) & SCCSR_UGCLG) != 0);
 #else
-	return ((csr_read(sstatus) & SSTATUS_UCRG) != 0);
+	return ((csr_read(sstatus) & SSTATUS_UYRG) != 0);
 #endif
 }
 
@@ -4200,6 +4182,9 @@ pmap_caploadgen_get_ucrg(void)
 #ifdef __riscv_xcheri
 #error "TWOSTAGE_CLEAN revoker requires Zcheri"
 #endif
+
+/* This is broken and should be reimplemented after pmap interface cleanup.*/
+#error "CHERI_CAPREVOKE_TWOSTAGE_CLEAN is temporarily broken"
 
 /*
  * The two-stage clean revoker attempts to transition pages from
@@ -4509,11 +4494,6 @@ out_cleaning:
 }
 
 #else /* !defined(CHERI_CAPREVOKE_TWOSTAGE_CLEAN) */
-
-#if !defined(__riscv_xcheri) && !defined(CHERI_CAPREVOKE_NO_CLEAN)
-#error "Zcheri requires CHERI_CAPREVOKE_NO_CLEAN or CHERI_CAPREVOKE_TWOSTAGE_CLEAN"
-#endif
-
 enum pmap_caploadgen_res
 pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 {
@@ -4565,11 +4545,11 @@ retry:
 		goto out;
 	}
 
+	switch (oldpte & PTE_YR_MASK) {
+	case PTE_YR_CLEAR:	/* tag clearing */
 #ifdef __riscv_xcheri
-	switch (oldpte & (PTE_CR | PTE_CRM)) {
-	case 0:		/* tag clearing */
-	case PTE_CRM:	/* always trapping; not something we can fix? */
-
+	case PTE_CRM:		/* always trapping; not something we can fix? */
+#endif
 		/*
 		 * TODO This seems wrong.  I guess the good news is that we
 		 * probably don't hit these cases often, but when we do it's
@@ -4582,21 +4562,13 @@ retry:
 		m = NULL;
 		res = PMAP_CAPLOADGEN_UNABLE;
 		goto out;
-	case PTE_CR:	/* always allowed; not for us to worry about? */
-		panic("Unexpected PTE @ CR !CRM; revocation not optional yet");
-	case PTE_CR | PTE_CRM: /* ah, here we go */
+	case PTE_YR_OK:		/* always allowed; not for us to worry about? */
+		panic("Unexpected PTE @ YR_OK; revocation not optional yet");
+	case PTE_YR_GEN:	/* ah, here we go */
 		break;
 	}
-#else
-	if ((oldpte & (PTE_CW | PTE_CRG)) == 0) {
-		/* CAP-NEVER, always trapping */
-		m = NULL;
-		res = PMAP_CAPLOADGEN_UNABLE;
-		goto out;
-	}
-#endif
 
-	if (!(oldpte & PTE_CRG) == !(pmap->flags.uclg)) {
+	if (!(oldpte & PTE_YRG) == !(pmap->flags.uclg)) {
 		/* Page already scanned, just fence (maybe redundantly) */
 		if (flags & PMAP_CAPLOADGEN_UPDATETLB)
 			sfence_vma_page(va);
@@ -4606,7 +4578,7 @@ retry:
 		goto out;
 	}
 
-	KASSERT(oldpte & PTE_U, ("!PTE_U w/ CLG mismatch va=%lx", va));
+	KASSERT(oldpte & PTE_U, ("!PTE_U w/ YRG mismatch va=%lx", va));
 
 	m = PHYS_TO_VM_PAGE(PTE_TO_PHYS(oldpte));
 	if (*mp == m) {
@@ -4617,18 +4589,13 @@ retry:
 		 */
 		res = PMAP_CAPLOADGEN_OK;
 
-                /*
-		 * XXX-AM: Zcheri doesn't ever transition to cap clean for now.
-		 * We also ignore dirty tracking, everything that is cap-permissive
-		 * is dirty.
-		 */
 #ifndef CHERI_CAPREVOKE_NO_CLEAN
 		if (!(flags & PMAP_CAPLOADGEN_HASCAPS)) {
 			/*
 			 * We didn't see a capability on this page; step this
 			 * PTE closer to being cap-clean.
 			 */
-			if (oldpte & PTE_CD) {
+			if (oldpte & PTE_YD) {
 				/*
 				 * CAP-DIRTY -> DIRTYABLE; we just do a store
 				 * here as there might be a capability store
@@ -4637,10 +4604,12 @@ retry:
 
 				 * scan the page again anyway.
 				 */
-				pmap_clear_bits(pte, PTE_CD);
-			} else if (oldpte & PTE_CW) {
+				pmap_clear_bits(pte, PTE_YD);
+				CTR1(KTR_CAPREVOKE, "pmap_update_yrg: va=%#lx YD=0\n", va);
+			} else if (oldpte & PTE_YW) {
 				/* PTE CAP-DIRTYABLE -> CAP-CLEAN? */
 				pmap_caploadgen_update_clear_cw(pte, oldpte);
+				CTR1(KTR_CAPREVOKE, "pmap_update_yrg: va=%#lx YW=0\n", va);
 			} else if (flags & PMAP_CAPLOADGEN_NONEWMAPS) {
 				/* No new mappings possible */
 				vm_page_astate_t mas = vm_page_astate_load(m);
@@ -4652,19 +4621,19 @@ retry:
 				    (mas.flags & PGA_CAPSTORE) == 0)) {
 					/*
 					 * We raced with another revoker, simply
-					 * update the LCLG and keep going.
+					 * update the YRG and keep going.
 					 */
 					;
 				} else {
 					/* PTE CAP-CLEAN; page -?> IDLE */
 
 					/*
-					 * The current PTE has neither CD
+					 * The current PTE has neither YD
 					 * nor CW asserted, from the tests
 					 * above, and TLBs can be wrong only
-					 * in the CLG... this update might
+					 * in the YRG... this update might
 					 * save us a spurious trap for
-					 * data-independent CLG faults.
+					 * data-independent YRG faults.
 					 */
 					if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
 						sfence_vma_page(va);
@@ -4672,6 +4641,7 @@ retry:
 					PMAP_UNLOCK(pmap);
 					rw_runlock(&pvh_global_lock);
 					pmap_caploadgen_test_all_clean(m);
+					CTR1(KTR_CAPREVOKE, "pmap_update_yrg: va=%#lx IDLE\n", va);
 					m = NULL;
 					goto out_unlocked;
 				}
@@ -4684,8 +4654,8 @@ retry:
 			 * We could clear PGA_CAPDIRTY here, too, but it
 			 * probably doesn't get set often ough to merit.
 			 */
-			if ((oldpte & PTE_CW) && !(oldpte & PTE_CD)) {
-				pmap_store_bits(pte, PTE_CD);
+			if ((oldpte & PTE_YW) && !(oldpte & PTE_YD)) {
+				pmap_store_bits(pte, PTE_YD);
 			}
 		}
 #endif /* !defined(CHERI_CAPREVOKE_NO_CLEAN) */
@@ -4699,15 +4669,16 @@ retry:
 		 */
 		pmap_caploadgen_update_crg(pmap, pte);
 
+		CTR2(KTR_CAPREVOKE, "pmap_update_yrg: va=%#lx YRG=%d\n",
+		    va, pmap->flags.uclg);
+
 		if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
 			sfence_vma_page(va);
 		}
 		m = NULL;
 	} else if (!(vm_page_astate_load(m).flags & PGA_CAPSTORE)) {
-		KASSERT(!(oldpte & PTE_CW), ("!PGA_CAPSTORE but CW?"));
-#ifdef __riscv_xcheri
-		KASSERT(!(oldpte & PTE_CD), ("!PGA_CAPSTORE but CD?"));
-#endif
+		KASSERT(!(oldpte & PTE_YW), ("!PGA_CAPSTORE but YW?"));
+		KASSERT(!(oldpte & PTE_YD), ("!PGA_CAPSTORE but YD?"));
 
 #if defined(INVARIANTS)
 #if defined(CHERI_CAPREVOKE_NO_CLEAN)
@@ -4836,14 +4807,14 @@ pmap_assert_consistent_clg(pmap_t pmap, vm_offset_t va)
 		tpte = l3e;
 	}
 
-	if ((tpte & PTE_CW) == 0)
+	if ((tpte & PTE_YW) == 0)
 		return;
-	if ((tpte & PTE_CRG) == 0) {
+	if ((tpte & PTE_YRG) == 0) {
 		KASSERT(pmap->flags.uclg == 0,
-		    ("PTR_CRG unset, but GCLG set (%#lx)", tpte));
+		    ("PTR_YRG unset, but UYRG set (%#lx)", tpte));
 	} else {
 		KASSERT(pmap->flags.uclg == 1,
-		    ("PTR_CRG set, but GCLG unset (%#lx)", tpte));
+		    ("PTR_YRG set, but UYRG unset (%#lx)", tpte));
 	}
 }
 #endif /* CHERI_CAPREVOKE */
@@ -6154,7 +6125,7 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap)
 		if ((tpte & PTE_A) != 0)
 			val |= MINCORE_REFERENCED | MINCORE_REFERENCED_OTHER;
 #if __has_feature(capabilities)
-		if ((tpte & PTE_CW) != 0)
+		if ((tpte & PTE_YW) != 0)
 			val |= MINCORE_CAPSTORE;
 #endif
 		managed = (tpte & PTE_SW_MANAGED) == PTE_SW_MANAGED;
@@ -6206,11 +6177,11 @@ update_crg:
 		csr_clear(sccsr, SCCSR_UGCLG);
 #else
 	if (pmap->flags.uclg) {
-		csr_set(sstatus, SSTATUS_UCRG);
-		td->td_frame->tf_sstatus |= SSTATUS_UCRG;
+		csr_set(sstatus, SSTATUS_UYRG);
+		td->td_frame->tf_sstatus |= SSTATUS_UYRG;
 	} else {
-		csr_clear(sstatus, SSTATUS_UCRG);
-		td->td_frame->tf_sstatus &= ~SSTATUS_UCRG;
+		csr_clear(sstatus, SSTATUS_UYRG);
+		td->td_frame->tf_sstatus &= ~SSTATUS_UYRG;
 	}
 #endif
 #endif

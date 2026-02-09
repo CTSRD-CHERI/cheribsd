@@ -4,5 +4,3 @@ nomakeoptions   CPUTYPE
 makeoptions	CPUTYPE=xcheri
 
 options		CHERI_CAPREVOKE_CLOADTAGS
-
-nooptions	CHERI_CAPREVOKE_NO_CLEAN

@@ -98,6 +98,9 @@
 	/* Enable CHERI for U-mode */
 	li	t0, SENVCFG_CRE
 	csrs	senvcfg, t0
+	/* Enable Svyrg */
+	li	t0, SSTATUS_YRGE
+	csrs	sstatus, t0
 #endif
 .endmacro
 
