@@ -88,7 +88,7 @@ vm_cheri_revoke_tlb_fault(void)
  * VM internal support for revocation
  */
 
- static inline int cgetcappoison(uintcap_t  a){
+static inline int cgetcappoison(uintcap_t  a){
        int ver= 0 ;
        asm volatile("cgetcappoison %0,%1" : "=r"(ver) : "C"(a));
        return ver;
