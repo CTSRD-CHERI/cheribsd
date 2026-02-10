@@ -636,7 +636,10 @@ proc0_init(void *dummy __unused)
 
 	/* Allocate a prototype map so we have something to fork. */
 	p->p_vmspace = &vmspace0;
+	mtx_init(&vmspace0.vm_mtx, "vmspace", NULL, MTX_DEF);
 	refcount_init(&vmspace0.vm_refcnt, 1);
+	LIST_INIT(&vmspace0.vm_proclist);
+	LIST_INSERT_HEAD(&vmspace0.vm_proclist, p, p_vm_proclist);
 	pmap_pinit0(vmspace_pmap(&vmspace0));
 
 	/*
