@@ -1626,7 +1626,9 @@ struct pf_pdesc {
 #ifdef INET6
 		struct icmp6_hdr	icmp6;
 #endif /* INET6 */
+#ifndef __CHERI_PURE_CAPABILITY__
 		char any[0];
+#endif
 	} hdr;
 
 	struct pf_addr	 nsaddr;	/* src address after NAT */
