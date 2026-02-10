@@ -1,4 +1,6 @@
-makeoptions	CPUTYPE=cheri
+
+makeoptions 	CPUTYPE=xcheri
+
 options 	CPU_CHERI
 options 	COMPAT_FREEBSD64
 
