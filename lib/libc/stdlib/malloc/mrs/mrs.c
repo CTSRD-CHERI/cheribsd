@@ -1910,8 +1910,8 @@ mrs_realloc(void *ptr, size_t size)
 	}
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size_aligned, 0, new_alloc);
 	
-	void * new_alloc_raw =  *(void **) new_alloc;
-	volatile int pver = cgetpver( new_alloc_raw);
+	//void * new_alloc_raw =  *(void **) new_alloc;
+	volatile int pver = cgetpver( ptr);
 	if (pver < 255){
 		csetpver(new_alloc, pver+1);
 	}
