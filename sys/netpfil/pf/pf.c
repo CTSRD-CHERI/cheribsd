@@ -7102,7 +7102,7 @@ pf_test_state(struct pf_kstate **state, struct pf_pdesc *pd, u_short *reason)
 	}
 
 	if (copyback && pd->hdrlen > 0)
-		m_copyback(pd->m, pd->off, pd->hdrlen, pd->hdr.any);
+		m_copyback(pd->m, pd->off, pd->hdrlen, (caddr_t)&pd->hdr);
 
 	return (action);
 }
