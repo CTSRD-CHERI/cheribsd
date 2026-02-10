@@ -51,7 +51,7 @@
 
 #define	CHERI_SEAL_VIOLATION_EXCEPTION	1
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__) && !defined(__riscv_zcheripurecap)
 #define	XFAIL_VARARG_BOUNDS	"varargs bounds known to be unimplemented"
 #endif
 
