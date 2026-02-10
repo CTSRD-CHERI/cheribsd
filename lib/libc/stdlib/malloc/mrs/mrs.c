@@ -215,6 +215,13 @@ static inline int cgetpver(void * a){
        return ver;
 }
 
+static inline int cgetcappoison(char *a){
+       int ver= 0 ;
+       asm volatile("cgetcappoison %0,%1" : "=r"(ver) : "C"(a));
+       return ver;
+}
+
+
 #ifdef QEMU_TARGET
 static inline void* csetcappoison(void * a){
    void * ptr;
@@ -361,13 +368,13 @@ static size_t page_size;
 /* Flags are constant after initialization. */
 static void *entire_shadow;
 static bool quarantining = true;
-static bool zeroing = false;
+static bool zeroing = true;
 #ifdef QEMU_TARGET
 static bool poisoning = true;
 static bool trapping = true;
 #else 
-static bool poisoning = true;
-static bool trapping = true;
+static bool poisoning = false;
+static bool trapping = false;
 #endif
 static bool revoke_every_free = false;
 static bool revoke_async = false;
@@ -730,7 +737,7 @@ validate_freed_pointer(void *ptr)
 	 * catches NULL and other invalid caps that may cause a rude
 	 * implementation of malloc_underlying_allocation() to crash.
 	 */
-	if (!cheri_gettag(ptr)) {
+	if (!cheri_gettag(ptr) || cgetcappoison(ptr) ==1) {
 		mrs_debug_printf("validate_freed_pointer: untagged capability addr %p\n",
 		    ptr);
 		return (NULL);
@@ -1632,14 +1639,14 @@ mrs_malloc(size_t size)
 	void * allocated_region_raw =  *(void **) allocated_region;
 	volatile int pver = cgetpver( allocated_region_raw);
 	if (pver < 255){
-		csetpver((char *)allocated_region, pver+1);
+		csetpver( allocated_region, pver+1);
 	}
 	else{
 		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
 			dczero((char*)(allocated_region+i));
 		}
 		printf("zero poison on mrs_malloc\n");
-		csetpver((char *)allocated_region, 0);
+		csetpver( allocated_region, 1);
 	}
 #ifdef ZERO_POISON_ON_ALLOC
 	if(zeroing){
@@ -1716,18 +1723,20 @@ mrs_calloc(size_t number, size_t size)
 	/*mrs_debug_printf("mrs_calloc: exit called %d size 0x%zx address %p\n", number, size, allocated_region);*/
 
 	MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size_aligned, number, allocated_region);
+	/*
 	void * allocated_region_raw =  *(void **) allocated_region;
 	volatile int pver = cgetpver( allocated_region_raw);
 	if (pver < 255){
-		csetpver((char *)allocated_region, pver+1);
+		csetpver(allocated_region, pver+1);
 	}
 	else{
 		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
 			dczero((char*)(allocated_region+i));
 		}
 		printf("zero poison on mrs_malloc\n");
-		csetpver((char *)allocated_region, 0);
+		csetpver(allocated_region, 1);
 	}
+	*/
 	if(trapping)
 		allocated_region = cclearpoisonperm(allocated_region);
 	return (allocated_region);
@@ -1832,14 +1841,14 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	void * allocated_region_raw =  *(void **) allocated_region;
 	volatile int pver = cgetpver( allocated_region_raw);
 	if (pver < 255){
-		csetpver((char *)allocated_region, pver+1);
+		csetpver(allocated_region, pver+1);
 	}
 	else{
 		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
 			dczero((char*)(allocated_region+i));
 		}
 		printf("zero poison on mrs_malloc\n");
-		csetpver((char *)allocated_region, 0);
+		csetpver(allocated_region, 1);
 	}
 	
 	if(trapping)
@@ -1904,14 +1913,14 @@ mrs_realloc(void *ptr, size_t size)
 	void * new_alloc_raw =  *(void **) new_alloc;
 	volatile int pver = cgetpver( new_alloc_raw);
 	if (pver < 255){
-		csetpver((char *)new_alloc, pver+1);
+		csetpver(new_alloc, pver+1);
 	}
 	else{
 		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
 			dczero((char*)(new_alloc+i));
 		}
 		printf("zero poison on mrs_malloc\n");
-		csetpver((char *)new_alloc, 0);
+		csetpver(new_alloc, 1);
 	}
 #ifdef ZERO_POISON_ON_ALLOC
 	if(zeroing){
@@ -1950,6 +1959,7 @@ mrs_free(void *ptr)
 	ins = ptr
 #else
 	ins = validate_freed_pointer(ptr);
+	
 	if (ins == NULL) {
 		mrs_debug_printf("mrs_free: validation failed\n");
 		if (abort_on_validation_failure)
@@ -1963,6 +1973,7 @@ mrs_free(void *ptr)
 	bzero(cheri_setoffset(ptr, 0), cheri_getlen(ptr));
 #endif
 	int size = cheri_getlen(ins);
+	csetpver(ins, cgetpver(ptr));
 	if(poisoning){
 		if(size>= MALLOC_CACHELINE_ALIGNMENT){
 			for(size_t i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT){
@@ -2019,14 +2030,14 @@ mrs_mallocx(size_t size, int flags)
 	void * ret_raw =  *(void **) ret;
 	volatile int pver = cgetpver( ret_raw);
 	if (pver < 255){
-		csetpver((char *)ret, pver+1);
+		csetpver(ret, pver+1);
 	}
 	else{
 		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
 			dczero((char*)(ret+i));
 		}
 		printf("zero poison on mrs_malloc\n");
-		csetpver((char *)ret, 0);
+		csetpver(ret, 1);
 	}
 	if(trapping)
 		ret = cclearpoisonperm(ret);
