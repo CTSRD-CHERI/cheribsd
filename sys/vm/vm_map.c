@@ -136,8 +136,8 @@ static uma_zone_t mapentzone;
 static uma_zone_t kmapentzone;
 static uma_zone_t vmspace_zone;
 static int vmspace_zinit(void *mem, int size, int flags);
-static void _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min,
-    vm_pointer_t max);
+static void _vm_map_init(vm_map_t map, pmap_t pmap, uintcap_t min,
+    uintcap_t max);
 static void vm_map_entry_deallocate(vm_map_entry_t entry, boolean_t system_map);
 static void vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry);
 static void vm_map_entry_dispose(vm_map_t map, vm_map_entry_t entry);
@@ -391,7 +391,7 @@ vmspace_zdtor(void *mem, int size, void *arg)
  * and initialize those structures.  The refcnt is set to 1.
  */
 struct vmspace *
-vmspace_alloc(vm_pointer_t min, vm_pointer_t max, pmap_pinit_t pinit)
+vmspace_alloc(uintcap_t min, uintcap_t max, pmap_pinit_t pinit)
 {
 	struct vmspace *vm;
 
@@ -987,7 +987,7 @@ vmspace_resident_count(struct vmspace *vmspace)
  * such as that in the vmspace structure.
  */
 static void
-_vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
+_vm_map_init(vm_map_t map, pmap_t pmap, uintcap_t min, uintcap_t max)
 {
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -1005,7 +1005,7 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 	map->timestamp = 0;
 	map->busy = 0;
 	map->anon_loc = 0;
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
 	/*
 	 * Do not enforce exact bounds here. The kernel map
 	 * can not be made representable without dropping some
@@ -1028,7 +1028,7 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 }
 
 void
-vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
+vm_map_init(vm_map_t map, pmap_t pmap, uintcap_t min, uintcap_t max)
 {
 	_vm_map_init(map, pmap, min, max);
 	sx_init(&map->lock, "vm map (user)");
@@ -5117,7 +5117,7 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 
 	old_map = &vm1->vm_map;
 	/* Copy immutable fields of vm1 to vm2. */
-#ifndef __CHERI_PURE_CAPABILITY__
+#if !__has_feature(capabilities)
 	vm2 = vmspace_alloc(vm_map_min(old_map), vm_map_max(old_map),
 	    pmap_pinit);
 #else
@@ -5754,16 +5754,16 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 {
 	struct vmspace *oldvmspace = p->p_vmspace;
 	struct vmspace *newvmspace;
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
 	vm_offset_t padded_minuser;
-	vm_pointer_t minuser_cap;
-	vm_pointer_t maxuser_cap;
+	uintcap_t minuser_cap;
+	uintcap_t maxuser_cap;
 	vm_offset_t user_length;
 #endif
 
 	KASSERT((curthread->td_pflags & TDP_EXECVMSPC) == 0,
 	    ("vmspace_exec recursed"));
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
 	/*
 	 * We create a new userspace capability for this map
 	 * Only allow non-representable map capability if the minuser
@@ -5785,7 +5785,7 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 	 *
 	 * XXX: It seems like this should be an sv_* member.
 	 */
-	minuser_cap = (vm_pointer_t)cheri_capability_build_user_rwx_unchecked(
+	minuser_cap = (uintcap_t)cheri_capability_build_user_rwx_unchecked(
 	    CHERI_CAP_USER_CODE_PERMS | CHERI_CAP_USER_DATA_PERMS |
 	    CHERI_PERMS_SWALL, padded_minuser, user_length, minuser);
 	maxuser_cap = cheri_address_set(minuser_cap, maxuser);
@@ -6209,16 +6209,15 @@ vm_map_prot2perms(vm_prot_t prot)
 	return (perms);
 }
 
-#ifdef __CHERI_PURE_CAPABILITY__
 /*
  * Create a capability for the given map, derived from the map root
  * capability.
  */
-vm_pointer_t
+uintcap_t
 _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
     vm_prot_t prot)
 {
-	vm_pointer_t retcap;
+	uintcap_t retcap;
 	int perms = ~CHERI_PROT2PERM_MASK | vm_map_prot2perms(prot);
 
 	retcap = cheri_bounds_set(
@@ -6226,7 +6225,6 @@ _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
 
 	return (cheri_perms_and(retcap, perms));
 }
-#endif /* __CHERI_PURE_CAPABILITY__ */
 #endif /* has_feature(capabilities) */
 
 /*
