@@ -1,5 +1,6 @@
 # Output a list of entries containing no known changes values.
 . - map(select(.changes[] | contains (
+  "bounds_compression",
   "calling_convention",
   "hashing",
   "ioctl:misc",
@@ -14,6 +15,7 @@
   "pointer_provenance",
   "pointer_shape",
   "support",
+  "subobject_bounds",
   "sysctl",
   "unsupported",
   "user_capabilities",
