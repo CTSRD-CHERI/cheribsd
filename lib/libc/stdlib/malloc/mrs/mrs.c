@@ -133,6 +133,8 @@ extern void snmalloc_flush_message_queue(void);
 #define	MALLOC_POISON_ENABLE_ENV	"_RUNTIME_POISON_ENABLE"
 #define	MALLOC_PTRAP_DISABLE_ENV	"_RUNTIME_PTRAP_DISABLE"
 #define	MALLOC_PTRAP_ENABLE_ENV	"_RUNTIME_PTRAP_ENABLE"
+#define	MALLOC_VERSION_DISABLE_ENV	"_RUNTIME_VERSION_DISABLE"
+#define	MALLOC_VERSION_ENABLE_ENV	"_RUNTIME_VERSION_ENABLE"
 
 #define	MALLOC_REVOKE_EVERY_FREE_DISABLE_ENV \
 	"_RUNTIME_REVOCATION_EVERY_FREE_DISABLE"
@@ -369,13 +371,10 @@ static size_t page_size;
 static void *entire_shadow;
 static bool quarantining = true;
 static bool zeroing = true;
-#ifdef QEMU_TARGET
-static bool poisoning = true;
-static bool trapping = true;
-#else 
 static bool poisoning = false;
 static bool trapping = false;
-#endif
+static bool versioning = false;
+
 static bool revoke_every_free = false;
 static bool revoke_async = false;
 static bool bound_pointers = false;
@@ -1480,6 +1479,11 @@ mrs_init_impl_locked(void)
 		} else if (getenv(MALLOC_PTRAP_ENABLE_ENV) != NULL) {
 			trapping = true;
 		}
+		if (getenv(MALLOC_VERSION_DISABLE_ENV) != NULL) {
+			versioning = false;
+		} else if (getenv(MALLOC_VERSION_ENABLE_ENV) != NULL) {
+			versioning = true;
+		}
 		if (getenv(MALLOC_ABORT_DISABLE_ENV) != NULL)
 			abort_on_validation_failure = false;
 		else if (getenv(MALLOC_ABORT_ENABLE_ENV) != NULL)
@@ -1636,17 +1640,19 @@ mrs_malloc(size_t size)
 	    size, allocated_region);*/
 
 	MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, allocated_region);
-	void * allocated_region_raw =  *(void **) allocated_region;
-	volatile int pver = cgetpver( allocated_region_raw);
-	if (pver < 255){
-		csetpver( allocated_region, pver+1);
-	}
-	else{
-		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-			dczero((char*)(allocated_region+i));
+	if(versioning){
+		void * allocated_region_raw =  *(void **) allocated_region;
+		volatile int pver = cgetpver( allocated_region_raw);
+		if (pver < 255){
+			csetpver( allocated_region, pver+1);
 		}
-		printf("zero poison on mrs_malloc\n");
-		csetpver( allocated_region, 1);
+		else{
+			for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
+				dczero((char*)(allocated_region+i));
+			}
+			printf("zero poison on mrs_malloc\n");
+			csetpver( allocated_region, 1);
+		}
 	}
 #ifdef ZERO_POISON_ON_ALLOC
 	if(zeroing){
@@ -1837,20 +1843,20 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 
 	MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 	    allocated_region);
-	
-	void * allocated_region_raw =  *(void **) allocated_region;
-	volatile int pver = cgetpver( allocated_region_raw);
-	if (pver < 255){
-		csetpver(allocated_region, pver+1);
-	}
-	else{
-		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-			dczero((char*)(allocated_region+i));
+	if(versioning) {
+		void * allocated_region_raw =  *(void **) allocated_region;
+		volatile int pver = cgetpver( allocated_region_raw);
+		if (pver < 255){
+			csetpver(allocated_region, pver+1);
 		}
-		printf("zero poison on mrs_malloc\n");
-		csetpver(allocated_region, 1);
+		else{
+			for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
+				dczero((char*)(allocated_region+i));
+			}
+			printf("zero poison on mrs_malloc\n");
+			csetpver(allocated_region, 1);
+		}
 	}
-	
 	if(trapping)
 		allocated_region = cclearpoisonperm(allocated_region); 
 	return (allocated_region);
@@ -1911,16 +1917,18 @@ mrs_realloc(void *ptr, size_t size)
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size_aligned, 0, new_alloc);
 	
 	//void * new_alloc_raw =  *(void **) new_alloc;
+	if(versioning){
 	volatile int pver = cgetpver( ptr);
-	if (pver < 255){
-		csetpver(new_alloc, pver+1);
-	}
-	else{
-		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-			dczero((char*)(new_alloc+i));
+		if (pver < 255){
+			csetpver(new_alloc, pver+1);
 		}
-		printf("zero poison on mrs_malloc\n");
-		csetpver(new_alloc, 1);
+		else{
+			for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
+				dczero((char*)(new_alloc+i));
+			}
+			printf("zero poison on mrs_malloc\n");
+			csetpver(new_alloc, 1);
+		}
 	}
 #ifdef ZERO_POISON_ON_ALLOC
 	if(zeroing){
@@ -2026,18 +2034,19 @@ mrs_mallocx(size_t size, int flags)
 		clear_region(ret, cheri_getlen(ret));
 #endif
 
-	
-	void * ret_raw =  *(void **) ret;
-	volatile int pver = cgetpver( ret_raw);
-	if (pver < 255){
-		csetpver(ret, pver+1);
-	}
-	else{
-		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-			dczero((char*)(ret+i));
+	if(versioning){
+		void * ret_raw =  *(void **) ret;
+		volatile int pver = cgetpver( ret_raw);
+		if (pver < 255){
+			csetpver(ret, pver+1);
 		}
-		printf("zero poison on mrs_malloc\n");
-		csetpver(ret, 1);
+		else{
+			for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
+				dczero((char*)(ret+i));
+			}
+			printf("zero poison on mrs_malloc\n");
+			csetpver(ret, 1);
+		}
 	}
 	if(trapping)
 		ret = cclearpoisonperm(ret);
