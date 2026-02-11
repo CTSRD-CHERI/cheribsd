@@ -51,6 +51,11 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20260211: Removed cheri_*_ptr_bits
+OLD_FILES+=usr/share/man/man9/cheri_clear_low_ptr_bits.9.gz
+OLD_FILES+=usr/share/man/man9/cheri_get_low_ptr_bits.9.gz
+OLD_FILES+=usr/share/man/man9/cheri_set_low_ptr_bits.9.gz
+
 # 20250205: bus_generic_attach.9 removed after the function was deprecated
 OLD_FILES+=usr/share/man/man9/bus_generic_attach.9.gz
 
