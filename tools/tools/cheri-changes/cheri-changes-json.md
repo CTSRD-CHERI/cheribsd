@@ -65,7 +65,7 @@ values are:
    convention such as declaring arguments in prototypes and va_args and
    non-va_args functions having different register use.
  * `hashing` - Use of pointer addresses in a hash.  In practice, a subset
-   of `virtual address, but common enough to call out.
+   of `virtual address`, but common enough to call out.
  * `ioctl:misc` - (kernel) Changes to support ioctls with capability pointers
    in their arguments.
  * `ioctl:net` - (kernel) Like `ioctl:misc` but covering network interface
