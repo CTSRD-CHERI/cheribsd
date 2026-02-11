@@ -80,6 +80,13 @@
 #define	CHERI_PERM_SW3			(1 << 18)	/* 0x00040000 */
 #endif /* !_KERNEL */
 
+/* Supported architecture permission bits feature flags */
+#ifdef __riscv_xcheri
+#define	HAS_CHERI_PERM_LOAD_STORE_CAP
+#else
+#define	HAS_CHERI_PERM_CAP
+#define	HAS_CHERI_PERM_LOAD_MUTABLE
+#endif
 
 /*
  * CHERI_PERMS_SWALL: Mask of all available software-defined permissions
