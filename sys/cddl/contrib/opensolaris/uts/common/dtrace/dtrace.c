@@ -11356,18 +11356,19 @@ dtrace_ecb_resize(dtrace_ecb_t *ecb)
 			if (curneeded == UINT32_MAX) {
 				/*
 				 * This is the first record in a tuple.  Align
-				 * curneeded to be at offset 4 in an 8-byte
-				 * aligned block.
+				 * curneeded to be at offset 4 in an aligned
+				 * block.
 				 */
 				ASSERT(act->dta_prev == NULL ||
 				    !act->dta_prev->dta_intuple);
 				ASSERT3U(aggbase, ==, UINT32_MAX);
 				curneeded = P2PHASEUP(ecb->dte_size,
-				    sizeof (uint64_t), sizeof (dtrace_aggid_t));
+				    sizeof (uint64ptr_t),
+				    sizeof (dtrace_aggid_t));
 
 				aggbase = curneeded - sizeof (dtrace_aggid_t);
 				ASSERT(IS_P2ALIGNED(aggbase,
-				    sizeof (uint64_t)));
+				    sizeof (uint64ptr_t)));
 			}
 			curneeded = P2ROUNDUP(curneeded, rec->dtrd_alignment);
 			rec->dtrd_offset = curneeded;
