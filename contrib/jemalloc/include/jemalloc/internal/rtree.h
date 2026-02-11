@@ -6,9 +6,9 @@
  *   "updated": 201906024,
  *   "target_type": "lib",
  *   "changes": [
- *     "pointer_bit_flags",
- *     "pointer_shape",
- *     "virtual_address"
+ *     "intcap_arithmetic",
+ *     "bounds_compression",
+ *     "pointer_shape"
  *   ]
  * }
  * CHERI CHANGES END
