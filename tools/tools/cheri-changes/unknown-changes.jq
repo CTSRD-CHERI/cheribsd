@@ -10,7 +10,6 @@
   "platform",
   "pointer_alignment",
   "pointer_as_integer",
-  "pointer_bit_flags",
   "integer_provenance",
   "pointer_provenance",
   "pointer_shape",
