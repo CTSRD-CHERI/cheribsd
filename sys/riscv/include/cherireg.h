@@ -169,7 +169,14 @@
 	CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP |		\
 	CHERI_PERM_EXECUTE | CHERI_PERM_SYSCALL)
 
+#ifdef __riscv_xcheri
 #define	CHERI_FLAGS_CAP_MODE	0x1
+#else
+#define	CHERI_FLAGS_CAP_MODE	0x0
+#endif
+#define	CHERI_FLAGS_CAP_MODE_MASK	0x1
+#define	CHERI_FLAGS_INT_MODE				\
+	(~CHERI_FLAGS_CAP_MODE & CHERI_FLAGS_CAP_MODE_MASK)
 
 /*
  * The CHERI object-type space is split between userspace and kernel,
