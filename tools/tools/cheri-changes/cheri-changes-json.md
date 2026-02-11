@@ -23,7 +23,6 @@ comments.  The following example shows all the current annotations.
  *     "platform",
  *     "pointer_alignment",
  *     "pointer_as_integer",
- *     "pointer_bit_flags",
  *     "integer_provenance",
  *     "pointer_provenance",
  *     "pointer_shape",
@@ -83,8 +82,6 @@ values are:
  * `pointer_as_integer` - Storing integers in pointer types or
    fabricating pointers from integers (often without any intent to use said
    pointers).
- * `pointer_bit_flags` - Storing and retrieving flags from the lower
-   bits of strongly-aligned pointers.
  * `integer_provenance` - Avoiding casts or misaligned storage that does
    not preserve tags.
  * `pointer_provenance` - Deriving pointers from the wrong source.  A
