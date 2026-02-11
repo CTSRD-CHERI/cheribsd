@@ -29,7 +29,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd December 12, 2025
+.Dd February 11, 2026
 .Dt CHERIC 9
 .Os
 .Sh NAME
@@ -55,9 +55,6 @@
 .Nm cheri_top_get
 .Nm cheri_type_get
 .Nm cheri_unseal
-.Nm cheri_clear_low_ptr_bits
-.Nm cheri_get_low_ptr_bits
-.Nm cheri_set_low_ptr_bits
 .Nd CHERI C built-in functions
 .Sh SYNOPSIS
 .In cheri/cheric.h
@@ -105,12 +102,6 @@
 .Fn cheri_type_get "void * __capability c"
 .Ft void * __capability
 .Fn cheri_unseal "void * __capability c" "void * __capability typecap"
-.Ft void * __capability
-.Fn cheri_clear_low_ptr_bits "void * __capability c" "size_t mask"
-.Ft size_t
-.Fn cheri_get_low_ptr_bits "void * __capability c" "size_t mask"
-.Ft void * __capability
-.Fn cheri_set_low_ptr_bits "void * __capability c" "size_t mask"
 .Sh DESCRIPTION
 The
 .Xr cheric 9
@@ -186,28 +177,6 @@ Return a capability derived from
 .Fa c
 that has its offset field set to
 .Fa offset .
-.El
-.Ss Capability address low bits
-The following APIs assist in getting, setting, and clearing lower bits in
-capabilities:
-.Bl -tag -width short
-.It Fn cheri_clear_low_ptr_bits "c" "mask"
-Return a capability derived from
-.Fa c ,
-but with the bits of the address indicated by
-.Fa mask
-cleared.
-.It Fn cheri_get_low_ptr_bits "c" "mask"
-Return the lower bits of the address of capability
-.Fa c
-indicated by
-.Fa mask .
-.It Fn cheri_set_low_ptr_bits "c" "mask"
-Return a capability derived from
-.Fa c ,
-but with the bits of the address indicated by
-.Fa mask
-set.
 .El
 .Ss Capability alignment
 To be added.
