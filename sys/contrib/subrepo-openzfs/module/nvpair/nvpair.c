@@ -3254,7 +3254,14 @@ nvs_xdr_nvl_fini(nvstream_t *nvs)
  * xdrproc_t-compatible callbacks for xdr_array()
  */
 
-#if defined(_KERNEL) && defined(__linux__) /* Linux kernel */
+/*
+ * XXX-CHERI: remove XDRPROC_TAKES_TWO_ARGS after CheriBSD version is bumped.
+ * Remove __CheriBSD_version check after __FreeBSD_version 1600010 is merged.
+ */
+#if defined(XDRPROC_TAKES_TWO_ARGS) || \
+    (defined(__CheriBSD_version) && __CheriBSD_version > 20250301) || \
+    (defined(__FreeBSD_version) && __FreeBSD_version >= 1600010) || \
+    (defined(_KERNEL) && defined(__linux__)) /* Linux kernel */
 
 #define	NVS_BUILD_XDRPROC_T(type)		\
 static bool_t					\
@@ -3272,7 +3279,7 @@ nvs_xdr_nvp_##type(struct XDR *xdrs, void *ptr, unsigned int i __unused) \
 	return (xdr_##type(xdrs, ptr));				\
 }
 
-#elif !defined(_KERNEL) && defined(XDR_CONTROL) /* tirpc */
+#elif !defined(_KERNEL) && defined(XDR_CONTROL) /* tirpc, FreeBSD < 16 */
 
 #define	NVS_BUILD_XDRPROC_T(type)		\
 static bool_t					\
@@ -3288,7 +3295,7 @@ nvs_xdr_nvp_##type(XDR *xdrs, ...)		\
 	return (xdr_##type(xdrs, ptr));		\
 }
 
-#else /* FreeBSD, sunrpc */
+#else /* FreeBSD kernel < 16, sunrpc */
 
 #define	NVS_BUILD_XDRPROC_T(type)		\
 static bool_t					\
