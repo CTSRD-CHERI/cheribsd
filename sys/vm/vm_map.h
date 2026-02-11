@@ -280,8 +280,8 @@ struct vm_map {
 	pmap_t pmap;			/* (c) Physical map */
 	vm_offset_t anon_loc;
 	int busy;
-#ifdef __CHERI_PURE_CAPABILITY__
-	vm_pointer_t map_capability;	/* Capability spanning the whole map */
+#if __has_feature(capabilities)
+	intcap_t map_capability;	/* Capability spanning the whole map */
 #endif
 #ifdef DIAGNOSTIC
 	int nupdates;
@@ -357,8 +357,8 @@ vm_map_is_system(vm_map_t map)
 }
 
 #endif	/* KLD_MODULE */
-#ifdef __CHERI_PURE_CAPABILITY__
-static __inline vm_pointer_t
+#if __has_feature(capabilities)
+static __inline uintcap_t
 vm_map_rootcap(vm_map_t map)
 {
 	return (map->map_capability);
@@ -580,7 +580,7 @@ vm_offset_t vm_map_findspace(vm_map_t, vm_offset_t, vm_size_t);
 int vm_map_alignspace(vm_map_t, vm_object_t, vm_ooffset_t,
     vm_offset_t *, vm_size_t, vm_offset_t, vm_offset_t);
 int vm_map_inherit (vm_map_t, vm_offset_t, vm_offset_t, vm_inherit_t);
-void vm_map_init(vm_map_t, pmap_t, vm_pointer_t, vm_pointer_t);
+void vm_map_init(vm_map_t, pmap_t, uintcap_t, uintcap_t);
 void vm_map_init_system(vm_map_t, pmap_t, vm_pointer_t, vm_pointer_t);
 int vm_map_insert (vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t,
     vm_pointer_t, vm_prot_t, vm_prot_t, int, vm_offset_t);
@@ -602,8 +602,8 @@ int vm_map_reservation_get(vm_map_t, vm_offset_t, vm_size_t, vm_offset_t *);
 int vm_map_prot2perms(vm_prot_t prot);
 void * __capability vm_map_reservation_cap(vm_map_t, vm_offset_t);
 #endif
-#ifdef __CHERI_PURE_CAPABILITY__
-vm_pointer_t _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
+#if __has_feature(capabilities)
+uintcap_t _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
     vm_prot_t prot);
 #define	vm_map_buildcap(map, addr, length, prot)	\
     _vm_map_buildcap(map, addr, length, prot)
