@@ -107,7 +107,8 @@
 #endif
 
 //#define QEMU_TARGET 1
-#define ZERO_POISON_ON_FLUSH 1
+//#define ZERO_POISON_ON_FLUSH 1
+#define CLEAR_ON_ALLOC 1
 #define	MALLOCX_LG_ALIGN_BITS	6
 #define	MALLOCX_LG_ALIGN_MASK	((1 << MALLOCX_LG_ALIGN_BITS) - 1)
 /* Use MALLOCX_ALIGN_GET() if alignment may not be specified in flags. */
@@ -371,8 +372,8 @@ static size_t page_size;
 static void *entire_shadow;
 static bool quarantining = true;
 static bool zeroing = true;
-static bool poisoning = false;
-static bool trapping = false;
+static bool poisoning = true;
+static bool trapping = true;
 static bool versioning = false;
 
 static bool revoke_every_free = false;
@@ -743,6 +744,7 @@ validate_freed_pointer(void *ptr)
 	}
 
 	void *underlying_allocation = REAL(malloc_underlying_allocation)(ptr);
+	csetpver(underlying_allocation, cgetpver(ptr));
 	if (underlying_allocation == NULL) {
 		mrs_debug_printf("validate_freed_pointer: not allocated by underlying allocator\n");
 		return (NULL);
@@ -1647,9 +1649,7 @@ mrs_malloc(size_t size)
 			csetpver( allocated_region, pver+1);
 		}
 		else{
-			for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-				dczero((char*)(allocated_region+i));
-			}
+			clear_region(allocated_region, cheri_getlen(allocated_region));
 			printf("zero poison on mrs_malloc\n");
 			csetpver( allocated_region, 1);
 		}
@@ -1713,13 +1713,6 @@ mrs_calloc(size_t number, size_t size)
 		    allocated_region);
 		return (allocated_region);
 	}
-#ifdef ZERO_POISON_ON_ALLOC
-	if(zeroing){
-		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-			dczero((char*)(allocated_region+i));
-		}
-	}
-#endif 
 	increment_allocated_size(allocated_region);
 
 	/*
@@ -1828,13 +1821,7 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 		    allocated_region);
 		return (allocated_region);
 	}
-#ifdef ZERO_POISON_ON_ALLOC
-	if(zeroing){
-		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-			dczero((char*)(allocated_region+i));
-		}
-	}
-#endif 
+
 #ifdef CLEAR_ON_ALLOC
 	clear_region(allocated_region, cheri_getlen(allocated_region));
 #endif /* CLEAR_ON_ALLOC */
@@ -1850,9 +1837,7 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 			csetpver(allocated_region, pver+1);
 		}
 		else{
-			for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-				dczero((char*)(allocated_region+i));
-			}
+			clear_region(allocated_region, cheri_getlen(allocated_region));
 			printf("zero poison on mrs_malloc\n");
 			csetpver(allocated_region, 1);
 		}
@@ -1980,14 +1965,14 @@ mrs_free(void *ptr)
 #ifdef CLEAR_ON_FREE
 	bzero(cheri_setoffset(ptr, 0), cheri_getlen(ptr));
 #endif
-	int size = cheri_getlen(ins);
+	int size = cheri_getlen(ptr);
 	csetpver(ins, cgetpver(ptr));
 	if(poisoning){
-		if(size>= MALLOC_CACHELINE_ALIGNMENT){
+		//if(size>= MALLOC_CACHELINE_ALIGNMENT){
 			for(size_t i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT){
 				cpoison(((char *) ins) + i);
 			}
-		}
+		//}
 	}
 	mrs_lock(&app_quarantine_lock);
 	quarantine_insert(app_quarantine, ins, size);
@@ -2018,16 +2003,7 @@ mrs_mallocx(size_t size, int flags)
 		ret = mrs_malloc(size_aligned);
 	else if (mrs_posix_memalign(&ret, size_aligned, align) != 0)
 		ret = NULL;
-#ifdef ZERO_POISON_ON_ALLOC
-	if(zeroing){
-		if(size>= MALLOC_CACHELINE_ALIGNMENT){
-			if (ret != NULL) {
-				for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT)
-					dczero(((char *) ret) + i);	
-			}
-		}
-	}
-#endif 
+
 #ifndef CLEAR_ON_ALLOC
 	/* Clear if requested and we aren't clearing above. */
 	if (ret != NULL && (flags & MALLOCX_ZERO) != 0)
@@ -2038,12 +2014,11 @@ mrs_mallocx(size_t size, int flags)
 		void * ret_raw =  *(void **) ret;
 		volatile int pver = cgetpver( ret_raw);
 		if (pver < 255){
-			csetpver(ret, pver+1);
+			csetpver(ret, pver + 1);
 		}
 		else{
-			for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-				dczero((char*)(ret+i));
-			}
+			if (ret != NULL && (flags & MALLOCX_ZERO) != 0)
+				clear_region(ret, cheri_getlen(ret));
 			printf("zero poison on mrs_malloc\n");
 			csetpver(ret, 1);
 		}
@@ -2094,7 +2069,23 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 		memcpy(new_alloc, underlying_allocation, size_aligned < old_size ? size_aligned : old_size);
 		mrs_free(ptr);
 	}
-	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size_aligned, 0, new_alloc);
+	if(versioning){
+		//void * new_alloc_raw =  *(void **) new_alloc;
+		volatile int pver = cgetpver( ptr);
+		if (pver < 255){
+			csetpver(new_alloc, pver+1);
+		}
+		else{
+			for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
+				dczero((char*)(new_alloc+i));
+			}
+			printf("zero poison on mrs_malloc\n");
+			csetpver(new_alloc, 1);
+		}
+	}
+	if(trapping)
+		new_alloc = cclearpoisonperm(new_alloc);
+	MRS_UTRACE(UTRACE_MRS_REALLOC, new_alloc, size_aligned, 0, new_alloc);
 	return (new_alloc);
 }
 
