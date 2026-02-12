@@ -107,7 +107,7 @@
 #endif
 
 //#define QEMU_TARGET 1
-//#define ZERO_POISON_ON_FLUSH 1
+#define ZERO_POISON_ON_FLUSH 1
 #define	MALLOCX_LG_ALIGN_BITS	6
 #define	MALLOCX_LG_ALIGN_MASK	((1 << MALLOCX_LG_ALIGN_BITS) - 1)
 /* Use MALLOCX_ALIGN_GET() if alignment may not be specified in flags. */
