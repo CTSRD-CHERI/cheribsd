@@ -6473,15 +6473,8 @@ vm_map_reservation_cap(vm_map_t map, vm_offset_t va)
 		max_prot = entry->max_protection;
 	}
 
-#ifdef __CHERI_PURE_CAPABILITY__
 	cap = (void * __capability)vm_map_buildcap(map, reservation,
 	    end - reservation, max_prot);
-#else
-	cap = cheri_address_set(userspace_root_cap, reservation);
-	cap = cheri_bounds_set(cap, end - reservation);
-	cap = cheri_perms_and(cap, ~CHERI_PROT2PERM_MASK |
-	    vm_map_prot2perms(max_prot));
-#endif
 out:
 	vm_map_unlock_read(map);
 	return (cap);
