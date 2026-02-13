@@ -1628,7 +1628,8 @@ mrs_malloc(size_t size)
 	}
 
 #ifdef CLEAR_ON_ALLOC
-	clear_region(allocated_region, cheri_getlen(allocated_region));
+	if(zeroing)
+		clear_region(allocated_region, cheri_getlen(allocated_region));
 #endif /* CLEAR_ON_ALLOC */
 
 	increment_allocated_size(allocated_region);
@@ -1650,13 +1651,7 @@ mrs_malloc(size_t size)
 		fprintf(stderr, "malloc reset pver to default\n");
 		csetpver( allocated_region, 1);
 	}
-#ifdef ZERO_POISON_ON_ALLOC
-	if(zeroing){
-		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-			dczero((char*)(allocated_region+i));
-		}
-	}
-#endif 
+
 	if(cgetpver(allocated_region) == pver){
 		fprintf(stderr, "illegal, pver is not correctly incremented \n");
 	}
@@ -1713,13 +1708,7 @@ mrs_calloc(size_t number, size_t size)
 		    allocated_region);
 		return (allocated_region);
 	}
-#ifdef ZERO_POISON_ON_ALLOC
-	if(zeroing){
-		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-			dczero((char*)(allocated_region+i));
-		}
-	}
-#endif 
+
 	increment_allocated_size(allocated_region);
 
 	/*
@@ -1822,7 +1811,8 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 	}
 
 #ifdef CLEAR_ON_ALLOC
-	clear_region(*ptr, cheri_getlen(*ptr));
+	if(zeroing)
+		clear_region(*ptr, cheri_getlen(*ptr));
 #endif /* CLEAR_ON_ALLOC */
 	//clear_region(*ptr, cheri_getlen(*ptr));
 	increment_allocated_size(*ptr);
@@ -1863,15 +1853,10 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 		    allocated_region);
 		return (allocated_region);
 	}
-#ifdef ZERO_POISON_ON_ALLOC
-	if(zeroing){
-		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-			dczero((char*)(allocated_region+i));
-		}
-	}
-#endif 
+
 #ifdef CLEAR_ON_ALLOC
-	clear_region(allocated_region, cheri_getlen(allocated_region));
+	if(zeroing)
+		clear_region(allocated_region, cheri_getlen(allocated_region));
 #endif /* CLEAR_ON_ALLOC */
 
 	increment_allocated_size(allocated_region);
@@ -1968,12 +1953,7 @@ mrs_realloc(void *ptr, size_t size)
 		fprintf(stderr, "reset pver to default\n");
 		csetpver(new_alloc, 1);
 	}
-#ifdef ZERO_POISON_ON_ALLOC
-	if(zeroing){
-		for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT)
-			dczero((char*)(new_alloc+i));	
-	}
-#endif 
+
 	if(cgetpver(new_alloc) == pver){
 		fprintf(stderr, "illegal, pver is not correctly incremented \n");
 	}
@@ -2058,20 +2038,13 @@ mrs_mallocx(size_t size, int flags)
 		ret = mrs_malloc(size_aligned);
 	else if (mrs_posix_memalign(&ret, size_aligned, align) != 0)
 		ret = NULL;
-#ifdef ZERO_POISON_ON_ALLOC
-	if(zeroing){
-		if(size>= MALLOC_CACHELINE_ALIGNMENT){
-			if (ret != NULL) {
-				for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT)
-					dczero(((char *) ret) + i);	
-			}
-		}
-	}
-#endif 
+
 #ifndef CLEAR_ON_ALLOC
 	/* Clear if requested and we aren't clearing above. */
-	if (ret != NULL && (flags & MALLOCX_ZERO) != 0)
-		clear_region(ret, cheri_getlen(ret));
+	if(zeroing){
+		if (ret != NULL && (flags & MALLOCX_ZERO) != 0)
+			clear_region(ret, cheri_getlen(ret));
+	}
 #endif
 
 	
