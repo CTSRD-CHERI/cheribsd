@@ -1866,6 +1866,10 @@ arena_ralloc(tsdn_t *tsdn, arena_t *arena, void *ptr, size_t oldsize,
 	 */
 	size_t copysize = (usize < oldsize) ? usize : oldsize;
 	memcpy(ret, ptr, copysize);
+#ifdef __CHERI_PURE_CAPABILITY__
+	csetpver(ret, cgetpver(ptr));
+#endif 
+	//if(cgetpver(ret) !=0) fprintf(stderr, "passing pver in arena \n");
 	isdalloct(tsdn, ptr, oldsize, tcache, NULL, true);
 	return ret;
 }
