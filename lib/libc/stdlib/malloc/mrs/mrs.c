@@ -1638,6 +1638,7 @@ mrs_malloc(size_t size)
 	    size, allocated_region);*/
 
 	MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, allocated_region);
+#ifdef PVER_ENABLE
 	void * allocated_region_raw =  *(void **) allocated_region;
 	volatile int pver = cgetpver( allocated_region_raw);
 	if (pver < 255){
@@ -1655,6 +1656,7 @@ mrs_malloc(size_t size)
 	if(cgetpver(allocated_region) == pver){
 		fprintf(stderr, "illegal, pver is not correctly incremented \n");
 	}
+#endif 
 	//clear_region(allocated_region, cheri_getlen(allocated_region));
 	if(trapping)
 		allocated_region = cclearpoisonperm(allocated_region);
@@ -1748,7 +1750,7 @@ mrs_real_posix_memalign(void **ptr, size_t alignment, size_t size)
 	ret = REAL(posix_memalign)(ptr, alignment, size_aligned);
 	if (ret == 0)
 		*ptr = mrs_bound_pointer(*ptr, size_aligned);
-
+#ifdef PVER_ENABLE
 	void * ptr_raw =  *(void **) *ptr;
 	volatile int pver = cgetpver( ptr_raw);
 	if (pver < 255){
@@ -1765,6 +1767,7 @@ mrs_real_posix_memalign(void **ptr, size_t alignment, size_t size)
 	if(cgetpver(*ptr) == pver){
 		fprintf(stderr, "illegal, pver is not correctly incremented \n");
 	}
+#endif
 	if(trapping)
 		*ptr = cclearpoisonperm(*ptr);
 	return (ret);
@@ -1789,6 +1792,7 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 		alignment = MALLOC_CACHELINE_ALIGNMENT;
 
 	int ret = mrs_real_posix_memalign(ptr, alignment, size_aligned);
+#ifdef PVER_ENABLE
 	void * ptr_raw =  *(void **) *ptr;
 	volatile int pver = cgetpver( ptr_raw);
 	if (pver < 255){
@@ -1805,6 +1809,7 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 	if(cgetpver(*ptr) == pver){
 		fprintf(stderr, "illegal, pver is not correctly incremented \n");
 	}
+#endif
 	if (ret != 0) {
 
 		return (ret);
@@ -1863,7 +1868,7 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 
 	MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 	    allocated_region);
-	
+#ifdef PVER_ENABLE	
 	void * allocated_region_raw =  *(void **) allocated_region;
 	volatile int pver = cgetpver( allocated_region_raw);
 	if (pver < 255){
@@ -1880,6 +1885,7 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	if(cgetpver(allocated_region) == pver){
 		fprintf(stderr, "illegal, pver is not correctly incremented \n");
 	}
+#endif
 	//clear_region(allocated_region, cheri_getlen(allocated_region));
 	if(trapping)
 		allocated_region = cclearpoisonperm(allocated_region); 
@@ -1939,7 +1945,7 @@ mrs_realloc(void *ptr, size_t size)
 		mrs_free(ptr);
 	}
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size_aligned, 0, new_alloc);
-	
+#ifdef PVER_ENABLE	
 	//void * new_alloc_raw =  *(void **) new_alloc;
 	volatile int pver = cgetpver( ptr);
 	if (pver < 255){
@@ -1957,6 +1963,7 @@ mrs_realloc(void *ptr, size_t size)
 	if(cgetpver(new_alloc) == pver){
 		fprintf(stderr, "illegal, pver is not correctly incremented \n");
 	}
+#endif
 	if(trapping)
 		new_alloc = cclearpoisonperm(new_alloc);
 	return (new_alloc);
@@ -2001,7 +2008,9 @@ mrs_free(void *ptr)
 	bzero(cheri_setoffset(ptr, 0), cheri_getlen(ptr));
 #endif
 	int size = cheri_getlen(ptr);
+#ifdef PVER_ENABLE
 	csetpver(ins, cgetpver(ptr));
+#endif
 	if(poisoning){
 		if(size>= MALLOC_CACHELINE_ALIGNMENT){
 			for(size_t i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT){
@@ -2047,7 +2056,7 @@ mrs_mallocx(size_t size, int flags)
 	}
 #endif
 
-	
+#ifdef PVER_ENABLE
 	void * ret_raw =  *(void **) ret;
 	volatile int pver = cgetpver( ret_raw);
 	if (pver < 255){
@@ -2064,6 +2073,7 @@ mrs_mallocx(size_t size, int flags)
 	if(cgetpver(ret) == pver){
 		fprintf(stderr, "illegal, pver is not correctly incremented \n");
 	}
+#endif
 	if(trapping)
 		ret = cclearpoisonperm(ret);
 	return (ret);
@@ -2111,6 +2121,7 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 		memcpy(new_alloc, underlying_allocation, size_aligned < old_size ? size_aligned : old_size);
 		mrs_free(ptr);
 	}
+#ifdef PVER_ENABLE
 	void * new_alloc_raw =  *(void **) new_alloc;
 	volatile int pver = cgetpver( new_alloc_raw);
 	if (pver < 255){
@@ -2127,6 +2138,7 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 	if(cgetpver(new_alloc) == pver){
 		fprintf(stderr, "illegal, pver is not correctly incremented \n");
 	}
+#endif
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size_aligned, 0, new_alloc);
 	return (new_alloc);
 }
