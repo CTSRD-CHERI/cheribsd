@@ -81,6 +81,9 @@
 #define	HAS_CHERI_PERM_LOAD_MUTABLE
 #define	HAS_CHERI_PERM_EXECUTIVE
 
+/* Define alias for MUTABLE_LOAD permission bit to have consistent spelling */
+#define	CHERI_PERM_LOAD_MUTABLE CHERI_PERM_MUTABLE_LOAD
+
 /*
  * Macros defining initial permission sets:
  *
