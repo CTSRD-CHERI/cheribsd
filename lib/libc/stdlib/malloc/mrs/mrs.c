@@ -108,6 +108,7 @@
 
 //#define QEMU_TARGET 1
 //#define ZERO_POISON_ON_FLUSH 1
+#define CLEAR_ON_ALLOC 1
 #define	MALLOCX_LG_ALIGN_BITS	6
 #define	MALLOCX_LG_ALIGN_MASK	((1 << MALLOCX_LG_ALIGN_BITS) - 1)
 /* Use MALLOCX_ALIGN_GET() if alignment may not be specified in flags. */
@@ -1659,7 +1660,7 @@ mrs_malloc(size_t size)
 	if(cgetpver(allocated_region) == pver){
 		fprintf(stderr, "illegal, pver is not correctly incremented \n");
 	}
-	clear_region(allocated_region, cheri_getlen(allocated_region));
+	//clear_region(allocated_region, cheri_getlen(allocated_region));
 	if(trapping)
 		allocated_region = cclearpoisonperm(allocated_region);
 	return (allocated_region);
@@ -1702,13 +1703,13 @@ mrs_calloc(size_t number, size_t size)
 	 * the alignment requirement for small sizes but that seems like an
 	 * extraordinarily unlikely and highly questionable optimization.
 	 */
-	if (!__builtin_mul_overflow(number, size_aligned, &tmpsize) &&
+	if (!__builtin_mul_overflow(number, size, &tmpsize) &&
 	    tmpsize < CAPREVOKE_BITMAP_ALIGNMENT)
 		allocated_region = mrs_real_calloc(1, CAPREVOKE_BITMAP_ALIGNMENT);
 	else
-		allocated_region = mrs_real_calloc(number, size_aligned);
+		allocated_region = mrs_real_calloc(number, size);
 	if (allocated_region == NULL) {
-		MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size_aligned, number,
+		MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number,
 		    allocated_region);
 		return (allocated_region);
 	}
@@ -1823,7 +1824,7 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 #ifdef CLEAR_ON_ALLOC
 	clear_region(*ptr, cheri_getlen(*ptr));
 #endif /* CLEAR_ON_ALLOC */
-	clear_region(*ptr, cheri_getlen(*ptr));
+	//clear_region(*ptr, cheri_getlen(*ptr));
 	increment_allocated_size(*ptr);
 
 	MRS_UTRACE(UTRACE_MRS_POSIX_MEMALIGN, NULL, size_aligned, alignment, *ptr);
@@ -1894,7 +1895,7 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	if(cgetpver(allocated_region) == pver){
 		fprintf(stderr, "illegal, pver is not correctly incremented \n");
 	}
-	clear_region(allocated_region, cheri_getlen(allocated_region));
+	//clear_region(allocated_region, cheri_getlen(allocated_region));
 	if(trapping)
 		allocated_region = cclearpoisonperm(allocated_region); 
 	return (allocated_region);
@@ -2019,7 +2020,7 @@ mrs_free(void *ptr)
 #ifdef CLEAR_ON_FREE
 	bzero(cheri_setoffset(ptr, 0), cheri_getlen(ptr));
 #endif
-	int size = cheri_getlen(ins);
+	int size = cheri_getlen(ptr);
 	csetpver(ins, cgetpver(ptr));
 	if(poisoning){
 		if(size>= MALLOC_CACHELINE_ALIGNMENT){
