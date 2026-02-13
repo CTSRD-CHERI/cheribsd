@@ -65,6 +65,14 @@
 #define	HAS_CHERI_PERM_EXECUTIVE
 #define	HAS_CHERI_PERM_SEAL
 
+/*
+ * Morello uses a different naming for the LOAD_MUTABLE permission.
+ * Define an alias here to make it consistent with RISC-V.
+ */
+#ifndef CHERI_PERM_LOAD_MUTABLE
+#define	CHERI_PERM_LOAD_MUTABLE CHERI_PERM_MUTABLE_LOAD
+#endif
+
 #define	CAPREG_PCC(capreg)	((capreg)->celr)
 
 #endif /* !_CHERIBSDTEST_H_ */
