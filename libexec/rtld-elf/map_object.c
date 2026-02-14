@@ -343,7 +343,8 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 					    path, rtld_strerror(errno));
 					goto error1;
 				}
-				(void)msetname(bss_addr, bss_len, "rtld:bss");
+				(void)msetname(bss_addr,
+				    bss_vlimit - bss_vaddr, "rtld:bss");
 			}
 		}
 
