@@ -1595,9 +1595,12 @@ static void *
 mrs_malloc(size_t size)
 {
 	mrs_init();
-	int size_aligned = __builtin_align_up(
+	int size_aligned = size;
+#ifdef ALIGN_CAP_SIZE
+	size_aligned = __builtin_align_up(
 			    size,
 			    MALLOC_CACHELINE_ALIGNMENT);
+#endif 
 	if (!quarantining)
 		return (mrs_real_malloc(size_aligned));
 
@@ -1675,9 +1678,12 @@ mrs_calloc(size_t number, size_t size)
 	size_t tmpsize;
 
 	mrs_init();
-	int size_aligned = __builtin_align_up(
-		    size,
-		    MALLOC_CACHELINE_ALIGNMENT);
+	int size_aligned = size;
+#ifdef ALIGN_CAP_SIZE
+	size_aligned = __builtin_align_up(
+			    size,
+			    MALLOC_CACHELINE_ALIGNMENT);
+#endif 
 	if (!quarantining)
 		return (mrs_real_calloc(number, size_aligned));
 
@@ -1744,9 +1750,12 @@ static int
 mrs_real_posix_memalign(void **ptr, size_t alignment, size_t size)
 {
 	int ret;
-	int size_aligned = __builtin_align_up(
-		    size,
-		    MALLOC_CACHELINE_ALIGNMENT);
+	int size_aligned = size;
+#ifdef ALIGN_CAP_SIZE
+	size_aligned = __builtin_align_up(
+			    size,
+			    MALLOC_CACHELINE_ALIGNMENT);
+#endif 
 	ret = REAL(posix_memalign)(ptr, alignment, size_aligned);
 	if (ret == 0)
 		*ptr = mrs_bound_pointer(*ptr, size_aligned);
@@ -1777,9 +1786,12 @@ static int
 mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 {
 	mrs_init();
-	int size_aligned = __builtin_align_up(
-		    size,
-		    MALLOC_CACHELINE_ALIGNMENT);
+	int size_aligned = size;
+#ifdef ALIGN_CAP_SIZE
+	size_aligned = __builtin_align_up(
+			    size,
+			    MALLOC_CACHELINE_ALIGNMENT);
+#endif 
 	if (!quarantining)
 		return (mrs_real_posix_memalign(ptr, alignment, size_aligned));
 
@@ -1839,9 +1851,12 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 {
 	mrs_init();
 
-	int size_aligned = __builtin_align_up(
-		    size,
-		    MALLOC_CACHELINE_ALIGNMENT);
+	int size_aligned = size;
+#ifdef ALIGN_CAP_SIZE
+	size_aligned = __builtin_align_up(
+			    size,
+			    MALLOC_CACHELINE_ALIGNMENT);
+#endif 
 	if (!quarantining)
 		return (mrs_real_aligned_alloc(alignment, size_aligned));
 
@@ -1908,9 +1923,12 @@ static void *
 mrs_realloc(void *ptr, size_t size)
 {
 	mrs_init();
-	int size_aligned = __builtin_align_up(
-		    size,
-		    MALLOC_CACHELINE_ALIGNMENT);
+	int size_aligned = size;
+#ifdef ALIGN_CAP_SIZE
+	size_aligned = __builtin_align_up(
+			    size,
+			    MALLOC_CACHELINE_ALIGNMENT);
+#endif 
 	if (!quarantining)
 		return (mrs_real_realloc(ptr, size_aligned));
 
@@ -2038,9 +2056,12 @@ mrs_mallocx(size_t size, int flags)
 	void *ret;
 
 	mrs_init();
-	int size_aligned = __builtin_align_up(
-		    size,
-		    MALLOC_CACHELINE_ALIGNMENT);
+	int size_aligned = size;
+#ifdef ALIGN_CAP_SIZE
+	size_aligned = __builtin_align_up(
+			    size,
+			    MALLOC_CACHELINE_ALIGNMENT);
+#endif 
 	if (!quarantining)
 		return (mrs_real_mallocx(size_aligned, flags));
 	if (align <= CAPREVOKE_BITMAP_ALIGNMENT)
@@ -2092,9 +2113,12 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 	size_t old_size;
 
 	mrs_init();
-	int size_aligned = __builtin_align_up(
-	    size,
-	    MALLOC_CACHELINE_ALIGNMENT);
+	int size_aligned = size;
+#ifdef ALIGN_CAP_SIZE
+	size_aligned = __builtin_align_up(
+			    size,
+			    MALLOC_CACHELINE_ALIGNMENT);
+#endif 
 	if (!quarantining)
 		return (mrs_real_rallocx(ptr, size_aligned, flags));
 
