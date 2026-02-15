@@ -1520,7 +1520,6 @@ struct msetname_args {
 int
 sys_msetname(struct thread *td, struct msetname_args *uap)
 {
-
 #if __has_feature(capabilities)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
 		return (EPROT);
