@@ -2333,7 +2333,6 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
     vm_pointer_t start, vm_pointer_t *reservp /* OUT */, vm_size_t length,
     vm_prot_t prot, vm_prot_t max, int cow)
 {
-
 	return (vm_map_fixed_name(map, object, offset, start, reservp, length,
 	    prot, max, cow, NULL));
 }
