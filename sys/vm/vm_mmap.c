@@ -1534,7 +1534,7 @@ sys_msetname(struct thread *td, struct msetname_args *uap)
 
 int
 kern_msetname(struct thread *td, uintptr_t addr0, size_t len,
-    const char *name)
+    const char * __capability name)
 {
 	char lname[MAP_ENTRY_NAME_LEN];
 	vm_offset_t addr;
