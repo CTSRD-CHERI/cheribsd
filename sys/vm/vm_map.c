@@ -2560,7 +2560,6 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
     vm_size_t length, vm_offset_t max_addr, int find_space,
     vm_prot_t prot, vm_prot_t max, int cow)
 {
-
 	return (vm_map_find_name(map, object, offset, addr, length, max_addr,
 	    find_space, prot, max, cow, NULL));
 }
