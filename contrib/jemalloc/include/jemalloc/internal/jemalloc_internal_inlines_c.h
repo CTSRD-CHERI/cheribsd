@@ -21,16 +21,6 @@
 #include "jemalloc/internal/sz.h"
 #include "jemalloc/internal/witness.h"
 
-static void csetpver(void  * a, int ver){
-    asm volatile("csetcappver %0, %1, %2": :"C"(a), "C"(a), "r"(ver));
-}
-
-static inline int cgetpver(void * a){
-       int ver= 0 ;
-       asm volatile("cgetcappver %0,%1" : "=r"(ver) : "C"(a));
-       return ver;
-}
-
 JEMALLOC_ALWAYS_INLINE void *
 unbound_ptr(tsdn_t *tsdn, void *ptr) {
 	void *ubptr;
@@ -81,7 +71,6 @@ unbound_ptr(tsdn_t *tsdn, void *ptr) {
 	assert((ptraddr_t)ptr == (ptraddr_t)ubptr);
 	assert(cheri_getbase(ubptr) == cheri_getbase(extent->e_addr));
 	assert(cheri_getlen(ubptr) == cheri_getlen(extent->e_addr));
-	csetpver(ubptr, cgetpver(ptr));
 #endif
 	return (ubptr);
 }
