@@ -12,7 +12,12 @@ __<${_this:T}>__:
 .if defined(_LIBCOMPATS)
 COMPAT_ARCH?=	${TARGET_ARCH}
 .for _LIBCOMPAT in ${_ALL_LIBCOMPATS}
+# Inherit CPUTYPE for distinguishing xcheri/rvy
+.if ${COMPAT_ARCH:Mriscv*c*} || ${_LIBCOMPAT:M64C}
+LIB${_LIBCOMPAT}CPUTYPE?=	${CPUTYPE_${_LIBCOMPAT}:U${TARGET_CPUTYPE}}
+.else
 LIB${_LIBCOMPAT}CPUTYPE?=	${CPUTYPE_${_LIBCOMPAT}}
+.endif
 .endfor
 .if (defined(WANT_COMPILER_TYPE) && ${WANT_COMPILER_TYPE} == gcc) || \
     (defined(X_COMPILER_TYPE) && ${X_COMPILER_TYPE} == gcc)
@@ -116,13 +121,18 @@ HAS_COMPAT+=	64
 LIB64_RISCV_ABI=	lp64d
 LIB64_MACHINE=	riscv
 LIB64_MACHINE_ARCH=riscv64
-.  if ${TARGET_CPUTYPE} == "cheri"
-.    warning "CPUTYPE=cheri is deprecated, please use xcheri or rvy"
-LIB64WMAKEENV=	MACHINE_CPU="riscv xcheri"
-.  else
-LIB64WMAKEENV=	MACHINE_CPU="riscv ${TARGET_CPUTYPE}"
-.  endif
-LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=${TARGET_CPUTYPE}
+.if ${LIB64CPUTYPE} == "cheri"
+.warning "CPUTYPE=cheri is deprecated, please use xcheri or rvy"
+LIB64_RISCV_CHERI_TYPE=	xcheri
+.elif empty(LIB64CPUTYPE)
+LIB64_RISCV_CHERI_TYPE=	xcheri
+.elif ${LIB64CPUTYPE} == "xcheri" || ${LIB64CPUTYPE} == "rvy"
+LIB64_RISCV_CHERI_TYPE=	${LIB64CPUTYPE}
+.else
+.error "Invalid CHERI variant ${LIB64CPUTYPE}"
+.endif
+LIB64WMAKEENV=	MACHINE_CPU="riscv cheri ${LIB64_RISCV_CHERI_TYPE}"
+LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=${LIB64_RISCV_CHERI_TYPE}
 # XXX: clang specific
 LIB64CPUFLAGS=	-target riscv64-unknown-freebsd${OS_REVISION}
 LIB64CPUFLAGS+=	-march=${LIB64_RISCV_MARCH} -mabi=${LIB64_RISCV_ABI}
@@ -147,7 +157,16 @@ LIB64CCPUFLAGS+=	-march=morello -mabi=purecap
 HAS_COMPAT+=	64C
 LIB64C_MACHINE=	riscv
 LIB64C_MACHINE_ARCH=	${COMPAT_ARCH}c
-LIB64CWMAKEFLAGS=	CPUTYPE=${TARGET_CPUTYPE}
+.if ${LIB64CCPUTYPE} == "cheri"
+.warning "CPUTYPE=cheri is deprecated, please use xcheri or rvy"
+LIB64CWMAKEFLAGS=	CPUTYPE=xcheri
+.elif empty(LIB64CCPUTYPE)
+LIB64CWMAKEFLAGS=	CPUTYPE=xcheri
+.elif ${LIB64CCPUTYPE} == "xcheri" || ${LIB64CCPUTYPE} == "rvy"
+LIB64CWMAKEFLAGS=	${LIB64CCPUTYPE}
+.else
+.error "Invalid CHERI variant ${LIB64CCPUTYPE}"
+.endif
 LIB64CCPUFLAGS=	-target riscv64-unknown-freebsd${OS_REVISION}
 LIB64C_RISCV_ABI=	l64pc128d
 LIB64CCPUFLAGS+=	-march=${LIB64C_RISCV_MARCH} -mabi=${LIB64C_RISCV_ABI}
@@ -159,12 +178,13 @@ LIB64CCPUFLAGS+=	-march=${LIB64C_RISCV_MARCH} -mabi=${LIB64C_RISCV_ABI}
 # See bsd.cpu.mk
 LIB${_LIBCOMPAT}_RISCV_MARCH=	rv64imafdc
 .if ${COMPAT_ARCH:Mriscv*c*} || ${_LIBCOMPAT:M64C}
-.  if ${__C:Mxcheri} || ${__C} == "cheri"
+.  if empty(LIB${_LIBCOMPAT}CPUTYPE) || ${LIB${_LIBCOMPAT}CPUTYPE} == "xcheri" || \
+      ${LIB${_LIBCOMPAT}CPUTYPE} == "cheri"
 LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}xcheri
-.  elif ${__C:Mrvy}
+.  elif ${LIB${_LIBCOMPAT}CPUTYPE} == "rvy"
 LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}zcherihybrid_zcherilevels
 .  else
-.    error "Invalid CHERI variant ${__C}"
+.    error "Invalid CHERI variant ${LIB${_LIBCOMPAT}CPUTYPE}"
 .  endif
 .endif
 .endfor

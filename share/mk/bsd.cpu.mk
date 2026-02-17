@@ -24,7 +24,7 @@ MACHINE_CPU = aim altivec
 MACHINE_CPU = aim altivec vsx vsx2
 . elif ${MACHINE_CPUARCH} == "riscv"
 .  if ${MACHINE_ARCH:Mriscv*c*}
-MACHINE_CPU = cheri
+MACHINE_CPU = cheri xcheri
 .  endif
 MACHINE_CPU += riscv
 . endif
