@@ -655,7 +655,8 @@ proc0_init(void *dummy __unused)
 	uintcap_t minuser_cap =
 	    (uintcap_t)cheri_capability_build_user_rwx_unchecked(
 	    0, p->p_sysent->sv_minuser,
-	    p->p_sysent->sv_maxuser - p->p_sysent->sv_minuser, 0);
+	    p->p_sysent->sv_maxuser - p->p_sysent->sv_minuser,
+	    p->p_sysent->sv_minuser);
 
 	vm_map_init(&vmspace0.vm_map, vmspace_pmap(&vmspace0),
 	    minuser_cap,

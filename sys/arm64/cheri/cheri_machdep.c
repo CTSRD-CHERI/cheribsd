@@ -121,12 +121,13 @@ hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 	tf->tf_ddc = (uintcap_t)cheri_capability_build_user_rwx(
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERMS_SWALL,
 	    CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
-	    CHERI_CAP_USER_DATA_OFFSET);
+	    CHERI_CAP_USER_DATA_BASE);
 
 	/* Use 'entry_addr' as offset of PCC. */
 	trapframe_set_elr(tf, (uintcap_t)cheri_capability_build_user_code(
 	    td, CHERI_CAP_USER_CODE_PERMS, CHERI_CAP_USER_CODE_BASE,
-	    CHERI_CAP_USER_CODE_LENGTH, entry_addr));
+	    CHERI_CAP_USER_CODE_LENGTH,
+	    CHERI_CAP_USER_CODE_BASE + entry_addr));
 }
 
 int

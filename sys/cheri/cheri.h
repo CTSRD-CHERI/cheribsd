@@ -45,30 +45,31 @@
  */
 void * __capability	_cheri_capability_build_user_code(struct thread *td,
 			    uint32_t perms, ptraddr_t basep, size_t length,
-			    off_t off, const char* func, int line);
+			    ptraddr_t addr, const char* func, int line);
 void * __capability	_cheri_capability_build_user_data(uint32_t perms,
-			    ptraddr_t basep, size_t length, off_t off,
+			    ptraddr_t basep, size_t length, ptraddr_t addr,
 			    const char* func, int line, bool exact);
 void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
-			    ptraddr_t basep, size_t length, off_t off,
+			    ptraddr_t basep, size_t length, ptraddr_t addr,
 			    const char* func, int line, bool exact);
 void * __capability	_cheri_capability_build_user_rwx_unchecked(
 			    uint32_t perms, ptraddr_t basep, size_t length,
-			    off_t off, const char* func, int line, bool exact);
-#define cheri_capability_build_user_code(td, perms, basep, length, off)	\
-	_cheri_capability_build_user_code(td, perms, basep, length, off,\
+			    ptraddr_t addr, const char* func, int line,
+			    bool exact);
+#define cheri_capability_build_user_code(td, perms, basep, length, addr) \
+	_cheri_capability_build_user_code(td, perms, basep, length, addr, \
 	    __func__, __LINE__)
-#define cheri_capability_build_user_data(perms, basep, length, off)	\
-	_cheri_capability_build_user_data(perms, basep, length, off,	\
+#define cheri_capability_build_user_data(perms, basep, length, addr)	\
+	_cheri_capability_build_user_data(perms, basep, length, addr,	\
 	    __func__, __LINE__, true)
-#define cheri_capability_build_inexact_user_data(perms, basep, length, off) \
-	_cheri_capability_build_user_data(perms, basep, length, off,	\
+#define cheri_capability_build_inexact_user_data(perms, basep, length, addr) \
+	_cheri_capability_build_user_data(perms, basep, length, addr,	\
 	    __func__, __LINE__, false)
-#define cheri_capability_build_user_rwx(perms, basep, length, off)	\
-	_cheri_capability_build_user_rwx(perms, basep, length, off,	\
+#define cheri_capability_build_user_rwx(perms, basep, length, addr)	\
+	_cheri_capability_build_user_rwx(perms, basep, length, addr,	\
 	    __func__, __LINE__, true)
-#define cheri_capability_build_user_rwx_unchecked(perms, basep, length, off) \
-	_cheri_capability_build_user_rwx_unchecked(perms, basep, length, off, \
+#define cheri_capability_build_user_rwx_unchecked(perms, basep, length, addr) \
+	_cheri_capability_build_user_rwx_unchecked(perms, basep, length, addr, \
 	    __func__, __LINE__, true)
 
 /*

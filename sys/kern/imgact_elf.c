@@ -1736,7 +1736,7 @@ prog_cap(struct image_params *imgp, uint64_t perms)
 	    (uintmax_t)prog_base, (uintmax_t)imgp->end_addr, prog_len));
 
 	return (cheri_capability_build_user_rwx(perms, prog_base, prog_len,
-	    imgp->start_addr - prog_base));
+	    imgp->start_addr));
 }
 
 static void * __capability
@@ -1761,7 +1761,7 @@ interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
 	MPASS(args->base >= interp_base);
 
 	return (cheri_capability_build_user_rwx(perms, interp_base, interp_len,
-	    args->base - interp_base));
+	    args->base));
 }
 
 static void * __capability
@@ -2159,11 +2159,13 @@ __elfN(coredump)(struct thread *td, struct vnode *vp, off_t limit, int flags)
 		php = (Elf_Phdr *)((char *)hdr + sizeof(Elf_Ehdr)) + 1;
 		for (i = 0; i < seginfo.count; i++) {
 #if __has_feature(capabilities)
-			section_cap = cheri_capability_build_user_data(
-			    CHERI_PERM_LOAD,
+			ptraddr_t section_addr =
 			    CHERI_REPRESENTABLE_ALIGN_DOWN(php->p_vaddr,
-			    php->p_filesz),
-			    CHERI_REPRESENTABLE_LENGTH(php->p_filesz), 0);
+			    php->p_filesz);
+			section_cap = cheri_capability_build_user_data(
+			    CHERI_PERM_LOAD, section_addr,
+			    CHERI_REPRESENTABLE_LENGTH(php->p_filesz),
+			    section_addr);
 #else
 			section_cap = (char *)(uintptr_t)php->p_vaddr;
 #endif
