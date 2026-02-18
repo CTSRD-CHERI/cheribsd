@@ -94,7 +94,7 @@ hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 	tf->tf_ddc = (uintcap_t)cheri_capability_build_user_rwx(
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERMS_SWALL,
 	    CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
-	    CHERI_CAP_USER_DATA_OFFSET);
+	    CHERI_CAP_USER_DATA_BASE);
 
 	/* Use 'entry_addr' as offset of PCC. */
 	tf->tf_sepc = (uintcap_t)cheri_capability_build_user_code(

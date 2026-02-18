@@ -1317,10 +1317,10 @@ exec_map_stack(struct image_params *imgp)
 #else
 	if (sv->sv_flags & SV_CHERI)
 		imgp->stack = cheri_capability_build_user_data(perms,
-		    stack_addr, ssiz, ssiz);
+		    stack_addr, ssiz, stack_top);
 	else
 		imgp->stack = cheri_capability_build_inexact_user_data(perms,
-		    stack_addr, ssiz, stack_top - stack_addr);
+		    stack_addr, ssiz, stack_top);
 #endif
 
 	if (sv->sv_flags & SV_CHERI) {
@@ -1348,7 +1348,8 @@ exec_map_stack(struct image_params *imgp)
 		imgp->strings = (void *)strings_addr;
 #else
 		imgp->strings = cheri_capability_build_user_data(
-		    CHERI_CAP_USER_DATA_PERMS, strings_addr, strings_size, 0);
+		    CHERI_CAP_USER_DATA_PERMS, strings_addr, strings_size,
+		    strings_addr);
 #endif
 	} else
 		imgp->strings = imgp->stack;
@@ -1446,7 +1447,7 @@ out:
 	 */
 	vmspace->vm_shp_base = (uintcap_t)cheri_capability_build_user_rwx(
 	    CHERI_CAP_USER_CODE_PERMS, sharedpage_addr,
-	    sv->sv_shared_page_len, 0);
+	    sv->sv_shared_page_len, sharedpage_addr);
 #endif
 
 	return (0);
