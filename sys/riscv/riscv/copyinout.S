@@ -34,6 +34,7 @@
  */
 
 #include <machine/asm.h>
+#include <machine/cherireg.h>
 #include <machine/riscvreg.h>
 #include <sys/errno.h>
 
@@ -73,6 +74,18 @@ copyio_fault_nopcb:
 	li	a0, EFAULT
 	RETURN
 END(copyio_fault)
+
+	.macro	assert_no_store_local reg
+#if defined(CHERI_RESTRICT_KERNCAP_FLOW) && defined(INVARIANTS)
+	li	t2, CHERI_PERM_STORE_LOCAL_CAP
+	cgetperm	t1, \reg
+	and	t1, t1, t2
+	beqz	t1, 1f
+	cmove ca0, \reg
+	_CALL cheri_assert_no_store_local
+1:
+#endif
+	.endmacro
 
 /*
  * copycommon - common copy routine
@@ -181,6 +194,7 @@ ENTRY(copyout)
 	csetbounds	ca0, ca3, a2
 #endif
 
+	assert_no_store_local	ca1
 	copycommon
 
 copyout_end:
@@ -205,6 +219,7 @@ ENTRY(copyin)
 	csetbounds	ca1, ca3, a2
 #endif
 
+	assert_no_store_local	ca0
 	copycommon
 
 copyin_end:
@@ -222,6 +237,7 @@ ENTRY(copyinstr)
 	mv	a5, x0		/* count = 0 */
 	beqz	a2, 3f		/* If len == 0 then skip loop */
 
+	assert_no_store_local	ca0
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, copyio_fault /* Get the handler address */
 	SET_FAULT_HANDLER(ca6, ca7) /* Set the handler */
@@ -364,6 +380,7 @@ ENTRY(copyoutptr)
 	csetbounds	ca0, ca3, a2
 #endif
 
+	assert_no_store_local	ca1
 	copycapcommon
 
 copyoutptr_end:
@@ -388,6 +405,7 @@ ENTRY(copyinptr)
 	csetbounds	ca1, ca3, a2
 #endif
 
+	assert_no_store_local	ca0
 	copycapcommon
 
 copyinptr_end:

@@ -212,6 +212,13 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 	perms = vm_prot2perms(cheri_perms_get(newcap), cap_prot);
 	newcap = cheri_perms_and(newcap, perms);
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_RESTRICT_KERNCAP_FLOW)
+	KASSERT((cheri_perms_get(newcap) & CHERI_PERM_GLOBAL) != 0,
+	    ("mmap_retcap: Missing PERM_GLOBAL"));
+	KASSERT((cheri_perms_get(newcap) & CHERI_PERM_STORE_LOCAL_CAP) == 0,
+	    ("mmap_retcap: Extra PERM_STORE_LOCAL_CAP"));
+#endif
+
 	return (newcap);
 }
 #endif
