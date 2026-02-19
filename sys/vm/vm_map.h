@@ -105,7 +105,7 @@ union vm_map_object {
  *	the next_read member is reused as the stack_guard_page storage, and
  *	offset is the stack protection.
  */
-#define	MAP_ENTRY_NAME_LEN	32
+#define	MAP_ENTRY_NAME_LEN	16
 struct vm_map_entry {
 	struct vm_map_entry *left;	/* left child or previous entry */
 	struct vm_map_entry *right;	/* right child or next entry */
