@@ -2541,12 +2541,15 @@ pmap_kremove_device(vm_offset_t sva, vm_size_t size)
 vm_pointer_t
 pmap_map(vm_pointer_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 {
+	vm_pointer_t p;
+
+	p = PHYS_TO_DMAP(start);
 #ifdef __CHERI_PURE_CAPABILITY__
-	return cheri_perms_and(cheri_bounds_set(PHYS_TO_DMAP(start), end - start),
-	    vm_map_prot2perms(prot));
-#else
-	return PHYS_TO_DMAP(start);
+	p = cheri_bounds_set(p, end - start);
+	p = cheri_perms_and(p, vm_prot2perms(cheri_perms_get(p), prot));
 #endif
+
+	return (p);
 }
 
 /*

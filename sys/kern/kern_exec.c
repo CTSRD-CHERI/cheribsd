@@ -1311,8 +1311,7 @@ exec_map_stack(struct image_params *imgp)
 	}
 
 #if __has_feature(capabilities)
-	perms = (~CHERI_PROT2PERM_MASK | vm_map_prot2perms(stack_prot)) &
-	    CHERI_CAP_USER_DATA_PERMS;
+        perms = vm_prot2perms(CHERI_CAP_USER_DATA_PERMS, stack_prot);
 #ifdef __CHERI_PURE_CAPABILITY__
 	imgp->stack = (void *)cheri_perms_and(stack_top, perms);
 #else

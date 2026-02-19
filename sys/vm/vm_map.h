@@ -599,10 +599,7 @@ int vm_map_reservation_create(vm_map_t, vm_pointer_t *, vm_size_t, vm_offset_t,
 int vm_map_reservation_create_locked(vm_map_t, vm_pointer_t *, vm_size_t, vm_prot_t);
 int vm_map_reservation_get(vm_map_t, vm_offset_t, vm_size_t, vm_offset_t *);
 #if __has_feature(capabilities)
-int vm_map_prot2perms(vm_prot_t prot);
 void * __capability vm_map_reservation_cap(vm_map_t, vm_offset_t);
-#endif
-#if __has_feature(capabilities)
 uintcap_t _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
     vm_prot_t prot);
 #define	vm_map_buildcap(map, addr, length, prot)	\

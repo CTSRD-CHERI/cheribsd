@@ -209,7 +209,7 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 	 * Set the permissions to PROT_MAX to allow a full
 	 * range of access subject to page permissions.
 	 */
-	perms = ~CHERI_PROT2PERM_MASK | vm_map_prot2perms(cap_prot);
+	perms = vm_prot2perms(cheri_perms_get(newcap), cap_prot);
 	newcap = cheri_perms_and(newcap, perms);
 
 	return (newcap);
@@ -376,7 +376,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	}
 
 	perms = cheri_perms_get(source_cap);
-	reqperms = vm_map_prot2perms(uap->prot);
+	reqperms = vm_prot2perms(0, uap->prot);
 #ifdef CHERI_PERM_EXECUTIVE
 	if ((flags & MAP_FIXED) && (perms & CHERI_PERM_EXECUTIVE) == 0)
 		/*

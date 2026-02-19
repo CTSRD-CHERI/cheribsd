@@ -171,7 +171,7 @@ useracc(void * __capability cap, int len, int rw)
 	    ("illegal ``rw'' argument to useracc (%x)\n", rw));
 	prot = rw;
 #if __has_feature(capabilities)
-	if (!cheri_can_access(cap, vm_map_prot2perms(prot), len))
+	if (!cheri_can_access(cap, vm_prot2perms(0, prot), len))
 		return (false);
 #endif
 	addr = (__cheri_addr vm_offset_t)cap;
@@ -195,7 +195,7 @@ vslock(void * __capability addr, size_t len, vm_prot_t prot __unused)
 
 #if __has_feature(capabilities)
 	if (!cheri_can_access(addr,
-	    vm_map_prot2perms(prot | VM_PROT_NO_IMPLY_CAP), len))
+	    vm_prot2perms(0, prot | VM_PROT_NO_IMPLY_CAP), len))
 		return (EPROT);
 #endif
 	vaddr = (__cheri_addr vm_offset_t)addr;

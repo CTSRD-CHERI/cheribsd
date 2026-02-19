@@ -1375,9 +1375,10 @@ pmap_map(vm_pointer_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 	vm_pointer_t p;
 
 	p = PHYS_TO_DMAP(start);
-	p = cheri_kern_bounds_set(p, end - start);
-	p = cheri_kern_perms_and(p, vm_map_prot2perms(prot) |
-	    ~CHERI_PROT2PERM_MASK);
+#ifdef __CHERI_PURE_CAPABILITY__
+	p = cheri_bounds_set(p, end - start);
+	p = cheri_perms_and(p, vm_prot2perms(cheri_perms_get(p), prot));
+#endif
 
 	return (p);
 }

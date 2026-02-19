@@ -1022,7 +1022,7 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 	}
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 	pbm->pbm_map_base = cheri_capability_build_user_data(
-	    vm_map_prot2perms(prot), addr, plen, 0);
+	    vm_prot2perms(0, prot), addr, plen, 0);
 #else
 	pbm->pbm_map_base = (void *)addr;
 #endif
