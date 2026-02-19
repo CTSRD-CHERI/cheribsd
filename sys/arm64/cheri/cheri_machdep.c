@@ -154,7 +154,7 @@ vm_prot2perms(int base, vm_prot_t prot)
 	}
 	if (prot & VM_PROT_EXECUTE)
 		perms |= CHERI_PERM_EXECUTE | CHERI_PERM_EXECUTIVE |
-		    CHERI_PERM_LOAD;
+		    CHERI_PERM_LOAD | CHERI_PERM_SYSCALL;
 
 	return ((base & ~CHERI_PERMS_RWX_MASK) | perms);
 }
