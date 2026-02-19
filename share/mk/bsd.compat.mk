@@ -122,7 +122,9 @@ LIB64_RISCV_ABI=	lp64d
 LIB64_MACHINE=	riscv
 LIB64_MACHINE_ARCH=riscv64
 .if ${LIB64CPUTYPE} == "cheri"
+.if 0
 .warning "CPUTYPE=cheri is deprecated, please use xcheri or rvy"
+.endif
 LIB64_RISCV_CHERI_TYPE=	xcheri
 .elif empty(LIB64CPUTYPE)
 LIB64_RISCV_CHERI_TYPE=	xcheri
@@ -158,7 +160,9 @@ HAS_COMPAT+=	64C
 LIB64C_MACHINE=	riscv
 LIB64C_MACHINE_ARCH=	${COMPAT_ARCH}c
 .if ${LIB64CCPUTYPE} == "cheri"
+.if 0
 .warning "CPUTYPE=cheri is deprecated, please use xcheri or rvy"
+.endif
 LIB64CWMAKEFLAGS=	CPUTYPE=xcheri
 .elif empty(LIB64CCPUTYPE)
 LIB64CWMAKEFLAGS=	CPUTYPE=xcheri
