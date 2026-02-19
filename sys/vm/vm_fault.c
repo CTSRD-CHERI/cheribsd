@@ -2366,7 +2366,7 @@ vm_fault_quick_hold_pages(vm_map_t map, void * __capability addr, vm_size_t len,
 	if (len == 0)
 		return (0);
 #if __has_feature(capabilities)
-	if (!cheri_can_access(addr, vm_map_prot2perms(prot), len))
+	if (!cheri_can_access(addr, vm_prot2perms(0, prot), len))
 		return (-1);
 #endif
 	start = (__cheri_addr vm_offset_t)trunc_page(addr);

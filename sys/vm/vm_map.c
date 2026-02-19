@@ -6158,36 +6158,6 @@ vm_map_reservation_init_entry(vm_map_entry_t new_entry)
 }
 
 #if __has_feature(capabilities)
-/*
- * Convert vm_prot_t to capability permission bits.
- */
-int
-vm_map_prot2perms(vm_prot_t prot)
-{
-	int perms = 0;
-
-	if (prot & (VM_PROT_CAP | VM_PROT_NO_IMPLY_CAP)) {
-		if (prot & (VM_PROT_READ | VM_PROT_COPY))
-			perms |= CHERI_PROT2PERM_READ_PERMS;
-		if (VM_PROT_HAS_READ_CAP(prot))
-			perms |= CHERI_PROT2PERM_READ_CAP_PERMS;
-		if (prot & VM_PROT_WRITE)
-			perms |= CHERI_PROT2PERM_WRITE_PERMS;
-		if (VM_PROT_HAS_WRITE_CAP(prot))
-			perms |= CHERI_PROT2PERM_WRITE_CAP_PERMS;
-	} else {
-		if (prot & (VM_PROT_READ | VM_PROT_COPY))
-			perms |= CHERI_PROT2PERM_READ_PERMS |
-			    CHERI_PROT2PERM_READ_CAP_PERMS;
-		if (prot & VM_PROT_WRITE)
-			perms |= CHERI_PROT2PERM_WRITE_PERMS |
-			    CHERI_PROT2PERM_WRITE_CAP_PERMS;
-	}
-	if (prot & VM_PROT_EXECUTE)
-		perms |= CHERI_PROT2PERM_EXEC_PERMS;
-
-	return (perms);
-}
 
 /*
  * Create a capability for the given map, derived from the map root
@@ -6198,10 +6168,10 @@ _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
     vm_prot_t prot)
 {
 	uintcap_t retcap;
-	int perms = ~CHERI_PROT2PERM_MASK | vm_map_prot2perms(prot);
+	uintcap_t rootcap = vm_map_rootcap(map);
+	int perms = vm_prot2perms(cheri_perms_get(rootcap), prot);
 
-	retcap = cheri_bounds_set(
-	    cheri_address_set(vm_map_rootcap(map), addr), length);
+	retcap = cheri_bounds_set(cheri_address_set(rootcap, addr), length);
 
 	return (cheri_perms_and(retcap, perms));
 }

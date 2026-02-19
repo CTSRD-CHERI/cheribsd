@@ -34,6 +34,7 @@
 #include <sys/kernel.h>
 #include <sys/devmap.h>
 #include <sys/proc.h>
+#include <vm/vm.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
@@ -126,4 +127,34 @@ hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 	trapframe_set_elr(tf, (uintcap_t)cheri_capability_build_user_code(
 	    td, CHERI_CAP_USER_CODE_PERMS, CHERI_CAP_USER_CODE_BASE,
 	    CHERI_CAP_USER_CODE_LENGTH, entry_addr));
+}
+
+int
+vm_prot2perms(int base, vm_prot_t prot)
+{
+	int perms = 0;
+
+	if (prot & (VM_PROT_CAP | VM_PROT_NO_IMPLY_CAP)) {
+		if (prot & (VM_PROT_READ | VM_PROT_COPY))
+			perms |= CHERI_PERM_LOAD;
+		if (VM_PROT_HAS_READ_CAP(prot))
+			perms |= CHERI_PERM_LOAD_CAP | CHERI_PERM_MUTABLE_LOAD;
+		if (prot & VM_PROT_WRITE)
+			perms |= CHERI_PERM_STORE;
+		if (VM_PROT_HAS_WRITE_CAP(prot))
+			perms |= CHERI_PERM_STORE_CAP |
+			    CHERI_PERM_STORE_LOCAL_CAP;
+	} else {
+		if (prot & (VM_PROT_READ | VM_PROT_COPY))
+			perms |= CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |
+			    CHERI_PERM_MUTABLE_LOAD;
+		if (prot & VM_PROT_WRITE)
+			perms |= CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+			    CHERI_PERM_STORE_LOCAL_CAP;
+	}
+	if (prot & VM_PROT_EXECUTE)
+		perms |= CHERI_PERM_EXECUTE | CHERI_PERM_EXECUTIVE |
+		    CHERI_PERM_LOAD;
+
+	return ((base & ~CHERI_PERMS_RWX_MASK) | perms);
 }

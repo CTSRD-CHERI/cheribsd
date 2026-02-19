@@ -113,21 +113,6 @@
 /* TODO #define CHERI_PERMS_HWALL_CID	(CHERI_PERM_SETCID) */
 
 /*
- * vm_prot_t to capability permission bits
- */
-#define	CHERI_PERMS_PROT2PERM_READ					\
-	CHERI_PERM_LOAD
-#define	CHERI_PERMS_PROT2PERM_READ_CAP					\
-	(CHERI_PERM_LOAD_CAP | CHERI_PERM_MUTABLE_LOAD)
-#define	CHERI_PERMS_PROT2PERM_WRITE					\
-	CHERI_PERM_STORE
-#define	CHERI_PERMS_PROT2PERM_WRITE_CAP					\
-	(CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP)
-#define	CHERI_PERMS_PROT2PERM_EXEC					\
-	(CHERI_PERM_EXECUTE | CHERI_PERM_EXECUTIVE |			\
-	 CHERI_PERMS_PROT2PERM_READ)
-
-/*
  * Basic userspace permission mask; CHERI_PERM_EXECUTE will be added for
  * executable capabilities (pcc); CHERI_PERM_STORE, CHERI_PERM_STORE_CAP,
  * and CHERI_PERM_STORE_LOCAL_CAP will be added for data permissions (ddc).
@@ -186,6 +171,18 @@
 
 #define	CHERI_PERMS_KERNEL_DATA_NOCAP					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_STORE)
+
+/*
+ * Permission mask that encodes the permission bits associated to
+ * the RWX memory access control.
+ * These are separate from the permission bits that encode other
+ * properties of capabilities (e.g. sealing or ASR).
+ */
+#define	CHERI_PERMS_RWX_MASK						\
+	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE |	\
+	CHERI_PERM_STORE_CAP |CHERI_PERM_MUTABLE_LOAD |			\
+	CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_EXECUTE |		\
+	CHERI_PERM_EXECUTIVE)
 
 /*
  * The CHERI object-type space is split between userspace and kernel,

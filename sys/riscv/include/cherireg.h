@@ -97,20 +97,6 @@
 	CHERI_PERM_SYSTEM_REGS | CHERI_PERM_SET_CID)
 
 /*
- * vm_prot_t to capability permission bits
- */
-#define	CHERI_PERMS_PROT2PERM_READ					\
-	CHERI_PERM_LOAD
-#define	CHERI_PERMS_PROT2PERM_READ_CAP					\
-	CHERI_PERM_LOAD_CAP
-#define	CHERI_PERMS_PROT2PERM_WRITE					\
-	CHERI_PERM_STORE
-#define	CHERI_PERMS_PROT2PERM_WRITE_CAP					\
-	(CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP)
-#define	CHERI_PERMS_PROT2PERM_EXEC					\
-	(CHERI_PERM_EXECUTE | CHERI_PERMS_PROT2PERM_READ)
-
-/*
  * Hardware defines a kind of tripartite taxonomy: memory, type, and CID.
  * They're all squished together in the permission bits, so define masks
  * that give us a kind of "kind" for capabilities.  A capability may belong
@@ -170,6 +156,17 @@
 
 #define	CHERI_PERMS_KERNEL_SEALCAP					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
+
+/*
+ * Permission mask that encodes the permission bits associated to
+ * the RWX memory access control.
+ * These are separate from the permission bits that encode other
+ * properties of capabilities (e.g. sealing or ASR).
+ */
+#define	CHERI_PERMS_RWX_MASK						\
+	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE |	\
+	CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP |		\
+	CHERI_PERM_EXECUTE)
 
 #define	CHERI_FLAGS_CAP_MODE	0x1
 
