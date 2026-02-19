@@ -1412,13 +1412,13 @@ exec_map_stack(struct image_params *imgp)
 		    sv->sv_maxuser, VMFS_ANY_SPACE,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
-		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE, "kernel:vdso");
+		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE, "sys:vdso");
 	} else {
 		vm_map_fixed_name(map, obj, 0, sv->sv_shared_page_base,
 		    &sharedpage_addr, sv->sv_shared_page_len,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
-		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE, "kernel:vdso");
+		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE, "sys:vdso");
 	}
 	if (error != KERN_SUCCESS) {
 		uprintf("%s: mapping shared page at addr: %p"
