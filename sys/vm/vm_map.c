@@ -2092,20 +2092,6 @@ charged:
 	 */
 	if (name != NULL )
 		strlcpy(new_entry->name, name, sizeof(new_entry->name));
-#if 0
-	else if (new_entry->object.vm_object == NULL &&
-	    (new_entry->eflags & MAP_ENTRY_GUARD) != 0)
-		strlcpy(new_entry->name, "kernel:vm_guard",
-		    sizeof(new_entry->name));
-	else if (new_entry->object.vm_object == NULL &&
-	    (new_entry->eflags & MAP_ENTRY_STACK_GAP) != 0)
-		strlcpy(new_entry->name, "kernel:vm_stackgap",
-		    sizeof(new_entry->name));
-	else if (new_entry->object.vm_object == NULL &&
-	    (new_entry->eflags & MAP_ENTRY_GROWS_DOWN) != 0)
-		strlcpy(new_entry->name, "kernel:vm_stack",
-		    sizeof(new_entry->name));
-#endif
 	else if (new_entry->object.vm_object == NULL)
 		strlcpy(new_entry->name, "kernel:vm_anon",
 		    sizeof(new_entry->name));
