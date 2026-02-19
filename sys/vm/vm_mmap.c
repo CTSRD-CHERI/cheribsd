@@ -238,6 +238,7 @@ vm_wxcheck(struct proc *p, char *call)
 static inline int
 vm_prot2vmprot(vm_prot_t *prot, const char *func, const char *protname)
 {
+#if __has_feature(capabilities)
 	vm_prot_t vm_prot;
 
 	KASSERT((*prot & ~_PROT_ALL) == 0, ("invalid bits in %s", protname));
@@ -258,6 +259,7 @@ vm_prot2vmprot(vm_prot_t *prot, const char *func, const char *protname)
 		vm_prot |= VM_PROT_NO_IMPLY_CAP;
 
 	*prot = vm_prot;
+#endif
 	return (0);
 }
 
@@ -463,6 +465,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	prot = PROT_EXTRACT(mrp->mr_prot);
 	/* Ensure max_prot is a superset of prot if non-zero */
 	if (max_prot != 0) {
+#if __has_feature(capabilities)
 		/*
 		 * If prot contains explicit capability permissions then
 		 * max_prot must as well.  Add PROT_NO_CAP to both to allow
@@ -476,6 +479,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 			prot |= PROT_NO_CAP;
 			max_prot |= PROT_NO_CAP;
 		}
+#endif
 		if ((max_prot & prot) != prot) {
 			SYSERRCAUSE("%s: requested page permissions exceed "
 			    "requested maximum", __func__);
@@ -566,7 +570,11 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		return (EINVAL);
 	}
 	if ((flags & MAP_GUARD) != 0 &&
-	    ((prot != PROT_NONE && prot != PROT_NO_CAP) || fd != -1 ||
+	    ((prot != PROT_NONE
+#if __has_feature(capabilities)
+	      && prot != PROT_NO_CAP
+#endif
+	     ) || fd != -1 ||
 	    pos != 0 || (flags & ~(MAP_FIXED | MAP_GUARD | MAP_EXCL |
 	    MAP_RESERVATION_CREATE |
 	    MAP_32BIT | MAP_ALIGNMENT_MASK)) != 0)) {
@@ -724,8 +732,10 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 			error = EINVAL;
 			goto done;
 		}
+#if __has_feature(capabilities)
 		if ((cap_prot & VM_PROT_CAP) != 0)
 			cap_maxprot = VM_PROT_ADD_CAP(cap_maxprot);
+#endif
 		if ((cap_prot & cap_maxprot) != cap_prot) {
 			SYSERRCAUSE("%s: unable to map file with "
 			    "requested permissions", __func__);
@@ -1056,11 +1066,13 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int userprot,
 
 	flags |= VM_MAP_PROTECT_SET_PROT | VM_MAP_PROTECT_KEEP_CAP;
 	if (max_prot != 0) {
+#if __has_feature(capabilities)
 		/* see comment in kern_mmap() */
 		if ((prot & _PROT_CAP) != 0 || (max_prot & _PROT_CAP) != 0) {
 			prot |= PROT_NO_CAP;
 			max_prot |= PROT_NO_CAP;
 		}
+#endif
 		if ((max_prot & prot) != prot)
 			return (ENOTSUP);
 		flags |= VM_MAP_PROTECT_SET_MAXPROT;
