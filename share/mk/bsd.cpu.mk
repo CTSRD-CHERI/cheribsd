@@ -322,7 +322,9 @@ MACHINE_CPU += vsx3
 ########## riscv
 . elif ${MACHINE_CPUARCH} == "riscv"
 .  if ${CPUTYPE} == "cheri"
+.   if 0
 .warning "CPUTYPE=cheri is deprecated, please use xcheri or rvy"
+.   endif
 MACHINE_CPU = cheri xcheri
 .  elif ${CPUTYPE} == "xcheri"
 MACHINE_CPU = cheri xcheri
