@@ -60,7 +60,7 @@ CFLAGS.memset.c+=-I${LIBC_SRCTOP}/include
 
 # Also use all the syscall .o files from libsys_pic (libsys is always NO_SSP):
 _libsys_other_objects= fstat fstatat fstatfs syscall \
-    cerror geteuid getegid sigfastblock munmap mprotect msetname \
+    cerror geteuid getegid sigfastblock munmap mprotect msetname _msetname \
     sysarch __sysctl issetugid __getcwd utrace getpid \
     thr_self thr_kill pread lseek _exit \
     getdirentries _close _fcntl _open _openat _read \
