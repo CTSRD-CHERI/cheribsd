@@ -42,6 +42,7 @@
 /* Machine type dependent parameters. */
 #include <machine/endian.h>
 #include <sys/_types.h>
+#include <sys/_offsetof.h>
 
 #include <sys/_pthreadtypes.h>
 
@@ -310,7 +311,6 @@ typedef	__int64_t	intptr64_t;
 typedef	__uint64_t	uintptr64_t;
 #endif
 
-#define offsetof(type, field) __offsetof(type, field)
 #endif /* _KERNEL */
 
 #if	defined(_KERNEL) || defined(_STANDALONE)
