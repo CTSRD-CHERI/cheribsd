@@ -96,6 +96,9 @@ WERROR?=	-Werror
 # tree, to ensure we don't regress the build.  LLVM11 and GCC10 will switch the
 # default over to -fno-common, making this redundant.
 CFLAGS+=	-fno-common
+.if defined(CHERI_COMPARTMENT_POLICY)
+CFLAGS+=	-ffunction-sections
+.endif
 
 # XXX LOCORE means "don't declare C stuff" not "for locore.s".
 ASM_CFLAGS= -x assembler-with-cpp -DLOCORE ${CFLAGS} ${ASM_CFLAGS.${.IMPSRC:T}}
