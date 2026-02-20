@@ -29,7 +29,7 @@
 #ifndef _DEV_HWC_HWC_CONTEXTHASH_H_
 #define _DEV_HWC_HWC_CONTEXTHASH_H_
 
-struct hwc_context * hwc_contexthash_lookup(struct proc *p);
+struct hwc_context *hwc_contexthash_lookup(struct proc *p);
 void hwc_contexthash_insert(struct hwc_context *ctx);
 void hwc_contexthash_remove(struct hwc_context *ctx);
 

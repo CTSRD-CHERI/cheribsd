@@ -96,7 +96,7 @@ hwc_ctx_alloc(struct hwc_context *tc)
 	char filename[32];
 	int error = 0;
 
-	if (tc->backend->methods->init != NULL){
+	if (tc->backend->methods->init != NULL) {
 		error = tc->backend->methods->init(tc);
 		if (error)
 			return (error);

@@ -36,9 +36,9 @@ struct hwc_owner {
 	LIST_ENTRY(hwc_owner)		next; /* Entry in hwc owner hash. */
 };
 
-struct hwc_context * hwc_owner_lookup_ctx(struct hwc_owner *ho, pid_t pid);
-struct hwc_owner * hwc_owner_alloc(struct proc *p);
+struct hwc_context *hwc_owner_lookup_ctx(struct hwc_owner *ho, pid_t pid);
+struct hwc_owner *hwc_owner_alloc(struct proc *p);
 void hwc_owner_shutdown(struct hwc_owner *ho);
-struct hwc_context * hwc_owner_lookup_ctx_by_cpu(struct hwc_owner *ho, int cpu);
+struct hwc_context *hwc_owner_lookup_ctx_by_cpu(struct hwc_owner *ho, int cpu);
 
 #endif /* !_DEV_HWC_HWC_OWNER_H_ */

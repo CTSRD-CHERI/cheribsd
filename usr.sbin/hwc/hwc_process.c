@@ -77,6 +77,7 @@ hwc_process_onsig(int signo)
 int
 hwc_process_create(int *sockpair, char **cmd, char **env __unused, int *pid0)
 {
+	struct sigaction act;
 	char token;
 	pid_t pid;
 	int error;
@@ -84,7 +85,11 @@ hwc_process_create(int *sockpair, char **cmd, char **env __unused, int *pid0)
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockpair) < 0)
 		return (-1);
 
-	signal(SIGCHLD, hwc_process_onsig);
+	act.sa_handler = hwc_process_onsig;
+	sigemptyset(&act.sa_mask);
+	act.sa_flags = 0;
+	sigaction(SIGCHLD, &act, NULL);
+
 	siginterrupt(SIGCHLD, 1);
 	pid = fork();
 
