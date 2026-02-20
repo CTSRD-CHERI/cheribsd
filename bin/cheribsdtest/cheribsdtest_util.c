@@ -151,3 +151,20 @@ skip_need_default_cheri_revoke(const struct cheri_test *ctp __unused)
 	}
 	return (NULL);
 }
+
+const char *
+skip_need_kernel_capflow(const struct cheri_test *ctp __unused)
+{
+	if (!feature_present("cheri_kernel_capflow"))
+		return ("No kernel capability flow enforcement");
+	return (NULL);
+}
+
+const char *
+skip_with_kernel_capflow(const struct cheri_test *ctp __unused)
+{
+	if (feature_present("cheri_kernel_capflow"))
+		return ("Kernel capability flow enforcement");
+	return (NULL);
+}
+
