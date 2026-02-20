@@ -29,7 +29,7 @@
 #ifndef _DEV_HWC_HWC_OWNERHASH_H_
 #define _DEV_HWC_HWC_OWNERHASH_H_
 
-struct hwc_owner * hwc_ownerhash_lookup(struct proc *p);
+struct hwc_owner *hwc_ownerhash_lookup(struct proc *p);
 void hwc_ownerhash_insert(struct hwc_owner *ho);
 void hwc_ownerhash_remove(struct hwc_owner *ho);
 
