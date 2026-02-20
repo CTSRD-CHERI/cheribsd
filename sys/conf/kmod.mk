@@ -151,6 +151,10 @@ CFLAGS.gcc+= --param large-function-growth=1000
 # share/mk/src.sys.mk, but the following is important for out-of-tree modules
 # (e.g. ports).
 CFLAGS+=	-fno-common
+.if defined(CHERI_COMPARTMENT_POLICY)
+CFLAGS+=	-ffunction-sections
+.endif
+
 .if ${LINKER_TYPE} != "lld" || ${LINKER_VERSION} < 140000
 # lld >= 14 warns that -d is deprecated, and will be removed.
 LDFLAGS+=	-d

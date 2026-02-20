@@ -9,7 +9,7 @@ SECTIONS
   .vmm_vectors : { *(.vmm_vectors) }
   .text      :
   {
-    *(.text)
+    *(.text .text.*)
     *(.stub)
     /* .gnu.warning sections are handled specially by elf32.em.  */
     *(.gnu.warning)
