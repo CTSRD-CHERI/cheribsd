@@ -418,6 +418,9 @@ static char cheri_notice[] =
 #ifdef CHERI_CAPREVOKE
     " with revocation support"
 #endif
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+    " with kernel-caplevels support"
+#endif
     "\n";
 SYSINIT(cherinotice, SI_SUB_COPYRIGHT, SI_ORDER_ANY, print_caddr_t,
     cheri_notice);
