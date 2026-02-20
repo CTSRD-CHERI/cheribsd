@@ -416,9 +416,6 @@ CHERIBSDTEST(initregs_stack,
 	if ((v & CHERI_PERM_GLOBAL) == 0)
 		cheribsdtest_failure_errx("perms %jx (global missing)", v);
 
-	if ((v & CHERI_PERM_STORE_LOCAL_CAP) == 0)
-		cheribsdtest_failure_errx("perms %jx (store_local_cap missing)",
-		    v);
 #ifdef HAS_CHERI_PERM_LOAD_MUTABLE
 	if ((v & CHERI_PERM_LOAD_MUTABLE) == 0)
 		cheribsdtest_failure_errx("perms %jx (load mutable missing)", v);
@@ -436,10 +433,6 @@ CHERIBSDTEST(initregs_stack,
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheribsdtest_failure_errx("perms %jx (system_regs present)", v);
 
-	if (v != CHERI_CAP_USER_DATA_PERMS)
-		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
-		    (uintmax_t)(CHERI_CAP_USER_DATA_PERMS));
-
 	/* Sealed bit. */
 	v = cheri_is_sealed(c);
 	if (v != 0)
@@ -449,6 +442,53 @@ CHERIBSDTEST(initregs_stack,
 	v = cheri_tag_get(c);
 	if (v != 1)
 		cheribsdtest_failure_errx("tag %jx (expected 1)", v);
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(initregs_stack_no_kernel_capflow_levels,
+    "Test global permissions of the stack capability (no kernel-capflow)",
+    .ct_check_skip=skip_with_kernel_capflow)
+{
+	void * __capability c = cheri_stack_get();
+	register_t v = cheri_perms_get(c);
+
+	if ((v & CHERI_PERM_GLOBAL) == 0)
+		cheribsdtest_failure_errx("perms %jx (global missing)", v);
+
+	if ((v & CHERI_PERM_STORE_LOCAL_CAP) == 0)
+		cheribsdtest_failure_errx("perms %jx (store_local_cap missing)",
+		    v);
+
+	if (v != CHERI_CAP_USER_DATA_PERMS)
+		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
+		    (uintmax_t)(CHERI_CAP_USER_DATA_PERMS));
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(initregs_stack_kernel_capflow_levels,
+    "Test global permissions of the stack capability with kernel-capflow",
+    .ct_check_skip=skip_need_kernel_capflow)
+{
+	void * __capability c = cheri_stack_get();
+	register_t v = cheri_perms_get(c);
+
+	if ((v & CHERI_PERM_GLOBAL) == 0)
+		cheribsdtest_failure_errx("perms %jx (global missing)", v);
+
+	if ((v & CHERI_PERM_STORE_LOCAL_CAP) != 0)
+		cheribsdtest_failure_errx("perms %jx (store_local_cap present)",
+		    v);
+
+	/*
+	 * XXX-AM: CHERI_CAP_USER_DATA_PERMS is unfortunately dependent on
+	 * the kernel-capflow feature, which can not be determined statically
+	 * in userspace.
+	 */
+	if (v != (CHERI_CAP_USER_DATA_PERMS & ~CHERI_PERM_STORE_LOCAL_CAP))
+		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
+		    (uintmax_t)(CHERI_CAP_USER_DATA_PERMS));
+
 	cheribsdtest_success();
 }
 
