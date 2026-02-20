@@ -116,15 +116,20 @@ int
 vm_prot2perms(int base, vm_prot_t prot)
 {
 	int perms = 0;
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	const int perm_kernel_level = 0;
+#else
+	const int perm_kernel_level = CHERI_PERM_STORE_LOCAL_CAP;
+#endif
 #ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	const int perm_load_cap = CHERI_PERM_LOAD_CAP;
 	const int perm_store_cap = CHERI_PERM_STORE_CAP |
-	    CHERI_PERM_STORE_LOCAL_CAP;
+	    perm_kernel_level;
 #else
 	const int perm_load_cap = CHERI_PERM_CAP |
 	    CHERI_PERM_LOAD_MUTABLE;
 	const int perm_store_cap = CHERI_PERM_CAP |
-	    CHERI_PERM_STORE_LOCAL_CAP;
+	    perm_kernel_level;
 #endif
 
 	if (prot & (VM_PROT_CAP | VM_PROT_NO_IMPLY_CAP)) {
