@@ -783,7 +783,8 @@ mount_bdev(struct file_system_type *fs_type, int flags, const char *dev_name,
 		goto fail2;
 
 	_g_topology_lock();
-	error = g_vfs_open(devvp, &cp, fs_type->name, 0);
+	error = g_vfs_open(devvp, &cp, fs_type->name,
+	    (mp->mnt_flag & MNT_RDONLY) != 0 ? 0 : 1);
 	_g_topology_unlock();
 	VOP_UNLOCK(devvp);
 	if (error != 0) {
