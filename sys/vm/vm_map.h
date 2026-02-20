@@ -235,6 +235,9 @@ struct cheri_revoke_stats;
  */
 struct vm_map {
 	struct vm_map_entry header;	/* List of entries */
+#if __has_feature(capabilities)
+	uintcap_t map_capability;	/* (c) Capability spanning the map */
+#endif
 	union {
 		struct sx lock;			/* Lock for map data */
 		struct mtx system_mtx;
@@ -280,9 +283,6 @@ struct vm_map {
 	pmap_t pmap;			/* (c) Physical map */
 	vm_offset_t anon_loc;
 	int busy;
-#if __has_feature(capabilities)
-	intcap_t map_capability;	/* Capability spanning the whole map */
-#endif
 #ifdef DIAGNOSTIC
 	int nupdates;
 #endif
