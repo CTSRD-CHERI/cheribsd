@@ -119,7 +119,7 @@ hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 
 	/* Set DDC to full user privilege. */
 	tf->tf_ddc = (uintcap_t)cheri_capability_build_user_rwx(
-	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM,
+	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERMS_SWALL,
 	    CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
 	    CHERI_CAP_USER_DATA_OFFSET);
 
