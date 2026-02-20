@@ -222,10 +222,11 @@ check_initreg_data_full_addrspace(void * __capability c)
 
 	/* Permissions. */
 	v = cheri_perms_get(c);
-	if (v != (CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM))
+	if (v != (CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM |
+	    CHERI_PERM_SYSCALL))
 		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_CAP_USER_DATA_PERMS |
-		    CHERI_PERM_SW_VMEM);
+		    CHERI_PERM_SW_VMEM | CHERI_PERM_SYSCALL);
 
 	/*
 	 * More overt tests for permissions that should -- or should not -- be
