@@ -1025,10 +1025,9 @@ void
 mark_buffer_dirty(struct buffer_head *bh)
 {
 #if 0
-	// XXX: Triggers panic half a minute after write
 	printf("%s: dirtying %p\n", __func__, bh);
-	bdirty((struct buf *)bh);
 #endif
+	bdirty((struct buf *)bh);
 }
 
 void
