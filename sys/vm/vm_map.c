@@ -1035,8 +1035,8 @@ vm_map_init(vm_map_t map, pmap_t pmap, uintcap_t min, uintcap_t max)
 }
 
 void
-vm_map_init_system(vm_map_t map, pmap_t pmap, vm_pointer_t min,
-    vm_pointer_t max)
+vm_map_init_system(vm_map_t map, pmap_t pmap, uintcap_t min,
+    uintcap_t max)
 {
 	_vm_map_init(map, pmap, min, max);
 	vm_map_modflags(map, MAP_SYSTEM_MAP, 0);
