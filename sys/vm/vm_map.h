@@ -581,7 +581,7 @@ int vm_map_alignspace(vm_map_t, vm_object_t, vm_ooffset_t,
     vm_offset_t *, vm_size_t, vm_offset_t, vm_offset_t);
 int vm_map_inherit (vm_map_t, vm_offset_t, vm_offset_t, vm_inherit_t);
 void vm_map_init(vm_map_t, pmap_t, uintcap_t, uintcap_t);
-void vm_map_init_system(vm_map_t, pmap_t, vm_pointer_t, vm_pointer_t);
+void vm_map_init_system(vm_map_t, pmap_t, uintcap_t, uintcap_t);
 int vm_map_insert (vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t,
     vm_pointer_t, vm_prot_t, vm_prot_t, int, vm_offset_t);
 int vm_map_lookup (vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, vm_object_t *,
