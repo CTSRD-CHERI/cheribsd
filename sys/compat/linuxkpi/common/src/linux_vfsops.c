@@ -60,9 +60,6 @@ sb_bread(struct super_block *sb, sector_t lbn)
 		return (NULL);
 	}
 
-	// XXX: Make it work without this
-	bp->b_flags |= B_MANAGED;
-
 	return ((struct buffer_head *)bp);
 }
 
