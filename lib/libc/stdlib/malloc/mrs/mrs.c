@@ -109,6 +109,7 @@
 //#define QEMU_TARGET 1
 //#define ZERO_POISON_ON_FLUSH 1
 #define CLEAR_ON_ALLOC 1
+#define PVER_ENABLE
 #define	MALLOCX_LG_ALIGN_BITS	6
 #define	MALLOCX_LG_ALIGN_MASK	((1 << MALLOCX_LG_ALIGN_BITS) - 1)
 /* Use MALLOCX_ALIGN_GET() if alignment may not be specified in flags. */
@@ -130,6 +131,8 @@ extern void snmalloc_flush_message_queue(void);
 #define	MALLOC_ABORT_ENABLE_ENV		"_RUNTIME_ABORT_ENABLE"
 #define	MALLOC_ZERO_DISABLE_ENV	"_RUNTIME_ZERO_DISABLE"
 #define	MALLOC_ZERO_ENABLE_ENV	"_RUNTIME_ZERO_ENABLE"
+#define	MALLOC_VERSION_DISABLE_ENV	"_RUNTIME_VERSION_DISABLE"
+#define	MALLOC_VERSION_ENABLE_ENV	"_RUNTIME_VERSION_ENABLE"
 #define	MALLOC_POISON_DISABLE_ENV	"_RUNTIME_POISON_DISABLE"
 #define	MALLOC_POISON_ENABLE_ENV	"_RUNTIME_POISON_ENABLE"
 #define	MALLOC_PTRAP_DISABLE_ENV	"_RUNTIME_PTRAP_DISABLE"
@@ -369,13 +372,15 @@ static size_t page_size;
 /* Flags are constant after initialization. */
 static void *entire_shadow;
 static bool quarantining = true;
-static bool zeroing = true;
+static bool zeroing = false;
+static bool versioning = false;
+
 #ifdef QEMU_TARGET
 static bool poisoning = true;
 static bool trapping = true;
 #else 
-static bool poisoning = true;
-static bool trapping = true;
+static bool poisoning = false;
+static bool trapping = false;
 #endif
 static bool revoke_every_free = false;
 static bool revoke_async = false;
@@ -1471,6 +1476,11 @@ mrs_init_impl_locked(void)
 		} else if (getenv(MALLOC_ZERO_ENABLE_ENV) != NULL) {
 			zeroing = true;
 		}
+		if (getenv(MALLOC_VERSION_DISABLE_ENV) != NULL) {
+			versioning = false;
+		} else if (getenv(MALLOC_VERSION_ENABLE_ENV) != NULL) {
+			versioning = true;
+		}
 		if (getenv(MALLOC_POISON_DISABLE_ENV) != NULL) {
 			poisoning = false;
 		} else if (getenv(MALLOC_POISON_ENABLE_ENV) != NULL) {
@@ -1642,23 +1652,20 @@ mrs_malloc(size_t size)
 
 	MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, allocated_region);
 #ifdef PVER_ENABLE
-	void * allocated_region_raw =  *(void **) allocated_region;
-	volatile int pver = cgetpver( allocated_region_raw);
-	if (pver < 255){
-		csetpver( allocated_region, pver+1);
-	}
-	else{
-		//for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-		//	dczero((char*)(allocated_region+i));
-		//}
-		clear_region(allocated_region, cheri_getlen(allocated_region));
-		fprintf(stderr, "malloc reset pver to default\n");
-		csetpver( allocated_region, 1);
+	if(versioning){
+		void * allocated_region_raw =  *(void **) allocated_region;
+		volatile int pver = cgetpver( allocated_region_raw);
+		if (pver < 255){
+			csetpver( allocated_region, pver+1);
+		}
+		else{
+
+			clear_region(allocated_region, cheri_getlen(allocated_region));
+			//fprintf(stderr, "malloc reset pver to default\n");
+			csetpver( allocated_region, 1);
+		}
 	}
 
-	if(cgetpver(allocated_region) == pver){
-		fprintf(stderr, "illegal, pver is not correctly incremented \n");
-	}
 #endif 
 	//clear_region(allocated_region, cheri_getlen(allocated_region));
 	if(trapping)
@@ -1760,22 +1767,20 @@ mrs_real_posix_memalign(void **ptr, size_t alignment, size_t size)
 	if (ret == 0)
 		*ptr = mrs_bound_pointer(*ptr, size_aligned);
 #ifdef PVER_ENABLE
-	void * ptr_raw =  *(void **) *ptr;
-	volatile int pver = cgetpver( ptr_raw);
-	if (pver < 255){
-		csetpver( *ptr, pver+1);
+	if(versioning){
+		void * ptr_raw =  *(void **) *ptr;
+		volatile int pver = cgetpver( ptr_raw);
+		if (pver < 255){
+			csetpver( *ptr, pver+1);
+		}
+		else{
+
+			clear_region(*ptr, cheri_getlen(*ptr));
+			//fprintf(stderr, "reset pver to default\n");
+			csetpver( *ptr, 1);
+		}
 	}
-	else{
-		//for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-		//	dczero((char*)(*ptr+i));
-		//}
-		clear_region(*ptr, cheri_getlen(*ptr));
-		fprintf(stderr, "reset pver to default\n");
-		csetpver( *ptr, 1);
-	}
-	if(cgetpver(*ptr) == pver){
-		fprintf(stderr, "illegal, pver is not correctly incremented \n");
-	}
+
 #endif
 	if(trapping)
 		*ptr = cclearpoisonperm(*ptr);
@@ -1805,21 +1810,18 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 
 	int ret = mrs_real_posix_memalign(ptr, alignment, size_aligned);
 #ifdef PVER_ENABLE
-	void * ptr_raw =  *(void **) *ptr;
-	volatile int pver = cgetpver( ptr_raw);
-	if (pver < 255){
-		csetpver( *ptr, pver+1);
-	}
-	else{
-		//for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-		//	dczero((char*)(*ptr+i));
-		//}
-		clear_region(*ptr, cheri_getlen(*ptr));
-		fprintf(stderr, "reset pver to default\n");
-		csetpver( *ptr, 1);
-	}
-	if(cgetpver(*ptr) == pver){
-		fprintf(stderr, "illegal, pver is not correctly incremented \n");
+	if(versioning){
+		void * ptr_raw =  *(void **) *ptr;
+		volatile int pver = cgetpver( ptr_raw);
+		if (pver < 255){
+			csetpver( *ptr, pver+1);
+		}
+		else{
+
+			clear_region(*ptr, cheri_getlen(*ptr));
+			//fprintf(stderr, "reset pver to default\n");
+			csetpver( *ptr, 1);
+		}
 	}
 #endif
 	if (ret != 0) {
@@ -1884,22 +1886,20 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 	    allocated_region);
 #ifdef PVER_ENABLE	
-	void * allocated_region_raw =  *(void **) allocated_region;
-	volatile int pver = cgetpver( allocated_region_raw);
-	if (pver < 255){
-		csetpver(allocated_region, pver+1);
+	if(versioning){
+		void * allocated_region_raw =  *(void **) allocated_region;
+		volatile int pver = cgetpver( allocated_region_raw);
+		if (pver < 255){
+			csetpver(allocated_region, pver+1);
+		}
+		else{
+
+			clear_region(allocated_region, cheri_getlen(allocated_region));
+			//fprintf(stderr, "reset pver to default\n");
+			csetpver(allocated_region, 1);
+		}
 	}
-	else{
-		//for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-		//	dczero((char*)(allocated_region+i));
-		//}
-		clear_region(allocated_region, cheri_getlen(allocated_region));
-		fprintf(stderr, "reset pver to default\n");
-		csetpver(allocated_region, 1);
-	}
-	if(cgetpver(allocated_region) == pver){
-		fprintf(stderr, "illegal, pver is not correctly incremented \n");
-	}
+
 #endif
 	//clear_region(allocated_region, cheri_getlen(allocated_region));
 	if(trapping)
@@ -1964,23 +1964,21 @@ mrs_realloc(void *ptr, size_t size)
 	}
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size_aligned, 0, new_alloc);
 #ifdef PVER_ENABLE	
-	//void * new_alloc_raw =  *(void **) new_alloc;
-	volatile int pver = cgetpver( ptr);
-	if (pver < 255){
-		csetpver(new_alloc, pver+1);
-	}
-	else{
-		//for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-		//	dczero((char*)(new_alloc+i));
-		//}
-		clear_region(new_alloc, cheri_getlen(new_alloc));
-		fprintf(stderr, "reset pver to default\n");
-		csetpver(new_alloc, 1);
-	}
+	if(versioning){
+		void * new_alloc_raw =  *(void **) new_alloc;
+		volatile int pver = cgetpver( new_alloc_raw);
+		if (pver < 255){
+			csetpver(new_alloc, pver+1);
+		}
+		else{
 
-	if(cgetpver(new_alloc) == pver){
-		fprintf(stderr, "illegal, pver is not correctly incremented \n");
+			clear_region(new_alloc, cheri_getlen(new_alloc));
+			csetpver(new_alloc, 1);
+		}
 	}
+	//if(cgetpver(new_alloc) == pver){
+	//	fprintf(stderr, "illegal, pver is not correctly incremented \n");
+	//}
 #endif
 	if(trapping)
 		new_alloc = cclearpoisonperm(new_alloc);
@@ -2027,7 +2025,8 @@ mrs_free(void *ptr)
 #endif
 	int size = cheri_getlen(ptr);
 #ifdef PVER_ENABLE
-	csetpver(ins, cgetpver(ptr));
+	if(versioning)
+		csetpver(ins, cgetpver(ptr));
 #endif
 	if(poisoning){
 		if(size>= MALLOC_CACHELINE_ALIGNMENT){
@@ -2078,22 +2077,19 @@ mrs_mallocx(size_t size, int flags)
 #endif
 
 #ifdef PVER_ENABLE
-	void * ret_raw =  *(void **) ret;
-	volatile int pver = cgetpver( ret_raw);
-	if (pver < 255){
-		csetpver(ret, pver+1);
+	if(versioning){
+		void * ret_raw =  *(void **) ret;
+		volatile int pver = cgetpver( ret_raw);
+		if (pver < 255){
+			csetpver(ret, pver+1);
+		}
+		else{
+			clear_region(ret, cheri_getlen(ret));
+			//fprintf(stderr, "reset pver to default\n");
+			csetpver(ret, 1);
+		}
 	}
-	else{
-		//for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-		//	dczero((char*)(ret+i));
-		//}
-		clear_region(ret, cheri_getlen(ret));
-		fprintf(stderr, "reset pver to default\n");
-		csetpver(ret, 1);
-	}
-	if(cgetpver(ret) == pver){
-		fprintf(stderr, "illegal, pver is not correctly incremented \n");
-	}
+
 #endif
 	if(trapping)
 		ret = cclearpoisonperm(ret);
@@ -2146,21 +2142,18 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 		mrs_free(ptr);
 	}
 #ifdef PVER_ENABLE
-	void * new_alloc_raw =  *(void **) new_alloc;
-	volatile int pver = cgetpver( new_alloc_raw);
-	if (pver < 255){
-		csetpver(new_alloc, pver+1);
-	}
-	else{
-		//for(int i =0; i< size_aligned;i+=MALLOC_CACHELINE_ALIGNMENT){
-		//	dczero((char*)(new_alloc+i));
-		//}
-		clear_region(new_alloc, cheri_getlen(new_alloc));
-		fprintf(stderr, "reset pver to default\n");
-		csetpver(new_alloc, 1);
-	}
-	if(cgetpver(new_alloc) == pver){
-		fprintf(stderr, "illegal, pver is not correctly incremented \n");
+	if(versioning){
+		void * new_alloc_raw =  *(void **) new_alloc;
+		volatile int pver = cgetpver( new_alloc_raw);
+		if (pver < 255){
+			csetpver(new_alloc, pver+1);
+		}
+		else{
+
+			clear_region(new_alloc, cheri_getlen(new_alloc));
+			//fprintf(stderr, "reset pver to default\n");
+			csetpver(new_alloc, 1);
+		}
 	}
 #endif
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size_aligned, 0, new_alloc);
