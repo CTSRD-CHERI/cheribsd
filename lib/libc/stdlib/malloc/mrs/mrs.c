@@ -106,6 +106,10 @@
 #define	QUARANTINE_NUMERATOR	1
 #endif
 
+#ifndef VERSIONING_THRESHOLD
+#define	VERSIONING_THRESHOLD	64
+#endif
+
 //#define QEMU_TARGET 1
 //#define ZERO_POISON_ON_FLUSH 1
 #define CLEAR_ON_ALLOC 1
@@ -156,6 +160,8 @@ extern void snmalloc_flush_message_queue(void);
 #define	MALLOC_QUARANTINE_NUMERATOR_ENV \
 	"_RUNTIME_QUARANTINE_NUMERATOR"
 
+#define	MALLOC_VERSIONING_THRESHOLD_ENV \
+	"_RUNTIME_VERSIONING_THRESHOLD"
 #define	MALLOC_REVOKE_SKIP_KERNEL_REVOCATION \
 	"_RUNTIME_REVOCATION_SKIP_KERNEL_REVOCATION"
 
@@ -391,6 +397,9 @@ static bool skip_kernel_revocation = false;
 
 static unsigned int quarantine_denominator = QUARANTINE_DENOMINATOR;
 static unsigned int quarantine_numerator = QUARANTINE_NUMERATOR;
+
+static unsigned int versioning_threshold = VERSIONING_THRESHOLD;
+
 
 static spinlock_t mrs_init_lock = _SPINLOCK_INITIALIZER;
 #define	MRS_LOCK(x)	__extension__ ({	\
@@ -1433,6 +1442,18 @@ mrs_init_impl_locked(void)
 			exit(7);
 		}
 	}
+	if ((envstr = secure_getenv(MALLOC_VERSIONING_THRESHOLD_ENV)) !=
+	    NULL) {
+		errno = 0;
+		versioning_threshold = strtoul(envstr, &end, 0);
+		if (*end != '\0' ||
+		    (versioning_threshold == ULONG_MAX &&
+		     errno == ERANGE)) {
+			mrs_puts("invalid "
+			    MALLOC_VERSIONING_THRESHOLD_ENV "\n");
+			exit(7);
+		}
+	}
 	if (quarantine_denominator == 0) {
 		mrs_puts("quarantine_denominator can not be 0\n");
 		exit(7);
@@ -1653,16 +1674,20 @@ mrs_malloc(size_t size)
 	MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, allocated_region);
 #ifdef PVER_ENABLE
 	if(versioning){
-		void * allocated_region_raw =  *(void **) allocated_region;
-		volatile int pver = cgetpver( allocated_region_raw);
-		if (pver < 255){
-			csetpver( allocated_region, pver+1);
-		}
-		else{
+		if(size > versioning_threshold){
+			void * allocated_region_raw =  *(void **) allocated_region;
+			volatile int pver = cgetpver( allocated_region_raw);
+			if (pver < 255){
+				csetpver( allocated_region, pver+1);
+			}
+			else{
 
+				clear_region(allocated_region, cheri_getlen(allocated_region));
+				//fprintf(stderr, "malloc reset pver to default\n");
+				csetpver( allocated_region, 1);
+			}
+		}else{
 			clear_region(allocated_region, cheri_getlen(allocated_region));
-			//fprintf(stderr, "malloc reset pver to default\n");
-			csetpver( allocated_region, 1);
 		}
 	}
 
@@ -1768,16 +1793,20 @@ mrs_real_posix_memalign(void **ptr, size_t alignment, size_t size)
 		*ptr = mrs_bound_pointer(*ptr, size_aligned);
 #ifdef PVER_ENABLE
 	if(versioning){
-		void * ptr_raw =  *(void **) *ptr;
-		volatile int pver = cgetpver( ptr_raw);
-		if (pver < 255){
-			csetpver( *ptr, pver+1);
-		}
-		else{
+		if(size > versioning_threshold){
+			void * ptr_raw =  *(void **) *ptr;
+			volatile int pver = cgetpver( ptr_raw);
+			if (pver < 255){
+				csetpver( *ptr, pver+1);
+			}
+			else{
 
+				clear_region(*ptr, cheri_getlen(*ptr));
+				//fprintf(stderr, "reset pver to default\n");
+				csetpver( *ptr, 1);
+			}
+		}else{
 			clear_region(*ptr, cheri_getlen(*ptr));
-			//fprintf(stderr, "reset pver to default\n");
-			csetpver( *ptr, 1);
 		}
 	}
 
@@ -1811,16 +1840,20 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 	int ret = mrs_real_posix_memalign(ptr, alignment, size_aligned);
 #ifdef PVER_ENABLE
 	if(versioning){
-		void * ptr_raw =  *(void **) *ptr;
-		volatile int pver = cgetpver( ptr_raw);
-		if (pver < 255){
-			csetpver( *ptr, pver+1);
-		}
-		else{
+		if(size > versioning_threshold){
+			void * ptr_raw =  *(void **) *ptr;
+			volatile int pver = cgetpver( ptr_raw);
+			if (pver < 255){
+				csetpver( *ptr, pver+1);
+			}
+			else{
 
+				clear_region(*ptr, cheri_getlen(*ptr));
+				//fprintf(stderr, "reset pver to default\n");
+				csetpver( *ptr, 1);
+			}
+		}else{
 			clear_region(*ptr, cheri_getlen(*ptr));
-			//fprintf(stderr, "reset pver to default\n");
-			csetpver( *ptr, 1);
 		}
 	}
 #endif
@@ -1887,16 +1920,21 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	    allocated_region);
 #ifdef PVER_ENABLE	
 	if(versioning){
-		void * allocated_region_raw =  *(void **) allocated_region;
-		volatile int pver = cgetpver( allocated_region_raw);
-		if (pver < 255){
-			csetpver(allocated_region, pver+1);
+		if (size > versioning_threshold) {
+			void * allocated_region_raw =  *(void **) allocated_region;
+			volatile int pver = cgetpver( allocated_region_raw);
+			if (pver < 255){
+				csetpver(allocated_region, pver+1);
+			}
+			else{
+
+				clear_region(allocated_region, cheri_getlen(allocated_region));
+				//fprintf(stderr, "reset pver to default\n");
+				csetpver(allocated_region, 1);
+			}
 		}
 		else{
-
 			clear_region(allocated_region, cheri_getlen(allocated_region));
-			//fprintf(stderr, "reset pver to default\n");
-			csetpver(allocated_region, 1);
 		}
 	}
 
@@ -1964,6 +2002,7 @@ mrs_realloc(void *ptr, size_t size)
 	}
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size_aligned, 0, new_alloc);
 #ifdef PVER_ENABLE	
+	/*
 	if(versioning){
 		void * new_alloc_raw =  *(void **) new_alloc;
 		volatile int pver = cgetpver( new_alloc_raw);
@@ -1979,6 +2018,7 @@ mrs_realloc(void *ptr, size_t size)
 	//if(cgetpver(new_alloc) == pver){
 	//	fprintf(stderr, "illegal, pver is not correctly incremented \n");
 	//}
+	*/
 #endif
 	if(trapping)
 		new_alloc = cclearpoisonperm(new_alloc);
@@ -2078,15 +2118,20 @@ mrs_mallocx(size_t size, int flags)
 
 #ifdef PVER_ENABLE
 	if(versioning){
-		void * ret_raw =  *(void **) ret;
-		volatile int pver = cgetpver( ret_raw);
-		if (pver < 255){
-			csetpver(ret, pver+1);
+		if (size > versioning_threshold) {
+			void * ret_raw =  *(void **) ret;
+			volatile int pver = cgetpver( ret_raw);
+			if (pver < 255){
+				csetpver(ret, pver+1);
+			}
+			else{
+				clear_region(ret, cheri_getlen(ret));
+				//fprintf(stderr, "reset pver to default\n");
+				csetpver(ret, 1);
+			}
 		}
 		else{
 			clear_region(ret, cheri_getlen(ret));
-			//fprintf(stderr, "reset pver to default\n");
-			csetpver(ret, 1);
 		}
 	}
 
@@ -2142,6 +2187,7 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 		mrs_free(ptr);
 	}
 #ifdef PVER_ENABLE
+	/*
 	if(versioning){
 		void * new_alloc_raw =  *(void **) new_alloc;
 		volatile int pver = cgetpver( new_alloc_raw);
@@ -2154,7 +2200,7 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 			//fprintf(stderr, "reset pver to default\n");
 			csetpver(new_alloc, 1);
 		}
-	}
+	}*/
 #endif
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size_aligned, 0, new_alloc);
 	return (new_alloc);
