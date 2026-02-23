@@ -87,6 +87,15 @@ cpu_set_pcb_frame(struct thread *td)
 #ifdef CHERI_BOUNDED_KSTACK
 	td->td_pcb = cheri_bounds_set_exact(td->td_pcb, sizeof(struct pcb));
         td->td_frame = cheri_bounds_set_exact(td->td_frame, TF_SIZE);
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+        /*
+	 * NB: The trap handler continues to access the frame via the
+	 * root kstack capability. This enforces capability flow via
+	 * kernel C code.
+	 */
+	td->td_frame = cheri_perms_clear(td->td_frame,
+	    CHERI_PERM_STORE_LOCAL_CAP);
+#endif
 
 	/*
 	 * Compute the bounded kernel stack pointer.

@@ -37,6 +37,7 @@
 
 #include <machine/trap.h>
 #include <machine/riscvreg.h>
+#include <machine/cherireg.h>
 
 /*
  * Save the registers to the kernel stack and enter the kernel context.
@@ -455,6 +456,10 @@
 #ifdef CHERI_BOUNDED_KSTACK
 	/* See save_registers */
 	cmove	ca0, cs0
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	li	t1, ~CHERI_PERM_STORE_LOCAL_CAP
+	candperm	ca0, ca0, t1
+#endif
 #else
 	cmove	ca0, csp
 #endif
@@ -510,6 +515,10 @@ ENTRY(cpu_exception_handler_user)
 #ifdef __CHERI_PURE_CAPABILITY__
 #ifdef CHERI_BOUNDED_KSTACK
 	cmove	ca0, cs0
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	li	t1, ~CHERI_PERM_STORE_LOCAL_CAP
+	candperm	ca0, ca0, t1
+#endif
 #else
 	cmove	ca0, csp
 #endif
