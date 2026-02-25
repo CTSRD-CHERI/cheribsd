@@ -35,6 +35,8 @@
 #ifndef _MACHINE_STACK_H_
 #define	_MACHINE_STACK_H_
 
+#include <sys/proc.h>
+
 #define	INKERNEL(va)	((va) >= VM_MIN_KERNEL_ADDRESS && \
 			 (va) <= VM_MAX_KERNEL_ADDRESS)
 
@@ -65,5 +67,42 @@ kstack_contains(struct thread *td, vm_offset_t va, size_t len)
 	    sizeof(struct pcb));
 }
 #endif	/* _SYS_PROC_H_ */
+
+/*
+ * Get the thread kernel stack bottom.
+ * This is the space immediately after the reserved pcb and trapframe space.
+ * The returned stack pointer is precisely bounded.
+ *
+ * NB: This assumes that td_frame has been initialized.
+ */
+static __inline uintptr_t
+kstack_bottom(struct thread *td)
+{
+	uintptr_t ks = td->td_kstack;
+
+#ifdef CHERI_BOUNDED_KSTACK
+	size_t ks_size;
+
+	ks_size = (ptraddr_t)td->td_frame - (ptraddr_t)ks + TF_SIZE +
+	    sizeof(struct kernframe);
+	/*
+	 * Note: td_frame is placed so that td_kstack + ks_size is
+	 * representable.
+	 */
+	KASSERT(CHERI_REPRESENTABLE_LENGTH(ks_size),
+	    ("kstack size not representable: %#zx", ks_size));
+	KASSERT(is_aligned(ks, CHERI_REPRESENTABLE_ALIGNMENT(ks_size)),
+	    ("kstack not sufficiently aligned: %#p size %#zx", (void *)ks,
+		ks_size));
+
+	ks = cheri_bounds_set_exact(ks, ks_size);
+	KASSERT(cheri_tag_get(ks), ("Invalid kstack %#p", (void *)ks));
+	ks = cheri_address_set(ks, (ptraddr_t)td->td_frame);
+#else
+	ks = (uintptr_t)td->td_frame;
+#endif
+
+	return (ks);
+}
 
 #endif /* !_MACHINE_STACK_H_ */

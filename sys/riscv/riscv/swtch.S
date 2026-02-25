@@ -625,6 +625,10 @@ ENTRY(fork_trampoline)
 	cmove	ca0, cs0
 	cmove	ca1, cs1
 	cmove	ca2, csp
+#ifdef CHERI_BOUNDED_KSTACK
+	li	t0, TF_SIZE
+	csetboundsexact	ca2, ca2, t0
+#endif
 	ccall	_C_LABEL(fork_exit)
 #else
 	mv	a0, s0
