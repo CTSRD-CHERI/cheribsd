@@ -88,6 +88,9 @@ ASSYM(TD_FRAME, offsetof(struct thread, td_frame));
 ASSYM(TD_MD, offsetof(struct thread, td_md));
 ASSYM(TD_LOCK, offsetof(struct thread, td_lock));
 ASSYM(TD_MDFLAGS, offsetof(struct thread, td_md.md_flags));
+#ifdef CHERI_BOUNDED_KSTACK
+ASSYM(TD_KSTACK, offsetof(struct thread, td_kstack));
+#endif
 
 ASSYM(TF_SIZE, TF_SIZE);
 ASSYM(TF_RA, offsetof(struct trapframe, tf_ra));
@@ -106,6 +109,9 @@ ASSYM(TF_SCAUSE, offsetof(struct trapframe, tf_scause));
 ASSYM(TF_SSTATUS, offsetof(struct trapframe, tf_sstatus));
 
 ASSYM(KF_TP, offsetof(struct kernframe, kf_tp));
+#ifdef CHERI_BOUNDED_KSTACK
+ASSYM(KF_SIZE, sizeof(struct kernframe));
+#endif
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 ASSYM(KF_DDC, offsetof(struct kernframe, kf_ddc));
 #endif

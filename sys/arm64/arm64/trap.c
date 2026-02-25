@@ -779,6 +779,13 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 	KASSERT((uintptr_t)get_pcpu() >= VM_MIN_KERNEL_ADDRESS,
 	    ("Invalid pcpu address from userland: %p (tpidr 0x%lx)",
 	     get_pcpu(), READ_SPECIALREG(tpidr_el1)));
+#ifdef CHERI_BOUNDED_KSTACK
+	KASSERT(cheri_base_get(td->td_pcb) >= cheri_top_get(cheri_stack_get()),
+	    ("Invalid kernel stack bounds: %#p overlaps pcb %#p",
+		cheri_stack_get(), td->td_pcb));
+	KASSERT(cheri_length_get(td->td_pcb) == sizeof(struct pcb),
+	    ("Unbounded PCB pointer %#p", td->td_pcb));
+#endif
 
 	kasan_mark(frame, sizeof(*frame), sizeof(*frame), 0);
 	kmsan_mark(frame, sizeof(*frame), KMSAN_STATE_INITED);
