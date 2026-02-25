@@ -99,6 +99,10 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 #if __has_feature(capabilities)
 	p2->p_md.md_sigcode = td1->td_proc->p_md.md_sigcode;
 #endif
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT((cheri_perms_get(td2->td_kstack) & CHERI_PERM_EXECUTE) == 0,
+	    ("Executable td_kstack %#p", (void *)td2->td_kstack));
+#endif
 
 	cpu_set_pcb_frame(td2);
 
