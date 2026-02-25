@@ -104,6 +104,11 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 #endif
 	}
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT((cheri_perms_get(td2->td_kstack) & CHERI_PERM_EXECUTE) == 0,
+	    ("Executable td_kstack %#p", (void *)td2->td_kstack));
+#endif
+
 	pcb2 = (struct pcb *)(td2->td_kstack +
 	    td2->td_kstack_pages * PAGE_SIZE) - 1;
 
