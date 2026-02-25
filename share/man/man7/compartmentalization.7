@@ -23,7 +23,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd February 3 2026
+.Dd February 25, 2026
 .Dt COMPARTMENTALIZATION 7
 .Os
 .Sh NAME
@@ -206,6 +206,9 @@ than the calling compartment.
 .It
 .Xr dl_iterate_phdr 3
 can access the program headers of all loaded libraries.
+.It
+.Xr elf_aux_info 3
+can return highly privileged pointers.
 .El
 .Sh AUTHORS
 .An Dapeng Gao Aq Mt dapeng.gao@cl.cam.ac.uk
