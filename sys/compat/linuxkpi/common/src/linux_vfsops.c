@@ -183,6 +183,8 @@ lkpi_create(struct vop_create_args *ap)
 	// XXX free
 	name = strndup(cnp->cn_nameptr, cnp->cn_namelen, M_LKPIVFS);
 	mode = vap->va_mode;
+	if (vap->va_type == VREG)
+		mode |= S_IFREG;
 
 	memset(&child_dentry, 0, sizeof(child_dentry));
 	child_dentry.d_name.name = name;
