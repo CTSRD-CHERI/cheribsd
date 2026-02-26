@@ -159,15 +159,10 @@ lkpi_lookup(struct vop_lookup_args *ap)
 	vp = child_dentry.d_inode;
 	MPASS(vp->v_type != VNON);
 
-	if (!VOP_ISLOCKED(vp)) {
-		// XXX: This should have happened earlier; somewhere in ->lookup?
-		//printf("%s: locking %p, flags %x\n", __func__, vp, cnp->cn_lkflags);
-		vn_lock(vp, cnp->cn_lkflags);
-	}
-	vref(vp);
+	error = vn_lock(vp, cnp->cn_lkflags | LK_RETRY);
 	*vpp = vp;
 
-	return (0);
+	return (error);
 }
 
 static int
@@ -441,9 +436,6 @@ lkpi_remove(struct vop_remove_args *ap)
 	if (error != 0)
 		printf("%s: ->unlink returned -%d\n", __func__, error);
 
-	// XXX: According to VOP_REMOVE(9) man page this shouldn't be neededed
-	VOP_UNLOCK(vp);
-
 	return (error);
 }
 
@@ -625,11 +617,7 @@ lkpi_reclaim(struct vop_reclaim_args *ap)
 
 	printf("%s: %p\n", __func__, ap);
 
-	// XXX panics:
-	// #15 0xffffffff80c8bf6b in vfs_hash_remove (vp=0xfffff801ddbd88e0) at /usr/home/trasz/git/freebsd-src/sys/kern/vfs_hash.c:149
-	// 149		LIST_REMOVE(vp, v_hashlist);
-	//
-	//vfs_hash_remove(vp);
+	vfs_hash_remove(vp);
 
 	// XXX
 	vp->v_data = NULL;
@@ -681,7 +669,7 @@ new_inode(struct super_block *sb)
 	lp = malloc(sizeof(*lp), M_LKPIVFS, M_WAITOK | M_ZERO);
 	vp->v_data = lp;
 
-	error = insmntque(vp, sb->s_mnt);
+	error = insmntque1(vp, sb->s_mnt);
 	if (error != 0) {
 		VOP_UNLOCK(vp);
 		printf("%s: insmntque returned %d\n", __func__, error);
@@ -692,7 +680,6 @@ new_inode(struct super_block *sb)
 	vp->i_flags |= I_NEW;
 
 	vn_set_state(vp, VSTATE_CONSTRUCTED);
-	vref(vp); // XXX: needed?
 
 	return (vp);
 }
@@ -856,7 +843,7 @@ lkpi_unmount(struct mount *mp, int mntflags)
 	flags = 0;
 	if (mntflags & MNT_FORCE)
 		flags |= FORCECLOSE;
-	error = vflush(mp, 0, flags, curthread);
+	error = vflush(mp, 1, flags, curthread);
 	if (error != 0) {
 		printf("%s: vflush failed with error %d\n", __func__, error);
 		return (error);
@@ -876,7 +863,6 @@ lkpi_unmount(struct mount *mp, int mntflags)
 static int
 lkpi_root(struct mount *mp, int flags, struct vnode **vpp)
 {
-	int error;
 	struct super_block *sb;
 	struct vnode *vp;
 
@@ -892,9 +878,7 @@ lkpi_root(struct mount *mp, int flags, struct vnode **vpp)
 	}
 
 	*vpp = vp;
-	error = 0;
-
-	return (error);
+	return (0);
 }
 
 static int
@@ -936,7 +920,6 @@ lkpi_vget(struct mount *mp, ino_t ino, int lkflags, struct vnode **vpp)
 	error = vfs_hash_get(mp, ino, lkflags, curthread, &vp, NULL, NULL);
 	if (error != 0 || vp == NULL) {
 		vp = new_inode(sb);
-		//printf("%s: vfs_hash_get returned %d; inserting %p for inode %lu\n", __func__, error, vp, ino);
 		error = vfs_hash_insert(vp, ino, lkflags, curthread,
 		    &oldvp, NULL, NULL);
 		if (error != 0 || oldvp != NULL) {
@@ -1131,8 +1114,16 @@ iget_locked(struct super_block *sb, unsigned long ino)
 	if (error != 0)
 		panic("%s: callers can't handle NULL return; error %d\n", __func__, error);
 
-	ASSERT_VOP_LOCKED(vp, __func__);
-	MPASS(vp->i_ino != 0);
+	if ((vp->i_flags & I_NEW) == 0) {
+		/*
+		 * Despite the name, iget_locked() returns a locked vnode only
+		 * if it was newly created. If it already existed, it's returned
+		 * unlocked.
+		 */
+		VOP_UNLOCK(vp);
+	}
+
+	MPASS(ino != 0);
 	MPASS(vp->i_ino == ino);
 
 	return (vp);
@@ -1301,7 +1292,14 @@ simple_inode_init_ts(struct vnode *vp)
 void
 insert_inode_hash(struct vnode *vp)
 {
-	//printf("%s: %p\n", __func__, vp);
+	struct vnode *ovp;
+	int error;
+
+	error = vfs_hash_insert(vp, vp->i_ino, LK_EXCLUSIVE | LK_RETRY,
+	    curthread, &ovp, NULL, NULL);
+	if (error != 0 || ovp != NULL)
+		panic("%s: vfs_hash_insert failed with error %d, ovp %p\n",
+		    __func__, error, ovp);
 }
 
 void
