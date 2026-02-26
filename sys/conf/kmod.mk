@@ -586,10 +586,11 @@ OBJS_DEPEND_GUESS+= ${SRCS:M*.h}
 OBJS_DEPEND_GUESS+= opt_global.h
 .endif
 
+.if defined(ZFSTOP)
+# Define include search paths of in-tree ZFS for use by ZFS/DTrace-related
+# modules if a build uses in-tree ZFS by virtue of defining ZFSTOP. For example,
+# in-tree kernel modules use ZFSTOP but out-of-tree kernel modules not.
 ZINCDIR=${ZFSTOP}/include
-.if !exists(${ZINCDIR})
-.error is ZFSTOP set?
-.endif
 OPENZFS_CFLAGS=     \
 	-D_SYS_VMEM_H_  \
 	-D__KERNEL__ \
@@ -602,6 +603,7 @@ OPENZFS_CFLAGS=     \
 	-I${SYSDIR}/cddl/compat/opensolaris \
 	-I${SYSDIR}/cddl/contrib/opensolaris/uts/common \
 	-include ${ZINCDIR}/os/freebsd/spl/sys/ccompile.h
+.endif
 
 .include <bsd.dep.mk>
 .include <bsd.clang-analyze.mk>
