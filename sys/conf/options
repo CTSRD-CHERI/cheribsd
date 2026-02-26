@@ -1020,6 +1020,7 @@ PRESERVE_EARLY_KENV	opt_global.h
 # CHERI
 CPU_CHERI	opt_global.h
 CHERI_PURECAP_KERNEL		opt_global.h
+CHERI_BOUNDED_KSTACK		opt_global.h
 
 #
 # Disable system-call authorisation for compartmentalised user code.
