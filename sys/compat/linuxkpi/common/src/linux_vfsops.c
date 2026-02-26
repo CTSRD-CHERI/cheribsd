@@ -851,9 +851,15 @@ lkpi_unmount(struct mount *mp, int mntflags)
 		return (error);
 	}
 
+	error = -sb->s_op->sync_fs(sb, 1);
+	if (error != 0) {
+		printf("%s: ->sync_fs returned %d\n", __func__, error);
+		return (error);
+	}
+
 	_g_topology_lock();
-        g_vfs_close(sb->s_bdev);
-        _g_topology_unlock();
+	g_vfs_close(sb->s_bdev);
+	_g_topology_unlock();
 	vrele(sb->s_devvp);
 
 	free(sb, M_LKPIVFS);
