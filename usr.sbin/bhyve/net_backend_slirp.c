@@ -83,6 +83,7 @@ static int
 slirp_init(struct net_backend *be, const char *devname __unused,
     nvlist_t *nvl, net_be_rxeof_t cb, void *param)
 {
+	static unsigned int slirp_index = 0;
 	struct slirp_priv *priv = NET_BE_PRIV(be);
 	nvlist_t *config;
 	posix_spawn_file_actions_t fa;
@@ -148,6 +149,7 @@ slirp_init(struct net_backend *be, const char *devname __unused,
 		mtu = DEFAULT_MTU;
 	}
 	nvlist_add_number(config, "mtui", mtu);
+	nvlist_add_number(config, "index", slirp_index);
 
 	priv->mtu = mtu;
 	priv->buf = malloc(mtu);
@@ -176,6 +178,8 @@ slirp_init(struct net_backend *be, const char *devname __unused,
 	(void)close(p[1]);
 	priv->s = s[0];
 	(void)close(s[1]);
+
+	slirp_index++;
 
 	return (0);
 
