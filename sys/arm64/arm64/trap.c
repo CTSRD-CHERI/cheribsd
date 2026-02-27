@@ -785,6 +785,16 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		cheri_stack_get(), td->td_pcb));
 	KASSERT(cheri_length_get(td->td_pcb) == sizeof(struct pcb),
 	    ("Unbounded PCB pointer %#p", td->td_pcb));
+	KASSERT(td->td_frame == frame, ("Invalid td_frame %#p != %#p",
+	    td->td_frame, frame));
+	KASSERT(cheri_length_get(frame) == sizeof(struct trapframe),
+	    ("Invalid trapframe bounds: %#p", frame));
+	KASSERT(cheri_base_get(cheri_stack_get()) == td->td_kstack,
+	    ("Invalid kernel stack base: %#p expect td_kstack %#p",
+		cheri_stack_get(), (void *)td->td_kstack));
+	KASSERT(cheri_top_get(cheri_stack_get()) <= (ptraddr_t)td->td_frame,
+	    ("Invalid kernel stack length: %#p overlaps frame %#p",
+		cheri_stack_get(), td->td_frame));
 #endif
 
 	kasan_mark(frame, sizeof(*frame), sizeof(*frame), 0);
