@@ -111,6 +111,9 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 
 	pcb2 = (struct pcb *)(td2->td_kstack +
 	    td2->td_kstack_pages * PAGE_SIZE) - 1;
+#ifdef CHERI_BOUNDED_KSTACK
+	pcb2 = cheri_bounds_set_exact(pcb2, sizeof(struct pcb));
+#endif
 
 	td2->td_pcb = pcb2;
 	bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
@@ -126,7 +129,18 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	ptrauth_fork(td2, td1);
 #endif
 
+#ifdef CHERI_BOUNDED_KSTACK
+	tf = (struct trapframe *)STACKALIGN(
+	    (struct trapframe *)cheri_address_set(td2->td_kstack,
+		(ptraddr_t)pcb2) - 1);
+	tf = cheri_bounds_set_exact(tf, sizeof(struct trapframe));
+	td2->td_md.md_kstack = (void *)cheri_address_set(
+	    cheri_bounds_set_exact(td2->td_kstack, (ptraddr_t)tf -
+		td2->td_kstack),
+	    (ptraddr_t)tf);
+#else
 	tf = (struct trapframe *)STACKALIGN((struct trapframe *)pcb2 - 1);
+#endif
 	bcopy(td1->td_frame, tf, sizeof(*tf));
 	tf->tf_x[0] = 0;
 	tf->tf_x[1] = 0;
@@ -141,8 +155,13 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	/* Set the return value registers for fork() */
 	td2->td_pcb->pcb_x[PCB_X19] = (uintptr_t)fork_return;
 	td2->td_pcb->pcb_x[PCB_X20] = (uintptr_t)td2;
+	td2->td_pcb->pcb_x[PCB_X21] = (uintptr_t)td2->td_frame;
 	td2->td_pcb->pcb_x[PCB_LR] = (uintptr_t)fork_trampoline;
+#ifdef CHERI_BOUNDED_KSTACK
+	td2->td_pcb->pcb_sp = (uintptr_t)td2->td_md.md_kstack;
+#else
 	td2->td_pcb->pcb_sp = (uintptr_t)td2->td_frame;
+#endif
 
 	vfp_new_thread(td2, td1, true);
 
@@ -209,8 +228,13 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 
 	td->td_pcb->pcb_x[PCB_X19] = (uintptr_t)fork_return;
 	td->td_pcb->pcb_x[PCB_X20] = (uintptr_t)td;
+	td->td_pcb->pcb_x[PCB_X21] = (uintptr_t)td->td_frame;
 	td->td_pcb->pcb_x[PCB_LR] = (uintptr_t)fork_trampoline;
+#ifdef CHERI_BOUNDED_KSTACK
+	td->td_pcb->pcb_sp = (uintptr_t)td->td_md.md_kstack;
+#else
 	td->td_pcb->pcb_sp = (uintptr_t)td->td_frame;
+#endif
 
 	/* Update VFP state for the new thread */
 	vfp_new_thread(td, td0, false);
@@ -317,6 +341,16 @@ cpu_thread_alloc(struct thread *td)
 	    td->td_kstack_pages * PAGE_SIZE) - 1;
 	td->td_frame = (struct trapframe *)STACKALIGN(
 	    (struct trapframe *)td->td_pcb - 1);
+#ifdef CHERI_BOUNDED_KSTACK
+	td->td_pcb = cheri_bounds_set_exact(td->td_pcb, sizeof(struct pcb));
+	td->td_frame = cheri_bounds_set_exact(td->td_frame,
+	    sizeof(struct trapframe));
+
+	td->td_md.md_kstack = (void *)cheri_address_set(
+	    cheri_bounds_set_exact(td->td_kstack,
+		(ptraddr_t)td->td_frame - td->td_kstack),
+	    (ptraddr_t)td->td_frame);
+#endif
 #ifdef PAC
 	ptrauth_thread_alloc(td);
 #endif
@@ -344,6 +378,7 @@ cpu_fork_kthread_handler(struct thread *td, void (*func)(void *), void *arg)
 
 	td->td_pcb->pcb_x[PCB_X19] = (uintptr_t)func;
 	td->td_pcb->pcb_x[PCB_X20] = (uintptr_t)arg;
+	td->td_pcb->pcb_x[PCB_X21] = (uintptr_t)td->td_frame;
 }
 
 void
