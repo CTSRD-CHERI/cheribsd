@@ -886,6 +886,10 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				if (num & CHERI_PERM_CAP)
 					PCHAR('C');
 #endif
+#ifdef HAS_CHERI_PERM_LOAD_MUTABLE
+				if (num & CHERI_PERM_LOAD_MUTABLE)
+					PCHAR('M');
+#endif
 				PCHAR(',');
 
 				/* bounds */
