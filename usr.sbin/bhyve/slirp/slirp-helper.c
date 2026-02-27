@@ -464,6 +464,7 @@ main(int argc, char **argv)
 	Slirp *slirp;
 	nvlist_t *config;
 	const char *hostfwd, *vmname;
+	unsigned int index;
 	int ch, fd, pipe, sd;
 	bool restricted;
 	size_t mtu;
@@ -527,6 +528,10 @@ main(int argc, char **argv)
 	if (config == NULL)
 		err(1, "nvlist_recv");
 
+	index = nvlist_get_number(config, "index") + 2;
+	if (index > 0xff)
+		errx(1, "index %u out of range", index);
+
 	mtu = nvlist_get_number(config, "mtui");
 	priv.mtu = mtu;
 	priv.buf = malloc(mtu);
@@ -538,16 +543,17 @@ main(int argc, char **argv)
 		setproctitle("%s", vmname);
 	restricted = !get_config_bool_node_default(config, "open", false);
 
+	index <<= 8;
 	slirpconfig = (SlirpConfig){
 		.version = 4,
 		.if_mtu = mtu,
 		.restricted = restricted,
 		.in_enabled = true,
-		.vnetwork.s_addr = htonl(0x0a000200),	/* 10.0.2.0/24 */
+		.vnetwork.s_addr = htonl(0x0a000000 | index), /* 10.0.n.0/24 */
 		.vnetmask.s_addr = htonl(0xffffff00),	/* 255.255.255.0 */
-		.vdhcp_start.s_addr = htonl(0x0a00020f),/* 10.0.2.15 */
-		.vhost.s_addr = htonl(0x0a000202),	/* 10.0.2.2 */
-		.vnameserver.s_addr = htonl(0x0a000203),/* 10.0.2.3 */
+		.vdhcp_start.s_addr = htonl(0x0a00000f | index), /* 10.0.2.15 */
+		.vhost.s_addr = htonl(0x0a000002 | index), /* 10.0.2.2 */
+		.vnameserver.s_addr = htonl(0x0a000003 | index), /* 10.0.2.3 */
 		.enable_emu = false,
 	};
 	libslirp_init();
