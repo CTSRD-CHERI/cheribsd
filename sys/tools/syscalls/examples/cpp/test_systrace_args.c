@@ -7,9 +7,9 @@
  */
 
 static void
-systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
+systrace_args(int sysnum, void *params, uintptr_t *uarg, int *n_args)
 {
-	intcap_t *iarg = (intcap_t *)uarg;
+	intptr_t *iarg = (intptr_t *)uarg;
 	int a = 0;
 	switch (sysnum) {
 #ifdef PLATFORM_FOO

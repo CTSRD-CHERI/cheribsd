@@ -728,9 +728,9 @@ struct cheri_revoke_args {
 	char crsi_l_[PADL_(struct cheri_revoke_syscall_info *)]; struct cheri_revoke_syscall_info * crsi; char crsi_r_[PADR_(struct cheri_revoke_syscall_info *)];
 };
 struct msetname_args {
-	char addr_l_[PADL_(void * __kerncap)]; void * __kerncap addr; char addr_r_[PADR_(void * __kerncap)];
+	char addr_l_[PADL_(void *)]; void * addr; char addr_r_[PADR_(void *)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
-	char name_l_[PADL_(const char * __kerncap)]; const char * __kerncap name; char name_r_[PADR_(const char * __kerncap)];
+	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
 };
 struct lchmod_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
