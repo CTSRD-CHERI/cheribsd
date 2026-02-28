@@ -1490,7 +1490,23 @@ fini(void)
 static void *
 mrs_real_malloc(size_t size)
 {
-	return (mrs_bound_pointer(REAL(malloc)(size), size));
+	void* allocated_region;
+
+	/*
+	 * Round up here to make sure there is only one allocation per
+	 * granule without requiring modifications to the underlying
+	 * allocator.
+	 *
+	 * XXX: If an allocator produced special, non-writable capabilities
+	 * for size=0 we might want to pass those calls through, but none
+	 * of the currently supported allocators do.
+	 */
+	if (size < CAPREVOKE_BITMAP_ALIGNMENT)
+		allocated_region = REAL(malloc)(CAPREVOKE_BITMAP_ALIGNMENT);
+	else
+		allocated_region = REAL(malloc)(size);
+
+	return (mrs_bound_pointer(allocated_region, size));
 }
 
 static void *
@@ -1505,21 +1521,7 @@ mrs_malloc(size_t size)
 
 	check_and_perform_flush(false);
 
-	void *allocated_region;
-
-	/*
-	 * Round up here to make sure there is only one allocation per
-	 * granule without requiring modifications to the underlying
-	 * allocator.
-	 *
-	 * XXX: If an allocator produced special, non-writable capabilities
-	 * for size=0 we might want to pass those calls through, but none
-	 * of the currently supported allocators do.
-	 */
-	if (size < CAPREVOKE_BITMAP_ALIGNMENT)
-		allocated_region = mrs_bound_pointer(mrs_real_malloc(CAPREVOKE_BITMAP_ALIGNMENT), size);
-	else
-		allocated_region = mrs_real_malloc(size);
+	void *allocated_region = mrs_real_malloc(size);
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0,
 		    allocated_region);
@@ -1542,27 +1544,7 @@ mrs_malloc(size_t size)
 static void *
 mrs_real_calloc(size_t number, size_t size)
 {
-	return (mrs_bound_pointer(REAL(calloc)(number, size), number * size));
-}
-
-void *
-mrs_calloc(size_t number, size_t size)
-{
 	size_t tmpsize;
-
-	mrs_init();
-
-	if (!quarantining)
-		return (mrs_real_calloc(number, size));
-
-	/*
-	 * This causes problems if our library is initialized before
-	 * the thread library.
-	 */
-	/*mrs_debug_printf("mrs_calloc: called\n");*/
-
-	check_and_perform_flush(false);
-
 	void *allocated_region;
 
 	/*
@@ -1576,9 +1558,30 @@ mrs_calloc(size_t number, size_t size)
 	 */
 	if (!__builtin_mul_overflow(number, size, &tmpsize) &&
 	    tmpsize < CAPREVOKE_BITMAP_ALIGNMENT)
-		allocated_region = mrs_real_calloc(1, CAPREVOKE_BITMAP_ALIGNMENT);
+		allocated_region = REAL(calloc)(1, CAPREVOKE_BITMAP_ALIGNMENT);
 	else
-		allocated_region = mrs_real_calloc(number, size);
+		allocated_region = REAL(calloc)(number, size);
+
+	return (mrs_bound_pointer(allocated_region, number * size));
+}
+
+void *
+mrs_calloc(size_t number, size_t size)
+{
+	mrs_init();
+
+	if (!quarantining)
+		return (mrs_real_calloc(number, size));
+
+	/*
+	 * This causes problems if our library is initialized before
+	 * the thread library.
+	 */
+	/*mrs_debug_printf("mrs_calloc: called\n");*/
+
+	check_and_perform_flush(false);
+
+	void *allocated_region = mrs_real_calloc(number, size);
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number,
 		    allocated_region);
