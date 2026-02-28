@@ -1516,10 +1516,13 @@ mrs_malloc(size_t size)
 	 * for size=0 we might want to pass those calls through, but none
 	 * of the currently supported allocators do.
 	 */
-	if (size < CAPREVOKE_BITMAP_ALIGNMENT)
+	if (size < CAPREVOKE_BITMAP_ALIGNMENT) {
 		allocated_region = mrs_real_malloc(CAPREVOKE_BITMAP_ALIGNMENT);
-	else
+		if (bound_pointers)
+			allocated_region = mrs_bound_pointer(allocated_region, size);
+	} else {
 		allocated_region = mrs_real_malloc(size);
+	}
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0,
 		    allocated_region);
