@@ -1490,7 +1490,7 @@ fini(void)
 static void *
 mrs_real_malloc(size_t size)
 {
-	void* allocated_region;
+	void *allocated_region;
 
 	/*
 	 * Round up here to make sure there is only one allocation per
