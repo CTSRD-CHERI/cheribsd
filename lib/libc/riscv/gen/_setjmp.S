@@ -237,10 +237,8 @@ botch:
 #ifdef _STANDALONE
 	j	botch
 #elif defined(__CHERI_PURE_CAPABILITY__)
-	clgc	ct0, _C_LABEL(longjmperror)
-	cjalr	ct0
-	clgc	ct0, _C_LABEL(abort)
-	cjalr	ct0
+	ccall	_C_LABEL(longjmperror)
+	ccall	_C_LABEL(abort)
 #else
 	call	_C_LABEL(longjmperror)
 	call	_C_LABEL(abort)

@@ -419,8 +419,7 @@
 	/* Handle the ast */
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	ca0, csp
-	clgc	cra, _C_LABEL(ast)
-	cjalr	cra
+	ccall	_C_LABEL(ast)
 #else
 	mv	a0, sp
 	call	_C_LABEL(ast)
