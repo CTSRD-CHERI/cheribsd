@@ -226,20 +226,7 @@ CHERIBSDTEST(nofault_cfromptr, "Exercise CFromPtr success")
 	char * __capability cd; /* stored into here */
 
 	cb = cheri_ptr(buf, 256);
-#if defined(__aarch64__) || defined(__riscv_xcheri_no_relocation) || defined(__riscv_zcheripurecap)
-	/*
-	 * morello-llvm emits cvtz for this intrinsic, which has an
-	 * address interpretation by default (unlike CFromPtr, which
-	 * has an offset interpretation).
-	 * https://git.morello-project.org/morello/llvm-project/-/issues/16
-	 *
-	 * Similarly, CHERI-RISC-V with ISAv9 always uses address
-	 * interpretation instead of offsetting from the base.
-	 */
 	cd = __builtin_cheri_cap_from_pointer(cb, (ptraddr_t)buf + 10);
-#else
-	cd = __builtin_cheri_cap_from_pointer(cb, 10);
-#endif
 	*cd = '\0';
 	cheribsdtest_success();
 }
