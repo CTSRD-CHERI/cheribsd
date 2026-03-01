@@ -453,8 +453,7 @@ ENTRY(cpu_exception_handler_supervisor)
 	save_registers 1
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	ca0, csp
-	clgc	cra, _C_LABEL(do_trap_supervisor)
-	cjalr	cra
+	ccall	_C_LABEL(do_trap_supervisor)
 #else
 	mv	a0, sp
 	call	_C_LABEL(do_trap_supervisor)
@@ -467,8 +466,7 @@ ENTRY(cpu_exception_handler_user)
 	save_registers 0
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	ca0, csp
-	clgc	cra, _C_LABEL(do_trap_user)
-	cjalr	cra
+	ccall	_C_LABEL(do_trap_user)
 #else
 	mv	a0, sp
 	call	_C_LABEL(do_trap_user)
