@@ -164,9 +164,6 @@
 #define	cheri_is_null_derived(x)					\
 	cheri_is_equal_exact((uintcap_t)cheri_address_get(x), x)
 
-/* Create an untagged capability from an integer */
-#define cheri_fromint(x)	cheri_offset_set(NULL, x)
-
 /* Increment @p dst to have the address of @p src */
 #define cheri_address_copy(dst, src)					\
 	(cheri_address_set(dst, cheri_address_get(src)))

@@ -849,7 +849,6 @@ MLINKS+=cheric.9 cheri_address_get.9 \
 	cheric.9 cheri_base_get.9 \
 	cheric.9 cheri_bounds_set.9 \
 	cheric.9 cheri_ddc_get.9 \
-	cheric.9 cheri_fromint.9 \
 	cheric.9 cheri_is_sealed.9 \
 	cheric.9 cheri_length_get.9 \
 	cheric.9 cheri_offset_get.9 \

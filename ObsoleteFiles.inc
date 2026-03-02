@@ -51,6 +51,9 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20260302: Removed cheri_fromint
+OLD_FILES+=usr/share/man/man9/cheri_fromint.9.gz
+
 # 20260211: Removed cheri_*_ptr_bits
 OLD_FILES+=usr/share/man/man9/cheri_clear_low_ptr_bits.9.gz
 OLD_FILES+=usr/share/man/man9/cheri_get_low_ptr_bits.9.gz
