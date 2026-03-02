@@ -70,7 +70,7 @@ make_code_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
 	 * Note: The addend is required for C++ exceptions since capabilities
 	 * for catch blocks point to the middle of a function.
 	 */
-	ret = cheri_offset_inc(ret, addend);
+	ret = (const char * __capability)ret + addend;
 	/* All code pointers should be sentries: */
 	ret = __builtin_cheri_seal_entry(ret);
 	return __DECONST_CAP(dlfunc_t __capability, ret);
