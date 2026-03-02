@@ -112,8 +112,9 @@
 
 //#define QEMU_TARGET 1
 //#define ZERO_POISON_ON_FLUSH 1
-#define CLEAR_ON_ALLOC 1
-#define PVER_ENABLE
+//#define CLEAR_ON_ALLOC 1
+//#define PVER_ENABLE
+//#define PTRAP_ENABLE
 #define	MALLOCX_LG_ALIGN_BITS	6
 #define	MALLOCX_LG_ALIGN_MASK	((1 << MALLOCX_LG_ALIGN_BITS) - 1)
 /* Use MALLOCX_ALIGN_GET() if alignment may not be specified in flags. */
@@ -1693,8 +1694,10 @@ mrs_malloc(size_t size)
 
 #endif 
 	//clear_region(allocated_region, cheri_getlen(allocated_region));
+#ifdef PTRAP_ENABLE
 	if(trapping)
 		allocated_region = cclearpoisonperm(allocated_region);
+#endif
 	return (allocated_region);
 }
 
@@ -1773,8 +1776,10 @@ mrs_calloc(size_t number, size_t size)
 	}
 	Calloc doesn't need PVER, as the memory returned is zeroed by Jemalloc
 	*/
+#ifdef PTRAP_ENABLE
 	if(trapping)
 		allocated_region = cclearpoisonperm(allocated_region);
+#endif 
 	return (allocated_region);
 }
 
@@ -1811,8 +1816,10 @@ mrs_real_posix_memalign(void **ptr, size_t alignment, size_t size)
 	}
 
 #endif
+#ifdef PTRAP_ENABLE
 	if(trapping)
 		*ptr = cclearpoisonperm(*ptr);
+#endif 
 	return (ret);
 }
 
@@ -1870,8 +1877,10 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 	increment_allocated_size(*ptr);
 
 	MRS_UTRACE(UTRACE_MRS_POSIX_MEMALIGN, NULL, size_aligned, alignment, *ptr);
+#ifdef PTRAP_ENABLE
 	if(trapping)
 		*ptr = cclearpoisonperm(*ptr);
+#endif 
 	return (ret);
 }
 
@@ -1940,8 +1949,10 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 
 #endif
 	//clear_region(allocated_region, cheri_getlen(allocated_region));
+#ifdef PTRAP_ENABLE
 	if(trapping)
 		allocated_region = cclearpoisonperm(allocated_region); 
+#endif 
 	return (allocated_region);
 }
 
@@ -2020,8 +2031,10 @@ mrs_realloc(void *ptr, size_t size)
 	//}
 	*/
 #endif
+#ifdef PTRAP_ENABLE
 	if(trapping)
 		new_alloc = cclearpoisonperm(new_alloc);
+#endif 
 	return (new_alloc);
 }
 
