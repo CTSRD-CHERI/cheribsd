@@ -168,8 +168,6 @@
 #define cheri_address_copy(dst, src)					\
 	(cheri_address_set(dst, cheri_address_get(src)))
 
-#define	cheri_offset_inc(x, y)	__builtin_cheri_offset_increment((x), (y))
-
 /* Get the top of a capability (i.e. one byte past the last accessible one) */
 #define	cheri_top_get(cap)	__extension__({			\
 	__typeof__(cap) c = (cap);				\
