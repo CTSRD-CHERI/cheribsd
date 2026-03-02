@@ -2155,7 +2155,8 @@ get_proc_vector64(struct thread *td, struct proc *p,
 	proc_vector = malloc(vsize * sizeof(char * __capability), M_TEMP,
 	    M_WAITOK);
 	for (i = 0; i < (int)vsize; i++)
-		proc_vector[i] = cheri_fromint(proc_vector64[i]);
+		proc_vector[i] =
+		    (char * __capability)(uintcap_t)proc_vector64[i];
 	*proc_vectorp = proc_vector;
 	*vsizep = vsize;
 done:

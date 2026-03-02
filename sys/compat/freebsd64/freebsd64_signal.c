@@ -66,14 +66,14 @@ convert_sigevent64(const struct sigevent64 *sig64, struct sigevent *sig)
 		CP(*sig64, *sig, sigev_signo);
 		memset(&sig->sigev_value, 0, sizeof(sig->sigev_value));
 		sig->sigev_value.sival_ptr =
-		    cheri_fromint(sig64->sigev_value.sival_ptr);
+		    (void * __capability)(uintcap_t)sig64->sigev_value.sival_ptr;
 		break;
 	case SIGEV_KEVENT:
 		CP(*sig64, *sig, sigev_notify_kqueue);
 		CP(*sig64, *sig, sigev_notify_kevent_flags);
 		memset(&sig->sigev_value, 0, sizeof(sig->sigev_value));
 		sig->sigev_value.sival_ptr =
-		    cheri_fromint(sig64->sigev_value.sival_ptr);
+		    (void * __capability)(uintcap_t)sig64->sigev_value.sival_ptr;
 		break;
 	default:
 		return (EINVAL);
@@ -108,7 +108,8 @@ freebsd64_sigaction(struct thread *td, struct freebsd64_sigaction_args *uap)
 		if (error)
 			return (error);
 		if (is_magic_sighandler_constant(act64.sa_u))
-			actp->sa_handler = cheri_fromint(act64.sa_u);
+			actp->sa_handler =
+			    (void * __capability)(uintcap_t)act64.sa_u;
 		else
 			actp->sa_handler = USER_CODE_PTR(act64.sa_u);
 		actp->sa_flags = act64.sa_flags;
@@ -235,7 +236,7 @@ freebsd64_sigqueue(struct thread *td, struct freebsd64_sigqueue_args *uap)
 	 * capability's address.
 	 */
 	memset(&sv, 0, sizeof(sv));
-	sv.sival_ptr = cheri_fromint((uintptr_t)uap->value);
+	sv.sival_ptr = (void * __capability)(uintcap_t)uap->value;
 
 	return (kern_sigqueue(td, uap->pid, uap->signum, &sv));
 }
