@@ -173,9 +173,9 @@
 	 * XXXBFG should this be done somewhere else? Maybe eventually per-process or
 	 * compartment?
 	 */
-	mrs x2, cctlr_el0
-	orr x2, x2, #(CCTLR_PERMVCT_MASK | CCTLR_SBL_MASK)
-	msr cctlr_el0, x2
+	mrs	x2, cctlr_el0
+	orr	x2, x2, #(CCTLR_PERMVCT_MASK | CCTLR_SBL_MASK)
+	msr	cctlr_el0, x2
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/*
@@ -294,7 +294,7 @@ virtdone:
 
 	/* Narrow bounds on data_cap to match code_cap. */
 	gcbase	x0, c2
-	scvalue c1, c1, x0
+	scvalue	c1, c1, x0
 	gclen	x0, c2
 	scbnds	c1, c1, x0
 
