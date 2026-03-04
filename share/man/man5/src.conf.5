@@ -910,8 +910,9 @@ Build the LLD linker during the bootstrap phase of the build,
 and use it during buildworld and buildkernel.
 .It Va WITHOUT_LLVM_ASSERTIONS
 Disable debugging assertions in LLVM.
-.It Va WITHOUT_LLVM_BINUTILS
-Install ELF Tool Chain's binary utilities instead of LLVM's.
+.It Va WITH_LLVM_BINUTILS
+Install LLVM's binutils (without an llvm- prefix),
+instead of ELF Tool Chain's tools.
 This includes
 .Xr addr2line 1 ,
 .Xr ar 1 ,
@@ -1784,14 +1785,6 @@ and
 Do not install
 programs used for program development,
 compilers, debuggers etc.
-When set, these options are also in effect:
-.Pp
-.Bl -inset -compact
-.It Va WITHOUT_LLVM_BINUTILS
-(unless
-.Va WITH_LLVM_BINUTILS
-is set explicitly)
-.El
 .It Va WITH_UBSAN
 Build the base system with Undefined Behavior Sanitizer (UBSan) to detect
 various kinds of undefined behavior at runtime.
