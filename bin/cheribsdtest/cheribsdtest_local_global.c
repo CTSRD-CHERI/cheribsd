@@ -85,8 +85,8 @@ CHERIBSDTEST(store_local_disallowed,
 {
 	char str[] = STR_VAL;
 	char * __capability cap = str;
-	char * __capability target;
-	char * __capability * __capability volatile targetp = &target;
+	char * __capability volatile target;
+	char * __capability volatile * __capability targetp = &target;
 
 	CHERIBSDTEST_VERIFY(strcmp(STR_VAL, str) == 0);
 	*targetp = cap;
