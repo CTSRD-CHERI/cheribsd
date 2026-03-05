@@ -284,7 +284,7 @@ ${FULLPROG}: ${OBJS} ${BLOB_OBJS} ${COMPARTMENT_POLICY}
 .endif
 .if defined(CHERI_COMPARTMENT_POLICY) && !empty(COMPARTMENT_POLICY)
 	${LD} -m ${LD_EMULATION} -Bshareable -znotext -znorelro ${_LDFLAGS} \
-	    --compartment-policy=${.CURDIR}/${COMPARTMENT_POLICY} \
+	    --compartment-policy=${COMPARTMENT_POLICY} \
 	    ${LDSCRIPT_FLAGS} -o ${.TARGET} ${OBJS} ${BLOB_OBJS}
 .else
 	${LD} -m ${LD_EMULATION} ${_LDFLAGS} ${LDSCRIPT_FLAGS} -r \

@@ -2,7 +2,7 @@ SRCDIR=${ZFSTOP}/module
 INCDIR=${ZFSTOP}/include
 
 KMOD=	zfs
-COMPARTMENT_POLICY=	zfs.json
+COMPARTMENT_POLICY=	${.CURDIR}/zfs.json
 
 .PATH:	${SRCDIR}/avl \
 	${SRCDIR}/lua \

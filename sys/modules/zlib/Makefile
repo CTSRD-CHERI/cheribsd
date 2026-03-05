@@ -16,7 +16,7 @@ SRCS+=	trees.c
 SRCS+=	uncompr.c
 SRCS+=	zutil.c
 
-COMPARTMENT_POLICY?=	zlib.json
+COMPARTMENT_POLICY?=	${.CURDIR}/zlib.json
 
 CWARNFLAGS.compress.c+=-Wno-cast-qual # compress:49
 CWARNFLAGS.deflate.c+=-Wno-cast-qual # deflate.c:415
