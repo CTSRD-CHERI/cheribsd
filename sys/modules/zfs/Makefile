@@ -2,7 +2,7 @@ SRCDIR=${ZFSTOP}/module
 INCDIR=${ZFSTOP}/include
 
 KMOD=	zfs
-COMPARTMENT_POLICY=	zfs.json
+COMPARTMENT_POLICY=	${.CURDIR}/zfs.json
 
 .PATH:	${SRCDIR}/avl \
 	${SRCDIR}/lua \
@@ -381,6 +381,8 @@ SRCS+=	zfs_zstd.c \
 	zstd_ldm.c \
 	zstd_opt.c
 
+CHERI_SUBOBJECT_BOUNDS=	conservative
+
 .include <bsd.kmod.mk>
 
 CFLAGS+= -include ${SRCTOP}/sys/cddl/compat/opensolaris/sys/debug_compat.h
@@ -531,8 +533,4 @@ zfs-sha512-x86_64.o: sha512-x86_64.S
 	    ${SRCDIR}/icp/asm-x86_64/sha2/sha512-x86_64.S \
 	    -o ${.TARGET}
 	${CTFCONVERT_CMD}
-.endif
-
-.if ${MACHINE_ABI:Mpurecap}
-CFLAGS+=-Xclang -cheri-bounds=conservative
 .endif

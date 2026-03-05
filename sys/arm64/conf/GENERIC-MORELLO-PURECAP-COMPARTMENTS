@@ -27,3 +27,6 @@ nooptions 	GEOM_UZIP	# Read-only compressed disks
 nooptions 	GZIO		# zlib I/O stream support
 nooptions	ZFS		# ZFS support
 nodevice	mxge		# Myricom Myri-10G 10GbE NIC
+
+# Do not compile in the em driver that we dynamically load.
+nodevice	em

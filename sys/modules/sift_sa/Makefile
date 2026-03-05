@@ -1,6 +1,6 @@
 KMOD=	sift_sa
 
-COMPARTMENT_POLICY=	sift_sa.json
+COMPARTMENT_POLICY=	${.CURDIR}/sift_sa.json
 
 # Use the policy regardless of the kernel.
 CHERI_COMPARTMENT_POLICY=yes
