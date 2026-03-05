@@ -143,9 +143,13 @@ STORE permission
 .It x
 EXECUTE permission
 .It R
-LOAD_CAP permission
+LOAD_CAP permission, when the architecture supports separate LOAD_CAP/STORE_CAP permission
 .It W
-STORE_CAP permission
+STORE_CAP permission, when the architecture supports separate LOAD_CAP/STORE_CAP permission
+.It C
+CAP permission, when the architecture does not support separate LOAD_CAP/STORE_CAP permission
+.It M
+MUTABLE_LOAD capability permission
 .It E
 EXECUTIVE permission (Morello only)
 .El
