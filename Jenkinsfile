@@ -28,7 +28,7 @@ def jobProperties = [
         rateLimit,
 ]
 // Don't archive sysroot/disk image/kernel images for pull requests and non-default/releng branches:
-def archiveBranches = ['main', 'master', 'dev']
+def archiveBranches = ['main', 'master', 'dev', 'next', 'dev-nocloadtags']
 if (!env.CHANGE_ID && (archiveBranches.contains(env.BRANCH_NAME) || env.BRANCH_NAME.startsWith('releng/'))) {
     if (!GlobalVars.isTestSuiteJob) {
         // Don't archive disk images for the test suite job
@@ -41,9 +41,7 @@ if (!env.CHANGE_ID && (archiveBranches.contains(env.BRANCH_NAME) || env.BRANCH_N
 }
 // Add an architecture selector for manual builds
 def allArchitectures = [
-        "aarch64", "amd64",
-        "morello-hybrid", "morello-purecap",
-        "riscv64", "riscv64-hybrid", "riscv64-purecap"
+        "riscv64-hybrid", "riscv64-purecap"
 ]
 jobProperties.add(parameters([
         text(defaultValue: allArchitectures.join('\n'),
