@@ -247,8 +247,8 @@ typedef struct devclass		*devclass_t;
  * and may use regular mutexes.  However, it is prohibited from
  * sleeping on a sleep queue.
  */
-typedef int driver_filter_t(void*);
-typedef void driver_intr_t(void*);
+typedef int driver_filter_t(void *);
+typedef void driver_intr_t(void *);
 
 /**
  * @brief Interrupt type bits.
