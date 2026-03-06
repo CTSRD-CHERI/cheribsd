@@ -98,6 +98,12 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 		case UIO_USERSPACE:
 			maybe_yield();
 			switch (uio->uio_rw) {
+			case UIO_READ:
+				error = copyout(cp, iov->iov_base, cnt);
+				break;
+			case UIO_WRITE:
+				error = copyin(iov->iov_base, cp, cnt);
+				break;
 #if __has_feature(capabilities)
 			case UIO_READ_CAP:
 				error = copyoutptr(cp, iov->iov_base, cnt);
@@ -106,18 +112,18 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 				error = copyinptr(iov->iov_base, cp, cnt);
 				break;
 #endif
-			case UIO_READ:
-				error = copyout(cp, iov->iov_base, cnt);
-				break;
-			case UIO_WRITE:
-				error = copyin(iov->iov_base, cp, cnt);
-				break;
 			}
 			if (error)
 				goto out;
 			break;
 		case UIO_SYSSPACE:
 			switch (uio->uio_rw) {
+			case UIO_READ:
+				bcopy_data(cp, iov->iov_base, cnt);
+				break;
+			case UIO_WRITE:
+				bcopy_data(iov->iov_base, cp, cnt);
+				break;
 #if __has_feature(capabilities)
 			case UIO_READ_CAP:
 				bcopy(cp, iov->iov_base, cnt);
@@ -126,12 +132,6 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 				bcopy(iov->iov_base, cp, cnt);
 				break;
 #endif
-			case UIO_READ:
-				bcopy_data(cp, iov->iov_base, cnt);
-				break;
-			case UIO_WRITE:
-				bcopy_data(iov->iov_base, cp, cnt);
-				break;
 			}
 			break;
 		case UIO_NOCOPY:
