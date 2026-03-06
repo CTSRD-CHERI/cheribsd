@@ -204,8 +204,7 @@ SYSCTL_NODE(ELF_NODE_OID, OID_AUTO, aslr, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
 static int __elfN(aslr_enabled) = __ELF_WORD_SIZE == 64;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, enable, CTLFLAG_RWTUN,
     &__elfN(aslr_enabled), 0,
-    ELF_ABI_NAME
-    ": enable address map randomization");
+    ELF_ABI_NAME ": enable address map randomization");
 
 /*
  * Enable ASLR by default for 64-bit PIE binaries.
@@ -213,8 +212,7 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, enable, CTLFLAG_RWTUN,
 static int __elfN(pie_aslr_enabled) = __ELF_WORD_SIZE == 64;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, pie_enable, CTLFLAG_RWTUN,
     &__elfN(pie_aslr_enabled), 0,
-    ELF_ABI_NAME
-    ": enable address map randomization for PIE binaries");
+    ELF_ABI_NAME ": enable address map randomization for PIE binaries");
 
 /*
  * Sbrk is deprecated and it can be assumed that in most cases it will not be
@@ -229,8 +227,7 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, honor_sbrk, CTLFLAG_RW,
 static int __elfN(aslr_stack) = __ELF_WORD_SIZE == 64;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, stack, CTLFLAG_RWTUN,
     &__elfN(aslr_stack), 0,
-    ELF_ABI_NAME
-    ": enable stack address randomization");
+    ELF_ABI_NAME ": enable stack address randomization");
 
 static int __elfN(aslr_shared_page) = __ELF_WORD_SIZE == 64;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, shared_page, CTLFLAG_RWTUN,
@@ -244,8 +241,8 @@ SYSCTL_INT(ELF_NODE_OID, OID_AUTO, sigfastblock,
     "enable sigfastblock for new processes");
 
 static bool __elfN(allow_wx) = true;
-SYSCTL_BOOL(ELF_NODE_OID, OID_AUTO, allow_wx, CTLFLAG_RWTUN,
-    &__elfN(allow_wx), 0,
+SYSCTL_BOOL(ELF_NODE_OID, OID_AUTO, allow_wx,
+    CTLFLAG_RWTUN, &__elfN(allow_wx), 0,
     "Allow pages to be mapped simultaneously writable and executable");
 
 static unsigned long __elfN(max_phdr_len) = 4 * PAGE_SIZE;
@@ -700,8 +697,8 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		if (sf == NULL)
 			return (KERN_FAILURE);
 		off = offset - trunc_page(offset);
-		error = copyout((void *)(sf_buf_kva(sf) + off),
-		    (void *)start, (ptraddr_t)end - (ptraddr_t)start);
+		error = copyout((void *)(sf_buf_kva(sf) + off), (void *)start,
+		    (ptraddr_t)end - (ptraddr_t)start);
 		vm_imgact_unmap_page(sf);
 		if (error != 0)
 			return (KERN_FAILURE);
@@ -745,8 +742,7 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 		 */
 		rv = vm_map_fixed(map, NULL, 0, start, NULL,
 		    (ptraddr_t)end - (ptraddr_t)start,
-		    prot | VM_PROT_WRITE, VM_PROT_ALL,
-		    MAP_CHECK_EXCL);
+		    prot | VM_PROT_WRITE, VM_PROT_ALL, MAP_CHECK_EXCL);
 		if (rv != KERN_SUCCESS)
 			return (rv);
 		if (object == NULL)
@@ -832,9 +828,7 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 		map_len = trunc_page(offset + filsz) - file_addr;
 	else
 		map_len = round_page(offset + filsz) - file_addr;
-#if __has_feature(capabilities)
-	map_addr = cheri_bounds_set(map_addr, map_len);
-#endif
+	map_addr = cheri_kern_bounds_set(map_addr, map_len);
 
 	if (map_len != 0) {
 		/* cow flags: don't dump readonly sections in core */
@@ -861,9 +855,7 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 	    filsz);
 	map_addr = trunc_page(vmaddr + filsz);
 	map_len = (ptraddr_t)round_page(vmaddr + memsz) - (ptraddr_t)map_addr;
-#if __has_feature(capabilities)
-	map_addr = cheri_bounds_set(map_addr, map_len);
-#endif
+	map_addr = cheri_kern_bounds_set(map_addr, map_len);
 
 	/* This had damn well better be true! */
 	if (map_len != 0) {
@@ -971,7 +963,7 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
  */
 static int
 __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
-	u_long *end_addr, u_long *entry)
+    u_long *end_addr, u_long *entry)
 {
 	struct {
 		struct nameidata nd;
@@ -1188,6 +1180,7 @@ __elfN(enforce_limits)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 	    (uintmax_t)imgp->end_addr, (uintmax_t)imgp->et_dyn_addr));
 #endif
 	MPASS(imgp->end_addr > imgp->start_addr);
+
 	/*
 	 * Check limits.  It should be safe to check the
 	 * limits after loading the segments since we do
@@ -2002,7 +1995,7 @@ __elfN(freebsd_fixup)(uintptr_t *stack_base, struct image_params *imgp)
 		return (EFAULT);
 	*stack_base = (uintptr_t)base;
 #else
-	KASSERT(__builtin_is_aligned(*stack_base, sizeof(void *)),
+	KASSERT(__is_aligned(*stack_base, sizeof(void *)),
 	    ("CheriABI stack pointer not properly aligned"));
 #endif
 	return (0);
