@@ -563,15 +563,8 @@ pagecopy(void *s, void *d)
 static __inline void
 pagecopy_cleartags(void *s, void *d)
 {
-#if __has_feature(capabilities)
-	void **dst;
-	void **src;
-	u_int i;
-
-	dst = d;
-	src = s;
-	for (i = 0; i < PAGE_SIZE / sizeof(*dst); i++)
-		*dst++ = cheri_tag_clear(*src++);
+#ifdef __CHERI_PURE_CAPABILITY__
+	memcpy_data(d, s, PAGE_SIZE);
 #else
 	pagecopy(s, d);
 #endif
