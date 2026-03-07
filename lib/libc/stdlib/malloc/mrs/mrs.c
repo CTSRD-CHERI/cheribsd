@@ -107,12 +107,12 @@
 #endif
 
 #ifndef VERSIONING_THRESHOLD
-#define	VERSIONING_THRESHOLD	64
+#define	VERSIONING_THRESHOLD	128
 #endif
 
 //#define QEMU_TARGET 1
 //#define ZERO_POISON_ON_FLUSH 1
-//#define CLEAR_ON_ALLOC 1
+#define CLEAR_ON_ALLOC 1
 //#define PVER_ENABLE
 //#define PTRAP_ENABLE
 #define	MALLOCX_LG_ALIGN_BITS	6
@@ -1663,8 +1663,8 @@ mrs_malloc(size_t size)
 	}
 
 #ifdef CLEAR_ON_ALLOC
-	if(zeroing)
-		clear_region(allocated_region, cheri_getlen(allocated_region));
+	//if(zeroing)
+	clear_region(allocated_region, cheri_getlen(allocated_region));
 #endif /* CLEAR_ON_ALLOC */
 
 	increment_allocated_size(allocated_region);
@@ -1674,7 +1674,7 @@ mrs_malloc(size_t size)
 
 	MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, allocated_region);
 #ifdef PVER_ENABLE
-	if(versioning){
+	//if(versioning){
 		if(size > versioning_threshold){
 			void * allocated_region_raw =  *(void **) allocated_region;
 			volatile int pver = cgetpver( allocated_region_raw);
@@ -1690,7 +1690,7 @@ mrs_malloc(size_t size)
 		}else{
 			clear_region(allocated_region, cheri_getlen(allocated_region));
 		}
-	}
+	//}
 
 #endif 
 	//clear_region(allocated_region, cheri_getlen(allocated_region));
@@ -1797,7 +1797,7 @@ mrs_real_posix_memalign(void **ptr, size_t alignment, size_t size)
 	if (ret == 0)
 		*ptr = mrs_bound_pointer(*ptr, size_aligned);
 #ifdef PVER_ENABLE
-	if(versioning){
+	//if(versioning){
 		if(size > versioning_threshold){
 			void * ptr_raw =  *(void **) *ptr;
 			volatile int pver = cgetpver( ptr_raw);
@@ -1813,7 +1813,7 @@ mrs_real_posix_memalign(void **ptr, size_t alignment, size_t size)
 		}else{
 			clear_region(*ptr, cheri_getlen(*ptr));
 		}
-	}
+	//}
 
 #endif
 #ifdef PTRAP_ENABLE
@@ -1846,7 +1846,7 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 
 	int ret = mrs_real_posix_memalign(ptr, alignment, size_aligned);
 #ifdef PVER_ENABLE
-	if(versioning){
+	//if(versioning){
 		if(size > versioning_threshold){
 			void * ptr_raw =  *(void **) *ptr;
 			volatile int pver = cgetpver( ptr_raw);
@@ -1862,7 +1862,7 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 		}else{
 			clear_region(*ptr, cheri_getlen(*ptr));
 		}
-	}
+	//}
 #endif
 	if (ret != 0) {
 
@@ -1870,8 +1870,8 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 	}
 
 #ifdef CLEAR_ON_ALLOC
-	if(zeroing)
-		clear_region(*ptr, cheri_getlen(*ptr));
+	//if(zeroing)
+	clear_region(*ptr, cheri_getlen(*ptr));
 #endif /* CLEAR_ON_ALLOC */
 	//clear_region(*ptr, cheri_getlen(*ptr));
 	increment_allocated_size(*ptr);
@@ -1919,8 +1919,8 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	}
 
 #ifdef CLEAR_ON_ALLOC
-	if(zeroing)
-		clear_region(allocated_region, cheri_getlen(allocated_region));
+	//if(zeroing)
+	clear_region(allocated_region, cheri_getlen(allocated_region));
 #endif /* CLEAR_ON_ALLOC */
 
 	increment_allocated_size(allocated_region);
@@ -1928,7 +1928,7 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 	    allocated_region);
 #ifdef PVER_ENABLE	
-	if(versioning){
+	//if(versioning){
 		if (size > versioning_threshold) {
 			void * allocated_region_raw =  *(void **) allocated_region;
 			volatile int pver = cgetpver( allocated_region_raw);
@@ -1945,7 +1945,7 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 		else{
 			clear_region(allocated_region, cheri_getlen(allocated_region));
 		}
-	}
+	//}
 
 #endif
 	//clear_region(allocated_region, cheri_getlen(allocated_region));
@@ -2078,16 +2078,16 @@ mrs_free(void *ptr)
 #endif
 	int size = cheri_getlen(ptr);
 #ifdef PVER_ENABLE
-	if(versioning)
-		csetpver(ins, cgetpver(ptr));
+	//if(versioning)
+	csetpver(ins, cgetpver(ptr));
 #endif
-	if(poisoning){
-		if(size>= MALLOC_CACHELINE_ALIGNMENT){
-			for(size_t i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT){
-				cpoison(((char *) ins) + i);
-			}
-		}
+	//if(poisoning){
+		//if(size>= MALLOC_CACHELINE_ALIGNMENT){
+	for(size_t i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT){
+		cpoison(((char *) ins) + i);
 	}
+		//}
+	//}
 	mrs_lock(&app_quarantine_lock);
 	quarantine_insert(app_quarantine, ins, size);
 	mrs_unlock(&app_quarantine_lock);
@@ -2123,14 +2123,14 @@ mrs_mallocx(size_t size, int flags)
 
 #ifndef CLEAR_ON_ALLOC
 	/* Clear if requested and we aren't clearing above. */
-	if(zeroing){
-		if (ret != NULL && (flags & MALLOCX_ZERO) != 0)
-			clear_region(ret, cheri_getlen(ret));
-	}
+	//if(zeroing){
+	if (ret != NULL && (flags & MALLOCX_ZERO) != 0)
+		clear_region(ret, cheri_getlen(ret));
+	//}
 #endif
 
 #ifdef PVER_ENABLE
-	if(versioning){
+	//if(versioning){
 		if (size > versioning_threshold) {
 			void * ret_raw =  *(void **) ret;
 			volatile int pver = cgetpver( ret_raw);
@@ -2146,7 +2146,7 @@ mrs_mallocx(size_t size, int flags)
 		else{
 			clear_region(ret, cheri_getlen(ret));
 		}
-	}
+	//}
 
 #endif
 	if(trapping)
