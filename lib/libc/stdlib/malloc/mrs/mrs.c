@@ -96,6 +96,9 @@
  * of the heap (default 1/4).
  */
 
+#define POISON_ON_FREE 1
+#define CLEAR_ON_ALLOC 1
+
 #ifdef QUARANTINE_RATIO
 #error QUARANTINE_RATIO is obsolete, use QUARANTINE_NUMERATOR/QUARANTINE_DENOMINATOR
 #endif
@@ -184,6 +187,10 @@ void *mrs_mallocx(size_t, int);
 void *mrs_rallocx(void *, size_t, int);
 void mrs_dallocx(void *, int);
 void mrs_sdallocx(void *, size_t, int);
+
+static inline void cpoison(char * a){
+  asm volatile("cpoison %0, 0(%1)": :"C"(a),"C"(a));
+}
 
 void *
 malloc(size_t size)
@@ -1770,6 +1777,12 @@ mrs_free(void *ptr)
 	bzero(cheri_setoffset(ptr, 0), cheri_getlen(ptr));
 #endif
 
+#ifdef POISON_ON_FREE
+	int poison_size = cheri_getlen(ptr);
+	for(size_t i = 0; i< poison_size; i += 16){
+		cpoison(((char *) ins) + i);
+	}
+#endif
 	mrs_lock(&app_quarantine_lock);
 	quarantine_insert(app_quarantine, ins, cheri_getlen(ins));
 	mrs_unlock(&app_quarantine_lock);
