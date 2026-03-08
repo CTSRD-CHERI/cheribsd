@@ -87,6 +87,11 @@ vm_cheri_revoke_tlb_fault(void)
 /*
  * VM internal support for revocation
  */
+static inline int cgetcappoison(uintcap_t  a){
+       int ver= 0 ;
+       asm volatile("cgetcappoison %0,%1" : "=r"(ver) : "C"(a));
+       return ver;
+}
 
 static int
 vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
@@ -95,6 +100,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
     vm_offset_t end)
 {
 	int perms = cheri_getperm(cut);
+	int isPoisonCap = cgetcappoison(cut);
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 
 	if (perms == 0) {
@@ -108,6 +114,8 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 		 */
 
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found_revoked);
+	} else if (isPoisonCap != 0) {
+
 	} else if (cheri_gettag(cut) && ctp(crshadow, cut, perms, start, end)) {
 		void * __capability cscratch;
 		int ok;

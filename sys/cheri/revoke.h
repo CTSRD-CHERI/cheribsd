@@ -80,15 +80,21 @@ cheri_revoke_epoch_clears(cheri_revoke_epoch_t now, cheri_revoke_epoch_t then)
 	return (cheri_revoke_epoch_ge(now, then + (then & 1) + 2));
 }
 
+static inline int cgetcappoison_revok(const void * __capability  a){
+       int ver= 0 ;
+       asm volatile("cgetcappoison %0,%1" : "=r"(ver) : "C"(a));
+       return ver;
+}
+
 #if __has_feature(capabilities)
 /* Returns 1 if cap is revoked, 0 otherwise. */
 static inline int
 cheri_revoke_is_revoked(const void * __capability cap)
 {
 #ifndef CHERI_CAPREVOKE_CLEARTAGS
-	return (__builtin_cheri_perms_get(cap) == 0);
+	return (__builtin_cheri_perms_get(cap) == 0 || cgetcappoison_revok(cap));
 #else
-	return (__builtin_cheri_tag_get(cap) == 0);
+	return (__builtin_cheri_tag_get(cap) == 0 || cgetcappoison_revok(cap));
 #endif
 }
 
