@@ -149,7 +149,6 @@
 .Fn sooptcopyinptr "struct sockopt *sopt" "void *buf" "size_t len" "size_t minlen"
 .Ft int
 .Fn sooptcopyout "struct sockopt *sopt" "const void *buf" "size_t len"
-.Fn sooptcopyoutptr "struct sockopt *sopt" "const void *buf" "size_t len"
 .Sh DESCRIPTION
 The kernel
 .Nm
@@ -583,9 +582,10 @@ data between user and kernel code.
 They do not preserve pointer provenance.
 If the copied data contains pointers, the
 .Fn sooptcopyinptr
-and
+function must be used for copy in.
+There is no
 .Fn sooptcopyoutptr
-functions must be used instead.
+as no consumers have been found.
 .Sh SEE ALSO
 .Xr bind 2 ,
 .Xr close 2 ,
