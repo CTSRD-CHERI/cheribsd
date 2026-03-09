@@ -590,7 +590,7 @@ static ssize_t pacmanfs_read(struct file *filp, char __user *buf, size_t len,
 			     loff_t *ppos)
 {
 	struct inode *inode = file_inode(filp);
-	ace2_syncpoint("PACMANFS_EXP1", "inode = 0x%px\n", inode->i_private);
+	ace2_syncpoint("PACMANFS_EXP1", "inode = %p\n", inode->i_private);
 	struct super_block *sb = inode->i_sb;
 	// Check bounds
 	if (*ppos >= inode->i_size)
