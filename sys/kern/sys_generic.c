@@ -686,12 +686,13 @@ struct ioctl_args {
 int
 sys_ioctl(struct thread *td, struct ioctl_args *uap)
 {
-	return (user_ioctl(td, uap->fd, uap->com, uap->data, &uap->data, 1));
+	return (user_ioctl(td, uap->fd, uap->com, uap->data, &uap->data,
+	    true));
 }
 
 int
 user_ioctl(struct thread *td, int fd, u_long ucom, void *udata, void *datap,
-    int copycaps)
+    bool copycaps)
 {
 	u_char smalldata[SYS_IOCTL_SMALL_SIZE] __aligned(SYS_IOCTL_SMALL_ALIGN);
 	uint32_t com;

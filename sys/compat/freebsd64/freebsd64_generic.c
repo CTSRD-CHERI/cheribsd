@@ -139,7 +139,7 @@ freebsd64_ioctl(struct thread *td, struct freebsd64_ioctl_args *uap)
 	else
 		udata = USER_PTR(uap->data, IOCPARM_LEN(com));
 
-	return (user_ioctl(td, uap->fd, com, udata, &uap->data, 0));
+	return (user_ioctl(td, uap->fd, com, udata, &uap->data, false));
 }
 
 int

@@ -614,7 +614,7 @@ int	user_getsockname(struct thread *td, int fdes, struct sockaddr *asa,
 int	user_getsockopt(struct thread *td, int s, int level, int name,
 	    void *val, socklen_t *avalsize);
 int	user_ioctl(struct thread *td, int fd, u_long ucom, void *udata,
-	    void *datap, int copycaps);
+	    void *datap, bool copycaps);
 int	user_jail_get(struct thread *td, struct iovec *iovp,
 	    unsigned int iovcnt, int flags, copyinuio_t *copyinuio_f,
 	    updateiov_t *updateiov_f);
