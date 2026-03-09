@@ -40,6 +40,9 @@
 #define	wsize	sizeof(u_long)
 #define	wmask	(wsize - 1)
 
+#define	dc_wsize	64
+#define	dc_wmask	(dc_wsize - 1)
+
 #ifdef BZERO
 #include <strings.h>
 

@@ -97,7 +97,7 @@
  */
 
 #define POISON_ON_FREE 1
-//#define CLEAR_ON_ALLOC_NWZ 1
+#define CLEAR_ON_ALLOC_NWZ 1
 
 #ifdef QUARANTINE_RATIO
 #error QUARANTINE_RATIO is obsolete, use QUARANTINE_NUMERATOR/QUARANTINE_DENOMINATOR
@@ -1551,16 +1551,20 @@ mrs_malloc(size_t size)
 	clear_region(allocated_region, cheri_getlen(allocated_region));
 #endif /* CLEAR_ON_ALLOC */
 #ifdef CLEAR_ON_ALLOC_NWZ
+	
 	int alloc_size = cheri_getlen(allocated_region);
 	int offset =0;
-	while(alloc_size >= 64){
-		dczero(allocated_region + offset);
-		offset += 64;
-		alloc_size-=64;
-		break;
+	size_t t;
+	if((t = (__cheri_addr long) allocated_region & 64-1) == 0) {
+		while(alloc_size >= 64){
+			dczero(allocated_region + offset);
+			offset += 64;
+			alloc_size-=64;
+			//break;
+		}
 	}
-	//if(alloc_size > 0)
-	//	clear_region(allocated_region + offset, alloc_size);
+	if(alloc_size > 0)
+		clear_region(allocated_region + offset, alloc_size);
 #endif
 	increment_allocated_size(allocated_region);
 
@@ -1667,14 +1671,16 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 #ifdef CLEAR_ON_ALLOC_NWZ
 	int alloc_size = cheri_getlen(*ptr);
 	int offset =0;
-	while(alloc_size >= 64){
-		dczero(*ptr + offset);
-		offset += 64;
-		alloc_size-=64;
-		break;
+	size_t t;
+	if((t = (__cheri_addr long) *ptr & 64-1) == 0) {
+		while(alloc_size >= 64){
+			dczero(*ptr + offset);
+			offset += 64;
+			alloc_size-=64;
+		}
 	}
-	//if(alloc_size > 0)
-	//	clear_region(*ptr + offset, alloc_size);
+	if(alloc_size > 0)
+		clear_region(*ptr + offset, alloc_size);
 #endif
 	increment_allocated_size(*ptr);
 
@@ -1717,14 +1723,16 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 #ifdef CLEAR_ON_ALLOC_NWZ
 	int alloc_size = cheri_getlen(allocated_region);
 	int offset =0;
-	while(alloc_size >= 64){
-		dczero(allocated_region + offset);
-		offset += 64;
-		alloc_size-=64;
-		break;
+	size_t t;
+	if((t = (__cheri_addr long) allocated_region & 64-1) == 0) {
+		while(alloc_size >= 64){
+			dczero(allocated_region + offset);
+			offset += 64;
+			alloc_size-=64;
+		}
 	}
-	//if(alloc_size > 0)
-	//	clear_region(allocated_region+offset, alloc_size);
+	if(alloc_size > 0)
+		clear_region(allocated_region+offset, alloc_size);
 #endif
 	increment_allocated_size(allocated_region);
 
@@ -1867,14 +1875,16 @@ mrs_mallocx(size_t size, int flags)
 #ifdef CLEAR_ON_ALLOC_NWZ
 	int alloc_size = cheri_getlen(ret);
 	int offset =0;
-	while(alloc_size >= 64){
-		dczero(ret + offset);
-		offset += 64;
-		alloc_size-=64;
-		break;
+	size_t t;
+	if((t = (__cheri_addr long) ret & 64-1) == 0) {
+		while(alloc_size >= 64){
+			dczero(ret + offset);
+			offset += 64;
+			alloc_size-=64;
+		}
 	}
-	//if(alloc_size > 0)
-	//	clear_region(ret + offset, alloc_size);
+	if(alloc_size > 0)
+		clear_region(ret + offset, alloc_size);
 #endif
 	return (ret);
 }
