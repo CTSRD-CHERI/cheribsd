@@ -732,7 +732,7 @@ int	kern_proc_out(struct proc *p, struct sbuf *sb, int flags);
 int	kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen,
 	int flags);
 int	kern_proc_kqueues_out(struct proc *p, struct sbuf *s, size_t maxlen,
-	bool compat32);
+	    u_int sv_flags);
 
 int	vntype_to_kinfo(int vtype);
 void	pack_kinfo(struct kinfo_file *kif);
