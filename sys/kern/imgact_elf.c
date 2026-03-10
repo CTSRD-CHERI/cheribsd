@@ -3330,13 +3330,10 @@ __elfN(note_procstat_kqueues)(void *arg, struct sbuf *sb, size_t *sizep)
 	size_t size, sect_sz, i;
 	ssize_t start_len, sect_len;
 	int structsize;
-	bool compat32;
 
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
-	compat32 = true;
 	structsize = sizeof(struct kinfo_knote32);
 #else
-	compat32 = false;
 	structsize = sizeof(struct kinfo_knote);
 #endif
 	p = arg;
@@ -3345,7 +3342,7 @@ __elfN(note_procstat_kqueues)(void *arg, struct sbuf *sb, size_t *sizep)
 		sb = sbuf_new(NULL, NULL, 128, SBUF_FIXEDLEN);
 		sbuf_set_drain(sb, sbuf_count_drain, &size);
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
-		kern_proc_kqueues_out(p, sb, -1, compat32);
+		kern_proc_kqueues_out(p, sb, -1, p->p_sysent->sv_flags);
 		sbuf_finish(sb);
 		sbuf_delete(sb);
 		*sizep = size;
@@ -3354,7 +3351,7 @@ __elfN(note_procstat_kqueues)(void *arg, struct sbuf *sb, size_t *sizep)
 
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
 		kern_proc_kqueues_out(p, sb, *sizep - sizeof(structsize),
-		    compat32);
+		    p->p_sysent->sv_flags);
 
 		sect_len = sbuf_end_section(sb, start_len, 0, 0);
 		if (sect_len < 0)
