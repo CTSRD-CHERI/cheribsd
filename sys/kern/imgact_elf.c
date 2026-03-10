@@ -3333,6 +3333,8 @@ __elfN(note_procstat_kqueues)(void *arg, struct sbuf *sb, size_t *sizep)
 
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
 	structsize = sizeof(struct kinfo_knote32);
+#elif defined(COMPAT_FREEBSD64) && __ELF_WORD_SIZE == 64 && !defined(__ELF_CHERI)
+	structsize = sizeof(struct kinfo_knote64);
 #else
 	structsize = sizeof(struct kinfo_knote);
 #endif

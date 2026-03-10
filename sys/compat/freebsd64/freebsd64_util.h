@@ -108,6 +108,11 @@ int	freebsd64_copyiniov(const struct iovec * __capability cb_arg,
 int	freebsd64_copyinuio(const struct iovec * __capability cb_arg,
 	    u_int iovcnt, struct uio **uiop);
 
+struct kinfo_knote;
+struct kinfo_knote64;
+void	freebsd64_kinfo_knote_to_64(const struct kinfo_knote *kin,
+	    struct kinfo_knote64 *kin64);
+
 int	freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags);
 int	freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp);
 
