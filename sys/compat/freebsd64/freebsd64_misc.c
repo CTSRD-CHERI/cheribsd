@@ -208,6 +208,43 @@ freebsd64_fexecve(struct thread *td, struct freebsd64_fexecve_args *uap)
 	return (error);
 }
 
+static void
+freebsd64_kevent_to_kevent64(const struct kevent *kevp, struct kevent64 *ks64)
+{
+	CP(*kevp, *ks64, ident);
+	CP(*kevp, *ks64, filter);
+	CP(*kevp, *ks64, flags);
+	CP(*kevp, *ks64, fflags);
+	CP(*kevp, *ks64, data);
+	ks64->udata = (__cheri_addr uint64_t)kevp->udata;
+	memcpy(&ks64->ext[0], &kevp->ext[0], sizeof(kevp->ext));
+}
+
+void
+freebsd64_kinfo_knote_to_64(const struct kinfo_knote *kin,
+    struct kinfo_knote64 *kin64)
+{
+	memset(kin64, 0, sizeof(*kin64));
+	CP(*kin, *kin64, knt_kq_fd);
+	freebsd64_kevent_to_kevent64(&kin->knt_event, &kin64->knt_event);
+	CP(*kin, *kin64, knt_status);
+	CP(*kin, *kin64, knt_extdata);
+	switch (kin->knt_extdata) {
+	case KNOTE_EXTDATA_NONE:
+		break;
+	case KNOTE_EXTDATA_VNODE:
+		CP(*kin, *kin64, knt_vnode.knt_vnode_type);
+		CP(*kin, *kin64, knt_vnode.knt_vnode_fsid);
+		CP(*kin, *kin64, knt_vnode.knt_vnode_fileid);
+		memcpy(kin64->knt_vnode.knt_vnode_fullpath,
+		    kin->knt_vnode.knt_vnode_fullpath, PATH_MAX);
+		break;
+	case KNOTE_EXTDATA_PIPE:
+		CP(*kin, *kin64, knt_pipe.knt_pipe_ino);
+		break;
+	}
+}
+
 /*
  * Copy 'count' items into the destination list pointed to by uap->eventlist.
  */

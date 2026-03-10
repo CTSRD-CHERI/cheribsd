@@ -75,6 +75,10 @@
 #include <sys/ktrace.h>
 #endif
 #include <machine/atomic.h>
+#ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64.h>
+#include <compat/freebsd64/freebsd64_util.h>
+#endif
 #ifdef COMPAT_FREEBSD32
 #include <compat/freebsd32/freebsd32.h>
 #include <compat/freebsd32/freebsd32_util.h>
@@ -2894,6 +2898,9 @@ kern_proc_kqueue_report_one(struct sbuf *s, struct proc *p,
     int kq_fd, struct kqueue *kq, struct knote *kn, u_int sv_flags __unused)
 {
 	struct kinfo_knote kin;
+#ifdef COMPAT_FREEBSD64
+	struct kinfo_knote64 kin64;
+#endif
 #ifdef COMPAT_FREEBSD32
 	struct kinfo_knote32 kin32;
 #endif
@@ -2910,6 +2917,12 @@ kern_proc_kqueue_report_one(struct sbuf *s, struct proc *p,
 	KQ_UNLOCK_FLUX(kq);
 	if (kn->kn_fop->f_userdump != NULL)
 		(void)kn->kn_fop->f_userdump(p, kn, &kin);
+#ifdef COMPAT_FREEBSD64
+	if ((sv_flags & (SV_LP64 | SV_CHERI)) == SV_LP64) {
+		freebsd64_kinfo_knote_to_64(&kin, &kin64);
+		error = sbuf_bcat(s, &kin64, sizeof(kin64));
+	} else
+#endif
 #ifdef COMPAT_FREEBSD32
 	if ((sv_flags & SV_ILP32) != 0) {
 		freebsd32_kinfo_knote_to_32(&kin, &kin32);
