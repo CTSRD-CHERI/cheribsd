@@ -700,10 +700,12 @@ fops_str_write(struct file *filp, const char *buf, size_t write_size,
 		return (-ENOMEM);
 
 	memcpy(new, old, old_len);
-	if (copy_from_user(new + old_len, buf, write_size) != 0) {
-		kfree(new);
-		return (-EFAULT);
-	}
+
+	/*
+	 * In Linux this would use copy_from_user, but pseudofs passes
+	 * a pointer to a kernel buffer in *buf, not a user pointer.
+	 */
+	memcpy(new + old_len, buf, write_size);
 
 	new[new_len] = '\0';
 	strim(new);
