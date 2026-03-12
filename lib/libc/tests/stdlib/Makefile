@@ -8,7 +8,7 @@ ATF_TESTS_C+=		libc_exit_test
 ATF_TESTS_C+=		mergesort_test
 ATF_TESTS_C+=		timsort_test
 ATF_TESTS_C+=		qsort_test
-.if ${COMPILER_TYPE} == "clang"
+.if ${COMPILER_FEATURES:Mblocks}
 .if !${MACHINE_ABI:Mpurecap}
 # See https://github.com/CTSRD-CHERI/llvm-project/issues/671
 ATF_TESTS_C+=		qsort_b_test

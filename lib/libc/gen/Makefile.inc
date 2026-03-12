@@ -182,7 +182,7 @@ CFLAGS.libcheri_caprevoke.c+=-I${SRCTOP}/lib/libcheri_caprevoke/${MACHINE_CPUARC
 SRCS+=	libcheri_caprevoke.c
 .endif
 
-.if ${COMPILER_TYPE} == "clang"
+.if ${COMPILER_FEATURES:Mblocks}
 CFLAGS.fts.c= -fblocks
 .endif
 
