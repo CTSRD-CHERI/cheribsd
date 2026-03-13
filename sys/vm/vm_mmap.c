@@ -1535,7 +1535,7 @@ int
 kern_msetname(struct thread *td, uintptr_t addr0, size_t len,
     const char * __capability name)
 {
-	char lname[MAP_ENTRY_NAME_LEN];
+	char *lname;
 	vm_offset_t addr;
 	vm_size_t size, pageoff;
 	int error;
@@ -1550,18 +1550,35 @@ kern_msetname(struct thread *td, uintptr_t addr0, size_t len,
 	if (addr + size < addr)
 		return (EINVAL);
 
-	error = copyinstr(name, lname, sizeof(lname), NULL);
+	/*
+	 * We copy into a larger buffer setting a notional administrative
+	 * limit in length to PATH_MAX, but in fact install a potentially
+	 * truncated version without an error.  This is because VM mapping
+	 * labels are advisory, and it's better to have a shortened version
+	 * than no information.  If use cases change, then an error here
+	 * might be preferable to truncation.
+	 */
+	lname = malloc(PATH_MAX, M_TEMP, M_ZERO | M_WAITOK);
+	error = copyinstr(name, lname, PATH_MAX, NULL);
 	if (error != 0)
-		return (error);
+		goto out;
 
 	switch (vm_map_msetname(&td->td_proc->p_vmspace->vm_map, addr,
 	    addr + size, lname)) {
 	case KERN_SUCCESS:
-		return (0);
+		error = 0;
+		break;
+
 	case KERN_PROTECTION_FAILURE:
-		return (EACCES);
+		error = EACCES;
+		break;
+
+	default:
+		error = EINVAL;
 	}
-	return (EINVAL);
+out:
+	free(lname, M_TEMP);
+	return (error);
 }
 
 #ifndef _SYS_SYSPROTO_H_
