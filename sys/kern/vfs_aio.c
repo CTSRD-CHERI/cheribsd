@@ -864,8 +864,8 @@ aio_process_mlock(struct kaiocb *job)
 	    ("%s: opcode %d", __func__, job->uaiocb.aio_lio_opcode));
 
 	aio_switch_vmspace(job);
-	error = kern_mlock(job->userproc, job->cred, (uintptr_t)(uintptr_t)
-	    __DEVOLATILE(void *, cb->aio_buf), cb->aio_nbytes);
+	error = kern_mlock(job->userproc, job->cred,
+	    __DEVOLATILE(uintptr_t, cb->aio_buf), cb->aio_nbytes);
 	aio_complete(job, error != 0 ? -1 : 0, error);
 }
 
@@ -1422,7 +1422,7 @@ aiocb_copyin(struct aiocb *ujob, struct kaiocb *kjob, int type)
 		type = kcb->aio_lio_opcode;
 	if (type & LIO_VECTORED) {
 		/* malloc a uio and copy in the iovec */
-		error = copyinuio(__DEVOLATILE(struct iovec *, kcb->aio_iov),
+		error = copyinuio(__DEVOLATILE(struct iovec*, kcb->aio_iov),
 		    kcb->aio_iovcnt, &kjob->uiop);
 	}
 
@@ -2207,8 +2207,8 @@ int
 freebsd6_aio_read(struct thread *td, struct freebsd6_aio_read_args *uap)
 {
 
-	return (aio_aqueue(td, (struct aiocb *)uap->aiocbp,
-	    NULL, LIO_READ, &aiocb_ops_osigevent));
+	return (aio_aqueue(td, (struct aiocb *)uap->aiocbp, NULL, LIO_READ,
+	    &aiocb_ops_osigevent));
 }
 #endif
 
@@ -2232,8 +2232,8 @@ int
 freebsd6_aio_write(struct thread *td, struct freebsd6_aio_write_args *uap)
 {
 
-	return (aio_aqueue(td, (struct aiocb *)uap->aiocbp,
-	    NULL, LIO_WRITE, &aiocb_ops_osigevent));
+	return (aio_aqueue(td, (struct aiocb *)uap->aiocbp, NULL, LIO_WRITE,
+	    &aiocb_ops_osigevent));
 }
 #endif
 
@@ -2624,8 +2624,7 @@ sys_aio_waitcomplete(struct thread *td, struct aio_waitcomplete_args *uap)
 	} else
 		tsp = NULL;
 
-	return (kern_aio_waitcomplete(td, (struct aiocb **)uap->aiocbp,
-	    tsp, &aiocb_ops));
+	return (kern_aio_waitcomplete(td, uap->aiocbp, tsp, &aiocb_ops));
 }
 
 static int
@@ -3477,8 +3476,7 @@ aiocb64_store_error(struct aiocb *ujob, long error)
 }
 
 static int
-aiocb64_store_aiocb(struct aiocb **ujobp,
-    struct aiocb *ujob)
+aiocb64_store_aiocb(struct aiocb **ujobp, struct aiocb *ujob)
 {
 
 	return (suword(ujobp, (ptraddr_t)ujob));
