@@ -105,6 +105,7 @@ INTERPOSED = \
 # Pseudo implementations of system calls with special behavior under c18n
 C18N_WRAPPED=	\
 	mmap \
+	msetname \
 	rfork \
 	thr_exit \
 	vfork
