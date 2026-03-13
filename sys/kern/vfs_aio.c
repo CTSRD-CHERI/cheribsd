@@ -294,11 +294,11 @@ struct kaioinfo {
  * Different ABIs provide their own operations.
  */
 struct aiocb_ops {
-	int	(*aio_copyin)(void *ujob, struct kaiocb *kjob, int ty);
-	long	(*fetch_status)(void *ujob);
-	long	(*fetch_error)(void *ujob);
-	int	(*store_status)(void *ujob, long status);
-	int	(*store_error)(void *ujob, long error);
+	int	(*aio_copyin)(struct aiocb *ujob, struct kaiocb *kjob, int ty);
+	long	(*fetch_status)(struct aiocb *ujob);
+	long	(*fetch_error)(struct aiocb *ujob);
+	int	(*store_status)(struct aiocb *ujob, long status);
+	int	(*store_error)(struct aiocb *ujob, long error);
 	int	(*store_aiocb)(struct aiocb **ujobp, struct aiocb *ujob);
 	size_t	(*size)(void);
 };
@@ -1410,7 +1410,7 @@ convert_old_sigevent(struct osigevent *osig, struct sigevent *nsig)
 }
 
 static int
-aiocb_copyin_old_sigevent(void *ujob, struct kaiocb *kjob,
+aiocb_copyin_old_sigevent(struct aiocb *ujob, struct kaiocb *kjob,
     int type __unused)
 {
 	struct oaiocb *ojob;
@@ -1428,7 +1428,7 @@ aiocb_copyin_old_sigevent(void *ujob, struct kaiocb *kjob,
 #endif
 
 static int
-aiocb_copyin(void *ujob, struct kaiocb *kjob, int type)
+aiocb_copyin(struct aiocb *ujob, struct kaiocb *kjob, int type)
 {
 	struct aiocb *kcb = &kjob->uaiocb;
 	int error;
@@ -1448,20 +1448,16 @@ aiocb_copyin(void *ujob, struct kaiocb *kjob, int type)
 }
 
 static long
-aiocb_fetch_status(void *ujobp)
+aiocb_fetch_status(struct aiocb *ujob)
 {
-	struct aiocb *ujob;
 
-	ujob = ujobp;
 	return (fuword(&ujob->_aiocb_private.status));
 }
 
 static long
-aiocb_fetch_error(void *ujobp)
+aiocb_fetch_error(struct aiocb *ujob)
 {
-	struct aiocb *ujob;
 
-	ujob = ujobp;
 	return (fuword(&ujob->_aiocb_private.error));
 }
 
@@ -1478,20 +1474,16 @@ aiocb_free_kaiocb(struct kaiocb *kjob)
 }
 
 static int
-aiocb_store_status(void *ujobp, long status)
+aiocb_store_status(struct aiocb *ujob, long status)
 {
-	struct aiocb *ujob;
 
-	ujob = ujobp;
 	return (suword(&ujob->_aiocb_private.status, status));
 }
 
 static int
-aiocb_store_error(void *ujobp, long error)
+aiocb_store_error(struct aiocb *ujob, long error)
 {
-	struct aiocb *ujob;
 
-	ujob = ujobp;
 	return (suword(&ujob->_aiocb_private.error, error));
 }
 
@@ -1949,7 +1941,7 @@ aio_kick_helper(void *context, int pending)
  * released.
  */
 static int
-kern_aio_return(struct thread *td, void *ujob, struct aiocb_ops *ops)
+kern_aio_return(struct thread *td, struct aiocb *ujob, struct aiocb_ops *ops)
 {
 	struct proc *p = td->td_proc;
 	struct kaiocb *job;
@@ -2088,7 +2080,8 @@ sys_aio_suspend(struct thread *td, struct aio_suspend_args *uap)
  * aio_cancel cancels any non-bio aio operations not currently in progress.
  */
 static int
-kern_aio_cancel(struct thread *td, int fd, void *ujob, struct aiocb_ops *ops)
+kern_aio_cancel(struct thread *td, int fd, struct aiocb *ujob,
+    struct aiocb_ops *ops)
 {
 	struct proc *p = td->td_proc;
 	struct kaioinfo *ki;
@@ -3431,7 +3424,7 @@ convert_old_sigevent64(struct osigevent64 *osig, struct sigevent *nsig)
 }
 
 static int
-aiocb64_copyin_old_sigevent(void *ujob,
+aiocb64_copyin_old_sigevent(struct aiocb *ujob,
     struct kaiocb *kjob, int type __unused)
 {
 	struct oaiocb64 job64;
@@ -3457,7 +3450,7 @@ aiocb64_copyin_old_sigevent(void *ujob,
 #endif
 
 static int
-aiocb64_copyin(void *ujob, struct kaiocb *kjob, int type)
+aiocb64_copyin(struct aiocb *ujob, struct kaiocb *kjob, int type)
 {
 	struct aiocb64 job64;
 	struct aiocb *kcb = &kjob->uaiocb;
@@ -3493,7 +3486,7 @@ aiocb64_copyin(void *ujob, struct kaiocb *kjob, int type)
 }
 
 static long
-aiocb64_fetch_status(void *ujob)
+aiocb64_fetch_status(struct aiocb *ujob)
 {
 	struct aiocb64 *ujob64;
 
@@ -3502,7 +3495,7 @@ aiocb64_fetch_status(void *ujob)
 }
 
 static long
-aiocb64_fetch_error(void *ujob)
+aiocb64_fetch_error(struct aiocb *ujob)
 {
 	struct aiocb64 *ujob64;
 
@@ -3511,7 +3504,7 @@ aiocb64_fetch_error(void *ujob)
 }
 
 static int
-aiocb64_store_status(void *ujob, long status)
+aiocb64_store_status(struct aiocb *ujob, long status)
 {
 	struct aiocb64 *ujob64;
 
@@ -3520,7 +3513,7 @@ aiocb64_store_status(void *ujob, long status)
 }
 
 static int
-aiocb64_store_error(void *ujob, long error)
+aiocb64_store_error(struct aiocb *ujob, long error)
 {
 	struct aiocb64 *ujob64;
 
