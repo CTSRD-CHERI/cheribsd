@@ -51,6 +51,7 @@
 
 #include "debug.h"
 #include "rtld.h"
+#include "rtld_libc.h"
 #ifdef CHERI_LIB_C18N
 #include "rtld_c18n.h"
 #endif
