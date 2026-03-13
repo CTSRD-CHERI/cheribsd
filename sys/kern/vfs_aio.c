@@ -1935,7 +1935,7 @@ kern_aio_return(struct thread *td, struct aiocb *ujob, struct aiocb_ops *ops)
 		return (EINVAL);
 	AIO_LOCK(ki);
 	TAILQ_FOREACH(job, &ki->kaio_done, plist) {
-		if ((ptraddr_t)job->ujob == (ptraddr_t)ujob)
+		if (job->ujob == ujob)
 			break;
 	}
 	if (job != NULL) {
@@ -2103,8 +2103,7 @@ kern_aio_cancel(struct thread *td, int fd, struct aiocb *ujob,
 	AIO_LOCK(ki);
 	TAILQ_FOREACH_SAFE(job, &ki->kaio_jobqueue, plist, jobn) {
 		if ((fd == job->uaiocb.aio_fildes) &&
-		    ((ujob == NULL) ||
-		     ((ptraddr_t)ujob == (ptraddr_t)job->ujob))) {
+		    ((ujob == NULL) || (ujob == job->ujob))) {
 			if (aio_cancel_job(p, ki, job)) {
 				cancelled++;
 			} else {
