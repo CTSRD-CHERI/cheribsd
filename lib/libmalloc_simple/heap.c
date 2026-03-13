@@ -73,6 +73,10 @@ static char *rcsid = "$FreeBSD$";
 #define	error_printf(...)	fprintf(stderr, __VA_ARGS__)
 #endif
 
+#ifdef IN_RTLD
+#include "rtld_libc.h"
+#endif
+
 struct pagepool_header {
 	size_t			ph_size;
 #ifdef __CHERI_PURE_CAPABILITY__
