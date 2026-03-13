@@ -102,17 +102,14 @@ INTERPOSED = \
 
 .ifdef CHERI_LIB_C18N
 # Pseudo implementations of system calls with special behavior under c18n
-SRCS+= \
-	mmap_c18n.c \
-	rfork_c18n.c \
-	thr_exit_c18n.c \
-	vfork_c18n.c
-
-NO_UNDERSCORE+= \
+C18N_WRAPPED=	\
 	mmap \
 	rfork \
 	thr_exit \
 	vfork
+
+SRCS+=		${C18N_WRAPPED:S/$/_c18n.c/}
+PSEUDO+=	${C18N_WRAPPED}
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}
