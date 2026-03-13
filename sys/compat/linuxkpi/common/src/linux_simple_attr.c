@@ -99,7 +99,7 @@ simple_attr_release(struct inode *inode, struct file *filp)
  * On failure, negative signed ERRNO
  */
 ssize_t
-simple_attr_read(struct file *filp, char __user *buf, size_t read_size,
+simple_attr_read(struct file *filp, char __user * __capability buf, size_t read_size,
     loff_t *ppos)
 {
 	struct simple_attr *sattr;
@@ -147,7 +147,7 @@ unlock:
  * On failure, negative signed ERRNO
  */
 static ssize_t
-simple_attr_write_common(struct file *filp, const char __user *ubuf,
+simple_attr_write_common(struct file *filp, const char __user * __capability ubuf,
     size_t write_size, loff_t *ppos, bool is_signed)
 {
 	struct simple_attr *sattr;
@@ -195,14 +195,14 @@ unlock:
 }
 
 ssize_t
-simple_attr_write(struct file *filp, const char __user *buf, size_t write_size,
+simple_attr_write(struct file *filp, const char __user * __capability buf, size_t write_size,
     loff_t *ppos)
 {
 	return (simple_attr_write_common(filp, buf,  write_size, ppos, false));
 }
 
 ssize_t
-simple_attr_write_signed(struct file *filp, const char __user *buf,
+simple_attr_write_signed(struct file *filp, const char __user * __capability buf,
     size_t write_size, loff_t *ppos)
 {
 	return (simple_attr_write_common(filp, buf,  write_size, ppos, true));

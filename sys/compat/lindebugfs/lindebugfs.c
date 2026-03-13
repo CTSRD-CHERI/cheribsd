@@ -663,7 +663,7 @@ fops_str_open(struct inode *inode, struct file *filp)
 }
 
 static ssize_t
-fops_str_read(struct file *filp, char __user *ubuf, size_t read_size,
+fops_str_read(struct file *filp, char __user * __capability ubuf, size_t read_size,
     loff_t *ppos)
 {
 	ssize_t ret;
@@ -697,7 +697,7 @@ fops_str_read(struct file *filp, char __user *ubuf, size_t read_size,
 }
 
 static ssize_t
-fops_str_write(struct file *filp, const char __user *buf, size_t write_size,
+fops_str_write(struct file *filp, const char __user * __capability buf, size_t write_size,
     loff_t *ppos)
 {
 	char *old, *new;
@@ -771,7 +771,7 @@ debugfs_create_str(const char *name, umode_t mode, struct dentry *parent,
 
 
 static ssize_t
-fops_blob_read(struct file *filp, char __user *ubuf, size_t read_size, loff_t *ppos)
+fops_blob_read(struct file *filp, char __user * __capability ubuf, size_t read_size, loff_t *ppos)
 {
 	struct debugfs_blob_wrapper *blob;
 

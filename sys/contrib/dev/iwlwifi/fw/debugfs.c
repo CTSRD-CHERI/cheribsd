@@ -34,7 +34,7 @@ static int _iwl_dbgfs_##name##_open(struct inode *inode,		\
 
 #define FWRT_DEBUGFS_READ_WRAPPER(name)					\
 static ssize_t _iwl_dbgfs_##name##_read(struct file *file,		\
-					char __user *user_buf,		\
+					char __user * __capability user_buf,		\
 					size_t count, loff_t *ppos)	\
 {									\
 	struct dbgfs_##name##_data *data = file->private_data;		\
@@ -71,7 +71,7 @@ static const struct file_operations iwl_dbgfs_##name##_ops = {		\
 
 #define FWRT_DEBUGFS_WRITE_WRAPPER(name, buflen, argtype)		\
 static ssize_t _iwl_dbgfs_##name##_write(struct file *file,		\
-					 const char __user *user_buf,	\
+					 const char __user * __capability user_buf,	\
 					 size_t count, loff_t *ppos)	\
 {									\
 	argtype *arg =							\
