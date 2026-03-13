@@ -136,7 +136,7 @@ static ssize_t iwl_dbgfs_pm_params_write(struct ieee80211_vif *vif, char *buf,
 }
 
 static ssize_t iwl_dbgfs_tx_pwr_lmt_read(struct file *file,
-					 char __user *user_buf,
+					 char __user * __capability user_buf,
 					 size_t count, loff_t *ppos)
 {
 	struct ieee80211_vif *vif = file->private_data;
@@ -151,7 +151,7 @@ static ssize_t iwl_dbgfs_tx_pwr_lmt_read(struct file *file,
 }
 
 static ssize_t iwl_dbgfs_pm_params_read(struct file *file,
-					char __user *user_buf,
+					char __user * __capability user_buf,
 					size_t count, loff_t *ppos)
 {
 	struct ieee80211_vif *vif = file->private_data;
@@ -167,7 +167,7 @@ static ssize_t iwl_dbgfs_pm_params_read(struct file *file,
 }
 
 static ssize_t iwl_dbgfs_mac_params_read(struct file *file,
-					 char __user *user_buf,
+					 char __user * __capability user_buf,
 					 size_t count, loff_t *ppos)
 {
 	struct ieee80211_vif *vif = file->private_data;
@@ -393,7 +393,7 @@ static ssize_t iwl_dbgfs_bf_params_write(struct ieee80211_vif *vif, char *buf,
 }
 
 static ssize_t iwl_dbgfs_bf_params_read(struct file *file,
-					char __user *user_buf,
+					char __user * __capability user_buf,
 					size_t count, loff_t *ppos)
 {
 	struct ieee80211_vif *vif = file->private_data;
@@ -442,7 +442,7 @@ static ssize_t iwl_dbgfs_bf_params_read(struct file *file,
 }
 
 static ssize_t iwl_dbgfs_os_device_timediff_read(struct file *file,
-						 char __user *user_buf,
+						 char __user * __capability user_buf,
 						 size_t count, loff_t *ppos)
 {
 	struct ieee80211_vif *vif = file->private_data;
@@ -521,7 +521,7 @@ iwl_dbgfs_low_latency_force_write(struct ieee80211_vif *vif, char *buf,
 }
 
 static ssize_t iwl_dbgfs_low_latency_read(struct file *file,
-					  char __user *user_buf,
+					  char __user * __capability user_buf,
 					  size_t count, loff_t *ppos)
 {
 	struct ieee80211_vif *vif = file->private_data;
@@ -549,7 +549,7 @@ static ssize_t iwl_dbgfs_low_latency_read(struct file *file,
 }
 
 static ssize_t iwl_dbgfs_uapsd_misbehaving_read(struct file *file,
-						char __user *user_buf,
+						char __user * __capability user_buf,
 						size_t count, loff_t *ppos)
 {
 	struct ieee80211_vif *vif = file->private_data;
@@ -632,7 +632,7 @@ static ssize_t iwl_dbgfs_rx_phyinfo_write(struct ieee80211_vif *vif, char *buf,
 }
 
 static ssize_t iwl_dbgfs_rx_phyinfo_read(struct file *file,
-					 char __user *user_buf,
+					 char __user * __capability user_buf,
 					 size_t count, loff_t *ppos)
 {
 	struct ieee80211_vif *vif = file->private_data;
@@ -686,7 +686,7 @@ static ssize_t iwl_dbgfs_quota_min_write(struct ieee80211_vif *vif, char *buf,
 }
 
 static ssize_t iwl_dbgfs_quota_min_read(struct file *file,
-					char __user *user_buf,
+					char __user * __capability user_buf,
 					size_t count, loff_t *ppos)
 {
 	struct ieee80211_vif *vif = file->private_data;
@@ -719,7 +719,7 @@ static ssize_t iwl_dbgfs_max_tx_op_write(struct ieee80211_vif *vif, char *buf,
 }
 
 static ssize_t iwl_dbgfs_max_tx_op_read(struct file *file,
-					char __user *user_buf,
+					char __user * __capability user_buf,
 					size_t count, loff_t *ppos)
 {
 	struct ieee80211_vif *vif = file->private_data;
@@ -766,7 +766,7 @@ static ssize_t iwl_dbgfs_int_mlo_scan_write(struct ieee80211_vif *vif,
 }
 
 static ssize_t iwl_dbgfs_esr_disable_reason_read(struct file *file,
-						 char __user *user_buf,
+						 char __user * __capability user_buf,
 						 size_t count, loff_t *ppos)
 {
 	struct ieee80211_vif *vif = file->private_data;

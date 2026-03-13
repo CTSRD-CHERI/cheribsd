@@ -19,7 +19,7 @@
 struct rtw_debugfs_priv {
 	struct rtw_dev *rtwdev;
 	int (*cb_read)(struct seq_file *m, void *v);
-	ssize_t (*cb_write)(struct file *filp, const char __user *buffer,
+	ssize_t (*cb_write)(struct file *filp, const char __user * __capability buffer,
 			    size_t count, loff_t *loff);
 	union {
 		u32 cb_data;
@@ -112,7 +112,7 @@ static int rtw_debugfs_single_show(struct seq_file *m, void *v)
 }
 
 static ssize_t rtw_debugfs_common_write(struct file *filp,
-					const char __user *buffer,
+					const char __user * __capability buffer,
 					size_t count, loff_t *loff)
 {
 	struct rtw_debugfs_priv *debugfs_priv = filp->private_data;
@@ -121,7 +121,7 @@ static ssize_t rtw_debugfs_common_write(struct file *filp,
 }
 
 static ssize_t rtw_debugfs_single_write(struct file *filp,
-					const char __user *buffer,
+					const char __user * __capability buffer,
 					size_t count, loff_t *loff)
 {
 	struct seq_file *seqpriv = (struct seq_file *)filp->private_data;
@@ -227,7 +227,7 @@ static int rtw_debugfs_get_fix_rate(struct seq_file *m, void *v)
 }
 
 static int rtw_debugfs_copy_from_user(char tmp[], int size,
-				      const char __user *buffer, size_t count,
+				      const char __user * __capability buffer, size_t count,
 				      int num)
 {
 	int tmp_len;
@@ -248,7 +248,7 @@ static int rtw_debugfs_copy_from_user(char tmp[], int size,
 }
 
 static ssize_t rtw_debugfs_set_read_reg(struct file *filp,
-					const char __user *buffer,
+					const char __user * __capability buffer,
 					size_t count, loff_t *loff)
 {
 	struct seq_file *seqpriv = (struct seq_file *)filp->private_data;
@@ -338,7 +338,7 @@ static int rtw_debugfs_get_rsvd_page(struct seq_file *m, void *v)
 }
 
 static ssize_t rtw_debugfs_set_rsvd_page(struct file *filp,
-					 const char __user *buffer,
+					 const char __user * __capability buffer,
 					 size_t count, loff_t *loff)
 {
 	struct seq_file *seqpriv = (struct seq_file *)filp->private_data;
@@ -367,7 +367,7 @@ static ssize_t rtw_debugfs_set_rsvd_page(struct file *filp,
 }
 
 static ssize_t rtw_debugfs_set_single_input(struct file *filp,
-					    const char __user *buffer,
+					    const char __user * __capability buffer,
 					    size_t count, loff_t *loff)
 {
 	struct seq_file *seqpriv = (struct seq_file *)filp->private_data;
@@ -385,7 +385,7 @@ static ssize_t rtw_debugfs_set_single_input(struct file *filp,
 }
 
 static ssize_t rtw_debugfs_set_write_reg(struct file *filp,
-					 const char __user *buffer,
+					 const char __user * __capability buffer,
 					 size_t count, loff_t *loff)
 {
 	struct rtw_debugfs_priv *debugfs_priv = filp->private_data;
@@ -431,7 +431,7 @@ static ssize_t rtw_debugfs_set_write_reg(struct file *filp,
 }
 
 static ssize_t rtw_debugfs_set_h2c(struct file *filp,
-				   const char __user *buffer,
+				   const char __user * __capability buffer,
 				   size_t count, loff_t *loff)
 {
 	struct rtw_debugfs_priv *debugfs_priv = filp->private_data;
@@ -461,7 +461,7 @@ static ssize_t rtw_debugfs_set_h2c(struct file *filp,
 }
 
 static ssize_t rtw_debugfs_set_rf_write(struct file *filp,
-					const char __user *buffer,
+					const char __user * __capability buffer,
 					size_t count, loff_t *loff)
 {
 	struct rtw_debugfs_priv *debugfs_priv = filp->private_data;
@@ -493,7 +493,7 @@ static ssize_t rtw_debugfs_set_rf_write(struct file *filp,
 }
 
 static ssize_t rtw_debugfs_set_rf_read(struct file *filp,
-				       const char __user *buffer,
+				       const char __user * __capability buffer,
 				       size_t count, loff_t *loff)
 {
 	struct seq_file *seqpriv = (struct seq_file *)filp->private_data;
@@ -523,7 +523,7 @@ static ssize_t rtw_debugfs_set_rf_read(struct file *filp,
 }
 
 static ssize_t rtw_debugfs_set_fix_rate(struct file *filp,
-					const char __user *buffer,
+					const char __user * __capability buffer,
 					size_t count, loff_t *loff)
 {
 	struct seq_file *seqpriv = (struct seq_file *)filp->private_data;
@@ -911,7 +911,7 @@ static int rtw_debugfs_get_coex_info(struct seq_file *m, void *v)
 }
 
 static ssize_t rtw_debugfs_set_coex_enable(struct file *filp,
-					   const char __user *buffer,
+					   const char __user * __capability buffer,
 					   size_t count, loff_t *loff)
 {
 	struct seq_file *seqpriv = (struct seq_file *)filp->private_data;
@@ -945,7 +945,7 @@ static int rtw_debugfs_get_coex_enable(struct seq_file *m, void *v)
 }
 
 static ssize_t rtw_debugfs_set_edcca_enable(struct file *filp,
-					    const char __user *buffer,
+					    const char __user * __capability buffer,
 					    size_t count, loff_t *loff)
 {
 	struct seq_file *seqpriv = (struct seq_file *)filp->private_data;
@@ -977,7 +977,7 @@ static int rtw_debugfs_get_edcca_enable(struct seq_file *m, void *v)
 }
 
 static ssize_t rtw_debugfs_set_fw_crash(struct file *filp,
-					const char __user *buffer,
+					const char __user * __capability buffer,
 					size_t count, loff_t *loff)
 {
 	struct seq_file *seqpriv = (struct seq_file *)filp->private_data;
@@ -1017,7 +1017,7 @@ static int rtw_debugfs_get_fw_crash(struct seq_file *m, void *v)
 }
 
 static ssize_t rtw_debugfs_set_force_lowest_basic_rate(struct file *filp,
-						       const char __user *buffer,
+						       const char __user * __capability buffer,
 						       size_t count, loff_t *loff)
 {
 	struct seq_file *seqpriv = (struct seq_file *)filp->private_data;
@@ -1050,7 +1050,7 @@ static int rtw_debugfs_get_force_lowest_basic_rate(struct seq_file *m, void *v)
 }
 
 static ssize_t rtw_debugfs_set_dm_cap(struct file *filp,
-				      const char __user *buffer,
+				      const char __user * __capability buffer,
 				      size_t count, loff_t *loff)
 {
 	struct seq_file *seqpriv = (struct seq_file *)filp->private_data;

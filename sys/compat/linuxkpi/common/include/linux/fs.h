@@ -134,8 +134,8 @@ typedef int (*filldir_t)(void *, const char *, int, off_t, u64, unsigned);
 
 struct file_operations {
 	struct module *owner;
-	ssize_t (*read)(struct linux_file *, char __user *, size_t, off_t *);
-	ssize_t (*write)(struct linux_file *, const char __user *, size_t, off_t *);
+	ssize_t (*read)(struct linux_file *, char __user * __capability, size_t, off_t *);
+	ssize_t (*write)(struct linux_file *, const char __user * __capability, size_t, off_t *);
 	unsigned int (*poll) (struct linux_file *, struct poll_table_struct *);
 	long (*unlocked_ioctl)(struct linux_file *, unsigned int, uintcap_t);
 	long (*compat_ioctl)(struct linux_file *, unsigned int, uintcap_t);
@@ -360,7 +360,7 @@ i_size_write(struct inode *inode, loff_t i_size)
  * On failure, negative value.
  */
 static inline ssize_t
-simple_read_from_buffer(void __user *dest, size_t read_size, loff_t *ppos,
+simple_read_from_buffer(void __user * __capability dest, size_t read_size, loff_t *ppos,
     void *orig, size_t buf_size)
 {
 	void *read_pos = ((char *) orig) + *ppos;
@@ -410,13 +410,13 @@ int simple_attr_open(struct inode *inode, struct file *filp,
 
 int simple_attr_release(struct inode *inode, struct file *filp);
 
-ssize_t simple_attr_read(struct file *filp, char __user *buf, size_t read_size,
+ssize_t simple_attr_read(struct file *filp, char __user * __capability buf, size_t read_size,
     loff_t *ppos);
 
-ssize_t simple_attr_write(struct file *filp, const char __user *buf,
+ssize_t simple_attr_write(struct file *filp, const char __user * __capability buf,
     size_t write_size, loff_t *ppos);
 
-ssize_t simple_attr_write_signed(struct file *filp, const char __user *buf,
+ssize_t simple_attr_write_signed(struct file *filp, const char __user * __capability buf,
 	    size_t write_size, loff_t *ppos);
 
 #endif /* _LINUXKPI_LINUX_FS_H_ */
