@@ -30,7 +30,7 @@ extent_alloc_mmap(void *new_addr, size_t size, size_t alignment, bool *zero,
 	if (*commit) {
 		*zero = true;
 	}
-	(void)msetname(new_addr, size, "jemalloc:extents");
+	(void)msetname(ret, size, "jemalloc:extents");
 	return ret;
 }
 
