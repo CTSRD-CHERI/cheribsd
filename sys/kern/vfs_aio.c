@@ -339,6 +339,8 @@ static int	filt_aio(struct knote *kn, long hint);
 static int	filt_lioattach(struct knote *kn);
 static void	filt_liodetach(struct knote *kn);
 static int	filt_lio(struct knote *kn, long hint);
+static int	kern_aio_cancel(struct thread *td, int fd, struct aiocb *ujob,
+		    struct aiocb_ops *ops);
 
 static void	aiocb_free_kaiocb(struct kaiocb *);
 
@@ -2054,6 +2056,12 @@ sys_aio_suspend(struct thread *td, struct aio_suspend_args *uap)
 /*
  * aio_cancel cancels any non-bio aio operations not currently in progress.
  */
+int
+sys_aio_cancel(struct thread *td, struct aio_cancel_args *uap)
+{
+	return(kern_aio_cancel(td, uap->fd, uap->aiocbp, &aiocb_ops));
+}
+
 static int
 kern_aio_cancel(struct thread *td, int fd, struct aiocb *ujob,
     struct aiocb_ops *ops)
@@ -2131,12 +2139,6 @@ done:
 	td->td_retval[0] = AIO_ALLDONE;
 
 	return (0);
-}
-
-int
-sys_aio_cancel(struct thread *td, struct aio_cancel_args *uap)
-{
-	return(kern_aio_cancel(td, uap->fd, uap->aiocbp, &aiocb_ops));
 }
 
 /*
