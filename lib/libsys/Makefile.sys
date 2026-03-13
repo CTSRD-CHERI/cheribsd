@@ -118,12 +118,13 @@ NO_UNDERSCORE+= \
 .if ${MACHINE_ABI:Mpurecap}
 # Var-args calling convention different for purecap
 NO_UNDERSCORE=	fcntl ioctl open openat
+
 .for _nu in ${NO_UNDERSCORE}
 INTERPOSED:=	${INTERPOSED:N${_nu}}
 .endfor
 S_NU+=		${NO_UNDERSCORE:C/^.*$/_&.S/}
 SRCS+=		${NO_UNDERSCORE:S/$/.c/} ${S_NU}
-NOASM+=		${NO_UNDERSCORE:S/$/.o/}
+NOASM+=		${NO_UNDERSCORE}
 .endif
 
 PSEUDO+=	${INTERPOSED}
