@@ -28,7 +28,7 @@ __msetname(void *addr, size_t len, const char *name)
 
 	/*
 	 * If msetname(2) isn't present, just disregard.
-	 */ 
+	 */
 	error = 0;
 	if (__getosreldate() >= P_OSREL_MSETNAME)
 		error = __sys_msetname(addr, len, name);
