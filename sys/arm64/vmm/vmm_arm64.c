@@ -469,6 +469,8 @@ vmmops_modinit(int ipinum)
 #ifdef SMP
 	el2_regs.vtcr_el2 |= VTCR_EL2_SH0_IS;
 #endif
+	if (pmap_vs_enabled())
+		el2_regs.vtcr_el2 |= VTCR_EL2_VS;
 #if __has_feature(capabilities)
 	/*
 	 * Enable the use of SC/LC/CDBM in stage 2 translation descriptors.
