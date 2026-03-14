@@ -236,6 +236,7 @@ pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
 		} else {
 			(void)msetname(ret, size, "jemalloc:pages_map");
 		}
+
 		return ret;
 	}
 #endif
