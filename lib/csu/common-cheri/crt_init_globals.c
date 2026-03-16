@@ -169,11 +169,10 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 	if (use_code_bounds) {
 		code_cap = cheri_pcc_get();
 		data_cap = __DECONST(void *, phdr);
-		data_cap = cheri_perms_clear(data_cap,
-		    CHERI_PERM_EXECUTE | CHERI_PERM_SW_VMEM);
-		rodata_cap = cheri_perms_clear(data_cap,
-		    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
-		    CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_SW_VMEM);
+		data_cap = cheri_perms_and(data_cap,
+		    CHERI_CAP_USER_DATA_PERMS);
+		rodata_cap = cheri_perms_and(data_cap,
+		    CHERI_CAP_USER_RODATA_PERMS);
 		goto handle_relocs;
 	}
 #endif
