@@ -42,6 +42,7 @@
 #include <vm/vm_cheri_revoke.h>
 #endif
 
+#ifdef HAS_CHERI_PERM_SEAL
 static struct mtx cheri_otype_lock;
 static struct unrhdr *cheri_otypes;
 /* Initialized in _start() */
@@ -103,6 +104,7 @@ cheri_otype_free(otype_t cap)
 	type = cheri_base_get(cap);
 	free_unr(cheri_otypes, type);
 }
+#endif /* HAS_CHERI_PERM_SEAL */
 
 #ifdef CHERI_CAPREVOKE
 #ifndef CHERI_CAPREVOKE_CLEARTAGS

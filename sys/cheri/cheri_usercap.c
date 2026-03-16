@@ -243,7 +243,9 @@ ptrace_derive_cap(struct proc *p, uintcap_t in, uintcap_t *out)
 {
 	struct thread *td;
 	void * __capability cap;
+#ifdef HAS_CHERI_PERM_SEAL
 	void * __capability sealcap;
+#endif
 
 	/*
 	 * Try to derive from existing user registers in this
@@ -263,8 +265,10 @@ ptrace_derive_cap(struct proc *p, uintcap_t in, uintcap_t *out)
 	if (cheri_ptrace_caps >= 2) {
 		/* If forging is allowed, derive from the userspace root. */
 		cap = cheri_cap_build(userspace_root_cap, in);
+#ifdef HAS_CHERI_PERM_SEAL
 		sealcap = cheri_type_copy(userspace_root_sealcap, in);
 		cap = cheri_seal_conditionally(cap, sealcap);
+#endif
 		if (cheri_tag_get(cap)) {
 			atomic_add_long(&cheri_forged_ptrace_caps, 1);
 			*out = (uintcap_t)cap;
