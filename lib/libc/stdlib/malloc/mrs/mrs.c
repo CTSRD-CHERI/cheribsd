@@ -1488,9 +1488,9 @@ fini(void)
 /* mrs functions */
 
 static void *
-mrs_real_malloc(size_t size, size_t bound)
+mrs_real_malloc(size_t size)
 {
-	return (mrs_bound_pointer(REAL(malloc)(size), bound));
+	return (mrs_bound_pointer(REAL(malloc)(size), size));
 }
 
 static void *
@@ -1499,7 +1499,7 @@ mrs_malloc(size_t size)
 	mrs_init();
 
 	if (!quarantining)
-		return (mrs_real_malloc(size, size));
+		return (mrs_real_malloc(size));
 
 	/*mrs_debug_printf("mrs_malloc: called\n");*/
 
@@ -1517,10 +1517,9 @@ mrs_malloc(size_t size)
 	 * of the currently supported allocators do.
 	 */
 	if (size < CAPREVOKE_BITMAP_ALIGNMENT)
-		allocated_region = mrs_real_malloc(CAPREVOKE_BITMAP_ALIGNMENT,
-			size);
+		allocated_region = mrs_real_malloc(CAPREVOKE_BITMAP_ALIGNMENT);
 	else
-		allocated_region = mrs_real_malloc(size, size);
+		allocated_region = mrs_real_malloc(size);
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0,
 		    allocated_region);
@@ -1541,9 +1540,9 @@ mrs_malloc(size_t size)
 }
 
 static void *
-mrs_real_calloc(size_t number, size_t size, size_t bound)
+mrs_real_calloc(size_t number, size_t size)
 {
-	return (mrs_bound_pointer(REAL(calloc)(number, size), bound));
+	return (mrs_bound_pointer(REAL(calloc)(number, size), number * size));
 }
 
 void *
@@ -1554,7 +1553,7 @@ mrs_calloc(size_t number, size_t size)
 	mrs_init();
 
 	if (!quarantining)
-		return (mrs_real_calloc(number, size, number * size));
+		return (mrs_real_calloc(number, size));
 
 	/*
 	 * This causes problems if our library is initialized before
@@ -1577,10 +1576,9 @@ mrs_calloc(size_t number, size_t size)
 	 */
 	if (!__builtin_mul_overflow(number, size, &tmpsize) &&
 	    tmpsize < CAPREVOKE_BITMAP_ALIGNMENT)
-		allocated_region = mrs_real_calloc(1, CAPREVOKE_BITMAP_ALIGNMENT,
-			tmpsize);
+		allocated_region = mrs_real_calloc(1, CAPREVOKE_BITMAP_ALIGNMENT);
 	else
-		allocated_region = mrs_real_calloc(number, size, tmpsize);
+		allocated_region = mrs_real_calloc(number, size);
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number,
 		    allocated_region);
