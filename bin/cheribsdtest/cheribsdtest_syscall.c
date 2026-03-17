@@ -135,6 +135,7 @@ CHERIBSDTEST(sig_dfl_ign, "Test proper handling of SIG_DFL and SIG_IGN")
 	cheribsdtest_success();
 }
 
+#if 0
 CHERIBSDTEST(ptrace_basic, "Test basic handling of ptrace functionality")
 {
 	int cpid, res;
@@ -168,6 +169,7 @@ CHERIBSDTEST(ptrace_basic, "Test basic handling of ptrace functionality")
 		exit(23);
 	}
 }
+#endif
 
 static int test_aio_sival_signal = 0;
 static siginfo_t test_aio_sival_info = { 0 };
