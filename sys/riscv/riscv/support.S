@@ -39,15 +39,77 @@
 #include "assym.inc"
 
 /*
+ * Hybrid kernels use .cap loads and stores whereas purecap kernels use
+ * capmode loads and stores.
+ * The .cap loads are only allowed on xcheri.
+ */
+.macro load_res width xreg preg
+#ifdef __CHERI_HYBRID__
+	/* Note: xcheri */
+	lr.\width\().cap	\xreg, 0(CAP(\preg))
+#else
+	lr.\width	\xreg, 0(\preg)
+#endif
+.endmacro
+
+.macro store_cond width xreg1 xreg2 preg
+#ifdef __CHERI_HYBRID__
+	/* Note: xcheri */
+	move		\xreg1, \xreg2
+	sc.\width\().cap	\xreg1, 0(CAP(\preg))
+#else
+	sc.\width	\xreg1, \xreg2, 0(\preg)
+#endif
+.endmacro
+
+.macro load_op width xreg preg
+#ifdef __CHERI_HYBRID__
+	/* Note: xcheri */
+	l\width\().cap	\xreg, 0(CAP(\preg))
+#else
+	l\width	\xreg, 0(\preg)
+#endif
+.endmacro
+
+.macro store_op width xreg preg
+#ifdef __CHERI_HYBRID__
+	/* Note: xcheri */
+	s\width\().cap	\xreg, 0(CAP(\preg))
+#else
+	s\width	\xreg, 0(\preg)
+#endif
+.endmacro
+
+#if __has_feature(capabilities)
+.macro load_ptr xreg preg
+#ifdef __CHERI_HYBRID__
+	/* Note: xcheri */
+	lc.cap	CAP(\xreg), 0(CAP(\preg))
+#else
+	ly	\xreg, 0(\preg)
+#endif
+.endmacro
+
+.macro store_ptr xreg preg
+#ifdef __CHERI_HYBRID__
+	/* Note: xcheri */
+	sc.cap	CAP(\xreg), 0(CAP(\preg))
+#else
+	sy	\xreg, 0(\preg)
+#endif
+.endmacro
+#endif
+
+/*
  * One of the fu* or su* functions failed, return -1.
  */
 ENTRY(fsu_fault)
 	MODESW_INT
-	SET_FAULT_HANDLER(PTR_NULL, PTR(a1))	/* Reset the handler function */
+	SET_FAULT_HANDLER(zero, a1)	/* Reset the handler function */
 	EXIT_USER_ACCESS(a1)
 fsu_fault_nopcb:
 	li	a0, -1
-	RETURN
+	ret
 END(fsu_fault)
 
 /*
@@ -56,35 +118,25 @@ END(fsu_fault)
 ENTRY(casueword32)
 	li	a4, (VM_MAXUSER_ADDRESS-3)
 	bgeu	a0, a4, fsu_fault_nopcb
-#ifdef __CHERI_PURE_CAPABILITY__
-	_LGC	PTR(a6), fsu_fault	/* Load the fault handler */
-#else
-	la	a6, fsu_fault		/* Load the fault handler */
-#endif
-	SET_FAULT_HANDLER(PTR(a6), PTR(a4))	/* And set it */
+
+	LA_PTR	a6, fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a4)	/* And set it */
 	ENTER_USER_ACCESS(a4)
 	MODESW_CAP
-	LR_W_CAP	a4, 0(CAP(a0))	/* Load-exclusive the data */
+
+	load_res	w a4 a0		/* Load-exclusive the data */
 	bne	a4, a1, 1f		/* If not equal then exit */
-#ifdef __riscv_xcheri
-#ifdef __CHERI_PURE_CAPABILITY__
-	csc.w	a5, a3, 0(PTR(a0))	/* Store the new data */
-#else
-	move	a5, a3
-	sc.w.cap a5, 0(CAP(a0))		/* Store the new data */
-#endif
-#else
-	sc.w	a5, a3, 0(CAP(a0))	/* Store the new data */
-#endif
+	store_cond	w a5 a3 a0	/* Store the new data */
 	beqz	a5, 2f			/* Success */
 
 1:	li	a5, 1			/* Normalize failure result */
-2:	MODESW_INT
+2:
+	MODESW_INT
 	EXIT_USER_ACCESS(a6)
-	SET_FAULT_HANDLER(PTR_NULL, PTR(a6))	/* Reset the fault handler */
-	_SW	a4, 0(PTR(a2))		/* Store the read data */
+	SET_FAULT_HANDLER(zero, a6)	/* Reset the fault handler */
+	sw	a4, 0(a2)		/* Store the read data */
 	mv	a0, a5			/* Success indicator */
-	RETURN				/* Return */
+	ret				/* Return */
 END(casueword32)
 
 /*
@@ -93,34 +145,23 @@ END(casueword32)
 ENTRY(casueword)
 	li	a4, (VM_MAXUSER_ADDRESS-7)
 	bgeu	a0, a4, fsu_fault_nopcb
-#ifdef __CHERI_PURE_CAPABILITY__
-	_LGC	PTR(a6), fsu_fault	/* Load the fault handler */
-#else
-	la	a6, fsu_fault		/* Load the fault handler */
-#endif
-	SET_FAULT_HANDLER(PTR(a6), PTR(a4))	/* And set it */
+	LA_PTR	a6, fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a4)	/* And set it */
 	ENTER_USER_ACCESS(a4)
 	MODESW_CAP
-	LR_D_CAP	a4, 0(CAP(a0))	/* Load-exclusive the data */
+
+	load_res	d a4 a0		/* Load-exclusive the data */
 	bne	a4, a1, 1f		/* If not equal then exit */
-#ifdef __riscv_xcheri
-#ifdef __CHERI_PURE_CAPABILITY__
-	csc.d	a5, a3, 0(PTR(a0))	/* Store the new data */
-#else
-	move	a5, a3
-	sc.d.cap a5, 0(CAP(a0))		/* Store the new data */
-#endif
-#else
-	sc.d	a5, a3, 0(CAP(a0))	/* Store the new data */
-#endif
+	store_cond	d a5 a3 a0	/* Store the new data */
 	beqz	a5, 2f			/* Success */
 1:	li	a5, 1			/* Normalize failure result */
-2:	MODESW_INT
+2:
+	MODESW_INT
 	EXIT_USER_ACCESS(a6)
-	SET_FAULT_HANDLER(PTR_NULL, PTR(a6))	/* Reset the fault handler */
-	_SD	a4, 0(PTR(a2))		/* Store the read data */
+	SET_FAULT_HANDLER(zero, a6)	/* Reset the fault handler */
+	sd	a4, 0(a2)		/* Store the read data */
 	mv	a0, a5			/* Success indicator */
-	RETURN				/* Return */
+	ret				/* Return */
 END(casueword)
 
 /*
@@ -129,19 +170,15 @@ END(casueword)
 ENTRY(fubyte)
 	li	a1, VM_MAXUSER_ADDRESS
 	bgeu	a0, a1, fsu_fault_nopcb
-#ifdef __CHERI_PURE_CAPABILITY__
-	_LGC	PTR(a6), fsu_fault	/* Load the fault handler */
-#else
-	la	a6, fsu_fault		/* Load the fault handler */
-#endif
-	SET_FAULT_HANDLER(PTR(a6), PTR(a1))	/* And set it */
+	LA_PTR	a6, fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a1)	/* And set it */
 	ENTER_USER_ACCESS(a1)
 	MODESW_CAP
-	LBU_CAP	a0, 0(CAP(a0))		/* Try loading the data */
+	load_op	bu a0 a0		/* Try loading the data */
 	MODESW_INT
 	EXIT_USER_ACCESS(a1)
-	SET_FAULT_HANDLER(PTR_NULL, PTR(a1))	/* Reset the fault handler */
-	RETURN				/* Return */
+	SET_FAULT_HANDLER(zero, a1)	/* Reset the fault handler */
+	ret				/* Return */
 END(fubyte)
 
 /*
@@ -150,19 +187,15 @@ END(fubyte)
 ENTRY(fuword16)
 	li	a1, (VM_MAXUSER_ADDRESS-1)
 	bgeu	a0, a1, fsu_fault_nopcb
-#ifdef __CHERI_PURE_CAPABILITY__
-	_LGC	PTR(a6), fsu_fault	/* Load the fault handler */
-#else
-	la	a6, fsu_fault		/* Load the fault handler */
-#endif
-	SET_FAULT_HANDLER(PTR(a6), PTR(a1))	/* And set it */
+	LA_PTR	a6, fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a1)	/* And set it */
 	ENTER_USER_ACCESS(a1)
 	MODESW_CAP
-	LHU_CAP	a0, 0(CAP(a0))		/* Try loading the data */
+	load_op	hu a0 a0		/* Try loading the data */
 	MODESW_INT
 	EXIT_USER_ACCESS(a1)
-	SET_FAULT_HANDLER(PTR_NULL, PTR(a1))	/* Reset the fault handler */
-	RETURN				/* Return */
+	SET_FAULT_HANDLER(zero, a1)	/* Reset the fault handler */
+	ret				/* Return */
 END(fuword16)
 
 /*
@@ -171,21 +204,17 @@ END(fuword16)
 ENTRY(fueword32)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
 	bgeu	a0, a2, fsu_fault_nopcb
-#ifdef __CHERI_PURE_CAPABILITY__
-	_LGC	PTR(a6), fsu_fault	/* Load the fault handler */
-#else
-	la	a6, fsu_fault		/* Load the fault handler */
-#endif
-	SET_FAULT_HANDLER(PTR(a6), PTR(a2))	/* And set it */
+	LA_PTR	a6, fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
 	MODESW_CAP
-	LW_CAP	a0, 0(CAP(a0))		/* Try loading the data */
+	load_op	w a0 a0			/* Try loading the data */
 	MODESW_INT
 	EXIT_USER_ACCESS(a2)
-	SET_FAULT_HANDLER(PTR_NULL, PTR(a2))	/* Reset the fault handler */
-	_SW	a0, 0(PTR(a1))		/* Save the data in kernel space */
+	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
+	sw	a0, 0(a1)		/* Save the data in kernel space */
 	li	a0, 0			/* Success */
-	RETURN				/* Return */
+	ret				/* Return */
 END(fueword32)
 
 /*
@@ -196,21 +225,17 @@ ENTRY(fueword)
 EENTRY(fueword64)
 	li	a2, (VM_MAXUSER_ADDRESS-7)
 	bgeu	a0, a2, fsu_fault_nopcb
-#ifdef __CHERI_PURE_CAPABILITY__
-	_LGC	PTR(a6), fsu_fault	/* Load the fault handler */
-#else
-	la	a6, fsu_fault		/* Load the fault handler */
-#endif
-	SET_FAULT_HANDLER(PTR(a6), PTR(a2))	/* And set it */
+	LA_PTR	a6, fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
 	MODESW_CAP
-	LD_CAP	a0, 0(CAP(a0))		/* Try loading the data */
+	load_op	d a0 a0			/* Try loading the data */
 	MODESW_INT
 	EXIT_USER_ACCESS(a2)
-	SET_FAULT_HANDLER(PTR_NULL, PTR(a2))	/* Reset the fault handler */
-	_SD	a0, 0(PTR(a1))		/* Save the data in kernel space */
+	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
+	sd	a0, 0(a1)		/* Save the data in kernel space */
 	li	a0, 0			/* Success */
-	RETURN				/* Return */
+	ret				/* Return */
 EEND(fueword64)
 END(fueword)
 
@@ -221,21 +246,17 @@ END(fueword)
 ENTRY(fuecap)
 	li	a2, (VM_MAXUSER_ADDRESS-7)
 	bgeu	a0, a2, fsu_fault_nopcb
-#ifdef __CHERI_PURE_CAPABILITY__
-	_LGC	PTR(a6), fsu_fault	/* Load the fault handler */
-#else
-	la	a6, fsu_fault		/* Load the fault handler */
-#endif
-	SET_FAULT_HANDLER(PTR(a6), PTR(a2))	/* And set it */
+	LA_PTR	a6, fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
 	MODESW_CAP
-	LC_CAP	CAP(a0), 0(CAP(a0))	/* Try loading the data */
+	load_ptr	a0 a0		/* Try loading the data */
 	MODESW_INT
 	EXIT_USER_ACCESS(a2)
-	SET_FAULT_HANDLER(PTR_NULL, PTR(a2))	/* Reset the fault handler */
-	_SC	CAP(a0), 0(PTR(a1))		/* Save the data in kernel space */
+	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
+	store_ptr	a0 a1		/* Save the data in kernel space */
 	li	a0, 0			/* Success */
-	RETURN				/* Return */
+	ret				/* Return */
 END(fuecap)
 #endif
 
@@ -245,20 +266,16 @@ END(fuecap)
 ENTRY(subyte)
 	li	a2, VM_MAXUSER_ADDRESS
 	bgeu	a0, a2, fsu_fault_nopcb
-#ifdef __CHERI_PURE_CAPABILITY__
-	_LGC	PTR(a6), fsu_fault	/* Load the fault handler */
-#else
-	la	a6, fsu_fault		/* Load the fault handler */
-#endif
-	SET_FAULT_HANDLER(PTR(a6), PTR(a2))	/* And set it */
+	LA_PTR	a6, fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
 	MODESW_CAP
-	SB_CAP	a1, 0(CAP(a0))		/* Try storing the data */
+	store_op	b a1 a0		/* Try storing the data */
 	MODESW_INT
 	EXIT_USER_ACCESS(a2)
-	SET_FAULT_HANDLER(PTR_NULL, PTR(a2))	/* Reset the fault handler */
+	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
-	RETURN				/* Return */
+	ret				/* Return */
 END(subyte)
 
 /*
@@ -267,20 +284,16 @@ END(subyte)
 ENTRY(suword16)
 	li	a2, (VM_MAXUSER_ADDRESS-1)
 	bgeu	a0, a2, fsu_fault_nopcb
-#ifdef __CHERI_PURE_CAPABILITY__
-	_LGC	PTR(a6), fsu_fault	/* Load the fault handler */
-#else
-	la	a6, fsu_fault		/* Load the fault handler */
-#endif
-	SET_FAULT_HANDLER(PTR(a6), PTR(a2))	/* And set it */
+	LA_PTR	a6, fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
 	MODESW_CAP
-	SH_CAP	a1, 0(CAP(a0))		/* Try storing the data */
+	store_op	h a1 a0		/* Try storing the data */
 	MODESW_INT
 	EXIT_USER_ACCESS(a2)
-	SET_FAULT_HANDLER(PTR_NULL, PTR(a2))	/* Reset the fault handler */
+	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
-	RETURN				/* Return */
+	ret				/* Return */
 END(suword16)
 
 /*
@@ -289,20 +302,16 @@ END(suword16)
 ENTRY(suword32)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
 	bgeu	a0, a2, fsu_fault_nopcb
-#ifdef __CHERI_PURE_CAPABILITY__
-	_LGC	PTR(a6), fsu_fault	/* Load the fault handler */
-#else
-	la	a6, fsu_fault		/* Load the fault handler */
-#endif
-	SET_FAULT_HANDLER(PTR(a6), PTR(a2))	/* And set it */
+	LA_PTR	a6, fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
 	MODESW_CAP
-	SW_CAP	a1, 0(CAP(a0))		/* Try storing the data */
+	store_op	w a1 a0		/* Try storing the data */
 	MODESW_INT
 	EXIT_USER_ACCESS(a2)
-	SET_FAULT_HANDLER(PTR_NULL, PTR(a2))	/* Reset the fault handler */
+	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
-	RETURN				/* Return */
+	ret				/* Return */
 END(suword32)
 
 /*
@@ -312,20 +321,16 @@ ENTRY(suword)
 EENTRY(suword64)
 	li	a2, (VM_MAXUSER_ADDRESS-7)
 	bgeu	a0, a2, fsu_fault_nopcb
-#ifdef __CHERI_PURE_CAPABILITY__
-	_LGC	PTR(a6), fsu_fault	/* Load the fault handler */
-#else
-	la	a6, fsu_fault		/* Load the fault handler */
-#endif
-	SET_FAULT_HANDLER(PTR(a6), PTR(a2))	/* And set it */
+	LA_PTR	a6, fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
 	MODESW_CAP
-	SD_CAP	a1, 0(CAP(a0))		/* Try storing the data */
-    	MODESW_INT
+	store_op	d a1 a0		/* Try storing the data */
+	MODESW_INT
 	EXIT_USER_ACCESS(a2)
-	SET_FAULT_HANDLER(PTR_NULL, PTR(a2))	/* Reset the fault handler */
+	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
-	RETURN				/* Return */
+	ret				/* Return */
 EEND(suword64)
 END(suword)
 
@@ -336,71 +341,67 @@ END(suword)
 ENTRY(sucap)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
 	bgeu	a0, a2, fsu_fault_nopcb
-#ifdef __CHERI_PURE_CAPABILITY__
-	_LGC	PTR(a6), fsu_fault	/* Load the fault handler */
-#else
-	la	a6, fsu_fault		/* Load the fault handler */
-#endif
-	SET_FAULT_HANDLER(PTR(a6), PTR(a2))	/* And set it */
+	LA_PTR	a6, fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
 	MODESW_CAP
-	SC_CAP	CAP(a1), 0(CAP(a0))	/* Try storing the data */
+	store_ptr	a1 a0		/* Try storing the data */
 	MODESW_INT
 	EXIT_USER_ACCESS(a2)
-	SET_FAULT_HANDLER(PTR_NULL, PTR(a2))	/* Reset the fault handler */
+	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
-	RETURN				/* Return */
+	ret				/* Return */
 END(sucap)
 #endif
 
 ENTRY(setjmp)
 	/* Store the stack pointer */
-	S_PTR	PTR(sp), 0(PTR(a0))
-	_CADDI	PTR(a0), PTR(a0), PTR_WIDTH
+	S_PTR	sp, 0(a0)
+	ADDI_PTR	a0, a0, PTR_WIDTH
 
 	/* Store the general purpose registers and ra */
-	S_PTR	PTR(s0), (0 * PTR_WIDTH)(PTR(a0))
-	S_PTR	PTR(s1), (1 * PTR_WIDTH)(PTR(a0))
-	S_PTR	PTR(s2), (2 * PTR_WIDTH)(PTR(a0))
-	S_PTR	PTR(s3), (3 * PTR_WIDTH)(PTR(a0))
-	S_PTR	PTR(s4), (4 * PTR_WIDTH)(PTR(a0))
-	S_PTR	PTR(s5), (5 * PTR_WIDTH)(PTR(a0))
-	S_PTR	PTR(s6), (6 * PTR_WIDTH)(PTR(a0))
-	S_PTR	PTR(s7), (7 * PTR_WIDTH)(PTR(a0))
-	S_PTR	PTR(s8), (8 * PTR_WIDTH)(PTR(a0))
-	S_PTR	PTR(s9), (9 * PTR_WIDTH)(PTR(a0))
-	S_PTR	PTR(s10), (10 * PTR_WIDTH)(PTR(a0))
-	S_PTR	PTR(s11), (11 * PTR_WIDTH)(PTR(a0))
-	S_PTR	PTR(ra), (12 * PTR_WIDTH)(PTR(a0))
+	S_PTR	s0, (0 * PTR_WIDTH)(a0)
+	S_PTR	s1, (1 * PTR_WIDTH)(a0)
+	S_PTR	s2, (2 * PTR_WIDTH)(a0)
+	S_PTR	s3, (3 * PTR_WIDTH)(a0)
+	S_PTR	s4, (4 * PTR_WIDTH)(a0)
+	S_PTR	s5, (5 * PTR_WIDTH)(a0)
+	S_PTR	s6, (6 * PTR_WIDTH)(a0)
+	S_PTR	s7, (7 * PTR_WIDTH)(a0)
+	S_PTR	s8, (8 * PTR_WIDTH)(a0)
+	S_PTR	s9, (9 * PTR_WIDTH)(a0)
+	S_PTR	s10, (10 * PTR_WIDTH)(a0)
+	S_PTR	s11, (11 * PTR_WIDTH)(a0)
+	S_PTR	ra, (12 * PTR_WIDTH)(a0)
 
 	/* Return value */
 	li	a0, 0
-	RETURN
+	ret
 END(setjmp)
 
 ENTRY(longjmp)
 	/* Restore the stack pointer */
-	L_PTR	PTR(sp), 0(PTR(a0))
-	_CADDI	PTR(a0), PTR(a0), PTR_WIDTH
+	L_PTR	sp, 0(a0)
+	ADDI_PTR	a0, a0, PTR_WIDTH
 
 	/* Restore the general purpose registers and ra */
-	L_PTR	PTR(s0), (0 * PTR_WIDTH)(PTR(a0))
-	L_PTR	PTR(s1), (1 * PTR_WIDTH)(PTR(a0))
-	L_PTR	PTR(s2), (2 * PTR_WIDTH)(PTR(a0))
-	L_PTR	PTR(s3), (3 * PTR_WIDTH)(PTR(a0))
-	L_PTR	PTR(s4), (4 * PTR_WIDTH)(PTR(a0))
-	L_PTR	PTR(s5), (5 * PTR_WIDTH)(PTR(a0))
-	L_PTR	PTR(s6), (6 * PTR_WIDTH)(PTR(a0))
-	L_PTR	PTR(s7), (7 * PTR_WIDTH)(PTR(a0))
-	L_PTR	PTR(s8), (8 * PTR_WIDTH)(PTR(a0))
-	L_PTR	PTR(s9), (9 * PTR_WIDTH)(PTR(a0))
-	L_PTR	PTR(s10), (10 * PTR_WIDTH)(PTR(a0))
-	L_PTR	PTR(s11), (11 * PTR_WIDTH)(PTR(a0))
-	L_PTR	PTR(ra), (12 * PTR_WIDTH)(PTR(a0))
+	L_PTR	s0, (0 * PTR_WIDTH)(a0)
+	L_PTR	s1, (1 * PTR_WIDTH)(a0)
+	L_PTR	s2, (2 * PTR_WIDTH)(a0)
+	L_PTR	s3, (3 * PTR_WIDTH)(a0)
+	L_PTR	s4, (4 * PTR_WIDTH)(a0)
+	L_PTR	s5, (5 * PTR_WIDTH)(a0)
+	L_PTR	s6, (6 * PTR_WIDTH)(a0)
+	L_PTR	s7, (7 * PTR_WIDTH)(a0)
+	L_PTR	s8, (8 * PTR_WIDTH)(a0)
+	L_PTR	s9, (9 * PTR_WIDTH)(a0)
+	L_PTR	s10, (10 * PTR_WIDTH)(a0)
+	L_PTR	s11, (11 * PTR_WIDTH)(a0)
+	L_PTR	ra, (12 * PTR_WIDTH)(a0)
 
 	/* Load the return value */
 	mv	a0, a1
-	RETURN
+	ret
 END(longjmp)
 
 /*
