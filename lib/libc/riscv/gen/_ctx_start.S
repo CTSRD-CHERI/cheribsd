@@ -34,8 +34,8 @@
 
 #include <machine/asm.h>
 ENTRY(_ctx_start)
-	_JALR	PTR(s0)		/* Call func from makecontext */
-	CMV_CAP	CAP(a0), CAP(s1)	/* Load ucp saved in makecontext */
-	_CALL	_C_LABEL(ctx_done)
-	_CALL	_C_LABEL(abort)
+	jalr	s0		/* Call func from makecontext */
+	MV_CAP	a0, s1		/* Load ucp saved in makecontext */
+	call	_C_LABEL(ctx_done)
+	call	_C_LABEL(abort)
 END(_ctx_start)

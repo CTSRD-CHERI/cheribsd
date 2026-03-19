@@ -38,14 +38,14 @@
 ENTRY(__sys_vfork)
 	WEAK_REFERENCE(__sys_vfork, vfork)
 	WEAK_REFERENCE(__sys_vfork, _vfork)
-	CMV_CAP	CAP(a2), CAP(ra)
+	MV_CAP	a2, ra
 
 	_SYSCALL(vfork)
 	bnez	t0, 1f
 	addi	a1, a1, -1
 	and	a0, a0, a1
-	CMV_CAP	CAP(ra), CAP(a2)
+	MV_CAP	ra, a2
 
-	RETURN
-1:	_TAIL	cerror@plt
+	ret
+1:	tail	cerror@plt
 END(__sys_vfork)

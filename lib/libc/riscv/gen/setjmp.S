@@ -35,117 +35,75 @@
 #include <machine/asm.h>
 #include <machine/setjmp.h>
 
-ENTRY(setjmp)
-#ifdef __CHERI_PURE_CAPABILITY__
-	_CADDI	PTR(sp), PTR(sp), -(2 * 16)
-	_SC	PTR(a0), 0(PTR(sp))
-	_SC	PTR(ra), 16(PTR(sp))
-
-	/* Store the signal mask */
-	_CADDI PTR(a2), PTR(a0), (_JB_SIGMASK * 16)	/* oset */
-	li	a1, 0				/* set */
-	li	a0, 1				/* SIG_BLOCK */
-	ccall	_C_LABEL(sigprocmask)
-
-	_LC	PTR(a0), 0(PTR(sp))
-	_LC	PTR(ra), 16(PTR(sp))
-	_CADDI	PTR(sp), PTR(sp), (2 * 16)
-
-	/* Store the magic value and stack pointer */
-	_LLC	PTR(t0), .Lmagic
-	_LD	t0, (PTR(t0))
-	_SC	PTR(t0), (0 * 16)(PTR(a0))
-	_SC	PTR(sp), (1 * 16)(PTR(a0))
-	_CADDI	PTR(a0), PTR(a0), (2 * 16)
-#ifdef CHERI_LIB_C18N
-	/* Store the trusted stack pointer */
-	caddi	csp, csp, -(2 * 16)
-	sc	ca0, (0 * 16)(csp)
-	sc	cra, (1 * 16)(csp)
-	cmv	ca0, cra
-	lgc	ct0, _C_LABEL(dl_c18n_get_trusted_stack)
-	jalr	ct0
-	lc	ca1, (0 * 16)(csp)
-	lc	cra, (1 * 16)(csp)
-	caddi	csp, csp, (2 * 16)
-	sc	ca0, 0(ca1)
-	caddi	ca0, ca1, 16
-#endif
-
-	/* Store the general purpose registers and ra */
-	_SC	PTR(s0), (0 * 16)(PTR(a0))
-	_SC	PTR(s1), (1 * 16)(PTR(a0))
-	_SC	PTR(s2), (2 * 16)(PTR(a0))
-	_SC	PTR(s3), (3 * 16)(PTR(a0))
-	_SC	PTR(s4), (4 * 16)(PTR(a0))
-	_SC	PTR(s5), (5 * 16)(PTR(a0))
-	_SC	PTR(s6), (6 * 16)(PTR(a0))
-	_SC	PTR(s7), (7 * 16)(PTR(a0))
-	_SC	PTR(s8), (8 * 16)(PTR(a0))
-	_SC	PTR(s9), (9 * 16)(PTR(a0))
-	_SC	PTR(s10), (10 * 16)(PTR(a0))
-	_SC	PTR(s11), (11 * 16)(PTR(a0))
-	_SC	PTR(ra), (12 * 16)(PTR(a0))
-	_CSRR	PTR(t0), ddc
-	_SC	PTR(t0), (13 * 16)(PTR(a0))
-	_CADDI	PTR(a0), PTR(a0), (14 * 16)
-
-#ifdef __riscv_float_abi_double
-	/* Store the fpe registers */
-	_FSD	fs0, (0 * 8)(PTR(a0))
-	_FSD	fs1, (1 * 8)(PTR(a0))
-	_FSD	fs2, (2 * 8)(PTR(a0))
-	_FSD	fs3, (3 * 8)(PTR(a0))
-	_FSD	fs4, (4 * 8)(PTR(a0))
-	_FSD	fs5, (5 * 8)(PTR(a0))
-	_FSD	fs6, (6 * 8)(PTR(a0))
-	_FSD	fs7, (7 * 8)(PTR(a0))
-	_FSD	fs8, (8 * 8)(PTR(a0))
-	_FSD	fs9, (9 * 8)(PTR(a0))
-	_FSD	fs10, (10 * 8)(PTR(a0))
-	_FSD	fs11, (11 * 8)(PTR(a0))
-	_CADDI	PTR(a0), PTR(a0), (12 * 8)
-#endif
-
-	/* Return value */
-	li	a0, 0
-	RETURN
+/*
+ * The stack is always aligned to 16 bytes, this scales the space allocated
+ * when storing capabilities to the stack.
+ */
+#ifdef __CHERI__
+#define	LONGJMP_STACK_SPACE	3
+#define	SETJMP_STACK_SPACE	2
 #else
-	addi	sp, sp, -(2 * 8)
-	sd	a0, 0(sp)
-	sd	ra, 8(sp)
+#define	LONGJMP_STACK_SPACE	2
+#define	SETJMP_STACK_SPACE	1
+#endif
+
+ENTRY(setjmp)
+	ADDI_PTR	sp, sp, -(SETJMP_STACK_SPACE * 16)
+	S_PTR	a0, 0(sp)
+	S_PTR	ra, PTR_WIDTH(sp)
 
 	/* Store the signal mask */
-	addi	a2, a0, (_JB_SIGMASK * 8)	/* oset */
+	ADDI_PTR	a2, a0, (_JB_SIGMASK * PTR_WIDTH)	/* oset */
 	li	a1, 0				/* set */
 	li	a0, 1				/* SIG_BLOCK */
 	call	_C_LABEL(sigprocmask)
 
-	ld	a0, 0(sp)
-	ld	ra, 8(sp)
-	addi	sp, sp, (2 * 8)
+	L_PTR	a0, 0(sp)
+	L_PTR	ra, PTR_WIDTH(sp)
+	ADDI_PTR	sp, sp, (SETJMP_STACK_SPACE * 16)
 
 	/* Store the magic value and stack pointer */
-	ld	t0, .Lmagic
-	sd	t0, (0 * 8)(a0)
-	sd	sp, (1 * 8)(a0)
-	addi	a0, a0, (2 * 8)
+	LLA_PTR	t0, .Lmagic
+	ld	t0, (t0)
+	S_PTR	t0, (0 * PTR_WIDTH)(a0)
+	S_PTR	sp, (1 * PTR_WIDTH)(a0)
+	ADDI_PTR	a0, a0, (2 * PTR_WIDTH)
+#ifdef CHERI_LIB_C18N
+	/* Store the trusted stack pointer */
+	ADDI_PTR	sp, sp, -(2 * PTR_WIDTH)
+	S_PTR	a0, (0 * PTR_WIDTH)(sp)
+	S_PTR	ra, (1 * PTR_WIDTH)(sp)
+	MV_PTR	a0, ra
+	LA_PTR	t0, _C_LABEL(dl_c18n_get_trusted_stack)
+	jalr	t0
+	L_PTR	a1, (0 * PTR_WIDTH)(sp)
+	L_PTR	ra, (1 * PTR_WIDTH)(sp)
+	ADDI_PTR	sp, sp, (2 * PTR_WIDTH)
+	S_PTR	a0, 0(a1)
+	ADDI_PTR	a0, a1, PTR_WIDTH
+#endif
 
 	/* Store the general purpose registers and ra */
-	sd	s0, (0 * 8)(a0)
-	sd	s1, (1 * 8)(a0)
-	sd	s2, (2 * 8)(a0)
-	sd	s3, (3 * 8)(a0)
-	sd	s4, (4 * 8)(a0)
-	sd	s5, (5 * 8)(a0)
-	sd	s6, (6 * 8)(a0)
-	sd	s7, (7 * 8)(a0)
-	sd	s8, (8 * 8)(a0)
-	sd	s9, (9 * 8)(a0)
-	sd	s10, (10 * 8)(a0)
-	sd	s11, (11 * 8)(a0)
-	sd	ra, (12 * 8)(a0)
-	addi	a0, a0, (13 * 8)
+	S_PTR	s0, (0 * PTR_WIDTH)(a0)
+	S_PTR	s1, (1 * PTR_WIDTH)(a0)
+	S_PTR	s2, (2 * PTR_WIDTH)(a0)
+	S_PTR	s3, (3 * PTR_WIDTH)(a0)
+	S_PTR	s4, (4 * PTR_WIDTH)(a0)
+	S_PTR	s5, (5 * PTR_WIDTH)(a0)
+	S_PTR	s6, (6 * PTR_WIDTH)(a0)
+	S_PTR	s7, (7 * PTR_WIDTH)(a0)
+	S_PTR	s8, (8 * PTR_WIDTH)(a0)
+	S_PTR	s9, (9 * PTR_WIDTH)(a0)
+	S_PTR	s10, (10 * PTR_WIDTH)(a0)
+	S_PTR	s11, (11 * PTR_WIDTH)(a0)
+	S_PTR	ra, (12 * PTR_WIDTH)(a0)
+#ifdef __CHERI__
+	GET_DDC(t0)
+	S_PTR	t0, (13 * PTR_WIDTH)(a0)
+	ADDI_PTR	a0, a0, (14 * PTR_WIDTH)
+#else
+	ADDI_PTR	a0, a0, (13 * PTR_WIDTH)
+#endif
 
 #ifdef __riscv_float_abi_double
 	/* Store the fpe registers */
@@ -161,153 +119,84 @@ ENTRY(setjmp)
 	fsd	fs9, (9 * 8)(a0)
 	fsd	fs10, (10 * 8)(a0)
 	fsd	fs11, (11 * 8)(a0)
-	addi	a0, a0, (12 * 8)
+	ADDI_PTR	a0, a0, (12 * 8)
 #endif
 
 	/* Return value */
 	li	a0, 0
 	ret
-#endif
 	.align	3
 .Lmagic:
 	.quad	_JB_MAGIC_SETJMP
 END(setjmp)
 
 ENTRY(longjmp)
-#ifdef __CHERI_PURE_CAPABILITY__
 	/* Check the magic value */
-	_LD	t0, 0(PTR(a0))
-	_LLC	PTR(t1), .Lmagic
-	_LD	t1, (PTR(t1))
+	ld	t0, 0(a0)
+	LLA_PTR	t1, .Lmagic
+	ld	t1, (t1)
 	bne	t0, t1, botch
-
 #ifdef CHERI_LIB_C18N
 	/*
 	 * Preserve the arguments in callee-saved registers instead of pushing
 	 * them onto the stack because stack unwinding will switch the stack.
 	 */
-	cmv	cs0, ca0
-	cmv	cs1, ca1
+	MV_PTR	s0, a0
+	MV_PTR	s1, a1
 	/* Pass the target untrusted stack pointer and trusted stack pointer */
-	lc	ca0, (1 * 16)(cs0)
-	lc	ca1, (2 * 16)(cs0)
-	lgc	ct0, _C_LABEL(dl_c18n_unwind_trusted_stack)
-	jalr	ct0
-	cmv	ca0, cs0
-	cmv	ca1, cs1
+	L_PTR	a0, (1 * PTR_WIDTH)(s0)
+	L_PTR	a1, (2 * PTR_WIDTH)(s0)
+	LA_PTR	t0, _C_LABEL(dl_c18n_unwind_trusted_stack)
+	jalr	t0
+	MV_PTR	a0, s0
+	MV_PTR	a1, s1
 #endif
 
-	_CADDI	PTR(sp), PTR(sp), -(3 * 16)
-	_SC	PTR(a0), (0 * 16)(PTR(sp))
-	_SC	PTR(ra), (1 * 16)(PTR(sp))
-	_SC	PTR(a1), (2 * 16)(PTR(sp))
+	ADDI_PTR	sp, sp, -(LONGJMP_STACK_SPACE * 16)
+	S_PTR	a0, (0 * PTR_WIDTH)(sp)
+	S_PTR	ra, (1 * PTR_WIDTH)(sp)
+	S_PTR	a1, (2 * PTR_WIDTH)(sp)
 
 	/* Restore the signal mask */
 	li	a2, 0				/* oset */
-	_CADDI	PTR(a1), PTR(a0), (_JB_SIGMASK * 16)	/* set */
-	li	a0, 3				/* SIG_BLOCK */
-	ccall	_C_LABEL(sigprocmask)
-
-	_LC	PTR(a1), (2 * 16)(PTR(sp))
-	_LC	PTR(ra), (1 * 16)(PTR(sp))
-	_LC	PTR(a0), (0 * 16)(PTR(sp))
-	_CADDI	PTR(sp), PTR(sp), (3 * 16)
-
-	/* Restore the stack pointer */
-	_LC	PTR(sp), 16(PTR(a0))
-	_CADDI	PTR(a0), PTR(a0), (2 * 16)
-#ifdef CHERI_LIB_C18N
-	/* Skip the trusted stack pointer */
-	caddi	ca0, ca0, 16
-#endif
-
-	/* Restore the general purpose registers and ra */
-	_LC	PTR(s0), (0 * 16)(PTR(a0))
-	_LC	PTR(s1), (1 * 16)(PTR(a0))
-	_LC	PTR(s2), (2 * 16)(PTR(a0))
-	_LC	PTR(s3), (3 * 16)(PTR(a0))
-	_LC	PTR(s4), (4 * 16)(PTR(a0))
-	_LC	PTR(s5), (5 * 16)(PTR(a0))
-	_LC	PTR(s6), (6 * 16)(PTR(a0))
-	_LC	PTR(s7), (7 * 16)(PTR(a0))
-	_LC	PTR(s8), (8 * 16)(PTR(a0))
-	_LC	PTR(s9), (9 * 16)(PTR(a0))
-	_LC	PTR(s10), (10 * 16)(PTR(a0))
-	_LC	PTR(s11), (11 * 16)(PTR(a0))
-	_LC	PTR(ra), (12 * 16)(PTR(a0))
-	_LC	PTR(t0), (13 * 16)(PTR(a0))
-	_CSRW	ddc, PTR(t0)
-	_CADDI	PTR(a0), PTR(a0), (14 * 16)
-
-#ifdef __riscv_float_abi_double
-	/* Restore the fpe registers */
-	_FLD	fs0, (0 * 8)(PTR(a0))
-	_FLD	fs1, (1 * 8)(PTR(a0))
-	_FLD	fs2, (2 * 8)(PTR(a0))
-	_FLD	fs3, (3 * 8)(PTR(a0))
-	_FLD	fs4, (4 * 8)(PTR(a0))
-	_FLD	fs5, (5 * 8)(PTR(a0))
-	_FLD	fs6, (6 * 8)(PTR(a0))
-	_FLD	fs7, (7 * 8)(PTR(a0))
-	_FLD	fs8, (8 * 8)(PTR(a0))
-	_FLD	fs9, (9 * 8)(PTR(a0))
-	_FLD	fs10, (10 * 8)(PTR(a0))
-	_FLD	fs11, (11 * 8)(PTR(a0))
-	_CADDI	PTR(a0), PTR(a0), (12 * 8)
-#endif
-
-	/* Load the return value */
-	mv	a0, a1
-	bnez	a1, 1f
-	li	a0, 1
-1:
-	RETURN
-
-botch:
-	ccall	_C_LABEL(longjmperror)
-	ccall	_C_LABEL(abort)
-#else
-	/* Check the magic value */
-	ld	t0, 0(a0)
-	ld	t1, .Lmagic
-	bne	t0, t1, botch
-
-	addi	sp, sp, -(4 * 8)
-	sd	a0, (0 * 8)(sp)
-	sd	ra, (1 * 8)(sp)
-	sd	a1, (2 * 8)(sp)
-
-	/* Restore the signal mask */
-	li	a2, 0				/* oset */
-	addi	a1, a0, (_JB_SIGMASK * 8)	/* set */
+	ADDI_PTR	a1, a0, (_JB_SIGMASK * PTR_WIDTH)	/* set */
 	li	a0, 3				/* SIG_BLOCK */
 	call	_C_LABEL(sigprocmask)
 
-	ld	a1, (2 * 8)(sp)
-	ld	ra, (1 * 8)(sp)
-	ld	a0, (0 * 8)(sp)
-	addi	sp, sp, (4 * 8)
+	L_PTR	a1, (2 * PTR_WIDTH)(sp)
+	L_PTR	ra, (1 * PTR_WIDTH)(sp)
+	L_PTR	a0, (0 * PTR_WIDTH)(sp)
+	ADDI_PTR	sp, sp, (LONGJMP_STACK_SPACE * 16)
 
 	/* Restore the stack pointer */
-	ld	t0, 8(a0)
-	mv	sp, t0
-	addi	a0, a0, (2 * 8)
+	L_PTR	sp, PTR_WIDTH(a0)
+	ADDI_PTR	a0, a0, (2 * PTR_WIDTH)
+#ifdef CHERI_LIB_C18N
+	/* Skip the trusted stack pointer */
+	ADDI_PTR	a0, a0, PTR_WIDTH
+#endif
 
 	/* Restore the general purpose registers and ra */
-	ld	s0, (0 * 8)(a0)
-	ld	s1, (1 * 8)(a0)
-	ld	s2, (2 * 8)(a0)
-	ld	s3, (3 * 8)(a0)
-	ld	s4, (4 * 8)(a0)
-	ld	s5, (5 * 8)(a0)
-	ld	s6, (6 * 8)(a0)
-	ld	s7, (7 * 8)(a0)
-	ld	s8, (8 * 8)(a0)
-	ld	s9, (9 * 8)(a0)
-	ld	s10, (10 * 8)(a0)
-	ld	s11, (11 * 8)(a0)
-	ld	ra, (12 * 8)(a0)
-	addi	a0, a0, (13 * 8)
+	L_PTR	s0, (0 * PTR_WIDTH)(a0)
+	L_PTR	s1, (1 * PTR_WIDTH)(a0)
+	L_PTR	s2, (2 * PTR_WIDTH)(a0)
+	L_PTR	s3, (3 * PTR_WIDTH)(a0)
+	L_PTR	s4, (4 * PTR_WIDTH)(a0)
+	L_PTR	s5, (5 * PTR_WIDTH)(a0)
+	L_PTR	s6, (6 * PTR_WIDTH)(a0)
+	L_PTR	s7, (7 * PTR_WIDTH)(a0)
+	L_PTR	s8, (8 * PTR_WIDTH)(a0)
+	L_PTR	s9, (9 * PTR_WIDTH)(a0)
+	L_PTR	s10, (10 * PTR_WIDTH)(a0)
+	L_PTR	s11, (11 * PTR_WIDTH)(a0)
+	L_PTR	ra, (12 * PTR_WIDTH)(a0)
+#ifdef __CHERI__
+	L_PTR	t0, (13 * PTR_WIDTH)(a0)
+	SET_DDC(t0)
+	ADDI_PTR	a0, a0, (14 * PTR_WIDTH)
+#else
+	ADDI_PTR	a0, a0, (13 * PTR_WIDTH)
+#endif
 
 #ifdef __riscv_float_abi_double
 	/* Restore the fpe registers */
@@ -323,7 +212,7 @@ botch:
 	fld	fs9, (9 * 8)(a0)
 	fld	fs10, (10 * 8)(a0)
 	fld	fs11, (11 * 8)(a0)
-	addi	a0, a0, (12 * 8)
+	ADDI_PTR	a0, a0, (12 * 8)
 #endif
 
 	/* Load the return value */
@@ -336,5 +225,4 @@ botch:
 botch:
 	call	_C_LABEL(longjmperror)
 	call	_C_LABEL(abort)
-#endif
 END(longjmp)
