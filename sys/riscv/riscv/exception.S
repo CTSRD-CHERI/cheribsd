@@ -139,10 +139,7 @@
 
 #ifndef __CHERI__
 	/* Switch to non-capmode PCC. */
-	cllc	ct1, 1f
-	csetflags ct1, ct1, x0
-	cjr	ct1
-1:
+	MODESW_INT(t1)
 #endif
 .option pop
 #endif
@@ -194,14 +191,9 @@
 #if __has_feature(capabilities)
 #ifndef __CHERI__
 	/* Switch to capmode PCC. */
-	lla	t0, 1f
-	cspecialr ct1, pcc
-	csetaddr ct1, ct1, t0
-	li	t0, 1
-	csetflags ct1, ct1, t0
-	jr.cap	ct1
+	MODESW_CAP(t0, t1)
 .option capmode
-1:
+
 	/*
 	 * Build a capability for 'csp' using 'sp' as an address
 	 * in the kernel DDC.

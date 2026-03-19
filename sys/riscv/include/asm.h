@@ -123,6 +123,21 @@
 #define	MV_CAP		ymv
 #define	ADD_CAP		yadd
 #define	ADDI_CAP	yaddi
+/* Note: xcheri */
+#define	MODESW_CAP(tmp, tmp1)					\
+	lla		tmp1, 99f;				\
+	cspecialr	CAP(tmp), pcc;				\
+	csetaddr CAP(tmp), CAP(tmp), tmp1;			\
+	li		tmp1, 1;				\
+	csetflags	CAP(tmp), CAP(tmp), tmp1;		\
+	jr.cap		CAP(tmp);				\
+	99:
+/* Note: xcheri */
+#define	MODESW_INT(tmp)						\
+	llc		CAP(tmp), 99f;				\
+	csetflags	CAP(tmp), CAP(tmp), zero;		\
+	jr.cap		CAP(tmp);				\
+	99:
 #else
 #define	CAP(x)		x
 #define	CAP_WIDTH	INT_WIDTH
@@ -132,6 +147,8 @@
 #define	MV_CAP		mv
 #define	ADD_CAP		add
 #define	ADDI_CAP	addi
+#define	MODESW_CAP(tmp, tmp1)
+#define	MODESW_INT(tmp)
 #endif
 
 #ifdef __CHERI__

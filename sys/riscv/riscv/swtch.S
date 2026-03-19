@@ -410,15 +410,10 @@ ENTRY(fork_trampoline)
 #if __has_feature(capabilities)
 #ifndef __CHERI__
 	/* Switch to capmode PCC. */
-	lla	t0, 1f
-	cspecialr	CAP(t1), pcc
-	csetaddr	CAP(t1), CAP(t1), t0
-	li	t0, 1
-	csetflags       CAP(t1), CAP(t1), t0
-	jr.cap	CAP(t1)
+	MODESW_CAP(t0, t1)
 .option push
 .option capmode
-1:
+
 	/*
 	 * Build a capability for 'csp' using 'sp' as an address
 	 * in the kernel DDC.

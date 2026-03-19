@@ -134,13 +134,7 @@ _alt_start:
 	 * our ELF header requests capmode.  The instructions below
 	 * should work in both modes.
 	 */
-	lla	t0, 1f
-	cspecialr ct1, pcc
-	csetaddr ct1, ct1, t0
-	li	t0, 1
-	csetflags ct1, ct1, t0
-	jr.cap	ct1
-1:
+	MODESW_CAP(t0, t1)
 .option pop
 #endif
 
@@ -521,13 +515,7 @@ ENTRY(mpentry)
 #ifdef __CHERI__
 .option push
 .option nocapmode
-	lla	t0, 1f
-	cspecialr	PTR(t1), pcc
-	csetaddr	PTR(t1), PTR(t1), t0
-	li	t0, 1
-	csetflags	PTR(t1), PTR(t1), t0
-	jr.cap	PTR(t1)
-1:
+	MODESW_CAP(t0, t1)
 .option pop
 #endif
 	/*
