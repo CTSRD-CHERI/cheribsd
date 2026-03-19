@@ -56,17 +56,10 @@
 	.weak alias;						\
 	.set alias,sym
 
-#ifdef __CHERI_PURE_CAPABILITY__
 #define	SET_FAULT_HANDLER(handler, tmp)					\
-	clc	tmp, PC_CURTHREAD(ctp);					\
-	clc	tmp, TD_PCB(tmp);		/* Load the pcb */	\
-	csc	handler, PCB_ONFAULT(tmp)	/* Set the handler */
-#else
-#define	SET_FAULT_HANDLER(handler, tmp)					\
-	ld	tmp, PC_CURTHREAD(tp);					\
-	ld	tmp, TD_PCB(tmp);		/* Load the pcb */	\
-	sd	handler, PCB_ONFAULT(tmp)	/* Set the handler */
-#endif
+	L_PTR	tmp, PC_CURTHREAD(tp);				\
+	L_PTR	tmp, TD_PCB(tmp);		/* Load the pcb */	\
+	S_PTR	handler, PCB_ONFAULT(tmp)	/* Set the handler */
 
 #define	ENTER_USER_ACCESS(tmp)						\
 	li	tmp, SSTATUS_SUM;					\
@@ -81,17 +74,103 @@
 	li	a6, func;						\
 	ecall
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	CAPABILITY_REG(reg)	c##reg
-#define	MOVE_REG(dst, src)	cmove CAPABILITY_REG(dst), CAPABILITY_REG(src)
-#define	_CALL	ccall
-#define	_TAIL	ctail
-#define	RETURN	cret
+/*
+ * Abstract CSR manipulation that requires different
+ * instructions across RV64, xcheri and RV64Y.
+ */
+#define	GET_DDC(rd)				\
+	cspecialr	CAP(rd), ddc
+
+#define	SET_DDC(rs)				\
+	cspecialw	ddc, CAP(rs)
+
+#define	GET_PCC(rd)				\
+	cspecialr	CAP(rd), pcc
+
+#if __has_feature(capabilities)
+#define	CSRR_CAP(rd, csrn)			\
+	cspecialr	CAP(rd), csrn ## c
+
+#define	CSRW_CAP(csrn, rs)			\
+	cspecialw	csrn ## c, CAP(rs)
+
+#define	CSRRW_CAP(rd, csrn, rs)				\
+	cspecialrw	CAP(rd), csrn ## c, CAP(rs)
 #else
-#define	MOVE_REG(dst, src)	mv dst, src
-#define	_CALL	call
-#define	_TAIL	tail
-#define	RETURN	ret
+#define	CSRR_CAP(rd, csrn)			\
+	csrr		rd, csrn
+
+#define	CSRW_CAP(csrn, rs)			\
+	csrw		csrn, rs
+
+#define	CSRRW_CAP(rd, csrn, rs)			\
+	csrrw		rd, csrn, rs
+#endif
+
+/*
+ * Instruction and register aliases for assembly that
+ * operates on pointers.
+ */
+
+#define	INT_WIDTH	8
+
+#if __has_feature(capabilities)
+#define	CAP(x)		c ## x
+#define	CAP_WIDTH	16
+
+#define	L_CAP		ly
+#define	S_CAP		sy
+#define	MV_CAP		ymv
+#define	ADD_CAP		yadd
+#define	ADDI_CAP	yaddi
+/* Note: xcheri */
+#define	MODESW_CAP(tmp, tmp1)					\
+	lla		tmp1, 99f;				\
+	cspecialr	CAP(tmp), pcc;				\
+	csetaddr CAP(tmp), CAP(tmp), tmp1;			\
+	li		tmp1, 1;				\
+	csetflags	CAP(tmp), CAP(tmp), tmp1;		\
+	jr.cap		CAP(tmp);				\
+	99:
+/* Note: xcheri */
+#define	MODESW_INT(tmp)						\
+	llc		CAP(tmp), 99f;				\
+	csetflags	CAP(tmp), CAP(tmp), zero;		\
+	jr.cap		CAP(tmp);				\
+	99:
+#else
+#define	CAP(x)		x
+#define	CAP_WIDTH	INT_WIDTH
+
+#define	L_CAP		ld
+#define	S_CAP		sd
+#define	MV_CAP		mv
+#define	ADD_CAP		add
+#define	ADDI_CAP	addi
+#define	MODESW_CAP(tmp, tmp1)
+#define	MODESW_INT(tmp, tmp1)
+#endif
+
+#ifdef __CHERI__
+#define	PTR_WIDTH	CAP_WIDTH
+
+#define	MV_PTR		ymv
+#define	ADD_PTR		yadd
+#define	ADDI_PTR	yaddi
+#define	L_PTR		ly
+#define	S_PTR		sy
+#define	LLA_PTR		lly
+#define	LA_PTR		lgy
+#else
+#define	PTR_WIDTH	INT_WIDTH
+
+#define	MV_PTR		mv
+#define	ADD_PTR		add
+#define	ADDI_PTR	addi
+#define	L_PTR		ld
+#define	S_PTR		sd
+#define	LLA_PTR		lla
+#define	LA_PTR		la
 #endif
 
 #endif /* _MACHINE_ASM_H_ */
