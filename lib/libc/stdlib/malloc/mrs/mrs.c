@@ -97,7 +97,8 @@
  */
 
 #define POISON_ON_FREE 1
-#define CLEAR_ON_ALLOC_NWZ 1
+#define CLEAR_ON_ALLOC_PVER 1
+#define PTRAP_ENABLE 1
 
 #ifdef QUARANTINE_RATIO
 #error QUARANTINE_RATIO is obsolete, use QUARANTINE_NUMERATOR/QUARANTINE_DENOMINATOR
@@ -108,6 +109,8 @@
 #ifndef QUARANTINE_NUMERATOR
 #define	QUARANTINE_NUMERATOR	1
 #endif
+
+#define PVER_THRESHOLD 512
 
 #define	MALLOCX_LG_ALIGN_BITS	6
 #define	MALLOCX_LG_ALIGN_MASK	((1 << MALLOCX_LG_ALIGN_BITS) - 1)
@@ -194,9 +197,31 @@ static inline void cpoison(char * a){
   asm volatile("cpoison %0, 0(%1)": :"C"(a),"C"(a));
 }
 
+static inline void cpoisonline(char * a){
+  asm volatile("cpoisonline %0, 0(%1)": :"C"(a),"C"(a));
+}
+
 static inline void dczero(char * a){
   //asm volatile("dczero %0, 0(%1)": :"C"(a),"C"(a));
   asm volatile("cclearpoison %0, 0(%1)": :"C"(a),"C"(a));
+}
+
+static void csetpver(void  * a, int ver){
+    asm volatile("csetcappver %0, %1, %2": :"C"(a), "C"(a), "r"(ver));
+}
+
+static inline int cgetpver(void * a){
+       int ver= 0 ;
+       asm volatile("cgetcappver %0,%1" : "=r"(ver) : "C"(a));
+       return ver;
+}
+
+void * cclearpoisonperm(void * a){
+	void *ptr ;
+	uint64_t mask = ~(1ull << 12);
+    ptr = cheri_andperm(a, mask);
+
+	return ptr;
 }
 
 void *
@@ -1550,6 +1575,22 @@ mrs_malloc(size_t size)
 #ifdef CLEAR_ON_ALLOC
 	clear_region(allocated_region, cheri_getlen(allocated_region));
 #endif /* CLEAR_ON_ALLOC */
+
+#ifdef CLEAR_ON_ALLOC_PVER
+	if(size >= PVER_THRESHOLD){
+		void * allocated_region_raw =  *(void **) allocated_region;
+		int pver = cgetpver( allocated_region_raw);
+		if(pver < 255){
+			csetpver(allocated_region, pver+1);
+		}else{
+			clear_region(allocated_region, cheri_getlen(allocated_region));
+			csetpver(allocated_region, 1);
+		}
+	}else{
+		clear_region(allocated_region, cheri_getlen(allocated_region));
+	}
+#endif /* CLEAR_ON_ALLOC_PVER */
+
 #ifdef CLEAR_ON_ALLOC_NWZ
 	
 	int alloc_size = cheri_getlen(allocated_region);
@@ -1572,6 +1613,9 @@ mrs_malloc(size_t size)
 	    size, allocated_region);*/
 
 	MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, allocated_region);
+#ifdef PTRAP_ENABLE 
+	allocated_region = cclearpoisonperm(allocated_region);
+#endif 
 	return (allocated_region);
 }
 
@@ -1630,6 +1674,9 @@ mrs_calloc(size_t number, size_t size)
 	/*mrs_debug_printf("mrs_calloc: exit called %d size 0x%zx address %p\n", number, size, allocated_region);*/
 
 	MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number, allocated_region);
+#ifdef PTRAP_ENABLE 
+	allocated_region = cclearpoisonperm(allocated_region);
+#endif 
 	return (allocated_region);
 }
 
@@ -1665,9 +1712,40 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 		return (ret);
 	}
 
+
+#ifdef CLEAR_ON_ALLOC_PVER
+	if(size >= PVER_THRESHOLD){
+		void * allocated_region_raw =  *(void **) *ptr;
+		int pver = cgetpver( allocated_region_raw);
+		if(pver < 255){
+			csetpver(*ptr, pver+1);
+		}else{
+			clear_region(*ptr, cheri_getlen(*ptr));
+			csetpver(*ptr, 1);
+		}
+	}else{
+		clear_region(*ptr, cheri_getlen(*ptr));
+	}
+#endif /* CLEAR_ON_ALLOC_PVER */
 #ifdef CLEAR_ON_ALLOC
 	clear_region(*ptr, cheri_getlen(*ptr));
 #endif /* CLEAR_ON_ALLOC */
+
+#ifdef CLEAR_ON_ALLOC_PVER
+	if(size >= PVER_THRESHOLD){
+		void * allocated_region_raw =  *(void **) *ptr;
+		int pver = cgetpver( allocated_region_raw);
+		if(pver < 255){
+			csetpver(*ptr, pver+1);
+		}else{
+			clear_region(*ptr, cheri_getlen(*ptr));
+			csetpver(*ptr, 1);
+		}
+	}else{
+		clear_region(*ptr, cheri_getlen(*ptr));
+	}
+#endif /* CLEAR_ON_ALLOC_PVER */
+
 #ifdef CLEAR_ON_ALLOC_NWZ
 	int alloc_size = cheri_getlen(*ptr);
 	int offset =0;
@@ -1685,6 +1763,9 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 	increment_allocated_size(*ptr);
 
 	MRS_UTRACE(UTRACE_MRS_POSIX_MEMALIGN, NULL, size, alignment, *ptr);
+#ifdef PTRAP_ENABLE 
+	*ptr = cclearpoisonperm(*ptr);
+#endif 
 	return (ret);
 }
 
@@ -1716,6 +1797,20 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 		    allocated_region);
 		return (allocated_region);
 	}
+#ifdef CLEAR_ON_ALLOC_PVER
+	if(size >= PVER_THRESHOLD){
+		void * allocated_region_raw =  *(void **) allocated_region;
+		int pver = cgetpver( allocated_region_raw);
+		if(pver < 255){
+			csetpver(allocated_region, pver+1);
+		}else{
+			clear_region(allocated_region, cheri_getlen(allocated_region));
+			csetpver(allocated_region, 1);
+		}
+	}else{
+		clear_region(allocated_region, cheri_getlen(allocated_region));
+	}
+#endif /* CLEAR_ON_ALLOC_PVER */
 
 #ifdef CLEAR_ON_ALLOC
 	clear_region(allocated_region, cheri_getlen(allocated_region));
@@ -1738,6 +1833,9 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 
 	MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 	    allocated_region);
+#ifdef PTRAP_ENABLE 
+	allocated_region= cclearpoisonperm(allocated_region);
+#endif 
 	return (allocated_region);
 }
 
@@ -1787,10 +1885,14 @@ mrs_realloc(void *ptr, size_t size)
 	 * and allocation succeeds.
 	 */
 	if (ptr != NULL && new_alloc != NULL) {
-		memcpy(new_alloc, ptr, size < old_size ? size : old_size);
+		void *underlying_allocation = REAL(malloc_underlying_allocation)(ptr);	
+		memcpy(new_alloc, underlying_allocation, size < old_size ? size : old_size);
 		mrs_free(ptr);
 	}
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size, 0, new_alloc);
+#ifdef PTRAP_ENABLE 
+	new_alloc= cclearpoisonperm(new_alloc);
+#endif 
 	return (new_alloc);
 }
 
@@ -1831,7 +1933,28 @@ mrs_free(void *ptr)
 #ifdef CLEAR_ON_FREE
 	bzero(cheri_setoffset(ptr, 0), cheri_getlen(ptr));
 #endif
-
+#ifdef CLEAR_ON_ALLOC_PVER
+	//if(versioning)
+	csetpver(ins, cgetpver(ptr));
+#endif
+#ifdef POISON_ON_FREE_LINE
+	
+	int poison_size = cheri_getlen(ptr);
+	int offset =0;
+	size_t t;
+	if((t = (__cheri_addr long) ptr & 64-1) == 0) {
+		while(poison_size >= 64){
+			cpoisonline(ptr + offset);
+			offset += 64;
+			poison_size-=64;
+		}
+	}
+	if(poison_size > 0){
+		for(size_t i = offset; i< poison_size; i += 16){
+			cpoison(((char *) ins) + i);
+		}
+	}
+#endif
 #ifdef POISON_ON_FREE
 	int poison_size = cheri_getlen(ptr);
 	for(size_t i = 0; i< poison_size; i += 16){
