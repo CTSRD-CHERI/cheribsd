@@ -40,19 +40,73 @@
 #include "assym.inc"
 
 /*
+ * Hybrid kernels use .cap loads and stores whereas purecap kernels use
+ * capmode loads and stores.
+ * The .cap loads are only allowed on xcheri.
+ */
+.macro load_byte xreg preg
+#ifdef __CHERI_HYBRID__
+	/* Note: xcheri */
+	lb.cap	\xreg, 0(CAP(\preg))
+#else
+	lb	\xreg, 0(\preg)
+#endif
+.endmacro
+
+.macro store_byte xreg preg
+#ifdef __CHERI_HYBRID__
+	/* Note: xcheri */
+	sb.cap	\xreg, 0(CAP(\preg))
+#else
+	sb	\xreg, 0(\preg)
+#endif
+.endmacro
+
+.macro load_word xreg preg
+#ifdef __CHERI_HYBRID__
+	/* Note: xcheri */
+	ld.cap	\xreg, 0(CAP(\preg))
+#else
+	ld	\xreg, 0(\preg)
+#endif
+.endmacro
+
+.macro store_word xreg preg
+#ifdef __CHERI_HYBRID__
+	/* Note: xcheri */
+	sd.cap	\xreg, 0(CAP(\preg))
+#else
+	sd	\xreg, 0(\preg)
+#endif
+.endmacro
+
+.macro load_ptr xreg preg
+#ifdef __CHERI_HYBRID__
+	/* Note: xcheri */
+	lc.cap	CAP(\xreg), 0(CAP(\preg))
+#else
+	ly	\xreg, 0(\preg)
+#endif
+.endmacro
+
+.macro store_ptr xreg preg
+#ifdef __CHERI_HYBRID__
+	/* Note: xcheri */
+	sc.cap	CAP(\xreg), 0(CAP(\preg))
+#else
+	sy	\xreg, 0(\preg)
+#endif
+.endmacro
+
+/*
  * Fault handler for the copy{in,out} functions below.
  */
 ENTRY(copyio_fault)
-	MODESW_INT
-#ifdef __CHERI_PURE_CAPABILITY__
-	SET_FAULT_HANDLER(PTR(null), PTR(a1))
-#else
-	SET_FAULT_HANDLER(x0, a1) /* Clear the handler */
-#endif
+	SET_FAULT_HANDLER(zero, a1) /* Clear the handler */
 	EXIT_USER_ACCESS(a1)
 copyio_fault_nopcb:
 	li	a0, EFAULT
-	RETURN
+	ret
 END(copyio_fault)
 
 /*
@@ -63,12 +117,8 @@ END(copyio_fault)
  * a2 - Size of copy
  */
 	.macro copycommon
-#ifdef __CHERI_PURE_CAPABILITY__
-	_LGC	PTR(a6), copyio_fault	/* Get the handler address */
-#else
-	la	a6, copyio_fault	/* Get the handler address */
-#endif
-	SET_FAULT_HANDLER(PTR(a6), PTR(a7))	/* Set the handler */
+	LA_PTR	a6, copyio_fault	/* Get the handler address */
+	SET_FAULT_HANDLER(a6, a7)	/* Set the handler */
 	ENTER_USER_ACCESS(a7)
 	MODESW_CAP
 
@@ -86,10 +136,10 @@ END(copyio_fault)
 
 	/* Byte copy until the first word-aligned address */
 1:
-	LB_CAP	a4, 0(CAP(a0))		/* Load byte from src */
-	CADDI_CAP	CAP(a0), CAP(a0), 1
-	SB_CAP	a4, 0(CAP(a1))
-	CADDI_CAP	CAP(a1), CAP(a1), 1	/* Store byte in dest */
+	load_byte	a4, a0		/* Load byte from src */
+	ADDI_CAP	a0, a0, 1
+	store_byte	a4, a1		/* Store byte in dest */
+	ADDI_CAP	a1, a1, 1
 	addi	a2, a2, -1		/* len-- */
 	andi	t0, a0, (XLEN_BYTES-1)
 	bnez	t0, 1b
@@ -97,10 +147,10 @@ END(copyio_fault)
 
 	/* Copy words */
 2:
-	LD_CAP	a4, 0(CAP(a0))		/* Load word from src */
-	CADDI_CAP	CAP(a0), CAP(a0), XLEN_BYTES
-	SD_CAP	a4, 0(CAP(a1))		/* Store word in dest */
-	CADDI_CAP	CAP(a1), CAP(a1), XLEN_BYTES
+	load_word	a4 a0		/* Load word from src */
+	ADDI_CAP	a0, a0, XLEN_BYTES
+	store_word	a4 a1		/* Store word in dest */
+	ADDI_CAP	a1, a1, XLEN_BYTES
 	addi	a2, a2, -XLEN_BYTES	/* len -= XLEN_BYTES */
 3:	bgeu	a2, t2, 2b		/* Again if len >= XLEN_BYTES */
 
@@ -109,16 +159,16 @@ END(copyio_fault)
 
 	/* Copy any remaining bytes */
 4:
-	LB_CAP	a4, 0(CAP(a0))		/* Load byte from src */
-	CADDI_CAP	CAP(a0), CAP(a0), 1
-	SB_CAP	a4, 0(CAP(a1))		/* Store byte in dest */
-	CADDI_CAP	CAP(a1), CAP(a1), 1
+	load_byte	a4, a0		/* Load byte from src */
+	ADDI_CAP	a0, a0, 1
+	store_byte	a4, a1		/* Store byte in dest */
+	ADDI_CAP	a1, a1, 1
 	addi	a2, a2, -1		/* len-- */
 	bnez	a2, 4b
 
 5:	MODESW_INT
 	EXIT_USER_ACCESS(a7)
-	SET_FAULT_HANDLER(PTR_NULL, PTR(a7))	/* Clear the handler */
+	SET_FAULT_HANDLER(zero, a7)	/* Clear the handler */
 	.endm
 
 /*
@@ -132,17 +182,17 @@ ENTRY(copyout)
 	li	a4, VM_MAXUSER_ADDRESS
 	bgeu	a3, a4, copyio_fault_nopcb
 
-#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-	CSRR_CAP	CAP(a3), ddc
-	CADD_CAP	CAP(a3), CAP(a3), a0
-	_SCBNDSR	CAP(a0), CAP(a3), a2
+#ifdef __CHERI_HYBRID__
+	GET_DDC(a3)
+	ADD_CAP		a3, a3, a0
+	ybndsw		a0, a3, a2
 #endif
 
 	copycommon
 
 copyout_end:
 	li	a0, 0		/* return 0 */
-	RETURN
+	ret
 END(copyout)
 
 /*
@@ -156,17 +206,17 @@ ENTRY(copyin)
 	li	a4, VM_MAXUSER_ADDRESS
 	bgeu	a3, a4, copyio_fault_nopcb
 
-#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-	CSRR_CAP	CAP(a3), ddc
-	CADD_CAP	CAP(a3), CAP(a3), a1
-	_SCBNDSR	CAP(a1), CAP(a3), a2
+#ifdef __CHERI_HYBRID__
+	GET_DDC(a3)
+	ADD_CAP		a3, a3, a1
+	ybndsw		a1, a3, a2
 #endif
 
 	copycommon
 
 copyin_end:
 	li	a0, 0		/* return 0 */
-	RETURN
+	ret
 END(copyin)
 
 /*
@@ -179,27 +229,23 @@ ENTRY(copyinstr)
 	mv	a5, x0		/* count = 0 */
 	beqz	a2, 3f		/* If len == 0 then skip loop */
 
-#ifdef __CHERI_PURE_CAPABILITY__
-	_LGC	PTR(a6), copyio_fault /* Get the handler address */
-#else
-	la	a6, copyio_fault /* Get the handler address */
-#endif
-	SET_FAULT_HANDLER(PTR(a6), PTR(a7)) /* Set the handler */
+	LA_PTR	a6, copyio_fault /* Get the handler address */
+	SET_FAULT_HANDLER(a6, a7) /* Set the handler */
 	ENTER_USER_ACCESS(a7)
 	MODESW_CAP
 
-#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-	CSRR_CAP	CAP(a4), ddc
-	CADD_CAP	CAP(a4), CAP(a4), a1
-	_SCBNDSR	CAP(a1), CAP(a4), a2
+#ifdef __CHERI_HYBRID__
+	GET_DDC(a4)
+	ADD_CAP		a4, a4, a1
+	ybndsw		a1, a4, a2
 #endif
 
 	li	a7, VM_MAXUSER_ADDRESS
 1:	bgeu	a0, a7, copyio_fault
-	LB_CAP	a4, 0(CAP(a0))	/* Load from uaddr */
-	CADDI_CAP	CAP(a0), CAP(a0), 1
-	SB_CAP	a4, 0(CAP(a1))	/* Store in kaddr */
-	CADDI_CAP	CAP(a1), CAP(a1), 1
+	load_byte	a4, a0	/* Load from uaddr */
+	ADDI_CAP	a0, a0, 1
+	store_byte	a4, a1	/* Store in kaddr */
+	ADDI_CAP	a1, a1, 1
 	beqz	a4, 2f
 	addi	a2, a2, -1	/* len-- */
 	addi	a5, a5, 1	/* count++ */
@@ -207,17 +253,17 @@ ENTRY(copyinstr)
 
 2:	MODESW_INT
 	EXIT_USER_ACCESS(a7)
-	SET_FAULT_HANDLER(PTR_NULL, PTR(a7)) /* Clear the handler */
+	SET_FAULT_HANDLER(zero, a7) /* Clear the handler */
 
 3:	beqz	a3, 4f		/* Check if done != NULL */
 	addi	a5, a5, 1	/* count++ */
-	sd	a5, 0(PTR(a3))	/* done = count */
+	sd	a5, 0(a3)	/* done = count */
 
 4:	mv	a0, x0		/* return 0 */
 	beqz	a4, 5f
 	li	a0, ENAMETOOLONG
 5:
-	RETURN
+	ret
 END(copyinstr)
 
 #if __has_feature(capabilities)
@@ -229,12 +275,8 @@ END(copyinstr)
  * a2 - Size of copy
  */
 	.macro copycapcommon
-#ifdef __CHERI_PURE_CAPABILITY__
-	_LGC	PTR(a6), copyio_fault	/* Get the handler address */
-#else
-	la	a6, copyio_fault	/* Get the handler address */
-#endif
-	SET_FAULT_HANDLER(PTR(a6), PTR(a7))	/* Set the handler */
+	LA_PTR	a6, copyio_fault	/* Get the handler address */
+	SET_FAULT_HANDLER(a6, a7)	/* Set the handler */
 	ENTER_USER_ACCESS(a7)
 	MODESW_CAP
 
@@ -252,10 +294,10 @@ END(copyinstr)
 
 	/* Byte copy until the first capability-aligned address */
 1:
-	LB_CAP	a4, 0(CAP(a0))		/* Load byte from src */
-	CADDI_CAP	CAP(a0), CAP(a0), 1
-	SB_CAP	a4, 0(CAP(a1))		/* Store byte in dest */
-	CADDI_CAP	CAP(a1), CAP(a1), 1
+	load_byte	a4, a0		/* Load byte from src */
+	ADDI_CAP	a0, a0, 1
+	store_byte	a4, a1		/* Store byte in dest */
+	ADDI_CAP	a1, a1, 1
 	addi	a2, a2, -1		/* len-- */
 	andi	t0, a0, (CLEN_BYTES-1)
 	bnez	t0, 1b
@@ -263,10 +305,10 @@ END(copyinstr)
 
 	/* Copy capabilities */
 2:
-	LC_CAP	CAP(a4), 0(CAP(a0))	/* Load capability from src */
-	CADDI_CAP	CAP(a0), CAP(a0), CLEN_BYTES
-	SC_CAP	CAP(a4), 0(CAP(a1))	/* Store capability in dest */
-	CADDI_CAP	CAP(a1), CAP(a1), CLEN_BYTES
+	load_ptr	a4 a0	/* Load capability from src */
+	ADDI_CAP	a0, a0, CLEN_BYTES
+	store_ptr	a4  a1	/* Store capability in dest */
+	ADDI_CAP	a1, a1, CLEN_BYTES
 	addi	a2, a2, -CLEN_BYTES	/* len -= CLEN_BYTES */
 3:	bgeu	a2, t2, 2b		/* Again if len >= CLEN_BYTES */
 
@@ -275,16 +317,16 @@ END(copyinstr)
 
 	/* Copy any remaining bytes */
 4:
-	LB_CAP	a4, 0(CAP(a0))		/* Load byte from src */
-	CADDI_CAP	CAP(a0), CAP(a0), 1
-	SB_CAP	a4, 0(ca1)		/* Store byte in dest */
-	CADDI_CAP	CAP(a1), CAP(a1), 1
+	load_byte	a4, a0		/* Load byte from src */
+	ADDI_CAP	a0, a0, 1
+	store_byte	a4, a1		/* Store byte in dest */
+	ADDI_CAP	a1, a1, 1
 	addi	a2, a2, -1		/* len-- */
 	bnez	a2, 4b
 
 5:	MODESW_INT
 	EXIT_USER_ACCESS(a7)
-	SET_FAULT_HANDLER(PTR_NULL, PTR(a7)) /* Clear the handler */
+	SET_FAULT_HANDLER(zero, a7) /* Clear the handler */
 	.endm
 
 /*
@@ -298,17 +340,17 @@ ENTRY(copyoutptr)
 	li	a4, VM_MAXUSER_ADDRESS
 	bgeu	a3, a4, copyio_fault_nopcb
 
-#ifndef __CHERI_PURE_CAPABILITY__
-	CSRR_CAP	CAP(a3), ddc
-	CADD_CAP	CAP(a3), CAP(a3), a0
-	_SCBNDSR	CAP(a0), CAP(a3), a2
+#ifndef __CHERI__
+	GET_DDC(a3)
+	ADD_CAP		a3, a3, a0
+	ybndsw		a0, a3, a2
 #endif
 
 	copycapcommon
 
 copyoutptr_end:
 	li	a0, 0		/* return 0 */
-	RETURN
+	ret
 END(copyoutptr)
 
 /*
@@ -322,17 +364,17 @@ ENTRY(copyinptr)
 	li	a4, VM_MAXUSER_ADDRESS
 	bgeu	a3, a4, copyio_fault_nopcb
 
-#ifndef __CHERI_PURE_CAPABILITY__
-	CSRR_CAP	CAP(a3), ddc
-	CADD_CAP	CAP(a3), CAP(a3), a1
-	_SCBNDSR	CAP(a1), CAP(a3), a2
+#ifndef __CHERI__
+	GET_DDC(a3)
+	ADD_CAP		a3, a3, a1
+	ybndsw		a1, a3, a2
 #endif
 
 	copycapcommon
 
 copyinptr_end:
 	li	a0, 0		/* return 0 */
-	RETURN
+	ret
 END(copyinptr)
 #endif
 
