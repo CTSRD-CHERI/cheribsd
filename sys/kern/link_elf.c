@@ -1444,17 +1444,20 @@ link_elf_init_compartments(linker_file_t lf, Elf_Phdr *phtable,
 			pcc = link_elf_find_compartment_pcc(lf,
 			    (ptraddr_t)(ef->address + phdr->p_vaddr),
 			    phdr->p_memsz);
-			if (pcc == NULL)
-				return (false);
-			plt = link_elf_find_compartment_plt(lf,
-			    (ptraddr_t)(ef->address + phdr->p_vaddr),
-			    phdr->p_memsz);
+			if (pcc != NULL) {
+				plt = link_elf_find_compartment_plt(lf,
+				    (ptraddr_t)(ef->address + phdr->p_vaddr),
+				    phdr->p_memsz);
+			} else {
+				plt = NULL;
+			}
 			elf_compartment_init(&ef->compartments[compartmentii],
 			    ef, (lastidp == NULL) ? 0 : ++lastid, lf->filename,
 			    ef->c18nstrtab + phdr->p_paddr,
 			    ef->address + phdr->p_vaddr, phdr->p_memsz, pcc,
 			    plt);
-			pcc->assigned = true;
+			if (pcc != NULL)
+				pcc->assigned = true;
 			if (plt != NULL)
 				plt->assigned = true;
 			compartmentii++;
