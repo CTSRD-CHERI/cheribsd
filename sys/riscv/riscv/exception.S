@@ -136,15 +136,7 @@
 .endif
 
 #ifndef __CHERI__
-	/* Switch to non-capmode PCC. */
-#ifdef __riscv_xcheri
-	cllc	CAP(t1), 1f
-	csetflags CAP(t1), CAP(t1), x0
-	cjr	CAP(t1)
-1:
-#else
-	modesw.int
-#endif
+	MODESW_INT(t1)
 #endif
 #endif /* __has_feature(capabilities) */
 .option pop
@@ -201,18 +193,9 @@
 #if __has_feature(capabilities)
 #ifndef __CHERI__
 	/* Switch to capmode PCC. */
-#ifdef __riscv_xcheri
-	lla	t0, 1f
-	cspecialr ct1, pcc
-	scaddr	ct1, ct1, t0
-	li	t0, 1
-	csetflags ct1, ct1, t0
-	jr.cap	ct1
-#else /* !defiend(__riscv_xcheri) */
-	modesw.cap
-#endif  /* !defiend(__riscv_xcheri) */
+	MODESW_CAP(t0, t1)
 .option capmode
-1:
+
 	/*
 	 * Build a capability for 'csp' using 'sp' as an address
 	 * in the kernel DDC.
