@@ -308,6 +308,7 @@ selectedArchitectures.each { suffix ->
             }
         }
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
+			  llvmBranch: "pcap", morelloLlvmBranch: "morello%2Fdev,
                           extraArgs: cheribuildArgs.join(" "),
                           skipArchiving: true, skipTarball: true,
                           sdkCompilerOnly: true,
