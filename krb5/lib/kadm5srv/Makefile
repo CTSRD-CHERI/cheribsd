@@ -13,7 +13,7 @@
 
 LIB=		kadm5srv_mit
 # SHLIB_MAJOR=	12
-LDFLAGS=-Wl,--no-undefined
+LDFLAGS+=-Wl,--no-undefined
 LIBADD=	krb5profile gssrpc gssapi_krb5 kdb5 krb5 k5crypto krb5support com_err
 VERSION_MAP=	${.CURDIR}/version.map
 

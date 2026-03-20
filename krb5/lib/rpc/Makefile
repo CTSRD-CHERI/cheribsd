@@ -13,7 +13,7 @@
 
 LIB=		gssrpc
 # SHLIB_MAJOR=	4
-LDFLAGS=-Wl,--no-undefined
+LDFLAGS+=-Wl,--no-undefined
 LIBADD=	gssapi_krb5 krb5 k5crypto com_err krb5support
 VERSION_MAP=	${.CURDIR}/version.map
 

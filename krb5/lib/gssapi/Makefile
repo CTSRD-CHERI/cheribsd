@@ -13,7 +13,7 @@
 
 LIB=		gssapi_krb5
 # SHLIB_MAJOR=	2
-LDFLAGS=-Wl,--no-undefined
+LDFLAGS+=-Wl,--no-undefined
 LIBADD=	krb5 k5crypto com_err krb5profile krb5support
 VERSION_MAP=	${.CURDIR}/version.map
 

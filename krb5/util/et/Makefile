@@ -15,7 +15,7 @@ PACKAGE=	kerberos-lib
 
 LIB=		com_err
 # SHLIB_MAJOR=	3
-LDFLAGS=-Wl,--no-undefined
+LDFLAGS+=-Wl,--no-undefined
 INCSDIR=${INCLUDEDIR}
 LIBADD=	krb5support
 VERSION_MAP=	${.CURDIR}/version.map

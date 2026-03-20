@@ -15,7 +15,7 @@ PACKAGE=	kerberos-lib
 
 LIB=	krb5support
 # SHLIB_MAJOR=	0
-LDFLAGS=-Wl,--no-undefined
+LDFLAGS+=-Wl,--no-undefined
 VERSION_MAP=	${.CURDIR}/version.map
 
 .PATH: ${KRB5_DIR}/util/support
