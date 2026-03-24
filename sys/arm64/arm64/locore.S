@@ -1094,7 +1094,11 @@ LENTRY(build_l2_block_pagetable)
 	/* Build the L2 block entry */
 	orr	x12, x7, #L2_BLOCK
 #if __has_feature(capabilities)
+#ifdef __CHERI_CAPREVOKE_KERNEL
+	orr	x12, x12, #(ATTR_LC_GEN0)
+#else
 	orr	x12, x12, #(ATTR_LC_ENABLED)
+#endif
 	orr	x12, x12, #(ATTR_CDBM | ATTR_SC)
 #endif
 	orr	x12, x12, #(ATTR_AF)
@@ -1176,7 +1180,12 @@ LENTRY(build_l3_page_pagetable)
 	/* Build the L3 page entry */
 	orr	x12, x7, #L3_PAGE
 #if __has_feature(capabilities)
-	orr	x12, x12, #(ATTR_CAP_RW)
+#ifdef __CHERI_CAPREVOKE_KERNEL
+	orr	x12, x12, #(ATTR_LC_GEN0)
+#else
+	orr	x12, x12, #(ATTR_LC_ENABLED)
+#endif
+	orr	x12, x12, #(ATTR_CDBM | ATTR_SC)
 #endif
 	orr	x12, x12, #(ATTR_AF)
 	orr	x12, x12, #(ATTR_S1_UXN)
