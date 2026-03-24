@@ -63,7 +63,7 @@ static MALLOC_DEFINE(M_HWC_OWNERHASH, "hwc_ohash", "Hardware Counters");
 
 static struct mtx hwc_ownerhash_mtx;
 static u_long hwc_ownerhashmask;
-static LIST_HEAD(hwc_ownerhash, hwc_owner) *hwc_ownerhash;
+static LIST_HEAD(hwc_ownerhash, hwc_owner) * hwc_ownerhash;
 
 struct hwc_owner *
 hwc_ownerhash_lookup(struct proc *p)
