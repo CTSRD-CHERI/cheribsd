@@ -136,7 +136,7 @@ static char static_kenv[PAGE_SIZE];
 	type __r;						\
 	ptraddr_t __res;					\
 	__res = MD_FETCH(mdp, info, ptraddr_t);			\
-	__r = (type)cheri_setaddress(kernel_root_cap, __res);	\
+	__r = (type)cheri_address_set(kernel_root_cap, __res);	\
 	__r;							\
 })
 #else
@@ -374,8 +374,6 @@ try_load_dtb(void)
 {
 	vm_pointer_t dtbp;
 
-	dtbp = (vm_pointer_t)NULL;
-#if 0
 	dtbp = MD_FETCH(preload_kmdp, MODINFOMD_DTBP, vm_offset_t);
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (dtbp != (vm_pointer_t)NULL) {
