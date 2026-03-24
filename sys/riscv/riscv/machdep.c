@@ -539,14 +539,14 @@ parse_metadata(void)
 	/* Read the boot metadata */
 	boothowto = MD_FETCH(preload_kmdp, MODINFOMD_HOWTO, int);
 	lastaddr = MD_FETCH(preload_kmdp, MODINFOMD_KERNEND, vm_offset_t);
-	kern_envp = MD_FETCH(preload_kmdp, MODINFOMD_ENVP, char *);
+	kern_envp = MD_FETCH_PTR(preload_kmdp, MODINFOMD_ENVP, char *);
 	if (kern_envp != NULL)
 		init_static_kenv(kern_envp, 0);
 	else
 		init_static_kenv(static_kenv, sizeof(static_kenv));
 #ifdef DDB
-	ksym_start = MD_FETCH(preload_kmdp, MODINFOMD_SSYM, uintptr_t);
-	ksym_end = MD_FETCH(preload_kmdp, MODINFOMD_ESYM, uintptr_t);
+	ksym_start = MD_FETCH_PTR(preload_kmdp, MODINFOMD_SSYM, uintptr_t);
+	ksym_end = MD_FETCH_PTR(preload_kmdp, MODINFOMD_ESYM, uintptr_t);
 	db_fetch_ksymtab(ksym_start, ksym_end, 0);
 #endif
 #ifdef FDT
