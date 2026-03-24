@@ -617,7 +617,8 @@ retry:
 		return (ENOMEM);
 	}
 	error = vm_map_find_locked(pipe_map, NULL, 0, &buffer,
-	    size, 0, VMFS_ANY_SPACE, VM_PROT_RW, VM_PROT_RW, 0);
+	    size, 0, VMFS_ANY_SPACE, VM_PROT_RW,
+	    VM_PROT_RW | VM_PROT_NO_IMPLY_CAP, 0);
 	vm_map_unlock(pipe_map);
 	if (error != KERN_SUCCESS) {
 		chgpipecnt(cpipe->pipe_pair->pp_owner->cr_ruidinfo, -size, 0);
