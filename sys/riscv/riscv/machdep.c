@@ -355,6 +355,10 @@ init_proc0(vm_pointer_t kstack)
 #endif
 	thread0.td_pcb->pcb_fpflags = 0;
 	thread0.td_frame = &proc0_tf;
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	thread0.td_frame = cheri_perms_clear(thread0.td_frame,
+	    CHERI_PERM_STORE_LOCAL_CAP);
+#endif
 	pcpup->pc_curpcb = thread0.td_pcb;
 }
 
