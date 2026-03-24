@@ -1,6 +1,0 @@
-#NO_UNIVERSE
-
-include "QEMU"
-include "std.XCHERI"
-
-ident XCHERI-QEMU

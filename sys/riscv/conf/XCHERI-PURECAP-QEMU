@@ -1,6 +1,0 @@
-#NO_UNIVERSE
-
-include "QEMU"
-include "std.XCHERI-PURECAP"
-
-ident XCHERI-PURECAP-QEMU

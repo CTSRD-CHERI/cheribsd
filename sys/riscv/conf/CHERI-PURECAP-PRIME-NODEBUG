@@ -1,4 +1,0 @@
-include "CHERI-PURECAP-PRIME"
-include "std.nodebug"
-
-ident CHERI-PURECAP-PRIME-NODEBUG
