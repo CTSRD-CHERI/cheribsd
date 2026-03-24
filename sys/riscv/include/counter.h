@@ -60,11 +60,6 @@ static void
 counter_u64_zero_one_cpu(void *arg)
 {
 
-#if 0
-printf("%s: arg %#.16lp\n", __func__, arg);
-printf("%s: zpget %#.16lp\n", __func__, zpcpu_get((counter_u64_t *)arg));
-#endif
-
 	*(zpcpu_get((counter_u64_t *)arg)) = 0;
 }
 
