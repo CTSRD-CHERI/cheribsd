@@ -47,9 +47,6 @@
  * Machine dependent constants for AMD64.
  */
 
-#define __HAVE_ACPI
-#define __PCI_REROUTE_INTERRUPT
-
 #ifndef MACHINE
 #define	MACHINE		"amd64"
 #endif

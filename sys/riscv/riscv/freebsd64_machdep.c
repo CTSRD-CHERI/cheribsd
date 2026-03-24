@@ -66,6 +66,7 @@
 
 #include <cheri/cheric.h>
 
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_util.h>
@@ -189,7 +190,7 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 
 	memset(&mc, 0, sizeof(mc));
 	if (mcp->mc_flags & _MC_CAP_VALID) {
-		error = copyincap(__USER_CAP(mcp->mc_capregs,
+		error = copyinptr(USER_PTR(mcp->mc_capregs,
 		    sizeof(mc.mc_capregs)), &mc.mc_capregs,
 		    sizeof(mc.mc_capregs));
 		if (error)
@@ -198,7 +199,7 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 		/* XXX: Permit userland to change GPRs for sigreturn? */
 
 		/* Honor 64-bit PC. */
-		mc.mc_capregs.cp_sepcc = cheri_setoffset(
+		mc.mc_capregs.cp_sepcc = cheri_offset_set(
 		    mc.mc_capregs.cp_sepcc, mcp->mc_gpregs.gp_sepc);
 	} else {
 		creg = (uintcap_t *)&mc.mc_capregs;
@@ -206,7 +207,7 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 		for (i = 0; i < CONTEXT64_GPREGS; i++)
 			creg[i] = (uintcap_t)greg[i];
 
-		mc.mc_capregs.cp_sepcc = cheri_setoffset(
+		mc.mc_capregs.cp_sepcc = cheri_offset_set(
 		    td->td_frame->tf_sepc, mcp->mc_gpregs.gp_sepc);
 		mc.mc_capregs.cp_ddc = td->td_frame->tf_ddc;
 		mc.mc_capregs.cp_sstatus = mcp->mc_gpregs.gp_sstatus;
@@ -282,7 +283,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_UNLOCK(td->td_proc);
 
 	/* Copy the capability registers out to the user's stack. */
-	if (copyoutcap(&mc.mc_capregs, __USER_CAP(capregs,
+	if (copyoutptr(&mc.mc_capregs, USER_PTR(capregs,
 	    sizeof(mc.mc_capregs)), sizeof(mc.mc_capregs)) != 0) {
 		PROC_LOCK(p);
 		printf("pid %d, tid %d: could not copy out cap registers\n",
@@ -292,7 +293,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyoutcap(&frame, __USER_CAP(fp, sizeof(frame)), sizeof(frame)) !=
+	if (copyoutptr(&frame, USER_PTR(fp, sizeof(frame)), sizeof(frame)) !=
 	    0) {
 		/* Process has trashed its stack. Kill it. */
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
@@ -327,7 +328,7 @@ freebsd64_sigreturn(struct thread *td, struct freebsd64_sigreturn_args *uap)
 	ucontext64_t uc;
 	int error;
 
-	error = copyincap(__USER_CAP_OBJ(uap->sigcntxp), &uc, sizeof(uc));
+	error = copyinptr(USER_PTR_OBJ(uap->sigcntxp), &uc, sizeof(uc));
 	if (error != 0)
 		return (error);
 

@@ -39,21 +39,6 @@
 #include <sys/types.h>
 #include <cheri/cherireg.h>
 
-/*
- * Canonical C-language representation of a CHERI object capability -- code and
- * data capabilities in registers or memory.
- */
-struct cheri_object {
-	void * __capability	co_codecap;
-	void * __capability	co_datacap;
-};
-
-#if !defined(_KERNEL) && __has_feature(capabilities)
-#define	CHERI_OBJECT_INIT_NULL	{NULL, NULL}
-#define	CHERI_OBJECT_ISNULL(co)	\
-    ((co).co_codecap == NULL && (co).co_datacap == NULL)
-#endif
-
 #ifdef _KERNEL
 /*
  * Functions to construct userspace capabilities.
@@ -90,9 +75,6 @@ void * __capability	_cheri_capability_build_user_rwx_unchecked(
  * Global capabilities used to construct other capabilities.
  */
 
-/* Root of all unsealed userspace capabilities. */
-extern void * __capability userspace_root_cap;
-
 /* Root of all sealed userspace capabilities. */
 extern void * __capability userspace_root_sealcap;
 
@@ -122,6 +104,17 @@ extern void * __capability vmm_gpa_root_cap;
 extern void * __capability vmm_el2_root_cap;
 #endif
 #endif
+
+/*
+ * Initialize root caps.
+ */
+void userspace_root_cap_init(void * __capability);
+
+/*
+ * Construct capabilities in the sysvec.
+ */
+struct sysentvec;
+void cheri_sysvec_init(struct sysentvec *sv);
 
 /*
  * Functions to create capabilities used in exec.
@@ -170,6 +163,7 @@ SYSCTL_DECL(_security_cheri_stats);
 extern u_int	security_cheri_bound_legacy_capabilities;
 extern u_int	cheri_cloadtags_stride;
 extern bool	security_cheri_lib_based_c18n_default;
+extern bool	security_cheri_check_perm_syscall;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
@@ -180,7 +174,7 @@ typedef void (cap_relocs_cb)(void *arg, bool function, bool constant,
 
 int	init_linker_file_cap_relocs(const void *start_relocs,
 	    const void *stop_relocs, void *data_cap, ptraddr_t base_addr,
-	    cap_relocs_cb *cb, void *cb_arg);
+	    bool can_set_code_bounds, cap_relocs_cb *cb, void *cb_arg);
 #endif
 #endif /* !_KERNEL */
 

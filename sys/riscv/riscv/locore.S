@@ -392,10 +392,22 @@ va:
 
 	/* Initialize cap relocs. */
 	li	t0, CHERI_PERMS_KERNEL_DATA
-	_ACPERM	PTR(a0), PTR(s0), t0
-	_LLC	PTR(ra), _C_LABEL(init_cap_relocs)
-	li	t0, CHERI_PERMS_KERNEL_CODE
-	_ACPERM	PTR(a1), PTR(ra), t0
+	_LLC	PTR(a0), _C_LABEL(__start___cap_relocs)
+	_ACPERM	PTR(a0), PTR(a0), t0
+	_LLC	PTR(a1), _C_LABEL(__stop___cap_relocs)
+	sub	t1, a1, a0
+	_SCBNDSR	PTR(a0), PTR(a0), t1
+	_CADD	PTR(a1), PTR(a0), t1
+	_ACPERM	PTR(a2), PTR(s0), t0
+	mv	a3, zero
+	mv	a4, zero		/* TODO: true for PT_CHERI_PCC */
+	_LLC	PTR(a5), _C_LABEL(kernel_cap_relocs_cb)
+#ifdef __riscv_xcheri
+	csetflags PTR(a6), PTR(a5), zero
+#else
+	scmode	PTR(a6), PTR(a5), zero
+#endif
+	_LLC	PTR(ra), _C_LABEL(init_linker_file_cap_relocs)
 	_JALR	PTR(ra)
 
 	/* Initialize capabilities. */

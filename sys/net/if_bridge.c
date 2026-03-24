@@ -944,7 +944,7 @@ bridge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			if (error)
 				break;
 		} else if (bc->bc_flags & BC_F_COPYINCAP) {
-			error = copyincap(ifd->ifd_data, &args, ifd->ifd_len);
+			error = copyinptr(ifd->ifd_data, &args, ifd->ifd_len);
 			if (error)
 				break;
 		}
@@ -964,7 +964,7 @@ bridge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if (bc->bc_flags & BC_F_COPYOUT)
 			error = copyout(&args, ifd->ifd_data, ifd->ifd_len);
 		else if (bc->bc_flags & BC_F_COPYOUTCAP)
-			error = copyoutcap(&args, ifd->ifd_data, ifd->ifd_len);
+			error = copyoutptr(&args, ifd->ifd_data, ifd->ifd_len);
 
 		break;
 

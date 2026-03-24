@@ -231,16 +231,36 @@ is specified and the
 file exists, the file is truncated to zero length.
 .Pp
 If
-.Dv O_EXCL
-is set with
 .Dv O_CREAT
-and the file already
-exists,
+is set, but file already exists,
+this flag has no effect except when
+.Dv O_EXCL
+is set too, in this case
 .Fn open
 fails with
 .Er EEXIST .
 This may be used to
 implement a simple exclusive access locking mechanism.
+In all other cases, the file is created
+and the access permission bits (see
+.Xr chmod 2)
+of the file mode
+are set to the value of the third argument taken as
+.Fa "mode_t mode"
+and passed through the
+.Xr umask 2 .
+This argument does not affect whether the file is opened
+for reading, writing, or for both.
+The open' request for a lock on the file, created with
+.Dv O_CREAT ,
+will never fail
+(provided that the underlying file system supports locking;
+see also
+.Dv O_SHLOCK
+and
+.Dv O_EXLOCK
+below).
+.Pp
 If
 .Dv O_EXCL
 is set and the last component of the pathname is
@@ -289,10 +309,6 @@ semantics can be obtained by setting
 for a shared lock, or
 .Dv O_EXLOCK
 for an exclusive lock.
-If creating a file with
-.Dv O_CREAT ,
-the request for the lock will never fail
-(provided that the underlying file system supports locking).
 .Pp
 .Dv O_DIRECT
 may be used to minimize or eliminate the cache effects of reading and writing.
@@ -393,7 +409,12 @@ but advisory locking is not allowed
 .It Xr dup 2
 .It Xr close 2
 .It Xr fstat 2
+.It Xr fstatfs 2
+.It Xr fchdir 2
+.It Xr fchroot 2
 .It Xr fexecve 2
+.It Xr funlinkat 2
+can be passed as the third argument
 .It Dv SCM_RIGHTS
 can be passed over a
 .Xr unix 4
@@ -403,16 +424,23 @@ message
 .It Xr kqueue 2
 only with
 .Dv EVFILT_VNODE
-.It Xr readlinkat 2
 .It Xr __acl_get_fd 2
 .It Xr __acl_aclcheck_fd 2
+.It Xr extattr 2
+.It Xr capsicum 4
+can be passed to
+.Fn cap_*_limit
+and
+.Fn cap_*_get
+system calls (such as
+.Xr cap_rights_limit 2 ) .
 .El
 .Pp
 Other operations like
 .Xr read 2 ,
 .Xr ftruncate 2 ,
 and any other that operate on file and not on file descriptor (except
-.Xr fstat 2 ),
+.Xr fstat 2 ) ,
 are not allowed.
 .Pp
 A file descriptor created with the

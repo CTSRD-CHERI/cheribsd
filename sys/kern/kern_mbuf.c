@@ -734,7 +734,7 @@ mb_ctor_clust(void *mem, int size, void *arg, int how)
 
 	m = (struct mbuf *)arg;
 	if (m != NULL) {
-		m->m_ext.ext_buf = cheri_kern_setbounds(mem, size);
+		m->m_ext.ext_buf = cheri_kern_bounds_set(mem, size);
 		m->m_data = m->m_ext.ext_buf;
 		m->m_flags |= M_EXT;
 		m->m_ext.ext_free = NULL;
@@ -938,8 +938,8 @@ mb_unmapped_free_mext(struct mbuf *m)
 	mb_free_extpg(old_m);
 }
 
-static struct mbuf *
-_mb_unmapped_to_ext(struct mbuf *m)
+static int
+_mb_unmapped_to_ext(struct mbuf *m, struct mbuf **mres)
 {
 	struct mbuf *m_new, *top, *prev, *mref;
 	struct sf_buf *sf;
@@ -949,9 +949,15 @@ _mb_unmapped_to_ext(struct mbuf *m)
 	u_int ref_inc = 0;
 
 	M_ASSERTEXTPG(m);
+
+	if (m->m_epg_tls != NULL) {
+		/* can't convert TLS mbuf */
+		m_freem(m);
+		*mres = NULL;
+		return (EINVAL);
+	}
+
 	len = m->m_len;
-	KASSERT(m->m_epg_tls == NULL, ("%s: can't convert TLS mbuf %p",
-	    __func__, m));
 
 	/* See if this is the mbuf that holds the embedded refcount. */
 	if (m->m_ext.ext_flags & EXT_FLAG_EMBREF) {
@@ -1050,7 +1056,8 @@ _mb_unmapped_to_ext(struct mbuf *m)
 			atomic_add_int(refcnt, ref_inc);
 	}
 	m_free(m);
-	return (top);
+	*mres = top;
+	return (0);
 
 fail:
 	if (ref_inc != 0) {
@@ -1067,13 +1074,15 @@ fail:
 	}
 	m_free(m);
 	m_freem(top);
-	return (NULL);
+	*mres = NULL;
+	return (ENOMEM);
 }
 
-struct mbuf *
-mb_unmapped_to_ext(struct mbuf *top)
+int
+mb_unmapped_to_ext(struct mbuf *top, struct mbuf **mres)
 {
-	struct mbuf *m, *next, *prev = NULL;
+	struct mbuf *m, *m1, *next, *prev = NULL;
+	int error;
 
 	prev = NULL;
 	for (m = top; m != NULL; m = next) {
@@ -1089,12 +1098,15 @@ mb_unmapped_to_ext(struct mbuf *top)
 				 */
 				prev->m_next = NULL;
 			}
-			m = _mb_unmapped_to_ext(m);
-			if (m == NULL) {
-				m_freem(top);
+			error = _mb_unmapped_to_ext(m, &m1);
+			if (error != 0) {
+				if (top != m)
+					m_free(top);
 				m_freem(next);
-				return (NULL);
+				*mres = NULL;
+				return (error);
 			}
+			m = m1;
 			if (prev == NULL) {
 				top = m;
 			} else {
@@ -1113,7 +1125,8 @@ mb_unmapped_to_ext(struct mbuf *top)
 			prev = m;
 		}
 	}
-	return (top);
+	*mres = top;
+	return (0);
 }
 
 /*
@@ -1566,7 +1579,7 @@ m_extadd(struct mbuf *mb, char *buf, u_int size, m_ext_free_t freef,
 	KASSERT(type != EXT_CLUSTER, ("%s: EXT_CLUSTER not allowed", __func__));
 
 	mb->m_flags |= (M_EXT | flags);
-	mb->m_ext.ext_buf = cheri_kern_setbounds(buf, size);
+	mb->m_ext.ext_buf = cheri_kern_bounds_set(buf, size);
 	mb->m_data = mb->m_ext.ext_buf;
 	mb->m_ext.ext_size = size;
 	mb->m_ext.ext_free = freef;

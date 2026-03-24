@@ -855,7 +855,7 @@ carp_input_c(struct mbuf *m, struct carp_header *ch, sa_family_t af, int ttl)
 	}
 
 	if (ifa->ifa_addr->sa_family == AF_INET) {
-		multicast = IN_MULTICAST(sc->sc_carpaddr.s_addr);
+		multicast = IN_MULTICAST(ntohl(sc->sc_carpaddr.s_addr));
 	} else {
 		multicast = IN6_IS_ADDR_MULTICAST(&sc->sc_carpaddr6);
 	}
@@ -1245,7 +1245,7 @@ carp_send_ad_locked(struct carp_softc *sc)
 		m->m_pkthdr.rcvif = NULL;
 		m->m_len = len;
 		M_ALIGN(m, m->m_len);
-		if (IN_MULTICAST(sc->sc_carpaddr.s_addr))
+		if (IN_MULTICAST(ntohl(sc->sc_carpaddr.s_addr)))
 			m->m_flags |= M_MCAST;
 		ip = mtod(m, struct ip *);
 		ip->ip_v = IPVERSION;
@@ -2969,26 +2969,25 @@ static const struct genl_cmd carp_cmds[] = {
 	},
 };
 
+static uint16_t carp_family_id;
 static void
 carp_nl_register(void)
 {
 	bool ret __diagused;
-	int family_id __diagused;
 
 	NL_VERIFY_PARSERS(all_parsers);
-	family_id = genl_register_family(CARP_NL_FAMILY_NAME, 0, 2,
+	carp_family_id = genl_register_family(CARP_NL_FAMILY_NAME, 0, 2,
 	    CARP_NL_CMD_MAX);
-	MPASS(family_id != 0);
+	MPASS(carp_family_id != 0);
 
-	ret = genl_register_cmds(CARP_NL_FAMILY_NAME, carp_cmds,
-	    nitems(carp_cmds));
+	ret = genl_register_cmds(carp_family_id, carp_cmds, nitems(carp_cmds));
 	MPASS(ret);
 }
 
 static void
 carp_nl_unregister(void)
 {
-	genl_unregister_family(CARP_NL_FAMILY_NAME);
+	genl_unregister_family(carp_family_id);
 }
 
 static void

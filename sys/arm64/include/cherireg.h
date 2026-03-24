@@ -37,30 +37,53 @@
 #define	CHERICAP_SIZE   16
 #define	CHERICAP_SHIFT	4
 
+#ifdef _KERNEL
 /*
  * CHERI ISA-defined constants for capabilities -- suitable for inclusion from
  * assembly source code.
  */
-#define	CHERI_PERM_GLOBAL			(1 << 0)	/* 0x00000001 */
-#define	CHERI_PERM_EXECUTIVE			(1 << 1)	/* 0x00000002 */
-#define	CHERI_PERM_SW0				(1 << 2)	/* 0x00000004 */
-#define	CHERI_PERM_SW1				(1 << 3)	/* 0x00000008 */
-#define	CHERI_PERM_SW2				(1 << 4)	/* 0x00000010 */
-#define	CHERI_PERM_SW3				(1 << 5)	/* 0x00000020 */
-#define	CHERI_PERM_MUTABLE_LOAD			(1 << 6)	/* 0x00000040 */
-#define	CHERI_PERM_COMPARTMENT_ID		(1 << 7)	/* 0x00000080 */
-#define	CHERI_PERM_BRANCH_SEALED_PAIR		(1 << 8)	/* 0x00000100 */
-#define	CHERI_PERM_INVOKE			CHERI_PERM_BRANCH_SEALED_PAIR
-#define	CHERI_PERM_SYSTEM			(1 << 9)	/* 0x00000200 */
-#define	CHERI_PERM_SYSTEM_REGS			CHERI_PERM_SYSTEM
-#define	CHERI_PERM_UNSEAL			(1 << 10)	/* 0x00000400 */
-#define	CHERI_PERM_SEAL				(1 << 11)	/* 0x00000800 */
-#define	CHERI_PERM_STORE_LOCAL_CAP		(1 << 12)	/* 0x00001000 */
-#define	CHERI_PERM_STORE_CAP			(1 << 13)	/* 0x00002000 */
-#define	CHERI_PERM_LOAD_CAP			(1 << 14)	/* 0x00004000 */
-#define	CHERI_PERM_EXECUTE			(1 << 15)	/* 0x00008000 */
-#define	CHERI_PERM_STORE			(1 << 16)	/* 0x00010000 */
-#define	CHERI_PERM_LOAD				(1 << 17)	/* 0x00020000 */
+#define	CHERI_PERM_GLOBAL		(1 << 0)	/* 0x00000001 */
+#define	CHERI_PERM_EXECUTIVE		(1 << 1)	/* 0x00000002 */
+#define	CHERI_PERM_SW0			(1 << 2)	/* 0x00000004 */
+#define	CHERI_PERM_SW1			(1 << 3)	/* 0x00000008 */
+#define	CHERI_PERM_SW2			(1 << 4)	/* 0x00000010 */
+#define	CHERI_PERM_SW3			(1 << 5)	/* 0x00000020 */
+#define	CHERI_PERM_MUTABLE_LOAD		(1 << 6)	/* 0x00000040 */
+#define	CHERI_PERM_COMPARTMENT_ID	(1 << 7)	/* 0x00000080 */
+#define	CHERI_PERM_BRANCH_SEALED_PAIR	(1 << 8)	/* 0x00000100 */
+#define	CHERI_PERM_SYSTEM		(1 << 9)	/* 0x00000200 */
+#define	CHERI_PERM_UNSEAL		(1 << 10)	/* 0x00000400 */
+#define	CHERI_PERM_SEAL			(1 << 11)	/* 0x00000800 */
+#define	CHERI_PERM_STORE_LOCAL_CAP	(1 << 12)	/* 0x00001000 */
+#define	CHERI_PERM_STORE_CAP		(1 << 13)	/* 0x00002000 */
+#define	CHERI_PERM_LOAD_CAP		(1 << 14)	/* 0x00004000 */
+#define	CHERI_PERM_EXECUTE		(1 << 15)	/* 0x00008000 */
+#define	CHERI_PERM_STORE		(1 << 16)	/* 0x00010000 */
+#define	CHERI_PERM_LOAD			(1 << 17)	/* 0x00020000 */
+
+#define	CHERI_PERM_INVOKE	CHERI_PERM_BRANCH_SEALED_PAIR
+#define	CHERI_PERM_SYSTEM_REGS	CHERI_PERM_SYSTEM
+#else
+/*
+ * These should be defined in cheriintrin.h, but aren't yet.
+ */
+#define	CHERI_PERM_EXECUTIVE		(1 << 1)	/* 0x00000002 */
+#define	CHERI_PERM_SW0			(1 << 2)	/* 0x00000004 */
+#define	CHERI_PERM_SW1			(1 << 3)	/* 0x00000008 */
+#define	CHERI_PERM_SW2			(1 << 4)	/* 0x00000010 */
+#define	CHERI_PERM_SW3			(1 << 5)	/* 0x00000020 */
+#define	CHERI_PERM_MUTABLE_LOAD		(1 << 6)	/* 0x00000040 */
+#define	CHERI_PERM_BRANCH_SEALED_PAIR	(1 << 8)	/* 0x00000100 */
+#define	CHERI_PERM_INVOKE CHERI_PERM_BRANCH_SEALED_PAIR
+#endif
+
+/* Supported architecture permission bits feature flags */
+#define	HAS_CHERI_PERM_LOAD_STORE_CAP
+#define	HAS_CHERI_PERM_LOAD_MUTABLE
+#define	HAS_CHERI_PERM_EXECUTIVE
+
+/* Define alias for MUTABLE_LOAD permission bit to have consistent spelling */
+#define	CHERI_PERM_LOAD_MUTABLE CHERI_PERM_MUTABLE_LOAD
 
 /*
  * Macros defining initial permission sets:
@@ -99,21 +122,6 @@
 /* TODO #define CHERI_PERMS_HWALL_CID	(CHERI_PERM_SETCID) */
 
 /*
- * vm_prot_t to capability permission bits
- */
-#define	CHERI_PERMS_PROT2PERM_READ					\
-	CHERI_PERM_LOAD
-#define	CHERI_PERMS_PROT2PERM_READ_CAP					\
-	(CHERI_PERM_LOAD_CAP | CHERI_PERM_MUTABLE_LOAD)
-#define	CHERI_PERMS_PROT2PERM_WRITE					\
-	CHERI_PERM_STORE
-#define	CHERI_PERMS_PROT2PERM_WRITE_CAP					\
-	(CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP)
-#define	CHERI_PERMS_PROT2PERM_EXEC					\
-	(CHERI_PERM_EXECUTE | CHERI_PERM_EXECUTIVE |			\
-	 CHERI_PERMS_PROT2PERM_READ | CHERI_PERMS_PROT2PERM_READ_CAP)
-
-/*
  * Basic userspace permission mask; CHERI_PERM_EXECUTE will be added for
  * executable capabilities (pcc); CHERI_PERM_STORE, CHERI_PERM_STORE_CAP,
  * and CHERI_PERM_STORE_LOCAL_CAP will be added for data permissions (ddc).
@@ -121,14 +129,15 @@
 #define	CHERI_PERMS_USERSPACE						\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |	\
 	CHERI_PERM_BRANCH_SEALED_PAIR |					\
-	(CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM))
+	(CHERI_PERMS_SWALL & ~(CHERI_PERM_SW_VMEM | CHERI_PERM_SYSCALL)))
 
 #define	CHERI_PERMS_USERSPACE_CIDCAP					\
 	(CHERI_PERM_COMPARTMENT_ID)
 
 #define	CHERI_PERMS_USERSPACE_CODE					\
 	(CHERI_PERMS_USERSPACE | CHERI_PERM_EXECUTE |			\
-	CHERI_PERM_EXECUTIVE | CHERI_PERM_MUTABLE_LOAD)
+	CHERI_PERM_EXECUTIVE | CHERI_PERM_MUTABLE_LOAD |		\
+	CHERI_PERM_SYSCALL)
 
 #define	CHERI_PERMS_USERSPACE_SEALCAP					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
@@ -174,6 +183,18 @@
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_STORE)
 
 /*
+ * Permission mask that encodes the permission bits associated to
+ * the RWX memory access control.
+ * These are separate from the permission bits that encode other
+ * properties of capabilities (e.g. sealing or ASR).
+ */
+#define	CHERI_PERMS_RWX_MASK						\
+	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE |	\
+	CHERI_PERM_STORE_CAP |CHERI_PERM_MUTABLE_LOAD |			\
+	CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_EXECUTE |		\
+	CHERI_PERM_EXECUTIVE | CHERI_PERM_SYSCALL)
+
+/*
  * The CHERI object-type space is split between userspace and kernel,
  * permitting kernel object references to be delegated to userspace (if
  * desired).  Currently, we provide 13 bits of namespace to each, with the top
@@ -192,9 +213,11 @@
 #define	CHERI_OTYPE_ISKERN(x)	(((x) & CHERI_OTYPE_KERN_FLAG) != 0)
 #define	CHERI_OTYPE_ISUSER(x)	(!(CHERI_OTYPE_ISKERN(x)))
 
+#ifdef _KERNEL
 /* Reserved CHERI object types: */
 #define	CHERI_OTYPE_UNSEALED	(0l)
 #define	CHERI_OTYPE_SENTRY	(1l)
+#endif
 
 /*
  * Root compartment ID capablity for userspace.
@@ -205,5 +228,22 @@
 #define	CHERI_COMPARTMENT_ID_USERSPACE_BASE	0x0
 #define	CHERI_COMPARTMENT_ID_USERSPACE_LENGTH	0x8000000000000000UL
 #define	CHERI_COMPARTMENT_ID_USERSPACE_OFFSET	0x0
+
+/*
+ * Derive an unbounded pointer before initial relocation.  For
+ * purecap, derive the pointer from PCC.
+ */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	CHERI_RODATA_PTR(x) ({						\
+	__typeof__((0, x)) _p;						\
+									\
+	__asm__ (							\
+	    "adrp %0, %c1\n\t"						\
+	    "add %0, %0, :lo12:%c1\n\t"					\
+	    : "=C" (_p) : "i" (x));					\
+	_p; })
+#else
+#define	CHERI_RODATA_PTR(x)	(&(*x))
+#endif
 
 #endif /* _ARM64_INCLUDE_CHERIREG_H_ */

@@ -60,6 +60,8 @@
 #include <linux/pci_ids.h>
 #include <linux/pm.h>
 
+#include <linux/kernel.h>	/* pr_debug */
+
 struct pci_device_id {
 	uint32_t	vendor;
 	uint32_t	device;
@@ -238,7 +240,7 @@ extern const char *pci_power_names[6];
 #define	PCI_IRQ_MSIX			0x04
 #define	PCI_IRQ_ALL_TYPES		(PCI_IRQ_MSIX|PCI_IRQ_MSI|PCI_IRQ_INTX)
 
-#if defined(LINUXKPI_VERSION) && (LINUXKPI_VERSION >= 60800)
+#if defined(LINUXKPI_VERSION) && (LINUXKPI_VERSION <= 61000)
 #define	PCI_IRQ_LEGACY			PCI_IRQ_INTX
 #endif
 
@@ -1355,6 +1357,9 @@ pci_bus_write_config_word(struct pci_bus *bus, unsigned int devfn, int pos,
 
 struct pci_dev *lkpi_pci_get_class(unsigned int class, struct pci_dev *from);
 #define	pci_get_class(class, from)	lkpi_pci_get_class(class, from)
+struct pci_dev *lkpi_pci_get_base_class(unsigned int class,
+    struct pci_dev *from);
+#define	pci_get_base_class(class, from)	lkpi_pci_get_base_class(class, from)
 
 /* -------------------------------------------------------------------------- */
 
@@ -1495,6 +1500,14 @@ pci_irq_vector(struct pci_dev *pdev, unsigned int vector)
 	}
 
         return (-ENXIO);
+}
+
+static inline int
+pci_wake_from_d3(struct pci_dev *pdev, bool enable)
+{
+
+	pr_debug("%s: TODO\n", __func__);
+	return (0);
 }
 
 #endif	/* _LINUXKPI_LINUX_PCI_H_ */

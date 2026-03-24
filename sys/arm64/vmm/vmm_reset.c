@@ -113,9 +113,10 @@ reset_vm_el01_regs(void *vcpu)
 	memset(el2ctx->pmevtyper_el0, 0, sizeof(el2ctx->pmevtyper_el0));
 
 #if __has_feature(capabilities)
-	el2ctx->tf.tf_ddc = (uintcap_t)cheri_setaddress(vmm_gva_root_cap, 0);
-	el2ctx->ddc_el0 = (uintcap_t)cheri_setaddress(vmm_gva_root_cap, 0);
-	el2ctx->rddc_el0 = (uintcap_t)cheri_setaddress(vmm_gva_root_cap, 0);
+	el2ctx->tf.tf_elr = (uintcap_t)cheri_address_set(vmm_gva_root_cap, 0);
+	el2ctx->tf.tf_ddc = (uintcap_t)cheri_address_set(vmm_gva_root_cap, 0);
+	el2ctx->ddc_el0 = (uintcap_t)cheri_address_set(vmm_gva_root_cap, 0);
+	el2ctx->rddc_el0 = (uintcap_t)cheri_address_set(vmm_gva_root_cap, 0);
 #endif
 }
 
@@ -151,6 +152,8 @@ reset_vm_el2_regs(void *vcpu)
 		el2ctx->hcr_el2 |= HCR_E2H;
 	}
 
+	/* Set the Extended Hypervisor Configuration Register */
+	el2ctx->hcrx_el2 = 0;
 	/* TODO: Trap all extensions we don't support */
 	el2ctx->mdcr_el2 = 0;
 	/* PMCR_EL0.N is read from MDCR_EL2.HPMN */

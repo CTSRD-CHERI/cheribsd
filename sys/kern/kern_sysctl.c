@@ -413,7 +413,7 @@ sysctl_warn_reuse(const char *func, struct sysctl_oid *leaf)
 	(void)sbuf_new(&sb, buf, sizeof(buf), SBUF_FIXEDLEN | SBUF_INCLUDENUL);
 	sbuf_set_drain(&sb, sbuf_printf_drain, NULL);
 
-	sbuf_printf(&sb, "%s: can't re-use a leaf (", __func__);
+	sbuf_printf(&sb, "%s: can't re-use a leaf (", func);
 
 	rc = sysctl_search_oid(nodes, leaf);
 	if (rc > 0) {
@@ -1917,8 +1917,7 @@ int
 sysctl_handle_string(SYSCTL_HANDLER_ARGS)
 {
 	char *tmparg;
-	size_t outlen;
-	int error = 0, ro_string = 0;
+	int error = 0;
 
 	/*
 	 * If the sysctl isn't writable and isn't a preallocated tunable that
@@ -1930,33 +1929,32 @@ sysctl_handle_string(SYSCTL_HANDLER_ARGS)
 	 */
 	if ((oidp->oid_kind & (CTLFLAG_WR | CTLFLAG_TUN)) == 0 ||
 	    arg2 == 0 || kdb_active) {
-		arg2 = strlen((char *)arg1) + 1;
-		ro_string = 1;
-	}
+		size_t outlen;
 
-	if (req->oldptr != NULL) {
-		if (ro_string) {
-			tmparg = arg1;
-			outlen = strlen(tmparg) + 1;
-		} else {
+		if (arg2 == 0)
+			outlen = arg2 = strlen(arg1) + 1;
+		else
+			outlen = strnlen(arg1, arg2 - 1) + 1;
+
+		tmparg = req->oldptr != NULL ? arg1 : NULL;
+		error = SYSCTL_OUT(req, tmparg, outlen);
+	} else {
+		size_t outlen;
+
+		if (req->oldptr != NULL) {
 			tmparg = malloc(arg2, M_SYSCTLTMP, M_WAITOK);
 			sx_slock(&sysctlstringlock);
 			memcpy(tmparg, arg1, arg2);
 			sx_sunlock(&sysctlstringlock);
-			outlen = strlen(tmparg) + 1;
-		}
-
-		error = SYSCTL_OUT(req, tmparg, outlen);
-
-		if (!ro_string)
-			free(tmparg, M_SYSCTLTMP);
-	} else {
-		if (!ro_string)
+			outlen = strnlen(tmparg, arg2 - 1) + 1;
+		} else {
+			tmparg = NULL;
 			sx_slock(&sysctlstringlock);
-		outlen = strlen((char *)arg1) + 1;
-		if (!ro_string)
+			outlen = strnlen(arg1, arg2 - 1) + 1;
 			sx_sunlock(&sysctlstringlock);
-		error = SYSCTL_OUT(req, NULL, outlen);
+		}
+		error = SYSCTL_OUT(req, tmparg, outlen);
+		free(tmparg, M_SYSCTLTMP);
 	}
 	if (error || !req->newptr)
 		return (error);
@@ -2121,7 +2119,7 @@ sysctl_old_kernel(struct sysctl_req *req, const void *p, size_t l)
 				    req->oldidx, PTR2CAP(p), i);
 			else
 #endif
-				memcpynocap_c((char * __capability)req->oldptr +
+				memcpy_data_c((char * __capability)req->oldptr +
 				    req->oldidx, PTR2CAP(p), i);
 		}
 	}
@@ -2144,7 +2142,7 @@ sysctl_new_kernel(struct sysctl_req *req, void *p, size_t l)
 		    (const char * __capability)req->newptr + req->newidx, l);
 	else
 #endif
-		memcpynocap_c(PTR2CAP(p),
+		memcpy_data_c(PTR2CAP(p),
 		    (const char * __capability)req->newptr + req->newidx, l);
 	req->newidx += l;
 	return (0);
@@ -2249,7 +2247,7 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 			i = len - origidx;
 		if (req->lock == REQ_WIRED) {
 			if (req->flags & SCTL_PTROUT)
-				error = copyoutcap_nofault(p,
+				error = copyoutptr_nofault(p,
 				    (char * __capability)req->oldptr +
 				    origidx, i);
 			else
@@ -2258,7 +2256,7 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 				    i);
 		} else
 			if (req->flags & SCTL_PTROUT)
-				error = copyoutcap(p,
+				error = copyoutptr(p,
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 			else
@@ -2285,7 +2283,7 @@ sysctl_new_user(struct sysctl_req *req, void *p, size_t l)
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
 	    "sysctl_new_user()");
 	if (req->flags & SCTL_PTRIN)
-		error = copyincap((const char * __capability)req->newptr +
+		error = copyinptr((const char * __capability)req->newptr +
 		    req->newidx, p, l);
 	else
 		error = copyin((const char * __capability)req->newptr +
@@ -2309,7 +2307,9 @@ sysctl_wire_old_buffer(struct sysctl_req *req, size_t len)
 	if (req->lock != REQ_WIRED && req->oldptr &&
 	    req->oldfunc == sysctl_old_user) {
 		if (wiredlen != 0) {
-			ret = vslock(req->oldptr, wiredlen);
+			ret = vslock(req->oldptr, wiredlen, VM_PROT_WRITE |
+			    ((req->flags & SCTL_PTROUT) != 0 ?
+			    VM_PROT_CAP : 0));
 			if (ret != 0) {
 				if (ret != ENOMEM)
 					return (ret);

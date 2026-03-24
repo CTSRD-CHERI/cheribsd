@@ -45,10 +45,8 @@
 #include <sys/malloc.h>
 #include <sys/queue.h>
 #include <sys/taskqueue.h>
-#include <sys/pciio.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
-#include <dev/pci/pci_private.h>
 #include <sys/firmware.h>
 #include <sys/sbuf.h>
 #include <sys/smp.h>
@@ -1135,7 +1133,7 @@ t4_calibration(void *arg)
 
 	sc = (struct adapter *)arg;
 
-	KASSERT((hw_off_limits(sc) == 0), ("hw_off_limits at t4_calibration"));
+	KASSERT(hw_all_ok(sc), ("!hw_all_ok at t4_calibration"));
 	hw = t4_read_reg64(sc, A_SGE_TIMESTAMP_LO);
 	sbt = sbinuptime();
 
@@ -1924,6 +1922,8 @@ stop_adapter(struct adapter *sc)
 	t4_shutdown_adapter(sc);
 	for_each_port(sc, i) {
 		pi = sc->port[i];
+		if (pi == NULL)
+			continue;
 		PORT_LOCK(pi);
 		if (pi->up_vis > 0 && pi->link_cfg.link_ok) {
 			/*
@@ -2035,6 +2035,8 @@ stop_lld(struct adapter *sc)
 	/* Quiesce all activity. */
 	for_each_port(sc, i) {
 		pi = sc->port[i];
+		if (pi == NULL)
+			continue;
 		pi->vxlan_tcam_entry = false;
 		for_each_vi(pi, j, vi) {
 			vi->xact_addr_filt = -1;
@@ -2862,7 +2864,7 @@ cxgbe_ioctl(if_t ifp, unsigned long cmd, caddr_t data)
 		if_setmtu(ifp, mtu);
 		if (vi->flags & VI_INIT_DONE) {
 			t4_update_fl_bufsize(ifp);
-			if (!hw_off_limits(sc) &&
+			if (hw_all_ok(sc) &&
 			    if_getdrvflags(ifp) & IFF_DRV_RUNNING)
 				rc = update_mac_settings(ifp, XGMAC_MTU);
 		}
@@ -2874,7 +2876,7 @@ cxgbe_ioctl(if_t ifp, unsigned long cmd, caddr_t data)
 		if (rc)
 			return (rc);
 
-		if (hw_off_limits(sc)) {
+		if (!hw_all_ok(sc)) {
 			rc = ENXIO;
 			goto fail;
 		}
@@ -2902,7 +2904,7 @@ cxgbe_ioctl(if_t ifp, unsigned long cmd, caddr_t data)
 		rc = begin_synchronized_op(sc, vi, SLEEP_OK | INTR_OK, "t4multi");
 		if (rc)
 			return (rc);
-		if (!hw_off_limits(sc) && if_getdrvflags(ifp) & IFF_DRV_RUNNING)
+		if (hw_all_ok(sc) && if_getdrvflags(ifp) & IFF_DRV_RUNNING)
 			rc = update_mac_settings(ifp, XGMAC_MCADDRS);
 		end_synchronized_op(sc, 0);
 		break;
@@ -3077,7 +3079,7 @@ fail:
 		rc = begin_synchronized_op(sc, vi, SLEEP_OK | INTR_OK, "t4i2c");
 		if (rc)
 			return (rc);
-		if (hw_off_limits(sc))
+		if (!hw_all_ok(sc))
 			rc = ENXIO;
 		else
 			rc = -t4_i2c_rd(sc, sc->mbox, pi->port_id, i2c.dev_addr,
@@ -3355,7 +3357,7 @@ cxgbe_media_change(if_t ifp)
 		if (IFM_OPTIONS(ifm->ifm_media) & IFM_ETH_TXPAUSE)
 			lc->requested_fc |= PAUSE_TX;
 	}
-	if (pi->up_vis > 0 && !hw_off_limits(sc)) {
+	if (pi->up_vis > 0 && hw_all_ok(sc)) {
 		fixup_link_config(pi);
 		rc = apply_link_config(pi);
 	}
@@ -3523,7 +3525,7 @@ cxgbe_media_status(if_t ifp, struct ifmediareq *ifmr)
 		return;
 	PORT_LOCK(pi);
 
-	if (pi->up_vis == 0 && !hw_off_limits(sc)) {
+	if (pi->up_vis == 0 && hw_all_ok(sc)) {
 		/*
 		 * If all the interfaces are administratively down the firmware
 		 * does not report transceiver changes.  Refresh port info here
@@ -4014,6 +4016,8 @@ stop_atid_allocator(struct adapter *sc)
 {
 	struct tid_info *t = &sc->tids;
 
+	if (t->natids == 0)
+		return;
 	mtx_lock(&t->atid_lock);
 	t->atid_alloc_stopped = true;
 	mtx_unlock(&t->atid_lock);
@@ -4024,6 +4028,8 @@ restart_atid_allocator(struct adapter *sc)
 {
 	struct tid_info *t = &sc->tids;
 
+	if (t->natids == 0)
+		return;
 	mtx_lock(&t->atid_lock);
 	KASSERT(t->atids_in_use == 0,
 	    ("%s: %d atids still in use.", __func__, t->atids_in_use));
@@ -6319,20 +6325,13 @@ int
 begin_synchronized_op(struct adapter *sc, struct vi_info *vi, int flags,
     char *wmesg)
 {
-	int rc, pri;
+	int rc;
 
 #ifdef WITNESS
 	/* the caller thinks it's ok to sleep, but is it really? */
 	if (flags & SLEEP_OK)
-		WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
-		    "begin_synchronized_op");
+		WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL, __func__);
 #endif
-
-	if (INTR_OK)
-		pri = PCATCH;
-	else
-		pri = 0;
-
 	ADAPTER_LOCK(sc);
 	for (;;) {
 
@@ -6351,7 +6350,8 @@ begin_synchronized_op(struct adapter *sc, struct vi_info *vi, int flags,
 			goto done;
 		}
 
-		if (mtx_sleep(&sc->flags, &sc->sc_lock, pri, wmesg, 0)) {
+		if (mtx_sleep(&sc->flags, &sc->sc_lock,
+		    flags & INTR_OK ? PCATCH : 0, wmesg, 0)) {
 			rc = EINTR;
 			goto done;
 		}
@@ -8273,7 +8273,7 @@ sysctl_btphy(SYSCTL_HANDLER_ARGS)
 	rc = begin_synchronized_op(sc, &pi->vi[0], SLEEP_OK | INTR_OK, "t4btt");
 	if (rc)
 		return (rc);
-	if (hw_off_limits(sc))
+	if (!hw_all_ok(sc))
 		rc = ENXIO;
 	else {
 		/* XXX: magic numbers */
@@ -8330,7 +8330,7 @@ sysctl_tx_vm_wr(SYSCTL_HANDLER_ARGS)
 	    "t4txvm");
 	if (rc)
 		return (rc);
-	if (hw_off_limits(sc))
+	if (!hw_all_ok(sc))
 		rc = ENXIO;
 	else if (if_getdrvflags(vi->ifp) & IFF_DRV_RUNNING) {
 		/*
@@ -8544,7 +8544,7 @@ sysctl_pause_settings(SYSCTL_HANDLER_ARGS)
 		    "t4PAUSE");
 		if (rc)
 			return (rc);
-		if (!hw_off_limits(sc)) {
+		if (hw_all_ok(sc)) {
 			PORT_LOCK(pi);
 			lc->requested_fc = n;
 			fixup_link_config(pi);
@@ -8640,7 +8640,7 @@ sysctl_requested_fec(SYSCTL_HANDLER_ARGS)
 			lc->requested_fec = n & (M_FW_PORT_CAP32_FEC |
 			    FEC_MODULE);
 		}
-		if (!hw_off_limits(sc)) {
+		if (hw_all_ok(sc)) {
 			fixup_link_config(pi);
 			if (pi->up_vis > 0) {
 				rc = apply_link_config(pi);
@@ -8678,7 +8678,7 @@ sysctl_module_fec(SYSCTL_HANDLER_ARGS)
 		rc = EBUSY;
 		goto done;
 	}
-	if (hw_off_limits(sc)) {
+	if (!hw_all_ok(sc)) {
 		rc = ENXIO;
 		goto done;
 	}
@@ -8744,7 +8744,7 @@ sysctl_autoneg(SYSCTL_HANDLER_ARGS)
 		goto done;
 	}
 	lc->requested_aneg = val;
-	if (!hw_off_limits(sc)) {
+	if (hw_all_ok(sc)) {
 		fixup_link_config(pi);
 		if (pi->up_vis > 0)
 			rc = apply_link_config(pi);
@@ -8779,7 +8779,7 @@ sysctl_force_fec(SYSCTL_HANDLER_ARGS)
 		return (rc);
 	PORT_LOCK(pi);
 	lc->force_fec = val;
-	if (!hw_off_limits(sc)) {
+	if (hw_all_ok(sc)) {
 		fixup_link_config(pi);
 		if (pi->up_vis > 0)
 			rc = apply_link_config(pi);
@@ -8819,7 +8819,7 @@ sysctl_temperature(SYSCTL_HANDLER_ARGS)
 	rc = begin_synchronized_op(sc, NULL, SLEEP_OK | INTR_OK, "t4temp");
 	if (rc)
 		return (rc);
-	if (hw_off_limits(sc))
+	if (!hw_all_ok(sc))
 		rc = ENXIO;
 	else {
 		param = V_FW_PARAMS_MNEM(FW_PARAMS_MNEM_DEV) |
@@ -8850,7 +8850,7 @@ sysctl_vdd(SYSCTL_HANDLER_ARGS)
 		    "t4vdd");
 		if (rc)
 			return (rc);
-		if (hw_off_limits(sc))
+		if (!hw_all_ok(sc))
 			rc = ENXIO;
 		else {
 			param = V_FW_PARAMS_MNEM(FW_PARAMS_MNEM_DEV) |
@@ -8887,7 +8887,7 @@ sysctl_reset_sensor(SYSCTL_HANDLER_ARGS)
 	rc = begin_synchronized_op(sc, NULL, SLEEP_OK | INTR_OK, "t4srst");
 	if (rc)
 		return (rc);
-	if (hw_off_limits(sc))
+	if (!hw_all_ok(sc))
 		rc = ENXIO;
 	else {
 		param = (V_FW_PARAMS_MNEM(FW_PARAMS_MNEM_DEV) |
@@ -8913,7 +8913,7 @@ sysctl_loadavg(SYSCTL_HANDLER_ARGS)
 	rc = begin_synchronized_op(sc, NULL, SLEEP_OK | INTR_OK, "t4lavg");
 	if (rc)
 		return (rc);
-	if (hw_off_limits(sc))
+	if (hw_all_ok(sc))
 		rc = ENXIO;
 	else {
 		param = V_FW_PARAMS_MNEM(FW_PARAMS_MNEM_DEV) |
@@ -12106,32 +12106,6 @@ t4_os_find_pci_capability(struct adapter *sc, int cap)
 	return (pci_find_cap(sc->dev, cap, &i) == 0 ? i : 0);
 }
 
-int
-t4_os_pci_save_state(struct adapter *sc)
-{
-	device_t dev;
-	struct pci_devinfo *dinfo;
-
-	dev = sc->dev;
-	dinfo = device_get_ivars(dev);
-
-	pci_cfg_save(dev, dinfo, 0);
-	return (0);
-}
-
-int
-t4_os_pci_restore_state(struct adapter *sc)
-{
-	device_t dev;
-	struct pci_devinfo *dinfo;
-
-	dev = sc->dev;
-	dinfo = device_get_ivars(dev);
-
-	pci_cfg_restore(dev, dinfo);
-	return (0);
-}
-
 void
 t4_os_portmod_changed(struct port_info *pi)
 {
@@ -12394,7 +12368,7 @@ toe_capability(struct vi_info *vi, bool enable)
 
 	if (!is_offload(sc))
 		return (ENODEV);
-	if (hw_off_limits(sc))
+	if (!hw_all_ok(sc))
 		return (ENXIO);
 
 	if (enable) {
@@ -12657,7 +12631,7 @@ ktls_capability(struct adapter *sc, bool enable)
 		return (ENODEV);
 	if (!is_t6(sc))
 		return (0);
-	if (hw_off_limits(sc))
+	if (!hw_all_ok(sc))
 		return (ENXIO);
 
 	if (enable) {

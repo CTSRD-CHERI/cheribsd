@@ -28,6 +28,7 @@
 #include "opt_evdev.h"
 
 #include <sys/param.h>
+#include <sys/abi_compat.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
 #include <sys/kernel.h>
@@ -591,7 +592,7 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 
 #if __has_feature(capabilities)
 		if (!SV_CURPROC_FLAG(SV_CHERI))
-			cap = __USER_CAP_STR(*(uint64_t *)data);
+			cap = USER_PTR_STR(*(uint64_t *)data);
 		else
 #endif
 			cap = *(void * __capability *)data;
@@ -613,7 +614,7 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 			return (EINVAL);
 #if __has_feature(capabilities)
 		if (!SV_CURPROC_FLAG(SV_CHERI))
-			cap = __USER_CAP_STR(*(uint64_t *)data);
+			cap = USER_PTR_STR(*(uint64_t *)data);
 		else
 #endif
 			cap = *(void * __capability *)data;

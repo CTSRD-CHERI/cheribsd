@@ -205,7 +205,7 @@ cpu_fetch_syscall_args(struct thread *td)
 
 #if __has_feature(capabilities)
 	if (__predict_false(stack_args != NULL)) {
-		error = copyincap(stack_args, dst_ap, sa->callp->sy_narg *
+		error = copyinptr(stack_args, dst_ap, sa->callp->sy_narg *
 		    sizeof(*dst_ap));
 		if (error)
 			return (error);
@@ -294,12 +294,12 @@ external_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	 */
 	if (test_bs_fault((uintcap_t)frame->tf_elr)) {
 #if defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
-		frame->tf_elr = cheri_setaddress(frame->tf_elr,
+		frame->tf_elr = cheri_address_set(frame->tf_elr,
 		    (ptraddr_t)generic_bs_fault);
 #elif defined(__CHERI_PURE_CAPABILITY__)
 		trapframe_set_elr(frame, (uintptr_t)generic_bs_fault);
 #elif __has_feature(capabilities)
-		trapframe_set_elr(frame, cheri_setaddress(frame->tf_elr,
+		trapframe_set_elr(frame, cheri_address_set(frame->tf_elr,
 		    (ptraddr_t)generic_bs_fault));
 #else
 		frame->tf_elr = (uint64_t)generic_bs_fault;
@@ -325,12 +325,12 @@ cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		    pcb->pcb_onfault != 0) {
 			frame->tf_x[0] = EPROT;
 #if defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
-			frame->tf_elr = cheri_setaddress(frame->tf_elr,
+			frame->tf_elr = cheri_address_set(frame->tf_elr,
 			    pcb->pcb_onfault);
 #elif defined(__CHERI_PURE_CAPABILITY__)
 			trapframe_set_elr(frame, pcb->pcb_onfault);
 #else
-			trapframe_set_elr(frame, cheri_setaddress(frame->tf_elr,
+			trapframe_set_elr(frame, cheri_address_set(frame->tf_elr,
 			    pcb->pcb_onfault));
 #endif
 			return;
@@ -505,14 +505,14 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 
 #if __has_feature(capabilities)
 			if ((esr & ISS_DATA_DFSC_MASK) == ISS_DATA_DFSC_LC_SC)
-				ftype |= VM_PROT_READ_CAP;
+				ftype |= VM_PROT_CAP;
 #endif
 		} else {
 			ftype = VM_PROT_WRITE;
 
 #if __has_feature(capabilities)
 			if ((esr & ISS_DATA_DFSC_MASK) == ISS_DATA_DFSC_LC_SC)
-				ftype |= VM_PROT_WRITE_CAP;
+				ftype |= VM_PROT_CAP;
 #endif
 		}
 		break;
@@ -530,12 +530,12 @@ bad_far:
 			if (td->td_intr_nesting_level == 0 &&
 			    pcb->pcb_onfault != 0) {
 #if defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
-				frame->tf_elr = cheri_setaddress(frame->tf_elr,
+				frame->tf_elr = cheri_address_set(frame->tf_elr,
 				    pcb->pcb_onfault);
 #elif defined(__CHERI_PURE_CAPABILITY__)
 				trapframe_set_elr(frame, pcb->pcb_onfault);
 #elif __has_feature(capabilities)
-				trapframe_set_elr(frame, cheri_setaddress(
+				trapframe_set_elr(frame, cheri_address_set(
 				    frame->tf_elr, pcb->pcb_onfault));
 #else
 				frame->tf_elr = pcb->pcb_onfault;
@@ -717,11 +717,10 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 		break;
 	case EXCP_BRK:
 #ifdef KDTRACE_HOOKS
-		if ((esr & ESR_ELx_ISS_MASK) == 0x40d && \
-		    dtrace_invop_jump_addr != 0) {
-			dtrace_invop_jump_addr(frame);
+		if ((esr & ESR_ELx_ISS_MASK) == 0x40d /* BRK_IMM16_VAL */ &&
+		    dtrace_invop_jump_addr != NULL &&
+		    dtrace_invop_jump_addr(frame) == 0)
 			break;
-		}
 #endif
 #ifdef KDB
 		kdb_trap(exception, 0, frame);

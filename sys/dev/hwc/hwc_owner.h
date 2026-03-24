@@ -26,19 +26,19 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _DEV_HWT_HWT_OWNER_H_
-#define _DEV_HWT_HWT_OWNER_H_
+#ifndef _DEV_HWC_HWC_OWNER_H_
+#define _DEV_HWC_HWC_OWNER_H_
 
 struct hwc_owner {
 	struct proc			*p;
 	struct mtx			mtx; /* Protects hwcs. */
-	LIST_HEAD(, hwc_context)	hwcs; /* Owned HWTs. */
+	LIST_HEAD(, hwc_context)	hwcs; /* Owned HWCs. */
 	LIST_ENTRY(hwc_owner)		next; /* Entry in hwc owner hash. */
 };
 
-struct hwc_context * hwc_owner_lookup_ctx(struct hwc_owner *ho, pid_t pid);
-struct hwc_owner * hwc_owner_alloc(struct proc *p);
+struct hwc_context *hwc_owner_lookup_ctx(struct hwc_owner *ho, pid_t pid);
+struct hwc_owner *hwc_owner_alloc(struct proc *p);
 void hwc_owner_shutdown(struct hwc_owner *ho);
-struct hwc_context * hwc_owner_lookup_ctx_by_cpu(struct hwc_owner *ho, int cpu);
+struct hwc_context *hwc_owner_lookup_ctx_by_cpu(struct hwc_owner *ho, int cpu);
 
-#endif /* !_DEV_HWT_HWT_OWNER_H_ */
+#endif /* !_DEV_HWC_HWC_OWNER_H_ */

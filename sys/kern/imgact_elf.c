@@ -610,10 +610,10 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
     Elf_Addr *preferred_rbase)
 {
 	u_long perm = CHERI_PERM_STORE |
-#ifdef CHERI_PERM_STORE_CAP
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	    CHERI_PERM_STORE_CAP |
 #endif
-#ifdef CHERI_PERM_CAP
+#ifdef HAS_CHERI_PERM_CAP
 	    CHERI_PERM_CAP |
 #endif
 	    CHERI_PERM_GLOBAL;
@@ -673,10 +673,10 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 #ifdef __CHERI_PURE_CAPABILITY__
 	reservation_cap = (void *)reservation;
 #else
-	reservation_cap = cheri_setbounds(
-	    cheri_setaddress(userspace_root_cap, reservation), end - start);
+	reservation_cap = (void * __capability)vm_map_buildcap(map, reservation,
+	    end - start, VM_PROT_ALL);
 #endif
-	*imgact_cap = cheri_andperm(reservation_cap, perm);
+	*imgact_cap = cheri_perms_and(reservation_cap, perm);
 
 	return (0);
 }
@@ -838,7 +838,7 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 	else
 		map_len = round_page(offset + filsz) - file_addr;
 #if __has_feature(capabilities)
-	map_addr = cheri_setbounds(map_addr, map_len);
+	map_addr = cheri_bounds_set(map_addr, map_len);
 #endif
 
 	if (map_len != 0) {
@@ -867,7 +867,7 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 	map_addr = trunc_page(vmaddr + filsz);
 	map_len = (ptraddr_t)round_page(vmaddr + memsz) - (ptraddr_t)map_addr;
 #if __has_feature(capabilities)
-	map_addr = cheri_setbounds(map_addr, map_len);
+	map_addr = cheri_bounds_set(map_addr, map_len);
 #endif
 
 	/* This had damn well better be true! */
@@ -924,7 +924,7 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 
 		/* Loadable segment */
 #if __has_feature(capabilities)
-		section_addr = (uintcap_t)cheri_setaddress(
+		section_addr = (uintcap_t)cheri_address_set(
 		    imgp->imgact_capability, phdr[i].p_vaddr + rbase);
 #else
 		section_addr = phdr[i].p_vaddr + rbase;
@@ -1581,7 +1581,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 
 	error = exec_new_vmspace(imgp, sv);
 
-	imgp->proc->p_sysent = sv;
 	imgp->proc->p_elf_brandinfo = brand_info;
 
 	vmspace = imgp->proc->p_vmspace;
@@ -1789,8 +1788,8 @@ timekeep_cap(struct image_params *imgp)
 	KASSERT(timekeep_len == CHERI_REPRESENTABLE_LENGTH(timekeep_len),
 	    ("timekeep_len needs rounding"));
 
-	tmpcap = (void * __capability)cheri_setboundsexact(
-	    cheri_andperm(timekeep_base, CHERI_PERMS_USERSPACE_RODATA),
+	tmpcap = (void * __capability)cheri_bounds_set_exact(
+	    cheri_perms_and(timekeep_base, CHERI_PERMS_USERSPACE_RODATA),
 	    timekeep_len);
 
 	return (tmpcap);
@@ -1824,7 +1823,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	 * program and AT_PHDR a writable one.  RTLD is responsible for
 	 * setting bounds.  Needs SW_VMEM so relro pages can be made RO.
 	 */
-	AUXARGS_ENTRY_PTR(pos, AT_PHDR, cheri_setaddress(prog_cap(imgp,
+	AUXARGS_ENTRY_PTR(pos, AT_PHDR, cheri_address_set(prog_cap(imgp,
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM),
 	    args->phdr));
 #else
@@ -1835,14 +1834,14 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY(pos, AT_PAGESZ, args->pagesz);
 	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
 #ifdef __ELF_CHERI
-	entry = cheri_setaddress(prog_cap(imgp, CHERI_CAP_USER_CODE_PERMS),
+	entry = cheri_address_set(prog_cap(imgp, CHERI_CAP_USER_CODE_PERMS),
 	    args->entry);
 #ifdef CHERI_FLAGS_CAP_MODE
 	/*
 	 * On architectures with a mode flag bit, we must ensure the flag is set in
 	 * AT_ENTRY for RTLD to be able to jump to it.
 	 */
-	entry = cheri_setflags(entry, CHERI_FLAGS_CAP_MODE);
+	entry = cheri_flags_set(entry, CHERI_FLAGS_CAP_MODE);
 #endif
 	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, entry);
 
@@ -1874,7 +1873,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		exec_base = interp_cap(imgp, args,
 		    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
 	}
-	AUXARGS_ENTRY_PTR(pos, AT_BASE, cheri_setaddress(exec_base,
+	AUXARGS_ENTRY_PTR(pos, AT_BASE, cheri_address_set(exec_base,
 	    args->base));
 #else
 	AUXARGS_ENTRY(pos, AT_ENTRY, args->entry);
@@ -1989,7 +1988,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	imgp->auxargs = NULL;
 	KASSERT(pos - argarray <= AT_COUNT, ("Too many auxargs"));
 
-	error = copyoutcap(argarray, (void * __capability)base,
+	error = copyoutptr(argarray, (void * __capability)base,
 	    sizeof(*argarray) * AT_COUNT);
 	free(argarray, M_TEMP);
 	return (error);
@@ -3025,6 +3024,9 @@ __elfN(prepare_register_notes)(struct thread *td, struct note_info_list *list,
 
 	size = 0;
 
+	if (target_td == td)
+		cpu_update_pcb(target_td);
+
 	/* NT_PRSTATUS must be the first register set note. */
 	size += __elfN(register_regset_note)(td, list, &__elfN(regset_prstatus),
 	    target_td);
@@ -3500,9 +3502,9 @@ __elfN(trans_prot)(Elf_Word flags)
 	if (flags & PF_X)
 		prot |= VM_PROT_EXECUTE;
 	if (flags & PF_W)
-		prot |= VM_PROT_WRITE | VM_PROT_WRITE_CAP;
+		prot |= VM_PROT_WRITE | VM_PROT_CAP;
 	if (flags & PF_R)
-		prot |= VM_PROT_READ | VM_PROT_READ_CAP;
+		prot |= VM_PROT_READ | VM_PROT_CAP;
 #if __ELF_WORD_SIZE == 32 && (defined(__amd64__) || defined(__i386__))
 	if (i386_read_exec && (flags & PF_R))
 		prot |= VM_PROT_EXECUTE;
@@ -3532,10 +3534,12 @@ __elfN(untrans_capprot)(vm_prot_t prot)
 	Elf_Word flags;
 
 	flags = 0;
-	if (prot & VM_PROT_READ_CAP)
-		flags |= PF_R;
-	if (prot & VM_PROT_WRITE_CAP)
-		flags |= PF_W;
+        if (prot & VM_PROT_CAP) {
+                if (prot & VM_PROT_READ)
+                        flags |= PF_R;
+                if (prot & VM_PROT_WRITE)
+                        flags |= PF_W;
+        }
 	return (flags);
 }
 #endif

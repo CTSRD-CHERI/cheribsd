@@ -193,7 +193,7 @@ contrib/openzfs/module/lua/lzio.c			optional zfs compile-with "${ZFS_C}"
 
 # zfs nvpair support
 contrib/openzfs/module/nvpair/fnvpair.c		optional zfs compile-with "${ZFS_C}"
-contrib/openzfs/module/nvpair/nvpair.c		optional zfs compile-with "${ZFS_RPC_C} ${NO_WSTRINGOP_OVERREAD}"
+contrib/openzfs/module/nvpair/nvpair.c		optional zfs compile-with "${ZFS_RPC_C} ${NO_WSTRINGOP_OVERREAD} -DXDRPROC_TAKES_TWO_ARGS"
 contrib/openzfs/module/nvpair/nvpair_alloc_fixed.c	optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/nvpair/nvpair_alloc_spl.c	optional zfs compile-with "${ZFS_C}"
 
@@ -1827,6 +1827,7 @@ dev/flash/at45d.c		optional at45d
 dev/flash/cqspi.c		optional cqspi fdt xdma
 dev/flash/mx25l.c		optional mx25l
 dev/flash/n25q.c		optional n25q fdt
+dev/flash/w25n.c		optional w25n fdt
 dev/flash/qspi_if.m		optional cqspi fdt | n25q fdt
 dev/fxp/if_fxp.c		optional fxp
 dev/fxp/inphy.c			optional fxp
@@ -1886,6 +1887,14 @@ dev/hid/ps4dshock.c		optional ps4dshock
 dev/hid/xb360gp.c		optional xb360gp
 dev/hifn/hifn7751.c		optional hifn
 dev/hptiop/hptiop.c		optional hptiop scbus
+dev/hwc/hwc.c			optional hwc
+dev/hwc/hwc_backend.c		optional hwc
+dev/hwc/hwc_context.c		optional hwc
+dev/hwc/hwc_contexthash.c	optional hwc
+dev/hwc/hwc_ioctl.c		optional hwc
+dev/hwc/hwc_owner.c		optional hwc
+dev/hwc/hwc_ownerhash.c		optional hwc
+dev/hwc/hwc_vm.c		optional hwc
 dev/hwpmc/hwpmc_logging.c	optional hwpmc
 dev/hwpmc/hwpmc_mod.c		optional hwpmc
 dev/hwpmc/hwpmc_soft.c		optional hwpmc
@@ -3423,6 +3432,7 @@ dev/usb/net/if_muge.c		optional muge
 dev/usb/net/if_rue.c		optional rue
 dev/usb/net/if_smsc.c		optional smsc
 dev/usb/net/if_udav.c		optional udav
+dev/usb/net/if_umb.c		optional umb
 dev/usb/net/if_ure.c		optional ure
 dev/usb/net/if_usie.c		optional usie
 dev/usb/net/if_urndis.c		optional urndis
@@ -3843,21 +3853,6 @@ geom/uzip/g_uzip_wrkthr.c	optional geom_uzip
 geom/uzip/g_uzip_zlib.c		optional geom_uzip
 geom/uzip/g_uzip_zstd.c		optional geom_uzip zstdio \
 	compile-with "${NORMAL_C} -I$S/contrib/zstd/lib/freebsd"
-geom/vinum/geom_vinum.c		optional geom_vinum
-geom/vinum/geom_vinum_create.c	optional geom_vinum
-geom/vinum/geom_vinum_drive.c	optional geom_vinum
-geom/vinum/geom_vinum_plex.c	optional geom_vinum
-geom/vinum/geom_vinum_volume.c	optional geom_vinum
-geom/vinum/geom_vinum_subr.c	optional geom_vinum
-geom/vinum/geom_vinum_raid5.c	optional geom_vinum
-geom/vinum/geom_vinum_share.c	optional geom_vinum
-geom/vinum/geom_vinum_list.c	optional geom_vinum
-geom/vinum/geom_vinum_rm.c	optional geom_vinum
-geom/vinum/geom_vinum_init.c	optional geom_vinum
-geom/vinum/geom_vinum_state.c	optional geom_vinum
-geom/vinum/geom_vinum_rename.c	optional geom_vinum
-geom/vinum/geom_vinum_move.c	optional geom_vinum
-geom/vinum/geom_vinum_events.c	optional geom_vinum
 geom/virstor/binstream.c	optional geom_virstor
 geom/virstor/g_virstor.c	optional geom_virstor
 geom/virstor/g_virstor_md.c	optional geom_virstor
@@ -4065,6 +4060,7 @@ kern/subr_stack.c		optional ddb | stack | ktr
 kern/subr_stats.c		optional stats
 kern/subr_taskqueue.c		standard
 kern/subr_terminal.c		optional vt
+kern/subr_ticks.S		standard
 kern/subr_trap.c		standard
 kern/subr_turnstile.c		standard
 kern/subr_uio.c			standard
@@ -4172,7 +4168,6 @@ kgssapi/krb5/krb5_mech.c	optional kgssapi
 kgssapi/krb5/kcrypto.c		optional kgssapi
 kgssapi/krb5/kcrypto_aes.c	optional kgssapi
 kgssapi/kgss_if.m		optional kgssapi
-kgssapi/gsstest.c		optional kgssapi_debug
 # These files in libkern/ are those needed by all architectures.  Some
 # of the files in libkern/ are only needed on some architectures, e.g.,
 # libkern/divdi3.c is needed by i386 but not alpha.  Also, some of these
@@ -4615,7 +4610,6 @@ netipsec/xform_ipcomp.c		optional ipsec inet | ipsec inet6
 netipsec/xform_tcp.c		optional ipsec inet tcp_signature | \
 	 ipsec inet6 tcp_signature | ipsec_support inet tcp_signature | \
 	 ipsec_support inet6 tcp_signature
-netlink/netlink_generic_kpi.c	standard
 netlink/netlink_glue.c		standard
 netlink/netlink_message_parser.c	standard
 netlink/netlink_domain.c	optional netlink
@@ -5250,6 +5244,7 @@ rpc/auth_unix.c			optional krpc | nfslockd | nfscl | nfsd
 rpc/authunix_prot.c		optional krpc | nfslockd | nfscl | nfsd
 rpc/clnt_bck.c			optional krpc | nfslockd | nfscl | nfsd
 rpc/clnt_dg.c			optional krpc | nfslockd | nfscl | nfsd
+rpc/clnt_nl.c			optional krpc | nfslockd | nfscl | nfsd
 rpc/clnt_rc.c			optional krpc | nfslockd | nfscl | nfsd
 rpc/clnt_vc.c			optional krpc | nfslockd | nfscl | nfsd
 rpc/getnetconfig.c		optional krpc | nfslockd | nfscl | nfsd

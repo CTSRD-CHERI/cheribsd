@@ -311,7 +311,7 @@ ktls_copyin_tls_enable(struct sockopt *sopt, struct tls_enable *tls)
 	uint8_t *cipher_key = NULL, *iv = NULL, *auth_key = NULL;
 
 	if (sopt->sopt_valsize == sizeof(tls_v0)) {
-		error = sooptcopyincap(sopt, &tls_v0, sizeof(tls_v0), sizeof(tls_v0));
+		error = sooptcopyinptr(sopt, &tls_v0, sizeof(tls_v0), sizeof(tls_v0));
 		if (error != 0)
 			goto done;
 		memset(tls, 0, sizeof(*tls));
@@ -327,7 +327,7 @@ ktls_copyin_tls_enable(struct sockopt *sopt, struct tls_enable *tls)
 		tls->tls_vmajor = tls_v0.tls_vmajor;
 		tls->tls_vminor = tls_v0.tls_vminor;
 	} else
-		error = sooptcopyincap(sopt, tls, sizeof(*tls), sizeof(*tls));
+		error = sooptcopyinptr(sopt, tls, sizeof(*tls), sizeof(*tls));
 
 	if (error != 0)
 		return (error);
@@ -456,7 +456,7 @@ ktls_buffer_import(void *arg, void **store, int count, int domain, int flags)
 		if (m == NULL)
 			break;
 		store[i] = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-		store[i] = cheri_kern_setbounds(store[i], ktls_maxlen);
+		store[i] = cheri_kern_bounds_set(store[i], ktls_maxlen);
 	}
 	return (i);
 }
@@ -483,7 +483,7 @@ ktls_free_mext_contig(struct mbuf *m)
 
 	M_ASSERTEXTPG(m);
 	epg = (void *)PHYS_TO_DMAP(m->m_epg_pa[0]);
-	uma_zfree(ktls_buffer_zone, cheri_kern_setbounds(epg, ktls_maxlen));
+	uma_zfree(ktls_buffer_zone, cheri_kern_bounds_set(epg, ktls_maxlen));
 }
 
 static int
@@ -505,7 +505,7 @@ ktls_init(void)
 		ktls_buffer_zone = uma_zcache_create("ktls_buffers",
 		    roundup2(ktls_maxlen, PAGE_SIZE), NULL, NULL, NULL, NULL,
 		    ktls_buffer_import, ktls_buffer_release, NULL,
-		    UMA_ZONE_FIRSTTOUCH);
+		    UMA_ZONE_FIRSTTOUCH | UMA_ZONE_NOTRIM);
 	}
 
 	/*

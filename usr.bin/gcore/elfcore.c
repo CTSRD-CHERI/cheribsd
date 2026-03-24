@@ -337,9 +337,9 @@ cb_put_memtag_phdr(struct map_entry *entry, void *closure)
 		phdr->p_filesz = phdr->p_memsz / (sizeof(uintcap_t) * NBBY);
 		phdr->p_align = 0;
 		phdr->p_flags = 0;
-		if (entry->protection & VM_PROT_READ_CAP)
+		if (entry->protection & VM_PROT_READ)
 			phdr->p_flags |= PF_R;
-		if (entry->protection & VM_PROT_WRITE_CAP)
+		if (entry->protection & VM_PROT_WRITE)
 			phdr->p_flags |= PF_W;
 
 		phc->offset += phdr->p_filesz;
@@ -680,10 +680,8 @@ readmap(pid_t pid)
 		if ((kve->kve_protection & KVME_PROT_EXEC) != 0)
 			ent->protection |= VM_PROT_EXECUTE;
 #if __has_feature(capabilities)
-		if ((kve->kve_protection & KVME_PROT_READ_CAP) != 0)
-			ent->protection |= VM_PROT_READ_CAP;
-		if ((kve->kve_protection & KVME_PROT_WRITE_CAP) != 0)
-			ent->protection |= VM_PROT_WRITE_CAP;
+		if ((kve->kve_protection & KVME_PROT_CAP) != 0)
+			ent->protection |= VM_PROT_CAP;
 #endif
 
 		*linkp = ent;

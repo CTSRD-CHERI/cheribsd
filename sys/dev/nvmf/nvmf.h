@@ -71,13 +71,32 @@ struct nvmf_ioc_nv {
  * qpair handoff nvlist		admin
  * qpair handoff nvlist array	io
  * binary			cdata	struct nvme_controller_data
+ * NVMF_RECONNECT_PARAMS nvlist	rparams
  */
 
 /*
  * The fields in the nvlist for NVMF_RECONNECT_PARAMS are:
  *
- * number			cntlid
- * string			subnqn
+ * binary			dle	struct nvme_discovery_log_entry
+ * string			hostnqn
+ * number			num_io_queues
+ * number			kato	(optional)
+ * number			io_qsize
+ * bool				sq_flow_control
+ *
+ * TCP transport:
+ *
+ * bool				header_digests
+ * bool				data_digests
+ */
+
+/*
+ * The fields in the nvlist for NVMF_CONNECTION_STATUS are:
+ *
+ * bool				connected
+ * timespec nvlist		last_disconnect
+ *  number			tv_sec
+ *  number			tv_nsec
  */
 
 /*
@@ -97,5 +116,6 @@ struct nvmf_ioc_nv {
 /* Operations on /dev/nvmeX */
 #define	NVMF_RECONNECT_PARAMS	_IOWR('n', 203, struct nvmf_ioc_nv)
 #define	NVMF_RECONNECT_HOST	_IOW('n', 204, struct nvmf_ioc_nv)
+#define	NVMF_CONNECTION_STATUS	_IOWR('n', 205, struct nvmf_ioc_nv)
 
 #endif /* !__NVMF_H__ */

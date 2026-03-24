@@ -212,7 +212,6 @@ static uint32_t rack_highest_sack_thresh_seen = 0;
 static uint32_t rack_highest_move_thresh_seen = 0;
 static uint32_t rack_merge_out_sacks_on_attack = 0;
 static int32_t rack_enable_hw_pacing = 0; /* Due to CCSP keep it off by default */
-static int32_t rack_hw_pace_extra_slots = 0;	/* 2 extra MSS time betweens */
 static int32_t rack_hw_rate_caps = 0; /* 1; */
 static int32_t rack_hw_rate_cap_per = 0;	/* 0 -- off  */
 static int32_t rack_hw_rate_min = 0; /* 1500000;*/
@@ -263,7 +262,7 @@ static int32_t rack_enobuf_hw_max = 12000;	/* 12 ms in usecs */
 static int32_t rack_enobuf_hw_min = 10000;	/* 10 ms in usecs */
 static int32_t rack_hw_rwnd_factor = 2;		/* How many max_segs the rwnd must be before we hold off sending */
 static int32_t rack_hw_check_queue = 0;		/* Do we always pre-check queue depth of a hw queue */
-static int32_t rack_full_buffer_discount = 10;
+
 /*
  * Currently regular tcp has a rto_min of 30ms
  * the backoff goes 12 times so that ends up
@@ -356,8 +355,6 @@ static int32_t rack_timely_dec_clear = 6;	/* Do we clear decrement count at a va
 static int32_t rack_timely_max_push_rise = 3;	/* One round of pushing */
 static int32_t rack_timely_max_push_drop = 3;	/* Three round of pushing */
 static int32_t rack_timely_min_segs = 4;	/* 4 segment minimum */
-static int32_t rack_use_max_for_nobackoff = 0;
-static int32_t rack_timely_int_timely_only = 0;	/* do interim timely's only use the timely algo (no b/w changes)? */
 static int32_t rack_timely_no_stopping = 0;
 static int32_t rack_down_raise_thresh = 100;
 static int32_t rack_req_segs = 1;
@@ -1056,11 +1053,6 @@ rack_init_sysctls(void)
 	    "Do we not use timely in DGP?");
 	SYSCTL_ADD_S32(&rack_sysctl_ctx,
 	    SYSCTL_CHILDREN(rack_pacing),
-	    OID_AUTO, "fullbufdisc", CTLFLAG_RW,
-	    &rack_full_buffer_discount, 10,
-	    "What percentage b/w reduction over the GP estimate for a full buffer (default=0 off)?");
-	SYSCTL_ADD_S32(&rack_sysctl_ctx,
-	    SYSCTL_CHILDREN(rack_pacing),
 	    OID_AUTO, "fillcw", CTLFLAG_RW,
 	    &rack_fill_cw_state, 0,
 	    "Enable fillcw on new connections (default=0 off)?");
@@ -1201,11 +1193,6 @@ rack_init_sysctls(void)
 	    OID_AUTO, "up_only", CTLFLAG_RW,
 	    &rack_hw_up_only, 0,
 	    "Do we allow hw pacing to lower the rate selected?");
-	SYSCTL_ADD_S32(&rack_sysctl_ctx,
-	    SYSCTL_CHILDREN(rack_hw_pacing),
-	    OID_AUTO, "extra_mss_precise", CTLFLAG_RW,
-	    &rack_hw_pace_extra_slots, 0,
-	    "If the rates between software and hardware match precisely how many extra time_betweens do we get?");
 	rack_timely = SYSCTL_ADD_NODE(&rack_sysctl_ctx,
 	    SYSCTL_CHILDREN(rack_sysctl_root),
 	    OID_AUTO,
@@ -1299,16 +1286,6 @@ rack_init_sysctls(void)
 	    OID_AUTO, "min_segs", CTLFLAG_RW,
 	    &rack_timely_min_segs, 4,
 	    "Rack timely when setting the cwnd what is the min num segments");
-	SYSCTL_ADD_S32(&rack_sysctl_ctx,
-	    SYSCTL_CHILDREN(rack_timely),
-	    OID_AUTO, "noback_max", CTLFLAG_RW,
-	    &rack_use_max_for_nobackoff, 0,
-	    "Rack timely when deciding if to backoff on a loss, do we use under max rtt else min");
-	SYSCTL_ADD_S32(&rack_sysctl_ctx,
-	    SYSCTL_CHILDREN(rack_timely),
-	    OID_AUTO, "interim_timely_only", CTLFLAG_RW,
-	    &rack_timely_int_timely_only, 0,
-	    "Rack timely when doing interim timely's do we only do timely (no b/w consideration)");
 	SYSCTL_ADD_S32(&rack_sysctl_ctx,
 	    SYSCTL_CHILDREN(rack_timely),
 	    OID_AUTO, "nonstop", CTLFLAG_RW,
@@ -15260,12 +15237,6 @@ rack_timer_audit(struct tcpcb *tp, struct tcp_rack *rack, struct sockbuf *sb)
 			if (tmr_up == PACE_TMR_DELACK)
 				/* We are supposed to have delayed ack up and we do */
 				return;
-		} else if (sbavail(&tptosocket(tp)->so_snd) && (tmr_up == PACE_TMR_RXT)) {
-			/*
-			 * if we hit enobufs then we would expect the possibility
-			 * of nothing outstanding and the RXT up (and the hptsi timer).
-			 */
-			return;
 		} else if (((V_tcp_always_keepalive ||
 			     rack->rc_inp->inp_socket->so_options & SO_KEEPALIVE) &&
 			    (tp->t_state <= TCPS_CLOSING)) &&
@@ -17462,7 +17433,6 @@ rack_get_pacing_delay(struct tcp_rack *rack, struct tcpcb *tp, uint32_t len, str
 {
 	uint64_t srtt;
 	int32_t slot = 0;
-	int32_t minslot = 0;
 	int can_start_hw_pacing = 1;
 	int err;
 	int pace_one;
@@ -17481,7 +17451,7 @@ rack_get_pacing_delay(struct tcp_rack *rack, struct tcpcb *tp, uint32_t len, str
 		 * the peer to have a gap in data sending.
 		 */
 		uint64_t cwnd, tr_perms = 0;
-		int32_t reduce = 0;
+		int32_t reduce;
 
 	old_method:
 		/*
@@ -17518,7 +17488,8 @@ rack_get_pacing_delay(struct tcp_rack *rack, struct tcpcb *tp, uint32_t len, str
 				slot -= reduce;
 			} else
 				slot = 0;
-		}
+		} else
+			reduce = 0;
 		slot *= HPTS_USEC_IN_MSEC;
 		if (rack->rc_pace_to_cwnd) {
 			uint64_t rate_wanted = 0;
@@ -17793,11 +17764,6 @@ rack_get_pacing_delay(struct tcp_rack *rack, struct tcpcb *tp, uint32_t len, str
 					rack->r_ctl.last_hw_bw_req = rate_wanted;
 				}
 			}
-		}
-		if (minslot && (minslot > slot)) {
-			rack_log_pacing_delay_calc(rack, minslot, slot, rack->r_ctl.crte->rate, bw_est, lentim,
-						   98, __LINE__, NULL, 0);
-			slot = minslot;
 		}
 	done_w_hdwr:
 		if (rack_limit_time_with_srtt &&
@@ -19004,11 +18970,7 @@ rack_fast_rsm_output(struct tcpcb *tp, struct tcp_rack *rack, struct rack_sendma
 	crtsc = get_cyclecount();
 	if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 		tp->tcp_cnt_counters[SND_OUT_DATA] += cnt_thru;
-	}
-	if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 		tp->tcp_proc_time[SND_OUT_DATA] += (crtsc - ts_val);
-	}
-	if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 		tp->tcp_cnt_counters[CNT_OF_MSS_OUT] += ((len + segsiz - 1) / segsiz);
 	}
 	sched_unpin();
@@ -19559,11 +19521,7 @@ again:
 	crtsc = get_cyclecount();
 	if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 		tp->tcp_cnt_counters[SND_OUT_DATA] += cnt_thru;
-	}
-	if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 		tp->tcp_proc_time[SND_OUT_DATA] += (crtsc - ts_val);
-	}
-	if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 		tp->tcp_cnt_counters[CNT_OF_MSS_OUT] += ((tot_len + segsiz - 1) / segsiz);
 	}
 	sched_unpin();
@@ -19894,8 +19852,6 @@ rack_output(struct tcpcb *tp)
 		crtsc = get_cyclecount();
 		if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 			tp->tcp_proc_time[SND_BLOCKED] += (crtsc - ts_val);
-		}
-		if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 			tp->tcp_cnt_counters[SND_BLOCKED]++;
 		}
 		sched_unpin();
@@ -19955,10 +19911,11 @@ rack_output(struct tcpcb *tp)
 	     (tp->t_state == TCPS_SYN_SENT)) &&
 	    SEQ_GT(tp->snd_max, tp->snd_una) && /* initial SYN or SYN|ACK sent */
 	    (tp->t_rxtshift == 0)) {              /* not a retransmit */
-		cwnd_to_use = rack->r_ctl.cwnd_to_use = tp->snd_cwnd;
-		so = inp->inp_socket;
-		sb = &so->so_snd;
-		goto just_return_nolock;
+		rack_start_hpts_timer(rack, tp, cts, 0, 0, 0);
+#ifdef TCP_ACCOUNTING
+		sched_unpin();
+#endif
+		return (0);
 	}
 	/*
 	 * Determine length of data that should be transmitted, and flags
@@ -21103,19 +21060,13 @@ just_return_nolock:
 		crtsc = get_cyclecount();
 		if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 			tp->tcp_cnt_counters[SND_OUT_DATA]++;
-		}
-		if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 			tp->tcp_proc_time[SND_OUT_DATA] += (crtsc - ts_val);
-		}
-		if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 			tp->tcp_cnt_counters[CNT_OF_MSS_OUT] += ((tot_len_this_send + segsiz - 1) / segsiz);
 		}
 	} else {
 		crtsc = get_cyclecount();
 		if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 			tp->tcp_cnt_counters[SND_LIMITED]++;
-		}
-		if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 			tp->tcp_proc_time[SND_LIMITED] += (crtsc - ts_val);
 		}
 	}
@@ -21362,8 +21313,6 @@ send:
 			crtsc = get_cyclecount();
 			if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 				tp->tcp_cnt_counters[SND_OUT_FAIL]++;
-			}
-			if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 				tp->tcp_proc_time[SND_OUT_FAIL] += (crtsc - ts_val);
 			}
 			sched_unpin();
@@ -22381,8 +22330,6 @@ nomore:
 			crtsc = get_cyclecount();
 			if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 				tp->tcp_cnt_counters[SND_OUT_FAIL]++;
-			}
-			if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 				tp->tcp_proc_time[SND_OUT_FAIL] += (crtsc - ts_val);
 			}
 			sched_unpin();
@@ -22436,8 +22383,6 @@ nomore:
 			crtsc = get_cyclecount();
 			if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 				tp->tcp_cnt_counters[SND_OUT_FAIL]++;
-			}
-			if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 				tp->tcp_proc_time[SND_OUT_FAIL] += (crtsc - ts_val);
 			}
 			sched_unpin();
@@ -22461,8 +22406,6 @@ nomore:
 			crtsc = get_cyclecount();
 			if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 				tp->tcp_cnt_counters[SND_OUT_FAIL]++;
-			}
-			if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 				tp->tcp_proc_time[SND_OUT_FAIL] += (crtsc - ts_val);
 			}
 			sched_unpin();
@@ -22613,18 +22556,12 @@ skip_all_send:
 	if (tot_len_this_send) {
 		if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 			tp->tcp_cnt_counters[SND_OUT_DATA]++;
-		}
-		if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 			tp->tcp_proc_time[SND_OUT_DATA] += crtsc;
-		}
-		if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 			tp->tcp_cnt_counters[CNT_OF_MSS_OUT] += ((tot_len_this_send + segsiz - 1) /segsiz);
 		}
 	} else {
 		if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 			tp->tcp_cnt_counters[SND_OUT_ACK]++;
-		}
-		if (tp->t_flags2 & TF2_TCP_ACCOUNTING) {
 			tp->tcp_proc_time[SND_OUT_ACK] += crtsc;
 		}
 	}
@@ -24497,15 +24434,29 @@ rack_get_sockopt(struct tcpcb *tp, struct sockopt *sopt)
 	 * when you exit recovery.
 	 */
 	case TCP_RACK_PACING_BETA:
+		if (strcmp(tp->t_cc->name, CCALGONAME_NEWRENO) != 0)
+			error = EINVAL;
+		else if (rack->rc_pacing_cc_set == 0)
+			optval = rack->r_ctl.rc_saved_beta.beta;
+		else {
+			/*
+			 * Reach out into the CC data and report back what
+			 * I have previously set. Yeah it looks hackish but
+			 * we don't want to report the saved values.
+			 */
+			if (tp->t_ccv.cc_data)
+				optval = ((struct newreno *)tp->t_ccv.cc_data)->beta;
+			else
+				error = EINVAL;
+		}
 		break;
-		/*
-		 * Beta_ecn is the congestion control value for NewReno that influences how
-		 * much of a backoff happens when a ECN mark is detected. It is normally set
-		 * to 80 for 80% i.e. the cwnd is reduced by 20% of its previous value when
-		 * you exit recovery. Note that classic ECN has a beta of 50, it is only
-		 * ABE Ecn that uses this "less" value, but we do too with pacing :)
-		 */
-
+	/*
+	 * Beta_ecn is the congestion control value for NewReno that influences how
+	 * much of a backoff happens when a ECN mark is detected. It is normally set
+	 * to 80 for 80% i.e. the cwnd is reduced by 20% of its previous value when
+	 * you exit recovery. Note that classic ECN has a beta of 50, it is only
+	 * ABE Ecn that uses this "less" value, but we do too with pacing :)
+	 */
 	case TCP_RACK_PACING_BETA_ECN:
 		if (strcmp(tp->t_cc->name, CCALGONAME_NEWRENO) != 0)
 			error = EINVAL;

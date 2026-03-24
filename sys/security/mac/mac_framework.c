@@ -778,11 +778,11 @@ copyin_mac(const void * const __capability mac_p, struct mac *mac)
 			return (error);
 
 		mac->m_buflen = tmpmac.m_buflen;
-		mac->m_string = __USER_CAP(tmpmac.m_string, tmpmac.m_buflen);
+		mac->m_string = USER_PTR(tmpmac.m_string, tmpmac.m_buflen);
 		return (0);
 	}
 #endif
-	error = copyincap(mac_p, mac, sizeof(*mac));
+	error = copyinptr(mac_p, mac, sizeof(*mac));
 	return (error);
 }
 

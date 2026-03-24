@@ -27,6 +27,7 @@
 #include <vm/vm_object.h>
 
 #include <dev/vmm/vmm_dev.h>
+#include <dev/vmm/vmm_mem.h>
 #include <dev/vmm/vmm_stat.h>
 
 #if defined(__amd64__) && defined(COMPAT_FREEBSD12)
@@ -306,7 +307,7 @@ vm_get_register_set(struct vcpu *vcpu, unsigned int count, int *regnum,
 		if (error)
 			break;
 #if __has_feature(capabilities)
-		regval[i] = cheri_cleartag(regval[i]);
+		regval[i] = cheri_tag_clear(regval[i]);
 #endif
 	}
 	return (error);
@@ -551,7 +552,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		error = vm_get_register(vcpu, vmreg->regnum, &vmreg->regval);
 #if __has_feature(capabilities)
 		if (error == 0)
-			vmreg->regval = cheri_cleartag(vmreg->regval);
+			vmreg->regval = cheri_tag_clear(vmreg->regval);
 #endif
 		break;
 	}
@@ -876,6 +877,7 @@ vmmdev_lookup_and_destroy(const char *name, struct ucred *cred)
 	sc->cdev = NULL;
 	sx_xunlock(&vmmdev_mtx);
 
+	vm_suspend(sc->vm, VM_SUSPEND_DESTROY);
 	destroy_dev(cdev);
 	vmmdev_destroy(sc);
 
@@ -1055,6 +1057,7 @@ vmmctl_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	return (error);
 }
 
+static struct cdev *vmmctl_cdev;
 static struct cdevsw vmmctlsw = {
 	.d_name		= "vmmctl",
 	.d_version	= D_VERSION,
@@ -1065,31 +1068,34 @@ static struct cdevsw vmmctlsw = {
 int
 vmmdev_init(void)
 {
-	struct cdev *cdev;
 	int error;
 
-	error = make_dev_p(MAKEDEV_CHECKNAME, &cdev, &vmmctlsw, NULL,
+	sx_xlock(&vmmdev_mtx);
+	error = make_dev_p(MAKEDEV_CHECKNAME, &vmmctl_cdev, &vmmctlsw, NULL,
 	    UID_ROOT, GID_WHEEL, 0600, "vmmctl");
-	if (error)
-		return (error);
+	if (error == 0)
+		pr_allow_flag = prison_add_allow(NULL, "vmm", NULL,
+		    "Allow use of vmm in a jail.");
+	sx_xunlock(&vmmdev_mtx);
 
-	pr_allow_flag = prison_add_allow(NULL, "vmm", NULL,
-	    "Allow use of vmm in a jail.");
-
-	return (0);
+	return (error);
 }
 
 int
 vmmdev_cleanup(void)
 {
-	int error;
+	sx_xlock(&vmmdev_mtx);
+	if (!SLIST_EMPTY(&head)) {
+		sx_xunlock(&vmmdev_mtx);
+		return (EBUSY);
+	}
+	if (vmmctl_cdev != NULL) {
+		destroy_dev(vmmctl_cdev);
+		vmmctl_cdev = NULL;
+	}
+	sx_xunlock(&vmmdev_mtx);
 
-	if (SLIST_EMPTY(&head))
-		error = 0;
-	else
-		error = EBUSY;
-
-	return (error);
+	return (0);
 }
 
 static int

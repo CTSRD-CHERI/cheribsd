@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2025 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2025-2026 Ruslan Bukin <br@bsdpad.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,11 +39,7 @@
 #include <dev/hwc/hwc_context.h>
 #include <dev/hwc/hwc_backend.h>
 
-#if 0
-#define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
-#else
 #define	dprintf(fmt, ...)
-#endif
 
 static struct ofw_compat_data compat_data[] = {
 	{ "riscv,pmu",			1 },
@@ -96,14 +92,10 @@ pmu_backend_configure(struct hwc_context *ctx, struct hwc_configure *hc)
 	dprintf("%s: event_id %d counter_id %d\n", __func__, hc->event_id,
 	    hc->counter_id);
 
-#if 1
-	/* Raw counter example usage. */
+	/* Raw counters. */
 	ret = SBI_CALL5(SBI_EXT_ID_PMU, SBI_PMU_COUNTER_CONFIG_MATCHING, 0,
-	    (1 << hc->counter_id), hc->flags, 0x20000, hc->event_id);
-#else
-	ret = SBI_CALL5(SBI_EXT_ID_PMU, SBI_PMU_COUNTER_CONFIG_MATCHING, 0,
-	    (1 << hc->counter_id), hc->flags, hc->event_id, 0);
-#endif
+	    (1 << hc->counter_id), hc->flags, SBI_PMU_EVENT_RAW_IDX,
+	    hc->event_id);
 
 	dprintf("%s: config match ev_id %d counter_id %d, err %ld val %ld\n",
 	    __func__, hc->event_id, hc->counter_id, ret.error, ret.value);
@@ -150,12 +142,6 @@ static struct hwc_backend_ops pmu_ops = {
 	.hwc_backend_configure = pmu_backend_configure,
 	.hwc_backend_start = pmu_backend_start,
 	.hwc_backend_stop = pmu_backend_stop,
-#if 0
-	.hwc_backend_enable = pmu_backend_enable,
-	.hwc_backend_disable = pmu_backend_disable,
-	.hwc_backend_read = pmu_backend_read,
-	.hwc_backend_dump = pmu_backend_dump,
-#endif
 };
 
 static struct hwc_backend pmu_backend = {

@@ -40,26 +40,20 @@
 #include <sys/rwlock.h>
 #include <sys/hwc.h>
 
-#include <dev/hwc/hwc_hook.h>
 #include <dev/hwc/hwc_context.h>
-#if 0
-#include <dev/hwc/hwc_config.h>
-#include <dev/hwc/hwc_thread.h>
-#endif
 #include <dev/hwc/hwc_owner.h>
 #include <dev/hwc/hwc_vm.h>
-#include <dev/hwc/hwc_cpu.h>
 
-#define	HWT_DEBUG
-#undef	HWT_DEBUG
+#define	HWC_DEBUG
+#undef	HWC_DEBUG
 
-#ifdef	HWT_DEBUG
+#ifdef	HWC_DEBUG
 #define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
 #else
 #define	dprintf(fmt, ...)
 #endif
 
-static MALLOC_DEFINE(M_HWT_CTX, "hwc_ctx", "Hardware Trace");
+static MALLOC_DEFINE(M_HWC_CTX, "hwc_ctx", "Hardware Counters");
 
 static bitstr_t *ident_set;
 static int ident_set_size;
@@ -96,11 +90,8 @@ hwc_ctx_alloc(struct hwc_context **ctx0)
 	struct hwc_context *ctx;
 	int error;
 
-	ctx = malloc(sizeof(struct hwc_context), M_HWT_CTX, M_WAITOK | M_ZERO);
+	ctx = malloc(sizeof(struct hwc_context), M_HWC_CTX, M_WAITOK | M_ZERO);
 
-	TAILQ_INIT(&ctx->records);
-	TAILQ_INIT(&ctx->threads);
-	TAILQ_INIT(&ctx->cpus);
 	mtx_init(&ctx->mtx, "ctx", NULL, MTX_SPIN);
 	mtx_init(&ctx->rec_mtx, "ctx_rec", NULL, MTX_DEF);
 	refcount_init(&ctx->refcnt, 0);
@@ -116,73 +107,13 @@ hwc_ctx_alloc(struct hwc_context **ctx0)
 	return (0);
 }
 
-static void
-hwc_ctx_free_cpus(struct hwc_context *ctx)
-{
-	struct hwc_cpu *cpu;
-
-	do {
-		HWT_CTX_LOCK(ctx);
-		cpu = TAILQ_FIRST(&ctx->cpus);
-		if (cpu)
-			TAILQ_REMOVE(&ctx->cpus, cpu, next);
-		HWT_CTX_UNLOCK(ctx);
-
-		if (cpu == NULL)
-			break;
-
-		/* TODO: move vm_free() to cpu_free()? */
-		hwc_vm_free(cpu->vm);
-		hwc_cpu_free(cpu);
-	} while (1);
-}
-
-#if 0
-static void
-hwc_ctx_free_threads(struct hwc_context *ctx)
-{
-	struct hwc_thread *thr;
-
-	dprintf("%s: remove threads\n", __func__);
-
-	do {
-		HWT_CTX_LOCK(ctx);
-		thr = TAILQ_FIRST(&ctx->threads);
-		if (thr)
-			TAILQ_REMOVE(&ctx->threads, thr, next);
-		HWT_CTX_UNLOCK(ctx);
-
-		if (thr == NULL)
-			break;
-
-		HWT_THR_LOCK(thr);
-		/* TODO: check if thr is sleeping before waking it up. */
-		wakeup(thr);
-		HWT_THR_UNLOCK(thr);
-
-		if (refcount_release(&thr->refcnt))
-			hwc_thread_free(thr);
-	} while (1);
-}
-#endif
-
 void
 hwc_ctx_free(struct hwc_context *ctx)
 {
 
-	if (ctx->mode == HWC_MODE_CPU)
-		hwc_ctx_free_cpus(ctx);
-#if 0
-	else
-		hwc_ctx_free_threads(ctx);
-
-	hwc_config_free(ctx);
-#else
 	hwc_vm_free(ctx->vm);
-#endif
-
 	hwc_ctx_ident_free(ctx->ident);
-	free(ctx, M_HWT_CTX);
+	free(ctx, M_HWC_CTX);
 }
 
 void
@@ -197,7 +128,7 @@ hwc_ctx_load(void)
 {
 
 	ident_set_size = (1 << 8);
-	ident_set = bit_alloc(ident_set_size, M_HWT_CTX, M_WAITOK);
+	ident_set = bit_alloc(ident_set_size, M_HWC_CTX, M_WAITOK);
 	mtx_init(&ident_set_mutex, "ident set", NULL, MTX_DEF);
 }
 
@@ -206,5 +137,5 @@ hwc_ctx_unload(void)
 {
 
 	mtx_destroy(&ident_set_mutex);
-	free(ident_set, M_HWT_CTX);
+	free(ident_set, M_HWC_CTX);
 }

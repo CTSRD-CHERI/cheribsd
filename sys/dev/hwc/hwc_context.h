@@ -26,8 +26,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _DEV_HWT_HWT_CONTEXT_H_
-#define _DEV_HWT_HWT_CONTEXT_H_
+#ifndef _DEV_HWC_HWC_CONTEXT_H_
+#define _DEV_HWC_HWC_CONTEXT_H_
 
 enum hwc_ctx_state {
 	CTX_STATE_STOPPED,
@@ -35,8 +35,6 @@ enum hwc_ctx_state {
 };
 
 struct hwc_context {
-	TAILQ_HEAD(, hwc_record_entry)	records;
-
 	LIST_ENTRY(hwc_context)		next_hch; /* Entry in contexthash. */
 	LIST_ENTRY(hwc_context)		next_hwcs; /* Entry in ho->hwcs. */
 
@@ -46,22 +44,9 @@ struct hwc_context {
 	int				kqueue_fd;
 	struct thread			*hwc_td;
 
-	/* CPU mode. */
-	cpuset_t			cpu_map;
-	TAILQ_HEAD(, hwc_cpu)		cpus;
-
 	/* Thread mode. */
 	struct proc			*proc; /* Target proc. */
 	pid_t				pid; /* Target pid. */
-	TAILQ_HEAD(, hwc_thread)	threads;
-	int				thread_counter;
-	int				pause_on_mmap;
-
-	size_t				bufsize; /* Trace bufsize for each vm.*/
-
-	void				*config;
-	size_t				config_size;
-	int				config_version;
 
 	struct hwc_owner		*hwc_owner;
 	struct hwc_backend		*hwc_backend;
@@ -74,9 +59,9 @@ struct hwc_context {
 	struct hwc_vm			*vm;
 };
 
-#define	HWT_CTX_LOCK(ctx)		mtx_lock_spin(&(ctx)->mtx)
-#define	HWT_CTX_UNLOCK(ctx)		mtx_unlock_spin(&(ctx)->mtx)
-#define	HWT_CTX_ASSERT_LOCKED(ctx)	mtx_assert(&(ctx)->mtx, MA_OWNED)
+#define	HWC_CTX_LOCK(ctx)		mtx_lock_spin(&(ctx)->mtx)
+#define	HWC_CTX_UNLOCK(ctx)		mtx_unlock_spin(&(ctx)->mtx)
+#define	HWC_CTX_ASSERT_LOCKED(ctx)	mtx_assert(&(ctx)->mtx, MA_OWNED)
 
 int hwc_ctx_alloc(struct hwc_context **ctx0);
 void hwc_ctx_free(struct hwc_context *ctx);
@@ -85,4 +70,4 @@ void hwc_ctx_put(struct hwc_context *ctx);
 void hwc_ctx_load(void);
 void hwc_ctx_unload(void);
 
-#endif /* !_DEV_HWT_HWT_CONTEXT_H_ */
+#endif /* !_DEV_HWC_HWC_CONTEXT_H_ */

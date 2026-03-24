@@ -172,19 +172,19 @@ c18n_malloc(size_t n)
 {
 	void *buf = xmalloc(n);
 
-	INC_NUM_BYTES(cheri_getlen(buf));
+	INC_NUM_BYTES(cheri_length_get(buf));
 	return (buf);
 }
 
 static void *
 c18n_realloc(void *buf, size_t new)
 {
-	size_t old = buf == NULL ? 0 : cheri_getlen(buf);
+	size_t old = buf == NULL ? 0 : cheri_length_get(buf);
 
 	buf = realloc(buf, new);
 	if (buf == NULL)
 		rtld_fatal("realloc failed");
-	new = cheri_getlen(buf);
+	new = cheri_length_get(buf);
 	INC_NUM_BYTES(new - old);
 	return (buf);
 }
@@ -192,7 +192,7 @@ c18n_realloc(void *buf, size_t new)
 static void
 c18n_free(void *buf)
 {
-	size_t old = buf == NULL ? 0 : cheri_getlen(buf);
+	size_t old = buf == NULL ? 0 : cheri_length_get(buf);
 
 	free(buf);
 	INC_NUM_BYTES(-old);
@@ -203,7 +203,7 @@ c18n_strdup(const char *s)
 {
 	char *buf = strdup(s);
 
-	INC_NUM_BYTES(cheri_getlen(buf));
+	INC_NUM_BYTES(cheri_length_get(buf));
 	return (buf);
 }
 
@@ -796,7 +796,7 @@ expand_stk_table(struct stk_table *table, size_t capacity)
 		o_capacity = table->meta->capacity;
 
 	table->meta->capacity =
-	    (cheri_getlen(table) - offsetof(typeof(*table), entries)) /
+	    (cheri_length_get(table) - offsetof(typeof(*table), entries)) /
 	    sizeof(*table->entries);
 
 	for (size_t i = o_capacity; i < table->meta->capacity; ++i) {
@@ -934,7 +934,7 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 	 * Record RTLD's stack in the stack lookup table.
 	 */
 #ifndef USE_RESTRICTED_MODE
-	sp = cheri_setoffset(cheri_getstack(), 0);
+	sp = cheri_offset_set(cheri_stack_get(), 0);
 #else
 	/*
 	 * RTLD's actual stack is the Executive stack which does not need to be
@@ -950,7 +950,7 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 	sp = dummy_stk;
 	set_untrusted_stk(sp);
 #endif
-	size = cheri_getlen(sp);
+	size = cheri_length_get(sp);
 	assert(size > 0);
 	table->meta->compart_stk[RTLD_COMPART_ID] = (struct stk_table_stk_info)
 	{
@@ -1020,7 +1020,7 @@ get_or_create_untrusted_stk(compart_id_t cid, struct stk_table **tablep)
 		.size = size,
 		.begin = stk - size
 	};
-	table->entries[cid].stack = cheri_clearperm(stk, CHERI_PERM_SW_VMEM);
+	table->entries[cid].stack = cheri_perms_clear(stk, CHERI_PERM_SW_VMEM);
 
 	atomic_fetch_add_explicit(&c18n_stats->rcs_ustack, 1,
 	    memory_order_relaxed);
@@ -1069,7 +1069,7 @@ resolve_untrusted_stk_impl(stk_table_index index)
 int
 c18n_is_tramp(uintptr_t pc, const struct trusted_frame *tf)
 {
-	if (!cheri_gettag(pc))
+	if (!cheri_tag_get(pc))
 		return (0);
 	return (pc == tf->landing);
 }
@@ -1208,8 +1208,9 @@ dl_c18n_is_trampoline(uintptr_t pc, void *tfs)
 	if (!C18N_ENABLED)
 		return (0);
 
+
 	tf = c18n_unseal_subset(tfs, sealer_trusted_stk, get_trusted_stk());
-	if (!cheri_gettag(tf))
+	if (!cheri_tag_get(tf))
 		return (0);
 
 	return (c18n_is_tramp(pc, tf));
@@ -1297,8 +1298,8 @@ tramp_pg_push(struct tramp_pg *pg, size_t len)
 	     */
 	    &size, n_size, memory_order_relaxed, memory_order_relaxed));
 
-	tramp = cheri_setboundsexact(tramp, len);
-	assert(cheri_gettag(tramp));
+	tramp = cheri_bounds_set_exact(tramp, len);
+	assert(cheri_tag_get(tramp));
 
 	return (tramp);
 }
@@ -1472,7 +1473,7 @@ tramp_pgs_alloc(const char buf[], const char *bufp, size_t len)
 		atomic_flag_clear_explicit(&tramp_pgs.lock,
 		    memory_order_release);
 	}
-	assert(cheri_gettag(tramp));
+	assert(cheri_tag_get(tramp));
 
 	memcpy(tramp, buf, len);
 	header = (struct tramp_header *)(tramp + (bufp - buf));
@@ -1484,7 +1485,7 @@ tramp_pgs_alloc(const char buf[], const char *bufp, size_t len)
 	 * addresses. Derive the start address from pg so that it has
 	 * sufficiently large bounds to contain these rounded addresses.
 	 */
-	__clear_cache(cheri_copyaddress(pg, header->entry), tramp + len);
+	__clear_cache(cheri_address_copy(pg, header->entry), tramp + len);
 #elif __riscv
 	/*
 	 * XXX Dapeng: This is insufficient for multicore as fence.i only
@@ -1524,15 +1525,15 @@ tramp_check_found(struct tramp_header *found, const Obj_Entry *reqobj,
 		    found->defobj->path, C18N_SIG_FORMAT(sig));
 	}
 
-	if (!cheri_gettag(data->target))
+	if (!cheri_tag_get(data->target))
 		return;
 
 	found_target = atomic_load_explicit(&found->target,
 	    memory_order_relaxed);
 	do {
-		if (cheri_gettag(found_target)) {
+		if (cheri_tag_get(found_target)) {
 			rtld_require(
-			    cheri_equal_exact(found_target, data->target),
+			    cheri_is_equal_exact(found_target, data->target),
 			    "c18n: Incompatible capability metadata for "
 			    "function %s: found %#p, requested %#p\n",
 			    symname(found->defobj, found->symnum),
@@ -1585,12 +1586,12 @@ tramp_make_entry(struct tramp_header *header, bool slow)
 
 	if (ld_compartment_no_fast_path != NULL || slow)
 		entry += c18n_tramp_entry_slow_offset;
-	entry = cheri_clearperm(entry, FUNC_PTR_REMOVE_PERMS);
+	entry = cheri_perms_clear(entry, FUNC_PTR_REMOVE_PERMS);
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	entry = cheri_capmode(entry);
 #endif
 
-	return (cheri_sealentry(entry));
+	return (cheri_sentry_create(entry));
 }
 
 void *
@@ -1612,7 +1613,7 @@ tramp_intern(const Plt_Entry *plt, compart_id_t caller,
 	/*
 	 * INVARIANT: The defobj of each trampoline is tagged.
 	 */
-	assert(cheri_gettag(data->defobj));
+	assert(cheri_tag_get(data->defobj));
 	if (data->def == NULL)
 		/*
 		 * Currently, the decision to elide the trampoline or not is
@@ -1741,8 +1742,8 @@ end:
 	 * capability, return an untagged trampoline.
 	 */
 	tramp_entry = tramp_make_entry(header, plt != NULL);
-	if (!cheri_gettag(data->target))
-		tramp_entry = cheri_cleartag(tramp_entry);
+	if (!cheri_tag_get(data->target))
+		tramp_entry = cheri_tag_clear(tramp_entry);
 
 	return (tramp_entry);
 }
@@ -1764,17 +1765,17 @@ sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 }
 
 struct tramp_header *
-tramp_reflect(const void *data)
+tramp_get_header(const void *data)
 {
 	struct tramp_header *ret;
 	struct tramp_pg *page;
 
-	if (!cheri_gettag(data) || !cheri_getsealed(data) ||
-	    cheri_gettype(data) != CHERI_OTYPE_SENTRY ||
-	    (cheri_getperm(data) & CHERI_PERM_LOAD) == 0 ||
-	    (cheri_getperm(data) & CHERI_PERM_EXECUTE) == 0
+	if (!cheri_tag_get(data) || !cheri_is_sealed(data) ||
+	    cheri_type_get(data) != CHERI_OTYPE_SENTRY ||
+	    (cheri_perms_get(data) & CHERI_PERM_LOAD) == 0 ||
+	    (cheri_perms_get(data) & CHERI_PERM_EXECUTE) == 0
 #ifdef HAS_RESTRICTED_MODE
-	    || (cheri_getperm(data) & CHERI_PERM_EXECUTIVE) == 0
+	    || (cheri_perms_get(data) & CHERI_PERM_EXECUTIVE) == 0)
 #endif
 	    )
 		return (NULL);
@@ -1785,7 +1786,7 @@ tramp_reflect(const void *data)
 	data = (const char *)data - 1;
 #endif
 	/*
-	 * INVARIANT: The pointer being reflected never points to before the
+	 * INVARIANT: The pointer being inspected never points to before the
 	 * function pointer entry point of the trampoline.
 	 *
 	 * When the fast path is enabled, the function pointer entry point is
@@ -1801,15 +1802,15 @@ tramp_reflect(const void *data)
 
 	for (page = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);
 	    page != NULL; page = SLIST_NEXT(page, link)) {
-		ret = cheri_buildcap(page, (uintptr_t)data);
-		if (!cheri_gettag(ret))
+		ret = cheri_cap_build(page, (uintptr_t)data);
+		if (!cheri_tag_get(ret))
 			continue;
 		/*
 		 * INVARIANT: The rederived pointer never points to before the
 		 * actual trampoline header.
 		 */
 		if (__is_aligned(ret, _Alignof(typeof(*ret))) &&
-		    cheri_gettag(ret->defobj))
+		    cheri_tag_get(ret->defobj))
 			/*
 			 * If the rederived pointer is correctly aligned and
 			 * the `defobj` field is tagged, then it must point to
@@ -1818,7 +1819,8 @@ tramp_reflect(const void *data)
 			return (ret);
 		else {
 			rtld_fdprintf(STDERR_FILENO,
-			    "c18n: Cannot reflect trampoline %#p\n", ret);
+			    "c18n: Cannot get header for trampoline %#p\n",
+			    ret);
 			break;
 		}
 	}
@@ -1826,21 +1828,32 @@ tramp_reflect(const void *data)
 	return (NULL);
 }
 
-ptraddr_t _rtld_tramp_reflect(const void *);
+ptraddr_t dl_c18n_get_trampoline_target(const void *);
 
 ptraddr_t
-_rtld_tramp_reflect(const void *addr)
+dl_c18n_get_trampoline_target(const void *addr)
 {
 	struct tramp_header *header;
 
 	if (!C18N_ENABLED)
 		return (0);
 
-	header = tramp_reflect(addr);
+	header = tramp_get_header(addr);
 	if (header == NULL)
 		return (0);
 
 	return ((ptraddr_t)header->target);
+}
+
+/*
+ * XXX: This is for compatibility with libc in version 25.03.
+ */
+ptraddr_t _rtld_tramp_reflect(const void *);
+
+ptraddr_t
+_rtld_tramp_reflect(const void *addr)
+{
+	return (dl_c18n_get_trampoline_target(addr));
 }
 
 /*
@@ -1858,9 +1871,9 @@ _rtld_c18n_is_enabled(void)
 static void *
 make_restricted(void *fptr)
 {
-	fptr = cheri_clearperm(fptr, CHERI_PERM_EXECUTIVE);
-	fptr = cheri_buildcap(cheri_getpcc(), (uintptr_t)fptr);
-	return (cheri_sealentry(fptr));
+	fptr = cheri_perms_clear(fptr, CHERI_PERM_EXECUTIVE);
+	fptr = cheri_cap_build(cheri_pcc_get(), (uintptr_t)fptr);
+	return (cheri_sentry_create(fptr));
 }
 #endif
 
@@ -1955,13 +1968,13 @@ c18n_init2(Obj_Entry *obj_rtld)
 	    &(size_t) { sizeof(sealer) }, NULL, 0) < 0)
 		rtld_fatal("sysctlbyname failed");
 
-	sealer_pltgot = cheri_setboundsexact(sealer, 1);
+	sealer_pltgot = cheri_bounds_set_exact(sealer, 1);
 	sealer += 1;
 
-	sealer_tcb = cheri_setboundsexact(sealer, 1);
+	sealer_tcb = cheri_bounds_set_exact(sealer, 1);
 	sealer += 1;
 
-	sealer_trusted_stk = cheri_setboundsexact(sealer, 1);
+	sealer_trusted_stk = cheri_bounds_set_exact(sealer, 1);
 	sealer += 1;
 
 #ifndef HAS_RESTRICTED_MODE
@@ -2010,9 +2023,17 @@ c18n_init2(Obj_Entry *obj_rtld)
 	 * Restricted mode capabilities.
 	 */
 	rtld_bind_start_fptr = make_restricted(rtld_bind_start_fptr);
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 	rtld_tlsdesc_static_fptr = make_restricted(rtld_tlsdesc_static_fptr);
 	rtld_tlsdesc_undef_fptr = make_restricted(rtld_tlsdesc_undef_fptr);
 	rtld_tlsdesc_dynamic_fptr = make_restricted(rtld_tlsdesc_dynamic_fptr);
+#endif
+#ifdef TLS_TGOT
+	rtld_tgot_tlsdesc_static_fptr =
+	    make_restricted(rtld_tgot_tlsdesc_static_fptr);
+	rtld_tgot_tlsdesc_dynamic_fptr =
+	    make_restricted(rtld_tgot_tlsdesc_dynamic_fptr);
+#endif
 #endif
 
 	/*
@@ -2038,6 +2059,18 @@ c18n_init2(Obj_Entry *obj_rtld)
 			.reg_args = 3, .mem_args = false, .ret_args = ONE
 		}
 	});
+
+#ifdef TLS_TGOT_COMPAT
+	tls_get_addr_common_compat_fptr = tramp_intern(NULL, RTLD_COMPART_ID,
+	    &(struct tramp_data) {
+		.target = tls_get_addr_common_compat_fptr,
+		.defobj = obj_rtld,
+		.sig = (struct func_sig) {
+			.valid = true,
+			.reg_args = 3, .mem_args = false, .ret_args = ONE
+		}
+	});
+#endif
 }
 
 /*
@@ -2054,7 +2087,7 @@ _rtld_thread_start_init(void (*p)(struct pthread *))
 {
 #ifdef USE_RESTRICTED_MODE
 	assert(!C18N_ENABLED ||
-	    (cheri_getperm(p) & CHERI_PERM_EXECUTIVE) != 0);
+	    (cheri_perms_get(p) & CHERI_PERM_EXECUTIVE) != 0);
 #endif
 	assert(thr_thread_start == NULL);
 	thr_thread_start = p;
@@ -2097,7 +2130,7 @@ _rtld_thread_start(struct pthread *curthread)
 static bool
 identify_untrusted_stk(void *canonical, void *untrusted)
 {
-	canonical = cheri_clearperm(canonical, CHERI_PERM_SW_VMEM);
+	canonical = cheri_perms_clear(canonical, CHERI_PERM_SW_VMEM);
 	return (cheri_is_subset(untrusted, canonical));
 }
 
@@ -2260,7 +2293,7 @@ _rtld_sighandler_init(__siginfohandler_t *handler)
 {
 #ifdef USE_RESTRICTED_MODE
 	assert(!C18N_ENABLED ||
-	    (cheri_getperm(handler) & CHERI_PERM_EXECUTIVE) != 0);
+	    (cheri_perms_get(handler) & CHERI_PERM_EXECUTIVE) != 0);
 #endif
 	assert(signal_dispatcher == sigdispatch);
 	signal_dispatcher = handler;
@@ -2396,7 +2429,7 @@ found_trusted:
 	 * The untrusted stack can only become temporarily inconsistent when
 	 * running code in Executive mode. This performs a quick sanity check.
 	 */
-	if ((cheri_getperm(ucp->uc_mcontext.mc_capregs.cap_elr) &
+	if ((cheri_perms_get(ucp->uc_mcontext.mc_capregs.cap_elr) &
 	    CHERI_PERM_EXECUTIVE) == 0) {
 		rtld_fdprintf(STDERR_FILENO,
 		    "c18n: Cannot resolve inconsistent untrusted stack %#p in "
@@ -2448,7 +2481,7 @@ found:
 #elif defined(__riscv)
 	table_reg = &ucp->uc_mcontext.mc_capregs.cp_ct[STACK_TABLE_N];
 #endif
-	if (!cheri_equal_exact(table, *table_reg))
+	if (!cheri_is_equal_exact(table, *table_reg))
 		table_reg = NULL;
 
 	signal_dispatcher(sig, info, ucp);
@@ -2456,7 +2489,7 @@ found:
 	/*
 	 * Check whether the table is still there.
 	 */
-	if (table_reg != NULL && !cheri_equal_exact(table, *table_reg))
+	if (table_reg != NULL && !cheri_is_equal_exact(table, *table_reg))
 		table_reg = NULL;
 
 	/*
@@ -2509,7 +2542,7 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	else
 		sigfunc = act->sa_handler;
 
-	header = tramp_reflect(sigfunc);
+	header = tramp_get_header(sigfunc);
 
 	/*
 	 * The signal handler must be wrapped by a trampoline if function

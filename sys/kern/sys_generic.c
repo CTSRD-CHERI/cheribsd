@@ -49,6 +49,7 @@
 #include <sys/lock.h>
 #include <sys/proc.h>
 #include <sys/signalvar.h>
+#include <sys/protosw.h>
 #include <sys/socketvar.h>
 #include <sys/uio.h>
 #include <sys/eventfd.h>
@@ -748,7 +749,7 @@ user_ioctl(struct thread *td, int fd, u_long ucom,
 		data = datap;
 	if (com & IOC_IN) {
 		if (copycaps)
-			error = copyincap(udata, data, size);
+			error = copyinptr(udata, data, size);
 		else
 			error = copyin(udata, data, size);
 		if (error != 0)
@@ -765,7 +766,7 @@ user_ioctl(struct thread *td, int fd, u_long ucom,
 
 	if (error == 0 && (com & IOC_OUT)) {
 		if (copycaps)
-			error = copyoutcap(data, udata, size);
+			error = copyoutptr(data, udata, size);
 		else
 			error = copyout(data, udata, size);
 	}
@@ -1925,7 +1926,7 @@ selsocket(struct socket *so, int events, struct timeval *tvp, struct thread *td)
 	 */
 	for (;;) {
 		selfdalloc(td, NULL);
-		if (sopoll(so, events, NULL, td) != 0) {
+		if (so->so_proto->pr_sopoll(so, events, td) != 0) {
 			error = 0;
 			break;
 		}

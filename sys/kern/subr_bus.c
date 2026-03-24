@@ -3902,17 +3902,6 @@ bus_generic_get_property(device_t dev, device_t child, const char *propname,
 }
 
 /**
- * @brief Stub function for implementing BUS_GET_RESOURCE_LIST().
- *
- * @returns NULL
- */
-struct resource_list *
-bus_generic_get_resource_list(device_t dev, device_t child)
-{
-	return (NULL);
-}
-
-/**
  * @brief Helper function for implementing BUS_DRIVER_ADDED().
  *
  * This implementation of BUS_DRIVER_ADDED() simply calls the driver's
@@ -5824,7 +5813,7 @@ devctl2_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		memset(&dr, 0, sizeof(dr));
 		memcpy(dr.dr_name, req64->dr_name, sizeof(dr.dr_name));
 		CP(*req64, dr, dr_flags);
-		dr.dr_data = __USER_CAP_STR(req64->dr_data);
+		dr.dr_data = USER_PTR_STR(req64->dr_data);
 		req = &dr;
 		cmd = _IOC_NEWTYPE(cmd, struct devreq);
 	} else

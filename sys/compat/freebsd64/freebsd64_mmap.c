@@ -48,6 +48,7 @@
 #include <vm/vm_object.h>
 #include <vm/vm_extern.h>
 
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 
 #if 0
@@ -94,10 +95,6 @@ freebsd64_mmap(struct thread *td, struct freebsd64_mmap_args *uap)
 		.mr_flags = uap->flags,
 		.mr_fd = uap->fd,
 		.mr_pos = uap->pos,
-#ifdef __CHERI_PURE_CAPABILITY__
-		/* Needed for fixed mappings */
-		.mr_source_cap = userspace_root_cap
-#endif
 	    }));
 }
 
@@ -113,10 +110,6 @@ freebsd6_freebsd64_mmap(struct thread *td,
 		.mr_flags = uap->flags,
 		.mr_fd = uap->fd,
 		.mr_pos = uap->pos,
-#ifdef __CHERI_PURE_CAPABILITY__
-		/* Needed for fixed mappings */
-		.mr_source_cap = userspace_root_cap
-#endif
 	    }));
 }
 #endif
@@ -157,7 +150,7 @@ int
 freebsd64_mincore(struct thread *td, struct freebsd64_mincore_args *uap)
 {
 	return (kern_mincore(td, (uintptr_t)uap->addr, uap->len,
-	    __USER_CAP(uap->vec, uap->len)));
+	    USER_PTR(uap->vec, uap->len)));
 }
 
 int

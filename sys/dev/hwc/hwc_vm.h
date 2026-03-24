@@ -26,24 +26,16 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _DEV_HWT_HWT_VM_H_
-#define _DEV_HWT_HWT_VM_H_
+#ifndef _DEV_HWC_HWC_VM_H_
+#define _DEV_HWC_HWC_VM_H_
 
 struct hwc_vm {
-	vm_page_t			*pages;
-	int				npages;
 	vm_object_t			obj;
-	vm_offset_t			kvaddr;
 	struct cdev			*cdev;
-
 	struct hwc_context		*ctx;
-#if 0
-	struct hwc_cpu			*cpu;	/* cpu mode only. */
-	struct hwc_thread		*thr;	/* thr mode only. */
-#endif
 };
 
 int hwc_vm_alloc(size_t bufsize, int kva_req, char *path, struct hwc_vm **vm0);
 void hwc_vm_free(struct hwc_vm *vm);
 
-#endif /* !_DEV_HWT_HWT_VM_H_ */
+#endif /* !_DEV_HWC_HWC_VM_H_ */

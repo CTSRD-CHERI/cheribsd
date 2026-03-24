@@ -147,6 +147,7 @@
 #include <vm/uma.h>
 
 #include <machine/asan.h>
+#include <machine/cpu_feat.h>
 #include <machine/machdep.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
@@ -355,7 +356,7 @@ vm_paddr_t dmap_phys_base;	/* The start of the dmap region */
 vm_paddr_t dmap_phys_max;	/* The limit of the dmap region */
 vm_offset_t dmap_max_addr;	/* The virtual address limit of the dmap */
 #ifdef __CHERI_PURE_CAPABILITY__
-void *dmap_base_cap;		/* Capability for the direct map region */
+void *dmap_capability;		/* Capability for the direct map region */
 #endif
 
 extern pt_entry_t pagetable_l0_ttbr1[];
@@ -367,7 +368,7 @@ static u_int physmap_idx;
 static SYSCTL_NODE(_vm, OID_AUTO, pmap, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "VM/pmap parameters");
 
-static bool pmap_lpa_enabled __read_mostly = false;
+bool pmap_lpa_enabled __read_mostly = false;
 pt_entry_t pmap_sh_attr __read_mostly = ATTR_SH(ATTR_SH_IS);
 
 #if PAGE_SIZE == PAGE_SIZE_4K
@@ -568,7 +569,7 @@ pagecopy_cleartags(void *s, void *d)
 	dst = d;
 	src = s;
 	for (i = 0; i < PAGE_SIZE / sizeof(*dst); i++)
-		*dst++ = cheri_cleartag(*src++);
+		*dst++ = cheri_tag_clear(*src++);
 #else
 	pagecopy(s, d);
 #endif
@@ -900,7 +901,7 @@ pmap_pte_memattr(pmap_t pmap, vm_memattr_t memattr)
 static inline uint64_t
 pmap_pte_cr(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 {
-	if (prot & VM_PROT_READ_CAP) {
+	if (VM_PROT_HAS_READ_CAP(prot)) {
 #ifdef CHERI_CAPREVOKE
 		if ((va < VM_MAX_USER_ADDRESS) &&
 		    (pmap->pm_stage == PM_STAGE1)) {
@@ -948,7 +949,7 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 	val |= pmap_pte_cr(pmap, va, prot);
 
 	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
-	if ((prot & VM_PROT_WRITE_CAP) != 0) {
+	if (VM_PROT_HAS_WRITE_CAP(prot)) {
 		/*
 		 * If we set CAPSTORE upon page allocation, the page is CAPSTORE
 		 * and this mapping is VM_PROT_WRITE_CAP.
@@ -1410,10 +1411,10 @@ pmap_bootstrap_dmap(void)
 	}
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	dmap_base_cap = cheri_setaddress(kernel_root_cap, DMAP_MIN_ADDRESS);
-	dmap_base_cap = cheri_setbounds(dmap_base_cap,
+	dmap_capability = cheri_address_set(kernel_root_cap, DMAP_MIN_ADDRESS);
+	dmap_capability = cheri_bounds_set(dmap_capability,
 	    dmap_phys_max - dmap_phys_base);
-	dmap_base_cap = cheri_andperm(dmap_base_cap,
+	dmap_capability = cheri_perms_and(dmap_capability,
 	    CHERI_PERMS_KERNEL_DATA);
 #endif
 
@@ -1454,8 +1455,6 @@ pmap_bootstrap(vm_size_t kernlen)
 	vm_paddr_t start_pa, pa;
 	uint64_t tcr;
 
-	pmap_cpu_init();
-
 	tcr = READ_SPECIALREG(tcr_el1);
 
 	/* Verify that the ASID is set through TTBR0. */
@@ -1481,9 +1480,9 @@ pmap_bootstrap(vm_size_t kernlen)
 
 	bs_state.freemempos = KERNBASE;
 #ifdef __CHERI_PURE_CAPABILITY__
-	bs_state.freemempos = (vm_pointer_t)cheri_setaddress(kernel_root_cap,
+	bs_state.freemempos = (vm_pointer_t)cheri_address_set(kernel_root_cap,
 	    bs_state.freemempos);
-	bs_state.freemempos = cheri_setbounds(bs_state.freemempos,
+	bs_state.freemempos = cheri_bounds_set(bs_state.freemempos,
 	    VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE - KERNBASE);
 #endif
 	bs_state.freemempos = roundup2(bs_state.freemempos + kernlen, PAGE_SIZE);
@@ -1513,8 +1512,8 @@ pmap_bootstrap(vm_size_t kernlen)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define alloc_pages(var, np)						\
-	(var) = cheri_setbounds(bs_state.freemempos, (np * PAGE_SIZE));	\
-	bs_state.freemempos += cheri_getlen((void *)(var));		\
+	(var) = cheri_bounds_set(bs_state.freemempos, (np * PAGE_SIZE));	\
+	bs_state.freemempos += cheri_length_get((void *)(var));		\
 	memset((char *)(var), 0, ((np) * PAGE_SIZE));
 #else
 #define alloc_pages(var, np)						\
@@ -1536,7 +1535,7 @@ pmap_bootstrap(vm_size_t kernlen)
 
 	virtual_avail = preinit_map_va + PMAP_PREINIT_MAPPING_SIZE;
 	virtual_avail = roundup2(virtual_avail, L1_SIZE);
-	virtual_end = cheri_kern_setaddress(virtual_avail,
+	virtual_end = cheri_kern_address_set(virtual_avail,
 	    VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE);
 	kernel_vm_end = virtual_avail;
 
@@ -1707,15 +1706,11 @@ pmap_init_pv_table(void)
 	int domain, i, j, pages;
 
 	/*
-	 * We strongly depend on the size being a power of two, so the assert
-	 * is overzealous. However, should the struct be resized to a
-	 * different power of two, the code below needs to be revisited.
+	 * We depend on the size being evenly divisible into a page so
+	 * that the pv_table array can be indexed directly while
+	 * safely spanning multiple pages from different domains.
 	 */
-#ifdef __CHERI_PURE_CAPABILITY__
-	CTASSERT((sizeof(*pvd) == 128));
-#else
-	CTASSERT((sizeof(*pvd) == 64));
-#endif
+	CTASSERT(PAGE_SIZE % sizeof(*pvd) == 0);
 
 	/*
 	 * Calculate the size of the array.
@@ -1770,7 +1765,7 @@ pmap_init_pv_table(void)
 		seg = &vm_phys_segs[i];
 		used_pvd = pmap_l2_pindex(roundup2(seg->end, L2_SIZE)) -
 		    pmap_l2_pindex(seg->start);
-		seg->md_first = cheri_kern_setbounds(pvd,
+		seg->md_first = cheri_kern_bounds_set(pvd,
 		    used_pvd * sizeof(*pvd));
 		pvd += used_pvd;
 
@@ -1791,38 +1786,74 @@ pmap_init_pv_table(void)
 	}
 }
 
-void
-pmap_cpu_init(void)
+static bool
+pmap_dbm_check(const struct cpu_feat *feat __unused, u_int midr __unused)
 {
-	uint64_t id_aa64mmfr1, tcr;
-	bool enable_dbm;
+	uint64_t id_aa64mmfr1;
 
-	enable_dbm = false;
-
-	/* Enable HAFDBS if supported */
 	id_aa64mmfr1 = READ_SPECIALREG(id_aa64mmfr1_el1);
-	if (ID_AA64MMFR1_HAFDBS_VAL(id_aa64mmfr1) >= ID_AA64MMFR1_HAFDBS_AF_DBS)
-		enable_dbm = true;
+	return (ID_AA64MMFR1_HAFDBS_VAL(id_aa64mmfr1) >=
+	    ID_AA64MMFR1_HAFDBS_AF_DBS);
+}
+
+static bool
+pmap_dbm_has_errata(const struct cpu_feat *feat __unused, u_int midr,
+    u_int **errata_list, u_int *errata_count)
+{
 	/* Disable on Cortex-A55 for erratum 1024718 - all revisions */
 	if (CPU_MATCH(CPU_IMPL_MASK | CPU_PART_MASK, CPU_IMPL_ARM,
-	    CPU_PART_CORTEX_A55, 0, 0))
-		enable_dbm = false;
-	/* Disable on Cortex-A510 for erratum 2051678 - r0p0 to r0p2 */
-	else if (CPU_MATCH(CPU_IMPL_MASK | CPU_PART_MASK | CPU_VAR_MASK,
-	    CPU_IMPL_ARM, CPU_PART_CORTEX_A510, 0, 0))
-		if (CPU_REV(PCPU_GET(midr)) < 3)
-			enable_dbm = false;
-	if (enable_dbm) {
-		tcr = READ_SPECIALREG(tcr_el1) | TCR_HD;
-		WRITE_SPECIALREG(tcr_el1, tcr);
-		isb();
-		/* Flush the local TLB for the TCR_HD flag change */
-		dsb(nshst);
-		__asm __volatile("tlbi vmalle1");
-		dsb(nsh);
-		isb();
+	    CPU_PART_CORTEX_A55, 0, 0)) {
+		static u_int errata_id = 1024718;
+
+		*errata_list = &errata_id;
+		*errata_count = 1;
+		return (true);
 	}
+
+	/* Disable on Cortex-A510 for erratum 2051678 - r0p0 to r0p2 */
+	if (CPU_MATCH(CPU_IMPL_MASK | CPU_PART_MASK | CPU_VAR_MASK,
+	    CPU_IMPL_ARM, CPU_PART_CORTEX_A510, 0, 0)) {
+		if (CPU_REV(PCPU_GET(midr)) < 3) {
+			static u_int errata_id = 2051678;
+
+			*errata_list = &errata_id;
+			*errata_count = 1;
+			return (true);
+		}
+	}
+
+	return (false);
 }
+
+static void
+pmap_dbm_enable(const struct cpu_feat *feat __unused,
+    cpu_feat_errata errata_status, u_int *errata_list __unused,
+    u_int errata_count)
+{
+	uint64_t tcr;
+
+	/* Skip if there is an erratum affecting DBM */
+	if (errata_status != ERRATA_NONE)
+		return;
+
+	tcr = READ_SPECIALREG(tcr_el1) | TCR_HD;
+	WRITE_SPECIALREG(tcr_el1, tcr);
+	isb();
+	/* Flush the local TLB for the TCR_HD flag change */
+	dsb(nshst);
+	__asm __volatile("tlbi vmalle1");
+	dsb(nsh);
+	isb();
+}
+
+static struct cpu_feat feat_dbm = {
+	.feat_name		= "FEAT_HAFDBS (DBM)",
+	.feat_check		= pmap_dbm_check,
+	.feat_has_errata	= pmap_dbm_has_errata,
+	.feat_enable		= pmap_dbm_enable,
+	.feat_flags		= CPU_FEAT_AFTER_DEV | CPU_FEAT_PER_CPU,
+};
+DATA_SET(cpu_feat_set, feat_dbm);
 
 /*
  *	Initialize the pmap module.
@@ -2194,11 +2225,14 @@ pmap_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 		     ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE)))
 			use = true;
 #if __has_feature(capabilities)
-		if ((prot & VM_PROT_READ_CAP) != 0 &&
-		    (tpte & ATTR_LC_ENABLED) == 0)
-			use = false;
-		if ((prot & VM_PROT_WRITE_CAP) != 0 && (tpte & ATTR_SC) == 0)
-			use = false;
+		if (prot & VM_PROT_CAP) {
+			if ((prot & VM_PROT_READ) != 0 &&
+			    (tpte & ATTR_LC_ENABLED) == 0)
+				use = false;
+			if ((prot & VM_PROT_WRITE) != 0 &&
+			    (tpte & ATTR_SC) == 0)
+				use = false;
+		}
 #endif
 
 		if (use) {
@@ -2517,12 +2551,15 @@ pmap_kremove_device(vm_offset_t sva, vm_size_t size)
 vm_pointer_t
 pmap_map(vm_pointer_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 {
+	vm_pointer_t p;
+
+	p = PHYS_TO_DMAP(start);
 #ifdef __CHERI_PURE_CAPABILITY__
-	return cheri_andperm(cheri_setbounds(PHYS_TO_DMAP(start), end - start),
-	    vm_map_prot2perms(prot));
-#else
-	return PHYS_TO_DMAP(start);
+	p = cheri_bounds_set(p, end - start);
+	p = cheri_perms_and(p, vm_prot2perms(cheri_perms_get(p), prot));
 #endif
+
+	return (p);
 }
 
 /*
@@ -7739,7 +7776,7 @@ pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 		}
 #if __has_feature(capabilities)
 		if (clear_tags)
-			bcopynocap(a_cp, b_cp, cnt);
+			bcopy_data(a_cp, b_cp, cnt);
 		else
 #endif
 			bcopy(a_cp, b_cp, cnt);
@@ -10141,7 +10178,7 @@ pmap_sync_icache(pmap_t pmap, vm_offset_t va, vm_size_t sz)
 			/* Extract the physical address & find it in the DMAP */
 			pa = pmap_extract(pmap, va);
 			if (pa != 0)
-				cpu_icache_sync_range((void *)cheri_kern_setbounds(
+				cpu_icache_sync_range((void *)cheri_kern_bounds_set(
 				    PHYS_TO_DMAP(pa), len), len);
 
 			/* Move to the next page */

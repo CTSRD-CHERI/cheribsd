@@ -34,12 +34,16 @@
 
 #ifndef _LIBC_PRIVATE_H_
 #define _LIBC_PRIVATE_H_
-#include <sys/_types.h>
-#include <sys/_pthreadtypes.h>
+#include <sys/types.h>
+
+#include <machine/tls.h>
 
 #include <libsys.h>
 
 #include <stdbool.h>
+#ifdef CHERI_LIB_C18N
+#include <stddef.h>
+#endif
 
 extern char **environ;
 
@@ -285,6 +289,12 @@ void __libc_start1_gcrt(int, char *[], char *[],
  * Initialise TLS for static programs
  */
 void _init_tls(void);
+#ifdef TLS_TGOT
+void __libc_init_tgot(void *tgot, const void *init, __size_t size, void *tls);
+#ifdef TLS_TGOT_COMPAT
+void __libc_init_got_tgot(void *data_cap, __ptrdiff_t tcbtgotoff);
+#endif
+#endif
 
 /*
  * Internal allocator for TLS
@@ -398,7 +408,6 @@ int __strerror_rl(int errnum, char *strerrbuf, size_t buflen,
 
 #ifdef CHERI_LIB_C18N
 bool	_rtld_c18n_is_enabled(void);
-ptraddr_t	_rtld_tramp_reflect(const void *);
 void	_rtld_thr_exit(long *);
 int	_rtld_sigaction(int, const struct sigaction *, struct sigaction *);
 #endif

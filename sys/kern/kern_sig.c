@@ -966,13 +966,13 @@ sys_sigaction(struct thread *td, struct sigaction_args *uap)
 	actp = (uap->act != NULL) ? &act : NULL;
 	oactp = (uap->oact != NULL) ? &oact : NULL;
 	if (actp) {
-		error = copyincap(uap->act, &act, sizeof(act));
+		error = copyinptr(uap->act, &act, sizeof(act));
 		if (error)
 			return (error);
 	}
 	error = kern_sigaction(td, uap->sig, actp, oactp, 0);
 	if (oactp && !error)
-		error = copyoutcap(&oact, uap->oact, sizeof(oact));
+		error = copyoutptr(&oact, uap->oact, sizeof(oact));
 	return (error);
 }
 
@@ -1304,7 +1304,7 @@ static int
 copyout_siginfo(const siginfo_t *si, void * __capability info)
 {
 
-	return (copyoutcap(si, info, sizeof(*si)));
+	return (copyoutptr(si, info, sizeof(*si)));
 }
 
 int
@@ -1806,7 +1806,7 @@ sys_sigaltstack(struct thread *td, struct sigaltstack_args *uap)
 	int error;
 
 	if (uap->ss != NULL) {
-		error = copyincap(uap->ss, &ss, sizeof(ss));
+		error = copyinptr(uap->ss, &ss, sizeof(ss));
 		if (error)
 			return (error);
 	}
@@ -1815,7 +1815,7 @@ sys_sigaltstack(struct thread *td, struct sigaltstack_args *uap)
 	if (error)
 		return (error);
 	if (uap->oss != NULL)
-		error = copyoutcap(&oss, uap->oss, sizeof(stack_t));
+		error = copyoutptr(&oss, uap->oss, sizeof(stack_t));
 	return (error);
 }
 
@@ -2111,7 +2111,7 @@ sys_sigqueue(struct thread *td, struct sigqueue_args *uap)
 		 * CheriABI processess? (Would have to happen in
 		 * delivery code to avoid a race).
 		 */
-		if (cheri_gettag(uap->value))
+		if (cheri_tag_get(uap->value))
 			return (EPROT);
 		memset(&sv2, 0, sizeof(sv2));
 		sv2.sival_int = sv.sival_int;

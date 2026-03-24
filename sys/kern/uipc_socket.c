@@ -96,8 +96,8 @@
  * NOTE: With regard to VNETs the general rule is that callers do not set
  * curvnet. Exceptions to this rule include soabort(), sodisconnect(),
  * sofree(), sorele(), sonewconn() and sorflush(), which are usually called
- * from a pre-set VNET context.  sopoll() currently does not need a VNET
- * context to be set.
+ * from a pre-set VNET context.  sopoll_generic() currently does not need a
+ * VNET context to be set.
  */
 
 #include <sys/cdefs.h>
@@ -109,6 +109,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/abi_compat.h>
 #include <sys/capsicum.h>
 #include <sys/fcntl.h>
 #include <sys/limits.h>
@@ -241,43 +242,58 @@ struct splice32 {
  * NB: The original sysctl somaxconn is still available but hidden
  * to prevent confusion about the actual purpose of this number.
  */
-static u_int somaxconn = SOMAXCONN;
+VNET_DEFINE_STATIC(u_int, somaxconn) = SOMAXCONN;
+#define	V_somaxconn	VNET(somaxconn)
 
 static int
 sysctl_somaxconn(SYSCTL_HANDLER_ARGS)
 {
 	int error;
-	int val;
+	u_int val;
 
-	val = somaxconn;
+	val = V_somaxconn;
 	error = sysctl_handle_int(oidp, &val, 0, req);
 	if (error || !req->newptr )
 		return (error);
 
 	/*
 	 * The purpose of the UINT_MAX / 3 limit, is so that the formula
-	 *   3 * so_qlimit / 2
+	 *   3 * sol_qlimit / 2
 	 * below, will not overflow.
          */
 
 	if (val < 1 || val > UINT_MAX / 3)
 		return (EINVAL);
 
-	somaxconn = val;
+	V_somaxconn = val;
 	return (0);
 }
 SYSCTL_PROC(_kern_ipc, OID_AUTO, soacceptqueue,
-    CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE, 0, sizeof(int),
-    sysctl_somaxconn, "I",
+    CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_VNET, 0, sizeof(u_int),
+    sysctl_somaxconn, "IU",
     "Maximum listen socket pending connection accept queue size");
 SYSCTL_PROC(_kern_ipc, KIPC_SOMAXCONN, somaxconn,
-    CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_SKIP | CTLFLAG_MPSAFE, 0,
-    sizeof(int), sysctl_somaxconn, "I",
+    CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_SKIP | CTLFLAG_MPSAFE | CTLFLAG_VNET, 0,
+    sizeof(u_int), sysctl_somaxconn, "IU",
     "Maximum listen socket pending connection accept queue size (compat)");
 
-static int numopensockets;
-SYSCTL_INT(_kern_ipc, OID_AUTO, numopensockets, CTLFLAG_RD,
-    &numopensockets, 0, "Number of open sockets");
+static u_int numopensockets;
+static int
+sysctl_numopensockets(SYSCTL_HANDLER_ARGS)
+{
+	u_int val;
+
+#ifdef VIMAGE
+	if(!IS_DEFAULT_VNET(curvnet))
+		val = curvnet->vnet_sockcnt;
+	else
+#endif
+		val = numopensockets;
+	return (sysctl_handle_int(oidp, &val, 0, req));
+}
+SYSCTL_PROC(_kern_ipc, OID_AUTO, numopensockets,
+    CTLTYPE_UINT | CTLFLAG_RD | CTLFLAG_MPSAFE | CTLFLAG_VNET, 0, sizeof(u_int),
+    sysctl_numopensockets, "IU", "Number of open sockets");
 
 /*
  * so_global_mtx protects so_gencnt, numopensockets, and the per-socket
@@ -1524,8 +1540,8 @@ solisten_proto(struct socket *so, int backlog)
 	so->so_options |= SO_ACCEPTCONN;
 
 listening:
-	if (backlog < 0 || backlog > somaxconn)
-		backlog = somaxconn;
+	if (backlog < 0 || backlog > V_somaxconn)
+		backlog = V_somaxconn;
 	so->sol_qlimit = backlog;
 
 	mtx_unlock(&so->so_snd_mtx);
@@ -2016,11 +2032,11 @@ sopeeraddr(struct socket *so, struct sockaddr *sa)
 #endif
 	int error;
 
-	CURVNET_SET(so->so_vnet);
+	CURVNET_ASSERT_SET();
+
 	error = so->so_proto->pr_peeraddr(so, sa);
 	KASSERT(sa->sa_len <= len,
 	    ("%s: protocol %p sockaddr overflow", __func__, so->so_proto));
-	CURVNET_RESTORE();
 
 	return (error);
 }
@@ -3685,6 +3701,19 @@ sorflush(struct socket *so)
 
 }
 
+int
+sosetfib(struct socket *so, int fibnum)
+{
+	if (fibnum < 0 || fibnum >= rt_numfibs)
+		return (EINVAL);
+
+	SOCK_LOCK(so);
+	so->so_fibnum = fibnum;
+	SOCK_UNLOCK(so);
+
+	return (0);
+}
+
 #ifdef SOCKET_HHOOK
 /*
  * Wrapper for Socket established helper hook.
@@ -3735,14 +3764,14 @@ sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 	if (sopt->sopt_td != NULL)
 		return (copyin(sopt->sopt_val, buf, valsize));
 
-	bcopynocap((__cheri_fromcap void *)sopt->sopt_val, buf, valsize);
+	bcopy_data((__cheri_fromcap void *)sopt->sopt_val, buf, valsize);
 	return (0);
 }
 
 #if __has_feature(capabilities)
 /* Version of sooptcopyin that preserves tags. */
 int
-sooptcopyincap(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
+sooptcopyinptr(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 {
 	size_t	valsize;
 
@@ -3752,7 +3781,7 @@ sooptcopyincap(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 		sopt->sopt_valsize = valsize = len;
 
 	if (sopt->sopt_td != NULL)
-		return (copyincap(sopt->sopt_val, buf, valsize));
+		return (copyinptr(sopt->sopt_val, buf, valsize));
 
 	bcopy((__cheri_fromcap void *)sopt->sopt_val, buf, valsize);
 	return (0);
@@ -3853,21 +3882,7 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 			break;
 
 		case SO_SETFIB:
-			error = sooptcopyin(sopt, &optval, sizeof optval,
-			    sizeof optval);
-			if (error)
-				goto bad;
-
-			if (optval < 0 || optval >= rt_numfibs) {
-				error = EINVAL;
-				goto bad;
-			}
-			if (((so->so_proto->pr_domain->dom_family == PF_INET) ||
-			   (so->so_proto->pr_domain->dom_family == PF_INET6) ||
-			   (so->so_proto->pr_domain->dom_family == PF_ROUTE)))
-				so->so_fibnum = optval;
-			else
-				so->so_fibnum = 0;
+			error = so->so_proto->pr_ctloutput(so, sopt);
 			break;
 
 		case SO_USER_COOKIE:
@@ -3935,11 +3950,11 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
-				extmac.m_string = __USER_CAP(tmpmac.m_string,
+				extmac.m_string = USER_PTR(tmpmac.m_string,
 				    tmpmac.m_buflen);
 			} else
 #endif
-				error = sooptcopyincap(sopt, &extmac,
+				error = sooptcopyinptr(sopt, &extmac,
 				    sizeof extmac, sizeof extmac);
 			if (error)
 				goto bad;
@@ -4069,7 +4084,7 @@ sooptcopyout(struct sockopt *sopt, const void *buf, size_t len)
 		if (sopt->sopt_td != NULL)
 			error = copyout(buf, sopt->sopt_val, valsize);
 		else
-			bcopynocap(buf, (__cheri_fromcap void *)sopt->sopt_val,
+			bcopy_data(buf, (__cheri_fromcap void *)sopt->sopt_val,
 			    valsize);
 	}
 	return (error);
@@ -4128,6 +4143,12 @@ sogetopt(struct socket *so, struct sockopt *sopt)
 integer:
 			error = sooptcopyout(sopt, &optval, sizeof optval);
 			break;
+
+		case SO_FIB:
+			SOCK_LOCK(so);
+			optval = so->so_fibnum;
+			SOCK_UNLOCK(so);
+			goto integer;
 
 		case SO_DOMAIN:
 			optval = so->so_proto->pr_domain->dom_family;
@@ -4215,11 +4236,11 @@ integer:
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
-				extmac.m_string = __USER_CAP(tmpmac.m_string,
+				extmac.m_string = USER_PTR(tmpmac.m_string,
 				    tmpmac.m_buflen);
 			} else
 #endif
-				error = sooptcopyincap(sopt, &extmac,
+				error = sooptcopyinptr(sopt, &extmac,
 				    sizeof(extmac), sizeof(extmac));
 			if (error)
 				goto bad;
@@ -4246,11 +4267,11 @@ integer:
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
-				extmac.m_string = __USER_CAP(tmpmac.m_string,
+				extmac.m_string = USER_PTR(tmpmac.m_string,
 				    tmpmac.m_buflen);
 			} else
 #endif
-				error = sooptcopyincap(sopt, &extmac,
+				error = sooptcopyinptr(sopt, &extmac,
 				    sizeof(extmac), sizeof(extmac));
 			if (error)
 				goto bad;
@@ -4459,20 +4480,7 @@ sohasoutofband(struct socket *so)
 }
 
 int
-sopoll(struct socket *so, int events, struct ucred *active_cred,
-    struct thread *td)
-{
-
-	/*
-	 * We do not need to set or assert curvnet as long as everyone uses
-	 * sopoll_generic().
-	 */
-	return (so->so_proto->pr_sopoll(so, events, active_cred, td));
-}
-
-int
-sopoll_generic(struct socket *so, int events, struct ucred *active_cred,
-    struct thread *td)
+sopoll_generic(struct socket *so, int events, struct thread *td)
 {
 	int revents;
 

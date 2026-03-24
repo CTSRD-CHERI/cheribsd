@@ -16,8 +16,11 @@ moduli: .MADE
 
 LIBADD=	ssh util
 
+.if ${MK_GSSAPI} != "no" && ${MK_KERBEROS_SUPPORT} != "no"
+LIBADD+=	gssapi_krb5 gssapi krb5
+.endif
+
 .if ${MK_TCP_WRAPPERS} != "no"
-CFLAGS+=	-DLIBWRAP=1
 LIBADD+=	wrap
 .endif
 

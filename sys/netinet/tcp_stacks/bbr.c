@@ -978,14 +978,6 @@ bbr_timer_audit(struct tcpcb *tp, struct tcp_bbr *bbr, uint32_t cts, struct sock
 				 * and we do
 				 */
 				return;
-		} else if (sbavail(&inp->inp_socket->so_snd) &&
-		    (tmr_up == PACE_TMR_RXT)) {
-			/*
-			 * if we hit enobufs then we would expect the
-			 * possibility of nothing outstanding and the RXT up
-			 * (and the hptsi timer).
-			 */
-			return;
 		} else if (((V_tcp_always_keepalive ||
 			    inp->inp_socket->so_options & SO_KEEPALIVE) &&
 			    (tp->t_state <= TCPS_CLOSING)) &&
@@ -2993,9 +2985,6 @@ use_initial_window:
 		/* We should not be at 0, go to the initial window then  */
 		goto use_initial_window;
 	}
-	if (bw < 1)
-		/* Probably should panic */
-		bw = 1;
 	if (bw < min_bw)
 		bw = min_bw;
 	return (bw);
@@ -5553,7 +5542,7 @@ lost_rate:
 		bbr_type_log_hdwr_pacing(bbr,
 					 bbr->r_ctl.crte->ptbl->rs_ifp,
 					 rate,
-					 ((bbr->r_ctl.crte == NULL) ? 0 : bbr->r_ctl.crte->rate),
+					 bbr->r_ctl.crte->rate,
 					 __LINE__,
 					 cts,
 					 error);
@@ -6792,8 +6781,6 @@ bbr_update_rtt(struct tcpcb *tp, struct tcp_bbr *bbr,
 			t = cts - rsm->r_tim_lastsent[0];
 		else
 			t = 1;
-		if ((int)t <= 0)
-			t = 1;
 		bbr->r_ctl.rc_last_rtt = t;
 		bbr_update_bbr_info(bbr, rsm, t, cts, to->to_tsecr, 0,
 				    BBR_RTT_BY_EXACTMATCH, rsm->r_tim_lastsent[0], ack_type, to);
@@ -6833,8 +6820,6 @@ bbr_update_rtt(struct tcpcb *tp, struct tcp_bbr *bbr,
 				if (TSTMP_GT(cts, rsm->r_tim_lastsent[i]))
 					t = cts - rsm->r_tim_lastsent[i];
 				else
-					t = 1;
-				if ((int)t <= 0)
 					t = 1;
 				bbr->r_ctl.rc_last_rtt = t;
 				bbr_update_bbr_info(bbr, rsm, t, cts, to->to_tsecr, uts, BBR_RTT_BY_TSMATCHING,
@@ -10313,10 +10298,6 @@ bbr_substate_change(struct tcp_bbr *bbr, uint32_t cts, int32_t line, int dolog)
 			bbr->r_ctl.bbr_smallest_srtt_state2 = bbr->r_ctl.bbr_smallest_srtt_this_state;
 	}
 	bbr->rc_bbr_substate++;
-	if (bbr->rc_bbr_substate >= BBR_SUBSTATE_COUNT) {
-		/* Cycle back to first state-> gain */
-		bbr->rc_bbr_substate = 0;
-	}
 	if (bbr_state_val(bbr) == BBR_SUB_GAIN) {
 		/*
 		 * We enter the gain(5/4) cycle (possibly less if

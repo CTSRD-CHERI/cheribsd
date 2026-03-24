@@ -90,7 +90,6 @@ struct pcicfg_vpd {
 struct pcicfg_msi {
     uint16_t	msi_ctrl;	/* Message Control */
     uint8_t	msi_location;	/* Offset of MSI capability registers. */
-    uint8_t	msi_msgnum;	/* Number of messages */
     int		msi_alloc;	/* Number of allocated messages. */
     uint64_t	msi_addr;	/* Contents of address register. */
     uint16_t	msi_data;	/* Contents of data register. */
@@ -111,14 +110,13 @@ struct msix_table_entry {
 
 struct pcicfg_msix {
     uint16_t	msix_ctrl;	/* Message Control */
-    uint16_t	msix_msgnum;	/* Number of messages */
     uint8_t	msix_location;	/* Offset of MSI-X capability registers. */
     uint8_t	msix_table_bar;	/* BAR containing vector table. */
     uint8_t	msix_pba_bar;	/* BAR containing PBA. */
     uint32_t	msix_table_offset;
     uint32_t	msix_pba_offset;
-    int		msix_alloc;	/* Number of allocated vectors. */
-    int		msix_table_len;	/* Length of virtual table. */
+    u_int	msix_alloc;	/* Number of allocated vectors. */
+    u_int	msix_table_len;	/* Length of virtual table. */
     struct msix_table_entry *msix_table; /* Virtual table. */
     struct msix_vector *msix_vectors;	/* Array of allocated vectors. */
     struct resource *msix_table_res;	/* Resource containing vector table. */
@@ -670,6 +668,7 @@ device_t pci_find_dbsf(uint32_t, uint8_t, uint8_t, uint8_t);
 device_t pci_find_device(uint16_t, uint16_t);
 device_t pci_find_class(uint8_t class, uint8_t subclass);
 device_t pci_find_class_from(uint8_t class, uint8_t subclass, device_t devfrom);
+device_t pci_find_base_class_from(uint8_t class, device_t devfrom);
 
 /* Can be used by drivers to manage the MSI-X table. */
 int	pci_pending_msix(device_t dev, u_int index);

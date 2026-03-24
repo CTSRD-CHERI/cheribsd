@@ -632,6 +632,7 @@ void vm_page_activate (vm_page_t);
 void vm_page_advise(vm_page_t m, int advice);
 vm_page_t vm_page_mpred(vm_object_t, vm_pindex_t);
 vm_page_t vm_page_alloc(vm_object_t, vm_pindex_t, int);
+vm_page_t vm_page_alloc_after(vm_object_t, vm_pindex_t, int, vm_page_t);
 vm_page_t vm_page_alloc_domain_after(vm_object_t, vm_pindex_t, int, int,
     vm_page_t);
 vm_page_t vm_page_alloc_contig(vm_object_t object, vm_pindex_t pindex, int req,
@@ -651,6 +652,8 @@ vm_page_t vm_page_alloc_noobj_contig_domain(int domain, int req, u_long npages,
     vm_memattr_t memattr);
 void vm_page_bits_set(vm_page_t m, vm_page_bits_t *bits, vm_page_bits_t set);
 bool vm_page_blacklist_add(vm_paddr_t pa, bool verbose);
+int vm_page_grab_zero_partial(vm_object_t object, vm_pindex_t pindex, int base,
+    int end);
 vm_page_t vm_page_grab(vm_object_t, vm_pindex_t, int);
 vm_page_t vm_page_grab_unlocked(vm_object_t, vm_pindex_t, int);
 int vm_page_grab_pages(vm_object_t object, vm_pindex_t pindex, int allocflags,
@@ -929,14 +932,11 @@ static inline vm_prot_t
 vm_page_mask_cap_prot(vm_page_t m, vm_prot_t prot)
 {
 
-	if (vm_page_astate_load(m).flags & PGA_CAPSTORE) {
-		return (prot);
+	if ((vm_page_astate_load(m).flags & PGA_CAPSTORE) != 0 ||
+	    (prot & VM_PROT_WRITE) == 0) {
+		return prot;
 	} else {
-#ifdef __riscv_zcheripurecap
-		return (prot & ~VM_PROT_CAP);
-#else
-		return (prot & ~VM_PROT_WRITE_CAP);
-#endif
+		return prot & ~VM_PROT_CAP;
 	}
 }
 

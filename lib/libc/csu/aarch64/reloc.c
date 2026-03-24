@@ -27,13 +27,44 @@
 
 #include <sys/cdefs.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <stdbool.h>
+
+static bool use_code_bounds;
+#endif
+
 static void
 ifunc_init(const Elf_Auxinfo *aux __unused)
 {
+#ifdef __CHERI_PURE_CAPABILITY__
+	const Elf_Phdr *phdr;
+	long phnum;
+
+	/* Digest the auxiliary vector. */
+	for (; aux->a_type != AT_NULL; aux++) {
+		switch (aux->a_type) {
+		case AT_PHDR:
+			phdr = aux->a_un.a_ptr;
+			break;
+		case AT_PHNUM:
+			phnum = aux->a_un.a_val;
+			break;
+		}
+	}
+	for (const Elf_Phdr *ph = phdr; ph < phdr + phnum; ph++) {
+		if (ph->p_type == PT_CHERI_PCC) {
+			use_code_bounds = true;
+			break;
+		}
+	}
+#endif
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#include <cheri/cheric.h>
+#include <cheri/cherireg.h>
+#include <cheriintrin.h>
+
+#include <stddef.h>
 
 /*
  * Fragments consist of a 64-bit address followed by a 56-bit length and an
@@ -42,7 +73,7 @@ ifunc_init(const Elf_Auxinfo *aux __unused)
 static uintcap_t
 init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
     const void * __capability text_rodata_cap, Elf_Addr base_addr,
-    Elf_Size addend)
+    Elf_Size addend, bool use_code_bounds)
 {
 	uintcap_t cap;
 	Elf_Addr address, len;
@@ -54,28 +85,25 @@ init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
 
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
 	    (uintcap_t)text_rodata_cap : (uintcap_t)data_cap;
-	cap = cheri_setaddress(cap, base_addr + address);
-	cap = cheri_clearperm(cap, CHERI_PERM_SW_VMEM);
+	cap = cheri_address_set(cap, base_addr + address);
+	if (perms != MORELLO_FRAG_EXECUTABLE || use_code_bounds)
+		cap = cheri_bounds_set(cap, len);
+	cap = cheri_perms_clear(cap, CHERI_PERM_SW_VMEM);
 
 	if (perms == MORELLO_FRAG_EXECUTABLE || perms == MORELLO_FRAG_RODATA) {
-		cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
+		cap = cheri_perms_clear(cap, CHERI_PERM_SEAL |
 		    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
 		    CHERI_PERM_STORE_LOCAL_CAP);
 	}
 	if (perms == MORELLO_FRAG_RWDATA || perms == MORELLO_FRAG_RODATA) {
-		cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
+		cap = cheri_perms_clear(cap, CHERI_PERM_SEAL |
 		    CHERI_PERM_EXECUTE);
-		cap = cheri_setbounds(cap, len);
 	}
 
 	cap += addend;
 
 	if (perms == MORELLO_FRAG_EXECUTABLE) {
-		/*
-		 * TODO tight bounds: lower bound and len should be set
-		 * with LSB == 0 for C64 code.
-		 */
-		cap = cheri_sealentry(cap);
+		cap = cheri_sentry_create(cap);
 	}
 
 	return (cap);
@@ -104,12 +132,57 @@ crt1_handle_rela(const Elf_Rela *r, void *data_cap, const void *code_cap)
 			    (r->r_addend - (ptraddr_t)code_cap);
 		else
 			ptr = init_cap_from_fragment(fragment, data_cap,
-			    code_cap, 0, r->r_addend);
+			    code_cap, 0, r->r_addend, use_code_bounds);
 		target = ((ifunc_resolver_t)ptr)(0, 0, 0, 0, 0, 0, 0, 0);
 		*where = target;
 		break;
 	}
 }
+
+static void
+crt1_handle_tgot_rela(const Elf_Rela *r, void *tgot, Elf_Addr init, void *tls)
+{
+	uintptr_t *where;
+	Elf_Addr *fragment;
+
+	switch (ELF_R_TYPE(r->r_info)) {
+	case R_MORELLO_TLS_TGOT_SLOT:
+		where = (uintptr_t *)((uintptr_t)tgot +
+		    (r->r_offset - init));
+		fragment = (Elf_Addr *)where;
+		*where = init_cap_from_fragment(fragment, tls,
+		    NULL, (ptraddr_t)tls, 0, true);
+		break;
+	}
+}
+
+#ifdef TLS_TGOT_COMPAT
+extern const Elf_Rela __rela_dyn_start[] __weak_symbol __hidden;
+extern const Elf_Rela __rela_dyn_end[] __weak_symbol __hidden;
+
+/*
+ * Statically-linked TGOT binaries normally have their Initial-Exec GOT entries
+ * filled in by the static linker (and in fact should never even use
+ * Initial-Exec), but with the mixed ABI we force Initial-Exec with dynamic
+ * relocations so that the static TLS block can remain next to the TCB for ABI
+ * compatibility. Those relocations are deferred until _init_tls, which calls
+ * here to apply them.
+ */
+void
+__libc_init_got_tgot(void *data_cap, ptrdiff_t tcbtgotoff)
+{
+	const Elf_Rela *r;
+	uintptr_t *where;
+
+	for (r = &__rela_dyn_start[0]; r < &__rela_dyn_end[0]; r++) {
+		if (ELF_R_TYPE(r->r_info) != R_MORELLO_TLS_TGOTREL64)
+			continue;
+		where = (uintptr_t *)((uintptr_t)data_cap +
+		    (r->r_offset - (ptraddr_t)data_cap));
+		*where = tcbtgotoff + r->r_addend;
+	}
+}
+#endif
 #else
 static void
 crt1_handle_rela(const Elf_Rela *r)

@@ -150,7 +150,12 @@ pmu_parse_counter(struct hwc_context *tc __unused, const ucl_object_t *top)
 	int event_id;
 	int mhpm_id;
 	const char *name;
-	bool enabled __unused;
+	bool enabled;
+
+	mhpm_id = -1;
+	event_id = -1;
+	name = NULL;
+	enabled = false;
 
 	while ((obj = ucl_iterate_object (top, &it, true))) {
 		k = ucl_object_key(obj);
@@ -164,15 +169,41 @@ pmu_parse_counter(struct hwc_context *tc __unused, const ucl_object_t *top)
 			enabled = ucl_object_toboolean(obj);
 	}
 
+	if (mhpm_id == -1) {
+		printf("The 'id' field not present, skipping\n");
+		return (0);
+	}
+
+	if (event_id == -1) {
+		printf("Counter %d: the 'event_id' field not present,"
+		    " skipping\n", mhpm_id);
+		return (0);
+	}
+
+	if (name == NULL) {
+		printf("Counter %d: the 'name' field not present, skipping\n",
+		    mhpm_id);
+		return (0);
+	}
+
+	if (enabled == false)
+		return (0);
+
+	if (counters[mhpm_id].enabled) {
+		printf("Counter %d already enabled, skipping\n", mhpm_id);
+		return (0);
+	}
+
 	counters[mhpm_id].event_id = event_id;
 	counters[mhpm_id].name = strdup(name);
-	counters[mhpm_id].enabled = enabled;
+	counters[mhpm_id].enabled = true;
 
-	return (0);
+	return (1);
 }
 
 static int
-pmu_parse_counters(struct hwc_context *tc, const ucl_object_t *top)
+pmu_parse_counters(struct hwc_context *tc, const ucl_object_t *top,
+    int *ncounters)
 {
 	ucl_object_iter_t it_obj = NULL;
 	ucl_object_iter_t it = NULL;
@@ -180,6 +211,9 @@ pmu_parse_counters(struct hwc_context *tc, const ucl_object_t *top)
 	const ucl_object_t *cur;
 	const char *k;
 	int error;
+	int i;
+
+	i = 0;
 
 	while ((obj = ucl_iterate_object (top, &it, true))) {
 		k = ucl_object_key(obj);
@@ -187,10 +221,18 @@ pmu_parse_counters(struct hwc_context *tc, const ucl_object_t *top)
 			continue;
 		while ((cur = ucl_iterate_object (obj, &it_obj, false))) {
 			error = pmu_parse_counter(tc, cur);
-			if (error)
+			if (error > 0) {
+				i += 1;
+				continue;
+			}
+			if (error == 0)
+				continue;
+			if (error < 0)
 				return (error);
 		}
 	}
+
+	*ncounters = i;
 
 	return (0);
 }
@@ -261,7 +303,7 @@ pmu_start_all(struct hwc_context *tc)
 }
 
 static int
-pmu_parse_config(struct hwc_context *tc)
+pmu_parse_config(struct hwc_context *tc, int *ncounters)
 {
 	struct ucl_parser *parser;
 	const ucl_object_t *obj;
@@ -284,7 +326,7 @@ pmu_parse_config(struct hwc_context *tc)
 	while ((obj = ucl_iterate_object(top, &it, true))) {
 		k = ucl_object_key(obj);
 		if (strcmp(k, "mhpmcounters") == 0) {
-			error = pmu_parse_counters(tc, obj);
+			error = pmu_parse_counters(tc, obj, ncounters);
 			if (error)
 				return (error);
 		}
@@ -297,12 +339,20 @@ static int
 pmu_configure(struct hwc_context *tc)
 {
 	struct counter *c;
+	int ncounters;
 	int error;
 	int i;
 
-	error = pmu_parse_config(tc);
+	ncounters = 0;
+
+	error = pmu_parse_config(tc, &ncounters);
 	if (error)
 		return (error);
+
+	if (ncounters == 0) {
+		printf("%s: no counters to configure\n", __func__);
+		return (-1);
+	}
 
 	/* Stop and reset any previous mappings. */
 	pmu_stop_all(tc, SBI_PMU_STOP_FLAG_RESET);
@@ -404,14 +454,14 @@ pmu_print(struct hwc_context *tc __unused)
 	int i;
 
 	/* Print out standard counters. */
-	printf(" time == %ld\n", csr_read(time));
-	printf(" cycle == %ld\n", csr_read(cycle));
-	printf(" instructions == %ld\n", csr_read(instret));
+	printf("      time == %ld\n", csr_read(time));
+	printf("      cycle == %ld\n", csr_read(cycle));
+	printf("      instructions == %ld\n", csr_read(instret));
 
 	for (i = 0; i < RISCV_NCOUNTERS; i++) {
 		c = &counters[i];
 		if (c->enabled == true)
-			printf(" %s == %ld\n", c->name,
+			printf("   %d: %s == %ld\n", i, c->name,
 			    csr_read_num(CSR_HPMCOUNTER3 - 3 + i));
 	}
 }

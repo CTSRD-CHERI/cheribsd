@@ -483,7 +483,8 @@ vm_reserv_depopulate(vm_reserv_t rv, int index)
 	if (rv->popcnt == 0) {
 		vm_reserv_remove(rv);
 		vm_domain_free_lock(vmd);
-		vm_phys_free_pages(rv->pages, VM_LEVEL_0_ORDER);
+		vm_phys_free_pages(rv->pages, VM_FREEPOOL_DEFAULT,
+		    VM_LEVEL_0_ORDER);
 		vm_domain_free_unlock(vmd);
 		counter_u64_add(vm_reserv_freed, 1);
 	}
@@ -504,7 +505,7 @@ vm_reserv_from_page(vm_page_t m)
 	seg = &vm_phys_segs[m->segind];
 	rv = seg->first_reserv + ((VM_PAGE_TO_PHYS(m) >> VM_LEVEL_0_SHIFT) -
 	    (seg->start >> VM_LEVEL_0_SHIFT));
-	return (cheri_kern_setboundsexact(rv, sizeof(*rv)));
+	return (cheri_kern_bounds_set_exact(rv, sizeof(*rv)));
 #else
 	return (&vm_reserv_array[VM_PAGE_TO_PHYS(m) >> VM_LEVEL_0_SHIFT]);
 #endif
@@ -949,7 +950,7 @@ static void
 vm_reserv_break(vm_reserv_t rv)
 {
 	vm_page_t m;
-	int hi, lo, pos;
+	int pos, pos0, pos1;
 
 	vm_reserv_assert_locked(rv);
 	CTR5(KTR_VM, "%s: rv %p object %p popcnt %d inpartpop %d",
@@ -960,23 +961,24 @@ vm_reserv_break(vm_reserv_t rv)
 	for (; m < rv->pages + VM_LEVEL_0_NPAGES; m += VM_SUBLEVEL_0_NPAGES)
 #endif
 		m->psind = 0;
-	hi = lo = -1;
-	pos = 0;
-	for (;;) {
-		bit_ff_at(rv->popmap, pos, VM_LEVEL_0_NPAGES, lo != hi, &pos);
-		if (lo == hi) {
-			if (pos == -1)
-				break;
-			lo = pos;
-			continue;
-		}
+	pos0 = bit_test(rv->popmap, 0) ? -1 : 0;
+	pos1 = -1 - pos0;
+	for (pos = 0; pos < VM_LEVEL_0_NPAGES; ) {
+		/* Find the first different bit after pos. */
+		bit_ff_at(rv->popmap, pos + 1, VM_LEVEL_0_NPAGES,
+		    pos1 < pos0, &pos);
 		if (pos == -1)
 			pos = VM_LEVEL_0_NPAGES;
-		hi = pos;
+		if (pos0 < pos1) {
+			pos0 = pos;
+			continue;
+		}
+		/* Free unused pages from pos0 to pos. */
+		pos1 = pos;
 		vm_domain_free_lock(VM_DOMAIN(rv->domain));
-		vm_phys_enqueue_contig(&rv->pages[lo], hi - lo);
+		vm_phys_enqueue_contig(&rv->pages[pos0], VM_FREEPOOL_DEFAULT,
+		    pos1 - pos0);
 		vm_domain_free_unlock(VM_DOMAIN(rv->domain));
-		lo = hi;
 	}
 	bit_nclear(rv->popmap, 0, VM_LEVEL_0_NPAGES - 1);
 	rv->popcnt = 0;
@@ -1077,7 +1079,7 @@ vm_reserv_init(void)
 #else
 		rv_slice = vm_reserv_array + (seg->start >> VM_LEVEL_0_SHIFT);
 #endif
-		seg->first_reserv = cheri_kern_setbounds(rv_slice,
+		seg->first_reserv = cheri_kern_bounds_set(rv_slice,
 		    nreserv * sizeof(*rv_slice));
 		paddr = roundup2(seg->start, VM_LEVEL_0_SIZE);
 		rv = seg->first_reserv + (paddr >> VM_LEVEL_0_SHIFT) -

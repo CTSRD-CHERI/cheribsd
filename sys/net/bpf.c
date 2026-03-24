@@ -1950,13 +1950,13 @@ bf_insns_get_ptr(void *fpp)
 	fpup = fpp;
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (__USER_CAP(
+		return (USER_PTR(
 		    (struct bpf_insn *)(uintptr_t)fpup->fp32.bf_insns,
 		    fpup->fp32.bf_len * sizeof(struct bpf_insn)));
 #endif
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI))
-		return (__USER_CAP(
+		return (USER_PTR(
 		    (struct bpf_insn *)(uintptr_t)fpup->fp64.bf_insns,
 		    fpup->fp64.bf_len * sizeof(struct bpf_insn)));
 #endif
@@ -2097,10 +2097,20 @@ bpf_setif(struct bpf_d *d, struct ifreq *ifr)
 	BPF_LOCK_ASSERT();
 
 	theywant = ifunit(ifr->ifr_name);
-	if (theywant == NULL || theywant->if_bpf == NULL)
+	if (theywant == NULL)
+		return (ENXIO);
+	/*
+	 * Look through attached interfaces for the named one.
+	 */
+	CK_LIST_FOREACH(bp, &bpf_iflist, bif_next) {
+		if (bp->bif_ifp == theywant &&
+		    bp->bif_bpf == &theywant->if_bpf)
+			break;
+	}
+	if (bp == NULL)
 		return (ENXIO);
 
-	bp = theywant->if_bpf;
+	MPASS(bp == theywant->if_bpf);
 	/*
 	 * At this point, we expect the buffer is already allocated.  If not,
 	 * return an error.
@@ -2848,6 +2858,33 @@ bpf_get_bp_params(struct bpf_if *bp, u_int *bif_dlt, u_int *bif_hdrlen)
 
 	return (0);
 }
+
+/*
+ * Detach descriptors on interface's vmove event.
+ */
+void
+bpf_ifdetach(struct ifnet *ifp)
+{
+	struct bpf_if *bp;
+	struct bpf_d *d;
+
+	BPF_LOCK();
+	CK_LIST_FOREACH(bp, &bpf_iflist, bif_next) {
+		if (bp->bif_ifp != ifp)
+			continue;
+
+		/* Detach common descriptors */
+		while ((d = CK_LIST_FIRST(&bp->bif_dlist)) != NULL) {
+			bpf_detachd_locked(d, true);
+		}
+
+		/* Detach writer-only descriptors */
+		while ((d = CK_LIST_FIRST(&bp->bif_wlist)) != NULL) {
+			bpf_detachd_locked(d, true);
+		}
+	}
+	BPF_UNLOCK();
+}
 #endif
 
 /*
@@ -2910,12 +2947,12 @@ bfl_list_get_ptr(void *bflp)
 	bflup = bflp;
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (__USER_CAP((u_int *)(uintptr_t)bflup->bfl32.bfl_list,
+		return (USER_PTR((u_int *)(uintptr_t)bflup->bfl32.bfl_list,
 		    bflup->bfl32.bfl_len * sizeof(u_int)));
 #endif
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI))
-		return (__USER_CAP((u_int *)(uintptr_t)bflup->bfl64.bfl_list,
+		return (USER_PTR((u_int *)(uintptr_t)bflup->bfl64.bfl_list,
 		    bflup->bfl64.bfl_len * sizeof(u_int)));
 #endif
 	return (bflup->bfl.bfl_list);

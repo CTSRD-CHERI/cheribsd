@@ -86,8 +86,8 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 				 * Note that cnt <= PAGE_SIZE, exact setbounds
 				 * is guaranteed to work.
 				 */
-				error = uiomove(cheri_setboundsexact(
-				    cheri_setaddress(dmap_capability, v), cnt),
+				error = uiomove(cheri_bounds_set_exact(
+				    cheri_address_set(dmap_capability, v), cnt),
 				    cnt, uio);
 #else
 				error = uiomove((void *)v, cnt, uio);

@@ -414,10 +414,10 @@ sdt_kld_load_probes(struct linker_file *lf)
 				continue;
 			}
 #ifdef __CHERI_PURE_CAPABILITY__
-			tp->patchpoint = (uintcap_t)cheri_setbounds(
-			    cheri_setaddress(kernel_root_cap, tp->patchpoint),
+			tp->patchpoint = (uintcap_t)cheri_bounds_set(
+			    cheri_address_set(kernel_root_cap, tp->patchpoint),
 			    INSN_SIZE);
-			tp->patchpoint = cheri_andperm(tp->patchpoint,
+			tp->patchpoint = cheri_perms_and(tp->patchpoint,
 			    CHERI_PERM_STORE | CHERI_PERM_SEAL);
 #endif
 			STAILQ_INSERT_TAIL(&tp->probe->tracepoint_list, tp,

@@ -138,7 +138,8 @@ cap_covers_pages(const void * __capability cap, size_t size)
 	size += pageoff;
 	size = (vm_size_t)round_page(size);
 
-	return (__CAP_CHECK(__DECONST_CAP(void * __capability, addr), size));
+	/* Individual syscalls check perms */
+	return (cheri_can_access(addr, 0, size));
 }
 
 static uintcap_t
@@ -165,10 +166,10 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 	 * address 'addr' to derive a valid capability.
 	 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+	KASSERT(cheri_tag_get(addr), ("Expected valid capability"));
 	newcap = addr;
 	/* Enforce per-thread mmap capability permission */
-	newcap = cheri_andperm(newcap, cheri_getperm(mrp->mr_source_cap));
+	newcap = cheri_perms_and(newcap, cheri_perms_get(mrp->mr_source_cap));
 #else
 	newcap = (uintcap_t)mrp->mr_source_cap;
 	if (mrp->mr_flags & MAP_FIXED) {
@@ -177,22 +178,22 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 		 * capability to the whole, properly-aligned region
 		 * with the offset pointing to hint.
 		 */
-		newcap = cheri_setaddress(newcap, rounddown2(addr, PAGE_SIZE));
-		newcap = cheri_setbounds(newcap,
+		newcap = cheri_address_set(newcap, rounddown2(addr, PAGE_SIZE));
+		newcap = cheri_bounds_set(newcap,
 		    roundup2(mrp->mr_len + (addr - rounddown2(addr, PAGE_SIZE)),
 		    PAGE_SIZE));
 		/* Shift address up if required */
-		newcap = cheri_setaddress(newcap, addr);
+		newcap = cheri_address_set(newcap, addr);
 	} else {
-		cap_base = cheri_getbase(newcap);
-		cap_len = cheri_getlen(newcap);
+		cap_base = cheri_base_get(newcap);
+		cap_len = cheri_length_get(newcap);
 		KASSERT(addr >= cap_base &&
 		    addr + mrp->mr_len <= cap_base + cap_len,
 		    ("Allocated range (%zx - %zx) is not within source "
 		    "capability (%zx - %zx)", addr, addr + mrp->mr_len,
 		    cap_base, cap_base + cap_len));
-		newcap = cheri_setbounds(
-		    cheri_setaddress(newcap, addr),
+		newcap = cheri_bounds_set(
+		    cheri_address_set(newcap, addr),
 		    roundup2(mrp->mr_len, PAGE_SIZE));
 	}
 #endif
@@ -208,8 +209,8 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 	 * Set the permissions to PROT_MAX to allow a full
 	 * range of access subject to page permissions.
 	 */
-	perms = ~CHERI_PROT2PERM_MASK | vm_map_prot2perms(cap_prot);
-	newcap = cheri_andperm(newcap, perms);
+	perms = vm_prot2perms(cheri_perms_get(newcap), cap_prot);
+	newcap = cheri_perms_and(newcap, perms);
 
 	return (newcap);
 }
@@ -237,6 +238,7 @@ vm_wxcheck(struct proc *p, char *call)
 static inline int
 vm_prot2vmprot(vm_prot_t *prot, const char *func, const char *protname)
 {
+#if __has_feature(capabilities)
 	vm_prot_t vm_prot;
 
 	KASSERT((*prot & ~_PROT_ALL) == 0, ("invalid bits in %s", protname));
@@ -251,15 +253,13 @@ vm_prot2vmprot(vm_prot_t *prot, const char *func, const char *protname)
 
 	vm_prot = (*prot & ~_PROT_CAP);
 	if ((*prot & PROT_CAP) != 0) {
-		if ((*prot & PROT_READ) != 0)
-			vm_prot |= VM_PROT_READ_CAP;
-		if ((*prot & PROT_WRITE) != 0)
-			vm_prot |= VM_PROT_WRITE_CAP;
+		vm_prot |= VM_PROT_CAP;
 	}
 	if ((*prot & PROT_NO_CAP) != 0)
 		vm_prot |= VM_PROT_NO_IMPLY_CAP;
 
 	*prot = vm_prot;
+#endif
 	return (0);
 }
 
@@ -330,14 +330,14 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	 * switch to using userspace_root_cap as the source
 	 * capability if this pattern proves common.
 	 */
-	hint = cheri_getaddress(uap->addr);
+	hint = cheri_address_get(uap->addr);
 
-	if (cheri_gettag(uap->addr)) {
+	if (cheri_tag_get(uap->addr)) {
 		if ((flags & MAP_FIXED) == 0)
 			return (EPROT);
 		else if ((flags & MAP_STACK) != 0)
 			return (ENOMEM);
-		else if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM))
+		else if ((cheri_perms_get(uap->addr) & CHERI_PERM_SW_VMEM))
 			source_cap = uap->addr;
 		else {
 			SYSERRCAUSE("MAP_FIXED without CHERI_PERM_SW_VMEM");
@@ -356,9 +356,10 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		if (flags & MAP_FIXED)
 			flags |= MAP_EXCL;
 
-		source_cap = userspace_root_cap;
+		source_cap = (void * __capability)vm_map_rootcap(
+		    &td->td_proc->p_vmspace->vm_map);
 	}
-	KASSERT(cheri_gettag(source_cap),
+	KASSERT(cheri_tag_get(source_cap),
 	    ("td->td_cheri_mmap_cap is untagged!"));
 
 	/*
@@ -366,18 +367,18 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	 * address range fits within the source capability.
 	 */
 	if ((flags & MAP_FIXED) &&
-	    (rounddown2(hint, PAGE_SIZE) < cheri_getbase(source_cap) ||
+	    (rounddown2(hint, PAGE_SIZE) < cheri_base_get(source_cap) ||
 	    roundup2(hint + uap->len, PAGE_SIZE) >
-	    cheri_getaddress(source_cap) + cheri_getlen(source_cap))) {
+	    cheri_address_get(source_cap) + cheri_length_get(source_cap))) {
 		SYSERRCAUSE("MAP_FIXED and too little space in "
 		    "capablity (0x%zx < 0x%zx)",
-		    cheri_getlen(source_cap) - cheri_getoffset(source_cap),
+		    cheri_bytes_remaining(source_cap),
 		    roundup2(uap->len, PAGE_SIZE));
 		return (EPROT);
 	}
 
-	perms = cheri_getperm(source_cap);
-	reqperms = vm_map_prot2perms(uap->prot);
+	perms = cheri_perms_get(source_cap);
+	reqperms = vm_prot2perms(0, uap->prot);
 #ifdef CHERI_PERM_EXECUTIVE
 	if ((flags & MAP_FIXED) && (perms & CHERI_PERM_EXECUTIVE) == 0)
 		/*
@@ -399,7 +400,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 
 	return (kern_mmap(td, &(struct mmap_req){
 		.mr_hint = hint,
-		.mr_max_addr = cheri_gettop(source_cap),
+		.mr_max_addr = cheri_top_get(source_cap),
 		.mr_len = uap->len,
 		.mr_prot = uap->prot,
 		.mr_flags = flags,
@@ -464,6 +465,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	prot = PROT_EXTRACT(mrp->mr_prot);
 	/* Ensure max_prot is a superset of prot if non-zero */
 	if (max_prot != 0) {
+#if __has_feature(capabilities)
 		/*
 		 * If prot contains explicit capability permissions then
 		 * max_prot must as well.  Add PROT_NO_CAP to both to allow
@@ -477,6 +479,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 			prot |= PROT_NO_CAP;
 			max_prot |= PROT_NO_CAP;
 		}
+#endif
 		if ((max_prot & prot) != prot) {
 			SYSERRCAUSE("%s: requested page permissions exceed "
 			    "requested maximum", __func__);
@@ -567,7 +570,11 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		return (EINVAL);
 	}
 	if ((flags & MAP_GUARD) != 0 &&
-	    ((prot != PROT_NONE && prot != PROT_NO_CAP) || fd != -1 ||
+	    ((prot != PROT_NONE
+#if __has_feature(capabilities)
+	      && prot != PROT_NO_CAP
+#endif
+	     ) || fd != -1 ||
 	    pos != 0 || (flags & ~(MAP_FIXED | MAP_GUARD | MAP_EXCL |
 	    MAP_RESERVATION_CREATE |
 	    MAP_32BIT | MAP_ALIGNMENT_MASK)) != 0)) {
@@ -650,7 +657,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		 * virtual address and will not be a valid capability.
 		 */
 		if ((flags & MAP_RESERVATION_CREATE) == 0)
-			addr = cheri_setaddress((uintcap_t)mrp->mr_source_cap,
+			addr = cheri_address_set((uintcap_t)mrp->mr_source_cap,
 			    addr);
 #endif
 	} else if (flags & MAP_32BIT) {
@@ -725,8 +732,10 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 			error = EINVAL;
 			goto done;
 		}
-		if ((cap_prot & (VM_PROT_READ_CAP | VM_PROT_WRITE_CAP)) != 0)
+#if __has_feature(capabilities)
+		if ((cap_prot & VM_PROT_CAP) != 0)
 			cap_maxprot = VM_PROT_ADD_CAP(cap_maxprot);
+#endif
 		if ((cap_prot & cap_maxprot) != cap_prot) {
 			SYSERRCAUSE("%s: unable to map file with "
 			    "requested permissions", __func__);
@@ -930,7 +939,7 @@ sys_munmap(struct thread *td, struct munmap_args *uap)
 #if __has_feature(capabilities)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
 		return (EPROT);
-	if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
+	if ((cheri_perms_get(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
 		return (EPROT);
 #endif
 
@@ -1016,7 +1025,7 @@ sys_mprotect(struct thread *td, struct mprotect_args *uap)
 #if __has_feature(capabilities)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
 		return (EPROT);
-	if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
+	if ((cheri_perms_get(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
 		return (EPROT);
 #endif
 
@@ -1057,11 +1066,13 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int userprot,
 
 	flags |= VM_MAP_PROTECT_SET_PROT | VM_MAP_PROTECT_KEEP_CAP;
 	if (max_prot != 0) {
+#if __has_feature(capabilities)
 		/* see comment in kern_mmap() */
 		if ((prot & _PROT_CAP) != 0 || (max_prot & _PROT_CAP) != 0) {
 			prot |= PROT_NO_CAP;
 			max_prot |= PROT_NO_CAP;
 		}
+#endif
 		if ((max_prot & prot) != prot)
 			return (ENOTSUP);
 		flags |= VM_MAP_PROTECT_SET_MAXPROT;
@@ -1104,7 +1115,7 @@ sys_minherit(struct thread *td, struct minherit_args *uap)
 #if __has_feature(capabilities)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
 		return (EPROT);
-	if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
+	if ((cheri_perms_get(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
 		return (EPROT);
 #endif
 	return (kern_minherit(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
@@ -1160,7 +1171,7 @@ sys_madvise(struct thread *td, struct madvise_args *uap)
 	 * CHERI_PERM_SW_VMEM.
 	 */
 	if (uap->behav == MADV_FREE &&
-	    (cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
+	    (cheri_perms_get(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
 		return (EPROT);
 #endif
 
@@ -1223,8 +1234,8 @@ sys_mincore(struct thread *td, struct mincore_args *uap)
 #if __has_feature(capabilities)
 	vm_offset_t range_bottom_page = trunc_page(addr);
 	vm_offset_t range_top_page = round_page(addr + uap->len);
-	vm_offset_t cap_bottom_page = trunc_page(cheri_getbase(addr));
-	vm_offset_t cap_top_page = round_page(cheri_gettop(addr));
+	vm_offset_t cap_bottom_page = trunc_page(cheri_base_get(addr));
+	vm_offset_t cap_top_page = round_page(cheri_top_get(addr));
 
 	/*
 	 * mincore(2) is a read-only, metadata operation.  Require that
@@ -1244,8 +1255,8 @@ sys_mincore(struct thread *td, struct mincore_args *uap)
 	 * be useful and isn't portable as there's no way to round them
 	 * down without stripping the tag.
 	 */
-	if (!cheri_gettag(addr) || cheri_getsealed(addr) ||
-	    (cheri_getperm(addr) &
+	if (!cheri_tag_get(addr) || cheri_is_sealed(addr) ||
+	    (cheri_perms_get(addr) &
 	    (CHERI_PERM_EXECUTE | CHERI_PERM_LOAD | CHERI_PERM_STORE)) == 0 ||
 	    range_bottom_page < cap_bottom_page ||
 	    range_bottom_page >= cap_top_page ||
@@ -2024,9 +2035,9 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 	bool curmap, fitit;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_getlen(addr) == sizeof(void *),
+	KASSERT(cheri_length_get(addr) == sizeof(void *),
 	    ("Invalid bounds for pointer-sized object %zx",
-	    (size_t)cheri_getlen(addr)));
+	    (size_t)cheri_length_get(addr)));
 #endif
 
 	curmap = map == &td->td_proc->p_vmspace->vm_map;
@@ -2170,7 +2181,7 @@ vm_derive_capreg(struct proc *p, uintcap_t in, uintcap_t *out)
 	int otype;
 
 	/* The only sealed caps supported for this are sentries. */
-	otype = cheri_gettype(in);
+	otype = cheri_type_get(in);
 	switch (otype) {
 	case CHERI_OTYPE_UNSEALED:
 	case CHERI_OTYPE_SENTRY:
@@ -2182,13 +2193,13 @@ vm_derive_capreg(struct proc *p, uintcap_t in, uintcap_t *out)
 	map = &p->p_vmspace->vm_map;
 	cap = vm_map_reservation_cap(map, (vm_offset_t)in);
 
-	cap = cheri_buildcap(cap, in);
+	cap = cheri_cap_build(cap, in);
 #ifdef __aarch64__
 	/* Morello requires explicit sealing for entry. */
 	if (otype == CHERI_OTYPE_SENTRY)
-		cap = cheri_sealentry(cap);
+		cap = cheri_sentry_create(cap);
 #endif
-	if (cheri_gettag(cap)) {
+	if (cheri_tag_get(cap)) {
 		*out = (uintcap_t)cap;
 		return (true);
 	}

@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd November 13, 2024
+.Dd February 3, 2025
 .Dt BUILD 7
 .Os
 .Sh NAME
@@ -449,6 +449,8 @@ include:
 .Bl -tag -width ".Cm delete-old-libs"
 .It Cm check-old
 Print a list of old files and directories in the system.
+.It Cm check-old-libs
+Print a list of obsolete base system libraries.
 .It Cm delete-old
 Delete obsolete base system files and directories interactively.
 When
@@ -879,6 +881,11 @@ This variable implies
 Use external GCC toolchains to build the requested targets.
 If the required toolchain package for a supported architecture is not installed,
 the build for that architecture is skipped.
+.Pp
+A specific version of GCC can be used by setting the value of this variable
+to the desired version
+.Pq for example, Dq gcc14 ;
+otherwise a default version of GCC is used.
 .It Va TARGETS
 Only build the listed targets instead of each supported architecture.
 .It Va EXTRA_TARGETS

@@ -36,9 +36,10 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <net/if.h>
 #include <net/pfvar.h>
-#include <arpa/inet.h>
 
 #include <ctype.h>
 #include <err.h>
@@ -89,7 +90,7 @@ static const char	*istats_text[2][2][2] = {
 		table.pfrt_flags |= PFR_TFLAG_PERSIST;			\
 		if ((!(opts & PF_OPT_NOACTION) ||			\
 		    (opts & PF_OPT_DUMMYACTION)) &&			\
-		    (pfr_add_tables(&table, 1, &nadd, flags)) &&	\
+		    (pfr_add_table(&table, &nadd, flags)) &&		\
 		    (errno != EPERM)) {					\
 			radix_perror();					\
 			goto _error;					\
@@ -104,7 +105,7 @@ static const char	*istats_text[2][2][2] = {
 	} while(0)
 
 int
-pfctl_clear_tables(const char *anchor, int opts)
+pfctl_do_clear_tables(const char *anchor, int opts)
 {
 	return pfctl_table(0, NULL, NULL, "-F", NULL, anchor, opts);
 }
@@ -157,7 +158,7 @@ pfctl_table(int argc, char *argv[], char *tname, const char *command,
 	if (!strcmp(command, "-F")) {
 		if (argc || file != NULL)
 			usage();
-		RVTEST(pfr_clr_tables(&table, &ndel, flags));
+		RVTEST(pfctl_clear_tables(pfh, &table, &ndel, flags));
 		xprintf(opts, "%d tables deleted", ndel);
 	} else if (!strcmp(command, "-s")) {
 		b.pfrb_type = (opts & PF_OPT_VERBOSE2) ?
@@ -189,7 +190,7 @@ pfctl_table(int argc, char *argv[], char *tname, const char *command,
 	} else if (!strcmp(command, "kill")) {
 		if (argc || file != NULL)
 			usage();
-		RVTEST(pfr_del_tables(&table, 1, &ndel, flags));
+		RVTEST(pfr_del_table(&table, &ndel, flags));
 		xprintf(opts, "%d table deleted", ndel);
 	} else if (!strcmp(command, "flush")) {
 		if (argc || file != NULL)
@@ -496,20 +497,24 @@ print_addrx(struct pfr_addr *ad, struct pfr_addr *rad, int dns)
 		printf("\t nomatch");
 	if (dns && ad->pfra_net == hostnet) {
 		char host[NI_MAXHOST];
-		union sockaddr_union sa;
+		struct sockaddr_storage ss;
 
 		strlcpy(host, "?", sizeof(host));
-		bzero(&sa, sizeof(sa));
-		sa.sa.sa_family = ad->pfra_af;
-		if (sa.sa.sa_family == AF_INET) {
-			sa.sa.sa_len = sizeof(sa.sin);
-			sa.sin.sin_addr = ad->pfra_ip4addr;
+		bzero(&ss, sizeof(ss));
+		ss.ss_family = ad->pfra_af;
+		if (ss.ss_family == AF_INET) {
+			struct sockaddr_in *sin = (struct sockaddr_in *)&ss;
+
+			sin->sin_len = sizeof(*sin);
+			sin->sin_addr = ad->pfra_ip4addr;
 		} else {
-			sa.sa.sa_len = sizeof(sa.sin6);
-			sa.sin6.sin6_addr = ad->pfra_ip6addr;
+			struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&ss;
+
+			sin6->sin6_len = sizeof(*sin6);
+			sin6->sin6_addr = ad->pfra_ip6addr;
 		}
-		if (getnameinfo(&sa.sa, sa.sa.sa_len, host, sizeof(host),
-		    NULL, 0, NI_NAMEREQD) == 0)
+		if (getnameinfo((struct sockaddr *)&ss, ss.ss_len, host,
+		    sizeof(host), NULL, 0, NI_NAMEREQD) == 0)
 			printf("\t(%s)", host);
 	}
 	printf("\n");

@@ -112,14 +112,13 @@ LDFLAGS+= -Wl,-zbti-report=error
 .endif
 .endif
 
-# Disable when bootstrapping as host may not support new relocations
-# TODO: Remove after the next release
-.if ${MACHINE_CPUARCH} == "aarch64" && ${MACHINE_CPU:Mcheri} && !defined(BOOTSTRAPPING)
-LDFLAGS+= -Wl,--local-caprelocs=elf
-
-.if ${MK_CHERI_CODEPTR_RELOCS} != "no" && ${COMPILER_FEATURES:Mmorello-codeptr-relocs}
-CFLAGS+=	-cheri-codeptr-relocs
-LDFLAGS+=	-cheri-codeptr-relocs
+.if ${MACHINE_ABI:Mpurecap}
+.if ${OPT_CHERI_TGOT_TLS} == "yes"
+CFLAGS+=	-cheri-tgot-tls
+.elif ${OPT_CHERI_TGOT_TLS} == "compat"
+CFLAGS+=	-cheri-tgot-tls=compat
+.elif ${OPT_CHERI_TGOT_TLS} == "no"
+CFLAGS+=	-no-cheri-tgot-tls
 .endif
 .endif
 
@@ -134,6 +133,15 @@ CXXFLAGS+= -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-cl
 .endif
 .else
 .warning INIT_ALL (${OPT_INIT_ALL}) requested but not supported by compiler
+.endif
+.endif
+
+# Zero used registers on return (mitigate some ROP)
+.if ${MK_ZEROREGS} != "no"
+.if ${COMPILER_FEATURES:Mzeroregs}
+ZEROREG_TYPE?= used
+CFLAGS+= -fzero-call-used-regs=${ZEROREG_TYPE}
+CXXFLAGS+= -fzero-call-used-regs=${ZEROREG_TYPE}
 .endif
 .endif
 
@@ -171,7 +179,8 @@ SHLIB_NAME_FULL=${SHLIB_NAME}.full
 # Use ${DEBUGDIR} for base system debug files, else .debug subdirectory
 .if ${_SHLIBDIR} == "/boot" ||\
     ${SHLIBDIR:C%/lib(/.*)?$%/lib%} == "/lib" ||\
-    ${SHLIBDIR:C%/usr/(tests/)?lib(32|64|64c|64cb|exec)?(/.*)?%/usr/lib%} == "/usr/lib"
+    ${SHLIBDIR:C%/usr/lib(32|64|64c|64cb|exec)?(/.*)?%/usr/lib%} == "/usr/lib" ||\
+    ${SHLIBDIR:C%/usr/tests(/.*)?%/usr/tests%} == "/usr/tests"
 DEBUGFILEDIR=${DEBUGDIR}${_SHLIBDIR}
 .else
 DEBUGFILEDIR=${_SHLIBDIR}/.debug

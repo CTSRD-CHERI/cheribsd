@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2025 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2025-2026 Ruslan Bukin <br@bsdpad.com>
  *
  * This work was supported by Innovate UK project 105694, "Digital Security
  * by Design (DSbD) Technology Platform Prototype".
@@ -38,17 +38,10 @@
 
 #include <dev/hwc/hwc_context.h>
 #include <dev/hwc/hwc_contexthash.h>
-#if 0
-#include <dev/hwc/hwc_thread.h>
-#endif
 #include <dev/hwc/hwc_owner.h>
 #include <dev/hwc/hwc_ownerhash.h>
 #include <dev/hwc/hwc_backend.h>
-#if 0
-#include <dev/hwc/hwc_record.h>
-#endif
 #include <dev/hwc/hwc_ioctl.h>
-#include <dev/hwc/hwc_hook.h>
 
 #define	HWC_DEBUG
 #undef	HWC_DEBUG
@@ -97,9 +90,6 @@ hwc_load(void)
 	hwc_ctx_load();
 	hwc_contexthash_load();
 	hwc_ownerhash_load();
-#if 0
-	hwc_record_load();
-#endif
 
 	error = make_dev_s(&args, &hwc_cdev, "hwc");
 	if (error != 0)
@@ -108,8 +98,6 @@ hwc_load(void)
 	hwc_exit_tag = EVENTHANDLER_REGISTER(process_exit, hwc_process_exit,
 	    NULL, EVENTHANDLER_PRI_ANY);
 
-	hwc_hook_load();
-
 	return (0);
 }
 
@@ -117,16 +105,12 @@ static int
 hwc_unload(void)
 {
 
-	hwc_hook_unload();
 	EVENTHANDLER_DEREGISTER(process_exit, hwc_exit_tag);
 	destroy_dev(hwc_cdev);
-#if 0
-	hwc_record_unload();
 	hwc_ownerhash_unload();
 	hwc_contexthash_unload();
 	hwc_ctx_unload();
 	hwc_backend_unload();
-#endif
 
 	return (0);
 }

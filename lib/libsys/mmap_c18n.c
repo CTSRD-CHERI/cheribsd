@@ -11,7 +11,8 @@
 
 #include <sys/mman.h>
 
-#include <cheri/cheric.h>
+#include <cheri/cherireg.h>
+#include <cheriintrin.h>
 
 #include "libc_private.h"
 
@@ -29,7 +30,7 @@ __mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 #ifdef __aarch64__
 		perms |= CHERI_PERM_EXECUTIVE;
 #endif
-		ret = cheri_clearperm(ret, perms);
+		ret = cheri_perms_clear(ret, perms);
 	}
 #endif
 	return (ret);

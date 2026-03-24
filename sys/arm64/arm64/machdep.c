@@ -77,6 +77,7 @@
 
 #include <machine/armreg.h>
 #include <machine/cpu.h>
+#include <machine/cpu_feat.h>
 #include <machine/debug_monitor.h>
 #include <machine/hypervisor.h>
 #include <machine/kdb.h>
@@ -195,34 +196,42 @@ SYSINIT(ssp_warn, SI_SUB_COPYRIGHT, SI_ORDER_ANY, print_ssp_warning, NULL);
 SYSINIT(ssp_warn2, SI_SUB_LAST, SI_ORDER_ANY, print_ssp_warning, NULL);
 #endif
 
-static void
-pan_setup(void)
+static bool
+pan_check(const struct cpu_feat *feat __unused, u_int midr __unused)
 {
 	uint64_t id_aa64mfr1;
 
 	id_aa64mfr1 = READ_SPECIALREG(id_aa64mmfr1_el1);
-	if (ID_AA64MMFR1_PAN_VAL(id_aa64mfr1) != ID_AA64MMFR1_PAN_NONE)
-		has_pan = 1;
+	return (ID_AA64MMFR1_PAN_VAL(id_aa64mfr1) != ID_AA64MMFR1_PAN_NONE);
 }
 
-void
-pan_enable(void)
+static void
+pan_enable(const struct cpu_feat *feat __unused,
+    cpu_feat_errata errata_status __unused, u_int *errata_list __unused,
+    u_int errata_count __unused)
 {
+	has_pan = 1;
 
 	/*
 	 * This sets the PAN bit, stopping the kernel from accessing
 	 * memory when userspace can also access it unless the kernel
 	 * uses the userspace load/store instructions.
 	 */
-	if (has_pan) {
-		WRITE_SPECIALREG(sctlr_el1,
-		    READ_SPECIALREG(sctlr_el1) & ~SCTLR_SPAN);
-		__asm __volatile(
-		    ".arch_extension pan	\n"
-		    "msr pan, #1		\n"
-		    ".arch_extension nopan	\n");
-	}
+	WRITE_SPECIALREG(sctlr_el1,
+	    READ_SPECIALREG(sctlr_el1) & ~SCTLR_SPAN);
+	__asm __volatile(
+	    ".arch_extension pan	\n"
+	    "msr pan, #1		\n"
+	    ".arch_extension nopan	\n");
 }
+
+static struct cpu_feat feat_pan = {
+	.feat_name		= "FEAT_PAN",
+	.feat_check		= pan_check,
+	.feat_enable		= pan_enable,
+	.feat_flags		= CPU_FEAT_EARLY_BOOT | CPU_FEAT_PER_CPU,
+};
+DATA_SET(cpu_feat_set, feat_pan);
 
 bool
 has_hyp(void)
@@ -413,7 +422,7 @@ init_proc0(vm_pointer_t kstack)
 
 	/* XXX-AM: We need to set bounds on pcb and kstack here as in MIPS */
 	proc_linkup0(&proc0, &thread0);
-	thread0.td_kstack = cheri_kern_andperm(kstack, CHERI_PERMS_KERNEL_DATA);
+	thread0.td_kstack = cheri_kern_perms_and(kstack, CHERI_PERMS_KERNEL_DATA);
 	thread0.td_kstack_pages = KSTACK_PAGES;
 #if defined(PERTHREAD_SSP)
 	thread0.td_md.md_canary = boot_canary;
@@ -752,16 +761,16 @@ exclude_efi_memreserve(vm_offset_t efi_systbl_phys)
 
 #ifdef FDT
 static void
-try_load_dtb(caddr_t kmdp)
+try_load_dtb(void)
 {
 	vm_pointer_t dtbp;
 
-	dtbp = MD_FETCH(kmdp, MODINFOMD_DTBP, vm_offset_t);
+	dtbp = MD_FETCH(preload_kmdp, MODINFOMD_DTBP, vm_offset_t);
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (dtbp != (vm_pointer_t)NULL) {
-		dtbp = (vm_pointer_t)cheri_andperm(cheri_setaddress(
+		dtbp = (vm_pointer_t)cheri_perms_and(cheri_address_set(
 		    kernel_root_cap, dtbp), CHERI_PERMS_KERNEL_DATA);
-		dtbp = cheri_setbounds(dtbp, fdt_totalsize((void *)dtbp));
+		dtbp = cheri_bounds_set(dtbp, fdt_totalsize((void *)dtbp));
 	}
 #endif
 
@@ -926,7 +935,6 @@ initarm(struct arm64_bootparams *abp)
 	char dts_version[255];
 #endif
 	vm_offset_t lastaddr;
-	caddr_t kmdp;
 	bool valid;
 
 	TSRAW(&thread0, TS_ENTER, __func__, NULL);
@@ -935,11 +943,6 @@ initarm(struct arm64_bootparams *abp)
 
 	/* Parse loader or FDT boot parameters. Determine last used address. */
 	lastaddr = parse_boot_param(abp);
-
-	/* Find the kernel address */
-	kmdp = preload_search_by_type("elf kernel");
-	if (kmdp == NULL)
-		kmdp = preload_search_by_type("elf64 kernel");
 
 	identify_cpu(0);
 	identify_hypervisor_smbios();
@@ -957,15 +960,16 @@ initarm(struct arm64_bootparams *abp)
 	PCPU_SET(curthread, &thread0);
 	PCPU_SET(midr, get_midr());
 
-	link_elf_ireloc(kmdp);
+	link_elf_ireloc();
 #ifdef FDT
-	try_load_dtb(kmdp);
+	try_load_dtb();
 #endif
 
-	efi_systbl_phys = MD_FETCH(kmdp, MODINFOMD_FW_HANDLE, vm_paddr_t);
+	efi_systbl_phys = MD_FETCH(preload_kmdp, MODINFOMD_FW_HANDLE,
+	    vm_paddr_t);
 
 	/* Load the physical memory ranges */
-	efihdr = (struct efi_map_header *)preload_search_info(kmdp,
+	efihdr = (struct efi_map_header *)preload_search_info(preload_kmdp,
 	    MODINFO_METADATA | MODINFOMD_EFI_MAP);
 	if (efihdr != NULL)
 		add_efi_map_entries(efihdr);
@@ -983,7 +987,7 @@ initarm(struct arm64_bootparams *abp)
 #endif
 
 	/* Exclude the EFI framebuffer from our view of physical memory. */
-	efifb = (struct efi_fb *)preload_search_info(kmdp,
+	efifb = (struct efi_fb *)preload_search_info(preload_kmdp,
 	    MODINFO_METADATA | MODINFOMD_EFI_FB);
 	if (efifb != NULL)
 		physmem_exclude_region(efifb->fb_addr, efifb->fb_size,
@@ -993,7 +997,6 @@ initarm(struct arm64_bootparams *abp)
 	init_param1();
 
 	cache_setup();
-	pan_setup();
 
 	/* Bootstrap enough of pmap  to enter the kernel proper */
 	pmap_bootstrap(lastaddr - KERNBASE);
@@ -1029,14 +1032,8 @@ initarm(struct arm64_bootparams *abp)
 		panic("Invalid bus configuration: %s",
 		    kern_getenv("kern.cfg.order"));
 
-#ifdef PAC
-	/*
-	 * Check if pointer authentication is available on this system, and
-	 * if so enable its use. This needs to be called before init_proc0
-	 * as that will configure the thread0 pointer authentication keys.
-	 */
-	ptrauth_init();
-#endif
+	/* Detect early CPU feature support */
+	enable_cpu_feat(CPU_FEAT_EARLY_BOOT);
 
 	/*
 	 * Dump the boot metadata. We have to wait for cninit() since console
@@ -1057,7 +1054,6 @@ initarm(struct arm64_bootparams *abp)
 	if ((boothowto & RB_KDB) != 0)
 		kdb_enter(KDB_WHY_BOOTFLAGS, "Boot flags requested debugger");
 #endif
-	pan_enable();
 
 	kcsan_cpu_init(0);
 	kasan_init();

@@ -2513,10 +2513,9 @@ extern int dtrace_instr_c_ret(uint32_t **instr);
 
 #define	NOP_INSTR	0xd503201f
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	RET_INSTR	0xc2c253c0
-#else
 #define	RET_INSTR	0xd65f03c0
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	RETC_INSTR	0xc2c253c0
 #endif
 
 #define	SUB_MASK	0xffc00000
@@ -2556,8 +2555,9 @@ extern int dtrace_instr_c_ret(uint32_t **instr);
 
 #define	DTRACE_INVOP_STP	1
 #define	DTRACE_INVOP_RET	2
-#define	DTRACE_INVOP_B		3
-#define	DTRACE_INVOP_SUB	4
+#define	DTRACE_INVOP_RETC	3
+#define	DTRACE_INVOP_B		4
+#define	DTRACE_INVOP_SUB	5
 
 #elif defined(__mips__)
 

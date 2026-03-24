@@ -2058,7 +2058,8 @@ uath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		 * Tx rate is controlled by firmware, report the maximum
 		 * negotiated rate in ifconfig output.
 		 */
-		ni->ni_txrate = ni->ni_rates.rs_rates[ni->ni_rates.rs_nrates-1];
+		ieee80211_node_set_txrate_dot11rate(ni,
+		    ni->ni_rates.rs_rates[ni->ni_rates.rs_nrates-1]);
 
 		if (uath_write_associd(sc) != 0) {
 			device_printf(sc->sc_dev,
@@ -2308,10 +2309,12 @@ uath_cmdeof(struct uath_softc *sc, struct uath_cmd *cmd)
 			    __func__, dlen, sizeof(uint32_t));
 			return;
 		}
-		/* XXX have submitter do this */
-		/* copy answer into caller's supplied buffer */
-		bcopy(hdr+1, cmd->odata, sizeof(uint32_t));
-		cmd->olen = sizeof(uint32_t);
+		if (cmd->odata != NULL) {
+			/* XXX have submitter do this */
+			/* copy answer into caller's supplied buffer */
+			bcopy(hdr+1, cmd->odata, sizeof(uint32_t));
+			cmd->olen = sizeof(uint32_t);
+		}
 		wakeup_one(cmd);		/* wake up caller */
 		break;
 

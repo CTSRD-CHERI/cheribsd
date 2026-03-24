@@ -100,7 +100,7 @@ efidev_ioctl(struct cdev *dev __unused, u_long cmd, caddr_t addr,
 
 		cmd = _IOC_NEWTYPE(cmd, struct efi_get_table_ioc);
 		addr = (caddr_t)egtioc;
-		egtioc->buf = __USER_CAP(egtioc64->buf, egtioc64->buf_len);
+		egtioc->buf = USER_PTR(egtioc64->buf, egtioc64->buf_len);
 		CP(*egtioc64, *egtioc, uuid);
 		CP(*egtioc64, *egtioc, table_len);
 		CP(*egtioc64, *egtioc, buf_len);
@@ -115,11 +115,11 @@ efidev_ioctl(struct cdev *dev __unused, u_long cmd, caddr_t addr,
 
 		cmd = _IOC_NEWTYPE(cmd, struct efi_var_ioc);
 		addr = (caddr_t)ev;
-		ev->name = __USER_CAP(ev64->name, ev64->namesize);
+		ev->name = USER_PTR(ev64->name, ev64->namesize);
 		CP(*ev64, *ev, namesize);
 		CP(*ev64, *ev, vendor);
 		CP(*ev64, *ev, attrib);
-		ev->data = __USER_CAP(ev64->data, ev64->datasize);
+		ev->data = USER_PTR(ev64->data, ev64->datasize);
 		CP(*ev64, *ev, datasize);
 		break;
 	}

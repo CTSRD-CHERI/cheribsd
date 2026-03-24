@@ -136,8 +136,8 @@ static uma_zone_t mapentzone;
 static uma_zone_t kmapentzone;
 static uma_zone_t vmspace_zone;
 static int vmspace_zinit(void *mem, int size, int flags);
-static void _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min,
-    vm_pointer_t max);
+static void _vm_map_init(vm_map_t map, pmap_t pmap, uintcap_t min,
+    uintcap_t max);
 static void vm_map_entry_deallocate(vm_map_entry_t entry, boolean_t system_map);
 static void vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry);
 static void vm_map_entry_dispose(vm_map_t map, vm_map_entry_t entry);
@@ -391,7 +391,7 @@ vmspace_zdtor(void *mem, int size, void *arg)
  * and initialize those structures.  The refcnt is set to 1.
  */
 struct vmspace *
-vmspace_alloc(vm_pointer_t min, vm_pointer_t max, pmap_pinit_t pinit)
+vmspace_alloc(uintcap_t min, uintcap_t max, pmap_pinit_t pinit)
 {
 	struct vmspace *vm;
 
@@ -987,12 +987,12 @@ vmspace_resident_count(struct vmspace *vmspace)
  * such as that in the vmspace structure.
  */
 static void
-_vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
+_vm_map_init(vm_map_t map, pmap_t pmap, uintcap_t min, uintcap_t max)
 {
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(min), ("Expected valid min capability"));
-	KASSERT(cheri_gettag(max), ("Expected valid max capability"));
+	KASSERT(cheri_tag_get(min), ("Expected valid min capability"));
+	KASSERT(cheri_tag_get(max), ("Expected valid max capability"));
 #endif
 
 	map->header.eflags = MAP_ENTRY_HEADER;
@@ -1005,14 +1005,14 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 	map->timestamp = 0;
 	map->busy = 0;
 	map->anon_loc = 0;
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
 	/*
 	 * Do not enforce exact bounds here. The kernel map
 	 * can not be made representable without dropping some
 	 * physical memory, so restrict bounds as much as possible
 	 * and rely on the vm_map min/max enforcement.
 	 */
-	map->map_capability = cheri_setbounds(min,
+	map->map_capability = cheri_bounds_set(min,
 	    (ptraddr_t)max - (ptraddr_t)min);
 #endif
 #ifdef DIAGNOSTIC
@@ -1028,15 +1028,15 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 }
 
 void
-vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
+vm_map_init(vm_map_t map, pmap_t pmap, uintcap_t min, uintcap_t max)
 {
 	_vm_map_init(map, pmap, min, max);
 	sx_init(&map->lock, "vm map (user)");
 }
 
 void
-vm_map_init_system(vm_map_t map, pmap_t pmap, vm_pointer_t min,
-    vm_pointer_t max)
+vm_map_init_system(vm_map_t map, pmap_t pmap, uintcap_t min,
+    uintcap_t max)
 {
 	_vm_map_init(map, pmap, min, max);
 	vm_map_modflags(map, MAP_SYSTEM_MAP, 0);
@@ -1840,17 +1840,6 @@ vm_map_lookup_entry(
 	return (FALSE);
 }
 
-#define	VM_PROT_SANITY(prot) do {					\
-	if (((prot) & VM_PROT_WRITE_CAP) != 0)				\
-		KASSERT(((prot) & VM_PROT_WRITE) != 0,			\
-		    ("%s: VM_PROT_WRITE_CAP without VM_PROT_WRITE",	\
-		    __func__));						\
-	if (((prot) & VM_PROT_READ_CAP) != 0)				\
-		KASSERT(((prot) & VM_PROT_READ) != 0,			\
-		    ("%s: VM_PROT_READ_CAP without VM_PROT_READ",	\
-		    __func__));						\
-	} while (0)
-
 /*
  * vm_map_insert1() is identical to vm_map_insert() except that it
  * returns the newly inserted map entry in '*res'.  In case the new
@@ -1881,8 +1870,6 @@ vm_map_insert1(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    object, cow));
 	KASSERT((prot & ~max) == 0,
 	    ("prot %#x is not subset of max_prot %#x", prot, max));
-	VM_PROT_SANITY(prot);
-	VM_PROT_SANITY(max);
 
 	/*
 	 * Check that the start and end points are not bogus.
@@ -1897,8 +1884,8 @@ vm_map_insert1(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	if (map->flags & MAP_RESERVATIONS) {
 		/* Make sure we fit into a single reservation entry. */
 #ifdef __CHERI_PURE_CAPABILITY__
-		if (cheri_gettag(start) == 0 ||
-		    cheri_getlen(start) < (ptraddr_t)end - (ptraddr_t)start)
+		if (cheri_tag_get(start) == 0 ||
+		    cheri_length_get(start) < (ptraddr_t)end - (ptraddr_t)start)
 			return (KERN_INVALID_ARGUMENT);
 #endif
 		if (vm_map_lookup_entry(map, start, &new_entry) == 0 ||
@@ -2300,7 +2287,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	bool reservation_created = false;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	if (cheri_getlen(start) < length)
+	if (cheri_length_get(start) < length)
 		return (KERN_INVALID_ARGUMENT);
 #endif
 
@@ -2327,7 +2314,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 			reservation_created = true;
 		} else {
 #ifdef __CHERI_PURE_CAPABILITY__
-			KASSERT(cheri_gettag(start),
+			KASSERT(cheri_tag_get(start),
 			    ("Expected valid capability"));
 #endif
 			result = vm_map_reservation_get(map, start, length,
@@ -2537,9 +2524,9 @@ vm_map_find_locked(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	MPASS((cow & MAP_REMAP) == 0 || (find_space == VMFS_NO_SPACE &&
 	    (cow & MAP_STACK_AREA) == 0));
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_getlen(addr) == sizeof(void *),
+	KASSERT(cheri_length_get(addr) == sizeof(void *),
 	    ("Invalid bounds for pointer-sized object %zx",
-	    cheri_getlen(addr)));
+	    cheri_length_get(addr)));
 #endif
 
 	if (find_space == VMFS_OPTIMAL_SPACE && (object == NULL ||
@@ -2718,7 +2705,7 @@ again:
 		map->anon_loc = reservation;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(reservation), ("Expected valid capability"));
+	KASSERT(cheri_tag_get(reservation), ("Expected valid capability"));
 #endif
 	*addr = reservation;
 	return (rv);
@@ -3084,8 +3071,8 @@ vm_map_submap(
 	int result = KERN_INVALID_ARGUMENT;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(start), ("Expected valid start capability"));
-	KASSERT(cheri_gettag(end), ("Expected valid end capability"));
+	KASSERT(cheri_tag_get(start), ("Expected valid start capability"));
+	KASSERT(cheri_tag_get(end), ("Expected valid end capability"));
 #endif
 
 	vm_map_lock(submap);
@@ -3188,7 +3175,7 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 	/*
 	 * NB: The lack of VM_OBJECT_ASSERT_CAP() is intentional.
 	 * pmap_enter_object() only establishes read-only mappings, so
-	 * VM_PROT_WRITE_CAP is ignored.
+	 * capability writes are disallowed with the lack of VM_PROT_WRITE.
 	 */
 	prot = VM_OBJECT_MASK_CAP_PROT(object, prot);
 
@@ -3280,8 +3267,6 @@ vm_map_protect(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	vm_offset_t orig_start;
 	vm_prot_t check_prot, max_prot, old_prot;
 	int rv;
-
-	VM_PROT_SANITY(new_prot);
 
 	if (start == end)
 		return (KERN_SUCCESS);
@@ -3516,7 +3501,7 @@ restart_checks:
 		 * about copy-on-write here.
 		 */
 		if ((old_prot & ~entry->protection) != 0) {
-#define MASK(entry)	(((entry)->eflags & MAP_ENTRY_COW) ? ~(VM_PROT_WRITE | VM_PROT_WRITE_CAP) : \
+#define MASK(entry)	(((entry)->eflags & MAP_ENTRY_COW) ? ~VM_PROT_WRITE : \
 							VM_PROT_ALL)
 			pmap_protect(map->pmap, entry->start,
 			    entry->end,
@@ -5132,13 +5117,13 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 
 	old_map = &vm1->vm_map;
 	/* Copy immutable fields of vm1 to vm2. */
-#ifndef __CHERI_PURE_CAPABILITY__
+#if !__has_feature(capabilities)
 	vm2 = vmspace_alloc(vm_map_min(old_map), vm_map_max(old_map),
 	    pmap_pinit);
 #else
 	vm2 = vmspace_alloc(
-	    cheri_setaddress(vm_map_rootcap(old_map), vm_map_min(old_map)),
-	    cheri_setaddress(vm_map_rootcap(old_map), vm_map_max(old_map)),
+	    cheri_address_set(vm_map_rootcap(old_map), vm_map_min(old_map)),
+	    cheri_address_set(vm_map_rootcap(old_map), vm_map_max(old_map)),
 	    pmap_pinit);
 #endif
 
@@ -5687,12 +5672,12 @@ retry:
 	stack_reservation = vm_map_buildcap(map, gap_entry->start,
 	    stack_entry->end - gap_entry->start, prot);
 
-	grow_start = (vm_pointer_t)cheri_kern_setaddress(stack_reservation,
+	grow_start = (vm_pointer_t)cheri_kern_address_set(stack_reservation,
 	    gap_entry->end - grow_amount);
 	if (gap_entry->start + grow_amount == gap_entry->end) {
-		gap_start = (vm_pointer_t)cheri_kern_setaddress(
+		gap_start = (vm_pointer_t)cheri_kern_address_set(
 		    stack_reservation, gap_entry->start);
-		gap_end = (vm_pointer_t)cheri_kern_setaddress(
+		gap_end = (vm_pointer_t)cheri_kern_address_set(
 		    stack_reservation, gap_entry->end);
 		vm_map_entry_delete(map, gap_entry);
 		gap_deleted = true;
@@ -5769,41 +5754,21 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 {
 	struct vmspace *oldvmspace = p->p_vmspace;
 	struct vmspace *newvmspace;
-#ifdef __CHERI_PURE_CAPABILITY__
-	vm_offset_t padded_minuser;
-	vm_pointer_t minuser_cap;
-	vm_pointer_t maxuser_cap;
-	vm_offset_t user_length;
+#if __has_feature(capabilities)
+	uintcap_t minuser_cap;
+	uintcap_t maxuser_cap;
 #endif
 
 	KASSERT((curthread->td_pflags & TDP_EXECVMSPC) == 0,
 	    ("vmspace_exec recursed"));
-#ifdef __CHERI_PURE_CAPABILITY__
-	/*
-	 * We create a new userspace capability for this map
-	 * Only allow non-representable map capability if the minuser
-	 * excludes the first page.
-	 */
-	user_length = MIN(maxuser - minuser,
-	    VM_MAXUSER_ADDRESS - VM_MINUSER_ADDRESS);
-	padded_minuser = CHERI_REPRESENTABLE_ALIGN_DOWN(minuser, user_length);
-	KASSERT(padded_minuser == minuser || minuser <= PAGE_SIZE,
-	    ("Unrepresentable base for new vmspace"));
-	KASSERT(maxuser - padded_minuser ==
-	    CHERI_REPRESENTABLE_LENGTH(user_length),
-	    ("Unrepresentable length for new vmspace"));
-
-	user_length = CHERI_REPRESENTABLE_LENGTH(user_length);
-	/*
-	 * XXX: Use the unchecked version here because the map is empty
-	 * at this point.
-	 *
-	 * XXX: It seems like this should be an sv_* member.
-	 */
-	minuser_cap = (vm_pointer_t)cheri_capability_build_user_rwx_unchecked(
-	    CHERI_CAP_USER_CODE_PERMS | CHERI_CAP_USER_DATA_PERMS |
-	    CHERI_PERMS_SWALL, padded_minuser, user_length, minuser);
-	maxuser_cap = cheri_setaddress(minuser_cap, maxuser);
+#if __has_feature(capabilities)
+	KASSERT(cheri_tag_get(p->p_sysent->sv_vmspace_cap),
+	    ("expected valid vmspace cap in sysvec %s, got %#lp",
+	     p->p_sysent->sv_name,
+	     (void * __capability)p->p_sysent->sv_vmspace_cap));
+	minuser_cap = cheri_address_set(p->p_sysent->sv_vmspace_cap,
+	    minuser);
+	maxuser_cap = cheri_address_set(minuser_cap, maxuser);
 	newvmspace = vmspace_alloc(minuser_cap, maxuser_cap, pmap_pinit);
 #else
 	newvmspace = vmspace_alloc(minuser, maxuser, pmap_pinit);
@@ -6019,7 +5984,7 @@ RetryLookupLocked:
 			 * We're attempting to read a copy-on-write page --
 			 * don't allow writes.
 			 */
-			prot &= ~(VM_PROT_WRITE | VM_PROT_WRITE_CAP);
+			prot &= ~VM_PROT_WRITE;
 		}
 	}
 
@@ -6087,7 +6052,7 @@ vm_map_lookup_locked(vm_map_t *var_map,		/* IN/OUT */
 	 */
 	prot = entry->protection;
 	fault_type &= VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE |
-	    VM_PROT_READ_CAP | VM_PROT_WRITE_CAP;
+	    VM_PROT_CAP;
 	if ((fault_type & prot) != fault_type)
 		return (KERN_PROTECTION_FAILURE);
 
@@ -6109,7 +6074,7 @@ vm_map_lookup_locked(vm_map_t *var_map,		/* IN/OUT */
 		 * We're attempting to read a copy-on-write page --
 		 * don't allow writes.
 		 */
-		prot &= ~(VM_PROT_WRITE | VM_PROT_WRITE_CAP);
+		prot &= ~VM_PROT_WRITE;
 	}
 
 	/*
@@ -6193,55 +6158,23 @@ vm_map_reservation_init_entry(vm_map_entry_t new_entry)
 }
 
 #if __has_feature(capabilities)
-/*
- * Convert vm_prot_t to capability permission bits.
- */
-int
-vm_map_prot2perms(vm_prot_t prot)
-{
-	int perms = 0;
 
-	if (prot & (VM_PROT_CAP | VM_PROT_NO_IMPLY_CAP)) {
-		if (prot & (VM_PROT_READ | VM_PROT_COPY))
-			perms |= CHERI_PROT2PERM_READ_PERMS;
-		if (prot & VM_PROT_READ_CAP)
-			perms |= CHERI_PROT2PERM_READ_CAP_PERMS;
-		if (prot & VM_PROT_WRITE)
-			perms |= CHERI_PROT2PERM_WRITE_PERMS;
-		if (prot & VM_PROT_WRITE_CAP)
-			perms |= CHERI_PROT2PERM_WRITE_CAP_PERMS;
-	} else {
-		if (prot & (VM_PROT_READ | VM_PROT_COPY))
-			perms |= CHERI_PROT2PERM_READ_PERMS |
-			    CHERI_PROT2PERM_READ_CAP_PERMS;
-		if (prot & VM_PROT_WRITE)
-			perms |= CHERI_PROT2PERM_WRITE_PERMS |
-			    CHERI_PROT2PERM_WRITE_CAP_PERMS;
-	}
-	if (prot & VM_PROT_EXECUTE)
-		perms |= CHERI_PROT2PERM_EXEC_PERMS;
-
-	return (perms);
-}
-
-#ifdef __CHERI_PURE_CAPABILITY__
 /*
  * Create a capability for the given map, derived from the map root
  * capability.
  */
-vm_pointer_t
+uintcap_t
 _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
     vm_prot_t prot)
 {
-	vm_pointer_t retcap;
-	int perms = ~CHERI_PROT2PERM_MASK | vm_map_prot2perms(prot);
+	uintcap_t retcap;
+	uintcap_t rootcap = vm_map_rootcap(map);
+	int perms = vm_prot2perms(cheri_perms_get(rootcap), prot);
 
-	retcap = cheri_setbounds(
-	    cheri_setaddress(vm_map_rootcap(map), addr), length);
+	retcap = cheri_bounds_set(cheri_address_set(rootcap, addr), length);
 
-	return (cheri_andperm(retcap, perms));
+	return (cheri_perms_and(retcap, perms));
 }
-#endif /* __CHERI_PURE_CAPABILITY__ */
 #endif /* has_feature(capabilities) */
 
 /*
@@ -6327,9 +6260,9 @@ vm_map_reservation_create_locked(vm_map_t map, vm_pointer_t *addr,
 
 	VM_MAP_ASSERT_LOCKED(map);
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_getlen(addr) == sizeof(void *),
+	KASSERT(cheri_length_get(addr) == sizeof(void *),
 	    ("Invalid bounds for pointer-sized object %zx",
-	    cheri_getlen(addr)));
+	    cheri_length_get(addr)));
 #endif
 
 	if ((map->flags & MAP_RESERVATIONS) == 0) {
@@ -6359,10 +6292,10 @@ vm_map_reservation_create_locked(vm_map_t map, vm_pointer_t *addr,
 
 	*addr = vm_map_buildcap(map, start, length, max_prot);
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(*addr), ("Expected valid capability"));
-	KASSERT(cheri_getlen(*addr) == length,
+	KASSERT(cheri_tag_get(*addr), ("Expected valid capability"));
+	KASSERT(cheri_length_get(*addr) == length,
 	    ("Inexact bounds expected %zx found %zx",
-	    (size_t)length, cheri_getlen(*addr)));
+	    (size_t)length, cheri_length_get(*addr)));
 #endif
 
 	return (KERN_SUCCESS);
@@ -6490,15 +6423,8 @@ vm_map_reservation_cap(vm_map_t map, vm_offset_t va)
 		max_prot = entry->max_protection;
 	}
 
-#ifdef __CHERI_PURE_CAPABILITY__
 	cap = (void * __capability)vm_map_buildcap(map, reservation,
 	    end - reservation, max_prot);
-#else
-	cap = cheri_setaddress(userspace_root_cap, reservation);
-	cap = cheri_setbounds(cap, end - reservation);
-	cap = cheri_andperm(cap, ~CHERI_PROT2PERM_MASK |
-	    vm_map_prot2perms(max_prot));
-#endif
 out:
 	vm_map_unlock_read(map);
 	return (cap);

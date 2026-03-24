@@ -83,6 +83,8 @@ typedef struct elf_file {
 	caddr_t		address;	/* Relocation address */
 #ifdef __CHERI_PURE_CAPABILITY__
 	caddr_t		mapbase;	/* Capability for derived pointers */
+	caddr_t		*pcc_caps;	/* Capability for code pointers */
+	size_t		npcc_caps;
 #endif
 #ifdef SPARSE_MAPPING
 	vm_object_t	object;		/* VM object to hold file pages */
@@ -397,11 +399,177 @@ static caddr_t
 ef_address(elf_file_t ef, ptraddr_t offset)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
-	return (cheri_setaddress(ef->mapbase, (ptraddr_t)ef->address + offset));
+	return (cheri_address_set(ef->mapbase, (ptraddr_t)ef->address + offset));
 #else
 	return (ef->address + offset);
 #endif
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Given a pointer into a linker file derived from ef->{map|pcc}base, narrow
+ * its permissions and bounds.
+ */
+static caddr_t
+make_capability(const Elf_Sym *sym, caddr_t val)
+{
+	switch (ELF_ST_TYPE(sym->st_info)) {
+	case STT_FUNC:
+	case STT_GNU_IFUNC:
+		val = cheri_perms_and(val, CHERI_PERMS_KERNEL_CODE);
+#ifdef CHERI_FLAGS_CAP_MODE
+		val = cheri_flags_set(val, CHERI_FLAGS_CAP_MODE);
+#endif
+		val = cheri_sentry_create(val);
+		break;
+	default:
+		val = cheri_bounds_set(val, sym->st_size);
+		val = cheri_perms_and(val, CHERI_PERMS_KERNEL_DATA);
+		break;
+	}
+	return (val);
+}
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+static caddr_t
+ef_pcc_cap(elf_file_t ef, ptraddr_t offset)
+{
+	caddr_t pcc_cap;
+	Elf_Addr addr;
+
+	if (ef->npcc_caps == 0)
+		return (ef->mapbase);
+
+	addr = (Elf_Addr)ef->address + offset;
+	for (size_t i = 0; i < ef->npcc_caps; i++) {
+		pcc_cap = ef->pcc_caps[i];
+		if (addr >= (ptraddr_t)pcc_cap &&
+		    addr < cheri_top_get(pcc_cap)) {
+			return (pcc_cap);
+		}
+	}
+	return (NULL);
+}
+#endif
+
+static caddr_t
+ef_symbol_address(elf_file_t ef, const Elf_Sym *sym)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	caddr_t base, val;
+
+	switch (ELF_ST_TYPE(sym->st_info)) {
+	case STT_FUNC:
+	case STT_GNU_IFUNC:
+		base = ef_pcc_cap(ef, sym->st_value);
+		break;
+	default:
+		base = ef->mapbase;
+		break;
+	}
+
+	val = cheri_address_set(base, (ptraddr_t)ef->address + sym->st_value);
+	return (make_capability(sym, val));
+#else
+	return (ef_address(ef, sym->st_value));
+#endif
+}
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Check for a valid ELF executable header at ef->mapbase.
+ *
+ * NB: RISC-V kernels do not map phdrs into memory.
+ */
+static bool
+have_phdrs(elf_file_t ef)
+{
+	const Elf_Ehdr *hdr;
+	hdr = (const Elf_Ehdr *)ef->mapbase;
+	return (IS_ELF(*hdr) &&
+	    hdr->e_ident[EI_CLASS] == ELF_TARG_CLASS &&
+	    hdr->e_ident[EI_DATA] == ELF_TARG_DATA &&
+	    hdr->e_ident[EI_VERSION] == EV_CURRENT &&
+	    hdr->e_machine == ELF_TARG_MACH &&
+	    hdr->e_version == ELF_TARG_VER &&
+	    hdr->e_phentsize == sizeof(Elf_Phdr) &&
+	    ELF_IS_CHERI(hdr));
+}
+
+static bool
+ef_create_pcc_caps(elf_file_t ef, const Elf_Phdr *phstart,
+    const Elf_Phdr *phlimit)
+{
+	const Elf_Phdr *phdr;
+	caddr_t pcc_cap;
+	size_t i, j;
+	bool valid;
+
+	for (phdr = phstart; phdr < phlimit; phdr++) {
+		switch (phdr->p_type) {
+		case PT_CHERI_PCC:
+			ef->npcc_caps++;
+			break;
+		}
+	}
+
+	if (ef->npcc_caps == 0)
+		return (true);
+
+	valid = true;
+	ef->lf.flags |= LINKER_FILE_PCC_BOUNDS;
+	i = 0;
+	ef->pcc_caps = mallocarray(ef->npcc_caps, sizeof(*ef->pcc_caps),
+	    M_LINKER, M_WAITOK | M_ZERO);
+	for (phdr = phstart; phdr < phlimit; phdr++) {
+		switch (phdr->p_type) {
+		case PT_CHERI_PCC:
+			pcc_cap = ef_address(ef, phdr->p_vaddr);
+			pcc_cap = cheri_bounds_set_exact(pcc_cap,
+			    phdr->p_memsz);
+
+			if (!cheri_tag_get(pcc_cap)) {
+				printf("%s: pcc_cap[%lu] %#p is not exact\n",
+				    ef->lf.filename, i, pcc_cap);
+				valid = false;
+			}
+			ef->pcc_caps[i] = pcc_cap;
+			i++;
+			break;
+		}
+	}
+
+	for (i = 1; i < ef->npcc_caps; i++) {
+		pcc_cap = ef->pcc_caps[i];
+		for (j = 0; j < i; j++) {
+			if (cheri_is_address_inbounds(pcc_cap,
+				cheri_base_get(ef->pcc_caps[j])) ||
+			    cheri_is_address_inbounds(ef->pcc_caps[j],
+				cheri_base_get(pcc_cap))) {
+				printf("%s: Overlapping PCC capabilities\n",
+				    ef->lf.filename);
+				return (false);
+			}
+		}
+	}
+	return (valid);
+}
+
+static bool
+preload_init_pcc_caps(elf_file_t ef)
+{
+	const Elf_Ehdr *hdr;
+	const Elf_Phdr *phdr;
+
+	if (!have_phdrs(ef))
+		return (true);
+
+	hdr = (const Elf_Ehdr *)ef->mapbase;
+	phdr = (const Elf_Phdr *)((const char *)hdr + hdr->e_phoff);
+	return (ef_create_pcc_caps(ef, phdr, phdr + hdr->e_phnum));
+}
+#endif
 
 /*
  * Actions performed after linking/loading both the preloaded kernel and any
@@ -471,18 +639,14 @@ link_elf_init(void* arg)
 	Elf_Dyn *dp;
 	Elf_Addr *ctors_addrp;
 	Elf_Size *ctors_sizep;
-	caddr_t modptr, baseptr, sizeptr;
+	caddr_t baseptr, sizeptr;
 	elf_file_t ef;
 	const char *modname;
 
 	linker_add_class(&link_elf_class);
 
 	dp = (Elf_Dyn *)&_DYNAMIC;
-	modname = NULL;
-	modptr = preload_search_by_type("elf" __XSTRING(__ELF_WORD_SIZE) " kernel");
-	if (modptr == NULL)
-		modptr = preload_search_by_type("elf kernel");
-	modname = (char *)preload_search_info(modptr, MODINFO_NAME);
+	modname = (char *)preload_search_info(preload_kmdp, MODINFO_NAME);
 	if (modname == NULL)
 		modname = "kernel";
 	linker_kernel_file = linker_make_file(modname, &link_elf_class);
@@ -503,9 +667,11 @@ link_elf_init(void* arg)
 	 * This has to have very broad bounds for the kernel so that
 	 * relocbase passed to elf_reloc works.
 	 */
-	ef->address = cheri_setaddress(kernel_root_cap, 0);
-	ef->mapbase = cheri_setbounds(ef->address + KERNBASE,
+	ef->address = cheri_address_set(kernel_root_cap, 0);
+	ef->mapbase = cheri_bounds_set(ef->address + KERNBASE,
 	    (ptraddr_t)_end - KERNBASE);
+	if (!preload_init_pcc_caps(ef))
+		panic("%s: Can't create PCC caps for kernel", __func__);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
 #ifdef SPARSE_MAPPING
@@ -524,9 +690,9 @@ link_elf_init(void* arg)
 	linker_kernel_file->size = -(intptr_t)linker_kernel_file->address;
 #endif
 
-	if (modptr != NULL) {
-		ef->modptr = modptr;
-		baseptr = preload_search_info(modptr, MODINFO_ADDR);
+	if (preload_kmdp != NULL) {
+		ef->modptr = preload_kmdp;
+		baseptr = preload_search_info(preload_kmdp, MODINFO_ADDR);
 		if (baseptr != NULL)
 #ifndef __CHERI_PURE_CAPABILITY__
 			linker_kernel_file->address = *(caddr_t *)baseptr;
@@ -535,26 +701,26 @@ link_elf_init(void* arg)
 			 * MODINFO_ADDR is really a virtual address,
 			 * not a pointer
 			 */
-			linker_kernel_file->address = cheri_setaddress(
+			linker_kernel_file->address = cheri_address_set(
 			    linker_kernel_file->address,
 			    *(vm_offset_t *)baseptr);
 #endif
-		sizeptr = preload_search_info(modptr, MODINFO_SIZE);
+		sizeptr = preload_search_info(preload_kmdp, MODINFO_SIZE);
 		if (sizeptr != NULL)
 			linker_kernel_file->size = *(size_t *)sizeptr;
-		ctors_addrp = (Elf_Addr *)preload_search_info(modptr,
+		ctors_addrp = (Elf_Addr *)preload_search_info(preload_kmdp,
 			MODINFO_METADATA | MODINFOMD_CTORS_ADDR);
-		ctors_sizep = (Elf_Size *)preload_search_info(modptr,
+		ctors_sizep = (Elf_Size *)preload_search_info(preload_kmdp,
 			MODINFO_METADATA | MODINFOMD_CTORS_SIZE);
 		if (ctors_addrp != NULL && ctors_sizep != NULL) {
-			linker_kernel_file->ctors_addr = cheri_kern_setbounds(
+			linker_kernel_file->ctors_addr = cheri_kern_bounds_set(
 			    ef->address + *ctors_addrp, *ctors_sizep);
 			linker_kernel_file->ctors_size = *ctors_sizep;
 		}
 	}
 
 	/* Set the bounds on load address */
-	linker_kernel_file->address = cheri_kern_setbounds(
+	linker_kernel_file->address = cheri_kern_bounds_set(
 	    linker_kernel_file->address, linker_kernel_file->size);
 #ifdef __CHERI_PURE_CAPABILITY__
 	ef->mapbase = linker_kernel_file->address;
@@ -603,13 +769,13 @@ link_elf_preload_parse_symbols(elf_file_t ef)
 		return (0);
 	esym = *(vm_offset_t *)pointer;
 
-	base = cheri_kern_setbounds(cheri_kern_setaddress(ef->address, ssym),
+	base = cheri_kern_bounds_set(cheri_kern_address_set(ef->address, ssym),
 	    esym - ssym);
 
 	symcnt = *(long *)base;
 	base += sizeof(long);
 	size = roundup(symcnt, sizeof(long));
-	symtab = (Elf_Sym *)cheri_kern_setbounds(base, size);
+	symtab = (Elf_Sym *)cheri_kern_bounds_set(base, size);
 	base += size;
 
 	if ((ptraddr_t)base > esym || (ptraddr_t)base < ssym) {
@@ -620,7 +786,7 @@ link_elf_preload_parse_symbols(elf_file_t ef)
 	strcnt = *(long *)base;
 	base += sizeof(long);
 	size = roundup(strcnt, sizeof(long));
-	strtab = cheri_kern_setbounds(base, size);
+	strtab = cheri_kern_bounds_set(base, size);
 	base += size;
 
 	if ((ptraddr_t)base > esym || (ptraddr_t)base < ssym) {
@@ -651,9 +817,9 @@ parse_dynamic(elf_file_t ef)
 			    ef_address(ef, dp->d_un.d_ptr);
 			ef->nbuckets = hashtab[0];
 			ef->nchains = hashtab[1];
-			ef->buckets = cheri_kern_setbounds(hashtab + 2,
+			ef->buckets = cheri_kern_bounds_set(hashtab + 2,
 			    ef->nbuckets * sizeof(Elf_Hashelt));
-			ef->chains = cheri_kern_setbounds(hashtab + 2 + ef->nbuckets,
+			ef->chains = cheri_kern_bounds_set(hashtab + 2 + ef->nbuckets,
 			    ef->nchains * sizeof(Elf_Hashelt));
 			break;
 		}
@@ -728,19 +894,19 @@ parse_dynamic(elf_file_t ef)
 	 * If we are not a cheri kernel these are no-ops.
 	 */
 	if (ef->strtab != NULL)
-		ef->strtab = cheri_kern_setbounds(ef->strtab, ef->strsz);
+		ef->strtab = cheri_kern_bounds_set(ef->strtab, ef->strsz);
 	if (ef->rel != NULL)
-		ef->rel = cheri_kern_setbounds(ef->rel, ef->relsize);
+		ef->rel = cheri_kern_bounds_set(ef->rel, ef->relsize);
 	if (ef->pltrel != NULL)
-		ef->pltrel = cheri_kern_setbounds(ef->pltrel, ef->pltrelsize);
+		ef->pltrel = cheri_kern_bounds_set(ef->pltrel, ef->pltrelsize);
 	if (ef->rela != NULL)
-		ef->rela = cheri_kern_setbounds(ef->rela, ef->relasize);
+		ef->rela = cheri_kern_bounds_set(ef->rela, ef->relasize);
 	if (ef->symtab != NULL)
-		ef->symtab = cheri_kern_setbounds(ef->symtab,
+		ef->symtab = cheri_kern_bounds_set(ef->symtab,
 		    ef->nchains * sizeof(Elf_Sym));
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
 	if (ef->caprelocs != NULL)
-		ef->caprelocs = cheri_kern_setbounds(ef->caprelocs,
+		ef->caprelocs = cheri_kern_bounds_set(ef->caprelocs,
 		    ef->caprelocssize);
 #endif
 
@@ -997,9 +1163,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	sizeptr = preload_search_info(modptr, MODINFO_SIZE);
 	dynptr = preload_search_info(modptr,
 	    MODINFO_METADATA | MODINFOMD_DYNAMIC);
-	if (type == NULL ||
-	    (strcmp(type, "elf" __XSTRING(__ELF_WORD_SIZE) " module") != 0 &&
-	     strcmp(type, "elf module") != 0))
+	if (type == NULL || strcmp(type, preload_modtype) != 0)
 		return (EFTYPE);
 	if (baseptr == NULL || sizeptr == NULL || dynptr == NULL)
 		return (EINVAL);
@@ -1012,12 +1176,16 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	ef->preloaded = 1;
 	ef->modptr = modptr;
 #ifdef __CHERI_PURE_CAPABILITY__
-	ef->address = cheri_setaddress(kernel_root_cap,
+	ef->address = cheri_address_set(kernel_root_cap,
 	    *(ptraddr_t *)baseptr);
-	ef->address = cheri_setbounds(ef->address, *(size_t *)sizeptr);
-	ef->address = cheri_andperm(ef->address, CHERI_PERMS_KERNEL_CODE |
+	ef->address = cheri_bounds_set(ef->address, *(size_t *)sizeptr);
+	ef->address = cheri_perms_and(ef->address, CHERI_PERMS_KERNEL_CODE |
 	    CHERI_PERMS_KERNEL_DATA);
 	ef->mapbase = ef->address;
+	if (!preload_init_pcc_caps(ef)) {
+		error = ENOEXEC;
+		goto out;
+	}
 #else
 	ef->address = *(caddr_t *)baseptr;
 #endif
@@ -1036,7 +1204,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	if (ctors_addrp != NULL && ctors_sizep != NULL) {
 		lf->ctors_addr = ef_address(ef, *ctors_addrp);
 		lf->ctors_size = *ctors_sizep;
-		lf->ctors_addr = cheri_kern_setbounds(lf->ctors_addr,
+		lf->ctors_addr = cheri_kern_bounds_set(lf->ctors_addr,
 		    lf->ctors_size);
 	}
 
@@ -1058,6 +1226,9 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 		return (error);
 	}
 	error = link_elf_reloc_local(lf);
+#ifdef __CHERI_PURE_CAPABILITY__
+out:
+#endif
 	if (error != 0) {
 		linker_file_unload(lf, LINKER_UNLOAD_FORCE);
 		return (error);
@@ -1296,6 +1467,11 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	ef->address = mapbase;
 #ifdef __CHERI_PURE_CAPABILITY__
 	ef->mapbase = mapbase;
+	if (!ef_create_pcc_caps(ef, phlimit - hdr->e_phnum, phlimit)) {
+		link_elf_error(filename, "Can't create PCC capabilities");
+		error = ENOEXEC;
+		goto out;
+	}
 #endif
 
 	/*
@@ -1374,7 +1550,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		if (segs[i]->p_type != PT_LOAD)
 			continue;
 
-		/* XXX: VM_PROT_READ_CAP or VM_PROT_WRITE_CAP? */
+		/* XXX: VM_PROT_CAP? */
 		prot = VM_PROT_READ;
 		if ((segs[i]->p_flags & PF_W) != 0)
 			prot |= VM_PROT_WRITE;
@@ -1431,7 +1607,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 			/* Record relocated address and size of .ctors. */
 			lf->ctors_addr = mapbase + shdr[i].sh_addr - base_vaddr;
 			lf->ctors_size = shdr[i].sh_size;
-			lf->ctors_addr = cheri_kern_setbounds(lf->ctors_addr,
+			lf->ctors_addr = cheri_kern_bounds_set(lf->ctors_addr,
 			    lf->ctors_size);
 		}
 	}
@@ -1527,6 +1703,9 @@ link_elf_unload_file(linker_file_t file)
 		link_elf_delete_gdb(&ef->gdb);
 		GDB_STATE(RT_CONSISTENT);
 	}
+#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+	free(ef->pcc_caps, M_LINKER);
 #endif
 
 	/* Notify MD code that a module is being unloaded. */
@@ -1743,33 +1922,6 @@ link_elf_lookup_debug_symbol(linker_file_t lf, const char *name,
 	return (ENOENT);
 }
 
-#ifdef __CHERI_PURE_CAPABILITY__
-/*
- * Given a pointer into a linker file derived from ef->mapbase, narrow
- * its permissions and bounds.
- */
-static caddr_t
-make_capability(const Elf_Sym *sym, caddr_t val)
-{
-
-	switch (ELF_ST_TYPE(sym->st_info)) {
-	case STT_FUNC:
-	case STT_GNU_IFUNC:
-		val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
-#ifdef CHERI_FLAGS_CAP_MODE
-		val = cheri_setflags(val, CHERI_FLAGS_CAP_MODE);
-#endif
-		val = cheri_sealentry(val);
-		break;
-	default:
-		val = cheri_setbounds(val, sym->st_size);
-		val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
-		break;
-	}
-	return (val);
-}
-#endif
-
 static int
 link_elf_lookup_debug_symbol_ctf(linker_file_t lf, const char *name,
     c_linker_sym_t *sym, linker_ctf_t *lc)
@@ -1843,10 +1995,7 @@ link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
 		if (!see_local && ELF_ST_BIND(es->st_info) == STB_LOCAL)
 			return (ENOENT);
 		symval->name = ef->strtab + es->st_name;
-		val = ef_address(ef, es->st_value);
-#ifdef __CHERI_PURE_CAPABILITY__
-		val = make_capability(es, val);
-#endif
+		val = ef_symbol_address(ef, es);
 		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC) {
 			link_elf_ifunc_symbol_value(lf, &val, &size);
 		} else {
@@ -1884,10 +2033,7 @@ link_elf_debug_symbol_values(linker_file_t lf, c_linker_sym_t sym,
 
 	if (es >= ef->ddbsymtab && es < (ef->ddbsymtab + ef->ddbsymcnt)) {
 		symval->name = ef->ddbstrtab + es->st_name;
-		val = ef_address(ef, es->st_value);
-#ifdef __CHERI_PURE_CAPABILITY__
-		val = make_capability(es, val);
-#endif
+		val = ef_symbol_address(ef, es);
 		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC) {
 			link_elf_ifunc_symbol_value(lf, &val, &size);
 		} else {
@@ -2093,10 +2239,7 @@ elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, uintptr_t *res)
 			*res = 0;
 			return (EINVAL);
 		}
-		addr = ef_address(ef, sym->st_value);
-#ifdef __CHERI_PURE_CAPABILITY__
-		addr = make_capability(sym, addr);
-#endif
+		addr = ef_symbol_address(ef, sym);
 		*res = (uintptr_t)addr;
 		return (0);
 	}
@@ -2158,14 +2301,14 @@ resolve_cap_reloc(void *arg, bool function, bool constant, ptraddr_t object,
 	}
 #endif
 	if (function) {
-		addr = cheri_andperm(addr, CHERI_PERMS_KERNEL_CODE);
+		addr = cheri_perms_and(addr, CHERI_PERMS_KERNEL_CODE);
 #ifdef CHERI_FLAGS_CAP_MODE
-		addr = cheri_setflags(addr, CHERI_FLAGS_CAP_MODE);
+		addr = cheri_flags_set(addr, CHERI_FLAGS_CAP_MODE);
 #endif
 	} else if (constant) {
-		addr = cheri_andperm(addr, CHERI_PERMS_KERNEL_RODATA);
+		addr = cheri_perms_and(addr, CHERI_PERMS_KERNEL_RODATA);
 	} else {
-		addr = cheri_andperm(addr, CHERI_PERMS_KERNEL_DATA);
+		addr = cheri_perms_and(addr, CHERI_PERMS_KERNEL_DATA);
 	}
 	*src = addr;
 }
@@ -2191,10 +2334,12 @@ link_elf_reloc_local(linker_file_t lf)
 	if (ef->caprelocs != NULL) {
 		void *data_cap;
 
-		data_cap = cheri_andperm(ef->mapbase, CHERI_PERMS_KERNEL_DATA);
+		data_cap = cheri_perms_and(ef->mapbase, CHERI_PERMS_KERNEL_DATA);
 		if (init_linker_file_cap_relocs(ef->caprelocs,
 		    (char *)ef->caprelocs + ef->caprelocssize, data_cap,
-		    (ptraddr_t)ef->address, resolve_cap_reloc, ef) != 0)
+		    (ptraddr_t)ef->address,
+		    (lf->flags & LINKER_FILE_PCC_BOUNDS) != 0,
+		    resolve_cap_reloc, ef) != 0)
 			return (ENOEXEC);
 	}
 #endif
@@ -2280,18 +2425,40 @@ elf_lookup_ifunc(linker_file_t lf, Elf_Size symidx, int deps __unused,
 	ef = (elf_file_t)lf;
 	symp = ef->symtab + symidx;
 	if (ELF_ST_TYPE(symp->st_info) == STT_GNU_IFUNC) {
-		val = ef_address(ef, symp->st_value);
-#ifdef __CHERI_PURE_CAPABILITY__
-		val = make_capability(symp, val);
-#endif
+		val = ef_symbol_address(ef, symp);
 		*res = ((uintptr_t (*)(void))val)();
 		return (0);
 	}
 	return (ENOENT);
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Set LINKER_FILE_PCC_BOUNDS but don't allocate pcc_caps[].
+ */
+static void
+preload_check_for_pcc_caps(elf_file_t ef)
+{
+	const Elf_Ehdr *hdr;
+	const Elf_Phdr *phdr, *phlimit;
+
+	if (!have_phdrs(ef))
+		return;
+
+	hdr = (const Elf_Ehdr *)ef->mapbase;
+	phdr = (const Elf_Phdr *)((const char *)hdr + hdr->e_phoff);
+	phlimit = phdr + hdr->e_phnum;
+	for (; phdr < phlimit; phdr++) {
+		if (phdr->p_type == PT_CHERI_PCC) {
+			ef->lf.flags |= LINKER_FILE_PCC_BOUNDS;
+			return;
+		}
+	}
+}
+#endif
+
 void
-link_elf_ireloc(caddr_t kmdp)
+link_elf_ireloc(void)
 {
 	struct elf_file eff;
 	elf_file_t ef;
@@ -2301,7 +2468,7 @@ link_elf_ireloc(caddr_t kmdp)
 
 	bzero_early(ef, sizeof(*ef));
 
-	ef->modptr = kmdp;
+	ef->modptr = preload_kmdp;
 	ef->dynamic = (Elf_Dyn *)&_DYNAMIC;
 
 #ifdef RELOCATABLE_KERNEL
@@ -2314,9 +2481,10 @@ link_elf_ireloc(caddr_t kmdp)
 	 * It is sad that this needs to be a root capability,
 	 * as in link_elf_init().
 	 */
-	ef->address = cheri_setaddress(kernel_root_cap, 0);
-	ef->mapbase = cheri_setbounds(ef->address + KERNBASE,
+	ef->address = cheri_address_set(kernel_root_cap, 0);
+	ef->mapbase = cheri_bounds_set(ef->address + KERNBASE,
 	    (ptraddr_t)_end - KERNBASE);
+	preload_check_for_pcc_caps(ef);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
 	parse_dynamic(ef);

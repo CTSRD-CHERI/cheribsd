@@ -1499,9 +1499,6 @@ struct unlinkat_args {
 struct posix_openpt_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
-struct gssd_syscall_args {
-	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
-};
 struct jail_get_args {
 	char iovp_l_[PADL_(struct iovec * __kerncap)]; struct iovec * __kerncap iovp; char iovp_r_[PADR_(struct iovec * __kerncap)];
 	char iovcnt_l_[PADL_(unsigned int)]; unsigned int iovcnt; char iovcnt_r_[PADR_(unsigned int)];
@@ -1843,8 +1840,7 @@ struct close_range_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct rpctls_syscall_args {
-	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char socookie_l_[PADL_(uint64_t)]; uint64_t socookie; char socookie_r_[PADR_(uint64_t)];
 };
 struct __specialfd_args {
 	char type_l_[PADL_(int)]; int type; char type_r_[PADR_(int)];
@@ -2238,7 +2234,6 @@ int	sys_renameat(struct thread *, struct renameat_args *);
 int	sys_symlinkat(struct thread *, struct symlinkat_args *);
 int	sys_unlinkat(struct thread *, struct unlinkat_args *);
 int	sys_posix_openpt(struct thread *, struct posix_openpt_args *);
-int	sys_gssd_syscall(struct thread *, struct gssd_syscall_args *);
 int	sys_jail_get(struct thread *, struct jail_get_args *);
 int	sys_jail_set(struct thread *, struct jail_set_args *);
 int	sys_jail_remove(struct thread *, struct jail_remove_args *);
@@ -3224,7 +3219,6 @@ int	freebsd13_swapoff(struct thread *, struct freebsd13_swapoff_args *);
 #define	SYS_AUE_symlinkat	AUE_SYMLINKAT
 #define	SYS_AUE_unlinkat	AUE_UNLINKAT
 #define	SYS_AUE_posix_openpt	AUE_POSIX_OPENPT
-#define	SYS_AUE_gssd_syscall	AUE_NULL
 #define	SYS_AUE_jail_get	AUE_JAIL_GET
 #define	SYS_AUE_jail_set	AUE_JAIL_SET
 #define	SYS_AUE_jail_remove	AUE_JAIL_REMOVE

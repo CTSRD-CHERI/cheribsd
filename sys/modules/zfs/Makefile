@@ -412,6 +412,7 @@ CFLAGS.lvm.c= -Wno-cast-qual
 CFLAGS.lz4.c= -Wno-cast-qual
 CFLAGS.lz4_zfs.c= -Wno-cast-qual
 CFLAGS.nvpair.c= -Wno-cast-qual -DHAVE_RPC_TYPES ${NO_WSTRINGOP_OVERREAD}
+CFLAGS.nvpair.c+= -DXDRPROC_TAKES_TWO_ARGS
 CFLAGS.pool.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
 CFLAGS.pool.c= -U__BMI__ -fno-tree-vectorize
 CFLAGS.spa.c= -Wno-cast-qual

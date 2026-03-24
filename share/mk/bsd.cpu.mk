@@ -24,7 +24,7 @@ MACHINE_CPU = aim altivec
 MACHINE_CPU = aim altivec vsx vsx2
 . elif ${MACHINE_CPUARCH} == "riscv"
 .  if ${MACHINE_ARCH:Mriscv*c*}
-MACHINE_CPU = cheri
+MACHINE_CPU = cheri xcheri
 .  endif
 MACHINE_CPU += riscv
 . endif
@@ -104,11 +104,7 @@ _CPUCFLAGS = -march=${CPUTYPE}
 . elif ${MACHINE_CPUARCH} == "amd64"
 _CPUCFLAGS = -march=${CPUTYPE}
 . elif ${MACHINE_CPUARCH} == "arm"
-.  if ${CPUTYPE} == "xscale"
-#XXX: gcc doesn't seem to like -mcpu=xscale, and dies while rebuilding itself
-#_CPUCFLAGS = -mcpu=xscale
-_CPUCFLAGS = -march=armv5te -D__XSCALE__
-.  elif ${CPUTYPE:M*soft*} != ""
+.  if ${CPUTYPE:M*soft*} != ""
 _CPUCFLAGS = -mfloat-abi=softfp
 .  elif ${CPUTYPE} == "cortexa"
 _CPUCFLAGS = -march=armv7 -mfpu=vfp
@@ -326,19 +322,21 @@ MACHINE_CPU += vsx3
 ########## riscv
 . elif ${MACHINE_CPUARCH} == "riscv"
 .  if ${CPUTYPE} == "cheri"
-.warning "CPUTYPE=cheri is deprecated, please use xcheri, zcheri093, or rvy"
+.   if 0
+.warning "CPUTYPE=cheri is deprecated, please use xcheri or rvy"
+.   endif
 MACHINE_CPU = cheri xcheri
 .  elif ${CPUTYPE} == "xcheri"
 MACHINE_CPU = cheri xcheri
-.  elif ${CPUTYPE} == "zcheri093"
-MACHINE_CPU = cheri zcheri093
+.  elif ${CPUTYPE} == "rvy"
+MACHINE_CPU = cheri rvy
 .  endif
 MACHINE_CPU += riscv
 . endif
 .endif
 
 .if ${MACHINE_CPUARCH} == "riscv"
-.if ${MACHINE_CPU:Mzcheri*}
+.if ${MACHINE_CPU:Mrvy}
 CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-vararg
 CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-memarg-caller
 CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-memarg-callee
@@ -349,7 +347,10 @@ CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-memarg-callee
 . if ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-march=morello
 CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs
+CFLAGS+=	-cheri-codeptr-relocs
 LDFLAGS+=	-march=morello
+LDFLAGS+=	-cheri-codeptr-relocs
+LDFLAGS+=	-Wl,--local-caprelocs=elf
 . endif
 
 . if ${MACHINE_ARCH:Maarch64*cb*}
@@ -398,8 +399,8 @@ CFLAGS.gcc+= -mabi=spe -mfloat-gprs=double -Wa,-me500
 RISCV_MARCH=	rv64imafdc
 .if ${MACHINE_CPU:Mxcheri}
 RISCV_MARCH:=	${RISCV_MARCH}xcheri
-.elif ${MACHINE_CPU:Mzcheri093}
-RISCV_MARCH:=	${RISCV_MARCH}zcherihybrid
+.elif ${MACHINE_CPU:Mrvy}
+RISCV_MARCH:=	${RISCV_MARCH}zcherihybrid_zcherilevels
 .endif
 
 .if ${MACHINE_ARCH:Mriscv*c*}
@@ -416,6 +417,7 @@ LDFLAGS += -march=${RISCV_MARCH} -mabi=${RISCV_ABI}
 
 .if !defined(NO_CPU_CFLAGS)
 CFLAGS += ${_CPUCFLAGS}
+CXXFLAGS += ${_CPUCFLAGS}
 .endif
 
 #

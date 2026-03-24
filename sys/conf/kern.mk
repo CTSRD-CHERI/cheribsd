@@ -153,11 +153,9 @@ INLINE_LIMIT?=	8000
 .if ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-march=morello
 CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs
-
-.if ${MK_CHERI_CODEPTR_RELOCS} != "no" && ${COMPILER_FEATURES:Mmorello-codeptr-relocs}
 CFLAGS+=	-cheri-codeptr-relocs
 LDFLAGS+=	-cheri-codeptr-relocs
-.endif
+LDFLAGS+=	-Wl,--local-caprelocs=elf
 .endif
 
 .if ${MACHINE_ARCH:Maarch*c*}
@@ -168,6 +166,16 @@ CFLAGS+=	-mabi=purecap
 .endif
 .else
 CFLAGS+=	-mabi=aapcs
+.endif
+.endif
+
+.if ${MACHINE_ABI:Mpurecap}
+.if ${OPT_CHERI_TGOT_TLS} == "yes"
+CFLAGS+=	-cheri-tgot-tls
+.elif ${OPT_CHERI_TGOT_TLS} == "compat"
+CFLAGS+=	-cheri-tgot-tls=compat
+.elif ${OPT_CHERI_TGOT_TLS} == "no"
+CFLAGS+=	-no-cheri-tgot-tls
 .endif
 .endif
 
@@ -186,8 +194,8 @@ CFLAGS+=	-mabi=aapcs
 RISCV_MARCH=	rv64imafdch
 .if ${MACHINE_CPU:Mxcheri}
 RISCV_MARCH:=	${RISCV_MARCH}xcheri
-.elif ${MACHINE_CPU:Mzcheri093}
-RISCV_MARCH:=	${RISCV_MARCH}zcherihybrid
+.elif ${MACHINE_CPU:Mrvy}
+RISCV_MARCH:=	${RISCV_MARCH}zcherihybrid_zcherilevels
 .endif
 
 RISCV_ABI=	lp64
@@ -204,7 +212,7 @@ INLINE_LIMIT?=	8000
 CFLAGS+=	-mno-relax
 .endif
 
-.if ${MACHINE_CPU:Mcheri}
+.if ${MACHINE_CPU:Mrvy}
 CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-vararg
 CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-memarg-caller
 CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-memarg-callee
@@ -425,7 +433,7 @@ PHONY_NOTMAIN = afterdepend afterinstall all beforedepend beforeinstall \
 .PHONY: ${PHONY_NOTMAIN}
 .NOTMAIN: ${PHONY_NOTMAIN}
 
-CSTD?=		gnu99
+CSTD?=		gnu17
 
 # c99/gnu99 is the minimum C standard version supported for kernel build
 .if ${CSTD} == "k&r" || ${CSTD} == "c89" || ${CSTD} == "c90" || \

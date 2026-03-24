@@ -29,18 +29,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
  * POSSIBILITY OF SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20221129,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "sunrpc"
- * }
- * CHERI CHANGES END
- */
 
 /*
  * clnt_tcp.c, Implements a TCP/IP based, client side RPC.
@@ -363,7 +351,7 @@ call_again:
 		if ((! XDR_PUTBYTES(xdrs, ct->ct_u.ct_mcallc, ct->ct_mpos)) ||
 		    (! XDR_PUTINT32(xdrs, &proc)) ||
 		    (! AUTH_MARSHALL(cl->cl_auth, xdrs)) ||
-		    (! (*xdr_args)(xdrs, args_ptr, 0))) {
+		    (! (*xdr_args)(xdrs, args_ptr))) {
 			if (ct->ct_error.re_status == RPC_SUCCESS)
 				ct->ct_error.re_status = RPC_CANTENCODEARGS;
 			(void)xdrrec_endofrecord(xdrs, TRUE);
@@ -433,8 +421,7 @@ call_again:
 			ct->ct_error.re_why = AUTH_INVALIDRESP;
 		} else {
 			if (cl->cl_auth->ah_cred.oa_flavor != RPCSEC_GSS) {
-				reply_stat = (*xdr_results)(xdrs, results_ptr,
-				    0);
+				reply_stat = (*xdr_results)(xdrs, results_ptr);
 			} else {
 				reply_stat = __rpc_gss_unwrap(cl->cl_auth,
 				    xdrs, xdr_results, results_ptr);
@@ -494,7 +481,7 @@ clnt_vc_freeres(CLIENT *cl, xdrproc_t xdr_res, void *res_ptr)
 	elem = vc_fd_find(ct->ct_fd);
 	mutex_lock(&elem->mtx);
 	xdrs->x_op = XDR_FREE;
-	dummy = (*xdr_res)(xdrs, res_ptr, 0);
+	dummy = (*xdr_res)(xdrs, res_ptr);
 
 	mutex_unlock(&clnt_fd_lock);
 	release_fd_lock(elem, mask);

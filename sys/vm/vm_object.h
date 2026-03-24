@@ -224,20 +224,20 @@ struct vm_object {
 #ifdef	_KERNEL
 
 /*
- * This only asserts VM_PROT_WRITE_CAP to ensure that capabilities are
+ * This only asserts VM_PROT_WRITE|VM_PROT_CAP to ensure that capabilities are
  * never stored into objects that are not permitted to hold
  * capabilities.
  */
 #define	VM_OBJECT_ASSERT_CAP(object, prot)				\
-	KASSERT(((prot) & VM_PROT_WRITE_CAP) == 0 ||			\
+	    KASSERT(!VM_PROT_HAS_WRITE_CAP(prot) ||			\
 	    ((object)->flags & OBJ_HASCAP) != 0,			\
 	    ("%s: enabling WRITE_CAP on object %p without HASCAP",	\
 	    __func__, (object)))
 
 /*
- * In reality this only strips VM_PROT_READ_CAP as pre-COW mappings of
- * non-OBJ_HASCAP mappings should already be stripping
- * VM_PROT_WRITE_CAP.
+ * In reality this only strips VM_PROT_CAP on VM_PROT_READ entries as pre-COW
+ * mappings of non-OBJ_HASCAP mappings should already be stripping
+ * VM_PROT_WRITE.
  */
 #define	VM_OBJECT_MASK_CAP_PROT(object, prot)				\
 	((object)->flags & OBJ_HASCAP ? (prot) : (prot) & ~VM_PROT_CAP)

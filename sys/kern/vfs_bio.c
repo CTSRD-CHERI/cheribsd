@@ -1201,12 +1201,8 @@ kern_vfs_bio_buffer_alloc(caddr_t v, long physmem_est)
 
 	/*
 	 * Reserve space for the buffer cache buffers
-	 * When we are called the first time, the capability is invalid
-	 * so we can not set bounds.
 	 */
-	if (cheri_kern_gettag(v))
-		buf = (void *)cheri_kern_setbounds(v, nbuf * STRUCT_BUF_ALLOCATION);
-	buf = (char *)v;
+	buf = (void *)cheri_kern_bounds_set(v, nbuf * STRUCT_BUF_ALLOCATION);
 	v = (caddr_t)v + STRUCT_BUF_ALLOCATION * nbuf;
 
 	return (v);
@@ -1241,7 +1237,7 @@ bufinit(void)
 
 	/* finally, initialize each buffer header and stick on empty q */
 	for (i = 0; i < nbuf; i++) {
-		bp = cheri_kern_setboundsexact(nbufp(i), STRUCT_BUF_ALLOCATION);
+		bp = cheri_kern_bounds_set_exact(nbufp(i), STRUCT_BUF_ALLOCATION);
 		bzero(bp, STRUCT_BUF_ALLOCATION);
 		bp->b_flags = B_INVAL;
 		bp->b_rcred = NOCRED;
@@ -1528,8 +1524,8 @@ bufshutdown(int show_busybufs)
 		if (!KERNEL_PANICKED()) {
 			swapoff_all();
 			vfs_unmountall();
+			BOOTTRACE("shutdown unmounted all filesystems");
 		}
-		BOOTTRACE("shutdown unmounted all filesystems");
 	}
 	DELAY(100000);		/* wait for console output to finish */
 }

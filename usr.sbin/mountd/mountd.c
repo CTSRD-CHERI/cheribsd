@@ -31,17 +31,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-// CHERI CHANGES START
-// {
-//   "updated": 20200721,
-//   "target_type": "prog",
-//   "changes": [
-//     "other"
-//   ],
-//   "change_comment": "Fix buffer underread"
-// }
-// CHERI CHANGES END
-
 
 #include <sys/param.h>
 #include <sys/conf.h>
@@ -1817,7 +1806,7 @@ get_exportlist_one(int passno)
 			len = endcp - cp;
 		}
 		if (opt_flags & OP_CLASSMASK)
-			syslog(LOG_WARNING,
+			syslog(LOG_ERR,
 			    "WARNING: No mask specified for %s, "
 			    "using out-of-date default",
 			    (&grp->gr_ptr.gt_net)->nt_name);

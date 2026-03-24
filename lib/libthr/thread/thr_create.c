@@ -182,7 +182,7 @@ _pthread_create(pthread_t * __restrict thread,
 #endif
 
 	/* Return thread pointer eariler so that new thread can use it. */
-	(*thread) = new_thread;
+	*thread = new_thread;
 	if (SHOULD_REPORT_EVENT(curthread, TD_CREATE) || cpusetp != NULL) {
 		THR_THREAD_LOCK(curthread, new_thread);
 		locked = 1;
@@ -197,9 +197,9 @@ _pthread_create(pthread_t * __restrict thread,
 	param.stack_base = new_thread->attr.stackaddr_attr;
 	param.stack_size = new_thread->attr.stacksize_attr;
 #ifdef __CHERI_PURE_CAPABILITY__
-	THR_ASSERT(cheri_gettag(param.stack_base) == 1,
+	THR_ASSERT(cheri_tag_get(param.stack_base) == 1,
 	    "stack_base must be a valid capability");
-	THR_ASSERT(cheri_getlen(param.stack_base) == param.stack_size,
+	THR_ASSERT(cheri_length_get(param.stack_base) == param.stack_size,
 	    "param.stack_base length should be param.stack_size!");
 #endif
 	param.tls_base = (char *)new_thread->tcb;
@@ -272,8 +272,8 @@ _pthread_create(pthread_t * __restrict thread,
 		THR_THREAD_UNLOCK(curthread, new_thread);
 	}
 out:
-	if (ret)
-		(*thread) = 0;
+	if (ret != 0)
+		*thread = NULL;
 	return (ret);
 }
 

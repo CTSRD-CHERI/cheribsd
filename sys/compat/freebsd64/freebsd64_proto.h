@@ -1163,9 +1163,6 @@ struct freebsd64_unlinkat_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
-struct freebsd64_gssd_syscall_args {
-	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
-};
 struct freebsd64_jail_get_args {
 	char iovp_l_[PADL_(struct iovec64 *)]; struct iovec64 * iovp; char iovp_r_[PADR_(struct iovec64 *)];
 	char iovcnt_l_[PADL_(unsigned int)]; unsigned int iovcnt; char iovcnt_r_[PADR_(unsigned int)];
@@ -1473,10 +1470,6 @@ struct freebsd64___realpathat_args {
 	char size_l_[PADL_(size_t)]; size_t size; char size_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
-struct freebsd64_rpctls_syscall_args {
-	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
-	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
-};
 struct freebsd64___specialfd_args {
 	char type_l_[PADL_(int)]; int type; char type_r_[PADR_(int)];
 	char req_l_[PADL_(const void *)]; const void * req; char req_r_[PADR_(const void *)];
@@ -1765,7 +1758,6 @@ int	freebsd64_readlinkat(struct thread *, struct freebsd64_readlinkat_args *);
 int	freebsd64_renameat(struct thread *, struct freebsd64_renameat_args *);
 int	freebsd64_symlinkat(struct thread *, struct freebsd64_symlinkat_args *);
 int	freebsd64_unlinkat(struct thread *, struct freebsd64_unlinkat_args *);
-int	freebsd64_gssd_syscall(struct thread *, struct freebsd64_gssd_syscall_args *);
 int	freebsd64_jail_get(struct thread *, struct freebsd64_jail_get_args *);
 int	freebsd64_jail_set(struct thread *, struct freebsd64_jail_set_args *);
 int	freebsd64___semctl(struct thread *, struct freebsd64___semctl_args *);
@@ -1823,7 +1815,6 @@ int	freebsd64_shm_open2(struct thread *, struct freebsd64_shm_open2_args *);
 int	freebsd64_shm_rename(struct thread *, struct freebsd64_shm_rename_args *);
 int	freebsd64_sigfastblock(struct thread *, struct freebsd64_sigfastblock_args *);
 int	freebsd64___realpathat(struct thread *, struct freebsd64___realpathat_args *);
-int	freebsd64_rpctls_syscall(struct thread *, struct freebsd64_rpctls_syscall_args *);
 int	freebsd64___specialfd(struct thread *, struct freebsd64___specialfd_args *);
 int	freebsd64_aio_writev(struct thread *, struct freebsd64_aio_writev_args *);
 int	freebsd64_aio_readv(struct thread *, struct freebsd64_aio_readv_args *);
@@ -2340,7 +2331,6 @@ int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swap
 #define	FREEBSD64_SYS_AUE_freebsd64_renameat	AUE_RENAMEAT
 #define	FREEBSD64_SYS_AUE_freebsd64_symlinkat	AUE_SYMLINKAT
 #define	FREEBSD64_SYS_AUE_freebsd64_unlinkat	AUE_UNLINKAT
-#define	FREEBSD64_SYS_AUE_freebsd64_gssd_syscall	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_jail_get	AUE_JAIL_GET
 #define	FREEBSD64_SYS_AUE_freebsd64_jail_set	AUE_JAIL_SET
 #define	FREEBSD64_SYS_AUE_freebsd64___semctl	AUE_SEMCTL
@@ -2398,7 +2388,6 @@ int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swap
 #define	FREEBSD64_SYS_AUE_freebsd64_shm_rename	AUE_SHMRENAME
 #define	FREEBSD64_SYS_AUE_freebsd64_sigfastblock	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64___realpathat	AUE_REALPATHAT
-#define	FREEBSD64_SYS_AUE_freebsd64_rpctls_syscall	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64___specialfd	AUE_SPECIALFD
 #define	FREEBSD64_SYS_AUE_freebsd64_aio_writev	AUE_AIO_WRITEV
 #define	FREEBSD64_SYS_AUE_freebsd64_aio_readv	AUE_AIO_READV

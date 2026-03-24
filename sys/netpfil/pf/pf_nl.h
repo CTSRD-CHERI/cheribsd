@@ -61,6 +61,9 @@ enum {
 	PFNL_CMD_GET_RULESETS = 23,
 	PFNL_CMD_GET_RULESET = 24,
 	PFNL_CMD_GET_SRCNODES = 25,
+	PFNL_CMD_CLEAR_TABLES = 26,
+	PFNL_CMD_ADD_TABLE = 27,
+	PFNL_CMD_DEL_TABLE = 28,
 	__PFNL_CMD_MAX,
 };
 #define PFNL_CMD_MAX (__PFNL_CMD_MAX -1)
@@ -128,6 +131,7 @@ enum pfstate_type_t {
 	PF_ST_DNRPIPE		= 35, /* u16 */
 	PF_ST_RT		= 36, /* u8 */
 	PF_ST_RT_IFNAME		= 37, /* string */
+	PF_ST_SRC_NODE_FLAGS	= 38, /* u8 */
 };
 
 enum pf_addr_type_t {
@@ -266,6 +270,11 @@ enum pf_rule_type_t {
 	PF_RT_MAX_SRC_CONN	= 74, /* u32 */
 	PF_RT_RPOOL_NAT		= 75, /* nested, pf_rpool_type_t */
 	PF_RT_NAF		= 76, /* u8 */
+	PF_RT_RPOOL_RT		= 77, /* nested, pf_rpool_type_t */
+	PF_RT_RCV_IFNOT		= 78, /* bool */
+	PF_RT_SRC_NODES_LIMIT	= 79, /* u64 */
+	PF_RT_SRC_NODES_NAT	= 80, /* u64 */
+	PF_RT_SRC_NODES_ROUTE	= 81, /* u64 */
 };
 
 enum pf_addrule_type_t {
@@ -420,6 +429,17 @@ enum pf_srcnodes_types_t {
 	PF_SN_EXPIRE		= 13, /* u64 */
 	PF_SN_CONNECTION_RATE	= 14, /* nested, pf_threshold */
 	PF_SN_NAF		= 15, /* u8 */
+	PF_SN_NODE_TYPE		= 16, /* u8 */
+};
+
+enum pf_tables_t {
+	PF_T_UNSPEC,
+	PF_T_ANCHOR		= 1, /* string */
+	PF_T_NAME		= 2, /* string */
+	PF_T_TABLE_FLAGS	= 3, /* u32 */
+	PF_T_FLAGS		= 4, /* u32 */
+	PF_T_NBR_DELETED	= 5, /* u32 */
+	PF_T_NBR_ADDED		= 6, /* u32 */
 };
 
 #ifdef _KERNEL

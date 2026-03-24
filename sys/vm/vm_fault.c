@@ -353,7 +353,7 @@ vm_fault_must_cheri_revoke(vm_map_t map, vm_prot_t prot, vm_page_t m,
 		return (false);
 
 	/* Or we're not mapping with capability read access */
-	if ((prot & VM_PROT_READ_CAP) == 0)
+	if ((prot & VM_PROT_READ) == 0 || (prot & VM_PROT_CAP) == 0)
 		return (false);
 
 	/* Or the page is known to not have capabilities */
@@ -428,7 +428,7 @@ vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 	/*
 	 * TODO: Well, this is kind of awkward.  We should, on the load side, be
 	 * leaving pages marked capdirty if VM_CHERI_REVOKE_PAGE_HASCAPS here.
-	 * While that generally takes the form of OR-ing VM_PROT_WRITE_CAP to
+	 * While that generally takes the form of OR-ing VM_PROT_CAP to
 	 * the flags (not prot!) passed to pmap_enter (mostly derived from
 	 * fs->fault_type, at that, even), there's more nuance here than just
 	 * that.  This routine is called while looking within superpages, and so
@@ -452,25 +452,6 @@ vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 	return (VFCR_OK);
 }
 #endif
-
-/*
- * Check whether the given page permission imply the page having
- * PGA_CAPSTORE set.
- * This is handled differently on architectures that distinguish
- * between VM_PROT_WRITE_CAP and VM_PROT_READ_CAP in the PTE entries.
- *
- * XXX-AM: This is really MD and should likely be somewhere else, but I
- * want this to be inlined.
- */
-static bool
-vm_fault_needs_capstore(vm_prot_t prot)
-{
-#ifdef __riscv_zcheripurecap
-	return ((prot & VM_PROT_CAP) != 0);
-#else
-	return ((prot & VM_PROT_WRITE_CAP) != 0);
-#endif
-}
 
 /*
  * Unlocks fs.first_object and fs.map on success.
@@ -541,7 +522,7 @@ vm_fault_soft_fast(struct faultstate *fs)
 			if ((fs->first_object->flags & OBJ_UNMANAGED) == 0)
 				flags |= PS_ALL_DIRTY;
 		}
-		if ((fs->prot & VM_PROT_WRITE_CAP) != 0) {
+		if (VM_PROT_HAS_WRITE_CAP(fs->prot)) {
 			/*
 			 * Similarly, if we're permitting capability stores,
 			 * require all pages to be tracked by the revoker
@@ -591,11 +572,11 @@ vm_fault_soft_fast(struct faultstate *fs)
 
 	/*
 	 * We might be upgrading a page previously mapped VM_PROT_WRITE to one
-	 * now mapped VM_PROT_WRITE | VM_PROT_WRITE_CAP.  Flag it as such.
+	 * now mapped VM_PROT_WRITE | VM_PROT_CAP.  Flag it as such.
 	 *
 	 * Importantly, realprot is exempt from vm_page_mask_cap_prot()!
 	 */
-	if (vm_fault_needs_capstore(realprot))
+	if (realprot & VM_PROT_CAP)
 		vm_page_aflag_set(m_map, PGA_CAPSTORE);
 #ifdef CHERI_CAPREVOKE
 	CTR4(KTR_CAPREVOKE,
@@ -771,7 +752,7 @@ vm_fault_populate(struct faultstate *fs)
 		KASSERT((VM_PAGE_TO_PHYS(m) & (pagesizes[bdry_idx] - 1)) == 0,
 		    ("unaligned superpage m %p %#jx", m,
 		    (uintmax_t)VM_PAGE_TO_PHYS(m)));
-		if (vm_fault_needs_capstore(fs->prot))
+		if (fs->prot & VM_PROT_CAP)
 			vm_page_aflag_set(m, PGA_CAPSTORE);
 		if (fs->fault_flags & VM_FAULT_NOPMAP) {
 			rv = KERN_SUCCESS;
@@ -834,7 +815,7 @@ skip_pmap_bdry:
 		npages = atop(pagesizes[psind]);
 		for (i = 0; i < npages; i++) {
 			vm_fault_populate_check_page(&m[i]);
-			if (vm_fault_needs_capstore(prot))
+			if (prot & VM_PROT_CAP)
 				vm_page_aflag_set(&m[i], PGA_CAPSTORE);
 			vm_fault_dirty(fs, &m[i]);
 
@@ -997,9 +978,9 @@ vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 			*ucode = BUS_OBJERR;
 			break;
 		case KERN_PROTECTION_FAILURE:
-			if ((fault_type & VM_PROT_WRITE_CAP) != 0)
+			if (VM_PROT_HAS_WRITE_CAP(fault_type))
 				segv_ucode = SEGV_STORETAG;
-			else if ((fault_type & VM_PROT_READ_CAP) != 0)
+			else if (VM_PROT_HAS_READ_CAP(fault_type))
 				segv_ucode = SEGV_LOADTAG;
 			else
 				segv_ucode = SEGV_ACCERR;
@@ -1608,7 +1589,7 @@ vm_fault_allocate(struct faultstate *fs)
 	}
 	fs->oom_started = false;
 
-	if (capstore_on_alloc && vm_fault_needs_capstore(fs->prot))
+	if (capstore_on_alloc && (fs->prot & VM_PROT_CAP) != 0)
 		vm_page_aflag_set(fs->m, PGA_CAPSTORE);
 #ifdef CHERI_CAPREVOKE
 	CTR4(KTR_CAPREVOKE,
@@ -2041,7 +2022,7 @@ found:
 				faultcount = 1;
 
 		} else {
-			fs.prot &= ~(VM_PROT_WRITE | VM_PROT_WRITE_CAP);
+			fs.prot &= ~VM_PROT_WRITE;
 		}
 	}
 
@@ -2140,7 +2121,7 @@ found:
 	VM_OBJECT_ASSERT_CAP(fs.object, fs.prot);
 
 	/*
-	 * Modulate VM_PROT_WRITE_CAP by fs.object's OBJ_HASCAP and fs.m's
+	 * Modulate VM_PROT_CAP by fs.object's OBJ_HASCAP and fs.m's
 	 * PGA_CAPSTORE.
 	 */
 	vm_prot_t realprot = VM_OBJECT_MASK_CAP_PROT(fs.object, fs.prot);
@@ -2372,7 +2353,7 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 			 * NB: The lack of VM_OBJECT_ASSERT_CAP() is
 			 * intentional.  pmap_enter_quick() only
 			 * establishes read-only mappings, so
-			 * VM_PROT_WRITE_CAP is ignored.
+			 * VM_PROT_CAP is ignored.
 			 */
 			pmap_enter_quick(pmap, addr, m,
 			    VM_OBJECT_MASK_CAP_PROT(lobject, prot));
@@ -2405,7 +2386,7 @@ vm_fault_quick_hold_pages(vm_map_t map, void * __capability addr, vm_size_t len,
 	if (len == 0)
 		return (0);
 #if __has_feature(capabilities)
-	if (!__CAP_CHECK(addr, len) || !vm_cap_allows_prot(addr, prot))
+	if (!cheri_can_access(addr, vm_prot2perms(0, prot), len))
 		return (-1);
 #endif
 	start = (__cheri_addr vm_offset_t)trunc_page(addr);
@@ -2496,7 +2477,7 @@ vm_fault_copy_entry(vm_map_t dst_map, vm_map_t src_map __unused,
 	vm_pindex_t dst_pindex, pindex, src_pindex;
 	vm_prot_t access, prot;
 	vm_offset_t vaddr;
-	vm_page_t dst_m;
+	vm_page_t dst_m, mpred;
 	vm_page_t src_m;
 	bool upgrade;
 
@@ -2568,9 +2549,11 @@ vm_fault_copy_entry(vm_map_t dst_map, vm_map_t src_map __unused,
 	 * with the source object, all of its pages must be dirtied,
 	 * regardless of whether they can be written.
 	 */
+	mpred = (src_object == dst_object) ?
+	   vm_page_mpred(src_object, src_pindex) : NULL;
 	for (vaddr = dst_entry->start, dst_pindex = 0;
 	    vaddr < dst_entry->end;
-	    vaddr += PAGE_SIZE, dst_pindex++) {
+	    vaddr += PAGE_SIZE, dst_pindex++, mpred = dst_m) {
 again:
 		/*
 		 * Find the page in the source object, and copy it in.
@@ -2608,9 +2591,9 @@ again:
 			/*
 			 * Allocate a page in the destination object.
 			 */
-			dst_m = vm_page_alloc(dst_object, (src_object ==
+			dst_m = vm_page_alloc_after(dst_object, (src_object ==
 			    dst_object ? src_pindex : 0) + dst_pindex,
-			    VM_ALLOC_NORMAL);
+			    VM_ALLOC_NORMAL, mpred);
 			if (dst_m == NULL) {
 				VM_OBJECT_WUNLOCK(dst_object);
 				VM_OBJECT_RUNLOCK(object);

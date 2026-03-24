@@ -659,8 +659,12 @@ PKG_VERSION:=	${_PKG_REVISION}${EXTRA_REVISION:C/[[:space:]]//g}
 .endif	# !defined(PKG_VERSION)
 
 .if !defined(PKG_TIMESTAMP)
+.if !empty(GIT_CMD) && exists(${GIT_CMD}) && exists(${SRCDIR}/.git)
+SOURCE_DATE_EPOCH!=	${GIT_CMD} -C ${SRCDIR} show -s --format=%ct HEAD
+.else
 TIMEEPOCHNOW=		%s
 SOURCE_DATE_EPOCH=	${TIMEEPOCHNOW:gmtime}
+.endif
 .else
 SOURCE_DATE_EPOCH=	${PKG_TIMESTAMP}
 .endif
@@ -826,7 +830,7 @@ BSARGS= 	DESTDIR= \
 		-DNO_PIC \
 		-DNO_SHARED \
 		MK_ASAN=no \
-		MK_CHERI_CODEPTR_RELOCS=no \
+		OPT_CHERI_TGOT_TLS=native \
 		MK_COMPARTMENT_POLICY=no \
 		MK_CTF=no \
 		MK_CLANG_EXTRAS=no \
@@ -859,7 +863,7 @@ TMAKE=		\
 		-DNO_CPU_CFLAGS \
 		-DNO_LINT \
 		MK_ASAN=no \
-		MK_CHERI_CODEPTR_RELOCS=no \
+		OPT_CHERI_TGOT_TLS=native \
 		MK_COMPARTMENT_POLICY=no \
 		MK_CTF=no \
 		MK_CLANG_EXTRAS=no \
@@ -899,7 +903,7 @@ KTMAKE=		${TIME_ENV} \
 		-DNO_LINT \
 		-DNO_PIC \
 		-DNO_SHARED \
-		MK_CHERI_CODEPTR_RELOCS=no \
+		OPT_CHERI_TGOT_TLS=native \
 		MK_COMPARTMENT_POLICY=no \
 		MK_CTF=no \
 		MK_HTML=no \
@@ -1077,13 +1081,18 @@ INSTALLFLAGS+=	-h sha256
 IMAKE_INSTALL=	INSTALL="${INSTALL_CMD} ${INSTALLFLAGS}"
 IMAKE_MTREE=	MTREE_CMD="${MTREE_CMD} ${MTREEFLAGS}"
 .endif
-.if make(distributeworld)
+
+.if make(distributeworld) || make(packageworld) || make(distributekernel) || \
+    make(packagekernel)
 .if ${DISTDIR:U/} == /
-.error DISTDIR must be set for make distributeworld and may not be the root directory.
+.error DISTDIR must be set for make distribute* and make package*, and may not be the root directory.
 .endif
 .if !defined(NO_ROOT) || !defined(METALOG)
-.error NO_ROOT and METALOG must be set for make distributeworld.
+.error NO_ROOT and METALOG must be set for make distribute* and make package*.
 .endif
+.endif
+
+.if make(distributeworld)
 CERTCTLDESTDIR=	${DESTDIR}/${DISTDIR}
 CERTCTLFLAGS+=	-d /base
 .else
@@ -1604,7 +1613,7 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	    -p ${DESTDIR}/${DISTDIR}/${dist}${TESTSBASE} >/dev/null
 .if ${MK_DEBUG_FILES} != "no"
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.tests.dist \
-	    -p ${DESTDIR}/${DISTDIR}/${dist}/usr/lib/debug/${TESTSBASE} >/dev/null
+	    -p ${DESTDIR}/${DISTDIR}/${dist}/usr/lib/debug${TESTSBASE} >/dev/null
 .endif
 .endif
 	${IMAKEENV} ${DISTR_MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.root.dist | \
@@ -1703,7 +1712,8 @@ _sysent_dirs+=	sys/compat/freebsd64
 _sysent_dirs+=	sys/amd64/linux		\
 		sys/amd64/linux32	\
 		sys/arm64/linux		\
-		sys/i386/linux
+		sys/i386/linux		\
+		sys/tools/syscalls/examples/cpp
 
 sysent: .PHONY
 .for _dir in ${_sysent_dirs}
@@ -2044,9 +2054,7 @@ distributekernel distributekernel.debug: .PHONY
 	false
 .endif
 	mkdir -p ${DESTDIR}/${DISTDIR}
-.if defined(NO_ROOT)
-	@echo "#${MTREE_MAGIC}" > ${DESTDIR}/${DISTDIR}/kernel.premeta
-.endif
+	rm -f ${DESTDIR}/${DISTDIR}/kernel.premeta
 	${_+_}cd ${KRNLOBJDIR}/${INSTALLKERNEL}; \
 	    ${IMAKEENV} ${IMAKE_INSTALL:S/METALOG/kernel.premeta/} \
 	    ${IMAKE_MTREE} PATH=${TMPPATH:Q} ${MAKE} KERNEL=${INSTKERNNAME} \
@@ -2054,15 +2062,14 @@ distributekernel distributekernel.debug: .PHONY
 	    METALOG=${METALOG:S/METALOG/kernel.premeta/} \
 	    ${.TARGET:S/distributekernel/install/}
 .if defined(NO_ROOT)
-	@sed -e 's|^./kernel|.|' ${DESTDIR}/${DISTDIR}/kernel.premeta > \
-	    ${DESTDIR}/${DISTDIR}/kernel.meta
+	echo "#${MTREE_MAGIC}" > ${DESTDIR}/${DISTDIR}/kernel.meta
+	sed -e 's|^./kernel|.|' ${DESTDIR}/${DISTDIR}/kernel.premeta | \
+	    ${METALOG_SORT_CMD} >> ${DESTDIR}/${DISTDIR}/kernel.meta
 .endif
 .endif
 .if ${BUILDKERNELS:[#]} > 1 && ${NO_INSTALLEXTRAKERNELS} != "yes"
 .for _kernel in ${BUILDKERNELS:[2..-1]}
-.if defined(NO_ROOT)
-	@echo "#${MTREE_MAGIC}" > ${DESTDIR}/${DISTDIR}/kernel.${_kernel}.premeta
-.endif
+	rm -f ${DESTDIR}/${DISTDIR}/kernel.${_kernel}.premeta
 	${_+_}cd ${KRNLOBJDIR}/${_kernel}; \
 	    ${IMAKEENV} ${IMAKE_INSTALL:S/METALOG/kernel.${_kernel}.premeta/} \
 	    ${IMAKE_MTREE} PATH=${TMPPATH:Q} ${MAKE} \
@@ -2071,9 +2078,10 @@ distributekernel distributekernel.debug: .PHONY
 	    METALOG=${METALOG:S/METALOG/kernel.${_kernel}.premeta/} \
 	    ${.TARGET:S/distributekernel/install/}
 .if defined(NO_ROOT)
-	@sed -e "s|^./kernel.${_kernel}|.|" \
-	    ${DESTDIR}/${DISTDIR}/kernel.${_kernel}.premeta > \
-	    ${DESTDIR}/${DISTDIR}/kernel.${_kernel}.meta
+	echo "#${MTREE_MAGIC}" > ${DESTDIR}/${DISTDIR}/kernel.${_kernel}.meta
+	sed -e "s|^./kernel.${_kernel}|.|" \
+	    ${DESTDIR}/${DISTDIR}/kernel.${_kernel}.premeta | \
+	    ${METALOG_SORT_CMD} >> ${DESTDIR}/${DISTDIR}/kernel.${_kernel}.meta
 .endif
 .endfor
 .endif
@@ -2132,7 +2140,7 @@ packagekernel: .PHONY
 .endif
 
 stagekernel: .PHONY
-	${_+_}${MAKE} -C ${.CURDIR} ${.MAKEFLAGS} distributekernel
+	${_+_}${MAKE} -C ${.CURDIR} ${.MAKEFLAGS} DISTDIR=. distributekernel
 
 PORTSDIR?=	/usr/ports
 WSTAGEDIR?=	${OBJTOP}/worldstage
@@ -2500,7 +2508,7 @@ real-sign-packages:	_pkgbootstrap .PHONY
 .if ${PKG_BIN_VERSION} < 11700
 	printf "packing_format = \"${PKG_FORMAT}\";\n" >> ${WSTAGEDIR}/meta
 .endif
-	@${PKG_CMD} -o ABI=${PKG_ABI} repo -o OSVERSION="${SRCRELDATE}" \
+	@${PKG_CMD} -o ABI=${PKG_ABI} -o OSVERSION="${SRCRELDATE}" repo \
 		-m ${WSTAGEDIR}/meta \
 		-o ${REPODIR}/${PKG_ABI}/${PKG_VERSION} \
 		${REPODIR}/${PKG_ABI}/${PKG_VERSION} \

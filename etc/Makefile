@@ -116,10 +116,10 @@ MTREES+=	mtree/BSD.pkg${libcompat}.dist	/
 .endfor
 .if ${MK_TESTS} != "no"
 MTREES+=	mtree/BSD.tests.dist		${TESTSBASE}
-MTREES+=	mtree/BSD.tests.dist		/usr/lib/debug/${TESTSBASE}
+MTREES+=	mtree/BSD.tests.dist		/usr/lib/debug${TESTSBASE}
 .if ${MK_LIB64C} != "no"
 MTREES+=	mtree/BSD.tests.dist		${TESTSBASE}/cheri
-MTREES+=	mtree/BSD.tests.dist		/usr/lib/debug/${TESTSBASE}/cheri
+MTREES+=	mtree/BSD.tests.dist		/usr/lib/debug${TESTSBASE}/cheri
 .endif
 .endif
 .if ${MK_SENDMAIL} != "no"

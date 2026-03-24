@@ -252,3 +252,62 @@ if [ -h "$OBJTOP"/lib/libc/jemalloc.3 ]; then
 	echo "Removing stale jemalloc.3 object"
 	run rm -f "$OBJTOP"/lib/libc/jemalloc.3
 fi
+
+if [ $MACHINE = arm64 ]; then
+	if [ ${MACHINE_ARCH} == aarch64c ]; then
+		OBJTOP_SAVE="$OBJTOP"
+		OBJTOP="$OBJTOP/obj-lib64"
+	fi
+
+	# 20250110  5e7d93a60440  add strcmp SIMD implementation
+	ALL_libcompats= clean_dep   lib/libc strcmp S arm-optimized-routines
+	run rm -f "$OBJTOP"/lib/libc/strcmp.S
+
+	# 20250110  b91003acffe7  add strspn optimized implementation
+	ALL_libcompats= clean_dep   lib/libc strspn c
+
+	# 20250110  f2bd390a54f1  add strcspn optimized implementation
+	ALL_libcompats= clean_dep   lib/libc strcspn c
+
+	# 20250110  89b3872376cb  add optimized strpbrk & strsep implementations
+	ALL_libcompats= clean_dep   lib/libc strpbrk c "libc.string.strpbrk.c"
+
+	# 20250110  79287d783c72  strcat enable use of SIMD
+	ALL_libcompats= clean_dep   lib/libc strcat c "libc.string.strcat.c"
+
+	# 20250110  756b7fc80837  add strlcpy SIMD implementation
+	ALL_libcompats= clean_dep   lib/libc strlcpy c
+
+	# 20250110  25c485e14769  add strncmp SIMD implementation
+	ALL_libcompats= clean_dep   lib/libc strncmp S arm-optimized-routines
+	run rm -f "$OBJTOP"/lib/libc/strncmp.S
+
+	# 20250110  bad17991c06d  add memccpy SIMD implementation
+	ALL_libcompats= clean_dep   lib/libc memccpy c
+
+	# 20250110  3dc5429158cf  add strncat SIMD implementation
+	ALL_libcompats= clean_dep   lib/libc strncat c "libc.string.strncat.c"
+
+	# 20250110  bea89d038ac5  add strlcat SIMD implementation, and move memchr
+	ALL_libcompats= clean_dep   lib/libc strlcat c "libc.string.strlcat.c"
+	ALL_libcompats= clean_dep   lib/libc memchr S "[[:space:]]memchr.S"
+	run rm -f "$OBJTOP"/lib/libc/memchr.S
+
+	# 20250110  3863fec1ce2d  add strlen SIMD implementation
+	ALL_libcompats= clean_dep   lib/libc strlen S arm-optimized-routines
+	run rm -f "$OBJTOP"/lib/libc/strlen.S
+
+	# 20250110  79e01e7e643c  add bcopy & bzero wrapper
+	ALL_libcompats= clean_dep   lib/libc bcopy c "libc.string.bcopy.c"
+	ALL_libcompats= clean_dep   lib/libc bzero c "libc.string.bzero.c"
+
+	# 20250110  f2c98669fc1b  add ASIMD-enhanced timingsafe_bcmp implementation
+	ALL_libcompats= clean_dep   lib/libc timingsafe_bcmp c
+
+	# 20250110  3f224333af16  add timingsafe_memcmp() assembly implementation
+	ALL_libcompats= clean_dep   lib/libc timingsafe_memcmp c
+
+	if [ ${MACHINE_ARCH} == aarch64c ]; then
+		OBJTOP="$OBJTOP_SAVE"
+	fi
+fi

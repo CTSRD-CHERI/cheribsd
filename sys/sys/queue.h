@@ -236,6 +236,9 @@ struct __no_subobject_bounds {						\
 
 #define	SLIST_EMPTY(head)	((head)->slh_first == NULL)
 
+#define	SLIST_EMPTY_ATOMIC(head)					\
+	(atomic_load_ptr(&(head)->slh_first) == NULL)
+
 #define	SLIST_FIRST(head)	((head)->slh_first)
 
 #define	SLIST_FOREACH(var, head, field)					\
@@ -365,7 +368,7 @@ struct __no_subobject_bounds {				\
 #define	STAILQ_ASSERT_EMPTY(head) do {					\
 	if (!STAILQ_EMPTY((head)))					\
 		panic("stailq %p is not empty", (head));		\
-}
+} while (0)
 
 /*
  * QMD_STAILQ_CHECK_TAIL(STAILQ_HEAD *head)
@@ -379,7 +382,7 @@ struct __no_subobject_bounds {				\
 } while (0)
 #else
 #define	QMD_STAILQ_CHECK_EMPTY(head)
-#define STAILQ_ASSERT_EMPTY(head)
+#define	STAILQ_ASSERT_EMPTY(head)
 #define	QMD_STAILQ_CHECK_TAIL(head)
 #endif /* (_KERNEL && INVARIANTS) */
 
@@ -396,6 +399,9 @@ struct __no_subobject_bounds {				\
 		QMD_STAILQ_CHECK_EMPTY(head);				\
 	STAILQ_FIRST(head) == NULL;					\
 })
+
+#define	STAILQ_EMPTY_ATOMIC(head)					\
+	(atomic_load_ptr(&(head)->stqh_first) == NULL)
 
 #define	STAILQ_FIRST(head)	((head)->stqh_first)
 
@@ -584,6 +590,9 @@ struct __no_subobject_bounds {				\
 } while (0)
 
 #define	LIST_EMPTY(head)	((head)->lh_first == NULL)
+
+#define	LIST_EMPTY_ATOMIC(head)						\
+	(atomic_load_ptr(&(head)->lh_first) == NULL)
 
 #define	LIST_FIRST(head)	((head)->lh_first)
 
@@ -788,6 +797,9 @@ struct __no_subobject_bounds {				\
 } while (0)
 
 #define	TAILQ_EMPTY(head)	((head)->tqh_first == NULL)
+
+#define	TAILQ_EMPTY_ATOMIC(head)					\
+	(atomic_load_ptr(&(head)->tqh_first) == NULL)
 
 #define	TAILQ_FIRST(head)	((head)->tqh_first)
 

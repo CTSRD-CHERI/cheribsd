@@ -643,7 +643,7 @@ proc0_init(void *dummy __unused)
 	 * proc0 is not expected to enter usermode, so there is no special
 	 * handling for sv_minuser here, like is done for exec_new_vmspace().
 	 */
-#ifndef __CHERI_PURE_CAPABILITY__
+#if !__has_feature(capabilities)
 	vm_map_init(&vmspace0.vm_map, vmspace_pmap(&vmspace0),
 	    p->p_sysent->sv_minuser, p->p_sysent->sv_maxuser);
 #else
@@ -652,15 +652,14 @@ proc0_init(void *dummy __unused)
 	 * we strip all access permission because proc0 is not
 	 * expected to enter usermode.
 	 */
-	caddr_t minuser_cap = cheri_setaddress(userspace_root_cap,
-	    p->p_sysent->sv_minuser);
-	minuser_cap = cheri_setbounds(minuser_cap,
-	    p->p_sysent->sv_maxuser - p->p_sysent->sv_minuser);
-	minuser_cap = cheri_andperm(minuser_cap, 0);
+	uintcap_t minuser_cap =
+	    (uintcap_t)cheri_capability_build_user_rwx_unchecked(
+	    0, p->p_sysent->sv_minuser,
+	    p->p_sysent->sv_maxuser - p->p_sysent->sv_minuser, 0);
 
 	vm_map_init(&vmspace0.vm_map, vmspace_pmap(&vmspace0),
-	    (vm_pointer_t)minuser_cap,
-	    (vm_pointer_t)minuser_cap + cheri_getlen(minuser_cap));
+	    minuser_cap,
+	    minuser_cap + cheri_length_get(minuser_cap));
 	vmspace0.vm_map.flags |= MAP_RESERVATIONS;
 #endif
 

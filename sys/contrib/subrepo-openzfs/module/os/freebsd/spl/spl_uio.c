@@ -129,7 +129,7 @@ zfs_uio_page_aligned(zfs_uio_t *uio)
 	const struct iovec *iov = GET_UIO_STRUCT(uio)->uio_iov;
 
 	for (int i = zfs_uio_iovcnt(uio); i > 0; iov++, i--) {
-		uintcap_t addr = (uintcap_t)iov->iov_base;
+		__uintcap_t addr = (__uintcap_t)iov->iov_base;
 		size_t size = iov->iov_len;
 		if ((addr & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
 				return (B_FALSE);
@@ -183,8 +183,13 @@ zfs_uio_hold_pages(void * __capability start, size_t len, int nr_pages,
 	ASSERT3S(len, >, 0);
 
 	prot = rw == UIO_READ ? (VM_PROT_READ | VM_PROT_WRITE) : VM_PROT_READ;
+#ifdef __CheriBSD_version
 	count = vm_fault_quick_hold_pages(map, start, len, prot, pages,
 	    nr_pages);
+#else
+	count = vm_fault_quick_hold_pages(map, (uintptr_t)start, len, prot, pages,
+	    nr_pages);
+#endif
 
 	return (count);
 }

@@ -153,6 +153,13 @@ struct vm_cpu_topology {
 	uint16_t	maxcpus;
 };
 
+#if __has_feature(capabilities)
+struct vm_cheri_capability_tag {
+	vm_paddr_t	gpa;	/* input, must be aligned */
+	uint8_t		tag;	/* output */
+};
+#endif
+
 enum {
 	/* general routines */
 	IOCNUM_ABIVERS = 0,

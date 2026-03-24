@@ -37,7 +37,8 @@
 #include "libc_private.h"
 #include "csu_common.h"
 
-#include <cheri/cheric.h>
+#include <cheri/cherireg.h>
+#include <cheriintrin.h>
 
 /*
  * For -pie executables rtld will process the __cap_relocs, so we don't need
@@ -45,15 +46,6 @@
  */
 #ifndef PIC
 #define	CHERI_INIT_RELA
-
-#define	RODATA_PTR(x) ({						\
-	__typeof__(x) *_p;						\
-									\
-	__asm__ (							\
-	    "adrp %0, " __STRING(x) "\n\t"				\
-	    "add %0, %0, :lo12:" __STRING(x) "\n\t"			\
-	    : "=C" (_p));						\
-	_p; })
 
 #include "caprel.h"
 
@@ -101,7 +93,7 @@ _start(void *auxv,
 		__builtin_trap(); /* RTLD missing? Wrong *crt1.o linked? */
 #endif
 
-	if (cheri_getdefault() != NULL)
+	if (cheri_ddc_get() != NULL)
 		__builtin_trap(); /* $ddc should be NULL */
 
 	/*

@@ -1,7 +1,7 @@
-# 
+#
 # Codasip X730 event id table.
 # Counter IDs available: 3 to 6.
-# 
+#
 mhpmcounters {
 	mhpmcounter = {
 		id = 3;

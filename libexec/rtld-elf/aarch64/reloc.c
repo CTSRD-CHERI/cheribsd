@@ -59,14 +59,26 @@
  * This is not the correct prototype, but we only need it for
  * a function pointer to a simple asm function.
  */
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 void *_rtld_tlsdesc_static(void *);
 void *_rtld_tlsdesc_undef(void *);
 void *_rtld_tlsdesc_dynamic(void *);
+#endif
+#ifdef TLS_TGOT
+void *_rtld_tgot_tlsdesc_static(void *);
+void *_rtld_tgot_tlsdesc_dynamic(void *);
+#endif
 
 void (*rtld_bind_start_fptr)(void) = &_rtld_bind_start;
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 void *(*rtld_tlsdesc_static_fptr)(void *) = &_rtld_tlsdesc_static;
 void *(*rtld_tlsdesc_undef_fptr)(void *) = &_rtld_tlsdesc_undef;
 void *(*rtld_tlsdesc_dynamic_fptr)(void *) = &_rtld_tlsdesc_dynamic;
+#endif
+#ifdef TLS_TGOT
+void *(*rtld_tgot_tlsdesc_static_fptr)(void *) = &_rtld_tgot_tlsdesc_static;
+void *(*rtld_tgot_tlsdesc_dynamic_fptr)(void *) = &_rtld_tgot_tlsdesc_dynamic;
+#endif
 
 bool
 arch_digest_dynamic(struct Struct_Obj_Entry *obj, const Elf_Dyn *dynp)
@@ -148,7 +160,7 @@ init_pltgot(Plt_Entry *plt)
 static uintcap_t
 init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
     const void * __capability pcc_cap, Elf_Addr base_addr,
-    Elf_Size addend)
+    Elf_Size addend, bool use_code_bounds)
 {
 	uintcap_t cap;
 	Elf_Addr address, len;
@@ -160,25 +172,22 @@ init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
 
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
 	    (uintcap_t)pcc_cap : (uintcap_t)data_cap;
-	cap = cheri_setaddress(cap, base_addr + address);
-	cap = cheri_clearperm(cap, CAP_RELOC_REMOVE_PERMS);
+	cap = cheri_address_set(cap, base_addr + address);
+	if (perms != MORELLO_FRAG_EXECUTABLE || use_code_bounds)
+		cap = cheri_bounds_set(cap, len);
+	cap = cheri_perms_clear(cap, CAP_RELOC_REMOVE_PERMS);
 
 	if (perms == MORELLO_FRAG_EXECUTABLE || perms == MORELLO_FRAG_RODATA) {
-		cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
+		cap = cheri_perms_clear(cap, FUNC_PTR_REMOVE_PERMS);
 	}
 	if (perms == MORELLO_FRAG_RWDATA || perms == MORELLO_FRAG_RODATA) {
-		cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
-		cap = cheri_setbounds(cap, len);
+		cap = cheri_perms_clear(cap, DATA_PTR_REMOVE_PERMS);
 	}
 
 	cap += addend;
 
 	if (perms == MORELLO_FRAG_EXECUTABLE) {
-		/*
-		 * TODO tight bounds: lower bound and len should be set
-		 * with LSB == 0 for C64 code.
-		 */
-		cap = cheri_sealentry(cap);
+		cap = cheri_sentry_create(cap);
 	}
 
 	return (cap);
@@ -198,14 +207,36 @@ void
 _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 {
 	caddr_t relocbase = NULL;
+	const Elf_Phdr *phdr = NULL;
 	const Elf_Rela *rela = NULL, *relalim;
+	size_t phnum = 0;
 	unsigned long relasz;
 	Elf_Addr *where;
 	void *pcc;
+	bool use_code_bounds = false;
 
 	for (; aux->a_type != AT_NULL; aux++) {
-		if (aux->a_type == AT_BASE) {
+		switch (aux->a_type) {
+		case AT_BASE:
 			relocbase = aux->a_un.a_ptr;
+			break;
+		case AT_PHDR:
+			phdr = aux->a_un.a_ptr;
+			break;
+		case AT_PHNUM:
+			phnum = aux->a_un.a_val;
+			break;
+		case AT_PHENT:
+			/* NB: Can't use assert() here. */
+			if (aux->a_un.a_val != sizeof(*phdr))
+				__builtin_trap();
+			break;
+		}
+	}
+
+	for (; phnum > 0; phdr++, phnum--) {
+		if (phdr->p_type == PT_CHERI_PCC) {
+			use_code_bounds = true;
 			break;
 		}
 	}
@@ -221,7 +252,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 		}
 	}
 
-	rela = cheri_setbounds(rela, relasz);
+	rela = cheri_bounds_set(rela, relasz);
 	relalim = (const Elf_Rela *)((const char *)rela + relasz);
 	pcc = __builtin_cheri_program_counter_get();
 
@@ -237,7 +268,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 			where = (Elf_Addr *)(relocbase + rela->r_offset);
 			*(uintcap_t *)where = init_cap_from_fragment(where,
 			    relocbase, pcc, (Elf_Addr)(uintptr_t)relocbase,
-			    rela->r_addend);
+			    rela->r_addend, use_code_bounds);
 			break;
 		default:
 			__builtin_trap();
@@ -303,6 +334,7 @@ do_copy_relocations(Obj_Entry *dstobj)
 	return (0);
 }
 
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 struct tls_data {
 	uintptr_t	dtv_gen;
 	int		tls_index;
@@ -395,6 +427,56 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela,
 #endif
 	}
 }
+#endif /* !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT) */
+
+#ifdef TLS_TGOT
+struct tgot_tls_data {
+	ptraddr_t	dtv_gen;
+	int		tls_index;
+	Elf_Addr	tgot_offs;
+};
+
+static struct tgot_tls_data *
+reloc_tgot_tlsdesc_alloc(int tlsindex, Elf_Addr tgotoffs)
+{
+	struct tgot_tls_data *tlsdesc;
+
+	tlsdesc = xmalloc(sizeof(struct tgot_tls_data));
+	tlsdesc->dtv_gen = tls_dtv_generation;
+	tlsdesc->tls_index = tlsindex;
+	tlsdesc->tgot_offs = tgotoffs;
+
+	return (tlsdesc);
+}
+
+struct tgot_tlsdesc_entry {
+	void	*(*func)(void *);
+	union {
+		Elf_Size		offset;
+		struct tgot_tls_data	*data;
+	};
+};
+
+static void
+reloc_tgot_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela,
+    struct tgot_tlsdesc_entry *where)
+{
+	if (obj->tgotoffset != 0) {
+		/* Object's TGOT is in initially allocated TGOT segment */
+		where->func = rtld_tgot_tlsdesc_static_fptr;
+#ifdef TLS_TGOT_COMPAT
+		where->offset = -obj->tgotoffset + rela->r_addend;
+#else
+		where->offset = obj->tgotoffset + rela->r_addend;
+#endif
+	} else {
+		/* Object's TGOT is dynamically allocated */
+		where->func = rtld_tgot_tlsdesc_dynamic_fptr;
+		where->data = reloc_tgot_tlsdesc_alloc(obj->tlsindex,
+		    rela->r_addend);
+	}
+}
+#endif /* TLS_TGOT */
 
 /*
  * Process the PLT relocations.
@@ -409,6 +491,7 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 	const Elf_Sym *def, *sym;
 #ifdef __CHERI_PURE_CAPABILITY__
 	const char *pcc;
+	bool use_code_bounds = obj->npcc_caps != 0;
 #endif
 	bool lazy;
 
@@ -460,16 +543,16 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 				 * can assume it is in use.
 				 */
 				pcc = pcc_cap(obj, fragment[0]);
-				pcc = cheri_clearperm(pcc,
+				pcc = cheri_perms_clear(pcc,
 				    FUNC_PTR_REMOVE_PERMS);
 				if (fragment[1] == 0)
-					*where = cheri_sealentry(
+					*where = cheri_sentry_create(
 					    (uintptr_t)pcc);
 				else
 					*where = init_cap_from_fragment(
 					    fragment, obj->relocbase, pcc,
 					    (Elf_Addr)(uintptr_t)obj->relocbase,
-					    rela->r_addend);
+					    rela->r_addend, use_code_bounds);
 #else
 				*where += (Elf_Addr)obj->relocbase;
 #endif
@@ -508,9 +591,26 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 #else
 		case R_AARCH64_TLSDESC:
 #endif
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 			reloc_tlsdesc(obj, rela, (struct tlsdesc_entry *)where,
 			    SYMLOOK_IN_PLT | flags, lockstate);
 			break;
+#else
+			_rtld_error("%s: Traditional TLS not supported",
+			    obj->path);
+			return (-1);
+#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+		case R_MORELLO_TGOT_TLSDESC:
+#ifdef TLS_TGOT
+			reloc_tgot_tlsdesc(obj, rela,
+			    (struct tgot_tlsdesc_entry *)where);
+			break;
+#else
+			_rtld_error("%s: TGOT not supported", obj->path);
+			return (-1);
+#endif
+#endif
 #ifdef __CHERI_PURE_CAPABILITY__
 		case R_MORELLO_IRELATIVE:
 #else
@@ -591,6 +691,7 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 	uintptr_t *where, target, ptr;
 #ifdef __CHERI_PURE_CAPABILITY__
 	Elf_Addr *fragment;
+	bool use_code_bounds = obj->npcc_caps != 0;
 #endif
 
 	where = (uintptr_t *)(obj->relocbase + rela->r_offset);
@@ -622,7 +723,7 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 		ptr = init_cap_from_fragment(fragment, obj->relocbase,
 		    pcc_cap(obj, fragment[0]),
 		    (Elf_Addr)(uintptr_t)obj->relocbase,
-		    rela->r_addend);
+		    rela->r_addend, use_code_bounds);
 #else
 	ptr = (uintptr_t)(obj->relocbase + rela->r_addend);
 #endif
@@ -788,6 +889,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	Elf_Addr *where, symval;
 #if __has_feature(capabilities)
 	void * __capability data_cap;
+	bool use_code_bounds = false;
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -797,6 +899,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	 */
 	if (obj == obj_rtld)
 		return (0);
+	use_code_bounds = obj->npcc_caps != 0;
 #endif
 
 #if __has_feature(capabilities)
@@ -823,7 +926,9 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		case R_AARCH64_ABS64:
 		case R_AARCH64_GLOB_DAT:
 #ifdef __CHERI_PURE_CAPABILITY__
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 		case R_MORELLO_TLS_TPREL128:
+#endif
 #else
 		case R_AARCH64_TLS_TPREL64:
 		case R_AARCH64_TLS_DTPREL64:
@@ -900,14 +1005,14 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    init_cap_from_fragment(where, data_cap,
 				pcc_cap(obj, where[0]),
 				(Elf_Addr)(uintptr_t)obj->relocbase,
-				rela->r_addend);
+				rela->r_addend, use_code_bounds);
 			break;
 		case R_MORELLO_FUNC_RELATIVE:
 			*(uintcap_t *)(void *)where =
 			    init_cap_from_fragment(where, data_cap,
 				pcc_cap(obj, where[0]),
 				(Elf_Addr)(uintptr_t)obj->relocbase,
-				rela->r_addend);
+				rela->r_addend, use_code_bounds);
 #ifdef CHERI_LIB_C18N
 			*(void **)where = tramp_intern(NULL, RTLD_COMPART_ID,
 			    &(struct tramp_data) {
@@ -951,14 +1056,32 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 #else
 		case R_AARCH64_TLSDESC:
 #endif
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 			reloc_tlsdesc(obj, rela, (struct tlsdesc_entry *)where,
 			    flags, lockstate);
 			break;
+#else
+			_rtld_error("%s: Traditional TLS not supported",
+			    obj->path);
+			return (-1);
+#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+		case R_MORELLO_TGOT_TLSDESC:
+#ifdef TLS_TGOT
+			reloc_tgot_tlsdesc(obj, rela,
+			    (struct tgot_tlsdesc_entry *)where);
+			break;
+#else
+			_rtld_error("%s: TGOT not supported", obj->path);
+			return (-1);
+#endif
+#endif
 #ifdef __CHERI_PURE_CAPABILITY__
 		case R_MORELLO_TLS_TPREL128:
 #else
 		case R_AARCH64_TLS_TPREL64:
 #endif
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 			/*
 			 * We lazily allocate offsets for static TLS as we
 			 * see the first relocation that references the
@@ -983,6 +1106,34 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				where[1] = def->st_size;
 #endif
 			break;
+#else
+			_rtld_error("%s: Traditional TLS not supported",
+			    obj->path);
+			return (-1);
+#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+		case R_MORELLO_TLS_TGOTREL64:
+#ifdef TLS_TGOT
+			if (!obj->tgot_static) {
+				if (!allocate_tgot_offset(
+				    __DECONST(Obj_Entry *, obj))) {
+					_rtld_error(
+					    "%s: No space available for static "
+					    "Thread Local Storage", obj->path);
+					return (-1);
+				}
+			}
+#ifdef TLS_TGOT_COMPAT
+			*where = -obj->tgotoffset + rela->r_addend;
+#else
+			*where = obj->tgotoffset + rela->r_addend;
+#endif
+			break;
+#else
+			_rtld_error("%s: TGOT not supported", obj->path);
+			return (-1);
+#endif
+#endif
 
 #ifndef __CHERI_PURE_CAPABILITY__
 		/*
@@ -1030,6 +1181,59 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	return (0);
 }
 
+#ifdef TLS_TGOT
+/*
+ * Process the TGOT relocations.
+ */
+int
+reloc_tgot(Obj_Entry *obj, struct tcb *tcb, void *tgot, int flags,
+    tls_get_block_cb get_block, RtldLockState *lockstate)
+{
+	const Obj_Entry *defobj;
+	const Elf_Rela *relalim;
+	const Elf_Rela *rela;
+	const Elf_Sym *def;
+	Elf_Addr *fragment;
+	Elf_Addr tgotinit;
+	uintptr_t *where;
+	uintptr_t val;
+	void *tls;
+
+	tls = NULL;
+	relalim = (const Elf_Rela *)((const char *)obj->tgotrela +
+	    obj->tgotrelasize);
+	tgotinit = (const char *)obj->tgotinit - obj->relocbase;
+	for (rela = obj->tgotrela; rela < relalim; rela++) {
+		where = (uintptr_t *)((uintptr_t)tgot +
+		    (rela->r_offset - tgotinit));
+		fragment = (Elf_Addr *)where;
+
+		assert(ELF_R_TYPE(rela->r_info) == R_MORELLO_TLS_TGOT_SLOT);
+
+		if (ELF_R_SYM(rela->r_info) != 0) {
+			def = find_symdef(ELF_R_SYM(rela->r_info), obj,
+			    &defobj, flags, NULL, lockstate);
+			if (def == NULL)
+				return (-1);
+			if (def->st_shndx == SHN_UNDEF)
+				val = 0;
+			else {
+				val = (uintptr_t)get_block(tcb,
+				    defobj->tlsindex) + def->st_value;
+				val = cheri_bounds_set(val, def->st_size);
+			}
+		} else {
+			if (tls == NULL)
+				tls = get_block(tcb, obj->tlsindex);
+			val = init_cap_from_fragment(fragment, tls, NULL,
+			    (Elf_Addr)tls, 0, true);
+		}
+		*where = val;
+	}
+	return (0);
+}
+#endif
+
 void
 allocate_initial_tls(Obj_Entry *objs)
 {
@@ -1039,10 +1243,16 @@ allocate_initial_tls(Obj_Entry *objs)
 	* offset allocated so far and adding a bit for dynamic modules to
 	* use.
 	*/
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 	tls_static_space = tls_last_offset + tls_last_size +
 	    ld_static_tls_extra;
+#endif
+#ifdef TLS_TGOT
+	tgot_static_space = tgot_last_offset + tgot_last_size +
+	    ld_static_tgot_extra;
+#endif
 
-	_tcb_set(allocate_tls(objs, NULL, TLS_TCB_SIZE, TLS_TCB_ALIGN));
+	_tcb_set(allocate_tls(objs, NULL, TLS_TCB_SIZE, TLS_TCB_ALIGN, NULL));
 }
 
 void *
@@ -1050,3 +1260,26 @@ __tls_get_addr(tls_index* ti)
 {
 	return (tls_get_addr_common(_tcb_get(), ti->ti_module, ti->ti_offset));
 }
+
+#ifdef TLS_TGOT_COMPAT
+size_t
+calculate_tgot_offset(size_t prev_offset, size_t prev_size __unused,
+    size_t size, size_t align, size_t offset)
+{
+	size_t res;
+
+	/*
+	 * res is the smallest integer satisfying res - prev_offset >= size
+	 * and (-res) % p_align = p_vaddr % p_align (= p_offset % p_align).
+	 */
+	res = prev_offset + size + align - 1;
+	res -= (res + offset) & (align - 1);
+	return (res);
+}
+
+size_t
+calculate_first_tgot_offset(size_t size, size_t align, size_t offset)
+{
+	return (calculate_tgot_offset(0, 0, size, align, offset));
+}
+#endif

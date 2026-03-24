@@ -38,22 +38,19 @@
 
 #include <dev/hwc/hwc_context.h>
 #include <dev/hwc/hwc_contexthash.h>
-#if 0
-#include <dev/hwc/hwc_config.h>
-#endif
 
-#define	HWT_DEBUG
-#undef	HWT_DEBUG
+#define	HWC_DEBUG
+#undef	HWC_DEBUG
 
-#ifdef	HWT_DEBUG
+#ifdef	HWC_DEBUG
 #define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
 #else
 #define	dprintf(fmt, ...)
 #endif
 
-#define	HWT_CONTEXTHASH_SIZE	1024
+#define	HWC_CONTEXTHASH_SIZE	1024
 
-static MALLOC_DEFINE(M_HWT_CONTEXTHASH, "hwc_chash", "Hardware Trace");
+static MALLOC_DEFINE(M_HWC_CONTEXTHASH, "hwc_chash", "Hardware Counters");
 
 /*
  * Hash function.  Discard the lower 2 bits of the pointer since
@@ -61,15 +58,15 @@ static MALLOC_DEFINE(M_HWT_CONTEXTHASH, "hwc_chash", "Hardware Trace");
  * round((2^LONG_BIT) * ((sqrt(5)-1)/2)).
  */
 
-#define	_HWT_HM	11400714819323198486u	/* hash multiplier */
-#define	HWT_HASH_PTR(P, M)	((((unsigned long) (P) >> 2) * _HWT_HM) & (M))
+#define	_HWC_HM	11400714819323198486u	/* hash multiplier */
+#define	HWC_HASH_PTR(P, M)	((((unsigned long) (P) >> 2) * _HWC_HM) & (M))
 
 static struct mtx hwc_contexthash_mtx;
 static u_long hwc_contexthashmask;
-static LIST_HEAD(hwc_contexthash, hwc_context)	*hwc_contexthash;
+static LIST_HEAD(hwc_contexthash, hwc_context) * hwc_contexthash;
 
 /*
- * To use by hwc_switch_in/out() and hwc_record() only.
+ * To use by hwc_switch_in/out() only.
  * This function returns with refcnt acquired.
  */
 struct hwc_context *
@@ -79,18 +76,18 @@ hwc_contexthash_lookup(struct proc *p)
 	struct hwc_context *ctx;
 	int hindex;
 
-	hindex = HWT_HASH_PTR(p, hwc_contexthashmask);
+	hindex = HWC_HASH_PTR(p, hwc_contexthashmask);
 	hch = &hwc_contexthash[hindex];
 
-	HWT_CTXHASH_LOCK();
+	HWC_CTXHASH_LOCK();
 	LIST_FOREACH(ctx, hch, next_hch) {
 		if (ctx->proc == p) {
 			refcount_acquire(&ctx->refcnt);
-			HWT_CTXHASH_UNLOCK();
+			HWC_CTXHASH_UNLOCK();
 			return (ctx);
 		}
 	}
-	HWT_CTXHASH_UNLOCK();
+	HWC_CTXHASH_UNLOCK();
 
 	return (NULL);
 }
@@ -101,28 +98,28 @@ hwc_contexthash_insert(struct hwc_context *ctx)
 	struct hwc_contexthash *hch;
 	int hindex;
 
-	hindex = HWT_HASH_PTR(ctx->proc, hwc_contexthashmask);
+	hindex = HWC_HASH_PTR(ctx->proc, hwc_contexthashmask);
 	hch = &hwc_contexthash[hindex];
 
-	HWT_CTXHASH_LOCK();
+	HWC_CTXHASH_LOCK();
 	LIST_INSERT_HEAD(hch, ctx, next_hch);
-	HWT_CTXHASH_UNLOCK();
+	HWC_CTXHASH_UNLOCK();
 }
 
 void
 hwc_contexthash_remove(struct hwc_context *ctx)
 {
 
-	HWT_CTXHASH_LOCK();
+	HWC_CTXHASH_LOCK();
 	LIST_REMOVE(ctx, next_hch);
-	HWT_CTXHASH_UNLOCK();
+	HWC_CTXHASH_UNLOCK();
 }
 
 void
 hwc_contexthash_load(void)
 {
 
-	hwc_contexthash = hashinit(HWT_CONTEXTHASH_SIZE, M_HWT_CONTEXTHASH,
+	hwc_contexthash = hashinit(HWC_CONTEXTHASH_SIZE, M_HWC_CONTEXTHASH,
 	    &hwc_contexthashmask);
 	mtx_init(&hwc_contexthash_mtx, "hwc ctx hash", "hwc ctx", MTX_SPIN);
 }
@@ -132,5 +129,5 @@ hwc_contexthash_unload(void)
 {
 
 	mtx_destroy(&hwc_contexthash_mtx);
-	hashdestroy(hwc_contexthash, M_HWT_CONTEXTHASH, hwc_contexthashmask);
+	hashdestroy(hwc_contexthash, M_HWC_CONTEXTHASH, hwc_contexthashmask);
 }

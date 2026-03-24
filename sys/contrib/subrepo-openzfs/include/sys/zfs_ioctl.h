@@ -23,7 +23,7 @@
  * Copyright (c) 2012, 2024 by Delphix. All rights reserved.
  * Copyright 2016 RackTop Systems.
  * Copyright (c) 2017, Intel Corporation.
- * Copyright (c) 2024, Klara, Inc.
+ * Copyright (c) 2024-2025, Klara, Inc.
  */
 
 #ifndef	_SYS_ZFS_IOCTL_H
@@ -421,6 +421,8 @@ typedef struct zinject_record {
 	uint64_t	zi_nlanes;
 	uint32_t	zi_cmd;
 	uint32_t	zi_dvas;
+	uint64_t	zi_match_count;		/* count of times matched */
+	uint64_t	zi_inject_count;	/* count of times injected */
 } zinject_record_t;
 
 #define	ZINJECT_NULL		0x1
@@ -453,6 +455,25 @@ typedef enum zinject_type {
 	ZINJECT_DELAY_IMPORT,
 	ZINJECT_DELAY_EXPORT,
 } zinject_type_t;
+
+typedef enum zinject_iotype {
+	/*
+	 * Compatibility: zi_iotype used to be set to ZIO_TYPE_, so make sure
+	 * the corresponding ZINJECT_IOTYPE_ matches. Note that existing here
+	 * does not mean that injections are possible for all these types.
+	 */
+	ZINJECT_IOTYPE_NULL	= ZIO_TYPE_NULL,
+	ZINJECT_IOTYPE_READ	= ZIO_TYPE_READ,
+	ZINJECT_IOTYPE_WRITE	= ZIO_TYPE_WRITE,
+	ZINJECT_IOTYPE_FREE	= ZIO_TYPE_FREE,
+	ZINJECT_IOTYPE_CLAIM	= ZIO_TYPE_CLAIM,
+	ZINJECT_IOTYPE_FLUSH	= ZIO_TYPE_FLUSH,
+	ZINJECT_IOTYPE_TRIM	= ZIO_TYPE_TRIM,
+	ZINJECT_IOTYPE_ALL	= ZIO_TYPES,
+	/* Room for future expansion for ZIO_TYPE_* */
+	ZINJECT_IOTYPE_PROBE	= 16,
+	ZINJECT_IOTYPES,
+} zinject_iotype_t;
 
 typedef struct zfs_share {
 	uint64_t	z_exportdata;
@@ -512,10 +533,22 @@ typedef struct zfs_cmd {
 	zfs_share_t	zc_share;
 	dmu_objset_stats_t zc_objset_stats;
 	struct drr_begin zc_begin_record;
-	zinject_record_t zc_inject_record;
-	uint32_t	zc_defer_destroy;
-	uint32_t	zc_flags;
-	uint64_t	zc_action_handle;
+
+	/*
+	 * zinject_record_t grew past its original size, which would push out
+	 * the size of zfs_cmd_t. To adjust for this, we allow it to use the
+	 * space after it, since those fields aren't used with ZFS_IOC_INJECT.
+	 */
+	union {
+		zinject_record_t zc_inject_record;
+		struct {
+			char		zc_pad1[sizeof (zinject_record_t) - 16];
+			uint32_t	zc_defer_destroy;
+			uint32_t	zc_flags;
+			uint64_t	zc_action_handle;
+		};
+	};
+
 	int		zc_cleanup_fd;
 	uint8_t		zc_simple;
 	uint8_t		zc_pad[3];		/* alignment */
@@ -525,6 +558,25 @@ typedef struct zfs_cmd {
 	zfs_stat_t	zc_stat;
 	uint64_t	zc_zoneid;
 } zfs_cmd_t;
+
+/*
+ * zfs_cmd_t (and by extension, it's member structs) must always be the same
+ * size. Changing it will break compatibility between the kernel module and the
+ * userspace tools.
+ *
+ * This test is convoluted because MAXPATHLEN and MAXNAMELEN can vary across
+ * platforms. We include them directly here, which means it won't trip if those
+ * ever change, but if that happens we likely have other things to worry about.
+ */
+#if defined(__CHERI_PURE_CAPABILITY__) || \
+	(defined(_KERNEL) && (defined(__CHERI__) || defined(__CHERI_HYBRID__)))
+#define	_expected_zfs_cmd_size	((MAXPATHLEN*3)+MAXNAMELEN+1248)
+#else
+#define	_expected_zfs_cmd_size	((MAXPATHLEN*3)+MAXNAMELEN+1200)
+#endif
+_Static_assert(sizeof (zfs_cmd_t) == _expected_zfs_cmd_size,
+	"zfs_cmd_t has wrong size");
+#undef	_expected_zfs_cmd_size
 
 typedef struct zfs_useracct {
 	char zu_domain[256];

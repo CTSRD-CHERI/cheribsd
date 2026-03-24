@@ -126,7 +126,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	syscallarg_t *ap, *dst_ap;
 	struct syscall_args *sa;
 #if __has_feature(capabilities)
-	syscallarg_t * __capability stack_args = NULL;
+	char * __capability stack_args = NULL;
 	int error;
 #endif
 
@@ -144,35 +144,72 @@ cpu_fetch_syscall_args(struct thread *td)
 #if __has_feature(capabilities)
 		/*
 		 * For syscall() and __syscall(), the arguments are
-		 * stored in a var args block pointed to be ct6.
+		 * stored in a var args block on the stack.
+		 * If using the CHERI bounded varargs ABI, the stack structure
+		 * is passed in ct6.
 		 */
-		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-			stack_args =
-			    (syscallarg_t * __capability)td->td_frame->tf_t[6];
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+#if defined(__riscv_xcheri)
+			stack_args = (char * __capability)td->td_frame->tf_sp;
+#else /* defined(__riscv_zcheripurecap) */
+			/* CHERI bounded-vararg ABI */
+			stack_args = (char * __capability)td->td_frame->tf_t[6];
+#endif /* defined(__riscv_zcheripurecap) */
+		}
 #endif
 	} else {
 		*dst_ap++ = *ap++;
 	}
 
-	if (__predict_false(sa->code >= p->p_sysent->sv_size))
+	if (__predict_false(sa->code >= p->p_sysent->sv_size)) {
 		sa->callp = &nosys_sysent;
 #if __has_feature(capabilities) && !defined(CPU_CHERI_NO_SYSCALL_AUTHORIZE)
 	/* Constrain code that can originate system calls. */
-	else if (__predict_false(!cheri_syscall_authorize(td)))
+	} else if (__predict_false(!cheri_syscall_authorize(td))) {
 		sa->callp = &nosys_sysent;
 #endif
-	else
+	} else {
 		sa->callp = &p->p_sysent->sv_table[sa->code];
+	}
 
 	KASSERT(sa->callp->sy_narg <= nitems(sa->args),
 	    ("Syscall %d takes too many arguments", sa->code));
 
 #if __has_feature(capabilities)
 	if (__predict_false(stack_args != NULL)) {
-		error = copyincap(stack_args, dst_ap, sa->callp->sy_narg *
+#if defined(__riscv_xcheri)
+		register_t intval;
+		int offset, ptrmask;
+		u_int i;
+
+		if (sa->code >= nitems(sysargmask))
+			ptrmask = 0;
+		else
+			ptrmask = sysargmask[sa->code];
+
+		offset = 0;
+		for (i = 0; i < sa->callp->sy_narg; i++) {
+			if (ptrmask & (1 << i)) {
+				offset = roundup2(offset, sizeof(uintcap_t));
+				error = fuecap(stack_args + offset,
+				    dst_ap);
+				offset += sizeof(uintcap_t);
+			} else {
+				error = fueword(stack_args + offset, &intval);
+				*dst_ap = intval;
+				offset += sizeof(intval);
+			}
+			dst_ap++;
+			if (error)
+				return (error);
+		}
+#else /* defined(__riscv_zcheripurecap) */
+		/* CHERI bounded-vararg ABI */
+		error = copyinptr(stack_args, dst_ap, sa->callp->sy_narg *
 		    sizeof(*dst_ap));
 		if (error)
 			return (error);
+#endif /* defined(__riscv_zcheripurecap) */
 	} else
 #endif
 	{
@@ -391,7 +428,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 			 * UNRESOLVED, then there's no point in trying the pmap
 			 * again.
 			 */
-			ftype = VM_PROT_READ | VM_PROT_READ_CAP;
+			ftype = VM_PROT_READ | VM_PROT_CAP;
 			goto skip_pmap;
 		}
 	}
@@ -399,9 +436,9 @@ page_fault_handler(struct trapframe *frame, int usermode)
 
 #if __has_feature(capabilities)
 	if (is_cheri_store_amo_cap_fault(frame)) {
-		ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
+		ftype = VM_PROT_WRITE | VM_PROT_CAP;
 	} else if (is_cheri_load_cap_fault(frame)) {
-		ftype = VM_PROT_READ | VM_PROT_READ_CAP;
+		ftype = VM_PROT_READ | VM_PROT_CAP;
 	} else
 #endif
 	if (frame->tf_scause == SCAUSE_STORE_PAGE_FAULT) {
@@ -432,7 +469,7 @@ skip_pmap:
 			if (pcb->pcb_onfault != 0) {
 				frame->tf_a[0] = error;
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-				frame->tf_sepc = cheri_setaddress(
+				frame->tf_sepc = cheri_address_set(
 				    frame->tf_sepc, pcb->pcb_onfault);
 #else
 				frame->tf_sepc = pcb->pcb_onfault;
@@ -537,7 +574,7 @@ do_trap_supervisor(struct trapframe *frame)
 		if (curthread->td_pcb->pcb_onfault != 0) {
 			frame->tf_a[0] = EPROT;
 #ifndef __CHERI_PURE_CAPABILITY__
-			frame->tf_sepc = cheri_setaddress(frame->tf_sepc,
+			frame->tf_sepc = cheri_address_set(frame->tf_sepc,
 			    curthread->td_pcb->pcb_onfault);
 #else
 			frame->tf_sepc = curthread->td_pcb->pcb_onfault;
@@ -682,9 +719,9 @@ do_trap_user(struct trapframe *frame)
 		if (!SV_PROC_FLAG(td->td_proc, SV_CHERI) &&
 		    cheri_is_length_violation(frame)) {
 			if (cheri_is_pcc_violation(frame) &&
-			    cheri_getbase(frame->tf_sepc) ==
+			    cheri_base_get(frame->tf_sepc) ==
 			    CHERI_CAP_USER_DATA_BASE &&
-			    cheri_getlen(frame->tf_sepc) ==
+			    cheri_length_get(frame->tf_sepc) ==
 			    CHERI_CAP_USER_DATA_LENGTH) {
 				call_trapsignal(td, SIGSEGV, SEGV_MAPERR,
 				    (ptraddr_t)frame->tf_sepc,
@@ -701,9 +738,9 @@ do_trap_user(struct trapframe *frame)
 			 * that would have been raised.
 			 */
 			if (cheri_is_ddc_violation(frame) &&
-			    cheri_getbase(frame->tf_ddc) ==
+			    cheri_base_get(frame->tf_ddc) ==
 			    CHERI_CAP_USER_DATA_BASE &&
-			    cheri_getlen(frame->tf_ddc) ==
+			    cheri_length_get(frame->tf_ddc) ==
 			    CHERI_CAP_USER_DATA_LENGTH) {
 				call_trapsignal(td, SIGSEGV, SEGV_MAPERR,
 				    0 /* XXX */,

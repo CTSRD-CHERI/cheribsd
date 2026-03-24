@@ -2880,7 +2880,7 @@ bool free_fastpath(void *ptr, size_t size, bool size_hint) {
 	cache_bin_t *bin = tcache_small_bin_get(tcache, alloc_ctx.szind);
 	cache_bin_info_t *bin_info = &tcache_bin_info[alloc_ctx.szind];
 	if (!cache_bin_dalloc_easy(bin, bin_info,
-	    unbound_ptr(tsd_tsdn(tsd_get(false)), ptr))) {
+	    unbound_ptr(tsd_tsdn(tsd), ptr))) {
 		return false;
 	}
 
@@ -3774,8 +3774,8 @@ je_malloc_usable_size(JEMALLOC_USABLE_SIZE_CONST void *ptr) {
 			ret = isalloc(tsdn, ptr);
 		}
 #ifdef __CHERI_PURE_CAPABILITY__
-		if (ret != 0 && cheri_gettag(ptr)) {
-			ret = MIN(ret, cheri_getlen(ptr));
+		if (ret != 0 && cheri_tag_get(ptr)) {
+			ret = MIN(ret, cheri_length_get(ptr));
 		}
 #endif
 	}

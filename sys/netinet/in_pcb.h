@@ -167,7 +167,10 @@ struct inpcbpolicy;
 struct m_snd_tag;
 struct inpcb {
 	/* Cache line #1 (amd64) */
-	CK_LIST_ENTRY(inpcb) inp_hash_exact;	/* hash table linkage */
+	union {
+		CK_LIST_ENTRY(inpcb) inp_hash_exact;	/* hash table linkage */
+		LIST_ENTRY(inpcb) inp_lbgroup_list;	/* lb group list */
+	};
 	CK_LIST_ENTRY(inpcb) inp_hash_wild;	/* hash table linkage */
 	struct rwlock	inp_lock;
 	/* Cache line #2 (amd64) */
@@ -420,28 +423,6 @@ SYSINIT(prot##_inpcbstorage_init, SI_SUB_PROTO_DOMAIN,			\
 SYSUNINIT(prot##_inpcbstorage_uninit, SI_SUB_PROTO_DOMAIN,		\
     SI_ORDER_SECOND, in_pcbstorage_destroy, &prot)
 
-/*
- * Load balance groups used for the SO_REUSEPORT_LB socket option. Each group
- * (or unique address:port combination) can be re-used at most
- * INPCBLBGROUP_SIZMAX (256) times. The inpcbs are stored in il_inp which
- * is dynamically resized as processes bind/unbind to that specific group.
- */
-struct inpcblbgroup {
-	CK_LIST_ENTRY(inpcblbgroup) il_list;
-	struct epoch_context il_epoch_ctx;
-	struct ucred	*il_cred;
-	uint16_t	il_lport;			/* (c) */
-	u_char		il_vflag;			/* (c) */
-	uint8_t		il_numa_domain;
-	uint32_t	il_pad2;
-	union in_dependaddr il_dependladdr;		/* (c) */
-#define	il_laddr	il_dependladdr.id46_addr.ia46_addr4
-#define	il6_laddr	il_dependladdr.id6_addr
-	uint32_t	il_inpsiz; /* max count in il_inp[] (h) */
-	uint32_t	il_inpcnt; /* cur count in il_inp[] (h) */
-	struct inpcb	*il_inp[];			/* (h) */
-};
-
 #define INP_LOCK_DESTROY(inp)	rw_destroy(&(inp)->inp_lock)
 #define INP_RLOCK(inp)		rw_rlock(&(inp)->inp_lock)
 #define INP_WLOCK(inp)		rw_wlock(&(inp)->inp_lock)
@@ -571,7 +552,7 @@ void 	inp_4tuple_get(struct inpcb *inp, uint32_t *laddr, uint16_t *lp,
 #define	INP_DROPPED		0x04000000 /* protocol drop flag */
 #define	INP_SOCKREF		0x08000000 /* strong socket reference */
 #define	INP_RESERVED_0          0x10000000 /* reserved field */
-#define	INP_RESERVED_1          0x20000000 /* reserved field */
+#define	INP_BOUNDFIB		0x20000000 /* Bound to a specific FIB. */
 #define	IN6P_RFC2292		0x40000000 /* used RFC2292 API on the socket */
 #define	IN6P_MTU		0x80000000 /* receive path MTU */
 
@@ -617,10 +598,11 @@ typedef	enum {
 	INPLOOKUP_WILDCARD = 0x00000001,	/* Allow wildcard sockets. */
 	INPLOOKUP_RLOCKPCB = 0x00000002,	/* Return inpcb read-locked. */
 	INPLOOKUP_WLOCKPCB = 0x00000004,	/* Return inpcb write-locked. */
+	INPLOOKUP_FIB = 0x00000008,		/* inp must be from same FIB. */
 } inp_lookup_t;
 
 #define	INPLOOKUP_MASK	(INPLOOKUP_WILDCARD | INPLOOKUP_RLOCKPCB | \
-	    INPLOOKUP_WLOCKPCB)
+	    INPLOOKUP_WLOCKPCB | INPLOOKUP_FIB)
 #define	INPLOOKUP_LOCKMASK	(INPLOOKUP_RLOCKPCB | INPLOOKUP_WLOCKPCB)
 
 #define	sotoinpcb(so)	((struct inpcb *)(so)->so_pcb)
@@ -658,19 +640,21 @@ void	in_pcbstorage_destroy(void *);
 
 void	in_pcbpurgeif0(struct inpcbinfo *, struct ifnet *);
 int	in_pcballoc(struct socket *, struct inpcbinfo *);
-int	in_pcbbind(struct inpcb *, struct sockaddr_in *, struct ucred *);
+#define	INPBIND_FIB	0x0001	/* bind to the PCB's FIB only */
+int	in_pcbbind(struct inpcb *, struct sockaddr_in *, int, struct ucred *);
 int	in_pcbbind_setup(struct inpcb *, struct sockaddr_in *, in_addr_t *,
-	    u_short *, struct ucred *);
+	    u_short *, int, struct ucred *);
 int	in_pcbconnect(struct inpcb *, struct sockaddr_in *, struct ucred *);
-int	in_pcbconnect_setup(struct inpcb *, struct sockaddr_in *, in_addr_t *,
-	    u_short *, in_addr_t *, u_short *, struct ucred *);
+int	in_pcbconnect_setup(const struct inpcb *, struct sockaddr_in *,
+	    in_addr_t *, u_short *, in_addr_t *, u_short *, struct ucred *);
 void	in_pcbdisconnect(struct inpcb *);
 void	in_pcbdrop(struct inpcb *);
 void	in_pcbfree(struct inpcb *);
 int	in_pcbinshash(struct inpcb *);
-int	in_pcbladdr(struct inpcb *, struct in_addr *, struct in_addr *,
+int	in_pcbladdr(const struct inpcb *, struct in_addr *, struct in_addr *,
 	    struct ucred *);
 int	in_pcblbgroup_numa(struct inpcb *, int arg);
+void	in_pcblisten(struct inpcb *);
 struct inpcb *
 	in_pcblookup(struct inpcbinfo *, struct in_addr, u_int,
 	    struct in_addr, u_int, int, struct ifnet *);
@@ -734,15 +718,3 @@ void	in_pcboutput_eagain(struct inpcb *);
 #endif /* _KERNEL */
 
 #endif /* !_NETINET_IN_PCB_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "header",
-//   "changes": [
-//     "integer_provenance"
-//   ],
-//   "changes_purecap": [
-//     "pointer_shape"
-//   ]
-// }
-// CHERI CHANGES END

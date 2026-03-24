@@ -690,6 +690,8 @@ struct ovfsconf {
 #define	VFCF_SBDRY	0x01000000	/* Stop at Boundary: defer stop requests
 					   to kernel->user (AST) transition */
 #define	VFCF_FILEMOUNT	0x02000000	/* allow mounting files */
+#define	VFCF_FILEREVINC	0x04000000	/* va_filerev is incr. by one */
+#define	VFCF_FILEREVCT	0x08000000	/* va_filerev is set to ctime */
 
 typedef uint32_t fsctlop_t;
 
@@ -746,7 +748,7 @@ struct vfsquery {
 /* Point a sysctl request at a vfsidctl's data. */
 #define VCTLTOREQ(vc, req)						\
 	do {								\
-		(req)->newptr = __USER_CAP((vc)->vc_ptr, (vc)->vc_len);	\
+		(req)->newptr = USER_PTR((vc)->vc_ptr, (vc)->vc_len);	\
 		(req)->newlen = (vc)->vc_len;				\
 		(req)->newidx = 0;					\
 	} while (0)

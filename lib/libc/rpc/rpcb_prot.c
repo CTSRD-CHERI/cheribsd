@@ -32,18 +32,6 @@
 /*
  * Copyright (c) 1986-1991 by Sun Microsystems Inc. 
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "sunrpc"
- * }
- * CHERI CHANGES END
- */
 
 /*
  * rpcb_prot.c
@@ -273,7 +261,7 @@ xdr_rpcb_rmtcallargs(XDR *xdrs, struct rpcb_rmtcallargs *p)
 		return (FALSE);
 	}
 	argposition = XDR_GETPOS(xdrs);
-	if (! (*objp->xdr_args)(xdrs, objp->args.args_val, 0)) {
+	if (! (*objp->xdr_args)(xdrs, objp->args.args_val)) {
 		return (FALSE);
 	}
 	position = XDR_GETPOS(xdrs);
@@ -302,7 +290,7 @@ xdr_rpcb_rmtcallres(XDR *xdrs, struct rpcb_rmtcallres *p)
 	if (!xdr_u_int(xdrs, &objp->results.results_len)) {
 		return (FALSE);
 	}
-	dummy = (*(objp->xdr_res))(xdrs, objp->results.results_val, 0);
+	dummy = (*(objp->xdr_res))(xdrs, objp->results.results_val);
 	return (dummy);
 }
 

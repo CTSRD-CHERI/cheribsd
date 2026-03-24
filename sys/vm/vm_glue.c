@@ -171,7 +171,7 @@ useracc(void * __capability cap, int len, int rw)
 	    ("illegal ``rw'' argument to useracc (%x)\n", rw));
 	prot = rw;
 #if __has_feature(capabilities)
-	if (!__CAP_CHECK(cap, len) || !vm_cap_allows_prot(cap, prot))
+	if (!cheri_can_access(cap, vm_prot2perms(0, prot), len))
 		return (false);
 #endif
 	addr = (__cheri_addr vm_offset_t)cap;
@@ -187,14 +187,17 @@ useracc(void * __capability cap, int len, int rw)
 }
 
 int
-vslock(void * __capability addr, size_t len)
+vslock(void * __capability addr, size_t len, vm_prot_t prot __unused)
 {
 	vm_offset_t end, last, start, vaddr;
 	vm_size_t npages;
 	int error;
 
-	if (!__CAP_CHECK(addr, len))
+#if __has_feature(capabilities)
+	if (!cheri_can_access(addr,
+	    vm_prot2perms(0, prot | VM_PROT_NO_IMPLY_CAP), len))
 		return (EPROT);
+#endif
 	vaddr = (__cheri_addr vm_offset_t)addr;
 	last = vaddr + len;
 	start = trunc_page(vaddr);
@@ -865,25 +868,27 @@ vm_cap_allows_prot(const void * __capability cap, vm_prot_t prot)
 	register_t reqperm;
 
 	reqperm = 0;
-	if (prot & VM_PROT_READ)
+	if (prot & VM_PROT_READ) {
 		reqperm |= CHERI_PERM_LOAD;
-#ifdef CHERI_PERM_LOAD_CAP
-	if (prot & VM_PROT_READ_CAP)
-		reqperm |= CHERI_PERM_LOAD_CAP;
+		if (prot & VM_PROT_CAP)
+#if defined(HAS_CHERI_PERM_LOAD_STORE_CAP)
+			reqperm |= CHERI_PERM_LOAD_CAP;
+#elif defined(HAS_CHERI_PERM_CAP)
+			reqperm |= CHERI_PERM_CAP;
 #endif
-	if (prot & VM_PROT_WRITE)
+	}
+	if (prot & VM_PROT_WRITE) {
 		reqperm |= CHERI_PERM_STORE;
-#ifdef CHERI_PERM_STORE_CAP
-	if (prot & VM_PROT_WRITE_CAP)
-		reqperm |= CHERI_PERM_STORE_CAP;
-#endif
-#ifdef CHERI_PERM_CAP
-	if (prot & (VM_PROT_WRITE_CAP | VM_PROT_READ_CAP))
+		if (prot & VM_PROT_CAP)
+#if defined(HAS_CHERI_PERM_LOAD_STORE_CAP)
+			reqperm |= CHERI_PERM_STORE_CAP;
+#elif defined(HAS_CHERI_PERM_CAP)
 		reqperm |= CHERI_PERM_CAP;
 #endif
+	}
 	if (prot & VM_PROT_EXECUTE)
 		reqperm |= CHERI_PERM_EXECUTE;
-	if ((cheri_getperm(cap) & reqperm) != reqperm)
+	if ((cheri_perms_get(cap) & reqperm) != reqperm)
 		return (false);
 	return (true);
 }

@@ -695,7 +695,7 @@ _ATOMIC_OP_PTR(clear, bic)
 _ATOMIC_OP_PTR(set, orr)
 
 static __inline uintptr_t
-atomic_load_acq_ptr(volatile uintptr_t *p)
+atomic_load_acq_ptr(const volatile uintptr_t *p)
 {
 	return (__atomic_load_n(p, __ATOMIC_ACQUIRE));
 }

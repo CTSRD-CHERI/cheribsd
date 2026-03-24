@@ -47,7 +47,6 @@
 #include <machine/pte.h>
 #include <machine/vmparam.h>
 
-#include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
 #include <err.h>
@@ -81,7 +80,7 @@ check_initreg_code(void * __capability c)
 	 * Dynamically linked pure-capability code should have a program
 	 * counter that is bounded to the current DSO/executable (or function).
 	 */
-	CHERIBSDTEST_VERIFY2(cheri_getbase(c) != 0, "code base should be nonzero");
+	CHERIBSDTEST_VERIFY2(cheri_base_get(c) != 0, "code base should be nonzero");
 	/*
 	 * Check that PCC ends at the end of the current DSO (or executable in
 	 * the statically linked case). Since we don't know the real value here,
@@ -90,45 +89,45 @@ check_initreg_code(void * __capability c)
 	 * length).
 	 */
 	ptraddr_t upper_bound =
-	    CHERI_REPRESENTABLE_LENGTH(cheri_getaddress(c) + 0x1000000);
-	CHERIBSDTEST_VERIFY2(cheri_getlength(c) < upper_bound,
-	    "code length 0x%jx should be < than 0x%jx)", cheri_getlength(c),
+	    CHERI_REPRESENTABLE_LENGTH(cheri_address_get(c) + 0x1000000);
+	CHERIBSDTEST_VERIFY2(cheri_length_get(c) < upper_bound,
+	    "code length 0x%jx should be < than 0x%jx)", cheri_length_get(c),
 	    upper_bound);
 #else
 	/*
 	 * In hybrid mode PCC should start at zero and extend to the end of the
 	 * user address space.
 	 */
-	CHERIBSDTEST_VERIFY2(cheri_getbase(c) == CHERI_CAP_USER_CODE_BASE,
-	    "code base 0x%jx (expected 0x%jx)", cheri_getbase(c),
+	CHERIBSDTEST_VERIFY2(cheri_base_get(c) == CHERI_CAP_USER_CODE_BASE,
+	    "code base 0x%jx (expected 0x%jx)", cheri_base_get(c),
 	    (uintmax_t)CHERI_CAP_USER_CODE_BASE);
-	CHERIBSDTEST_VERIFY2(cheri_getlength(c) == CHERI_CAP_USER_CODE_LENGTH,
-	    "code length 0x%jx should be 0x%jx", cheri_getlength(c),
+	CHERIBSDTEST_VERIFY2(cheri_length_get(c) == CHERI_CAP_USER_CODE_LENGTH,
+	    "code length 0x%jx should be 0x%jx", cheri_length_get(c),
 	    (uintmax_t)CHERI_CAP_USER_CODE_LENGTH);
 #endif
 	/* Offset. */
-	CHERIBSDTEST_VERIFY(cheri_getoffset(c) == 0);
+	CHERIBSDTEST_VERIFY(cheri_offset_get(c) == 0);
 
-#ifndef __riscv_zcheripurecap
+#ifdef HAS_CHERI_PERM_SEAL
 	/* Type -- should have unsealed type. */
-	v = cheri_gettype(c);
+	v = cheri_type_get(c);
 	if (v != (uintmax_t)CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_OTYPE_UNSEALED);
 #endif
 
 	/* Sealed bit. */
-	v = cheri_getsealed(c);
+	v = cheri_is_sealed(c);
 	if (v != 0)
 		cheribsdtest_failure_errx("sealed %jx (expected 0)", v);
 
 	/* Tag bit. */
-	v = cheri_gettag(c);
+	v = cheri_tag_get(c);
 	if (v != 1)
 		cheribsdtest_failure_errx("tag %jx (expected 1)", v);
 
 	/* Permissions. */
-	v = cheri_getperm(c);
+	v = cheri_perms_get(c);
 	/*
 	 * More overt tests for permissions that should -- or should not -- be
 	 * there, regardless of consistency with the kernel headers.
@@ -145,15 +144,13 @@ check_initreg_code(void * __capability c)
 	if ((v & CHERI_PERM_STORE) != 0)
 		cheribsdtest_failure_errx("perms %jx (store present)", v);
 
-#ifdef CHERI_PERM_LOAD_CAP
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	if ((v & CHERI_PERM_LOAD_CAP) == 0)
 		cheribsdtest_failure_errx("perms %jx (loadcap missing)", v);
-#endif
-#ifdef CHERI_PERM_STORE_CAP
 	if ((v & CHERI_PERM_STORE_CAP) != 0)
 		cheribsdtest_failure_errx("perms %jx (storecap present)", v);
 #endif
-#ifdef CHERI_PERM_CAP
+#ifdef HAS_CHERI_PERM_CAP
         if ((v & CHERI_PERM_CAP) == 0)
 		cheribsdtest_failure_errx("perms %jx (cap missing)", v);
 #endif
@@ -162,10 +159,11 @@ check_initreg_code(void * __capability c)
 		cheribsdtest_failure_errx("perms %jx (store_local_cap present)",
 		    v);
 
-#ifdef __riscv_zcheripurecap
+#ifdef HAS_CHERI_PERM_LOAD_MUTABLE
 	if ((v & CHERI_PERM_LOAD_MUTABLE) == 0)
 		cheribsdtest_failure_errx("perms %jx (load mutable missing)", v);
-#else
+#endif
+#ifdef HAS_CHERI_PERM_SEAL
 	if ((v & CHERI_PERM_SEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (seal present)", v);
 
@@ -212,37 +210,38 @@ check_initreg_data_full_addrspace(void * __capability c)
 	uintmax_t v;
 
 	/* Base. */
-	v = cheri_getbase(c);
+	v = cheri_base_get(c);
 	if (v != CHERI_CAP_USER_DATA_BASE)
 		cheribsdtest_failure_errx("base %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_CAP_USER_DATA_BASE);
 
 	/* Length. */
-	v = cheri_getlen(c);
+	v = cheri_length_get(c);
 	if (v > CHERI_CAP_USER_DATA_LENGTH)
 		cheribsdtest_failure_errx("length 0x%jx (expected <= 0x%jx)", v,
 		    CHERI_CAP_USER_DATA_LENGTH);
 
 	/* Offset. */
-	v = cheri_getoffset(c);
+	v = cheri_offset_get(c);
 	if (v != CHERI_CAP_USER_DATA_OFFSET)
 		cheribsdtest_failure_errx("offset %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_CAP_USER_DATA_OFFSET);
 
-#ifndef __riscv_zcheripurecap
+#ifdef HAS_CHERI_PERM_SEAL
 	/* Type -- should have unsealed type. */
-	v = cheri_gettype(c);
+	v = cheri_type_get(c);
 	if (v != (uintmax_t)CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_OTYPE_UNSEALED);
 #endif
 
 	/* Permissions. */
-	v = cheri_getperm(c);
-	if (v != (CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM))
+	v = cheri_perms_get(c);
+	if (v != (CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM |
+	    CHERI_PERM_SYSCALL))
 		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_CAP_USER_DATA_PERMS |
-		    CHERI_PERM_SW_VMEM);
+		    CHERI_PERM_SW_VMEM | CHERI_PERM_SYSCALL);
 
 	/*
 	 * More overt tests for permissions that should -- or should not -- be
@@ -260,15 +259,13 @@ check_initreg_data_full_addrspace(void * __capability c)
 	if ((v & CHERI_PERM_STORE) == 0)
 		cheribsdtest_failure_errx("perms %jx (store missing)", v);
 
-#ifdef CHERI_PERM_LOAD_CAP
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	if ((v & CHERI_PERM_LOAD_CAP) == 0)
 		cheribsdtest_failure_errx("perms %jx (loadcap missing)", v);
-#endif
-#ifdef CHERI_PERM_STORE_CAP
 	if ((v & CHERI_PERM_STORE_CAP) == 0)
 		cheribsdtest_failure_errx("perms %jx (storecap missing)", v);
 #endif
-#ifdef CHERI_PERM_CAP
+#ifdef HAS_CHERI_PERM_CAP
 	if ((v & CHERI_PERM_CAP) == 0)
 		cheribsdtest_failure_errx("perms %jx (cap missing)", v);
 #endif
@@ -277,10 +274,11 @@ check_initreg_data_full_addrspace(void * __capability c)
 		cheribsdtest_failure_errx("perms %jx (store_local_cap missing)",
 		    v);
 
-#ifdef __riscv_zcheripurecap
+#ifdef HAS_CHERI_PERM_LOAD_MUTABLE
 	if ((v & CHERI_PERM_LOAD_MUTABLE) == 0)
 		cheribsdtest_failure_errx("perms %jx (load mutable missing)", v);
-#else
+#endif
+#ifdef HAS_CHERI_PERM_SEAL
 	if ((v & CHERI_PERM_SEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (seal present)", v);
 
@@ -299,12 +297,12 @@ check_initreg_data_full_addrspace(void * __capability c)
 		    v & CHERI_PERMS_SWALL, CHERI_PERMS_SWALL);
 
 	/* Sealed bit. */
-	v = cheri_getsealed(c);
+	v = cheri_is_sealed(c);
 	if (v != 0)
 		cheribsdtest_failure_errx("sealed %jx (expected 0)", v);
 
 	/* Tag bit. */
-	v = cheri_gettag(c);
+	v = cheri_tag_get(c);
 	if (v != 1)
 		cheribsdtest_failure_errx("tag %jx (expected 1)", v);
 	cheribsdtest_success();
@@ -315,14 +313,14 @@ CHERIBSDTEST(initregs_default, "Test initial value of default capability")
 {
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	if (cheri_getdefault() == NULL)
+	if (cheri_ddc_get() == NULL)
 		cheribsdtest_success();
 	else
 		cheribsdtest_failure_errx("Expected NULL $ddc but was %-#p",
-		    cheri_getdefault());
+		    cheri_ddc_get());
 
 #else
-	check_initreg_data_full_addrspace(cheri_getdefault());
+	check_initreg_data_full_addrspace(cheri_ddc_get());
 #endif
 }
 
@@ -344,54 +342,54 @@ CHERIBSDTEST(initregs_default, "Test initial value of default capability")
  */
 
 #define	CHERI_STACK_USE_MAX	(256 * 1024)
+#define	CHERI_STACK_SWPERMS						\
+	(CHERI_PERMS_SWALL & ~(CHERI_PERM_SW_VMEM | CHERI_PERM_SYSCALL))
 
 CHERIBSDTEST(initregs_stack_user_perms,
     "Test user permissions of stack capability")
 {
 	register_t v;
 
-	v = cheri_getperm(cheri_getstack());
-	if ((v & CHERI_PERMS_SWALL) !=
-	    (CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM))
+	v = cheri_perms_get(cheri_stack_get());
+	if ((v & CHERI_PERMS_SWALL) != CHERI_STACK_SWPERMS)
 		cheribsdtest_failure_errx("swperms %jx (expected swperms %x)",
-		    v & CHERI_PERMS_SWALL,
-		    (CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM));
+		    v & CHERI_PERMS_SWALL, CHERI_STACK_SWPERMS);
 	cheribsdtest_success();
 }
 
 CHERIBSDTEST(initregs_stack,
     "Test initial value of stack capability")
 {
-	void * __capability c = cheri_getstack();
+	void * __capability c = cheri_stack_get();
 	register_t v;
 
 	/* Base. */
-	if (cheri_getbase(c) == CHERI_CAP_USER_DATA_BASE)
+	if (cheri_base_get(c) == CHERI_CAP_USER_DATA_BASE)
 		cheribsdtest_failure_errx("base 0x%jx (did not expect 0x%jx)",
-		    cheri_getbase(c), (uintmax_t)CHERI_CAP_USER_DATA_BASE);
+		    cheri_base_get(c), (uintmax_t)CHERI_CAP_USER_DATA_BASE);
 
 	/* Length. */
 	/* Technically dynamic, but defaults to MAXSSIZ. */
-	if (cheri_getlen(c) > MAXSSIZ)
+	if (cheri_length_get(c) > MAXSSIZ)
 		cheribsdtest_failure_errx("length 0x%jx (> MAXSSIZ 0x%jx)",
-		    cheri_getlen(c), (uintmax_t)MAXSSIZ);
+		    cheri_length_get(c), (uintmax_t)MAXSSIZ);
 
 	/* Offset. */
 	/* If we're running len > offset... */
-	if (cheri_getlen(c) - cheri_getoffset(c) > CHERI_STACK_USE_MAX)
+	if (cheri_length_get(c) - cheri_offset_get(c) > CHERI_STACK_USE_MAX)
 		cheribsdtest_failure_errx("offset more then 0x%jx from top "
 		    "(0x%jx)", (intmax_t)CHERI_STACK_USE_MAX,
-		    cheri_getlen(c) - cheri_getoffset(c));
+		    cheri_length_get(c) - cheri_offset_get(c));
 
-#ifndef __riscv_zcheripurecap
+#ifdef HAS_CHERI_PERM_SEAL
 	/* Type -- should have unsealed type. */
-	if (cheri_gettype(c) != CHERI_OTYPE_UNSEALED)
+	if (cheri_type_get(c) != CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype 0x%jx (expected 0x%jx)",
-		    cheri_gettype(c), (uintmax_t)CHERI_OTYPE_UNSEALED);
+		    cheri_type_get(c), (uintmax_t)CHERI_OTYPE_UNSEALED);
 #endif
 
 	/* Permissions. */
-	v = cheri_getperm(c);
+	v = cheri_perms_get(c);
 
 	/*
 	 * More overt tests for permissions that should -- or should not -- be
@@ -402,33 +400,30 @@ CHERIBSDTEST(initregs_stack,
 
 	if ((v & CHERI_PERM_LOAD) == 0)
 		cheribsdtest_failure_errx("perms %jx (load missing)", v);
+	if ((v & CHERI_PERM_STORE) == 0)
+		cheribsdtest_failure_errx("perms %jx (store missing)", v);
 
-#ifdef CHERI_PERM_LOAD_CAP
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	if ((v & CHERI_PERM_LOAD_CAP) == 0)
 		cheribsdtest_failure_errx("perms %jx (loadcap missing)", v);
+	if ((v & CHERI_PERM_STORE_CAP) == 0)
+		cheribsdtest_failure_errx("perms %jx (storecap missing)", v);
+#endif
+#ifdef HAS_CHERI_PERM_CAP
+	if ((v & CHERI_PERM_CAP) == 0)
+		cheribsdtest_failure_errx("perms %jx (cap missing)", v);
 #endif
 	if ((v & CHERI_PERM_GLOBAL) == 0)
 		cheribsdtest_failure_errx("perms %jx (global missing)", v);
 
-	if ((v & CHERI_PERM_STORE) == 0)
-		cheribsdtest_failure_errx("perms %jx (store missing)", v);
-#ifdef CHERI_PERM_STORE_CAP
-	if ((v & CHERI_PERM_STORE_CAP) == 0)
-		cheribsdtest_failure_errx("perms %jx (storecap missing)", v);
-#endif
-#ifdef CHERI_PERM_CAP
-	if ((v & CHERI_PERM_CAP) == 0)
-		cheribsdtest_failure_errx("perms %jx (cap missing)", v);
-#endif
-
 	if ((v & CHERI_PERM_STORE_LOCAL_CAP) == 0)
 		cheribsdtest_failure_errx("perms %jx (store_local_cap missing)",
 		    v);
-
-#ifdef __riscv_zcheripurecap
+#ifdef HAS_CHERI_PERM_LOAD_MUTABLE
 	if ((v & CHERI_PERM_LOAD_MUTABLE) == 0)
 		cheribsdtest_failure_errx("perms %jx (load mutable missing)", v);
-#else
+#endif
+#ifdef HAS_CHERI_PERM_SEAL
 	if ((v & CHERI_PERM_SEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (seal present)", v);
 
@@ -446,12 +441,12 @@ CHERIBSDTEST(initregs_stack,
 		    (uintmax_t)(CHERI_CAP_USER_DATA_PERMS));
 
 	/* Sealed bit. */
-	v = cheri_getsealed(c);
+	v = cheri_is_sealed(c);
 	if (v != 0)
 		cheribsdtest_failure_errx("sealed %jx (expected 0)", v);
 
 	/* Tag bit. */
-	v = cheri_gettag(c);
+	v = cheri_tag_get(c);
 	if (v != 1)
 		cheribsdtest_failure_errx("tag %jx (expected 1)", v);
 	cheribsdtest_success();
@@ -464,26 +459,26 @@ CHERIBSDTEST(initregs_returncap, "Test value of return capability")
 	
 	/* The return capability should always be a sentry capability */
 	c = __builtin_return_address(0);
-	v = cheri_getperm(c);
+	v = cheri_perms_get(c);
 
-	CHERIBSDTEST_VERIFY(cheri_gettag(c));
+	CHERIBSDTEST_VERIFY(cheri_tag_get(c));
 	/* Check that execute is present and store permissions aren't */
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_EXECUTE) == CHERI_PERM_EXECUTE,
 	    "perms %jx (execute missing)", v);
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_STORE) == 0,
 	    "perms %jx (store present)", v);
-#ifdef CHERI_PERM_STORE_CAP
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_STORE_CAP) == 0,
 	    "perms %jx (storecap present)", v);
 #endif
-#ifdef CHERI_PERM_CAP
+#ifdef HAS_CHERI_PERM_CAP
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_CAP) != 0,
 	    "perms %jx (cap missing)", v);
 #endif
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_STORE_LOCAL_CAP) == 0,
 	    "perms %jx (store_local_cap present)", v);
 
-	v = cheri_gettype(c);
+	v = cheri_type_get(c);
 	CHERIBSDTEST_VERIFY2(v == (uintmax_t)CHERI_OTYPE_SENTRY,
 	    "otype %jx (expected %jx)", v, (uintmax_t)CHERI_OTYPE_SENTRY);
 
@@ -500,8 +495,8 @@ CHERIBSDTEST(initregs_pcc,
 	void * __capability c;
 
 	/* $pcc includes $pc, so clear that for the purposes of the check. */
-	c = cheri_getpcc();
-	c = cheri_setoffset(c, 0);
+	c = cheri_pcc_get();
+	c = cheri_offset_set(c, 0);
 	check_initreg_code(c);
 }
 

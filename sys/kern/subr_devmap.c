@@ -233,7 +233,7 @@ devmap_ptov(vm_paddr_t pa, vm_size_t size)
 			 * representable. This must be enforced when inserting
 			 * entries.
 			 */
-			return (cheri_setboundsexact(cheri_setaddress(
+			return (cheri_bounds_set_exact(cheri_address_set(
 			    devmap_capability, pd->pd_va + (pa - pd->pd_pa)),
 			    size));
 #else
@@ -302,9 +302,9 @@ pmap_mapdev(vm_paddr_t pa, vm_size_t size)
 		akva_devmap_vaddr =
 		    CHERI_REPRESENTABLE_ALIGN_DOWN(akva_devmap_vaddr, size);
 		akva_devmap_vaddr = trunc_page(akva_devmap_vaddr);
-		va = (vm_pointer_t)cheri_setboundsexact(cheri_setaddress(
+		va = (vm_pointer_t)cheri_bounds_set_exact(cheri_address_set(
 		    devmap_capability, akva_devmap_vaddr), size);
-		KASSERT(va + cheri_getlen((void *)va) <= oldva,
+		KASSERT(va + cheri_length_get((void *)va) <= oldva,
 		    ("%s: early devmap overlaps", __func__));
 #else
 		akva_devmap_vaddr = trunc_page(akva_devmap_vaddr - size);
@@ -355,9 +355,9 @@ pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 		akva_devmap_vaddr =
 		    CHERI_REPRESENTABLE_ALIGN_DOWN(akva_devmap_vaddr, size);
 		akva_devmap_vaddr = trunc_page(akva_devmap_vaddr);
-		va = (vm_pointer_t)cheri_setboundsexact(cheri_setaddress(
+		va = (vm_pointer_t)cheri_bounds_set_exact(cheri_address_set(
 		    devmap_capability, akva_devmap_vaddr), size);
-		KASSERT(va + cheri_getlen((void *)va) <= oldva,
+		KASSERT(va + cheri_length_get((void *)va) <= oldva,
 		    ("%s: early devmap overlaps", __func__));
 #else
 		akva_devmap_vaddr = trunc_page(akva_devmap_vaddr - size);
@@ -412,9 +412,9 @@ devmap_init_capability(void * __capability cap)
 	devmap_capability = cap;
 
 	/* XXX: Too early to panic? */
-	KASSERT(cheri_gettop(cap) == DEVMAP_MAX_VADDR,
+	KASSERT(cheri_top_get(cap) == DEVMAP_MAX_VADDR,
 	    ("devmap capability end doesn't match DEVMAP_MAX_VADDR"));
-	KASSERT(cheri_getlen(cap) == PMAP_MAPDEV_EARLY_SIZE,
+	KASSERT(cheri_length_get(cap) == PMAP_MAPDEV_EARLY_SIZE,
 	    ("devmap capability length doesn't match PMAP_MAPDEV_EARLY_SIZE"));
 }
 #endif

@@ -37,34 +37,23 @@
 #include <sys/rwlock.h>
 #include <sys/hwc.h>
 
-#include <dev/hwc/hwc_hook.h>
 #include <dev/hwc/hwc_context.h>
 #include <dev/hwc/hwc_contexthash.h>
-#if 0
-#include <dev/hwc/hwc_config.h>
-#endif
-#include <dev/hwc/hwc_cpu.h>
-#if 0
-#include <dev/hwc/hwc_thread.h>
-#endif
 #include <dev/hwc/hwc_owner.h>
 #include <dev/hwc/hwc_ownerhash.h>
 #include <dev/hwc/hwc_backend.h>
 #include <dev/hwc/hwc_vm.h>
-#if 0
-#include <dev/hwc/hwc_record.h>
-#endif
 
-#define	HWT_DEBUG
-#undef	HWT_DEBUG
+#define	HWC_DEBUG
+#undef	HWC_DEBUG
 
-#ifdef	HWT_DEBUG
+#ifdef	HWC_DEBUG
 #define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
 #else
 #define	dprintf(fmt, ...)
 #endif
 
-static MALLOC_DEFINE(M_HWT_OWNER, "hwc_owner", "Hardware Trace");
+static MALLOC_DEFINE(M_HWC_OWNER, "hwc_owner", "Hardware Counters");
 
 struct hwc_context *
 hwc_owner_lookup_ctx(struct hwc_owner *ho, pid_t pid)
@@ -83,31 +72,12 @@ hwc_owner_lookup_ctx(struct hwc_owner *ho, pid_t pid)
 	return (NULL);
 }
 
-#if 0
-struct hwc_context *
-hwc_owner_lookup_ctx_by_cpu(struct hwc_owner *ho, int cpu)
-{
-	struct hwc_context *ctx;
-
-	mtx_lock(&ho->mtx);
-	LIST_FOREACH(ctx, &ho->hwcs, next_hwcs) {
-		if (ctx->cpu == cpu) {
-			mtx_unlock(&ho->mtx);
-			return (ctx);
-		}
-	}
-	mtx_unlock(&ho->mtx);
-
-	return (NULL);
-}
-#endif
-
 struct hwc_owner *
 hwc_owner_alloc(struct proc *p)
 {
 	struct hwc_owner *ho;
 
-	ho = malloc(sizeof(struct hwc_owner), M_HWT_OWNER,
+	ho = malloc(sizeof(struct hwc_owner), M_HWC_OWNER,
 	    M_WAITOK | M_ZERO);
 	ho->p = p;
 
@@ -141,9 +111,9 @@ hwc_owner_shutdown(struct hwc_owner *ho)
 		 * A hook could be still dealing with this ctx right here.
 		 */
 
-		HWT_CTX_LOCK(ctx);
+		HWC_CTX_LOCK(ctx);
 		ctx->state = 0;
-		HWT_CTX_UNLOCK(ctx);
+		HWC_CTX_UNLOCK(ctx);
 
 		/* Ensure hooks invocation is now completed. */
 		while (refcount_load(&ctx->refcnt) > 0)
@@ -154,12 +124,9 @@ hwc_owner_shutdown(struct hwc_owner *ho)
 		 */
 
 		hwc_backend_deinit(ctx);
-#if 0
-		hwc_record_free_all(ctx);
-#endif
 		hwc_ctx_free(ctx);
 	}
 
 	hwc_ownerhash_remove(ho);
-	free(ho, M_HWT_OWNER);
+	free(ho, M_HWC_OWNER);
 }

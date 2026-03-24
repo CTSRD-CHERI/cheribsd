@@ -1235,7 +1235,7 @@ sys_ktimer_create(struct thread *td, struct ktimer_create_args *uap)
 	if (uap->evp == NULL) {
 		evp = NULL;
 	} else {
-		error = copyincap(uap->evp, &ev, sizeof(ev));
+		error = copyinptr(uap->evp, &ev, sizeof(ev));
 		if (error != 0)
 			return (error);
 		evp = &ev;

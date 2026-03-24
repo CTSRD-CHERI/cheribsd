@@ -129,9 +129,7 @@ cpuset_t all_harts;
 
 extern int *end;
 
-#ifdef FDT
 static char static_kenv[PAGE_SIZE];
-#endif
 
 /*
  * When emulating RISC-V boards under QEMU, ISA-level tracing can be enabled and
@@ -272,8 +270,18 @@ cpu_flush_dcache(void *ptr, size_t len)
 int
 cpu_est_clockrate(int cpu_id, uint64_t *rate)
 {
+	struct pcpu *pc;
 
-	panic("cpu_est_clockrate");
+	pc = pcpu_find(cpu_id);
+	if (pc == NULL || rate == NULL)
+		return (EINVAL);
+
+	if (pc->pc_clock == 0)
+		return (EOPNOTSUPP);
+
+	*rate = pc->pc_clock;
+
+	return (0);
 }
 
 void
@@ -350,16 +358,16 @@ init_proc0(vm_pointer_t kstack)
 
 #ifdef FDT
 static void
-try_load_dtb(caddr_t kmdp)
+try_load_dtb(void)
 {
 	vm_pointer_t dtbp;
 
-	dtbp = MD_FETCH(kmdp, MODINFOMD_DTBP, vm_offset_t);
+	dtbp = MD_FETCH(preload_kmdp, MODINFOMD_DTBP, vm_offset_t);
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (dtbp != (vm_pointer_t)NULL) {
-		dtbp = (vm_pointer_t)cheri_andperm(cheri_setaddress(
+		dtbp = (vm_pointer_t)cheri_perms_and(cheri_address_set(
 		    kernel_root_cap, dtbp), CHERI_PERMS_KERNEL_DATA);
-		dtbp = cheri_setbounds(dtbp, fdt_totalsize((void *)dtbp));
+		dtbp = cheri_bounds_set(dtbp, fdt_totalsize((void *)dtbp));
 	}
 #endif
 
@@ -415,7 +423,7 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_NAME);
 	PRELOAD_PUSH_STRING("kernel");
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_TYPE);
-	PRELOAD_PUSH_STRING("elf kernel");
+	PRELOAD_PUSH_STRING(preload_kerntype);
 
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_ADDR);
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(vm_offset_t));
@@ -434,7 +442,7 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	 */
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	const void *dtbp_virt = cheri_setaddress(kernel_root_cap,
+	const void *dtbp_virt = cheri_address_set(kernel_root_cap,
 	    rvbp->dtbp_phys);
 	dtb_size = fdt_totalsize(dtbp_virt);
 	lastaddr = CHERI_REPRESENTABLE_ALIGN_UP(lastaddr, dtb_size);
@@ -451,10 +459,10 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(vm_offset_t));
 	PRELOAD_PUSH_VALUE(vm_offset_t, lastaddr);
 #ifdef __CHERI_PURE_CAPABILITY__
-	void *dtbp = cheri_setbounds(cheri_setaddress(kernel_root_cap,
+	void *dtbp = cheri_bounds_set(cheri_address_set(kernel_root_cap,
 	    lastaddr), dtb_size);
 	memmove(dtbp, dtbp_virt, dtb_size);
-	lastaddr = roundup(lastaddr + cheri_getlen(dtbp), sizeof(int));
+	lastaddr = roundup(lastaddr + cheri_length_get(dtbp), sizeof(int));
 #else
 	memmove((void *)lastaddr, (const void *)rvbp->dtbp_phys, dtb_size);
 	lastaddr = roundup(lastaddr + dtb_size, sizeof(int));
@@ -507,38 +515,32 @@ parse_fdt_bootargs(void)
 static vm_offset_t
 parse_metadata(void)
 {
-	caddr_t kmdp;
 	vm_offset_t lastaddr;
 #ifdef DDB
 	vm_pointer_t ksym_start, ksym_end;
 #endif
 	char *kern_envp;
 
-	/* Find the kernel address */
-	kmdp = preload_search_by_type("elf kernel");
-	if (kmdp == NULL)
-		kmdp = preload_search_by_type("elf64 kernel");
-	KASSERT(kmdp != NULL, ("No preload metadata found!"));
+	/* Initialize preload_kmdp */
+	preload_initkmdp(true);
 
 	/* Read the boot metadata */
-	boothowto = MD_FETCH(kmdp, MODINFOMD_HOWTO, int);
-	lastaddr = MD_FETCH(kmdp, MODINFOMD_KERNEND, vm_offset_t);
-	kern_envp = MD_FETCH(kmdp, MODINFOMD_ENVP, char *);
+	boothowto = MD_FETCH(preload_kmdp, MODINFOMD_HOWTO, int);
+	lastaddr = MD_FETCH(preload_kmdp, MODINFOMD_KERNEND, vm_offset_t);
+	kern_envp = MD_FETCH(preload_kmdp, MODINFOMD_ENVP, char *);
 	if (kern_envp != NULL)
 		init_static_kenv(kern_envp, 0);
 	else
 		init_static_kenv(static_kenv, sizeof(static_kenv));
 #ifdef DDB
-	ksym_start = MD_FETCH(kmdp, MODINFOMD_SSYM, uintptr_t);
-	ksym_end = MD_FETCH(kmdp, MODINFOMD_ESYM, uintptr_t);
+	ksym_start = MD_FETCH(preload_kmdp, MODINFOMD_SSYM, uintptr_t);
+	ksym_end = MD_FETCH(preload_kmdp, MODINFOMD_ESYM, uintptr_t);
 	db_fetch_ksymtab(ksym_start, ksym_end, 0);
 #endif
 #ifdef FDT
-	try_load_dtb(kmdp);
-	if (kern_envp == NULL) {
-		init_static_kenv(static_kenv, sizeof(static_kenv));
+	try_load_dtb();
+	if (kern_envp == NULL)
 		parse_fdt_bootargs();
-	}
 #endif
 	return (lastaddr);
 }

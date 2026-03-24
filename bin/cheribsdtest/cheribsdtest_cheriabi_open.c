@@ -38,9 +38,6 @@
 #include <sys/sysctl.h>
 #include <sys/time.h>
 
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -150,7 +147,7 @@ CHERIBSDTEST(cheriabi_open_bad_len,
 	char *path;
 	int fd;
 
-	path = cheri_setbounds(pathbuf, strlen(pathbuf));
+	path = cheri_bounds_set(pathbuf, strlen(pathbuf));
 
 	fd = open(path, O_RDONLY);
 	if (fd > 0)
@@ -168,7 +165,7 @@ CHERIBSDTEST(cheriabi_open_bad_len_2, "Path with offset past its bounds")
 	char *path;
 	int fd;
 
-	path = cheri_setbounds(pathbuf, 3);
+	path = cheri_bounds_set(pathbuf, 3);
 	path += 4;
 
 	fd = open(path, O_RDONLY);
@@ -187,7 +184,7 @@ CHERIBSDTEST(cheriabi_open_bad_tag, "Path with tag bit missing")
 	char *path;
 	int fd;
 
-	path = cheri_cleartag((char *)pathbuf);
+	path = cheri_tag_clear(pathbuf);
 
 	fd = open(path, O_RDONLY);
 	if (fd > 0)
@@ -206,7 +203,7 @@ CHERIBSDTEST(cheriabi_open_bad_perm,
 	char *path;
 	int fd;
 
-	path = cheri_andperm(pathbuf, ~CHERI_PERM_LOAD);
+	path = cheri_perms_and(pathbuf, ~CHERI_PERM_LOAD);
 
 	fd = open(path, O_RDONLY);
 	if (fd > 0)
@@ -223,7 +220,7 @@ CHERIBSDTEST(cheriabi_open_sentry, "Sealed path")
 	const char *sealed_path;
 	int fd;
 
-	sealed_path = cheri_sealentry("/dev/null");
+	sealed_path = cheri_sentry_create("/dev/null");
 	fd = open(sealed_path, O_RDONLY);
 	if (fd > 0)
 		cheribsdtest_failure_errx("open succeeded");
@@ -234,7 +231,7 @@ CHERIBSDTEST(cheriabi_open_sentry, "Sealed path")
 	cheribsdtest_success();
 }
 
-#ifdef __riscv_xcheri
+#ifdef HAS_CHERI_PERM_SEAL
 CHERIBSDTEST(cheriabi_open_sealed, "Sealed path")
 {
 	char *path, *sealed_path;
@@ -264,4 +261,4 @@ CHERIBSDTEST(cheriabi_open_sealed, "Sealed path")
 
 	cheribsdtest_success();
 }
-#endif /* defined(__riscv_xcheri) */
+#endif

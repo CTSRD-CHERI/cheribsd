@@ -575,6 +575,12 @@ pfsync_state_import(union pfsync_state_union *sp, int flags, int msg_version)
 		 * from the local ruleset.
 		 */
 		if (r != &V_pf_default_rule) {
+			struct pf_kpool		*pool = &r->route;
+
+			/* Backwards compatibility. */
+			if (TAILQ_EMPTY(&pool->list))
+				pool = &r->rdr;
+
 			/*
 			 * The ruleset is identical, try to recover. If the rule
 			 * has a redirection pool with a single interface, there
@@ -583,7 +589,7 @@ pfsync_state_import(union pfsync_state_union *sp, int flags, int msg_version)
 			 * give up, as we can't be sure that we will pick the
 			 * same one as the pfsync peer did.
 			 */
-			rpool_first = TAILQ_FIRST(&(r->rdr.list));
+			rpool_first = TAILQ_FIRST(&(pool->list));
 			if ((rpool_first == NULL) ||
 			    (TAILQ_NEXT(rpool_first, entries) != NULL)) {
 				DPFPRINTF(PF_DEBUG_MISC,
@@ -1750,17 +1756,19 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 static void
 pfsync_out_state_1301(struct pf_kstate *st, void *buf)
 {
-	union pfsync_state_union *sp = buf;
+	struct pfsync_state_1301 *sp;
 
-	pfsync_state_export(sp, st, PFSYNC_MSG_VERSION_1301);
+	sp = buf;
+	pfsync_state_export_1301(sp, st);
 }
 
 static void
 pfsync_out_state_1400(struct pf_kstate *st, void *buf)
 {
-	union pfsync_state_union *sp = buf;
+	struct pfsync_state_1400 *sp;
 
-	pfsync_state_export(sp, st, PFSYNC_MSG_VERSION_1400);
+	sp = buf;
+	pfsync_state_export_1400(sp, st);
 }
 
 static void

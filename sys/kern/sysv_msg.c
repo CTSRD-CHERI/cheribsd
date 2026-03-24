@@ -1831,7 +1831,7 @@ freebsd32_msgsnd(struct thread *td, struct freebsd32_msgsnd_args *uap)
 		return (error);
 	mtype = mtype32;
 	return (kern_msgsnd(td, uap->msqid,
-	    (const char * __capability)__USER_CAP(msgp, uap->msgsz) +
+	    (const char * __capability)USER_PTR(msgp, uap->msgsz) +
 	    sizeof(mtype32), uap->msgsz, uap->msgflg, mtype));
 }
 
@@ -1845,7 +1845,7 @@ freebsd32_msgrcv(struct thread *td, struct freebsd32_msgrcv_args *uap)
 
 	msgp = PTRIN(uap->msgp);
 	if ((error = kern_msgrcv(td, uap->msqid,
-	    (char * __capability)__USER_CAP(msgp, uap->msgsz) + sizeof(mtype32),
+	    (char * __capability)USER_PTR(msgp, uap->msgsz) + sizeof(mtype32),
 	    uap->msgsz, uap->msgtyp, uap->msgflg, &mtype)) != 0)
 		return (error);
 	mtype32 = (int32_t)mtype;
@@ -1864,7 +1864,7 @@ freebsd7_freebsd64_msgctl(struct thread *td,
 	int error;
 
 	if (uap->cmd == IPC_SET) {
-		error = copyin(__USER_CAP_OBJ(uap->buf), &msqbuf64,
+		error = copyin(USER_PTR_OBJ(uap->buf), &msqbuf64,
 		    sizeof(msqbuf64));
 		if (error)
 			return (error);
@@ -1894,7 +1894,7 @@ freebsd7_freebsd64_msgctl(struct thread *td,
 		CP(msqbuf, msqbuf64, msg_stime);
 		CP(msqbuf, msqbuf64, msg_rtime);
 		CP(msqbuf, msqbuf64, msg_ctime);
-		error = copyout(&msqbuf64, __USER_CAP_OBJ(uap->buf),
+		error = copyout(&msqbuf64, USER_PTR_OBJ(uap->buf),
 		    sizeof(struct msqid_ds64));
 	}
 	return (error);
@@ -1909,7 +1909,7 @@ freebsd64_msgctl(struct thread *td, struct freebsd64_msgctl_args *uap)
 	int error;
 
 	if (uap->cmd == IPC_SET) {
-		error = copyin(__USER_CAP_OBJ(uap->buf), &msqbuf64,
+		error = copyin(USER_PTR_OBJ(uap->buf), &msqbuf64,
 		    sizeof(msqbuf64));
 		if (error)
 			return (error);
@@ -1939,7 +1939,7 @@ freebsd64_msgctl(struct thread *td, struct freebsd64_msgctl_args *uap)
 		CP(msqbuf, msqbuf64, msg_stime);
 		CP(msqbuf, msqbuf64, msg_rtime);
 		CP(msqbuf, msqbuf64, msg_ctime);
-		error = copyout(&msqbuf64, __USER_CAP_OBJ(uap->buf),
+		error = copyout(&msqbuf64, USER_PTR_OBJ(uap->buf),
 		    sizeof(struct msqid_ds64));
 	}
 	return (error);
@@ -1951,11 +1951,11 @@ freebsd64_msgsnd(struct thread *td, struct freebsd64_msgsnd_args *uap)
 	long mtype;
 	int error;
 
-	if ((error = copyin(__USER_CAP(uap->msgp, sizeof(mtype)),
+	if ((error = copyin(USER_PTR(uap->msgp, sizeof(mtype)),
 	    &mtype, sizeof(mtype))) != 0)
 		return (error);
 	return (kern_msgsnd(td, uap->msqid,
-	    (const char * __capability)__USER_CAP(uap->msgp, uap->msgsz) +
+	    (const char * __capability)USER_PTR(uap->msgp, uap->msgsz) +
 	    sizeof(mtype), uap->msgsz, uap->msgflg, mtype));
 }
 
@@ -1966,10 +1966,10 @@ freebsd64_msgrcv(struct thread *td, struct freebsd64_msgrcv_args *uap)
 	int error;
 
 	if ((error = kern_msgrcv(td, uap->msqid,
-	    (char * __capability)__USER_CAP(uap->msgp, uap->msgsz) +
+	    (char * __capability)USER_PTR(uap->msgp, uap->msgsz) +
 	    sizeof(mtype), uap->msgsz, uap->msgtyp, uap->msgflg, &mtype)) != 0)
 		return (error);
-	return (copyout(&mtype, __USER_CAP(uap->msgp, sizeof(mtype)),
+	return (copyout(&mtype, USER_PTR(uap->msgp, sizeof(mtype)),
 	    sizeof(mtype)));
 }
 #endif /* COMPAT_FREEBSD64 */

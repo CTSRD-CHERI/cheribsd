@@ -95,7 +95,7 @@ process___cap_relocs(Obj_Entry *obj)
 		    code_reloc_flag)) {
 			/* code pointer */
 			cap = (uintcap_t)pcc_cap(obj, reloc->object);
-			cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
+			cap = cheri_perms_clear(cap, FUNC_PTR_REMOVE_PERMS);
 
 			/*
 			 * Do not set tight bounds for functions
@@ -105,32 +105,32 @@ process___cap_relocs(Obj_Entry *obj)
 		} else if (reloc->permissions == constant_reloc_flag) {
 			 /* read-only data pointer */
 			cap = (uintcap_t)data_base + reloc->object;
-			cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
-			cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
+			cap = cheri_perms_clear(cap, FUNC_PTR_REMOVE_PERMS);
+			cap = cheri_perms_clear(cap, DATA_PTR_REMOVE_PERMS);
 		} else if (reloc->permissions == 0) {
 			/* read-write data */
 			cap = (uintcap_t)data_base + reloc->object;
-			cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
+			cap = cheri_perms_clear(cap, DATA_PTR_REMOVE_PERMS);
 		} else {
 			_rtld_error("%s: Unknown capreloc type %#zx",
 			    obj->path, reloc->permissions);
 			return (-1);
 		}
-		cap = cheri_clearperm(cap, CAP_RELOC_REMOVE_PERMS);
+		cap = cheri_perms_clear(cap, CAP_RELOC_REMOVE_PERMS);
 		if (can_set_bounds && reloc->size != 0)
-			cap = cheri_setbounds(cap, reloc->size);
+			cap = cheri_bounds_set(cap, reloc->size);
 		cap += reloc->offset;
 		/* Convert function pointers to sentries */
 		if (reloc->permissions == function_reloc_flag ||
 		    reloc->permissions == (function_reloc_flag |
 		    code_reloc_flag)) {
-			cap = cheri_sealentry(cap);
+			cap = cheri_sentry_create(cap);
 #ifdef CHERI_LIB_C18N
 			if ((reloc->permissions & code_reloc_flag) == 0)
 				cap = (uintcap_t)tramp_intern(NULL,
 				    RTLD_COMPART_ID, &(struct tramp_data) {
-					.target = (void *)cap,
-					.defobj = obj
+				       .target = (void *)cap,
+				       .defobj = obj
 				});
 #endif
 		}
@@ -164,12 +164,12 @@ process_ifunc___cap_relocs(Obj_Entry *obj)
 			continue;
 
 		cap = (uintcap_t)pcc_cap(obj, reloc->object);
-		cap = cheri_clearperm(cap,
+		cap = cheri_perms_clear(cap,
 		    FUNC_PTR_REMOVE_PERMS | CAP_RELOC_REMOVE_PERMS);
 		if (tight_pcc_bounds && reloc->size != 0)
-			cap = cheri_setbounds(cap, reloc->size);
+			cap = cheri_bounds_set(cap, reloc->size);
 		cap += reloc->offset;
-		cap = cheri_sealentry(cap);
+		cap = cheri_sentry_create(cap);
 		cap = call_ifunc_resolver(cap);
 		*dest = cap;
 	}

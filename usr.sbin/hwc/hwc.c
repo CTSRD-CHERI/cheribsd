@@ -96,7 +96,7 @@ hwc_ctx_alloc(struct hwc_context *tc)
 	char filename[32];
 	int error = 0;
 
-	if (tc->backend->methods->init != NULL){
+	if (tc->backend->methods->init != NULL) {
 		error = tc->backend->methods->init(tc);
 		if (error)
 			return (error);
@@ -106,12 +106,8 @@ hwc_ctx_alloc(struct hwc_context *tc)
 	al.mode = tc->mode;
 	if (tc->mode == HWC_MODE_THREAD)
 		al.pid = tc->pid;
-	else {
-#if 0
-		al.cpu_map = &tc->cpu_map;
-		al.cpusetsize = sizeof(cpuset_t);
-#endif
-	}
+	else
+		return (-1);
 
 	al.pid = tc->pid;
 	al.backend_name = tc->backend->name;
@@ -164,7 +160,7 @@ usage(void)
 	errx(EX_USAGE,
 		"hwc [-c devname] [path to executable]\n"
 		"\t -c\tname\t\tName of tracing device, e.g. 'coresight'.\n"
-		"\t -o\toutput-file\t\tFile name to store results into.\n"
+		"\t -f\tconfig-file\tHW counters configuration file.\n"
 		"\t -h\tHelp."
         );
 }
@@ -300,7 +296,7 @@ main(int argc, char **argv, char **env)
 	if (argc < 0)
 		exit(EXIT_FAILURE);
 
-	while ((option = getopt(argc, argv, "P:R:gs:hc:b:rw:t:i:f:o:")) != -1)
+	while ((option = getopt(argc, argv, "P:R:hc:f:o:")) != -1)
 		switch (option) {
 		case 'P':
 			tc->attach = 1;

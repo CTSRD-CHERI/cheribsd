@@ -94,7 +94,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
     uintcap_t * __capability cutp, uintcap_t cut, vm_offset_t start,
     vm_offset_t end)
 {
-	int perms = cheri_getperm(cut);
+	int perms = cheri_perms_get(cut);
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 
 	if (perms == 0) {
@@ -108,7 +108,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 		 */
 
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found_revoked);
-	} else if (cheri_gettag(cut) && ctp(crshadow, cut, perms, start, end)) {
+	} else if (cheri_tag_get(cut) && ctp(crshadow, cut, perms, start, end)) {
 		void * __capability cscratch;
 		int ok;
 		long sc_result;
@@ -174,7 +174,7 @@ again:
 		if (__builtin_expect(sc_result == 0, 1)) {
 			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 			/* Don't count a revoked cap as HASCAPS */
-		} else if (!cheri_gettag(cscratch)) {
+		} else if (!cheri_tag_get(cscratch)) {
 			/* Data; don't sweat it */
 		} else if (cheri_revoke_is_revoked(cscratch)) {
 			/* Revoked cap; don't worry about it */
@@ -234,47 +234,6 @@ disable_user_memory_access(void)
 	);
 }
 
-#ifdef CHERI_CAPREVOKE_CLOADTAGS
-uint8_t cloadtags_stride;
-SYSCTL_U8(_vm, OID_AUTO, cloadtags_stride, 0, &cloadtags_stride, 0, "XXX");
-
-static void
-measure_cloadtags_stride(void *ignored __unused)
-{
-	/* A 256-byte cache-line is probably beyond the pale, so use that */
-	void * __capability buf[16] __attribute__((aligned(256)));
-	int i;
-
-	/* Fill with capabilities */
-	for (i = 0; i < sizeof(buf)/sizeof(buf[0]); i++) {
-		buf[i] = userspace_root_cap;
-	}
-
-	uint64_t tags = cheri_loadtags(buf);
-	switch (tags) {
-	case 0x0001:
-		cloadtags_stride = 1;
-		break;
-	case 0x0003:
-		cloadtags_stride = 2;
-		break;
-	case 0x000F:
-		cloadtags_stride = 4;
-		break;
-	case 0x00FF:
-		cloadtags_stride = 8;
-		break;
-	case 0xFFFF:
-		cloadtags_stride = 16;
-		break;
-	default:
-		panic("Bad cloadtags result 0x%" PRIx64, tags);
-	}
-}
-SYSINIT(
-    cloadtags_stride, SI_SUB_VM, SI_ORDER_ANY, measure_cloadtags_stride, NULL);
-#endif
-
 // TODO: CPREFETCH()
 
 static inline int
@@ -300,7 +259,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 	vm_cheri_revoke_test_fn ctp = crc->map->vm_cheri_revoke_test;
 	const uint8_t * __capability crshadow = crc->crshadow;
 #ifdef CHERI_CAPREVOKE_CLOADTAGS
-	uint8_t _cloadtags_stride = cloadtags_stride;
+	uint8_t _cloadtags_stride = cheri_cloadtags_stride;
 	uint64_t tags, nexttags;
 #endif
 
@@ -321,7 +280,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 	}
 #endif
 
-	for (; cheri_getaddress(mvu) < mve; mvu += _cloadtags_stride) {
+	for (; cheri_address_get(mvu) < mve; mvu += _cloadtags_stride) {
 		uintcap_t * __capability mvt = mvu;
 
 		nexttags = cheri_loadtags(mvu + _cloadtags_stride);
@@ -357,10 +316,10 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 #else /* no CLOADTAGS */
 	/* TODO: lines_scan approximation for CHERI_REVOKE_STATS? */
 
-	for (; cheri_getaddress(mvu) < mve; mvu++) {
+	for (; cheri_address_get(mvu) < mve; mvu++) {
 		uintcap_t cut = *mvu;
 
-		if (cheri_gettag(cut)) {
+		if (cheri_tag_get(cut)) {
 			if (cb(&res, crc, crshadow, ctp, mvu, cut, start, end))
 				goto out;
 		}
@@ -378,7 +337,7 @@ out:
 int
 vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *crc, uintcap_t cut)
 {
-	if (cheri_gettag(cut)) {
+	if (cheri_tag_get(cut)) {
 		int res;
 		vm_offset_t start, end;
 
@@ -395,7 +354,7 @@ vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *crc, uintcap_t cut)
 		enable_user_memory_access();
 #endif
 		res = crc->map->vm_cheri_revoke_test(crc->crshadow, cut,
-		    cheri_getperm(cut), start, end);
+		    cheri_perms_get(cut), start, end);
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
 		disable_user_memory_access();
 		curthread->td_pcb->pcb_onfault = prev_onfault;
@@ -429,7 +388,7 @@ vm_cheri_revoke_page_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 	mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 	mve = mva + PAGE_SIZE;
 
-	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), PAGE_SIZE);
+	mvu = cheri_bounds_set(cheri_address_set(kdc, mva), PAGE_SIZE);
 
 	res = vm_cheri_revoke_page_iter(crc, vm_do_cheri_revoke, mvu, mve);
 
@@ -455,12 +414,12 @@ vm_cheri_revoke_page_ro_adapt(int *res,
     vm_offset_t end)
 {
 	/* If the thing has no permissions, we don't need to scan it later */
-	if ((cheri_gettag(cut) == 0) || (cheri_getperm(cut) == 0))
+	if ((cheri_tag_get(cut) == 0) || (cheri_perms_get(cut) == 0))
 		return (0);
 
 	*res |= VM_CHERI_REVOKE_PAGE_HASCAPS;
 
-	if (ctp(crshadow, cut, cheri_getperm(cut), start, end)) {
+	if (ctp(crshadow, cut, cheri_perms_get(cut), start, end)) {
 		*res |= VM_CHERI_REVOKE_PAGE_DIRTY;
 
 		/* One dirty answer is as good as any other; stop eary */
@@ -508,7 +467,7 @@ vm_cheri_revoke_page_ro(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 	mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 	mve = mva + PAGE_SIZE;
 
-	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), PAGE_SIZE);
+	mvu = cheri_bounds_set(cheri_address_set(kdc, mva), PAGE_SIZE);
 
 	res = vm_cheri_revoke_page_iter(crc, vm_cheri_revoke_page_ro_adapt, mvu,
 	    mve);

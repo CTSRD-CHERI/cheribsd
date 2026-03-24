@@ -218,8 +218,6 @@ exec_linux_imgact(struct image_params *imgp)
 	imgp->interpreted = 0;
 	imgp->entry_addr = a_out->a_entry;
 
-	imgp->proc->p_sysent = &linux_sysvec;
-
 fail:
 	vn_lock(imgp->vp, LK_EXCLUSIVE | LK_RETRY);
 	return (error);

@@ -113,11 +113,17 @@ const char *rtld_get_var(const char *name);
 int rtld_set_var(const char *name, const char *val);
 
 #ifdef __CHERI_PURE_CAPABILITY__
+#ifdef _KERNEL
+#include <sys/stddef.h>
+#else
+#include <stddef.h>
+#endif
 #include <machine/c18n.h>
 void *dl_c18n_get_trusted_stack(uintptr_t);
 void dl_c18n_unwind_trusted_stack(void *, void *);
 int dl_c18n_is_trampoline(uintptr_t, void *);
 void *dl_c18n_pop_trusted_stack(struct dl_c18n_compart_state *, void *);
+ptraddr_t dl_c18n_get_trampoline_target(const void *);
 #endif
 
 #ifdef __ARM_EABI__

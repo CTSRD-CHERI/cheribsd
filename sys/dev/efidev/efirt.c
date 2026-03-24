@@ -167,7 +167,6 @@ efi_init(void)
 	struct efi_map_header *efihdr;
 	struct efi_md *map;
 	struct efi_rt *rtdm;
-	caddr_t kmdp;
 	size_t efisz;
 	int ndesc, rt_disabled;
 
@@ -194,8 +193,8 @@ efi_init(void)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	EFI_ST_ARRAY(table, name, num)					\
-    ((struct efi_##name *)cheri_andperm(cheri_setbounds(		\
-	    cheri_setaddress(kernel_root_cap, (table)->st_##name),	\
+    ((struct efi_##name *)cheri_perms_and(cheri_bounds_set(		\
+	    cheri_address_set(kernel_root_cap, (table)->st_##name),	\
 	    sizeof(struct efi_##name) * (num)), CHERI_PERMS_KERNEL_DATA))
 #else
 #define	EFI_ST_ARRAY(table, name, num)					\
@@ -210,10 +209,7 @@ efi_init(void)
 			printf("EFI config table is not present\n");
 	}
 
-	kmdp = preload_search_by_type("elf kernel");
-	if (kmdp == NULL)
-		kmdp = preload_search_by_type("elf64 kernel");
-	efihdr = (struct efi_map_header *)preload_search_info(kmdp,
+	efihdr = (struct efi_map_header *)preload_search_info(preload_kmdp,
 	    MODINFO_METADATA | MODINFOMD_EFI_MAP);
 	if (efihdr == NULL) {
 		if (bootverbose)
@@ -563,8 +559,8 @@ efi_call(struct efirt_callinfo *ecp)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	EFI_RT_METHOD_PA(method)				\
-    ((uintptr_t)cheri_sealentry(cheri_andperm(			\
-	cheri_setaddress(kernel_root_cap,			\
+    ((uintptr_t)cheri_sentry_create(cheri_perms_and(			\
+	cheri_address_set(kernel_root_cap,			\
 	    ((struct efi_rt *)efi_phys_to_kva((uintptr_t)	\
 	    efi_runtime, sizeof(struct efi_rt)))->method),	\
 	CHERI_PERMS_KERNEL_CODE)))

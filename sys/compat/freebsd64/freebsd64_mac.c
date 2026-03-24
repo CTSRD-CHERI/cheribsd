@@ -41,6 +41,7 @@
 #include <sys/proc.h>
 #include <sys/syscallsubr.h>
 
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_util.h>
 
@@ -51,75 +52,75 @@ int
 freebsd64___mac_get_pid(struct thread *td,
     struct freebsd64___mac_get_pid_args *uap)
 {
-	return (kern_mac_get_pid(td, uap->pid, __USER_CAP_OBJ(uap->mac_p)));
+	return (kern_mac_get_pid(td, uap->pid, USER_PTR_OBJ(uap->mac_p)));
 }
 
 int
 freebsd64___mac_get_proc(struct thread *td,
     struct freebsd64___mac_get_proc_args *uap)
 {
-	return (kern_mac_get_proc(td, __USER_CAP_OBJ(uap->mac_p)));
+	return (kern_mac_get_proc(td, USER_PTR_OBJ(uap->mac_p)));
 }
 
 int
 freebsd64___mac_set_proc(struct thread *td,
     struct freebsd64___mac_set_proc_args *uap)
 {
-	return (kern_mac_set_proc(td, __USER_CAP_OBJ(uap->mac_p)));
+	return (kern_mac_set_proc(td, USER_PTR_OBJ(uap->mac_p)));
 }
 
 int
 freebsd64___mac_get_fd(struct thread *td,
     struct freebsd64___mac_get_fd_args *uap)
 {
-	return (kern_mac_get_fd(td, uap->fd, __USER_CAP_OBJ(uap->mac_p)));
+	return (kern_mac_get_fd(td, uap->fd, USER_PTR_OBJ(uap->mac_p)));
 }
 
 int
 freebsd64___mac_get_file(struct thread *td,
     struct freebsd64___mac_get_file_args *uap)
 {
-	return (kern_mac_get_path(td, __USER_CAP_STR(uap->path_p),
-	    __USER_CAP_OBJ(uap->mac_p), FOLLOW));
+	return (kern_mac_get_path(td, USER_PTR_PATH(uap->path_p),
+	    USER_PTR_OBJ(uap->mac_p), FOLLOW));
 }
 
 int
 freebsd64___mac_get_link(struct thread *td,
     struct freebsd64___mac_get_link_args *uap)
 {
-	return (kern_mac_get_path(td, __USER_CAP_STR(uap->path_p),
-	    __USER_CAP_OBJ(uap->mac_p), NOFOLLOW));
+	return (kern_mac_get_path(td, USER_PTR_PATH(uap->path_p),
+	    USER_PTR_OBJ(uap->mac_p), NOFOLLOW));
 }
 
 int
 freebsd64___mac_set_fd(struct thread *td,
     struct freebsd64___mac_set_fd_args *uap)
 {
-	return (kern_mac_set_fd(td, uap->fd, __USER_CAP_OBJ(uap->mac_p)));
+	return (kern_mac_set_fd(td, uap->fd, USER_PTR_OBJ(uap->mac_p)));
 }
 
 int
 freebsd64___mac_set_file(struct thread *td,
     struct freebsd64___mac_set_file_args *uap)
 {
-	return (kern_mac_set_path(td, __USER_CAP_STR(uap->path_p),
-	    __USER_CAP_OBJ(uap->mac_p), FOLLOW));
+	return (kern_mac_set_path(td, USER_PTR_PATH(uap->path_p),
+	    USER_PTR_OBJ(uap->mac_p), FOLLOW));
 }
 
 int
 freebsd64___mac_set_link(struct thread *td,
     struct freebsd64___mac_set_link_args *uap)
 {
-	return (kern_mac_set_path(td, __USER_CAP_STR(uap->path_p),
-	    __USER_CAP_OBJ(uap->mac_p), NOFOLLOW));
+	return (kern_mac_set_path(td, USER_PTR_PATH(uap->path_p),
+	    USER_PTR_OBJ(uap->mac_p), NOFOLLOW));
 }
 
 int
 freebsd64_mac_syscall(struct thread *td,
     struct freebsd64_mac_syscall_args *uap)
 {
-	return (kern_mac_syscall(td, __USER_CAP_OBJ(uap->policy), uap->call,
-	    __USER_CAP_UNBOUND(uap->arg)));
+	return (kern_mac_syscall(td, USER_PTR_OBJ(uap->policy), uap->call,
+	    USER_PTR_UNBOUND(uap->arg)));
 }
 
 int
@@ -134,9 +135,9 @@ freebsd64___mac_execve(struct thread *td,
 	if (error != 0)
 		return (error);
 	error = exec_copyin_args(&eargs, NULL, UIO_SYSSPACE,
-	    __USER_CAP_UNBOUND(uap->argv), __USER_CAP_UNBOUND(uap->envv));
+	    USER_PTR_UNBOUND(uap->argv), USER_PTR_UNBOUND(uap->envv));
 	if (error == 0)
-		error = kern_execve(td, &eargs, __USER_CAP_OBJ(uap->mac_p),
+		error = kern_execve(td, &eargs, USER_PTR_OBJ(uap->mac_p),
 		    oldvmspace);
 
 	post_execve(td, error, oldvmspace);

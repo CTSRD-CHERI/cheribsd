@@ -389,7 +389,6 @@ typedef int (__sys_renameat_t)(int, const char * __kerncap, int, const char * __
 typedef int (__sys_symlinkat_t)(const char * __kerncap, int, const char * __kerncap);
 typedef int (__sys_unlinkat_t)(int, const char * __kerncap, int);
 typedef int (__sys_posix_openpt_t)(int);
-typedef int (__sys_gssd_syscall_t)(const char * __kerncap);
 typedef int (__sys_jail_get_t)(struct iovec * __kerncap, unsigned int, int);
 typedef int (__sys_jail_set_t)(struct iovec * __kerncap, unsigned int, int);
 typedef int (__sys_jail_remove_t)(int);
@@ -455,7 +454,7 @@ typedef int (__sys_shm_rename_t)(const char * __kerncap, const char * __kerncap,
 typedef int (__sys_sigfastblock_t)(int, void * __kerncap);
 typedef int (__sys___realpathat_t)(int, const char * __kerncap, char * __kerncap, size_t, int);
 typedef int (__sys_close_range_t)(u_int, u_int, int);
-typedef int (__sys_rpctls_syscall_t)(int, const char * __kerncap);
+typedef int (__sys_rpctls_syscall_t)(uint64_t);
 typedef int (__sys___specialfd_t)(int, const void * __kerncap, size_t);
 typedef int (__sys_aio_writev_t)(struct aiocb * __kerncap);
 typedef int (__sys_aio_readv_t)(struct aiocb * __kerncap);
@@ -795,7 +794,6 @@ int __sys_renameat(int oldfd, const char * __kerncap old, int newfd, const char 
 int __sys_symlinkat(const char * __kerncap path1, int fd, const char * __kerncap path2);
 int __sys_unlinkat(int fd, const char * __kerncap path, int flag);
 int __sys_posix_openpt(int flags);
-int __sys_gssd_syscall(const char * __kerncap path);
 int __sys_jail_get(struct iovec * __kerncap iovp, unsigned int iovcnt, int flags);
 int __sys_jail_set(struct iovec * __kerncap iovp, unsigned int iovcnt, int flags);
 int __sys_jail_remove(int jid);
@@ -861,7 +859,7 @@ int __sys_shm_rename(const char * __kerncap path_from, const char * __kerncap pa
 int __sys_sigfastblock(int cmd, void * __kerncap ptr);
 int __sys___realpathat(int fd, const char * __kerncap path, char * __kerncap buf, size_t size, int flags);
 int __sys_close_range(u_int lowfd, u_int highfd, int flags);
-int __sys_rpctls_syscall(int op, const char * __kerncap path);
+int __sys_rpctls_syscall(uint64_t socookie);
 int __sys___specialfd(int type, const void * __kerncap req, size_t len);
 int __sys_aio_writev(struct aiocb * __kerncap aiocbp);
 int __sys_aio_readv(struct aiocb * __kerncap aiocbp);

@@ -248,7 +248,7 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 		if (SV_PROC_FLAG(td->td_proc, SV_UNBOUND_PCC))
-			tf->tf_elr = cheri_setaddress(tf->tf_elr,
+			tf->tf_elr = cheri_address_set(tf->tf_elr,
 			    (__cheri_addr ptraddr_t)entry);
 		else
 			trapframe_set_elr(tf, (uintcap_t)entry);
@@ -339,6 +339,14 @@ cpu_fork_kthread_handler(struct thread *td, void (*func)(void *), void *arg)
 
 	td->td_pcb->pcb_x[PCB_X19] = (uintptr_t)func;
 	td->td_pcb->pcb_x[PCB_X20] = (uintptr_t)arg;
+}
+
+void
+cpu_update_pcb(struct thread *td)
+{
+	MPASS(td == curthread);
+	td->td_pcb->pcb_tpidr_el0 = READ_SPECIALREG(tpidr_el0);
+	td->td_pcb->pcb_tpidrro_el0 = READ_SPECIALREG(tpidrro_el0);
 }
 
 void

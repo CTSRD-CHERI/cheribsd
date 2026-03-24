@@ -378,7 +378,7 @@ pagecopy_cleartags(void *s, void *d)
 	dst = d;
 	src = s;
 	for (i = 0; i < PAGE_SIZE / sizeof(*dst); i++)
-		*dst++ = cheri_cleartag(*src++);
+		*dst++ = cheri_tag_clear(*src++);
 #else
 	pagecopy(s, d);
 #endif
@@ -595,7 +595,7 @@ pmap_early_alloc_tables(vm_paddr_t *freemempos, int npages)
 	pt_entry_t *pt;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	pt = cheri_setbounds(cheri_setaddress(kernel_root_cap, *freemempos),
+	pt = cheri_bounds_set(cheri_address_set(kernel_root_cap, *freemempos),
 	    npages * PAGE_SIZE);
 #else
 	pt = (pt_entry_t *)*freemempos;
@@ -643,11 +643,11 @@ pmap_bootstrap_dmap(pd_entry_t *l1, vm_paddr_t freemempos)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Initialize this now so that PHYS_TO_DMAP works below. */
-	dmap_capability = cheri_setaddress(kernel_root_cap,
+	dmap_capability = cheri_address_set(kernel_root_cap,
 	    DMAP_MIN_ADDRESS);
-	dmap_capability = cheri_setbounds(dmap_capability,
+	dmap_capability = cheri_bounds_set(dmap_capability,
 	    dmap_phys_max - dmap_phys_base);
-	dmap_capability = cheri_andperm(dmap_capability,
+	dmap_capability = cheri_perms_and(dmap_capability,
 	    CHERI_PERMS_KERNEL_DATA);
 #endif
 
@@ -954,16 +954,16 @@ pmap_bootstrap(vm_paddr_t kernstart, vm_size_t kernlen)
 	 * Therefore generate one such capability. Incrementing freeva will bump
 	 * up the cursor, but not the bounds.
 	 */
-	kmemcap = cheri_setaddress(kernel_root_cap, VM_MIN_KERNEL_ADDRESS);
-	kmemcap = cheri_setbounds(kmemcap, VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS);
-	freeva = (vm_pointer_t)cheri_setaddress(kmemcap, freeva);
+	kmemcap = cheri_address_set(kernel_root_cap, VM_MIN_KERNEL_ADDRESS);
+	kmemcap = cheri_bounds_set(kmemcap, VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS);
+	freeva = (vm_pointer_t)cheri_address_set(kmemcap, freeva);
 
 #define reserve_space(var, pa, size)					\
 	do {								\
-		var = cheri_setbounds(freeva, size);			\
+		var = cheri_bounds_set(freeva, size);			\
 		pa = freemempos;					\
-		freeva += cheri_getlen(var);				\
-		freemempos += cheri_getlen(var);			\
+		freeva += cheri_length_get(var);				\
+		freemempos += cheri_length_get(var);			\
 	} while (0)
 #else
 #define reserve_space(var, pa, size)					\
@@ -1003,7 +1003,7 @@ pmap_bootstrap(vm_paddr_t kernstart, vm_size_t kernlen)
 
 	/* Mark the bounds of our available virtual address space */
 	kernel_vm_end = virtual_avail = freeva;
-	virtual_end = cheri_kern_setaddress(virtual_avail, DEVMAP_MIN_VADDR);
+	virtual_end = cheri_kern_address_set(virtual_avail, DEVMAP_MIN_VADDR);
 
 	/* Exclude the reserved physical memory from allocations. */
 	physmem_exclude_region(kernstart, freemempos - kernstart,
@@ -1216,13 +1216,12 @@ pmap_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 			use = false;
 #if __has_feature(capabilities)
 #if defined(__riscv_xcheri)
-		if ((prot & VM_PROT_READ_CAP) != 0 && (l3 & PTE_CR) == 0)
+		if (VM_PROT_HAS_READ_CAP(prot) && (l3 & PTE_CR) == 0)
 			use = false;
-		if ((prot & VM_PROT_WRITE_CAP) != 0 && (l3 & PTE_CW) == 0)
+		if (VM_PROT_HAS_WRITE_CAP(prot) && (l3 & PTE_CW) == 0)
 			use = false;
 #elif defined(__riscv_zcheripurecap)
-		if ((prot & (VM_PROT_READ_CAP | VM_PROT_WRITE_CAP)) != 0 &&
-		    (l3 & PTE_CW) == 0)
+		if ((prot & VM_PROT_CAP) != 0 && (l3 & PTE_CW) == 0)
 			use = false;
 #endif
 #endif
@@ -1381,9 +1380,10 @@ pmap_map(vm_pointer_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 	vm_pointer_t p;
 
 	p = PHYS_TO_DMAP(start);
-	p = cheri_kern_setbounds(p, end - start);
-	p = cheri_kern_andperm(p, vm_map_prot2perms(prot) |
-	    ~CHERI_PROT2PERM_MASK);
+#ifdef __CHERI_PURE_CAPABILITY__
+	p = cheri_bounds_set(p, end - start);
+	p = cheri_perms_and(p, vm_prot2perms(cheri_perms_get(p), prot));
+#endif
 
 	return (p);
 }
@@ -2949,20 +2949,20 @@ pmap_fault(pmap_t pmap, vm_offset_t va, vm_prot_t ftype)
 	if ((pmap != kernel_pmap && (oldpte & PTE_U) == 0) ||
 	    ((ftype & VM_PROT_WRITE) != 0 && (oldpte & PTE_W) == 0) ||
 #if __has_feature(capabilities)
-	    ((ftype & VM_PROT_WRITE_CAP) != 0 && (oldpte & PTE_CW) == 0) ||
+	    (VM_PROT_HAS_WRITE_CAP(ftype) && (oldpte & PTE_CW) == 0) ||
 #endif
 	    (ftype == VM_PROT_EXECUTE && (oldpte & PTE_X) == 0) ||
 	    (ftype == VM_PROT_READ && (oldpte & PTE_R) == 0))
 		goto done;
 
 	bits = PTE_A;
-	if ((ftype & VM_PROT_WRITE) != 0)
+	if ((ftype & VM_PROT_WRITE) != 0) {
 		bits |= PTE_D;
-
 #if __has_feature(capabilities) && defined(__riscv_xcheri)
-	if ((ftype & VM_PROT_WRITE_CAP) != 0)
-		bits |= PTE_CD;
+		if ((ftype & VM_PROT_CAP) != 0)
+			bits |= PTE_CD;
 #endif
+	}
 
 	/*
 	 * Spurious faults can occur if the implementation caches invalid
@@ -3307,8 +3307,7 @@ cheri_pte_cr(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 	 * the moment, just leave it be, but this merits more investigation.
 	 * See also pmap_caploadgen_test_all_clean.
 	 */
-
-	if (prot & VM_PROT_READ_CAP) {
+	if (VM_PROT_HAS_READ_CAP(prot)) {
 #ifdef CHERI_CAPREVOKE
 		if (va < VM_MAX_USER_ADDRESS) {
 			/* User pages' tags gated by CLG */
@@ -3363,22 +3362,26 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	new_l3 = PTE_V | PTE_R | PTE_A;
 	if (prot & VM_PROT_EXECUTE)
 		new_l3 |= PTE_X;
-	if (flags & VM_PROT_WRITE)
+	if (flags & VM_PROT_WRITE) {
 		new_l3 |= PTE_D;
-	if (prot & VM_PROT_WRITE)
+#if __has_feature(capabilities) && defined(__riscv_xcheri)
+		if (flags & VM_PROT_CAP)
+			new_l3 |= PTE_CD;
+#endif
+	}
+	if (prot & VM_PROT_WRITE) {
 		new_l3 |= PTE_W;
+#if __has_feature(capabilities)
+		if (prot & VM_PROT_CAP)
+			new_l3 |= PTE_CW;
+#endif
+	}
 	if (va < VM_MAX_USER_ADDRESS)
 		new_l3 |= PTE_U;
 #if __has_feature(capabilities)
-	if (prot & VM_PROT_WRITE_CAP)
-		new_l3 |= PTE_CW;
 #ifdef __riscv_zcheripurecap
-	if (prot & VM_PROT_READ_CAP)
+	if (VM_PROT_HAS_READ_CAP(prot))
 		new_l3 |= PTE_CW;
-#endif
-#ifdef __riscv_xcheri
-	if (flags & VM_PROT_WRITE_CAP)
-		new_l3 |= PTE_CD;
 #endif
 	new_l3 |= cheri_pte_cr(pmap, va, m, prot);
 #endif
@@ -3394,13 +3397,17 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	 * to do the dirty bit accounting for these mappings.
 	 */
 	if ((m->oflags & VPO_UNMANAGED) != 0) {
-		if (prot & VM_PROT_WRITE)
+		if (prot & VM_PROT_WRITE) {
 			new_l3 |= PTE_D;
 #if __has_feature(capabilities) && defined(__riscv_xcheri)
-		// XXX-AM: Is this redundant? PTE_CD is set unconditionally above.
-		if (prot & VM_PROT_WRITE_CAP)
-			new_l3 |= PTE_CD;
+			/*
+			 * XXX-AM: Is this redundant? PTE_CD is set
+			 * unconditionally above.
+			 */
+			if (prot & VM_PROT_CAP)
+				new_l3 |= PTE_CD;
 #endif
+		}
 	} else
 		new_l3 |= PTE_SW_MANAGED;
 
@@ -5075,7 +5082,7 @@ pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 		}
 #if __has_feature(capabilities)
 		if (clear_tags)
-			bcopynocap(a_cp, b_cp, cnt);
+			bcopy_data(a_cp, b_cp, cnt);
 		else
 #endif
 			bcopy(a_cp, b_cp, cnt);
@@ -5896,7 +5903,7 @@ void *
 pmap_mapbios(vm_paddr_t pa, vm_size_t size)
 {
 
-        return (cheri_kern_setbounds((void *)PHYS_TO_DMAP(pa), size));
+        return (cheri_kern_bounds_set((void *)PHYS_TO_DMAP(pa), size));
 }
 
 void

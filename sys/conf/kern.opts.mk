@@ -32,7 +32,6 @@ __DEFAULT_YES_OPTIONS = \
     BLUETOOTH \
     CCD \
     CDDL \
-    CHERI_CODEPTR_RELOCS \
     CRYPT \
     CUSE \
     DTRACE \
