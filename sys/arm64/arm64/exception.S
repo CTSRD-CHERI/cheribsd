@@ -256,35 +256,6 @@
 2:
 .endm
 
-#ifdef CHERI_CAPREVOKE_KERNEL
-/*
- * Handle kernel CLG faults.
- * Note that kernel CLG faults are special. We can't load from anywhere
- * but the direct map to perform the fault scan.
- *
- * XXX-AM: This should probably be done in assembly to prevent stray loads from
- * occurring.
- */
-ENTRY(do_kmem_fault_revoke)
-	/* Grab the pcpu revoke root */
-	mrs	c19, ctpidr_el1
-	ldr	c20, [c19, #KMEM_REVOKE_PCPU_ROOT_DMAP]
-	/* PTE walk to the page */
-
-	/*
-	 * Page scan loop. Superpage demotion is complicated here and
-	 * we need more support for this. We may have to pay the price
-	 * to scan the whole superpage.
-	 * XXX-AM: I think this may be a problem for the large L2 mappings
-	 * used the initial kernel image.
-	 */
-
-	/* Update PTE */
-
-	ret
-END(do_kmem_fault_revoke)
-#endif
-
 #ifdef KMSAN
 /*
  * The KMSAN runtime relies on a TLS block to track initialization and origin
@@ -322,22 +293,19 @@ ENTRY(handle_el1h_sync)
 	mrs	x13, far_el1
 	ldr	x14, =VM_MAX_USER_ADDRESS
 	cmp	x13, x14
-	b.le	1f
 	mrs	x13, esr_el1
-	ldr	x14, =ESR_ELx_EC_MASK
+	ldr	x14, =(ESR_ELx_EC_MASK | ISS_DATA_WnR | ISS_DATA_DFSC_MASK)
 	and	x13, x13, x14
-	lsr	x13, x13, #ESR_ELx_EC_SHIFT
-	ldr	x14, =EXCP_DATA_ABORT
-	cmp	x13, x14
+	ldr	x14, =((EXCP_DATA_ABORT << ESR_ELx_EC_SHIFT) | ISS_DATA_DFSC_LC_SC)
+	ccmp	x13, x14, #0, hi
+	mrs	c0, ctpidr_el1
+	ldr	c1, [c0, #KMEM_REVOKE_PCPU_STACK]
+	mov	c2, csp
+	csel	c1, c1, c2, eq
+	mov	csp, c1
 	b.ne	1f
-	mrs	x13, esr_el1
-	ldr	x14, =ISS_DATA_DFSC_MASK
-	and	x13, x13, x14
-	ldr	x14, =ISS_DATA_DFSC_LC_SC
-	cmp	x13, x14
-	b.ne	1f
-	bl do_kmem_fault_revoke
-	b	2f
+	bl	do_kmem_fault_revoke
+	b 2f
 1:
 #endif
 	KMSAN_ENTER

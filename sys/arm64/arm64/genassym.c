@@ -63,6 +63,7 @@ ASSYM(PC_CURTHREAD, offsetof(struct pcpu, pc_curthread));
 ASSYM(PC_SSBD, offsetof(struct pcpu, pc_ssbd));
 #ifdef CHERI_CAPREVOKE_KERNEL
 ASSYM(PC_KMEM_REVOKE_STATE, offsetof(struct pcpu, pc_kmem_revoke_state));
+ASSYM(KMEM_REVOKE_PCPU_STACK, offsetof(struct kmem_revoke_pcpu, clg_fault_kstack));
 #endif
 
 /* Size of pcb, rounded to keep stack alignment */

@@ -56,6 +56,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_param.h>
 #include <vm/vm_cheri_revoke.h>
 
+#ifdef CHERI_CAPREVOKE_KERNEL
+#include <machine/pte.h>
+#endif
+
 /*
  * Revocation test predicates
  */
@@ -528,10 +532,240 @@ kmem_revoke_md_init_pcpu0(struct pcpu *pcpup)
 	pcpu_state->dmap_cap = dmap_base_cap;
 	pcpu_state->dmap_phys_base = dmap_phys_base;
 	pcpu_state->shadow_cap = kernel_shadow_root_cap;
-	pcpu_state->clg_fault_kstack = (void *)PHYS_TO_DMAP_LEN(paddr,
-	    PAGE_SIZE - sizeof(*pcpu_state));
+	pcpu_state->clg_fault_kstack = cheri_setaddress(
+	    (void *)PHYS_TO_DMAP_LEN(paddr, PAGE_SIZE - sizeof(*pcpu_state)),
+	    (ptraddr_t)pcpu_state);
 	pcpup->pc_kmem_revoke_state = pcpu_state;
 
 	return (pcpu_state);
+}
+
+#define PHYS_TO_DMAP_NOGOT(pcpu_state, pa)				\
+	((vm_pointer_t)pcpu_state->dmap_cap +				\
+	    ((pa) - pcpu_state->dmap_phys_base))
+
+static int
+kmem_revoke_md_shadow_probe(const uint8_t *kshadow, uintptr_t cut)
+{
+	uint8_t bmbits;
+	const uint8_t *bmloc;
+
+	ptraddr_t va = cheri_getbase(cut);
+	int perms = cheri_getperm(cut);
+
+	bmloc = kshadow + (va / CHERI_REVOKE_KSHADOW_GRANULE / 8);
+	/*
+	 * May race with painting, but this should not be a problem because we
+	 * will pick it up again in the next epoch.
+	 */
+	bmbits = *bmloc;
+	if (bmbits == 0) {
+		return (0);
+	}
+
+	if (bmbits & (1 << ((va / CHERI_REVOKE_KSHADOW_GRANULE) % 8))) {
+		if (__builtin_expect(perms & CHERI_PERM_SW_VMEM, 0)) {
+			return (0);
+		}
+		return (perms & CHERI_PERMS_HWALL_MEMORY) != 0;
+	}
+	return (0);
+}
+
+/*
+ * Handle kernel CLG faults.
+ * Note: this function runs with some important restrictions:
+ *
+ * 1. Interrupts are disabled
+ * 2. The kernel stack is substituted with a non-CLG faulting stack for this CPU.
+ * there should not be a context switch happening while in this state.
+ * 3. The stack space is limited to < PAGE_SIZE
+ * 4. No capabilities can be loaded from normal kernel memory, this includes
+ * global pointers from the GOT.
+ *
+ * We need to replicate some of the pmap PTE walking logic, because
+ * the pmap functions use the DMAP via the DMAP macros, and those perform
+ * GOT loads.
+ */
+int
+do_kmem_fault_revoke(struct kmem_revoke_pcpu *pcpu_state)
+{
+	pd_entry_t *table;
+	pt_entry_t *pte;
+#ifdef NOTYET
+	uintptr_t *cutp, *endp;
+#endif
+	pd_entry_t tpde;
+	pt_entry_t tpte;
+	uint64_t far;
+	vm_paddr_t paddr;
+	int lvl;
+	int pte_clg;
+	int sclg;
+
+	far = READ_SPECIALREG(far_el1);
+	if (!ADDR_IS_KERNEL(far)) {
+		panic("Invalid kernel revoke fault");
+	}
+
+	/* Moral equivalent of caploadgen_update() */
+	/* XXX-AM: Do I need to lock the kernel_pmap? */
+	/* XXX-AM: Do I need to wire the page? */
+
+	/*
+	 * XXX-AM: We could load the global kernel pmap pointer
+	 * from the GOT via the DMAP.
+	 * This can rely on the fact that the .text section is
+	 * contiguous in DMAP as well.
+	 * However this is fairly involved because we need to
+	 * fetch the GOT va, kextract the GOT PA and tranlsate
+	 * that to a pointer into the DMAP.
+	 *
+	 * Instead of using pmap, we grab ttbr1_el1 and perform the
+	 * PT walk manually.
+	 */
+	paddr = READ_SPECIALREG(ttbr1_el1) & TTBR_BADDR;
+#if PAGE_SIZE == PAGE_SIZE_4K
+	paddr = paddr << (PAGE_SHIFT_4K - 1);
+#elif PAGE_SIZE == PAGE_SIZE_16K
+	paddr = paddr << (PAGE_SHIFT_16K - 1);
+#else
+#error "Unsupported page size"
+#endif
+	table = (pd_entry_t *)PHYS_TO_DMAP_NOGOT(pcpu_state, paddr);
+	tpde = table[pmap_l0_index(far)];
+	if ((tpde & ATTR_DESCR_MASK) != L0_TABLE) {
+		panic("Invalid L0 PTE");
+	}
+
+	table = (pd_entry_t *)PHYS_TO_DMAP_NOGOT(pcpu_state, PTE_TO_PHYS(tpde));
+	tpde = table[pmap_l1_index(far)];
+	if ((tpde & ATTR_DESCR_MASK) != L1_TABLE) {
+		panic("Invalid L1 PTE");
+	}
+
+	table = (pd_entry_t *)PHYS_TO_DMAP_NOGOT(pcpu_state, PTE_TO_PHYS(tpde));
+	tpde = table[pmap_l2_index(far)];
+	if ((tpde & ATTR_DESCR_MASK) != L2_TABLE) {
+		lvl = 2;
+		paddr = PTE_TO_PHYS(tpde);
+		pte = &table[pmap_l2_index(far)];
+		tpte = tpde;
+	} else {
+		pte = (pt_entry_t *)PHYS_TO_DMAP_NOGOT(pcpu_state,
+		    PTE_TO_PHYS(tpde));
+		pte = &pte[pmap_l3_index(far)];
+		tpte = *pte;
+		if ((tpte & ATTR_DESCR_MASK) != L3_PAGE) {
+			    panic("Invalid L3 PTE");
+		}
+		if ((tpte & ATTR_CONTIGUOUS) != 0) {
+			lvl = 1;
+		} else {
+			lvl = 0;
+		}
+		paddr = PTE_TO_PHYS(tpte);
+	}
+
+	/* Check PTE bits before sweeping unnecessarily */
+	switch (tpte & ATTR_LC_MASK) {
+	case ATTR_LC_DISABLED:
+	case ATTR_LC_ENABLED:
+		/*
+		 * Always ok or always disable, defer to the general
+		 * fault handler.
+		 * XXX-AM: Horribly reuse pmap caploadgen return codes.
+		 */
+		return PMAP_CAPLOADGEN_UNABLE;
+	case ATTR_LC_GEN0:
+	case ATTR_LC_GEN1:
+		break;
+	}
+
+	/* Could read this from kernel_pmap, but must bypass the GOT */
+	sclg = (READ_SPECIALREG(cctlr_el1) & CCTLR_EL1_TGEN1_MASK) != 0;
+	pte_clg = (tpte & ATTR_LC_GEN_MASK) != 0;
+	if (pte_clg == sclg) {
+		/*
+		 * Keep this fence for consistency with pmap_caploadgen_update
+		 * XXX-AM: It is unclear to me why we fence here.
+		 */
+		__asm __volatile("tlbi vaale1is, %0" : : "r" (far));
+		return PMAP_CAPLOADGEN_ALREADY;
+	}
+
+#ifdef NOTYET
+	/*
+	 * Do the actual sweep.
+	 * XXX-AM: Duplicates logic in vm_do_cheri_revoke. Ideally we could
+	 * converge it but we don't want to use the kernel_pmap or
+	 * PHYS_TO_DMAP, both of which cause GOT accesses.
+	 */
+	cutp = (uintptr_t *)PHYS_TO_DMAP_NOGOT(pcpu_state, paddr);
+	cutp = cheri_setboundsexact(cutp, pagesizes[lvl]);
+	endp = cutp + pagesizes[lvl] / sizeof(uintptr_t);
+	/* dirty = false; */
+	for (; cutp < endp; cutp++) {
+		uintptr_t cut = *cutp;
+		void *cscratch;
+		int perms = cheri_getperm(cut);
+		int stxr_status = 1;
+		/*
+		 * Technically checking the address is not enough, because
+		 * a kernel capability may have its address out of bounds.
+		 * XXX-AM: In practice I don't think this matters because
+		 * we can't paint the shadow bitmap below MIN_KERNEL_ADDR
+		 * so we can't revoke user-spanning capabilities with this.
+		 */
+		if (!ADDR_IS_KERNEL(cut) || !cheri_gettag(cut) || perms == 0) {
+			// XXX log stats: found already revoked cap
+			continue;
+		}
+
+		/* Check the shadow bitmap and revoke */
+		if (kmem_revoke_md_shadow_probe(pcpu_state->shadow_cap, cut)) {
+			uintptr_t cutr = cheri_revoke_cap(cut);
+
+			__asm__ __volatile__ (
+				"0: ldxr %[cscratch], [%[cutp]]\n\t"
+				"cmp %[cscratch], %[cut]\n\t"
+				"bne 1f\n\t"
+				"stxr %w[stxr_status], %[cutr], [%[cutp]]\n\t"
+				"cbnz %w[stxr_status], 0b\n\t"
+				"1:\n\t"
+				: [stxr_status] "+&r" (stxr_status),
+				  [cscratch] "=&C" (cscratch), [cutr] "+C" (cutr)
+				: [cut] "C" (cut), [cutp] "C" (cutp)
+				: "memory");
+
+			/* stxr returns 0 on success */
+			if (__predict_true(stxr_status == 0)) {
+				// XXX log stats: caps_cleared
+				/* CHERI_REVOKE_STATS_BUMP(crst, caps_cleared); */
+			} else if (!cheri_gettag(cscratch) ||
+			    cheri_revoke_is_revoked(cscratch)) {
+				/* Data or revoked cap, nothing to do */
+			} else {
+				/* Unexpected capability at cutp */
+				/* dirty = true; */
+			}
+		} else {
+			/* dirty = true; */
+		}
+	}
+#else
+	(void)lvl;
+#endif
+
+	/* Moral equivalent of caploadgen_update() without idling logic */
+	/* Again, ignore all the locks... */
+	if (sclg) {
+		atomic_set_64(pte, ATTR_LC_GEN_MASK);
+	} else {
+		atomic_clear_64(pte, ATTR_LC_GEN_MASK);
+	}
+	__asm __volatile("tlbi vaale1is, %0" : : "r" (far));
+
+	return (PMAP_CAPLOADGEN_OK);
 }
 #endif

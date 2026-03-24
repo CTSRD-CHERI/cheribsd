@@ -49,6 +49,7 @@ struct kmem_revoke_pcpu {
 struct kmem_revoke_pcpu *kmem_revoke_md_init_pcpu0(struct pcpu *pcpup);
 struct kmem_revoke_pcpu *kmem_revoke_md_alloc_pcpu(int domain,
     struct pcpu *pcpup);
+int do_kmem_fault_revoke(struct kmem_revoke_pcpu *pcpu_state);
 #endif /* CHERI_CAPREVOKE_KERNEL */
 #endif /* _KERNEL */
 
