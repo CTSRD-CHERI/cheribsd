@@ -139,6 +139,7 @@ SUBDIR=	\
 	${_hptmv} \
 	${_hptnr} \
 	${_hptrr} \
+	hwc \
 	hwpmc \
 	${_hyperv} \
 	i2c \
@@ -315,6 +316,7 @@ SUBDIR=	\
 	${_pfsync} \
 	plip \
 	${_pms} \
+	pmu \
 	ppbus \
 	ppc \
 	ppi \
