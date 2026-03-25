@@ -20,4 +20,3 @@ device		xlnx_pcib
 
 options 	ROOTDEVNAME=\"ufs:/dev/nda0p2\"
 nooptions	NFS_ROOT
-device		hwc

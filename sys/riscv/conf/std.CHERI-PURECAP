@@ -5,5 +5,3 @@ machine		riscv	riscv64c
 makeoptions	CHERI_SUBOBJECT_BOUNDS=subobject-safe
 
 options 	CHERI_PURECAP_KERNEL
-
-device		hwc
