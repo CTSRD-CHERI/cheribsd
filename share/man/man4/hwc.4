@@ -1,0 +1,85 @@
+.\"
+.\" Copyright (c) 2026 Ruslan Bukin <br@bsdpad.com>
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.Dd July 12, 2025
+.Dt HWC 4
+.Os
+.Sh NAME
+.Nm hwc
+.Nd Hardware Counting Framework
+.Sh SYNOPSIS
+.Cd "device hwc"
+.Pp
+At least one of:
+.Cd "device pmu"
+.Pq riscv
+.Pp
+In
+.Xr rc.conf 5 :
+.Cd kld_list="hwc"
+.Sh DESCRIPTION
+The
+.Nm
+framework provides infrastructure for hardware counters.
+.Sh HARDWARE
+The framework supports counters found in
+.Cd riscv
+systems:
+.Pp
+.Bl -bullet -compact
+.It
+RISC-V PMU
+.El
+.Pp
+The
+.Nm
+framework supports one modes of operation:
+.Bl -tag -width "Thread mode"
+.It Em Thread mode
+Count events occuried during process runtime in user mode.
+.El
+.Sh MANAGEMENT
+When loaded into kernel, the
+.Nm
+framework provides
+.Pa /dev/hwc
+character device.
+The only
+.Xr ioctl 2
+request it accepts is
+.Dv HWC_IOC_ALLOC .
+This request allocates kernel counting context (CTX) based on requested mode of
+operation and pid.
+.Pp
+Upon successful CTX allocation, the ioctl returns a CTX identification
+number (ident).
+.Pp
+Each CTX is then managed using its own dedicated character device found at
+.Pa "/dev/hwc_${ident}_${pid}",
+where ident is a unique identification number of counting context, pid is
+process pid.
+.Sh HOOKS
+The framework is hook-less.
+.Sh IOCTL INTERFACE
+Once a CTX is allocated, its management character device accepts several
+.Xr ioctl 2
+requests:
+.Bl -tag -width "HWC_IOC_RECORD_GET"
+.It Dv HWC_IOC_START
+Start counting.
+.It Dv HWC_IOC_STOP
+Stop counting.
+.It Dv HWC_IOC_CONFIGURE
+Configure the counting backend.
+.El
+.Sh SEE ALSO
+.Xr hwc 8
+.Sh HISTORY
+The
+.Nm
+framework first appeared in
+.Fx 16.0 .
+.Sh AUTHORS
+.An Ruslan Bukin Aq Mt br@FreeBSD.org

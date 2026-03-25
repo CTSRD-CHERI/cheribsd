@@ -1,5 +1,5 @@
 PROG_CXX=	hwc
-MAN=
+MAN=		hwc.8
 
 CFLAGS+= -I${SRCTOP}/contrib/libucl/include
 CFLAGS+= -I${SRCTOP}/sys

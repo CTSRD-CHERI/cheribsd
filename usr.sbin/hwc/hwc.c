@@ -111,6 +111,7 @@ hwc_ctx_alloc(struct hwc_context *tc)
 
 	al.pid = tc->pid;
 	al.backend_name = tc->backend->name;
+	al.backend_name_len = strlen((__cheri_fromcap const char *)tc->backend->name);
 	al.ident = &tc->ident;
 
 	error = ioctl(tc->fd, HWC_IOC_ALLOC, &al);
@@ -159,7 +160,8 @@ usage(void)
 
 	errx(EX_USAGE,
 		"hwc [-c devname] [path to executable]\n"
-		"\t -c\tname\t\tName of tracing device, e.g. 'coresight'.\n"
+		"\t -c\tname\t\tName of counting backend, e.g. 'pmu' "
+		    " for RISC-V PMU.\n"
 		"\t -f\tconfig-file\tHW counters configuration file.\n"
 		"\t -h\tHelp."
         );
@@ -312,8 +314,8 @@ main(int argc, char **argv, char **env)
 			backend_name = strdup(optarg);
 			found = 0;
 			for (i = 0; backends[i].name != NULL; i++) {
-				if (strcmp(backends[i].name, backend_name) ==
-				    0) {
+				if (strcmp((__cheri_fromcap const char *)
+				    backends[i].name, backend_name) == 0) {
 					tc->backend = &backends[i];
 					found = 1;
 					break;
