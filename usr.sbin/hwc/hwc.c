@@ -159,7 +159,8 @@ usage(void)
 
 	errx(EX_USAGE,
 		"hwc [-c devname] [path to executable]\n"
-		"\t -c\tname\t\tName of tracing device, e.g. 'coresight'.\n"
+		"\t -c\tname\t\tName of counting backend, e.g. 'pmu' "
+		    " for RISC-V PMU.\n"
 		"\t -f\tconfig-file\tHW counters configuration file.\n"
 		"\t -h\tHelp."
         );
