@@ -677,6 +677,16 @@ fast_out:
 		 * increment the GCLG after a (kernel) thread has
 		 * faulted but before it has installed a PTE for the new
 		 * mapping.
+		 *
+		 * XXXJC: pmap_caploadgen_next should be updating all the CPUs
+		 * for the given pmap, not deferring it to a later call to
+		 * pmap_activate on each CPU. Note that kernel AIO-like worker
+		 * threads may be running and get out of sync otherwise. The
+		 * async revoker itself won't be performing a revocation pass
+		 * given the condition here, but if we can queue up the same
+		 * vmspace quickly enough then it won't switch away, and
+		 * vmspace_switch_aio's fast path would expect to not need to
+		 * call pmap_activate.
 		 */
 		vm_map_lock(&vm->vm_map);
 		pmap_caploadgen_next(vmm->pmap);
