@@ -585,8 +585,13 @@ vmspace_switch_aio(struct vmspace *newvm)
 	    ("vmspace_switch_aio: newvm unreferenced"));
 
 	oldvm = curproc->p_vmspace;
-	if (oldvm == newvm)
+	if (oldvm == newvm) {
+#ifdef CHERI_CAPREVOKE
+		/* XXX: See pmap_activate call in kern_cheri_revoke */
+		pmap_activate(curthread);
+#endif
 		return;
+	}
 
 	/*
 	 * Point to the new address space and refer to it.
