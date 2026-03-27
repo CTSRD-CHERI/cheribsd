@@ -97,7 +97,7 @@ WERROR?=	-Werror
 # default over to -fno-common, making this redundant.
 CFLAGS+=	-fno-common
 .if defined(CHERI_COMPARTMENT_POLICY)
-CFLAGS+=	-ffunction-sections
+CFLAGS+=	-fdata-sections -ffunction-sections
 .endif
 
 # XXX LOCORE means "don't declare C stuff" not "for locore.s".

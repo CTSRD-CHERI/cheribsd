@@ -152,7 +152,7 @@ CFLAGS.gcc+= --param large-function-growth=1000
 # (e.g. ports).
 CFLAGS+=	-fno-common
 .if defined(CHERI_COMPARTMENT_POLICY)
-CFLAGS+=	-ffunction-sections
+CFLAGS+=	-fdata-sections -ffunction-sections
 .endif
 
 .if ${LINKER_TYPE} != "lld" || ${LINKER_VERSION} < 140000
