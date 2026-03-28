@@ -36,7 +36,7 @@
  * That pointer references the vm_page that is "mapped" by the sf_buf.  The
  * actual mapping is provided by the direct virtual-to-physical mapping.
  */
-static inline vm_offset_t
+static inline vm_pointer_t
 sf_buf_kva(struct sf_buf *sf)
 {
 
