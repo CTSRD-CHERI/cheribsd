@@ -60,7 +60,10 @@ kmap(vm_page_t page)
 #ifdef DRMCOMPAT_HAVE_DMAP
 	vm_pointer_t daddr;
 
-	daddr = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page));
+	daddr = PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(page));
+#ifdef __CHERI_PURE_CAPABILITY__
+	daddr = cheri_perms_clear(daddr, CHERI_PERM_CAP);
+#endif
 
 	return ((void *)daddr);
 #else
