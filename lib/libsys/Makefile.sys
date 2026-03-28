@@ -31,7 +31,7 @@
 .include "${LIBSYS_SRCTOP}/x86/Makefile.sys"
 .endif
 
-SRCS+= clock_gettime.c gettimeofday.c __vdso_gettimeofday.c msetname.c
+SRCS+= clock_gettime.c gettimeofday.c __vdso_gettimeofday.c
 
 # Sources common to both syscall interfaces:
 SRCS+=	\
@@ -57,7 +57,6 @@ PSEUDO= \
 	exit \
 	getlogin \
 	gettimeofday \
-	msetname \
 	sched_getcpu
 
 INTERPOSED = \
@@ -72,6 +71,7 @@ INTERPOSED = \
 	fsync \
 	fork \
 	kevent \
+	msetname \
 	msync \
 	nanosleep \
 	open \

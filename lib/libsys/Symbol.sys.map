@@ -385,7 +385,6 @@ FBSD_1.8 {
 	fchroot;
 	getrlimitusage;
 	kcmp;
-	msetname;
 	setcred;
 };
 

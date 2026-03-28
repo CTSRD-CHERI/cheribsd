@@ -60,7 +60,7 @@ CFLAGS.memset.c+=-I${LIBC_SRCTOP}/include
 
 # Also use all the syscall .o files from libsys_pic (libsys is always NO_SSP):
 _libsys_other_objects= fstat fstatat fstatfs syscall \
-    cerror geteuid getegid sigfastblock munmap mprotect msetname _msetname \
+    cerror geteuid getegid sigfastblock munmap mprotect _msetname \
     sysarch __sysctl issetugid __getcwd utrace getpid \
     thr_self thr_kill pread lseek _exit \
     getdirentries _close _fcntl _open _openat _read \
@@ -74,7 +74,7 @@ _libsys_other_objects+=mmap
 .endif
 
 # A few other bits from libc_nossp_pic:
-_libc_other_objects= sigsetjmp lstat stat _setjmp setjmp setjmperr
+_libc_other_objects= sigsetjmp lstat stat _setjmp setjmp setjmperr msetname
 
 # Finally add additional architecture-dependent libc and libsys dependencies
 .if ${LIBC_ARCH} == "arm"

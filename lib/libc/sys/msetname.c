@@ -17,12 +17,10 @@
 #include <errno.h>
 #include "libc_private.h"
 
-int __msetname(void *addr, size_t len, const char *name);
-
-__weak_reference(__msetname, msetname);
+__weak_reference(__sys_msetname, __msetname);
 
 int
-__msetname(void *addr, size_t len, const char *name)
+msetname(void *addr, size_t len, const char *name)
 {
 	int error;
 
