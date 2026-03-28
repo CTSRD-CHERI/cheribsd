@@ -62,6 +62,8 @@
 #define	CHERI_PERM_EXECUTE			(1 << 15)	/* 0x00008000 */
 #define	CHERI_PERM_STORE			(1 << 16)	/* 0x00010000 */
 #define	CHERI_PERM_LOAD				(1 << 17)	/* 0x00020000 */
+
+#define	CHERI_PERM_CAP	(CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP)
 #else
 /*
  * These should be defined in cheriintrin.h, but aren't yet.

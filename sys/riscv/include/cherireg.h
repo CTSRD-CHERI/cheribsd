@@ -65,6 +65,8 @@
 #define	CHERI_PERM_SYSTEM_REGS			(1 << 10)	/* 0x00000400 */
 #define	CHERI_PERM_SET_CID			(1 << 11)	/* 0x00000800 */
 
+#define	CHERI_PERM_CAP	(CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP)
+
 /* User-defined permission bits. */
 #define	CHERI_PERM_SW0			(1 << 15)	/* 0x00008000 */
 #define	CHERI_PERM_SW1			(1 << 16)	/* 0x00010000 */
