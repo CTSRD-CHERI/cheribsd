@@ -110,7 +110,7 @@
 #define	QUARANTINE_NUMERATOR	1
 #endif
 
-#define PVER_THRESHOLD 512
+#define PVER_THRESHOLD 64
 
 #define	MALLOCX_LG_ALIGN_BITS	6
 #define	MALLOCX_LG_ALIGN_MASK	((1 << MALLOCX_LG_ALIGN_BITS) - 1)
@@ -1578,8 +1578,13 @@ mrs_malloc(size_t size)
 
 #ifdef CLEAR_ON_ALLOC_PVER
 	if(size >= PVER_THRESHOLD){
-		void * allocated_region_raw =  *(void **) allocated_region;
-		int pver = cgetpver( allocated_region_raw);
+		int pver = cgetpver(allocated_region);
+		if(pver ==0){
+			void * allocated_region_raw =  *(void **) allocated_region;
+			pver = cgetpver( allocated_region_raw);
+		}else{
+			fprintf(stderr, "pver not zero\n");
+		}
 		if(pver < 255){
 			csetpver(allocated_region, pver+1);
 		}else{
@@ -1715,8 +1720,12 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 
 #ifdef CLEAR_ON_ALLOC_PVER
 	if(size >= PVER_THRESHOLD){
-		void * allocated_region_raw =  *(void **) *ptr;
-		int pver = cgetpver( allocated_region_raw);
+		int pver = cgetpver(*ptr);
+		if(cgetpver(*ptr) ==0){
+			void * allocated_region_raw =  *(void **) *(void **) *ptr;
+			pver = cgetpver( allocated_region_raw);
+		}
+
 		if(pver < 255){
 			csetpver(*ptr, pver+1);
 		}else{
@@ -1730,21 +1739,6 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 #ifdef CLEAR_ON_ALLOC
 	clear_region(*ptr, cheri_getlen(*ptr));
 #endif /* CLEAR_ON_ALLOC */
-
-#ifdef CLEAR_ON_ALLOC_PVER
-	if(size >= PVER_THRESHOLD){
-		void * allocated_region_raw =  *(void **) *ptr;
-		int pver = cgetpver( allocated_region_raw);
-		if(pver < 255){
-			csetpver(*ptr, pver+1);
-		}else{
-			clear_region(*ptr, cheri_getlen(*ptr));
-			csetpver(*ptr, 1);
-		}
-	}else{
-		clear_region(*ptr, cheri_getlen(*ptr));
-	}
-#endif /* CLEAR_ON_ALLOC_PVER */
 
 #ifdef CLEAR_ON_ALLOC_NWZ
 	int alloc_size = cheri_getlen(*ptr);
@@ -1799,8 +1793,11 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	}
 #ifdef CLEAR_ON_ALLOC_PVER
 	if(size >= PVER_THRESHOLD){
-		void * allocated_region_raw =  *(void **) allocated_region;
-		int pver = cgetpver( allocated_region_raw);
+		int pver = cgetpver(allocated_region);
+		if(cgetpver(allocated_region) ==0){
+			void * allocated_region_raw =  *(void **) allocated_region;
+			pver = cgetpver( allocated_region_raw);
+		}
 		if(pver < 255){
 			csetpver(allocated_region, pver+1);
 		}else{
@@ -1961,6 +1958,9 @@ mrs_free(void *ptr)
 		cpoison(((char *) ins) + i);
 	}
 #endif
+#ifdef CLEAR_ON_ALLOC_PVER
+	csetpver(ins, cgetpver(ptr));
+#endif 
 	mrs_lock(&app_quarantine_lock);
 	quarantine_insert(app_quarantine, ins, cheri_getlen(ins));
 	mrs_unlock(&app_quarantine_lock);
