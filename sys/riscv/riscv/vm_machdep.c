@@ -51,7 +51,6 @@
 #include <machine/cpu.h>
 #include <machine/cpufunc.h>
 #include <machine/pcb.h>
-#include <machine/stack.h>
 #include <machine/frame.h>
 #include <machine/sbi.h>
 
@@ -66,7 +65,7 @@ cpu_set_pcb_frame(struct thread *td)
 {
 #ifdef CHERI_BOUNDED_KSTACK
 	ptraddr_t kstack_top;
-	ptraddr_t kstack_aligned_top;
+	ptraddr_t kstack_align;
 #endif
 
 	td->td_pcb = (struct pcb *)((char *)td->td_kstack +
@@ -87,22 +86,20 @@ cpu_set_pcb_frame(struct thread *td)
 
 #ifdef CHERI_BOUNDED_KSTACK
 	td->td_pcb = cheri_bounds_set_exact(td->td_pcb, sizeof(struct pcb));
-	/*
-	 * The placement is td_frame is more constrained here.
-	 * To ensure precise representability of the saved kernel stack,
-	 * top = td_frame + TF_SIZE + sizeof(struct kernframe) must fall at a
-	 * representable boundary for the region [td_kstack, top).
-	 * This means that we may insert additional padding between td_pcb
-	 * and the end of struct kernframe.
-	 */
-	kstack_top = (ptraddr_t)td->td_frame + TF_SIZE +
-	    sizeof(struct kernframe);
-	kstack_aligned_top = rounddown2(kstack_top,
-	    CHERI_REPRESENTABLE_ALIGNMENT(kstack_top - td->td_kstack));
-	td->td_frame -= kstack_top - kstack_aligned_top;
-	KASSERT(kstack_top - kstack_aligned_top < 64,
-	    ("Too much kernel stack wasted"));
         td->td_frame = cheri_bounds_set_exact(td->td_frame, TF_SIZE);
+
+	/*
+	 * Compute the bounded kernel stack pointer.
+	 * Note that we need to ensure representability and avoid giving
+	 * access to td_frame. This means that there may be a gap between
+	 * td_frame and the the kernel stack.
+	 */
+	kstack_align = CHERI_REPRESENTABLE_ALIGNMENT((ptraddr_t)td->td_frame -
+	    td->td_kstack);
+	kstack_top = rounddown2((ptraddr_t)td->td_frame, kstack_align);
+	td->td_md.md_kstack = (void *)cheri_address_set(
+	    cheri_bounds_set_exact(td->td_kstack, kstack_top - td->td_kstack),
+	    kstack_top);
 #endif
 }
 
@@ -150,8 +147,13 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	/* Set the return value registers for fork() */
 	td2->td_pcb->pcb_s[0] = (uintptr_t)fork_return;
 	td2->td_pcb->pcb_s[1] = (uintptr_t)td2;
+	td2->td_pcb->pcb_s[2] = (uintptr_t)td2->td_frame;
 	td2->td_pcb->pcb_ra = (uintptr_t)fork_trampoline;
-	td2->td_pcb->pcb_sp = kstack_bottom(td2);
+#ifdef CHERI_BOUNDED_KSTACK
+	td2->td_pcb->pcb_sp = (uintptr_t)td2->td_md.md_kstack;
+#else
+	td2->td_pcb->pcb_sp = (uintptr_t)td2->td_frame;
+#endif
 
 	/* Setup to release spin count in fork_exit(). */
 	td2->td_md.md_spinlock_count = 1;
@@ -210,8 +212,13 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 
 	td->td_pcb->pcb_s[0] = (uintptr_t)fork_return;
 	td->td_pcb->pcb_s[1] = (uintptr_t)td;
+	td->td_pcb->pcb_s[2] = (uintptr_t)td->td_frame;
 	td->td_pcb->pcb_ra = (uintptr_t)fork_trampoline;
-	td->td_pcb->pcb_sp = kstack_bottom(td);
+#ifdef CHERI_BOUNDED_KSTACK
+	td->td_pcb->pcb_sp = (uintptr_t)td->td_md.md_kstack;
+#else
+	td->td_pcb->pcb_sp = (uintptr_t)td->td_frame;
+#endif
 
 	/* Setup to release spin count in fork_exit(). */
 	td->td_md.md_spinlock_count = 1;
@@ -297,8 +304,13 @@ cpu_fork_kthread_handler(struct thread *td, void (*func)(void *), void *arg)
 
 	td->td_pcb->pcb_s[0] = (uintptr_t)func;
 	td->td_pcb->pcb_s[1] = (uintptr_t)arg;
+	td->td_pcb->pcb_s[2] = (uintptr_t)td->td_frame;
 	td->td_pcb->pcb_ra = (uintptr_t)fork_trampoline;
-	td->td_pcb->pcb_sp = kstack_bottom(td);
+#ifdef CHERI_BOUNDED_KSTACK
+	td->td_pcb->pcb_sp = (uintptr_t)td->td_md.md_kstack;
+#else
+	td->td_pcb->pcb_sp = (uintptr_t)td->td_frame;
+#endif
 }
 
 void
