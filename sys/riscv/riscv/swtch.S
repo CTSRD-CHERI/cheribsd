@@ -624,12 +624,16 @@ ENTRY(fork_trampoline)
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	ca0, cs0
 	cmove	ca1, cs1
-	cmove	ca2, csp
-#ifdef CHERI_BOUNDED_KSTACK
-	li	t0, TF_SIZE
-	csetboundsexact	ca2, ca2, t0
-#endif
+	cmove	ca2, cs2
 	ccall	_C_LABEL(fork_exit)
+
+#ifdef CHERI_BOUNDED_KSTACK
+	/* Recover the full kstack bounds to access trapframe */
+	clc	ct0, (PC_CURTHREAD)(ctp)
+	clc	ct1, (TD_KSTACK)(ct0)
+	clc	ct0, (TD_FRAME)(ct0)
+	csetaddr	csp, ct1, t0
+#endif
 #else
 	mv	a0, s0
 	mv	a1, s1

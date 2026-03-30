@@ -90,6 +90,7 @@ ASSYM(TD_LOCK, offsetof(struct thread, td_lock));
 ASSYM(TD_MDFLAGS, offsetof(struct thread, td_md.md_flags));
 #ifdef CHERI_BOUNDED_KSTACK
 ASSYM(TD_KSTACK, offsetof(struct thread, td_kstack));
+ASSYM(TD_MDKSTACK, offsetof(struct thread, td_md.md_kstack));
 #endif
 
 ASSYM(TF_SIZE, TF_SIZE);
