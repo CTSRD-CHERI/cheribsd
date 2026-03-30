@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2025 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2025-2026 Ruslan Bukin <br@bsdpad.com>
  *
  * This work was supported by Innovate UK project 105694, "Digital Security
  * by Design (DSbD) Technology Platform Prototype".
@@ -29,6 +29,11 @@
  */
 
 /* Hardware Counters (HWC) framework. */
+
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#include <sys/sysent.h>
+#endif
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -260,17 +265,33 @@ hwc_ioctl_alloc(struct thread *td, struct hwc_alloc *halloc)
 	return (error);
 }
 
+/* Allocate HWC context. */
 int
 hwc_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
 {
+	struct hwc_alloc *halloc;
 	int error;
+#ifdef COMPAT_FREEBSD64
+	struct hwc_alloc64 *halloc64;
+	struct hwc_alloc local_halloc;
+#endif
 
-	/* Allocate HWC context. */
+	halloc = (struct hwc_alloc *)addr;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		halloc64 = (struct hwc_alloc64 *)addr;
+		halloc = &local_halloc;
+		CP(*halloc64, *halloc, backend_name_len);
+		halloc->backend_name = USER_PTR(halloc64->backend_name,
+		    halloc->backend_name_len);
+	}
+#endif
 
 	switch (cmd) {
 	case HWC_IOC_ALLOC:
-		error = hwc_ioctl_alloc(td, (struct hwc_alloc *)addr);
+		error = hwc_ioctl_alloc(td, halloc);
 		return (error);
 	default:
 		return (ENXIO);

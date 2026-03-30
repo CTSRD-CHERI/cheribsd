@@ -45,11 +45,22 @@
 
 #define	HWC_MODE_THREAD		1
 
+#ifdef COMPAT_FREEBSD64
+struct hwc_alloc64 {
+	int		mode;
+	pid_t		pid;		/* thread mode */
+	uint64_t	backend_name;
+	size_t		backend_name_len;
+	uint64_t	ident;
+} __aligned(16);
+#endif
+
 struct hwc_alloc {
 	int		mode;
 	pid_t		pid;		/* thread mode */
-	const char	*backend_name;
-	int		*ident;
+	const char	* __capability backend_name;
+	size_t		backend_name_len;
+	int		* __capability ident;
 } __aligned(16);
 
 struct hwc_configure {

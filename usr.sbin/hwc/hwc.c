@@ -111,6 +111,7 @@ hwc_ctx_alloc(struct hwc_context *tc)
 
 	al.pid = tc->pid;
 	al.backend_name = tc->backend->name;
+	al.backend_name_len = strlen(tc->backend->name);
 	al.ident = &tc->ident;
 
 	error = ioctl(tc->fd, HWC_IOC_ALLOC, &al);
