@@ -73,11 +73,12 @@
  * Build kernel pointer for the given data symbol
  * assuming the kernel mmu mapping is enabled
  */
-.macro buildptr dregn, sym, size
+.macro buildptr dregn, sym, size, clrperm = xzr
 	ldr	x\dregn, =\sym
 #ifdef __CHERI_PURE_CAPABILITY__
 	cvtd	c\dregn, x\dregn
 	scbnds	c\dregn, c\dregn, \size
+	clrperm c\dregn, c\dregn, \clrperm
 #endif
 .endmacro
 
@@ -244,7 +245,8 @@ virtdone:
 
 	/* Set up the stack */
 	mov	x7, #(PAGE_SIZE * KSTACK_PAGES)
-	buildptr 25, initstack, x7
+	ldr	x6, =(~CHERI_PERMS_KERNEL_DATA)
+	buildptr 25, initstack, x7, x6
 	/* Preserve initstack in x/c25 for bootparams */
 	add	PTR(7), PTR(25), x7
 	/*
@@ -255,7 +257,7 @@ virtdone:
 	sub	PTRN(sp), PTR(7), #PCB_SIZE
 
 	/* Zero the BSS */
-	buildptr_range 15, 14, _bss_start, _end
+	buildptr_range 15, 14, _bss_start, _end, x6
 1:
 	stp	xzr, xzr, [PTR(15)], #16
 	cmp	PTR(15), PTR(14)
