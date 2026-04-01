@@ -5004,6 +5004,11 @@ int
 kern_copy_file_range(struct thread *td, int infd, off_t *inoffp, int outfd,
     off_t *outoffp, size_t len, unsigned int flags)
 {
+#if 1
+	// Workaround for https://github.com/CTSRD-CHERI/cheribsd/issues/2603
+	return (EINVAL);
+#else
+
 	struct file *infp, *outfp;
 	struct vnode *invp, *outvp;
 	int error;
@@ -5120,6 +5125,7 @@ out:
 		fdrop(infp, td);
 	td->td_retval[0] = retlen;
 	return (error);
+#endif
 }
 
 int
