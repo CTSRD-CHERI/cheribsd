@@ -619,15 +619,19 @@ lkpi_inactive(struct vop_inactive_args *ap)
 	struct vnode *vp;
 	int error;
 
-	printf("%s: %p\n", __func__, ap);
-
 	vp = ap->a_vp;
+	//printf("%s: %p, i_nlink %d\n", __func__, vp, vp->i_nlink);
+
 	mp = vp->v_mount;
 	sb = VFSTOSB(mp);
-	error = -sb->s_op->write_inode(vp, NULL);
-	if (error != 0) {
-		printf("%s: ->write_inode returned -%d\n", __func__, error);
-		return (error);
+	if (vp->i_nlink == 0) {
+		sb->s_op->evict_inode(vp);
+	} else {
+		error = -sb->s_op->write_inode(vp, NULL);
+		if (error != 0) {
+			printf("%s: ->write_inode returned -%d\n", __func__, error);
+			return (error);
+		}
 	}
 
 	return (0);
@@ -640,7 +644,7 @@ lkpi_reclaim(struct vop_reclaim_args *ap)
 
 	vp = ap->a_vp;
 
-	//printf("%s: %p\n", __func__, ap);
+	//printf("%s: %p\n", __func__, vp);
 
 	vfs_hash_remove(vp);
 
@@ -1249,7 +1253,9 @@ void
 //truncate_inode_pages_final(struct address_space *as)
 truncate_inode_pages_final(void *as)
 {
-	printf("%s: %p\n", __func__, as);
+	// XXX: Anything to do here?
+
+	//printf("%s: %p\n", __func__, as);
 }
 
 void
@@ -1376,17 +1382,18 @@ truncate_setsize(struct vnode *vp, loff_t size)
 void
 clear_inode(struct vnode *vp)
 {
-	printf("%s: %p\n", __func__, vp);
+	// XXX: Anything to do here?
+	//printf("%s: %p\n", __func__, vp);
 }
 
 void
 invalidate_inode_buffers(struct vnode *vp)
 {
 	int error;
-	printf("%s: XXX untested, invalidating %p\n", __func__, vp);
 
 	error = vinvalbuf(vp, 0, 0, 0);
-	printf("%s: vinvalbuf returned %d for vp %p\n", __func__, error, vp);
+	if (error != 0)
+		printf("%s: vinvalbuf returned %d for vp %p\n", __func__, error, vp);
 }
 
 int
