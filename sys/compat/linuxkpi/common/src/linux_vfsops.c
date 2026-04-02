@@ -330,7 +330,12 @@ lkpi_read(struct vop_read_args *ap)
 
 	memset(&file, 0, sizeof(file));
 	file.f_inode = vp;
+	// XXX: pacmanfs can sleep on ace2_syncpoint, and we don't want to keep
+	// the inode locked then, see https://github.com/CTSRD-CHERI/cheribsd/issues/2603
+	VOP_UNLOCK(vp);
 	nbytes = vp->i_fop->read(&file, (__cheri_fromcap char *)base, len, &off);
+	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+	// XXX: check if the vnode is still there after relocking
 	if (nbytes < 0) {
 		printf("%s: ->read failed with error %d\n", __func__, nbytes);
 		// XXX now what
