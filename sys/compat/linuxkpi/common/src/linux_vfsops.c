@@ -479,10 +479,6 @@ lkpi_rmdir(struct vop_rmdir_args *ap)
 	if (error != 0)
 		printf("%s: ->rmdir returned -%d\n", __func__, error);
 
-	// XXX: According to VOP_RMDIR(9) man page this shouldn't be neededed?
-	if (error == 0)
-		VOP_UNLOCK(vp);
-
 	return (error);
 }
 
