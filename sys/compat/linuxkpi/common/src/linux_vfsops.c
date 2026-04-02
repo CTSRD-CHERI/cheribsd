@@ -614,13 +614,35 @@ lkpi_write(struct vop_write_args *ap)
 }
 
 static int
+lkpi_inactive(struct vop_inactive_args *ap)
+{
+	struct super_block *sb;
+	struct mount *mp;
+	struct vnode *vp;
+	int error;
+
+	printf("%s: %p\n", __func__, ap);
+
+	vp = ap->a_vp;
+	mp = vp->v_mount;
+	sb = VFSTOSB(mp);
+	error = -sb->s_op->write_inode(vp, NULL);
+	if (error != 0) {
+		printf("%s: ->write_inode returned -%d\n", __func__, error);
+		return (error);
+	}
+
+	return (0);
+}
+
+static int
 lkpi_reclaim(struct vop_reclaim_args *ap)
 {
 	struct vnode *vp;
 
 	vp = ap->a_vp;
 
-	printf("%s: %p\n", __func__, ap);
+	//printf("%s: %p\n", __func__, ap);
 
 	vfs_hash_remove(vp);
 
@@ -649,6 +671,7 @@ struct vop_vector lkpi_vnodeops = {
 	.vop_setattr =		lkpi_setattr,
 	.vop_symlink =		lkpi_symlink,
 	.vop_write =		lkpi_write,
+	.vop_inactive =		lkpi_inactive,
 	.vop_reclaim =		lkpi_reclaim,
 };
 VFS_VOP_VECTOR_REGISTER(lkpi_vnodeops);
