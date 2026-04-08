@@ -13,14 +13,13 @@ objcopy.1: elfcopy.1
 	    -e '/\.Nm elfcopy ,/d' < ${.ALLSRC} > ${.TARGET}
 CLEANFILES+= objcopy.1
 
-SRCS=	archive.c ascii.c binary.c main.c objects.c pe.c sections.c segments.c \
-	symbols.c
+SRCS=	archive.c ascii.c binary.c main.c pe.c sections.c segments.c symbols.c
 
 WARNS?=	5
 
 LIBADD=	archive elftc elf pe
 
-CFLAGS+=-I${ELFTCDIR}/libelftc -I${ELFTCDIR}/libpe -I${ELFTCDIR}/libelf -I${ELFTCDIR}/common
+CFLAGS+=-I${ELFTCDIR}/libelftc -I${ELFTCDIR}/libpe -I${ELFTCDIR}/common
 CFLAGS+=-DWITH_PE=1
 
 MAN=	${PROG}.1 strip.1

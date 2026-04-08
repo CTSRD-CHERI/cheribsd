@@ -26,9 +26,7 @@
 
 #include <sys/param.h>
 #include <sys/stat.h>
-#include <assert.h>
 #include <err.h>
-#include <fcntl.h>
 #include <libgen.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -970,8 +968,8 @@ resync_sections(struct elfcopy *ecp)
 				s->off = roundup(off, s->align);
 		} else {
 			if (s->loadable && (ecp->flags & RELOCATABLE) == 0)
-				warnx("moving loadable section %s (section at %#lx, off %#lx), "
-				    "is this intentional?", s->name, s->off, off);
+				warnx("moving loadable section %s, "
+				    "is this intentional?", s->name);
 			s->off = roundup(off, s->align);
 		}
 
@@ -1349,23 +1347,6 @@ create_external_section(struct elfcopy *ecp, const char *name, char *newname,
 	return (s);
 }
 
-size_t
-first_free_offset(struct elfcopy *ecp)
-{
-	struct section	*s;
-	size_t		 off;
-
-	off = 0;
-	TAILQ_FOREACH(s, &ecp->v_sec, sec_list) {
-		if (s->type != SHT_NOBITS && s->type != SHT_NULL)
-			off = s->off + s->sz;
-		else
-			off = s->off;
-	}
-
-	return (off);
-}
-
 /*
  * Insert sections specified by --add-section to the end of section list.
  */
@@ -1373,11 +1354,18 @@ static void
 insert_sections(struct elfcopy *ecp)
 {
 	struct sec_add	*sa;
+	struct section	*s;
 	size_t		 off;
 	uint64_t	 stype;
 
 	/* Put these sections in the end of current list. */
-	off = first_free_offset(ecp);
+	off = 0;
+	TAILQ_FOREACH(s, &ecp->v_sec, sec_list) {
+		if (s->type != SHT_NOBITS && s->type != SHT_NULL)
+			off = s->off + s->sz;
+		else
+			off = s->off;
+	}
 
 	STAILQ_FOREACH(sa, &ecp->v_sadd, sadd_list) {
 
@@ -1433,11 +1421,8 @@ update_shdr(struct elfcopy *ecp, int update_link)
 		/*
 		 * sh_link needs to be updated, since the index of the
 		 * linked section might have changed.
-		 *
-		 * Sections copied from additional objects have sh_link values
-		 * already updated.
 		 */
-		if (update_link && osh.sh_link != 0 && s->iobject == NULL)
+		if (update_link && osh.sh_link != 0)
 			osh.sh_link = ecp->secndx[osh.sh_link];
 
 		/*
@@ -1610,294 +1595,6 @@ add_section(struct elfcopy *ecp, const char *arg)
 
 	STAILQ_INSERT_TAIL(&ecp->v_sadd, sa, sadd_list);
 	ecp->flags |= SEC_ADD;
-}
-
-static struct transplant *
-transplant_new(const char *namestr, bool isparent)
-{
-	struct transplant	*t;
-
-	if ((t = malloc(sizeof(*t))) == NULL)
-		err(EXIT_FAILURE, "malloc failed");
-
-	if ((t->namestr = strdup(namestr)) == NULL)
-		err(EXIT_FAILURE, "strdup failed");
-
-	t->isparent = isparent;
-
-	return (t);
-}
-
-void
-add_transplant(struct elfcopy *ecp, const char *namestr)
-{
-	struct transplant	*t;
-
-	t = transplant_new(namestr, false);
-	TAILQ_INSERT_TAIL(&ecp->v_transplants, t, t_list);
-}
-
-void
-add_transplant_parent(struct elfcopy *ecp, const char *namestr)
-{
-	struct transplant	*t;
-
-	t = transplant_new(namestr, true);
-	TAILQ_INSERT_HEAD(&ecp->v_transplants, t, t_list);
-}
-
-static void
-transplant_parent(struct elfcopy *ecp, struct transplant *t)
-{
-	GElf_Phdr	firstload, iphdr, lastload;
-	size_t		dynamicndx, i, phdrnum;
-	bool		isfirstload;
-
-	if (elf_getphdrnum(ecp->ein, &phdrnum) == -1)
-		errx(EXIT_FAILURE, "elf_getphdrnum() failed: %s", elf_errmsg(-1));
-
-	dynamicndx = 0;
-	isfirstload = true;
-	for (i = 0; i < phdrnum; i++) {
-		if (gelf_getphdr(ecp->ein, i, &iphdr) != &iphdr)
-			errx(EXIT_FAILURE, "gelf_getphdr failed: %s", elf_errmsg(-1));
-
-		switch (iphdr.p_type) {
-		case PT_DYNAMIC:
-			assert(dynamicndx == 0);
-			dynamicndx = i;
-			break;
-		case PT_LOAD:
-			if (isfirstload) {
-				firstload = iphdr;
-				isfirstload = false;
-			}
-			lastload = iphdr;
-			break;
-		default:
-			/* Nothing to do. */
-			break;
-		}
-	}
-	assert(!isfirstload);
-
-	/*
-	 * Update transplant with information for an object header.
-	 */
-	t->vaddr = firstload.p_vaddr;
-	t->msz = lastload.p_vaddr + lastload.p_memsz - firstload.p_vaddr;
-	t->dynamicndx = dynamicndx;
-}
-
-static void
-transplant_one(struct elfcopy *ecp, struct transplant *t)
-{
-	static int	 prefix;
-
-	struct segment	*firstseg, *lastseg, *seg;
-	struct section	*s, **smap;
-	int		 ifd;
-	Elf		*ein;
-	Elf_Scn		*scn;
-	Elf_Data	*data;
-	Elf64_Shdr	*shdr;
-	GElf_Phdr	 iphdr;
-	GElf_Shdr	 shdrvalue;
-	size_t		 dynamicndx, shdrnum, phdrnum;
-	size_t		 i, transplant_offset;
-	char		*sname, *name;
-	size_t string_table_section_index;
-	int error;
-
-	prefix++;
-
-	ifd = open(t->namestr, O_RDONLY);
-	if (ifd == -1)
-		err(EXIT_FAILURE, "open %s failed", t->namestr);
-	ein = elf_begin(ifd, ELF_C_READ, NULL);
-	if (ein == NULL)
-		errx(EXIT_FAILURE, "elf_begin() failed: %s", elf_errmsg(-1));
-	error = elf_getshdrstrndx(ein, &string_table_section_index);
-	if (error != 0)
-		errx(EXIT_FAILURE, "elf_getshdrstrndx() failed: %s", elf_errmsg(-1));
-
-	/*
-	 * Calculate where to put the new section in the file.  Align it a bit more
-	 * than needed so that it stands out in readelf(1) output.
-	 */
-	transplant_offset = roundup(first_free_offset(ecp), 0x100000);
-
-	/*
-	 * Allocate a map of section numbers to update links (sh_link) between
-	 * them.
-	 */
-	if (elf_getshdrnum(ein, &shdrnum) == -1)
-		errx(EXIT_FAILURE, "elf_getshdrnum() failed: %s", elf_errmsg(-1));
-	smap = calloc(shdrnum, sizeof(*smap));
-	if (smap == NULL)
-		errx(EXIT_FAILURE, "calloc() failed: %s", elf_errmsg(-1));
-
-	/*
-	 * Transplant the sections.
-	 */
-	for (i = 1; i < shdrnum; i++) {
-		scn = elf_getscn(ein, i);
-		if (scn == NULL)
-			errx(EXIT_FAILURE, "elf_getscn(%zd) failed: %s", i, elf_errmsg(-1));
-
-		shdr = elf64_getshdr(scn);
-		if (shdr == NULL)
-			errx(EXIT_FAILURE, "elf_getshdr() failed: %s", elf_errmsg(-1));
-
-		/*
-		 * Extract section name.
-		 */
-		sname = elf_strptr(ein, string_table_section_index, shdr->sh_name);
-		if (sname == NULL)
-			errx(EXIT_FAILURE, "elf_getshdrstrndx() failed: %s", elf_errmsg(-1));
-		data = elf_rawdata(scn, NULL);
-		if (data == NULL)
-			errx(EXIT_FAILURE, "elf_rawdata() failed: %s", elf_errmsg(-1));
-
-		asprintf(&name, ".%d%s", prefix, sname);
-
-		fprintf(stderr, "%s: shdr %zd, name %s, off %zd + %#lx, size %zd\n",
-		    __func__, i, sname, shdr->sh_offset, transplant_offset, data->d_size);
-
-		s = create_external_section(ecp, name, NULL, data->d_buf,
-		    data->d_size, shdr->sh_offset + transplant_offset, shdr->sh_type,
-		    ELF_T_BYTE, shdr->sh_flags, shdr->sh_addralign,
-		    shdr->sh_addr + transplant_offset, 1 /* XXX */);
-		s->iobject = t;
-		smap[i] = s;
-
-		if (gelf_getshdr(s->os, &shdrvalue) == NULL)
-			errx(EXIT_FAILURE, "gelf_getshdr() failed: %s",
-			    elf_errmsg(-1));
-		shdrvalue.sh_entsize = shdr->sh_entsize;
-		shdrvalue.sh_link = shdr->sh_link;
-		if (!gelf_update_shdr(s->os, &shdrvalue))
-			errx(EXIT_FAILURE, "gelf_update_shdr() failed: %s",
-			    elf_errmsg(-1));
-
-		add_to_inseg_list(ecp, s);
-	}
-
-	/*
-	 * Update section links.
-	 */
-	for (i = 1; i < shdrnum; i++) {
-		s = smap[i];
-		if (s == NULL)
-			continue;
-
-		if (gelf_getshdr(s->os, &shdrvalue) == NULL)
-			errx(EXIT_FAILURE, "gelf_getshdr() failed: %s",
-			    elf_errmsg(-1));
-		if (shdrvalue.sh_link == 0)
-			continue;
-
-		shdrvalue.sh_link = elf_ndxscn(smap[shdrvalue.sh_link]->os);
-		if (!gelf_update_shdr(s->os, &shdrvalue))
-			errx(EXIT_FAILURE, "gelf_update_shdr() failed: %s",
-			    elf_errmsg(-1));
-	}
-
-	/*
-	 * Now do segments (program headers).
-	 */
-	dynamicndx = 0;
-	firstseg = NULL;
-	lastseg = NULL;
-	seg = NULL;
-	if (elf_getphdrnum(ein, &phdrnum) == -1)
-		errx(EXIT_FAILURE, "elf_getphdrnum() failed: %s", elf_errmsg(-1));
-	for (i = 0; i < phdrnum; i++) {
-		if (gelf_getphdr(ein, i, &iphdr) != &iphdr)
-			errx(EXIT_FAILURE, "gelf_getphdr failed: %s", elf_errmsg(-1));
-
-		/*
-		 * Filter which segments we want to transplant.
-		 */
-		switch (iphdr.p_type) {
-		case PT_DYNAMIC:
-			assert(dynamicndx == 0);
-			dynamicndx = ecp->ophnum;
-			break;
-		case PT_LOAD:
-			break;
-		default:
-			continue;
-		}
-
-		/*
-		 * Bump the number of segments to output, for copy_phdr().
-		 */
-		ecp->ophnum++;
-
-		/*
-		 * Append to v_seg; copy_phdr() will regenerate phdrs in ELF based on that.
-		 */
-		if ((seg = calloc(1, sizeof(*seg))) == NULL)
-			err(EXIT_FAILURE, "calloc failed");
-		seg->p_type	= iphdr.p_type;
-		seg->vaddr	= iphdr.p_vaddr + transplant_offset;
-		seg->paddr	= iphdr.p_paddr + transplant_offset;
-		seg->p_flags	= iphdr.p_flags;
-		seg->p_align	= iphdr.p_align;
-		seg->off	= iphdr.p_offset + transplant_offset;
-		seg->fsz	= iphdr.p_filesz;
-		seg->msz	= iphdr.p_memsz;
-		seg->type	= iphdr.p_type;
-		STAILQ_INSERT_TAIL(&ecp->v_seg, seg, seg_list);
-
-		if (iphdr.p_type == PT_LOAD) {
-			if (firstseg == NULL)
-				firstseg = seg;
-			lastseg = seg;
-		}
-	}
-	assert(firstseg != NULL);
-	assert(lastseg != NULL);
-	assert(seg != NULL);
-
-	/*
-	 * Update transplant with information for an object header.
-	 */
-	t->vaddr = firstseg->vaddr;
-	t->msz = lastseg->vaddr + lastseg->msz - firstseg->vaddr;
-	t->dynamicndx = dynamicndx;
-
-#if 0
-	/*
-	 * Usually the program headers are near the beginning of the ELF file;
-	 * there's no room there anymore though.  Allocate another section
-	 * to hold phdrs.
-	 */
-	s = create_external_section(ecp, ".phdrs", NULL, NULL,
-	    data->d_size, shdr->sh_offset + transplant_offset, shdr->sh_type, ELF_T_BYTE, shdr->sh_flags,
-	    shdr->sh_addralign, shdr->sh_addr + transplant_offset, 0);
-	//add_to_inseg_list(ecp, s);
-#endif
-
-	free(smap);
-}
-
-void
-transplant(struct elfcopy *ecp)
-{
-	struct transplant	*t;
-
-	TAILQ_FOREACH(t, &ecp->v_transplants, t_list) {
-		t->id = ecp->oohnum;
-		t->name = elftc_string_table_insert(ecp->shstrtab->strtab,
-		    t->namestr);
-		if (t->isparent)
-			transplant_parent(ecp, t);
-		else
-			transplant_one(ecp, t);
-		ecp->oohnum++;
-	}
 }
 
 void
