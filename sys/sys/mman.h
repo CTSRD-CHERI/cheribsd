@@ -367,6 +367,7 @@ int	shm_unlink(const char *);
 #endif
 #if __BSD_VISIBLE
 int	memfd_create(const char *, unsigned int);
+int	msetname(void *, size_t, const char *);
 int	shm_create_largepage(const char *, int, int, int, mode_t);
 int	shm_rename(const char *, const char *, int);
 #endif

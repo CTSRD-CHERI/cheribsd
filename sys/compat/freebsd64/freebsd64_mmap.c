@@ -161,6 +161,17 @@ freebsd64_mlock(struct thread *td, struct freebsd64_mlock_args *uap)
 }
 
 int
+freebsd64_msetname(struct thread *td, struct freebsd64_msetname_args *uap)
+{
+	/*
+	 * The name argument isn't a path, but we limit the copyinstr to
+	 * PATH_MAX so we can use USER_PTR_PATH to potentially bound it.
+	 */
+	return (kern_msetname(td, (uintptr_t)uap->addr, uap->len,
+	    USER_PTR_PATH(uap->name)));
+}
+
+int
 freebsd64_munlock(struct thread *td, struct freebsd64_munlock_args *uap)
 {
 	return (kern_munlock(td, (uintptr_t)uap->addr, uap->len));
