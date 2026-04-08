@@ -71,6 +71,7 @@ INTERPOSED = \
 	fsync \
 	fork \
 	kevent \
+	msetname \
 	msync \
 	nanosleep \
 	open \
