@@ -1526,7 +1526,14 @@
 		    _Out_ struct cheri_revoke_syscall_info *crsi,
 		);
 	}
-262-271	AUE_NULL	RESERVED
+262	AUE_MSETNAME	STD|CAPENABLED {
+		int msetname(
+		    _In_ void *addr,
+		    size_t len,
+		    _In_z_ const char *name
+		);
+	}
+263-271	AUE_NULL	RESERVED
 272	AUE_O_GETDENTS	COMPAT11|CAPENABLED {
 		int getdents(
 		    int fd,
