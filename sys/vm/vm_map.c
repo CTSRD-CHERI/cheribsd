@@ -2083,8 +2083,16 @@ charged:
 	new_entry->eflags = protoeflags;
 	new_entry->object.vm_object = object;
 
+	/*
+	 * If a specific name is requested, use that.  Otherwise, for entries
+	 * with NULL objects, try to derive a suitable name from the entry's
+	 * flags.
+	 */
 	if (name != NULL)
 		strlcpy(new_entry->name, name, sizeof(new_entry->name));
+	else if (new_entry->object.vm_object == NULL)
+		strlcpy(new_entry->name, "sys:vm_anon",
+		    sizeof(new_entry->name));
 	else
 		new_entry->name[0] = '\0';
 	new_entry->offset = offset;
@@ -5556,7 +5564,7 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 	gap_bot = addrbos;
 	gap_top = bot;
 	rv = vm_map_insert1(map, NULL, 0, bot, top, prot, max, cow, reservation,
-	    &new_entry, NULL);
+	    &new_entry, "sys:vm_stack");
 	if (rv != KERN_SUCCESS)
 		return (rv);
 	KASSERT(new_entry->end == top || new_entry->start == bot,
@@ -5567,7 +5575,7 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 		return (KERN_SUCCESS);
 	rv = vm_map_insert1(map, NULL, 0, gap_bot, gap_top, VM_PROT_NONE,
 	    VM_PROT_NONE, MAP_CREATE_GUARD | MAP_CREATE_STACK_GAP,
-	    reservation, &gap_entry, NULL);
+	    reservation, &gap_entry, "sys:vm_stack_guard");
 	if (rv == KERN_SUCCESS) {
 		KASSERT((gap_entry->eflags & MAP_ENTRY_GUARD) != 0,
 		    ("entry %p not gap %#x", gap_entry, gap_entry->eflags));
@@ -5790,7 +5798,7 @@ retry:
 			    gap_end, VM_PROT_NONE, VM_PROT_NONE,
 			    MAP_CREATE_GUARD | MAP_CREATE_STACK_GAP,
 			    stack_entry->reservation, &gap_entry,
-			    NULL);
+			    "sys:vm_stack_guard");
 			MPASS(rv1 == KERN_SUCCESS);
 			gap_entry->next_read = sgp;
 			gap_entry->offset = prot | VM_PROT_MAX(max);
@@ -6235,6 +6243,8 @@ vm_map_reservation_init_entry(vm_map_entry_t new_entry)
 	new_entry->cred = NULL;
 	new_entry->eflags = MAP_ENTRY_UNMAPPED;
 	new_entry->object.vm_object = NULL;
+	strlcpy(new_entry->name, "sys:vm_reservation",
+	    sizeof(new_entry->name));
 	new_entry->offset = 0;
 	/* handle MAP_INHERIT_SHARE cow flag? */
 	new_entry->inheritance = VM_INHERIT_DEFAULT;
