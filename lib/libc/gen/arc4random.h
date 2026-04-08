@@ -114,6 +114,7 @@ _rs_allocate(struct _rs **rsp, struct _rsx **rsxp)
 		munmap(p, sizeof(*p));
 		return (-1);
 	}
+	(void)msetname(p, sizeof(*p), "libc:arc4random");
 #endif
 
 	_rs_initialize_fxrng();

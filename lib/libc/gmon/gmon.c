@@ -89,6 +89,8 @@ monstartup(u_long lowpc, u_long highpc)
 		ERR("monstartup: out of memory\n");
 		return;
 	}
+	(void)msetname(cp, p->kcountsize + p->fromssize + p->tossize,
+	    "libc:gmon");
 #ifdef notdef
 	bzero(cp, p->kcountsize + p->fromssize + p->tossize);
 #endif
