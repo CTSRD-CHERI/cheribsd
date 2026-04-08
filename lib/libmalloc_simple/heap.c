@@ -127,6 +127,7 @@ __morepages(int n)
 		error_printf("%s: mmap of pagepool failed\n", __func__);
 		return (0);
 	}
+	(void)msetname(newpp, size, "crt:libmalloc_simple");
 	newpp->ph_next = curpp;
 	newpp->ph_size = size;
 	curpp = newpp;

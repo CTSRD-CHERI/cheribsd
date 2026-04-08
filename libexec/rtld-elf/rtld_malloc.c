@@ -316,6 +316,7 @@ morepages(int n)
 		pagepool_start = pagepool_end = NULL;
 		return (0);
 	}
+	(void)msetname(addr, n * pagesz, "rtld:malloc");
 	pagepool_start = addr;
 	pagepool_end = pagepool_start + n * pagesz;
 	pagepool_start += offset;
