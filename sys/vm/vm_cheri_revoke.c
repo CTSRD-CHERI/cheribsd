@@ -1292,9 +1292,9 @@ vm_map_install_cheri_revoke_shadow(struct vm_map *map, struct sysentvec *sv)
 
 	reserved_shadow = true;
 
-	error = vm_map_insert(map, vmo_shadow, 0, start, end_addr,
+	error = vm_map_insert_name(map, vmo_shadow, 0, start, end_addr,
 	    VM_PROT_READ | VM_PROT_WRITE, VM_PROT_READ | VM_PROT_WRITE,
-	    cow, start_addr);
+	    cow, start_addr, "sys:vm_shadow");
 
 	if (error != KERN_SUCCESS)
 		goto out;
@@ -1314,9 +1314,9 @@ vm_map_install_cheri_revoke_shadow(struct vm_map *map, struct sysentvec *sv)
 	if (error != KERN_SUCCESS)
 		goto out;
 
-	error = vm_map_insert(map, vmo_info, 0, start, end_addr,
+	error = vm_map_insert_name(map, vmo_info, 0, start, end_addr,
 	    VM_PROT_READ | VM_PROT_WRITE, VM_PROT_READ | VM_PROT_WRITE,
-	    0, start_addr);
+	    0, start_addr, "sys:vm_shadow_info");
 
 	if (error != KERN_SUCCESS)
 		goto out;
