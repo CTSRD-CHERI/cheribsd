@@ -149,7 +149,6 @@ CLEAN+=	${KERNEL_KO}.bin
 # Generate an IR version of the kernel as an extra build output.
 .if defined(COMPILE_IR)
 KERNEL_EXTRA+= ${KERNEL_KO}.ll
-KERNEL_EXTRA_INSTALL+= ${KERNEL_KO}.ll
 CLEAN+=	${KERNEL_KO}.ll
 .endif
 
