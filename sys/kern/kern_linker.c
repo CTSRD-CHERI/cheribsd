@@ -2529,6 +2529,7 @@ SYSCTL_PROC(_kern, OID_AUTO, function_list,
     sysctl_kern_function_list, "",
     "kernel function list");
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 static int
 sysctl_kern_kc18n_compartments(SYSCTL_HANDLER_ARGS)
 {
@@ -2562,6 +2563,7 @@ out:
 static SYSCTL_NODE(_kern, KERN_KC18N_COMPARTS, kc18n_compartments,
 	CTLFLAG_RD | CTLFLAG_MPSAFE, sysctl_kern_kc18n_compartments,
 	"Kernel compartment list");
+#endif
 
 // CHERI CHANGES START
 // {
