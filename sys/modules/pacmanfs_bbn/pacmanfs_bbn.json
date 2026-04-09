@@ -683,7 +683,7 @@
             },
             "permissions": "x",
             "object": {
-                "name": "linux_kfree_async",
+                "name": "lkpi_kfree",
                 "type": "symbol"
             }
         },
@@ -1269,16 +1269,6 @@
         },
         {
             "subject": {
-                "name": "compart_819"
-            },
-            "permissions": "x",
-            "object": {
-                "name": "free",
-                "type": "symbol"
-            }
-        },
-        {
-            "subject": {
                 "name": "compart_832"
             },
             "permissions": "x",
@@ -1493,7 +1483,7 @@
             },
             "permissions": "x",
             "object": {
-                "name": "linux_kfree_async",
+                "name": "lkpi_kfree",
                 "type": "symbol"
             }
         },
@@ -1545,16 +1535,6 @@
             "object": {
                 "name": "compart_817",
                 "type": "compartment"
-            }
-        },
-        {
-            "subject": {
-                "name": "compart_825"
-            },
-            "permissions": "x",
-            "object": {
-                "name": "free",
-                "type": "symbol"
             }
         },
         {
