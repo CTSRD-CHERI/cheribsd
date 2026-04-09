@@ -23,7 +23,6 @@ SRCS=	elf.c							\
 	elf_rand.c						\
 	elf_rawfile.c						\
 	elf_phnum.c						\
-	elf_ohnum.c						\
 	elf_shnum.c						\
 	elf_shstrndx.c						\
 	elf_scn.c						\
@@ -35,11 +34,9 @@ SRCS=	elf.c							\
 	gelf_dyn.c						\
 	gelf_ehdr.c						\
 	gelf_getclass.c						\
-	gelf_falign.c						\
 	gelf_fsize.c						\
 	gelf_mips64el.c						\
 	gelf_move.c						\
-	gelf_ohdr.c						\
 	gelf_phdr.c						\
 	gelf_rel.c						\
 	gelf_rela.c						\
@@ -59,7 +56,6 @@ SRCS=	elf.c							\
 	libelf_extended.c					\
 	libelf_memory.c						\
 	libelf_open.c						\
-	libelf_ohdr.c						\
 	libelf_phdr.c						\
 	libelf_shdr.c						\
 	libelf_xlate.c						\

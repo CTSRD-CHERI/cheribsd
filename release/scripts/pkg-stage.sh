@@ -19,18 +19,18 @@ graphics/drm-515-kmod
 misc/freebsd-doc-all
 net/mpd5
 net/rsync
-net/wifi-firmware-rtw88-kmod
+net/wifi-firmware-kmod@release
 ports-mgmt/pkg
 shells/bash
 shells/zsh
-security/sudo
+security/sudo@default
 sysutils/screen
 sysutils/seatd
 sysutils/tmux
 www/firefox
 www/links
 x11/gnome
-x11/kde5
+x11/kde
 x11/sddm
 x11/xorg
 x11-wm/sway"
@@ -53,7 +53,7 @@ export PKG_ALTABI=$(pkg --rootdir ${ROOTDIR} config ALTABI 2>/dev/null)
 export PKG_REPODIR="packages/${PKG_ABI}"
 
 /bin/mkdir -p ${ROOTDIR}/${PKG_REPODIR}
-if [ ! -z "${PKG_ALTABI}" ]; then
+if [ -n "${PKG_ALTABI}" ]; then
 	ln -s ${PKG_ABI} ${ROOTDIR}/packages/${PKG_ALTABI}
 fi
 

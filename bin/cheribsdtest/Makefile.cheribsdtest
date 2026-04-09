@@ -35,6 +35,12 @@ SRCS+=	cheribsdtest_bounds_subobject.c					\
 	cheribsdtest_bounds_varargs.c					\
 	cheribsdtest_malloc.c						\
 	cheribsdtest_sentries.c
+
+.if ${MK_COMPARTMENT_POLICY} != "no"
+SRCS+=	cheribsdtest_compartments.c
+CFLAGS.cheribsdtest_compartments.c+=-ffunction-sections
+COMPARTMENT_POLICY=	${CHERIBSDTEST_DIR}/compartments.json
+.endif
 .endif
 
 CHERIBSDTEST_DIR:=	${.PARSEDIR}

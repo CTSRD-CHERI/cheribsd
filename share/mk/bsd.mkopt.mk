@@ -67,7 +67,7 @@ MK_${var}:=	yes
 # step towards removing the options entirely.
 #
 .for var in ${__REQUIRED_OPTIONS}
-.if defined(WITHOUT_${var})
+.if defined(WITHOUT_${var}) && !make(showconfig)
 .warning WITHOUT_${var} option ignored: it is no longer supported
 .endif
 MK_${var}:=	yes
@@ -112,10 +112,12 @@ MK_${var}:=	no
 .if !defined(__${opt}_DEFAULT) || empty(__${opt}_DEFAULT)
 .error __${opt}_DEFAULT undefined or empty
 .endif
+.if !defined(OPT_${opt})
 .if defined(${opt})
 OPT_${opt}:=	${${opt}}
 .else
 OPT_${opt}:=	${__${opt}_DEFAULT}
+.endif
 .endif
 .if empty(OPT_${opt}) || ${__${opt}_OPTIONS:M${OPT_${opt}}} != ${OPT_${opt}}
 .error Invalid option OPT_${opt} (${OPT_${opt}}), must be one of: ${__${opt}_OPTIONS}

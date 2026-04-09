@@ -79,55 +79,18 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
 #define make_function_pointer(def, defobj) \
 	make_function_cap(def, defobj)
 
-/* ignore _init/_fini */
-#define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
-#define call_init_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
-
-/* TODO: Per-function captable/PLT/FNDESC support */
-#ifdef CHERI_LIB_C18N
-#define call_init_array_pointer(_obj, _target)				\
-	(C18N_FPTR_ENABLED ? (InitArrFunc)(_target).value :		\
-	    (InitArrFunc)tramp_intern(NULL, RTLD_COMPART_ID,		\
-	        &(struct tramp_data) {					\
-		    .target = (void *)(_target).value,			\
-		    .defobj = _obj,					\
-		    .sig = (struct func_sig) {				\
-			.valid = true,					\
-			.reg_args = 3, .mem_args = false,		\
-			.ret_args = NONE }				\
-	}))(main_argc, main_argv, environ)
-
-#define call_fini_array_pointer(_obj, _target)				\
-	(C18N_FPTR_ENABLED ? (InitFunc)(_target).value :		\
-	    (InitFunc)tramp_intern(NULL, RTLD_COMPART_ID,		\
-	        &(struct tramp_data) {					\
-		    .target = (void *)(_target).value,			\
-		    .defobj = _obj,					\
-		    .sig = (struct func_sig) {				\
-			.valid = true,					\
-			.reg_args = 0, .mem_args = false,		\
-			.ret_args = NONE }				\
-	}))()
-#else
-#define call_init_array_pointer(obj, target)				\
-	(((InitArrFunc)(target).value)(main_argc, main_argv, environ))
-
-#define call_fini_array_pointer(obj, target)				\
-	(((InitFunc)(target).value)())
-#endif
-
 #else /* __CHERI_PURE_CAPABILITY__ */
 
 #define	make_function_pointer(def, defobj) \
 	((defobj)->relocbase + (def)->st_value)
+
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 #define	call_initfini_pointer(obj, target) \
 	(((InitFunc)(target))())
 
 #define	call_init_pointer(obj, target) \
 	(((InitArrFunc)(target))(main_argc, main_argv, environ))
-
-#endif /* __CHERI_PURE_CAPABILITY__ */
 
 /*
  * Pass zeros into the ifunc resolver so we can change them later. The first
@@ -142,12 +105,28 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
 
 #define	round(size, align)				\
 	(((size) + (align) - 1) & ~((align) - 1))
+
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 #define	calculate_first_tls_offset(size, align, offset)	\
 	round(TLS_TCB_SIZE, align)
 #define	calculate_tls_offset(prev_offset, prev_size, size, align, offset) \
 	round(prev_offset + prev_size, align)
 #define calculate_tls_post_size(align) \
 	round(TLS_TCB_SIZE, align) - TLS_TCB_SIZE
+#endif
+
+#ifdef TLS_TGOT
+#ifdef TLS_TGOT_COMPAT
+size_t calculate_first_tgot_offset(size_t size, size_t align, size_t offset);
+size_t calculate_tgot_offset(size_t prev_offset, size_t prev_size, size_t size,
+    size_t align, size_t offset);
+#else
+#define	calculate_first_tgot_offset(size, align, offset)	\
+	TLS_TCB_SIZE
+#define	calculate_tgot_offset(prev_offset, prev_size, size, align, offset) \
+	round(prev_offset + prev_size, align)
+#endif
+#endif
 
 typedef struct {
     unsigned long ti_module;
@@ -159,8 +138,14 @@ extern void *__tls_get_addr(tls_index *ti);
 #define md_abi_variant_hook(x)
 
 extern void (*rtld_bind_start_fptr)(void);
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 extern void *(*rtld_tlsdesc_static_fptr)(void *);
 extern void *(*rtld_tlsdesc_undef_fptr)(void *);
 extern void *(*rtld_tlsdesc_dynamic_fptr)(void *);
+#endif
+#ifdef TLS_TGOT
+extern void *(*rtld_tgot_tlsdesc_static_fptr)(void *);
+extern void *(*rtld_tgot_tlsdesc_dynamic_fptr)(void *);
+#endif
 
 #endif

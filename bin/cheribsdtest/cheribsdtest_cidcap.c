@@ -59,43 +59,43 @@ check_cidcap(uintcap_t cidcap, size_t base, size_t length, size_t offset)
 
 	if (base != (size_t)-1) {
 		/* Base. */
-		v = cheri_getbase(cidcap);
+		v = cheri_base_get(cidcap);
 		if (v != base)
 			cheribsdtest_failure_errx("base %jx (expected %jx)", v,
 			    (uintmax_t)base);
 	}
 
 	/* Length. */
-	v = cheri_getlen(cidcap);
+	v = cheri_length_get(cidcap);
 	if (v != length)
 		cheribsdtest_failure_errx("length 0x%jx (expected 0x%jx)", v,
 		    (uintmax_t)length);
 
 	/* Offset. */
-	v = cheri_getoffset(cidcap);
+	v = cheri_offset_get(cidcap);
 	if (v != offset)
 		cheribsdtest_failure_errx("offset %jx (expected %jx)", v,
 		    (uintmax_t)offset);
 
 	/* Type -- should have unsealed type. */
-	v = cheri_gettype(cidcap);
+	v = cheri_type_get(cidcap);
 	if (v != (u_register_t)CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_OTYPE_UNSEALED);
 
 	/* Permissions. */
-	v = cheri_getperm(cidcap);
+	v = cheri_perms_get(cidcap);
 	if (v != CHERI_COMPARTMENT_ID_USERSPACE_PERMS)
 		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_COMPARTMENT_ID_USERSPACE_PERMS);
 
 	/* Sealed bit. */
-	v = cheri_getsealed(cidcap);
+	v = cheri_is_sealed(cidcap);
 	if (v != 0)
 		cheribsdtest_failure_errx("sealed %jx (expected 0)", v);
 
 	/* Tag bit. */
-	v = cheri_gettag(cidcap);
+	v = cheri_tag_get(cidcap);
 	if (v != 1)
 		cheribsdtest_failure_errx("tag %jx (expected 1)", v);
 }

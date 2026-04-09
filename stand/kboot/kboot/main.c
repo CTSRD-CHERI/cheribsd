@@ -26,7 +26,9 @@
 #include <stand.h>
 #include <sys/param.h>
 #include <sys/boot.h>
+#ifdef LOADER_FDT_SUPPORT
 #include <fdt_platform.h>
+#endif
 
 #include <machine/cpufunc.h>
 #include <bootstrap.h>
@@ -47,9 +49,23 @@ static void kboot_zfs_probe(void);
 
 extern int command_fdt_internal(int argc, char *argv[]);
 
+/*
+ * On amd64, KERNSTART is where the first actual kernel page is mapped, after
+ * the compatibility mapping. We reserve 2MB at the start of the address space
+ * for the page tables, etc, and so need to offset this there (and only there).
+ * The loader needs to know about this so we can pad everything to the proper
+ * place in PA. Ideally, we'd include vmparam.h to figure this out, but the
+ * macros it uses are not easily available in this compile environment, so we
+ * hard code that knowledge here.
+ */
+#if defined(__amd64__)
+#define KERN_PADDING (2 << 20)
+#else
+#define KERN_PADDING 0
+#endif
+
 #define PA_INVAL (vm_offset_t)-1
 static vm_offset_t pa_start = PA_INVAL;
-static vm_offset_t padding;
 static vm_offset_t offset;
 
 static uint64_t commit_limit;
@@ -259,6 +275,10 @@ kboot_find_smbios(void)
 	ep = buffer + strlen(buffer);
 	walker = buffer;
 	while (walker <= ep) {
+		/*
+		 * Linux outputs the v3 table first if present, so we will
+		 * choose it in priority.
+		 */
 		if (strncmp("SMBIOS3=", walker, 8) == 0)
 			return((vm_offset_t)strtoull(walker + 8, NULL, 0));
 		if (strncmp("SMBIOS=", walker, 7) == 0)
@@ -380,6 +400,8 @@ main(int argc, const char **argv)
 			bootdev = getenv("currdev");
 	}
 #endif
+	if (bootdev == NULL)
+		bootdev = "host:/";
 	if (bootdev != NULL) {
 		/*
 		 * Otherwise, honor what's on the command line. If we've been
@@ -508,15 +530,13 @@ kboot_copyin(const void *src, vm_offset_t dest, const size_t len)
 
 	if (pa_start == PA_INVAL) {
 		pa_start = kboot_get_phys_load_segment();
-//		padding = 2 << 20; /* XXX amd64: revisit this when we make it work */
-		padding = 0;
 		offset = dest;
 		get_phys_buffer(pa_start, len, &destbuf);
 	}
 
 	remainder = len;
 	do {
-		segsize = get_phys_buffer(dest + pa_start + padding - offset, remainder, &destbuf);
+		segsize = get_phys_buffer(dest + pa_start + KERN_PADDING - offset, remainder, &destbuf);
 		bcopy(src, destbuf, segsize);
 		remainder -= segsize;
 		src += segsize;
@@ -534,7 +554,7 @@ kboot_copyout(vm_offset_t src, void *dest, const size_t len)
 
 	remainder = len;
 	do {
-		segsize = get_phys_buffer(src + pa_start + padding - offset, remainder, &srcbuf);
+		segsize = get_phys_buffer(src + pa_start + KERN_PADDING - offset, remainder, &srcbuf);
 		bcopy(srcbuf, dest, segsize);
 		remainder -= segsize;
 		src += segsize;
@@ -620,6 +640,7 @@ kboot_zfs_probe(void)
 #endif
 }
 
+#ifdef LOADER_FDT_SUPPORT
 /*
  * Since proper fdt command handling function is defined in fdt_loader_cmd.c,
  * and declaring it as extern is in contradiction with COMMAND_SET() macro
@@ -634,4 +655,4 @@ command_fdt(int argc, char *argv[])
 }
 
 COMMAND_SET(fdt, "fdt", "flattened device tree handling", command_fdt);
-
+#endif

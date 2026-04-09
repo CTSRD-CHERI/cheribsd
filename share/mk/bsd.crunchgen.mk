@@ -44,6 +44,8 @@ CRUNCH_GENERATE_LINKS?= yes
 # it.
 CRUNCHARGS+= MK_AUTO_OBJ=no
 CRUNCH_BUILDOPTS+= MK_AUTO_OBJ=${MK_AUTO_OBJ}
+# See bsd.compiler.mk/bsd.lib.mk/bsd.prog.mk
+CRUNCH_BUILDOPTS+= -D_CRUNCHGEN
 
 CLEANFILES+= ${CONF} *.o *.lo *.c *.mk *.cache *.a *.h
 

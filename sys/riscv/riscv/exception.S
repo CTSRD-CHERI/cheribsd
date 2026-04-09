@@ -264,11 +264,7 @@
 	csetaddr ct1, ct1, t0
 	li	t0, 1
 	csetflags ct1, ct1, t0
-#ifdef __riscv_xcheri_mode_dependent_jumps
 	jr.cap	ct1
-#else
-	cjr	ct1
-#endif
 .option capmode
 1:
 	/*
@@ -423,8 +419,7 @@
 	/* Handle the ast */
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	ca0, csp
-	clgc	cra, _C_LABEL(ast)
-	cjalr	cra
+	ccall	_C_LABEL(ast)
 #else
 	mv	a0, sp
 	call	_C_LABEL(ast)
@@ -458,8 +453,7 @@ ENTRY(cpu_exception_handler_supervisor)
 	save_registers 1
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	ca0, csp
-	clgc	cra, _C_LABEL(do_trap_supervisor)
-	cjalr	cra
+	ccall	_C_LABEL(do_trap_supervisor)
 #else
 	mv	a0, sp
 	call	_C_LABEL(do_trap_supervisor)
@@ -472,8 +466,7 @@ ENTRY(cpu_exception_handler_user)
 	save_registers 0
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	ca0, csp
-	clgc	cra, _C_LABEL(do_trap_user)
-	cjalr	cra
+	ccall	_C_LABEL(do_trap_user)
 #else
 	mv	a0, sp
 	call	_C_LABEL(do_trap_user)

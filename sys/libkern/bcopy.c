@@ -108,7 +108,7 @@ _memcpy(void *dst0, const void *src0, size_t length, bool keeptags)
 		t = length / wsize;
 #if __has_feature(capabilities)
 		if (!keeptags) {
-			TLOOP(*(word *)dst = (word)cheri_cleartag(
+			TLOOP(*(word *)dst = (word)cheri_tag_clear(
 			        (void * __capability)*(const word *)src);
 			    src += wsize; dst += wsize);
 		} else
@@ -141,7 +141,7 @@ _memcpy(void *dst0, const void *src0, size_t length, bool keeptags)
 #if __has_feature(capabilities)
 		if (!keeptags) {
 			TLOOP(src -= wsize; dst -= wsize;
-			    *(word *)dst = (word)cheri_cleartag(
+			    *(word *)dst = (word)cheri_tag_clear(
 			        (void * __capability)*(const word *)src));
 		} else
 #endif
@@ -164,12 +164,12 @@ __strong_reference(memcpy, memmove);
 
 #if __has_feature(capabilities)
 void *
-memcpynocap(void *dst0, const void *src0, size_t length)
+memcpy_data(void *dst0, const void *src0, size_t length)
 {
 	return _memcpy(dst0, src0, length, false);
 }
 
-__strong_reference(memcpynocap, memmovenocap);
+__strong_reference(memcpy_data, memmove_data);
 #endif
 // CHERI CHANGES START
 // {

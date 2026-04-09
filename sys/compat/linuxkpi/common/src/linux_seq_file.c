@@ -40,7 +40,7 @@
 MALLOC_DEFINE(M_LSEQ, "seq_file", "seq_file");
 
 ssize_t
-seq_read(struct linux_file *f, char *ubuf, size_t size, off_t *ppos)
+seq_read(struct linux_file *f, char __user * __capability ubuf, size_t size, off_t *ppos)
 {
 	struct seq_file *m;
 	struct sbuf *sbuf;
@@ -49,6 +49,7 @@ seq_read(struct linux_file *f, char *ubuf, size_t size, off_t *ppos)
 
 	m = f->private_data;
 	sbuf = m->buf;
+	sbuf_clear(sbuf);
 
 	p = m->op->start(m, ppos);
 	rc = m->op->show(m, p);
@@ -59,18 +60,8 @@ seq_read(struct linux_file *f, char *ubuf, size_t size, off_t *ppos)
 	if (rc)
 		return (rc);
 
-	rc = sbuf_len(sbuf);
-	if (*ppos >= rc || size < 1)
-		return (-EINVAL);
-
-	size = min(rc - *ppos, size);
-	rc = strscpy(ubuf, sbuf_data(sbuf) + *ppos, size + 1);
-
-	/* add 1 for null terminator */
-	if (rc > 0)
-		rc += 1;
-
-	return (rc);
+	return (simple_read_from_buffer(ubuf, size, ppos, sbuf_data(sbuf),
+	    sbuf_len(sbuf)));
 }
 
 int

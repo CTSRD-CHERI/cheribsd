@@ -76,6 +76,11 @@
 	li	tmp, SSTATUS_SUM;					\
 	csrc	sstatus, tmp
 
+#define	SBI_CALL(ext, func)						\
+	li	a7, ext;						\
+	li	a6, func;						\
+	ecall
+
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	CAPABILITY_REG(reg)	c##reg
 #define	MOVE_REG(dst, src)	cmove CAPABILITY_REG(dst), CAPABILITY_REG(src)

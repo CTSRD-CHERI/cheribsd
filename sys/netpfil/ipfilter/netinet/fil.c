@@ -18,6 +18,7 @@
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/abi_compat.h>
 #include <sys/time.h>
 #if defined(_KERNEL) && defined(__FreeBSD__)
 #  if !defined(IPFILTER_LKM)
@@ -1330,8 +1331,8 @@ ipf_pr_tcpcommon(fr_info_t *fin)
 		return (1);
 	}
 
-	flags = tcp->th_flags;
-	fin->fin_tcpf = tcp->th_flags;
+	flags = tcp_get_flags(tcp);
+	fin->fin_tcpf = tcp_get_flags(tcp);
 
 	/*
 	 * If the urgent flag is set, then the urgent pointer must
@@ -4050,7 +4051,7 @@ ipf_sync(ipf_main_softc_t *softc, void *ifp)
  * end up being unaligned) and on the kernel's local stack.
  */
 /* ------------------------------------------------------------------------ */
-/* Function:    copyinptr                                                   */
+/* Function:    copyin_indirect                                             */
 /* Returns:     int - 0 = success, else failure                             */
 /* Parameters:  src(I)  - pointer to the source address                     */
 /*              dst(I)  - destination address                               */
@@ -4061,7 +4062,7 @@ ipf_sync(ipf_main_softc_t *softc, void *ifp)
 /* NB: src - pointer to user space pointer, dst - kernel space pointer      */
 /* ------------------------------------------------------------------------ */
 int
-copyinptr(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
+copyin_indirect(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
 {
 	char * __capability ca;
 	int error;
@@ -4083,7 +4084,7 @@ copyinptr(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    copyoutptr                                                  */
+/* Function:    copyout_indirect                                            */
 /* Returns:     int - 0 = success, else failure                             */
 /* Parameters:  src(I)  - pointer to the source address                     */
 /*              dst(I)  - destination address                               */
@@ -4094,7 +4095,7 @@ copyinptr(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
 /* NB: src - kernel space pointer, dst - pointer to user space pointer.     */
 /* ------------------------------------------------------------------------ */
 int
-copyoutptr(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
+copyout_indirect(ipf_main_softc_t *softc, void *src, void *dst, size_t size)
 {
 	char * __capability ca;
 	int error;
@@ -4669,7 +4670,7 @@ frrequest(ipf_main_softc_t *softc, int unit, ioctlcmd_t req, caddr_t data,
 				 * changes.
 				 */
 #ifndef __CHERI_PURE_CAPABILITY__
-				error = COPYIN(__USER_CAP(uptr, fp->fr_dsize), ptr, fp->fr_dsize);
+				error = COPYIN(USER_PTR(uptr, fp->fr_dsize), ptr, fp->fr_dsize);
 #else
 				error = COPYIN(uptr, ptr, fp->fr_dsize);
 #endif
@@ -4913,7 +4914,7 @@ frrequest(ipf_main_softc_t *softc, int unit, ioctlcmd_t req, caddr_t data,
 			if (error == 0) {
 				if ((f->fr_dsize != 0) && (uptr != NULL)) {
 #ifndef __CHERI_PURE_CAPABILITY__
-					error = COPYOUT(f->fr_data, __USER_CAP(uptr, f->fr_dsize),
+					error = COPYOUT(f->fr_data, USER_PTR(uptr, f->fr_dsize),
 							f->fr_dsize);
 #else
 					error = COPYOUT(f->fr_data, uptr,
@@ -5966,7 +5967,7 @@ ipf_updateipid(fr_info_t *fin)
 		id = (u_short)sum;
 		ip->ip_id = htons(id);
 	} else {
-		ip_fillid(ip);
+		ip_fillid(ip, V_ip_random_id);
 		id = ntohs(ip->ip_id);
 		if ((fin->fin_flx & FI_FRAG) != 0)
 			(void) ipf_frag_ipidnew(fin, (u_32_t)id);

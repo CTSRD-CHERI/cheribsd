@@ -117,7 +117,7 @@ aw_de2_attach(device_t dev)
 			device_probe_and_attach(cdev);
 	}
 
-	return (bus_generic_attach(dev));
+	return (bus_attach_children(dev));
 }
 
 static int

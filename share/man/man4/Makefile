@@ -40,10 +40,6 @@ MAN=	aac.4 \
 	alc.4 \
 	ale.4 \
 	alpm.4 \
-	altera_atse.4 \
-	altera_avgen.4 \
-	altera_jtag_uart.4 \
-	altera_sdcard.4 \
 	altq.4 \
 	amdpm.4 \
 	${_amdsbwd.4} \
@@ -76,7 +72,6 @@ MAN=	aac.4 \
 	bce.4 \
 	bcm5974.4 \
 	bcma.4 \
-	berirom.4 \
 	bfe.4 \
 	bge.4 \
 	${_bhyve.4} \
@@ -272,6 +267,7 @@ MAN=	aac.4 \
 	iwnfw.4 \
 	iwlwifi.4 \
 	iwlwififw.4 \
+	${_iwx.4} \
 	ix.4 \
 	ixl.4 \
 	jedec_dimm.4 \
@@ -445,6 +441,7 @@ MAN=	aac.4 \
 	owc.4 \
 	ovpn.4 \
 	${_padlock.4} \
+	p9fs.4 \
 	pass.4 \
 	pca954x.4 \
 	pccard.4 \
@@ -479,6 +476,7 @@ MAN=	aac.4 \
 	pty.4 \
 	puc.4 \
 	pwmc.4 \
+	${_pvscsi.4} \
 	${_qat.4} \
 	${_qat_c2xxx.4} \
 	${_qlxge.4} \
@@ -589,7 +587,6 @@ MAN=	aac.4 \
 	tslog.4 \
 	tty.4 \
 	tun.4 \
-	twe.4 \
 	tws.4 \
 	udp.4 \
 	udplite.4 \
@@ -653,8 +650,6 @@ MLINKS+=age.4 if_age.4
 MLINKS+=agp.4 agpgart.4
 MLINKS+=alc.4 if_alc.4
 MLINKS+=ale.4 if_ale.4
-MLINKS+=altera_atse.4 atse.4
-MLINKS+=altera_sdcard.4 altera_sdcardc.4
 MLINKS+=altq.4 ALTQ.4
 MLINKS+=ath.4 if_ath.4
 MLINKS+=aue.4 if_aue.4
@@ -773,7 +768,9 @@ MLINKS+=ptnet.4 if_ptnet.4
 MLINKS+=ral.4 if_ral.4
 MLINKS+=re.4 if_re.4
 MLINKS+=rl.4 if_rl.4
-MLINKS+=rtwn_pci.4 if_rtwn_pci.4
+MLINKS+=rtw88.4 if_rtw88.4
+MLINKS+=rtw89.4 if_rtw89.4
+MLINKS+=rtwn.4 if_rtwn.4
 MLINKS+=rue.4 if_rue.4
 MLINKS+=scsi.4 cam.4
 MLINKS+=scsi.4 scbus.4
@@ -862,7 +859,6 @@ _if_bxe.4=	if_bxe.4
 _if_hn.4=	if_hn.4
 _if_nfe.4=	if_nfe.4
 _if_urtw.4=	if_urtw.4
-_if_vmx.4=	if_vmx.4
 _if_wpi.4=	if_wpi.4
 _igc.4=		igc.4
 _imcsmb.4=	imcsmb.4
@@ -893,7 +889,6 @@ _urtw.4=	urtw.4
 _viawd.4=	viawd.4
 _vmci.4=	vmci.4
 _vmd.4=		vmd.4
-_vmx.4=		vmx.4
 _wbwd.4=	wbwd.4
 _wdatwd.4=	wdatwd.4
 _wpi.4=		wpi.4
@@ -904,6 +899,7 @@ _xnb.4=		xnb.4
 
 .if ${MACHINE_CPUARCH} == "amd64"
 _ioat.4=	ioat.4
+_iwx.4=		iwx.4
 _nvdimm.4=	nvdimm.4
 _qlxge.4=	qlxge.4
 _qlxgb.4=	qlxgb.4
@@ -913,6 +909,7 @@ _sfxge.4=	sfxge.4
 _smartpqi.4=	smartpqi.4
 _sume.4=	sume.4
 
+MLINKS+=iwx.4 if_iwx.4
 MLINKS+=qlxge.4 if_qlxge.4
 MLINKS+=qlxgb.4 if_qlxgb.4
 MLINKS+=qlxgbe.4 if_qlxgbe.4
@@ -929,9 +926,12 @@ _vmm.4=		vmm.4
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386" || \
 	 ${MACHINE_CPUARCH} == "aarch64"
 _gve.4=		gve.4
+_if_vmx.4=	if_vmx.4
 _ipmi.4=	ipmi.4
 _linux.4=	linux.4
 _ossl.4=	ossl.4
+_pvscsi.4=	pvscsi.4
+_vmx.4=		vmx.4
 .endif
 
 .if ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "aarch64" || \
@@ -1015,6 +1015,7 @@ _pfsync.4=	pfsync.4
 
 .if ${MK_USB} != "no"
 MAN+=	\
+	mtw.4 \
 	otus.4 \
 	otusfw.4 \
 	rsu.4 \
@@ -1049,6 +1050,7 @@ MAN+=	\
 	uled.4 \
 	ulpt.4 \
 	umass.4 \
+	umb.4 \
 	umcs.4 \
 	umct.4 \
 	umodem.4 \
@@ -1072,6 +1074,7 @@ MAN+=	\
 	veriexec.4 \
 	zyd.4
 
+MLINKS+=mtw.4 if_mtw.4
 MLINKS+=otus.4 if_otus.4
 MLINKS+=rsu.4 if_rsu.4
 MLINKS+=rtwn_usb.4 if_rtwn_usb.4

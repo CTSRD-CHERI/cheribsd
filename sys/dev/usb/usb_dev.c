@@ -1228,13 +1228,13 @@ usb_filter_read(struct knote *kn, long hint)
 	return (m ? 1 : 0);
 }
 
-static struct filterops usb_filtops_write = {
+static const struct filterops usb_filtops_write = {
 	.f_isfd = 1,
 	.f_detach = usb_filter_detach,
 	.f_event = usb_filter_write,
 };
 
-static struct filterops usb_filtops_read = {
+static const struct filterops usb_filtops_read = {
 	.f_isfd = 1,
 	.f_detach = usb_filter_detach,
 	.f_event = usb_filter_read,
@@ -1673,7 +1673,7 @@ usb_static_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 #endif
 #ifdef COMPAT_FREEBSD64
 		case USB_READ_DIR64:
-			err = usb_read_symlink(__USER_CAP(u.urd64->urd_data,
+			err = usb_read_symlink(USER_PTR(u.urd64->urd_data,
 			    u.urd64->urd_maxlen), u.urd64->urd_startentry,
 			    u.urd64->urd_maxlen);
 			break;

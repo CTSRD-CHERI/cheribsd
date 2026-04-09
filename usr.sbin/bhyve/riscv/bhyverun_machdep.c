@@ -308,6 +308,8 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 	int error;
 	int pcie_intrs[4] = {PCIE_INTA, PCIE_INTB, PCIE_INTC, PCIE_INTD};
 	vm_paddr_t fdt_gpa;
+	char isa[32];
+	int retval;
 
 	bootrom = get_config_value("bootrom");
 	if (bootrom == NULL) {
@@ -321,8 +323,13 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 		return (error);
 	}
 
+	error = vm_get_capability(bsp, VM_CAP_SSTC, &retval);
+	assert(error == 0);
+	snprintf(isa, sizeof(isa), "%s%s", "rv64imafdc",
+	    retval == 1 ? "_sstc" : "");
+
 	fdt_gpa = vm_get_highmem_base(ctx) + roundup2(len, FDT_DTB_ALIGN);
-	error = fdt_init(ctx, guest_ncpus, fdt_gpa, FDT_SIZE);
+	error = fdt_init(ctx, guest_ncpus, fdt_gpa, FDT_SIZE, isa);
 	if (error != 0)
 		return (error);
 
@@ -330,7 +337,7 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 	error = vm_set_register(bsp, VM_REG_GUEST_A1, fdt_gpa);
 	assert(error == 0);
 
-	fdt_add_aplic(APLIC_MEM_BASE, APLIC_MEM_SIZE);
+	fdt_add_aplic(APLIC_MEM_BASE, APLIC_MEM_SIZE, guest_ncpus);
 	error = vm_attach_aplic(ctx, APLIC_MEM_BASE, APLIC_MEM_SIZE);
 	if (error != 0) {
 		warn("vm_attach_aplic()");

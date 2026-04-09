@@ -45,8 +45,7 @@ ENTRY(setjmp)
 	cincoffset ca2, ca0, (_JB_SIGMASK * 16)	/* oset */
 	li	a1, 0				/* set */
 	li	a0, 1				/* SIG_BLOCK */
-	clgc	ct0, _C_LABEL(sigprocmask)
-	cjalr	ct0
+	ccall	_C_LABEL(sigprocmask)
 
 	clc	ca0, 0(csp)
 	clc	cra, 16(csp)
@@ -177,8 +176,7 @@ ENTRY(longjmp)
 	li	a2, 0				/* oset */
 	cincoffset ca1, ca0, (_JB_SIGMASK * 16)	/* set */
 	li	a0, 3				/* SIG_BLOCK */
-	clgc	ct0, _C_LABEL(sigprocmask)
-	cjalr	ct0
+	ccall	_C_LABEL(sigprocmask)
 
 	clc	ca1, (2 * 16)(csp)
 	clc	cra, (1 * 16)(csp)
@@ -226,13 +224,14 @@ ENTRY(longjmp)
 
 	/* Load the return value */
 	mv	a0, a1
+	bnez	a1, 1f
+	li	a0, 1
+1:
 	cret
 
 botch:
-	clgc	ct0, _C_LABEL(longjmperror)
-	cjalr	ct0
-	clgc	ct0, _C_LABEL(abort)
-	cjalr	ct0
+	ccall	_C_LABEL(longjmperror)
+	ccall	_C_LABEL(abort)
 #else
 	/* Check the magic value */
 	ld	t0, 0(a0)

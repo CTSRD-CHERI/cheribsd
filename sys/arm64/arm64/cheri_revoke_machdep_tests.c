@@ -52,7 +52,7 @@ vm_cheri_revoke_test_mem_map(const uint8_t * __capability crshadow,
 	uint8_t bmbits;
 	const uint8_t * __capability bmloc;
 
-	ptraddr_t va = cheri_getbase(cut);
+	ptraddr_t va = cheri_base_get(cut);
 
 	bmloc = crshadow - VM_CHERI_REVOKE_BSZ_OTYPE -
 	    (va / VM_CHERI_REVOKE_GSZ_MEM_MAP / 8);
@@ -89,7 +89,7 @@ vm_cheri_revoke_test_mem_nomap(const uint8_t * __capability crshadow,
 	uint8_t bmbits;
 	const uint8_t * __capability bmloc;
 
-	ptraddr_t va = cheri_getbase(cut);
+	ptraddr_t va = cheri_base_get(cut);
 
 	bmloc = crshadow + (va / VM_CHERI_REVOKE_GSZ_MEM_NOMAP / 8);
 
@@ -118,7 +118,7 @@ vm_cheri_revoke_test_mem_nomap(const uint8_t * __capability crshadow,
 static inline unsigned
 vm_cheri_revoke_test_range(vm_offset_t start, vm_offset_t end, uintcap_t cut)
 {
-	ptraddr_t va = cheri_getbase(cut);
+	ptraddr_t va = cheri_base_get(cut);
 
 	return (va >= start && va < end);
 }

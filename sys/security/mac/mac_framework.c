@@ -70,7 +70,9 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/abi_compat.h>
 #include <sys/condvar.h>
+#include <sys/jail.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/mac.h>
@@ -107,7 +109,12 @@ SYSCTL_NODE(_security, OID_AUTO, mac, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "TrustedBSD MAC policy controls");
 
 /*
- * Declare that the kernel provides MAC support, version 3 (FreeBSD 7.x).
+ * Root sysctl node for MAC modules' jail parameters.
+ */
+SYSCTL_JAIL_PARAM_NODE(mac, "Jail parameters for MAC policy controls");
+
+/*
+ * Declare that the kernel provides a specific version of MAC support.
  * This permits modules to refuse to be loaded if the necessary support isn't
  * present, even if it's pre-boot.
  */
@@ -736,28 +743,46 @@ mac_check_structmac_consistent(const struct mac *mac)
 	return (0);
 }
 
+#ifdef COMPAT_FREEBSD32
+struct mac32 {
+	uint32_t	m_buflen;	/* size_t */
+	uint32_t	m_string;	/* char * */
+};
+#endif
+
 int
-copyin_mac(void * __capability mac_p, struct mac *mac)
+copyin_mac(const void * const __capability mac_p, struct mac *mac)
 {
 	int error;
 
 	memset(mac, 0, sizeof(*mac));
 #ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		error = EOPNOTSUPP;
-	else
+	if (SV_CURPROC_FLAG(SV_ILP32)) {
+		struct mac32 mac32;
+
+		error = copyin(mac_p, &mac32, sizeof(mac32));
+		if (error != 0)
+			return (error);
+
+		CP(mac32, *mac, m_buflen);
+		PTRIN_CP(mac32, *mac, m_string);
+		return (0);
+	}
 #endif
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
 		struct mac64 tmpmac;
+
 		error = copyin(mac_p, &tmpmac, sizeof(tmpmac));
+		if (error != 0)
+			return (error);
+
 		mac->m_buflen = tmpmac.m_buflen;
-		mac->m_string = __USER_CAP(tmpmac.m_string, tmpmac.m_buflen);
-	} else
-#endif
-	{
-		error = copyincap(mac_p, mac, sizeof(*mac));
+		mac->m_string = USER_PTR(tmpmac.m_string, tmpmac.m_buflen);
+		return (0);
 	}
+#endif
+	error = copyinptr(mac_p, mac, sizeof(*mac));
 	return (error);
 }
 

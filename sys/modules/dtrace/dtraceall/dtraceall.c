@@ -85,4 +85,7 @@ MODULE_DEPEND(dtraceall, systrace, 1, 1, 1);
 #if defined(COMPAT_FREEBSD32)
 MODULE_DEPEND(dtraceall, systrace_freebsd32, 1, 1, 1);
 #endif
+#if defined(COMPAT_FREEBSD64)
+MODULE_DEPEND(dtraceall, systrace_freebsd64, 1, 1, 1);
+#endif
 MODULE_DEPEND(dtraceall, profile, 1, 1, 1);

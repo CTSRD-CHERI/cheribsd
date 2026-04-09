@@ -68,7 +68,7 @@ tramp_compile(char **entry, const struct tramp_data *data)
 	size_t hook_off, count_off;
 	size_t header_off, target_off, landing_off, unused_regs;
 	compart_id_t callee;
-	bool executive = cheri_getperm(data->target) & CHERI_PERM_EXECUTIVE;
+	bool executive = cheri_perms_get(data->target) & CHERI_PERM_EXECUTIVE;
 	bool count = ld_compartment_switch_count != NULL;
 	bool hook = ld_compartment_utrace != NULL ||
 	    ld_compartment_overhead != NULL;
@@ -147,6 +147,8 @@ tramp_compile(char **entry, const struct tramp_data *data)
 	callee = compart_id_for_address(data->defobj, (ptraddr_t)data->target);
 
 	COPY(push_frame);
+	PATCH_MOV(push_frame, cid_fast, cid_to_index(callee).val);
+	PATCH_LDR_IMM(push_frame, target_fast, target_off);
 	PATCH_MOV(push_frame, cid, cid_to_index(callee).val);
 	landing_off = PATCH_OFF(push_frame, landing);
 	/*

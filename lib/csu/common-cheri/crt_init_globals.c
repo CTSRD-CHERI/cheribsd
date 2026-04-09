@@ -33,37 +33,45 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include <cheri/cheric.h>
+#include <cheri/cherireg.h>
+#include <cheriintrin.h>
 
 #ifdef PIC
 #error "PIEs never need to initialise their own globals"
 #endif
 
 #ifdef CHERI_INIT_RELA
-extern const Elf_Rela __weak_symbol __rela_dyn_start __hidden;
-extern const Elf_Rela __weak_symbol __rela_dyn_end __hidden;
+extern const Elf_Rela __weak_symbol __rela_dyn_start[] __hidden;
+extern const Elf_Rela __weak_symbol __rela_dyn_end[] __hidden;
 
 static __always_inline void
-crt_init_rela(const Elf_Phdr *phdr __unused)
+crt_init_rela(const Elf_Phdr *phdr __unused, const Elf_Phdr *phlimit __unused)
 {
 	const Elf_Rela *rela, *relalim;
 	void * __capability data_cap;
 	const void * __capability code_cap;
+	bool use_code_bounds = false;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	data_cap = __DECONST(void *, phdr);
+	for (const Elf_Phdr *ph = phdr; ph < phlimit; ph++) {
+		if (ph->p_type == PT_CHERI_PCC) {
+			use_code_bounds = true;
+			break;
+		}
+	}
 #else
-	data_cap = cheri_getdefault();
+	data_cap = cheri_ddc_get();
 #endif
-	data_cap = cheri_clearperm(data_cap,
+	data_cap = cheri_perms_clear(data_cap,
 	    CHERI_PERM_EXECUTE | CHERI_PERM_SW_VMEM);
 
-	code_cap = cheri_getpcc();
+	code_cap = cheri_pcc_get();
 
-	rela = RODATA_PTR(__rela_dyn_start);
-	relalim = RODATA_PTR(__rela_dyn_end);
+	rela = CHERI_RODATA_PTR(__rela_dyn_start);
+	relalim = CHERI_RODATA_PTR(__rela_dyn_end);
 	for (; rela < relalim; rela++)
-		elf_reloc(rela, data_cap, code_cap, 0);
+		elf_reloc(rela, data_cap, code_cap, 0, use_code_bounds);
 }
 #endif
 
@@ -84,12 +92,15 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
     const void * __capability *rodata_cap_out)
 {
 	const Elf_Phdr *phlimit = phdr + phnum;
+	const struct capreloc *start_relocs;
+	const struct capreloc *stop_relocs;
 	Elf_Addr text_start = (Elf_Addr)-1l;
 	Elf_Addr text_end = 0;
 	Elf_Addr readonly_start = (Elf_Addr)-1l;
 	Elf_Addr readonly_end = 0;
 	Elf_Addr writable_start = (Elf_Addr)-1l;
 	Elf_Addr writable_end = 0;
+	bool use_code_bounds = false;
 	bool have_rodata_segment = false;
 	bool have_text_segment = false;
 	bool have_data_segment = false;
@@ -98,7 +109,7 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 	const void * __capability rodata_cap;
 
 #ifdef CHERI_INIT_RELA
-	crt_init_rela(phdr);
+	crt_init_rela(phdr, phlimit);
 #endif
 
 	/* Attempt to bound the data capability to only the writable segment */
@@ -109,6 +120,8 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 				__builtin_trap();
 				break;
 			}
+			if (ph->p_type == PT_CHERI_PCC)
+				use_code_bounds = true;
 			continue;
 		}
 		/*
@@ -139,6 +152,31 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 			readonly_end = MAX(readonly_end, seg_end);
 		}
 	}
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * Pure capability executables with multiple compartments
+	 * might have multiple writable and executable segments.
+	 * However, the capabilities for `phdr` and the current PCC
+	 * should be constrained to the executable.  Trust relocations
+	 * to further narrow bounds as needed.
+	 *
+	 * XXX: Once PT_CHERI_PCC is required for pure capability
+	 * binaries, the purecap version of this function should be
+	 * simplified such that the phdrs are only examined for
+	 * hybrid.
+	 */
+	if (use_code_bounds) {
+		code_cap = cheri_pcc_get();
+		data_cap = __DECONST(void *, phdr);
+		data_cap = cheri_perms_clear(data_cap,
+		    CHERI_PERM_EXECUTE | CHERI_PERM_SW_VMEM);
+		rodata_cap = cheri_perms_clear(data_cap,
+		    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+		    CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_SW_VMEM);
+		goto handle_relocs;
+	}
+#endif
 
 	if (!have_text_segment) {
 		/* No text segment??? Must be an error somewhere else. */
@@ -181,33 +219,44 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 #ifdef __CHERI_PURE_CAPABILITY__
 		data_cap = __DECONST(void *, phdr);
 #else
-		data_cap = cheri_getdefault();
+		data_cap = cheri_ddc_get();
 #endif
-		data_cap = cheri_clearperm(data_cap,
+		data_cap = cheri_perms_clear(data_cap,
 		   CHERI_PERM_EXECUTE | CHERI_PERM_SW_VMEM);
 
-		code_cap = cheri_getpcc();
-		rodata_cap = cheri_clearperm(data_cap,
-		    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+		code_cap = cheri_pcc_get();
+		rodata_cap = cheri_perms_clear(data_cap,
+		    CHERI_PERM_STORE |
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
+		    CHERI_PERM_STORE_CAP |
+#endif
 		    CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_SW_VMEM);
 
-		data_cap = cheri_setaddress(data_cap, writable_start);
-		rodata_cap = cheri_setaddress(rodata_cap, readonly_start);
+		data_cap = cheri_address_set(data_cap, writable_start);
+		rodata_cap = cheri_address_set(rodata_cap, readonly_start);
 
 		/* TODO: should we use exact setbounds? */
 		data_cap =
-		    cheri_setbounds(data_cap, writable_end - writable_start);
+		    cheri_bounds_set(data_cap, writable_end - writable_start);
 		rodata_cap =
-		    cheri_setbounds(rodata_cap, readonly_end - readonly_start);
+		    cheri_bounds_set(rodata_cap, readonly_end - readonly_start);
 
-		if (!cheri_gettag(data_cap))
+		if (!cheri_tag_get(data_cap))
 			__builtin_trap();
-		if (!cheri_gettag(rodata_cap))
+		if (!cheri_tag_get(rodata_cap))
 			__builtin_trap();
-		if (!cheri_gettag(code_cap))
+		if (!cheri_tag_get(code_cap))
 			__builtin_trap();
 	}
-	cheri_init_globals_3(data_cap, code_cap, rodata_cap);
+
+#ifdef __CHERI_PURE_CAPABILITY__
+handle_relocs:
+#endif
+	start_relocs = CHERI_RODATA_PTR(__start___cap_relocs);
+	stop_relocs = CHERI_RODATA_PTR(__stop___cap_relocs);
+
+	cheri_init_globals_impl(start_relocs, stop_relocs, data_cap, code_cap,
+	    rodata_cap, use_code_bounds, 0);
 	if (data_cap_out)
 		*data_cap_out = data_cap;
 	if (code_cap_out)

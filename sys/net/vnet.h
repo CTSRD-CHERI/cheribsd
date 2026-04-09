@@ -311,7 +311,7 @@ extern struct sx vnet_sxlock;
  * See https://github.com/CTSRD-CHERI/llvm-project/issues/495
  */
 #define	_VNET_PTR(b, n)							\
-	cheri_setbounds((__typeof(VNET_NAME(n)) *)((b) +		\
+	cheri_bounds_set((__typeof(VNET_NAME(n)) *)((b) +		\
 	    ((ptraddr_t)&VNET_NAME(n) - (ptraddr_t)VNET_START)),	\
 	    sizeof(VNET_NAME(n)))
 #else

@@ -93,8 +93,8 @@ fake_preload_metadata(void *dtb_ptr, size_t dtb_size)
 	size_t size;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	lastaddr = (vm_pointer_t)cheri_setaddress(
-	    cheri_andperm(kernel_root_cap,
+	lastaddr = (vm_pointer_t)cheri_address_set(
+	    cheri_perms_and(kernel_root_cap,
 		CHERI_PERMS_KERNEL_DATA_NOCAP),
 	    (vm_offset_t)&end);
 #else
@@ -107,7 +107,7 @@ fake_preload_metadata(void *dtb_ptr, size_t dtb_size)
 	PRELOAD_PUSH_STRING("kernel");
 
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_TYPE);
-	PRELOAD_PUSH_STRING("elf kernel");
+	PRELOAD_PUSH_STRING(preload_kerntype);
 
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_ADDR);
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(vm_offset_t));
@@ -115,7 +115,8 @@ fake_preload_metadata(void *dtb_ptr, size_t dtb_size)
 
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_SIZE);
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(size_t));
-	PRELOAD_PUSH_VALUE(uint64_t, (size_t)(&end - VM_MIN_KERNEL_ADDRESS));
+	PRELOAD_PUSH_VALUE(uint64_t,
+		(size_t)((vm_offset_t)&end - VM_MIN_KERNEL_ADDRESS));
 
 	if (dtb_ptr != NULL) {
 		/* Copy DTB to KVA space and insert it into module chain. */
@@ -132,6 +133,9 @@ fake_preload_metadata(void *dtb_ptr, size_t dtb_size)
 	PRELOAD_PUSH_VALUE(uint32_t, 0);
 
 	preload_metadata = (caddr_t)(uintptr_t)fake_preload;
+
+	/* Initialize preload_kmdp */
+	preload_initkmdp(true);
 
 	init_static_kenv(NULL, 0);
 
@@ -185,7 +189,7 @@ linux_parse_boot_param(struct arm64_bootparams *abp)
 		return (0);
 	/* Test if modulep point to valid DTB. */
 	dtb_ptr = (struct fdt_header *)abp->modulep;
-	dtb_ptr = cheri_kern_andperm(dtb_ptr,
+	dtb_ptr = cheri_kern_perms_and(dtb_ptr,
 	    CHERI_PERMS_KERNEL_RODATA & CHERI_PERMS_KERNEL_DATA_NOCAP);
 	if (fdt_check_header(dtb_ptr) != 0)
 		return (0);
@@ -199,7 +203,6 @@ static vm_offset_t
 freebsd_parse_boot_param(struct arm64_bootparams *abp)
 {
 	vm_offset_t lastaddr = 0;
-	void *kmdp;
 #ifdef DDB
 	vm_pointer_t ksym_start;
 	vm_pointer_t ksym_end;
@@ -210,40 +213,42 @@ freebsd_parse_boot_param(struct arm64_bootparams *abp)
 		return (0);
 
 	preload_metadata = (caddr_t)(uintptr_t)(abp->modulep);
-	preload_metadata = cheri_kern_andperm(preload_metadata,
+	preload_metadata = cheri_kern_perms_and(preload_metadata,
 	    CHERI_PERMS_KERNEL_DATA & CHERI_PERMS_KERNEL_DATA_NOCAP);
-	kmdp = preload_search_by_type("elf kernel");
-	if (kmdp == NULL)
+
+	/* Initialize preload_kmdp */
+	preload_initkmdp(false);
+	if (preload_kmdp == NULL)
 		return (0);
 
-	boothowto = MD_FETCH(kmdp, MODINFOMD_HOWTO, int);
+	boothowto = MD_FETCH(preload_kmdp, MODINFOMD_HOWTO, int);
 	/*
 	 * XXX-AM: Sadly we don't have bounds for this. We need the
 	 * loader to support passing capabilities here.
 	 */
-	env_addr = MD_FETCH(kmdp, MODINFOMD_ENVP, vm_offset_t);
+	env_addr = MD_FETCH(preload_kmdp, MODINFOMD_ENVP, vm_offset_t);
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (env_addr != 0) {
-		env_addr = (vm_pointer_t)cheri_setaddress(kernel_root_cap,
+		env_addr = (vm_pointer_t)cheri_address_set(kernel_root_cap,
 		    env_addr);
-		env_addr = cheri_andperm(env_addr,
+		env_addr = cheri_perms_and(env_addr,
 		    CHERI_PERMS_KERNEL_DATA_NOCAP);
 	}
 #endif
 	loader_envp = (char *)env_addr;
 	init_static_kenv(loader_envp, 0);
-	lastaddr = MD_FETCH(kmdp, MODINFOMD_KERNEND, vm_offset_t);
+	lastaddr = MD_FETCH(preload_kmdp, MODINFOMD_KERNEND, vm_offset_t);
 #ifdef DDB
-	ksym_start = MD_FETCH(kmdp, MODINFOMD_SSYM, vm_offset_t);
-	ksym_end = MD_FETCH(kmdp, MODINFOMD_ESYM, vm_offset_t);
+	ksym_start = MD_FETCH(preload_kmdp, MODINFOMD_SSYM, vm_offset_t);
+	ksym_end = MD_FETCH(preload_kmdp, MODINFOMD_ESYM, vm_offset_t);
 #ifdef __CHERI_PURE_CAPABILITY__
-	ksym_start = (vm_pointer_t)cheri_setaddress(kernel_root_cap,
+	ksym_start = (vm_pointer_t)cheri_address_set(kernel_root_cap,
 	    ksym_start);
-	ksym_start = cheri_setbounds(ksym_start,
+	ksym_start = cheri_bounds_set(ksym_start,
 	    (ptraddr_t)ksym_end - (ptraddr_t)ksym_start);
-	ksym_start = cheri_andperm(ksym_start,
+	ksym_start = cheri_perms_and(ksym_start,
 	    CHERI_PERMS_KERNEL_DATA_NOCAP);
-	ksym_end = cheri_setaddress(ksym_start, ksym_end);
+	ksym_end = cheri_address_set(ksym_start, ksym_end);
 #endif
 	db_fetch_ksymtab(ksym_start, ksym_end, 0);
 #endif

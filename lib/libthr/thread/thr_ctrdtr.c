@@ -25,18 +25,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20221129,
- *   "target_type": "lib",
- *   "changes": [
- *     "pointer_shape"
- *   ],
- *   "change_comment": "TLS alignment"
- * }
- * CHERI CHANGES END
- */
 
 #include <sys/types.h>
 #include <rtld_tls.h>

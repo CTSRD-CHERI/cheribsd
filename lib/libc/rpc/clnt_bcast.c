@@ -32,18 +32,6 @@
 /*
  * Copyright (c) 1986-1991 by Sun Microsystems Inc. 
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "sunrpc"
- * }
- * CHERI CHANGES END
- */
 
 /*
  * clnt_bcast.c
@@ -631,7 +619,7 @@ rpc_broadcast_exp(rpcprog_t prog, rpcvers_t vers, rpcproc_t proc,
 			xdrs->x_op = XDR_FREE;
 			msg.acpted_rply.ar_results.proc = (xdrproc_t) xdr_void;
 			(void) xdr_replymsg(xdrs, &msg);
-			(void) (*xresults)(xdrs, resultsp, 0);
+			(void) (*xresults)(xdrs, resultsp);
 			XDR_DESTROY(xdrs);
 			if (done) {
 				stat = RPC_SUCCESS;

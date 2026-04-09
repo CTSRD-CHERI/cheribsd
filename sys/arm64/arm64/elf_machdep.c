@@ -398,29 +398,30 @@ decode_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr *addrp,
 static uintcap_t __nosanitizecoverage
 build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
     void * __capability data_cap, const void * __capability code_cap,
-    bool iskernel)
+    bool use_code_bounds, bool iskernel)
 {
 	uintcap_t cap;
 
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
 	    (uintcap_t)code_cap : (uintcap_t)data_cap;
-	cap = cheri_setaddress(cap, addr);
+	cap = cheri_address_set(cap, addr);
+	if (perms != MORELLO_FRAG_EXECUTABLE || use_code_bounds)
+		cap = cheri_bounds_set(cap, size);
 
 	if (perms == MORELLO_FRAG_EXECUTABLE ||
 	    perms == MORELLO_FRAG_RODATA) {
-		cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
+		cap = cheri_perms_clear(cap, CHERI_PERM_SEAL |
 		    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
 		    CHERI_PERM_STORE_LOCAL_CAP);
 	}
 	if (perms == MORELLO_FRAG_RWDATA ||
 	    perms == MORELLO_FRAG_RODATA) {
-		cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
+		cap = cheri_perms_clear(cap, CHERI_PERM_SEAL |
 		    CHERI_PERM_EXECUTE);
-		cap = cheri_setbounds(cap, size);
 	}
 	cap += offset;
 	if (perms == MORELLO_FRAG_EXECUTABLE) {
-		cap = cheri_sealentry(cap);
+		cap = cheri_sentry_create(cap);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 		if (iskernel) {
 			/*
@@ -433,7 +434,7 @@ build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
 			cap = (uintptr_t)compartment_entry((uintptr_t)cap);
 #endif
 	}
-	KASSERT(cheri_gettag(cap) != 0,
+	KASSERT(cheri_tag_get(cap) != 0,
 	    ("Relocation produce invalid capability %#lp",
 	    (void * __capability)cap));
 	return (cap);
@@ -443,14 +444,14 @@ build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
 static uintcap_t __nosanitizecoverage
 build_cap_from_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr offset,
     void * __capability data_cap, const void * __capability code_cap,
-    bool iskernel)
+    bool use_code_bounds, bool iskernel)
 {
 	Elf_Addr addr, size;
 	uint8_t perms;
 
 	decode_fragment(fragment, relocbase, &addr, &size, &perms);
 	return (build_reloc_cap(addr, size, perms, offset, data_cap, code_cap,
-	    iskernel));
+	    use_code_bounds, iskernel));
 }
 #endif
 #endif
@@ -472,7 +473,13 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 	const Elf_Rel *rel;
 	const Elf_Rela *rela;
 	int error;
+#if __has_feature(capabilities)
+	bool use_code_bounds = false;
+#endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	use_code_bounds = (lf->flags & LINKER_FILE_PCC_BOUNDS) != 0;
+#endif
 	switch (type) {
 	case ELF_RELOC_REL:
 		rel = (const Elf_Rel *)data;
@@ -531,7 +538,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			    (val == addr1 ? relocbase :
 			    linker_kernel_file->address);
 			*(uintcap_t *)(void *)where = build_reloc_cap(addr1,
-			    size, perms, addend, base, base,
+			    size, perms, addend, base, base, use_code_bounds,
 			    lf == linker_kernel_file);
 		}
 #endif
@@ -603,7 +610,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		 * the lookup function instead.
 		 */
 		if (addend != 0) {
-			KASSERT(!cheri_getsealed(addr),
+			KASSERT(!cheri_is_sealed(addr),
 			    ("%s: sentry %#p with non-zero addend %#lx",
 			    __func__, (void *)addr, addend));
 
@@ -650,15 +657,16 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			return (-1);
 #else
 			addr = (uintptr_t)(relocbase + rela->r_addend);
-			addr = cheri_clearperm(addr, CHERI_PERM_SEAL |
+			addr = cheri_perms_clear(addr, CHERI_PERM_SEAL |
 			    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
 			    CHERI_PERM_STORE_LOCAL_CAP);
-			addr = cheri_sealentry(addr);
+			addr = cheri_sentry_create(addr);
 #endif
 		} else
 			addr = build_cap_from_fragment(where,
 			    (Elf_Addr)relocbase, rela->r_addend,
-			    relocbase, relocbase, lf == linker_kernel_file);
+			    relocbase, relocbase, use_code_bounds,
+			    lf == linker_kernel_file);
 		addr = ((uintptr_t (*)(void))addr)();
 		*(uintptr_t *)where = addr;
 		break;
@@ -798,16 +806,39 @@ static void __nosanitizecoverage
 elf_reloc_self_perms(const Elf_Dyn *dynp, void *data_cap, const void *code_cap,
     uint8_t permsmask)
 {
+	const Elf_Ehdr *hdr;
+	const Elf_Phdr *phdr, *phlimit;
 	const Elf_Rela *rela = NULL, *rela_end;
 	Elf_Addr addr, *fragment, size;
 	uintptr_t cap;
 	size_t rela_size = 0;
+	bool use_code_bounds = false;
 	uint8_t perms;
+
+	/* See if there is an ELF header is at KERNBASE. */
+	hdr = data_cap;
+	if (IS_ELF(*hdr) &&
+	    hdr->e_ident[EI_CLASS] == ELF_TARG_CLASS &&
+	    hdr->e_ident[EI_DATA] == ELF_TARG_DATA &&
+	    hdr->e_ident[EI_VERSION] == EV_CURRENT &&
+	    hdr->e_machine == ELF_TARG_MACH &&
+	    hdr->e_version == ELF_TARG_VER &&
+	    hdr->e_phentsize == sizeof(Elf_Phdr) &&
+	    ELF_IS_CHERI(hdr)) {
+		phdr = (const Elf_Phdr *)((const char *)hdr + hdr->e_phoff);
+		phlimit = phdr + hdr->e_phnum;
+		for (; phdr < phlimit; phdr++) {
+			if (phdr->p_type == PT_CHERI_PCC) {
+				use_code_bounds = true;
+				break;
+			}
+		}
+	}
 
 	for (; dynp->d_tag != DT_NULL; dynp++) {
 		switch (dynp->d_tag) {
 		case DT_RELA:
-			rela = (const Elf_Rela *)cheri_setaddress(data_cap,
+			rela = (const Elf_Rela *)cheri_address_set(data_cap,
 			    dynp->d_un.d_ptr);
 			break;
 		case DT_RELASZ:
@@ -816,7 +847,7 @@ elf_reloc_self_perms(const Elf_Dyn *dynp, void *data_cap, const void *code_cap,
 		}
 	}
 
-	rela = cheri_setbounds(rela, rela_size);
+	rela = cheri_bounds_set(rela, rela_size);
 	rela_end = (const Elf_Rela *)((const char *)rela + rela_size);
 
 	for (; rela < rela_end; rela++) {
@@ -824,14 +855,14 @@ elf_reloc_self_perms(const Elf_Dyn *dynp, void *data_cap, const void *code_cap,
 		switch (ELF_R_TYPE(rela->r_info)) {
 		case R_MORELLO_RELATIVE:
 		case R_MORELLO_FUNC_RELATIVE:
-			fragment = (Elf_Addr *)cheri_setaddress(data_cap,
+			fragment = (Elf_Addr *)cheri_address_set(data_cap,
 			    rela->r_offset);
 			decode_fragment(fragment, 0, &addr, &size, &perms);
 			if ((perms & permsmask) != perms)
 				continue;
 
 			cap = build_reloc_cap(addr, size, perms, rela->r_addend,
-			    data_cap, code_cap, true);
+			    data_cap, code_cap, use_code_bounds, true);
 			*((uintptr_t *)fragment) = cap;
 			break;
 		}

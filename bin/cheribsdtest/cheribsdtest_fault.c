@@ -42,9 +42,6 @@
 #include <machine/frame.h>
 #include <machine/trap.h>
 
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-
 #include <err.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -113,6 +110,7 @@ CHERIBSDTEST(nofault_perm_load,
 	cheribsdtest_success();
 }
 
+#ifdef HAS_CHERI_PERM_SEAL
 CHERIBSDTEST(illegal_perm_seal,
     "Exercise capability seal permission failure",
     CT_SEAL_VIOLATION_EXCEPTION)
@@ -127,10 +125,10 @@ CHERIBSDTEST(illegal_perm_seal,
 	if (sysctlbyname("security.cheri.sealcap", &sealcap, &sealcap_size,
 	    NULL, 0) < 0)
 		cheribsdtest_failure_err("sysctlbyname(security.cheri.sealcap)");
-	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_SEAL);
+	sealcap = cheri_perms_and(sealcap, ~CHERI_PERM_SEAL);
 	sealed = cheri_seal(ip, sealcap);
 	/* cheri_seal() should tag-clear on failure on all architectures. */
-	if (!cheri_gettag(sealed)) {
+	if (!cheri_tag_get(sealed)) {
 #if CHERI_SEAL_VIOLATION_EXCEPTION
 		/*
 		 * For the transition period from trapping to tag-clearing
@@ -145,6 +143,7 @@ CHERIBSDTEST(illegal_perm_seal,
 	cheribsdtest_failure_errx("cheri_seal() performed successfully "
 	    "%#lp with bad sealcap %#lp", sealed, sealcap);
 }
+#endif
 
 CHERIBSDTEST(fault_perm_store,
     "Exercise capability store permission failure",
@@ -168,6 +167,7 @@ CHERIBSDTEST(nofault_perm_store,
 	cheribsdtest_success();
 }
 
+#ifdef HAS_CHERI_PERM_SEAL
 CHERIBSDTEST(illegal_perm_unseal,
     "Exercise capability unseal permission failure",
     CT_SEAL_VIOLATION_EXCEPTION)
@@ -183,13 +183,13 @@ CHERIBSDTEST(illegal_perm_unseal,
 	if (sysctlbyname("security.cheri.sealcap", &sealcap, &sealcap_size,
 	    NULL, 0) < 0)
 		cheribsdtest_failure_err("sysctlbyname(security.cheri.sealcap)");
-	if ((cheri_getperm(sealcap) & CHERI_PERM_SEAL) == 0)
+	if ((cheri_perms_get(sealcap) & CHERI_PERM_SEAL) == 0)
 		cheribsdtest_failure_errx("unexpected !seal perm on sealcap");
 	sealed = cheri_seal(ip, sealcap);
-	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_UNSEAL);
+	sealcap = cheri_perms_and(sealcap, ~CHERI_PERM_UNSEAL);
 	unsealed = cheri_unseal(sealed, sealcap);
 	/* cheri_unseal() should tag-clear on failure on all architectures. */
-	if (!cheri_gettag(unsealed)) {
+	if (!cheri_tag_get(unsealed)) {
 #if CHERI_SEAL_VIOLATION_EXCEPTION
 		/*
 		 * For the transition period from trapping to tag-clearing
@@ -204,6 +204,7 @@ CHERIBSDTEST(illegal_perm_unseal,
 	cheribsdtest_failure_errx("cheri_unseal() performed successfully "
 	    "%#lp with bad unsealcap %#lp", unsealed, sealcap);
 }
+#endif
 
 CHERIBSDTEST(fault_tag, "Store via untagged capability",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
@@ -214,7 +215,7 @@ CHERIBSDTEST(fault_tag, "Store via untagged capability",
 	char ch;
 	char * __capability chp = cheri_ptr(&ch, sizeof(ch));
 
-	chp = cheri_cleartag(chp);
+	chp = cheri_tag_clear(chp);
 	*chp = '\0';
 }
 
@@ -225,20 +226,7 @@ CHERIBSDTEST(nofault_cfromptr, "Exercise CFromPtr success")
 	char * __capability cd; /* stored into here */
 
 	cb = cheri_ptr(buf, 256);
-#if defined(__aarch64__) || defined(__riscv_xcheri_no_relocation)
-	/*
-	 * morello-llvm emits cvtz for this intrinsic, which has an
-	 * address interpretation by default (unlike CFromPtr, which
-	 * has an offset interpretation).
-	 * https://git.morello-project.org/morello/llvm-project/-/issues/16
-	 *
-	 * Similarly, CHERI-RISC-V with ISAv9 always uses address
-	 * interpretation instead of offsetting from the base.
-	 */
 	cd = __builtin_cheri_cap_from_pointer(cb, (ptraddr_t)buf + 10);
-#else
-	cd = __builtin_cheri_cap_from_pointer(cb, 10);
-#endif
 	*cd = '\0';
 	cheribsdtest_success();
 }

@@ -117,6 +117,11 @@ int	freebsd32_copyinuio(const struct iovec * __capability cb_arg,
 	    struct uio **uiop);
 void	freebsd32_rusage_out(const struct rusage *s, struct rusage32 *s32);
 
+struct kinfo_knote;
+struct kinfo_knote32;
+void	freebsd32_kinfo_knote_to_32(const struct kinfo_knote *kin,
+	    struct kinfo_knote32 *kin32);
+
 extern int compat_freebsd_32bit;
 
 #endif /* !_COMPAT_FREEBSD32_FREEBSD32_UTIL_H_ */

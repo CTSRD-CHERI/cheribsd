@@ -204,7 +204,6 @@ struct vm_object {
 #define	OBJ_PAGERPRIV2	0x00008000	/* Pager private */
 #define	OBJ_SYSVSHM	0x00010000	/* SysV SHM */
 #define	OBJ_POSIXSHM	0x00020000	/* Posix SHM */
-#define	OBJ_CDEVH	0x00040000	/* OBJT_DEVICE handle is cdev */
 #define	OBJ_HASCAP	0x01000000	/* object can store capabilities */
 #define	OBJ_NOCAP	0x02000000	/* object and all shadow objects can
 					   not store capabilities */
@@ -224,20 +223,20 @@ struct vm_object {
 #ifdef	_KERNEL
 
 /*
- * This only asserts VM_PROT_WRITE_CAP to ensure that capabilities are
+ * This only asserts VM_PROT_WRITE|VM_PROT_CAP to ensure that capabilities are
  * never stored into objects that are not permitted to hold
  * capabilities.
  */
 #define	VM_OBJECT_ASSERT_CAP(object, prot)				\
-	KASSERT(((prot) & VM_PROT_WRITE_CAP) == 0 ||			\
+	    KASSERT(!VM_PROT_HAS_WRITE_CAP(prot) ||			\
 	    ((object)->flags & OBJ_HASCAP) != 0,			\
 	    ("%s: enabling WRITE_CAP on object %p without HASCAP",	\
 	    __func__, (object)))
 
 /*
- * In reality this only strips VM_PROT_READ_CAP as pre-COW mappings of
- * non-OBJ_HASCAP mappings should already be stripping
- * VM_PROT_WRITE_CAP.
+ * In reality this only strips VM_PROT_CAP on VM_PROT_READ entries as pre-COW
+ * mappings of non-OBJ_HASCAP mappings should already be stripping
+ * VM_PROT_WRITE.
  */
 #define	VM_OBJECT_MASK_CAP_PROT(object, prot)				\
 	((object)->flags & OBJ_HASCAP ? (prot) : (prot) & ~VM_PROT_CAP)
@@ -400,6 +399,8 @@ void vm_object_page_noreuse(vm_object_t object, vm_pindex_t start,
 void vm_object_page_remove(vm_object_t object, vm_pindex_t start,
     vm_pindex_t end, int options);
 boolean_t vm_object_populate(vm_object_t, vm_pindex_t, vm_pindex_t);
+void vm_object_prepare_buf_pages(vm_object_t object, vm_page_t *ma_dst,
+    int count, int *rbehind, int *rahead, vm_page_t *ma_src);
 void vm_object_print(long addr, boolean_t have_addr, long count, char *modif);
 void vm_object_reference (vm_object_t);
 void vm_object_reference_locked(vm_object_t);

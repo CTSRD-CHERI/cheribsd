@@ -89,10 +89,6 @@ static struct	csum *fscs;
 #define	sblock	disk.d_fs
 #define	acg	disk.d_cg
 
-union dinode {
-	struct ufs1_dinode dp1;
-	struct ufs2_dinode dp2;
-};
 #define DIP(dp, field) \
 	((sblock.fs_magic == FS_UFS1_MAGIC) ? \
 	(dp)->dp1.field : (dp)->dp2.field)
@@ -1228,13 +1224,3 @@ newfs_random(void)
 		return (nextnum++);
 	return (arc4random());
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20221129,
-//   "target_type": "prog",
-//   "changes_purecap": [
-//     "pointer_shape"
-//   ],
-//   "change_comment": "embedded pointer storage in superblock"
-// }
-// CHERI CHANGES END

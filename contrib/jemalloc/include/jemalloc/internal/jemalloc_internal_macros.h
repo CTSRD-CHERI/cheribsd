@@ -115,11 +115,13 @@ JEMALLOC_DIAGNOSTIC_DISABLE_SPURIOUS
 #define	BOUND_PTR(ptr, size)	(ptr)
 #define	ROUND_SIZE(size)		(size)
 #else
+#include <cheri/cheric.h>
+
 #define	BOUND_PTR(ptr, size) ({						\
 	typeof(ptr) _ptr = (ptr);					\
 	size_t _size = (size);						\
 	(_ptr == NULL ? NULL :						\
-	 cheri_andperm(cheri_setboundsexact(_ptr,			\
+	 cheri_perms_and(cheri_bounds_set_exact(_ptr,			\
 	     _size == 0 ? 1 : _size),					\
 	     CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_SW_VMEM));	\
 })
@@ -133,3 +135,14 @@ JEMALLOC_DIAGNOSTIC_DISABLE_SPURIOUS
 #endif
 
 #endif /* JEMALLOC_INTERNAL_MACROS_H */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20260211,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

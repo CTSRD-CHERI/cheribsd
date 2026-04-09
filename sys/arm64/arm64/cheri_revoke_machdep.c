@@ -94,7 +94,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
     uintcap_t * __capability cutp, uintcap_t cut, vm_offset_t start,
     vm_offset_t end)
 {
-	int perms = cheri_getperm(cut);
+	int perms = cheri_perms_get(cut);
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 
 	if (perms == 0) {
@@ -108,7 +108,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 		 */
 
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found_revoked);
-	} else if (cheri_gettag(cut) && ctp(crshadow, cut, perms, start, end)) {
+	} else if (cheri_tag_get(cut) && ctp(crshadow, cut, perms, start, end)) {
 		void * __capability cscratch;
 		int stxr_status = 1;
 
@@ -160,7 +160,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 		if (__predict_true(stxr_status == 0)) {
 			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 			/* Don't count a revoked cap as HASCAPS */
-		} else if (!cheri_gettag(cscratch)) {
+		} else if (!cheri_tag_get(cscratch)) {
 			/* Data; don't sweat it */
 		} else if (cheri_revoke_is_revoked(cscratch)) {
 			/* Revoked cap; don't worry about it */
@@ -231,10 +231,10 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 	enable_user_memory_access();
 #endif
 
-	for (; cheri_getaddress(mvu) < mve; mvu++) {
+	for (; cheri_address_get(mvu) < mve; mvu++) {
 		uintcap_t cut = *mvu;
 
-		if (cheri_gettag(cut)) {
+		if (cheri_tag_get(cut)) {
 			if (cb(&res, crc, crshadow, ctp, mvu, cut, start, end))
 				goto out;
 		}
@@ -251,7 +251,7 @@ out:
 int
 vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *crc, uintcap_t cut)
 {
-	if (cheri_gettag(cut)) {
+	if (cheri_tag_get(cut)) {
 		int res;
 		vm_offset_t start, end;
 
@@ -268,7 +268,7 @@ vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *crc, uintcap_t cut)
 		enable_user_memory_access();
 #endif
 		res = crc->map->vm_cheri_revoke_test(crc->crshadow, cut,
-		    cheri_getperm(cut), start, end);
+		    cheri_perms_get(cut), start, end);
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
 		disable_user_memory_access();
 		curthread->td_pcb->pcb_onfault = prev_onfault;
@@ -302,7 +302,7 @@ vm_cheri_revoke_page_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 	mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 	mve = mva + PAGE_SIZE;
 
-	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), PAGE_SIZE);
+	mvu = cheri_bounds_set(cheri_address_set(kdc, mva), PAGE_SIZE);
 
 	res = vm_cheri_revoke_page_iter(crc, vm_do_cheri_revoke, mvu, mve);
 
@@ -333,15 +333,15 @@ vm_cheri_revoke_page_ro_adapt(int *res,
 	 * Being untagged would imply mutation, but we're visiting this page
 	 * under the assumption that it's read-only.
 	 */
-	KASSERT(cheri_gettag(cut), ("vm_cheri_revoke_page_ro_adapt untagged"));
+	KASSERT(cheri_tag_get(cut), ("vm_cheri_revoke_page_ro_adapt untagged"));
 
 	/* If the thing has no permissions, we don't need to scan it later */
-	if ((cheri_gettag(cut) == 0) || (cheri_getperm(cut) == 0))
+	if ((cheri_tag_get(cut) == 0) || (cheri_perms_get(cut) == 0))
 		return (0);
 
 	*res |= VM_CHERI_REVOKE_PAGE_HASCAPS;
 
-	if (ctp(crshadow, cut, cheri_getperm(cut), start, end)) {
+	if (ctp(crshadow, cut, cheri_perms_get(cut), start, end)) {
 		*res |= VM_CHERI_REVOKE_PAGE_DIRTY;
 
 		/* One dirty answer is as good as any other; stop early */
@@ -379,7 +379,7 @@ vm_cheri_revoke_page_ro(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 	mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 	mve = mva + pagesizes[0];
 
-	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), pagesizes[0]);
+	mvu = cheri_bounds_set(cheri_address_set(kdc, mva), pagesizes[0]);
 
 	res = vm_cheri_revoke_page_iter(crc, vm_cheri_revoke_page_ro_adapt, mvu,
 	    mve);

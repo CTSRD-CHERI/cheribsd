@@ -258,7 +258,7 @@ mrsas_passthru(struct mrsas_softc *sc, void *arg, u_long ioctlCmd)
 			kern_sge32[i].length = user_ioc32->sgl[i].iov_len;
 
 			iov_len = user_ioc32->sgl[i].iov_len;
-			iov_base_ptrin = __USER_CAP(PTRIN(
+			iov_base_ptrin = USER_PTR(PTRIN(
 			    user_ioc32->sgl[i].iov_base), iov_len);
 #endif
 		}
@@ -331,7 +331,7 @@ mrsas_passthru(struct mrsas_softc *sc, void *arg, u_long ioctlCmd)
 #ifdef COMPAT_FREEBSD32
 		} else {
 			iov_len = user_ioc32->sgl[i].iov_len;
-			iov_base_ptrin = __USER_CAP(PTRIN(
+			iov_base_ptrin = USER_PTR(PTRIN(
 			    user_ioc32->sgl[i].iov_base), iov_len);
 #endif
 		}
@@ -354,7 +354,7 @@ mrsas_passthru(struct mrsas_softc *sc, void *arg, u_long ioctlCmd)
 		sense_ptr = (unsigned long *)((uintptr_t)user_ioc->frame.raw +
 		    user_ioc->sense_off);
 		ret = copyout(ioctl_sense_mem,
-		    __USER_CAP((unsigned long *)(uintptr_t)*sense_ptr, user_ioc->sense_len),
+		    USER_PTR((unsigned long *)(uintptr_t)*sense_ptr, user_ioc->sense_len),
 		    user_ioc->sense_len);
 		if (ret) {
 			device_printf(sc->mrsas_dev, "IOCTL sense copyout failed!\n");

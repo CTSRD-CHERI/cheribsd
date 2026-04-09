@@ -106,7 +106,14 @@ gen_table "lio_listiomodes" "LIO_(NO)?WAIT[[:space:]]+[0-9]+"              "aio.
 gen_table "madvisebehav"    "_?MADV_[A-Z]+[[:space:]]+[0-9]+"              "sys/mman.h"
 gen_table "minheritflags"   "INHERIT_[A-Z]+[[:space:]]+[0-9]+"             "sys/mman.h"
 gen_table "mlockallflags"   "MCL_[A-Z]+[[:space:]]+0x[0-9]+"               "sys/mman.h"
-gen_table "mmapprot"        "PROT_[A-Z]+[[:space:]]+0x[0-9A-Fa-f]+"        "sys/mman.h"
+case $MACHINE_ARCH in
+aarch64c|aarch64cb|riscv64c)
+	gen_table "mmapprot"        "PROT_[A-Z]+[[:space:]]+0x[0-9A-Fa-f]+"        "sys/mman.h"
+	;;
+*)
+	gen_table "mmapprot"        "PROT_[A-Z]+[[:space:]]+0x[0-9A-Fa-f]+"        "sys/mman.h" "_CAP"
+	;;
+esac
 gen_table "ngbtsolevel"     "SOL_[A-Z0-9]+[[:space:]]+0x[0-9A-Fa-f]+"      "netgraph/bluetooth/include/ng_btsocket.h"
 gen_table "fileflags"       "[SU]F_[A-Z]+[[:space:]]+0x[0-9A-Fa-f]+"       "sys/stat.h"		"UF_COMPRESSED|UF_TRACKED|UF_SETTABLE|SF_SETTABLE"
 gen_table "filemode"        "S_[A-Z]+[[:space:]]+[0-6]{7}"                 "sys/stat.h"

@@ -572,7 +572,7 @@ struct sysent freebsd64_sysent[] = {
 	{ .sy_narg = AS(freebsd64_symlinkat_args), .sy_call = (sy_call_t *)freebsd64_symlinkat, .sy_auevent = AUE_SYMLINKAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 502 = freebsd64_symlinkat */
 	{ .sy_narg = AS(freebsd64_unlinkat_args), .sy_call = (sy_call_t *)freebsd64_unlinkat, .sy_auevent = AUE_UNLINKAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 503 = freebsd64_unlinkat */
 	{ .sy_narg = AS(posix_openpt_args), .sy_call = (sy_call_t *)sys_posix_openpt, .sy_auevent = AUE_POSIX_OPENPT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 504 = posix_openpt */
-	{ .sy_narg = AS(freebsd64_gssd_syscall_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 505 = freebsd64_gssd_syscall */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 505 = obsolete kgssapi */
 	{ .sy_narg = AS(freebsd64_jail_get_args), .sy_call = (sy_call_t *)freebsd64_jail_get, .sy_auevent = AUE_JAIL_GET, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 506 = freebsd64_jail_get */
 	{ .sy_narg = AS(freebsd64_jail_set_args), .sy_call = (sy_call_t *)freebsd64_jail_set, .sy_auevent = AUE_JAIL_SET, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 507 = freebsd64_jail_set */
 	{ .sy_narg = AS(jail_remove_args), .sy_call = (sy_call_t *)sys_jail_remove, .sy_auevent = AUE_JAIL_REMOVE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 508 = jail_remove */
@@ -643,7 +643,7 @@ struct sysent freebsd64_sysent[] = {
 	{ .sy_narg = AS(freebsd64_sigfastblock_args), .sy_call = (sy_call_t *)freebsd64_sigfastblock, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 573 = freebsd64_sigfastblock */
 	{ .sy_narg = AS(freebsd64___realpathat_args), .sy_call = (sy_call_t *)freebsd64___realpathat, .sy_auevent = AUE_REALPATHAT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 574 = freebsd64___realpathat */
 	{ .sy_narg = AS(close_range_args), .sy_call = (sy_call_t *)sys_close_range, .sy_auevent = AUE_CLOSERANGE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 575 = close_range */
-	{ .sy_narg = AS(freebsd64_rpctls_syscall_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 576 = freebsd64_rpctls_syscall */
+	{ .sy_narg = AS(rpctls_syscall_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 576 = rpctls_syscall */
 	{ .sy_narg = AS(freebsd64___specialfd_args), .sy_call = (sy_call_t *)freebsd64___specialfd, .sy_auevent = AUE_SPECIALFD, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 577 = freebsd64___specialfd */
 	{ .sy_narg = AS(freebsd64_aio_writev_args), .sy_call = (sy_call_t *)freebsd64_aio_writev, .sy_auevent = AUE_AIO_WRITEV, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 578 = freebsd64_aio_writev */
 	{ .sy_narg = AS(freebsd64_aio_readv_args), .sy_call = (sy_call_t *)freebsd64_aio_readv, .sy_auevent = AUE_AIO_READV, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 579 = freebsd64_aio_readv */
@@ -657,4 +657,6 @@ struct sysent freebsd64_sysent[] = {
 	{ .sy_narg = AS(freebsd64_timerfd_settime_args), .sy_call = (sy_call_t *)freebsd64_timerfd_settime, .sy_auevent = AUE_TIMERFD, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 587 = freebsd64_timerfd_settime */
 	{ .sy_narg = AS(freebsd64_kcmp_args), .sy_call = (sy_call_t *)freebsd64_kcmp, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 588 = freebsd64_kcmp */
 	{ .sy_narg = AS(freebsd64_getrlimitusage_args), .sy_call = (sy_call_t *)freebsd64_getrlimitusage, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 589 = freebsd64_getrlimitusage */
+	{ .sy_narg = AS(fchroot_args), .sy_call = (sy_call_t *)sys_fchroot, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 590 = fchroot */
+	{ .sy_narg = AS(freebsd64_setcred_args), .sy_call = (sy_call_t *)freebsd64_setcred, .sy_auevent = AUE_SETCRED, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 591 = freebsd64_setcred */
 };

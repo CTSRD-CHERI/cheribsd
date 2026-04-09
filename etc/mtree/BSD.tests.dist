@@ -382,6 +382,8 @@
             ..
             stdlib
             ..
+            stdtime
+            ..
             string
             ..
             sys
@@ -505,6 +507,8 @@
         ..
         route
         ..
+        savecore
+        ..
         sysctl
         ..
     ..
@@ -542,6 +546,10 @@
         audit
         ..
         auditpipe
+        ..
+        cam
+            ctl
+            ..
         ..
         capsicum
         ..
@@ -793,10 +801,6 @@
         ..
         compat32
         ..
-        cam
-            ctl
-            ..
-        ..
         devrandom
         ..
         dtrace
@@ -872,6 +876,8 @@
         mqueue
         ..
         net
+            bpf
+                ..
             if_ovpn
                 ccd
                 ..
@@ -946,6 +952,8 @@
         posixshm
         ..
         ses
+        ..
+        sound
         ..
         sys
         ..
@@ -1089,8 +1097,6 @@
         ..
         cut
         ..
-        dc
-        ..
         diff
         ..
         diff3
@@ -1159,6 +1165,8 @@
         ..
         m4
         ..
+        mail
+        ..
         mkimg
         ..
         mktemp
@@ -1200,6 +1208,8 @@
         tail
         ..
         tar
+        ..
+        tee
         ..
         tftp
         ..
@@ -1266,6 +1276,8 @@
         sa
         ..
         syslogd
+        ..
+        sysrc
         ..
     ..
 ..

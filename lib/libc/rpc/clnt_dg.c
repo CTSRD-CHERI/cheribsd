@@ -32,18 +32,6 @@
 /*
  * Copyright (c) 1986-1991 by Sun Microsystems Inc. 
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20221129,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "sunrpc"
- * }
- * CHERI CHANGES END
- */
 
 /*
  * Implements a connectionless client side RPC.
@@ -412,7 +400,7 @@ call_again_same_xid:
 		if ((! XDR_PUTBYTES(xdrs, cu->cu_outhdr, cu->cu_xdrpos)) ||
 		    (! XDR_PUTINT32(xdrs, &proc)) ||
 		    (! AUTH_MARSHALL(cl->cl_auth, xdrs)) ||
-		    (! (*xargs)(xdrs, argsp, 0))) {
+		    (! (*xargs)(xdrs, argsp))) {
 			cu->cu_error.re_status = RPC_CANTENCODEARGS;
 			goto out;
 		}
@@ -636,7 +624,7 @@ clnt_dg_freeres(CLIENT *cl, xdrproc_t xdr_res, void *res_ptr)
 	elem = dg_fd_find(cu->cu_fd);
 	mutex_lock(&elem->mtx);
 	xdrs->x_op = XDR_FREE;
-	dummy = (*xdr_res)(xdrs, res_ptr, 0);
+	dummy = (*xdr_res)(xdrs, res_ptr);
 	mutex_unlock(&clnt_fd_lock);
 	release_fd_lock(elem, mask);
 	return (dummy);

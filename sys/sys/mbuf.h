@@ -825,7 +825,7 @@ struct mbuf	*mb_alloc_ext_plus_pages(int, int);
 struct mbuf	*mb_mapped_to_unmapped(struct mbuf *, int, int, int,
 		    struct mbuf **);
 int		 mb_unmapped_compress(struct mbuf *m);
-struct mbuf 	*mb_unmapped_to_ext(struct mbuf *m);
+int		 mb_unmapped_to_ext(struct mbuf *m, struct mbuf **mres);
 void		 mb_free_notready(struct mbuf *m, int count);
 void		 m_adj(struct mbuf *, int);
 void		 m_adj_decap(struct mbuf *, int);
@@ -925,7 +925,7 @@ m_extaddref(struct mbuf *m, char *buf, u_int size, u_int *ref_cnt,
 
 	atomic_add_int(ref_cnt, 1);
 	m->m_flags |= M_EXT;
-	m->m_ext.ext_buf = cheri_kern_setbounds(buf, size);
+	m->m_ext.ext_buf = cheri_kern_bounds_set(buf, size);
 	m->m_ext.ext_cnt = ref_cnt;
 	m->m_data = m->m_ext.ext_buf;
 	m->m_ext.ext_size = size;
@@ -975,7 +975,7 @@ m_init(struct mbuf *m, int how, short type, int flags)
 
 	m->m_next = NULL;
 	m->m_nextpkt = NULL;
-	m->m_data = cheri_kern_setbounds(m->m_dat, MLEN);
+	m->m_data = cheri_kern_bounds_set(m->m_dat, MLEN);
 	m->m_len = 0;
 	m->m_flags = flags;
 	m->m_type = type;
@@ -1081,7 +1081,7 @@ m_cljset(struct mbuf *m, void *cl, int type)
 		break;
 	}
 
-	m->m_data = m->m_ext.ext_buf = cheri_kern_setbounds(cl, size);
+	m->m_data = m->m_ext.ext_buf = cheri_kern_bounds_set(cl, size);
 	m->m_ext.ext_free = m->m_ext.ext_arg1 = m->m_ext.ext_arg2 = NULL;
 	m->m_ext.ext_size = size;
 	m->m_ext.ext_type = type;
@@ -1121,7 +1121,7 @@ static inline u_int
 m_extrefcnt(struct mbuf *m)
 {
 
-	KASSERT(m->m_flags & M_EXT, ("%s: M_EXT missing", __func__));
+	KASSERT(m->m_flags & M_EXT, ("%s: M_EXT missing for %p", __func__, m));
 
 	return ((m->m_ext.ext_flags & EXT_FLAG_EMBREF) ? m->m_ext.ext_count :
 	    *m->m_ext.ext_cnt);
@@ -1153,13 +1153,13 @@ m_extrefcnt(struct mbuf *m)
 /* Check if the supplied mbuf has a packet header, or else panic. */
 #define	M_ASSERTPKTHDR(m)						\
 	KASSERT((m) != NULL && (m)->m_flags & M_PKTHDR,			\
-	    ("%s: no mbuf packet header!", __func__))
+	    ("%s: no mbuf %p packet header!", __func__, (m)))
 
 /* Check if the supplied mbuf has no send tag, or else panic. */
 #define	M_ASSERT_NO_SND_TAG(m)						\
 	KASSERT((m) != NULL && (m)->m_flags & M_PKTHDR &&		\
 	       ((m)->m_pkthdr.csum_flags & CSUM_SND_TAG) == 0,		\
-	    ("%s: receive mbuf has send tag!", __func__))
+	    ("%s: receive mbuf %p has send tag!", __func__, (m)))
 
 /* Check if mbuf is multipage. */
 #define M_ASSERTEXTPG(m)						\
@@ -1173,7 +1173,7 @@ m_extrefcnt(struct mbuf *m)
  */
 #define	M_ASSERTVALID(m)						\
 	KASSERT((((struct mbuf *)m)->m_flags & 0) == 0,			\
-	    ("%s: attempted use of a free mbuf!", __func__))
+	    ("%s: attempted use of a free mbuf %p!", __func__, (m)))
 
 /* Check whether any mbuf in the chain is unmapped. */
 #ifdef INVARIANTS
@@ -1218,12 +1218,9 @@ m_extrefcnt(struct mbuf *m)
 static __inline void
 m_align(struct mbuf *m, int len)
 {
-#ifdef INVARIANTS
-	const char *msg = "%s: not a virgin mbuf";
-#endif
 	int adjust;
-
-	KASSERT(m->m_data == M_START(m), (msg, __func__));
+	KASSERT(m->m_data == M_START(m),
+	    ("%s: not a virgin mbuf %p", __func__, m));
 
 	adjust = M_SIZE(m) - len;
 	m->m_data += adjust &~ (sizeof(long)-1);
@@ -1543,14 +1540,16 @@ m_free(struct mbuf *m)
 static __inline int
 rt_m_getfib(struct mbuf *m)
 {
-	KASSERT(m->m_flags & M_PKTHDR , ("Attempt to get FIB from non header mbuf."));
+	KASSERT(m->m_flags & M_PKTHDR,
+	    ("%s: Attempt to get FIB from non header mbuf %p", __func__, m));
 	return (m->m_pkthdr.fibnum);
 }
 
 #define M_GETFIB(_m)   rt_m_getfib(_m)
 
 #define M_SETFIB(_m, _fib) do {						\
-        KASSERT((_m)->m_flags & M_PKTHDR, ("Attempt to set FIB on non header mbuf."));	\
+        KASSERT((_m)->m_flags & M_PKTHDR, \
+	    ("%s: Attempt to set FIB on non header mbuf %p", __func__, (_m))); \
 	((_m)->m_pkthdr.fibnum) = (_fib);				\
 } while (0)
 
@@ -1821,9 +1820,9 @@ static inline void
 mbuf_tstmp2timespec(struct mbuf *m, struct timespec *ts)
 {
 
-	KASSERT((m->m_flags & M_PKTHDR) != 0, ("mbuf %p no M_PKTHDR", m));
+	M_ASSERTPKTHDR(m);
 	KASSERT((m->m_flags & (M_TSTMP|M_TSTMP_LRO)) != 0,
-	    ("mbuf %p no M_TSTMP or M_TSTMP_LRO", m));
+	    ("%s: mbuf %p no M_TSTMP or M_TSTMP_LRO", __func__, m));
 	ts->tv_sec = m->m_pkthdr.rcv_tstmp / 1000000000;
 	ts->tv_nsec = m->m_pkthdr.rcv_tstmp % 1000000000;
 }
@@ -1833,9 +1832,9 @@ static inline void
 mbuf_tstmp2timeval(struct mbuf *m, struct timeval *tv)
 {
 
-	KASSERT((m->m_flags & M_PKTHDR) != 0, ("mbuf %p no M_PKTHDR", m));
+	M_ASSERTPKTHDR(m);
 	KASSERT((m->m_flags & (M_TSTMP|M_TSTMP_LRO)) != 0,
-	    ("mbuf %p no M_TSTMP or M_TSTMP_LRO", m));
+	    ("%s: mbuf %p no M_TSTMP or M_TSTMP_LRO", __func__, m));
 	tv->tv_sec = m->m_pkthdr.rcv_tstmp / 1000000000;
 	tv->tv_usec = (m->m_pkthdr.rcv_tstmp % 1000000000) / 1000;
 }

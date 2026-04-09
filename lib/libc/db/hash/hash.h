@@ -31,17 +31,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20180629,
- *   "target_type": "lib",
- *   "changes": [
- *     "pointer_bit_flags"
- *   ]
- * }
- * CHERI CHANGES END
- */
 
 /* Operations */
 typedef enum {
@@ -148,7 +137,7 @@ typedef struct htab	 {		/* Memory resident data structure */
 #define ALL_SET			((u_int32_t)0xFFFFFFFF)
 #define ALL_CLEAR		0
 
-#define PTROF(X)	((BUFHEAD *)((intptr_t)(X)&(intptr_t)~0x3))
+#define PTROF(X)	((BUFHEAD *)((intptr_t)(X)&~0x3))
 #define ISMOD(X)	((u_int32_t)(intptr_t)(X)&0x1)
 #define DOMOD(X)	((X) = (char *)((intptr_t)(X)|0x1))
 #define ISDISK(X)	((u_int32_t)(intptr_t)(X)&0x2)

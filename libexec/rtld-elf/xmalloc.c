@@ -25,19 +25,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
- /*
-  * CHERI CHANGES START
-  * {
-  *   "updated": 20221129,
-  *    "target_type": "lib",
-  *   "changes": [
-  *     "pointer_alignment"
-  *   ],
-  *   "change_comment": "Use __builtin_align_up"
-  * }
-  * CHERI CHANGES END
-  */
-
 #include <sys/param.h>
 #include <stddef.h>
 #include <stdlib.h>

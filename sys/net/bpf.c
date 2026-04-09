@@ -217,7 +217,7 @@ struct bpf_dltlist64 {
  * frames, ethernet frames, etc).
  */
 CK_LIST_HEAD(bpf_iflist, bpf_if);
-static struct bpf_iflist bpf_iflist;
+static struct bpf_iflist bpf_iflist = CK_LIST_HEAD_INITIALIZER();
 static struct sx	bpf_sx;		/* bpf global lock */
 static int		bpf_bpfd_cnt;
 
@@ -284,13 +284,13 @@ static struct cdevsw bpf_cdevsw = {
 	.d_kqfilter =	bpfkqfilter,
 };
 
-static struct filterops bpfread_filtops = {
+static const struct filterops bpfread_filtops = {
 	.f_isfd = 1,
 	.f_detach = filt_bpfdetach,
 	.f_event = filt_bpfread,
 };
 
-static struct filterops bpfwrite_filtops = {
+static const struct filterops bpfwrite_filtops = {
 	.f_isfd = 1,
 	.f_detach = filt_bpfdetach,
 	.f_event = filt_bpfwrite,
@@ -1148,13 +1148,15 @@ bpfread(struct cdev *dev, struct uio *uio, int ioflag)
 	error = bpf_uiomove(d, d->bd_hbuf, d->bd_hlen, uio);
 
 	BPFD_LOCK(d);
-	KASSERT(d->bd_hbuf != NULL, ("bpfread: lost bd_hbuf"));
-	d->bd_fbuf = d->bd_hbuf;
-	d->bd_hbuf = NULL;
-	d->bd_hlen = 0;
-	bpf_buf_reclaimed(d);
-	d->bd_hbuf_in_use = 0;
-	wakeup(&d->bd_hbuf_in_use);
+	if (d->bd_hbuf_in_use) {
+		KASSERT(d->bd_hbuf != NULL, ("bpfread: lost bd_hbuf"));
+		d->bd_fbuf = d->bd_hbuf;
+		d->bd_hbuf = NULL;
+		d->bd_hlen = 0;
+		bpf_buf_reclaimed(d);
+		d->bd_hbuf_in_use = 0;
+		wakeup(&d->bd_hbuf_in_use);
+	}
 	BPFD_UNLOCK(d);
 
 	return (error);
@@ -1950,13 +1952,13 @@ bf_insns_get_ptr(void *fpp)
 	fpup = fpp;
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (__USER_CAP(
+		return (USER_PTR(
 		    (struct bpf_insn *)(uintptr_t)fpup->fp32.bf_insns,
 		    fpup->fp32.bf_len * sizeof(struct bpf_insn)));
 #endif
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI))
-		return (__USER_CAP(
+		return (USER_PTR(
 		    (struct bpf_insn *)(uintptr_t)fpup->fp64.bf_insns,
 		    fpup->fp64.bf_len * sizeof(struct bpf_insn)));
 #endif
@@ -2097,10 +2099,20 @@ bpf_setif(struct bpf_d *d, struct ifreq *ifr)
 	BPF_LOCK_ASSERT();
 
 	theywant = ifunit(ifr->ifr_name);
-	if (theywant == NULL || theywant->if_bpf == NULL)
+	if (theywant == NULL)
+		return (ENXIO);
+	/*
+	 * Look through attached interfaces for the named one.
+	 */
+	CK_LIST_FOREACH(bp, &bpf_iflist, bif_next) {
+		if (bp->bif_ifp == theywant &&
+		    bp->bif_bpf == &theywant->if_bpf)
+			break;
+	}
+	if (bp == NULL)
 		return (ENXIO);
 
-	bp = theywant->if_bpf;
+	MPASS(bp == theywant->if_bpf);
 	/*
 	 * At this point, we expect the buffer is already allocated.  If not,
 	 * return an error.
@@ -2848,6 +2860,33 @@ bpf_get_bp_params(struct bpf_if *bp, u_int *bif_dlt, u_int *bif_hdrlen)
 
 	return (0);
 }
+
+/*
+ * Detach descriptors on interface's vmove event.
+ */
+void
+bpf_ifdetach(struct ifnet *ifp)
+{
+	struct bpf_if *bp;
+	struct bpf_d *d;
+
+	BPF_LOCK();
+	CK_LIST_FOREACH(bp, &bpf_iflist, bif_next) {
+		if (bp->bif_ifp != ifp)
+			continue;
+
+		/* Detach common descriptors */
+		while ((d = CK_LIST_FIRST(&bp->bif_dlist)) != NULL) {
+			bpf_detachd_locked(d, true);
+		}
+
+		/* Detach writer-only descriptors */
+		while ((d = CK_LIST_FIRST(&bp->bif_wlist)) != NULL) {
+			bpf_detachd_locked(d, true);
+		}
+	}
+	BPF_UNLOCK();
+}
 #endif
 
 /*
@@ -2910,12 +2949,12 @@ bfl_list_get_ptr(void *bflp)
 	bflup = bflp;
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (__USER_CAP((u_int *)(uintptr_t)bflup->bfl32.bfl_list,
+		return (USER_PTR((u_int *)(uintptr_t)bflup->bfl32.bfl_list,
 		    bflup->bfl32.bfl_len * sizeof(u_int)));
 #endif
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI))
-		return (__USER_CAP((u_int *)(uintptr_t)bflup->bfl64.bfl_list,
+		return (USER_PTR((u_int *)(uintptr_t)bflup->bfl64.bfl_list,
 		    bflup->bfl64.bfl_len * sizeof(u_int)));
 #endif
 	return (bflup->bfl.bfl_list);
@@ -3007,8 +3046,6 @@ bpf_drvinit(void *unused)
 	struct cdev *dev;
 
 	sx_init(&bpf_sx, "bpf global lock");
-	CK_LIST_INIT(&bpf_iflist);
-
 	dev = make_dev(&bpf_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600, "bpf");
 	/* For compatibility */
 	make_dev_alias(dev, "bpf0");

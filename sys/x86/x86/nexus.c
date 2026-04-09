@@ -81,8 +81,6 @@
 #include <isa/isareg.h>
 #endif
 
-#define	ELF_KERN_STR	("elf"__XSTRING(__ELF_WORD_SIZE)" kernel")
-
 static MALLOC_DEFINE(M_NEXUSDEV, "nexusdev", "Nexus device");
 
 #define DEVTONX(dev)	((struct nexus_device *)device_get_ivars(dev))
@@ -262,7 +260,7 @@ nexus_attach(device_t dev)
 {
 
 	nexus_init_resources();
-	bus_generic_probe(dev);
+	bus_identify_children(dev);
 
 	/*
 	 * Explicitly add the legacy0 device here.  Other platform
@@ -271,7 +269,7 @@ nexus_attach(device_t dev)
 	 */
 	if (BUS_ADD_CHILD(dev, 10, "legacy", 0) == NULL)
 		panic("legacy: could not attach");
-	bus_generic_attach(dev);
+	bus_attach_children(dev);
 	return (0);
 }
 
@@ -647,15 +645,11 @@ ram_attach(device_t dev)
 	struct resource *res;
 	rman_res_t length;
 	vm_paddr_t *p;
-	caddr_t kmdp;
 	uint32_t smapsize;
 	int error, rid;
 
 	/* Retrieve the system memory map from the loader. */
-	kmdp = preload_search_by_type("elf kernel");
-	if (kmdp == NULL)
-		kmdp = preload_search_by_type(ELF_KERN_STR);
-	smapbase = (struct bios_smap *)preload_search_info(kmdp,
+	smapbase = (struct bios_smap *)preload_search_info(preload_kmdp,
 	    MODINFO_METADATA | MODINFOMD_SMAP);
 	if (smapbase != NULL) {
 		smapsize = *((u_int32_t *)smapbase - 1);

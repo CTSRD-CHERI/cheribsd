@@ -99,6 +99,7 @@
 #include <vm/vm_pagequeue.h>
 #include <vm/vm_object.h>
 #include <vm/vm_kern.h>
+#include <vm/vm_radix.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_pager.h>
 #include <vm/vm_phys.h>
@@ -172,7 +173,7 @@ useracc(void * __capability cap, int len, int rw)
 	    ("illegal ``rw'' argument to useracc (%x)\n", rw));
 	prot = rw;
 #if __has_feature(capabilities)
-	if (!__CAP_CHECK(cap, len) || !vm_cap_allows_prot(cap, prot))
+	if (!cheri_can_access(cap, vm_prot2perms(0, prot), len))
 		return (false);
 #endif
 	addr = (__cheri_addr vm_offset_t)cap;
@@ -188,14 +189,17 @@ useracc(void * __capability cap, int len, int rw)
 }
 
 int
-vslock(void * __capability addr, size_t len)
+vslock(void * __capability addr, size_t len, vm_prot_t prot __unused)
 {
 	vm_offset_t end, last, start, vaddr;
 	vm_size_t npages;
 	int error;
 
-	if (!__CAP_CHECK(addr, len))
+#if __has_feature(capabilities)
+	if (!cheri_can_access(addr,
+	    vm_prot2perms(0, prot | VM_PROT_NO_IMPLY_CAP), len))
 		return (EPROT);
+#endif
 	vaddr = (__cheri_addr vm_offset_t)addr;
 	last = vaddr + len;
 	start = trunc_page(vaddr);
@@ -676,40 +680,36 @@ static int
 vm_thread_stack_back(vm_offset_t ks, vm_page_t ma[], int npages, int req_class,
     int domain)
 {
+	struct pctrie_iter pages;
 	vm_object_t obj = vm_thread_kstack_size_to_obj(npages);
 	vm_pindex_t pindex;
-	vm_page_t m;
+	vm_page_t m, mpred;
 	int n;
 
 	pindex = vm_kstack_pindex(ks, npages);
 
+	vm_page_iter_init(&pages, obj);
 	VM_OBJECT_WLOCK(obj);
-	for (n = 0; n < npages;) {
-		m = vm_page_grab(obj, pindex + n,
+	for (n = 0; n < npages; ma[n++] = m) {
+		m = vm_page_grab_iter(obj, &pages, pindex + n,
 		    VM_ALLOC_NOCREAT | VM_ALLOC_WIRED);
-		if (m == NULL) {
-			m = n > 0 ? ma[n - 1] : vm_page_mpred(obj, pindex);
-			m = vm_page_alloc_domain_after(obj, pindex + n, domain,
-			    req_class | VM_ALLOC_WIRED, m);
+		if (m != NULL)
+			continue;
+		mpred = (n > 0) ? ma[n - 1] :
+		    vm_radix_iter_lookup_lt(&pages, pindex);
+		m = vm_page_alloc_domain_after(obj, &pages, pindex + n,
+		    domain, req_class | VM_ALLOC_WIRED, mpred);
+		if (m != NULL)
+			continue;
+		for (int i = 0; i < n; i++) {
+			m = ma[i];
+			(void)vm_page_unwire_noq(m);
+			vm_page_free(m);
 		}
-		if (m == NULL)
-			break;
-		ma[n++] = m;
-	}
-	if (n < npages)
-		goto cleanup;
-	VM_OBJECT_WUNLOCK(obj);
-
-	return (0);
-cleanup:
-	for (int i = 0; i < n; i++) {
-		m = ma[i];
-		(void)vm_page_unwire_noq(m);
-		vm_page_free(m);
+		break;
 	}
 	VM_OBJECT_WUNLOCK(obj);
-
-	return (ENOMEM);
+	return (n < npages ? ENOMEM : 0);
 }
 
 static vm_object_t
@@ -912,17 +912,31 @@ vm_cap_allows_prot(const void * __capability cap, vm_prot_t prot)
 	register_t reqperm;
 
 	reqperm = 0;
-	if (prot & VM_PROT_READ)
+	if (prot & VM_PROT_READ) {
 		reqperm |= CHERI_PERM_LOAD;
-	if (prot & VM_PROT_READ_CAP)
-		reqperm |= CHERI_PERM_LOAD_CAP;
-	if (prot & VM_PROT_WRITE)
+		if (prot & VM_PROT_CAP)
+#if defined(HAS_CHERI_PERM_LOAD_STORE_CAP)
+			reqperm |= CHERI_PERM_LOAD_CAP;
+#elif defined(HAS_CHERI_PERM_CAP)
+			reqperm |= CHERI_PERM_CAP;
+#else
+#error "Missing LOAD_CAP permission"
+#endif
+	}
+	if (prot & VM_PROT_WRITE) {
 		reqperm |= CHERI_PERM_STORE;
-	if (prot & VM_PROT_WRITE_CAP)
-		reqperm |= CHERI_PERM_STORE_CAP;
+		if (prot & VM_PROT_CAP)
+#if defined(HAS_CHERI_PERM_LOAD_STORE_CAP)
+			reqperm |= CHERI_PERM_STORE_CAP;
+#elif defined(HAS_CHERI_PERM_CAP)
+		reqperm |= CHERI_PERM_CAP;
+#else
+#error "Missing STORE_CAP permission"
+#endif
+	}
 	if (prot & VM_PROT_EXECUTE)
 		reqperm |= CHERI_PERM_EXECUTE;
-	if ((cheri_getperm(cap) & reqperm) != reqperm)
+	if ((cheri_perms_get(cap) & reqperm) != reqperm)
 		return (false);
 	return (true);
 }

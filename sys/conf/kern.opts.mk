@@ -32,7 +32,6 @@ __DEFAULT_YES_OPTIONS = \
     BLUETOOTH \
     CCD \
     CDDL \
-    CHERI_CODEPTR_RELOCS \
     CRYPT \
     CUSE \
     DTRACE \
@@ -80,8 +79,8 @@ BROKEN_OPTIONS+= OFED
 BROKEN_OPTIONS+= KERNEL_RETPOLINE
 .endif
 
-# EFI doesn't exist on powerpc or riscv and is broken on i386
-.if ${MACHINE:Mpowerpc} || ${MACHINE:Mriscv} || ${MACHINE} == "i386"
+# EFI doesn't exist on powerpc and is broken on i386
+.if ${MACHINE:Mpowerpc} || ${MACHINE} == "i386"
 BROKEN_OPTIONS+=EFI
 .endif
 

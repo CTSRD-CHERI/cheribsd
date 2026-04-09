@@ -350,10 +350,10 @@ END(copyinstr)
 /*
  * Copies from a kernel to user address preserving tags
  *
- * int copyoutcap(const void *kaddr, void * __capability udaddr, size_t len)
+ * int copyoutptr(const void *kaddr, void * __capability udaddr, size_t len)
  */
-ENTRY(copyoutcap)
-	beqz	a2, copyoutcap_end	/* If len == 0 then skip loop */
+ENTRY(copyoutptr)
+	beqz	a2, copyoutptr_end	/* If len == 0 then skip loop */
 	add	a3, a1, a2
 	li	a4, VM_MAXUSER_ADDRESS
 	bgeu	a3, a4, copyio_fault_nopcb
@@ -366,18 +366,18 @@ ENTRY(copyoutcap)
 
 	copycapcommon
 
-copyoutcap_end:
+copyoutptr_end:
 	li	a0, 0		/* return 0 */
 	RETURN
-END(copyoutcap)
+END(copyoutptr)
 
 /*
  * Copies from a user to kernel address preserving tags
  *
- * int copyincap(const void * __capability uaddr, void *kaddr, size_t len)
+ * int copyinptr(const void * __capability uaddr, void *kaddr, size_t len)
  */
-ENTRY(copyincap)
-	beqz	a2, copyincap_end	/* If len == 0 then skip loop */
+ENTRY(copyinptr)
+	beqz	a2, copyinptr_end	/* If len == 0 then skip loop */
 	add	a3, a0, a2
 	li	a4, VM_MAXUSER_ADDRESS
 	bgeu	a3, a4, copyio_fault_nopcb
@@ -390,10 +390,10 @@ ENTRY(copyincap)
 
 	copycapcommon
 
-copyincap_end:
+copyinptr_end:
 	li	a0, 0		/* return 0 */
 	RETURN
-END(copyincap)
+END(copyinptr)
 #endif
 
 /*

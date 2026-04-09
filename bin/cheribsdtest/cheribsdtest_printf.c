@@ -36,9 +36,6 @@
 #error "This code requires a CHERI-aware compiler"
 #endif
 
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -67,56 +64,74 @@ test_printf_cap_one(void * __capability p, int expected_tokens,
 		cheribsdtest_failure_errx("Mismatched tokens for %s, "
 		    "expected %d got %d", descr, expected_tokens, tokens);
 
-	if (addr != cheri_getaddress(p))
+	if (addr != cheri_address_get(p))
 		cheribsdtest_failure_errx("Mismatched address for %s", descr);
 
 	if (tokens == 1)
 		return;
 
 	permsp = perms;
-	if ((cheri_getperm(p) & CHERI_PERM_LOAD) != 0) {
+	if ((cheri_perms_get(p) & CHERI_PERM_LOAD) != 0) {
 		if (*permsp != 'r')
 			cheribsdtest_failure_errx("Missing 'r' permission for %s",
 			    descr);
 		permsp++;
 	}
-	if ((cheri_getperm(p) & CHERI_PERM_STORE) != 0) {
+	if ((cheri_perms_get(p) & CHERI_PERM_STORE) != 0) {
 		if (*permsp != 'w')
 			cheribsdtest_failure_errx("Missing 'w' permission for %s",
 			    descr);
 		permsp++;
 	}
-	if ((cheri_getperm(p) & CHERI_PERM_EXECUTE) != 0) {
+	if ((cheri_perms_get(p) & CHERI_PERM_EXECUTE) != 0) {
 		if (*permsp != 'x')
 			cheribsdtest_failure_errx("Missing 'x' permission for %s",
 			    descr);
 		permsp++;
 	}
-	if ((cheri_getperm(p) & CHERI_PERM_LOAD) != 0) {
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
+	if ((cheri_perms_get(p) & CHERI_PERM_LOAD_CAP) != 0) {
 		if (*permsp != 'R')
 			cheribsdtest_failure_errx("Missing 'R' permission for %s",
 			    descr);
 		permsp++;
 	}
-	if ((cheri_getperm(p) & CHERI_PERM_STORE) != 0) {
+	if ((cheri_perms_get(p) & CHERI_PERM_STORE_CAP) != 0) {
 		if (*permsp != 'W')
 			cheribsdtest_failure_errx("Missing 'W' permission for %s",
 			    descr);
 		permsp++;
 	}
+#endif
+#ifdef HAS_CHERI_PERM_CAP
+	if ((cheri_perms_get(p) & CHERI_PERM_CAP) != 0) {
+		if (*permsp != 'C')
+			cheribsdtest_failure_errx("Missing 'C' permission for %s",
+			    descr);
+		permsp++;
+	}
+#endif
+#ifdef HAS_CHERI_PERM_LOAD_MUTABLE
+	if ((cheri_perms_get(p) & CHERI_PERM_LOAD_MUTABLE) != 0) {
+		if (*permsp != 'M')
+			cheribsdtest_failure_errx("Missing 'l' permission for %s",
+			    descr);
+		permsp++;
+	}
+#endif
 	if (*permsp != '\0')
 		cheribsdtest_failure_errx("Extra permissions '%s' for %s", permsp,
 		    descr);
 
-	if (base != cheri_getbase(p))
+	if (base != cheri_base_get(p))
 		cheribsdtest_failure_errx("Mismatched base for %s", descr);
-	if (top != cheri_getbase(p) + cheri_getlength(p))
+	if (top != cheri_base_get(p) + cheri_length_get(p))
 		cheribsdtest_failure_errx("Mismatched top for %s", descr);
 
 	if (tokens == 4)
 		return;
 
-	if (cheri_gettag(p)) {
+	if (cheri_tag_get(p)) {
 		if (strstr(attr, "invalid") != NULL)
 			cheribsdtest_failure_errx("Tagged cap marked invalid "
 			    "for %s", descr);
@@ -126,7 +141,7 @@ test_printf_cap_one(void * __capability p, int expected_tokens,
 			    "invalid for %s", descr);
 	}
 
-	switch (cheri_gettype(p)) {
+	switch (cheri_type_get(p)) {
 	case CHERI_OTYPE_UNSEALED:
 		if (strstr(attr, "sealed") != NULL)
 			cheribsdtest_failure_errx("Unsealed cap marked as "
@@ -198,7 +213,7 @@ CHERIBSDTEST(printf_cap, "Various checks of %#p")
 
 	test_printf_cap_one(datap, 4, "stack array");
 
-	test_printf_cap_one(cheri_cleartag(datap), 5, "untagged stack array");
+	test_printf_cap_one(cheri_tag_clear(datap), 5, "untagged stack array");
 
 	cheribsdtest_success();
 }

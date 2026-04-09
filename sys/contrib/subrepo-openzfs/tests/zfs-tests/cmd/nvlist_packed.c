@@ -613,7 +613,7 @@ nvpair_value_equal(nvpair_t *nvp_a, nvpair_t *nvp_b)
 		break;
 
 	case DATA_TYPE_STRING: {
-		char *str_a, *str_b;
+		const char *str_a, *str_b;
 		nvpair_value_string(nvp_a, &str_a);
 		nvpair_value_string(nvp_b, &str_b);
 		if (strcmp(str_a, str_b) == 0)
@@ -621,7 +621,7 @@ nvpair_value_equal(nvpair_t *nvp_a, nvpair_t *nvp_b)
 		break;
 	}
 	case DATA_TYPE_STRING_ARRAY: {
-		char **stra_a, **stra_b;
+		const char **stra_a, **stra_b;
 		uint_t nelem_a, nelem_b;
 		nvpair_value_string_array(nvp_a, &stra_a, &nelem_a);
 		nvpair_value_string_array(nvp_b, &stra_b, &nelem_b);

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: CDDL-1.0
 /*
  * CDDL HEADER START
  *
@@ -3245,7 +3246,8 @@ nvs_xdr_nvl_fini(nvstream_t *nvs)
  * xdrproc_t-compatible callbacks for xdr_array()
  */
 
-#if defined(_KERNEL) && defined(__linux__) /* Linux kernel */
+#if (defined(__FreeBSD_version) && __FreeBSD_version >= 1600010) || \
+    defined(_KERNEL) && defined(__linux__) /* Linux kernel */
 
 #define	NVS_BUILD_XDRPROC_T(type)		\
 static bool_t					\
@@ -3281,7 +3283,6 @@ nvs_xdr_nvp_##type(XDR *xdrs, void *ptr, ...)	\
 
 #endif
 
-/* BEGIN CSTYLED */
 NVS_BUILD_XDRPROC_T(char);
 NVS_BUILD_XDRPROC_T(short);
 NVS_BUILD_XDRPROC_T(u_short);
@@ -3289,7 +3290,6 @@ NVS_BUILD_XDRPROC_T(int);
 NVS_BUILD_XDRPROC_T(u_int);
 NVS_BUILD_XDRPROC_T(longlong_t);
 NVS_BUILD_XDRPROC_T(u_longlong_t);
-/* END CSTYLED */
 
 /*
  * The format of xdr encoded nvpair is:

@@ -102,28 +102,26 @@ INTERPOSED = \
 
 .ifdef CHERI_LIB_C18N
 # Pseudo implementations of system calls with special behavior under c18n
-SRCS+= \
-	mmap_c18n.c \
-	rfork_c18n.c \
-	thr_exit_c18n.c \
-	vfork_c18n.c
-
-NO_UNDERSCORE+= \
+C18N_WRAPPED=	\
 	mmap \
 	rfork \
 	thr_exit \
 	vfork
+
+SRCS+=		${C18N_WRAPPED:S/$/_c18n.c/}
+PSEUDO+=	${C18N_WRAPPED}
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}
 # Var-args calling convention different for purecap
 NO_UNDERSCORE=	fcntl ioctl open openat
+
 .for _nu in ${NO_UNDERSCORE}
 INTERPOSED:=	${INTERPOSED:N${_nu}}
 .endfor
 S_NU+=		${NO_UNDERSCORE:C/^.*$/_&.S/}
 SRCS+=		${NO_UNDERSCORE:S/$/.c/} ${S_NU}
-NOASM+=		${NO_UNDERSCORE:S/$/.o/}
+NOASM+=		${NO_UNDERSCORE}
 .endif
 
 PSEUDO+=	${INTERPOSED}
@@ -340,6 +338,7 @@ MAN+=	abort2.2 \
 	rmdir.2 \
 	rtprio.2 \
 	sched_get_priority_max.2 \
+	sched_getcpu.3 \
 	sched_setparam.2 \
 	sched_setscheduler.2 \
 	sched_yield.2 \
@@ -351,6 +350,7 @@ MAN+=	abort2.2 \
 	semget.2 \
 	semop.2 \
 	send.2 \
+	setcred.2 \
 	setfib.2 \
 	sendfile.2 \
 	setgroups.2 \
@@ -440,6 +440,7 @@ MLINKS+=chmod.2 fchmod.2 \
 MLINKS+=chown.2 fchown.2 \
 	chown.2 fchownat.2 \
 	chown.2 lchown.2
+MLINKS+=chroot.2 fchroot.2
 MLINKS+=clock_gettime.2 clock_getres.2 \
 	clock_gettime.2 clock_settime.2
 MLINKS+=closefrom.2 close_range.2
@@ -493,6 +494,7 @@ MLINKS+=jail.2 jail_attach.2 \
 	jail.2 jail_set.2
 MLINKS+=kldunload.2 kldunloadf.2
 MLINKS+=kqueue.2 kevent.2 \
+	kqueue.2 kqueue1.2 \
 	kqueue.2 kqueuex.2 \
 	kqueue.2 EV_SET.3
 MLINKS+=link.2 linkat.2

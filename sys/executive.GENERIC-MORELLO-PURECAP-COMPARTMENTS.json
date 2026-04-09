@@ -7,6 +7,7 @@
 			"bcopy.o",
 			"freebsd64_machdep.o",
 			"cheri_machdep.o",
+			"cheri_usercap.o",
 			"compartment.o",
 			"compartment_machdep.o",
 			"machdep.o",

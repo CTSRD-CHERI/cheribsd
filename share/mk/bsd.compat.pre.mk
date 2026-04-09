@@ -1,5 +1,5 @@
 .if !targets(__<${_this:T}>__)
-__<${_this:T}>__:
+__<${_this:T}>__:	.NOTMAIN
 
 _ALL_LIBCOMPATS:=	32 64 64C 64CB
 

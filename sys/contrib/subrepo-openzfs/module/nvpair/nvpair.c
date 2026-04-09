@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: CDDL-1.0
 /*
  * CDDL HEADER START
  *
@@ -56,7 +57,7 @@
 
 #define	skip_whitespace(p)	while ((*(p) == ' ') || (*(p) == '\t')) (p)++
 
-#if __has_feature(capabilities)
+#if defined(__CHERI__) || defined(__CHERI_HYBRID__)
 #define NVPAIR_OVER_ALLOCATE_DECODE
 #endif
 
@@ -3254,7 +3255,14 @@ nvs_xdr_nvl_fini(nvstream_t *nvs)
  * xdrproc_t-compatible callbacks for xdr_array()
  */
 
-#if defined(_KERNEL) && defined(__linux__) /* Linux kernel */
+/*
+ * XXX-CHERI: remove XDRPROC_TAKES_TWO_ARGS after CheriBSD version is bumped.
+ * Remove __CheriBSD_version check after __FreeBSD_version 1600010 is merged.
+ */
+#if defined(XDRPROC_TAKES_TWO_ARGS) || \
+    (defined(__CheriBSD_version) && __CheriBSD_version > 20250301) || \
+    (defined(__FreeBSD_version) && __FreeBSD_version >= 1600010) || \
+    (defined(_KERNEL) && defined(__linux__)) /* Linux kernel */
 
 #define	NVS_BUILD_XDRPROC_T(type)		\
 static bool_t					\
@@ -3263,7 +3271,7 @@ nvs_xdr_nvp_##type(XDR *xdrs, void *ptr)	\
 	return (xdr_##type(xdrs, ptr));		\
 }
 
-#elif !defined(_KERNEL) && defined(__FreeBSD__)
+#elif !defined(_KERNEL) && defined(__FreeBSD__) && defined(__CheriBSD_version)
 
 #define	NVS_BUILD_XDRPROC_T(type)				\
 static int							\
@@ -3272,7 +3280,7 @@ nvs_xdr_nvp_##type(struct XDR *xdrs, void *ptr, unsigned int i __unused) \
 	return (xdr_##type(xdrs, ptr));				\
 }
 
-#elif !defined(_KERNEL) && defined(XDR_CONTROL) /* tirpc */
+#elif !defined(_KERNEL) && defined(XDR_CONTROL) /* tirpc, FreeBSD < 16 */
 
 #define	NVS_BUILD_XDRPROC_T(type)		\
 static bool_t					\
@@ -3288,7 +3296,7 @@ nvs_xdr_nvp_##type(XDR *xdrs, ...)		\
 	return (xdr_##type(xdrs, ptr));		\
 }
 
-#else /* FreeBSD, sunrpc */
+#else /* FreeBSD kernel < 16, sunrpc */
 
 #define	NVS_BUILD_XDRPROC_T(type)		\
 static bool_t					\
@@ -3299,7 +3307,6 @@ nvs_xdr_nvp_##type(XDR *xdrs, void *ptr, ...)	\
 
 #endif
 
-/* BEGIN CSTYLED */
 NVS_BUILD_XDRPROC_T(char);
 NVS_BUILD_XDRPROC_T(short);
 NVS_BUILD_XDRPROC_T(u_short);
@@ -3307,7 +3314,6 @@ NVS_BUILD_XDRPROC_T(int);
 NVS_BUILD_XDRPROC_T(u_int);
 NVS_BUILD_XDRPROC_T(longlong_t);
 NVS_BUILD_XDRPROC_T(u_longlong_t);
-/* END CSTYLED */
 
 /*
  * The format of xdr encoded nvpair is:

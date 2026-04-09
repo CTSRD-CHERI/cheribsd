@@ -231,7 +231,7 @@ LENTRY(efi_rt_fault)
 	/* Normal exit returning an error */
 	ldr	x0, =EFAULT
 	b	.Lefi_rt_arch_call_exit
-END(efi_rt_fault)
+LEND(efi_rt_fault)
 #endif
 
 GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

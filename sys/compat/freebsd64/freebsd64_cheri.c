@@ -37,6 +37,7 @@
 #include <cheri/cheric.h>
 #include <cheri/cherireg.h>
 
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 
 int
@@ -44,7 +45,7 @@ freebsd64_cheri_cidcap_alloc(struct thread *td, struct
     freebsd64_cheri_cidcap_alloc_args *uap)
 {
 #ifdef CHERI_PERM_COMPARTMENT_ID
-	return (kern_cheri_cidcap_alloc(td, __USER_CAP_OBJ(uap->cidp)));
+	return (kern_cheri_cidcap_alloc(td, USER_PTR_OBJ(uap->cidp)));
 #else
 	return (ENOTSUP);
 #endif

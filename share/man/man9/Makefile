@@ -28,6 +28,7 @@ MAN=	accept_filter.9 \
 	BUS_ADD_CHILD.9 \
 	bus_adjust_resource.9 \
 	bus_alloc_resource.9 \
+	bus_attach_children.9 \
 	BUS_BIND_INTR.9 \
 	bus_child_present.9 \
 	BUS_CHILD_DELETED.9 \
@@ -35,10 +36,8 @@ MAN=	accept_filter.9 \
 	BUS_CHILD_LOCATION.9 \
 	BUS_CHILD_PNPINFO.9 \
 	BUS_CONFIG_INTR.9 \
-	bus_delayed_attach_children.9 \
 	BUS_DESCRIBE_INTR.9 \
 	bus_dma.9 \
-	bus_generic_attach.9 \
 	bus_generic_detach.9 \
 	bus_generic_new_pass.9 \
 	bus_generic_print_child.9 \
@@ -47,6 +46,7 @@ MAN=	accept_filter.9 \
 	BUS_GET_CPUS.9 \
 	BUS_GET_PROPERTY.9 \
 	bus_get_resource.9 \
+	BUS_HINTED_CHILD.9 \
 	bus_map_resource.9 \
 	BUS_NEW_PASS.9 \
 	BUS_PRINT_CHILD.9 \
@@ -69,6 +69,7 @@ MAN=	accept_filter.9 \
 	contigmalloc.9 \
 	copy.9 \
 	counter.9 \
+	cpu_machdep.9 \
 	cpuset.9 \
 	cr_bsd_visible.9 \
 	cr_cansee.9 \
@@ -673,7 +674,12 @@ MLINKS+=buf_ring.9 buf_ring_alloc.9 \
 	buf_ring.9 buf_ring_peek.9
 MLINKS+=bus_activate_resource.9 bus_deactivate_resource.9
 MLINKS+=bus_alloc_resource.9 bus_alloc_resource_any.9
+MLINKS+=bus_attach_children.9 bus_delayed_attach_children.9 \
+	bus_attach_children.9 bus_detach_children.9 \
+	bus_attach_children.9 bus_enumerate_hinted_children.9 \
+	bus_attach_children.9 bus_identify_children.9
 MLINKS+=BUS_BIND_INTR.9 bus_bind_intr.9
+MLINKS+=BUS_CONFIG_INTR.9 bus_config_intr.9
 MLINKS+=BUS_DESCRIBE_INTR.9 bus_describe_intr.9
 MLINKS+=bus_dma.9 busdma.9 \
 	bus_dma.9 bus_dmamap_create.9 \
@@ -692,6 +698,9 @@ MLINKS+=bus_dma.9 busdma.9 \
 	bus_dma.9 bus_dmamem_free.9 \
 	bus_dma.9 bus_dma_tag_create.9 \
 	bus_dma.9 bus_dma_tag_destroy.9
+MLINKS+=bus_generic_print_child.9 bus_print_child_domain.9 \
+	bus_generic_print_child.9 bus_print_child_footer.9 \
+	bus_generic_print_child.9 bus_print_child_header.9
 MLINKS+=bus_generic_read_ivar.9 bus_generic_write_ivar.9
 MLINKS+=BUS_GET_CPUS.9 bus_get_cpus.9
 MLINKS+=bus_map_resource.9 bus_unmap_resource.9 \
@@ -835,30 +844,26 @@ MLINKS+=callout.9 callout_active.9 \
 	callout.9 callout_schedule_sbt_on.9 \
 	callout.9 callout_stop.9 \
 	callout.9 callout_when.9
-MLINKS+=cheric.9 cheri_andperm.9 \
-	cheric.9 cheri_clear_low_ptr_bits.9 \
-	cheric.9 cheri_setbounds.9 \
-	cheric.9 cheri_fromint.9 \
-	cheric.9 cheri_get_low_ptr_bits.9 \
-	cheric.9 cheri_getaddress.9 \
-	cheric.9 cheri_getbase.9 \
-	cheric.9 cheri_getdefault.9 \
-	cheric.9 cheri_getlen.9 \
-	cheric.9 cheri_getoffset.9 \
-	cheric.9 cheri_getpcc.9 \
-	cheric.9 cheri_getperm.9 \
-	cheric.9 cheri_getsealed.9 \
-	cheric.9 cheri_getstack.9 \
-	cheric.9 cheri_gettop.9 \
-	cheric.9 cheri_gettag.9 \
-	cheric.9 cheri_gettype.9 \
-	cheric.9 cheri_clearperm.9 \
-	cheric.9 cheri_cleartag.9 \
-	cheric.9 cheri_incoffset.9 \
+MLINKS+=cheric.9 cheri_address_get.9 \
+	cheric.9 cheri_address_set.9 \
+	cheric.9 cheri_base_get.9 \
+	cheric.9 cheri_bounds_set.9 \
+	cheric.9 cheri_ddc_get.9 \
+	cheric.9 cheri_is_sealed.9 \
+	cheric.9 cheri_length_get.9 \
+	cheric.9 cheri_offset_get.9 \
+	cheric.9 cheri_offset_inc.9 \
+	cheric.9 cheri_offset_set.9 \
+	cheric.9 cheri_pcc_get.9 \
+	cheric.9 cheri_perms_and.9 \
+	cheric.9 cheri_perms_clear.9 \
+	cheric.9 cheri_perms_get.9 \
 	cheric.9 cheri_seal.9 \
-	cheric.9 cheri_set_low_ptr_bits.9 \
-	cheric.9 cheri_setaddress.9 \
-	cheric.9 cheri_setoffset.9 \
+	cheric.9 cheri_stack_get.9 \
+	cheric.9 cheri_tag_clear.9 \
+	cheric.9 cheri_tag_get.9 \
+	cheric.9 cheri_top_get.9 \
+	cheric.9 cheri_type_get.9 \
 	cheric.9 cheri_unseal.9
 MLINKS+=cnv.9 cnvlist.9 \
 	cnv.9 cnvlist_free_binary.9 \
@@ -917,9 +922,13 @@ MLINKS+=casuword.9 casueword.9 \
 	casuword.9 casuword32.9
 MLINKS+=copy.9 copyin.9 \
 	copy.9 copyin_nofault.9 \
+	copy.9 copyinptr.9 \
+	copy.9 copyinptr_nofault.9 \
 	copy.9 copyinstr.9 \
 	copy.9 copyout.9 \
 	copy.9 copyout_nofault.9 \
+	copy.9 copyoutptr.9 \
+	copy.9 copyoutptr_nofault.9 \
 	copy.9 copystr.9
 MLINKS+=counter.9 counter_u64_alloc.9 \
 	counter.9 counter_u64_free.9 \
@@ -934,6 +943,27 @@ MLINKS+=counter.9 counter_u64_alloc.9 \
 	counter.9 SYSCTL_ADD_COUNTER_U64.9 \
 	counter.9 SYSCTL_COUNTER_U64_ARRAY.9 \
 	counter.9 SYSCTL_ADD_COUNTER_U64_ARRAY.9
+MLINKS+=cpu_machdep.9 cpu_copy_thread.9 \
+	cpu_machdep.9 cpu_exec_vmspace_reuse.9 \
+	cpu_machdep.9 cpu_exit.9 \
+	cpu_machdep.9 cpu_fetch_syscall_args.9 \
+	cpu_machdep.9 cpu_fork.9 \
+	cpu_machdep.9 cpu_fork_kthread_handler.9 \
+	cpu_machdep.9 cpu_idle.9 \
+	cpu_machdep.9 cpu_idle_wakeup.9 \
+	cpu_machdep.9 cpu_procctl.9 \
+	cpu_machdep.9 cpu_ptrace.9 \
+	cpu_machdep.9 cpu_set_syscall_retval.9 \
+	cpu_machdep.9 cpu_set_upcall.9 \
+	cpu_machdep.9 cpu_set_user_tls.9 \
+	cpu_machdep.9 cpu_switch.9 \
+	cpu_machdep.9 cpu_sync_core.9 \
+	cpu_machdep.9 cpu_thread_alloc.9 \
+	cpu_machdep.9 cpu_thread_clean.9 \
+	cpu_machdep.9 cpu_thread_exit.9 \
+	cpu_machdep.9 cpu_thread_free.9 \
+	cpu_machdep.9 cpu_throw.9 \
+	cpu_machdep.9 cpu_update_pcb.9
 MLINKS+=cpuset.9 CPUSET_T_INITIALIZER.9 \
 	cpuset.9 CPUSET_FSET.9 \
 	cpuset.9 CPU_CLR.9 \
@@ -1045,6 +1075,9 @@ MLINKS+=device_set_desc.9 device_get_desc.9 \
 	device_set_desc.9 device_set_descf.9 \
 	device_set_desc.9 device_set_desc_copy.9
 MLINKS+=device_set_flags.9 device_get_flags.9
+MLINKS+=device_probe_and_attach.9 device_attach.9 \
+	device_probe_and_attach.9 device_detach.9 \
+	device_probe_and_attach.9 device_probe.9
 MLINKS+=devstat.9 devicestat.9 \
 	devstat.9 devstat_new_entry.9 \
 	devstat.9 devstat_end_transaction.9 \
@@ -1367,6 +1400,9 @@ MLINKS+=ifnet.9 if_addmulti.9 \
 	ifnet.9 ifqueue.9 \
 	ifnet.9 ifunit.9 \
 	ifnet.9 ifunit_ref.9
+# IfAPI
+MLINKS+=ifnet.9 ifapi.9
+
 MLINKS+=insmntque.9 insmntque1.9
 MLINKS+=intr_event.9 intr_event_add_handler.9 \
 	intr_event.9 intr_event_create.9 \
@@ -1600,8 +1636,6 @@ MLINKS+=microuptime.9 binuptime.9 \
 	microuptime.9 getsbinuptime.9 \
 	microuptime.9 nanouptime.9 \
 	microuptime.9 sbinuptime.9
-MLINKS+=mi_switch.9 cpu_switch.9 \
-	mi_switch.9 cpu_throw.9
 MLINKS+=mod_cc.9 CCV.9 \
 	mod_cc.9 DECLARE_CC_MODULE.9
 MLINKS+=mtx_pool.9 mtx_pool_alloc.9 \
@@ -1783,10 +1817,12 @@ MLINKS+=panic.9 vpanic.9 \
 	panic.9 KERNEL_PANICKED.9
 MLINKS+=pci.9 pci_alloc_msi.9 \
 	pci.9 pci_alloc_msix.9 \
+	pci.9 pci_clear_pme.9 \
 	pci.9 pci_disable_busmaster.9 \
 	pci.9 pci_disable_io.9 \
 	pci.9 pci_enable_busmaster.9 \
 	pci.9 pci_enable_io.9 \
+	pci.9 pci_enable_pme.9 \
 	pci.9 pci_find_bsf.9 \
 	pci.9 pci_find_cap.9 \
 	pci.9 pci_find_dbsf.9 \
@@ -1799,6 +1835,7 @@ MLINKS+=pci.9 pci_alloc_msi.9 \
 	pci.9 pci_get_powerstate.9 \
 	pci.9 pci_get_vpd_ident.9 \
 	pci.9 pci_get_vpd_readonly.9 \
+	pci.9 pci_has_pm.9 \
 	pci.9 pci_iov_attach.9 \
 	pci.9 pci_iov_attach_name.9 \
 	pci.9 pci_iov_detach.9 \
@@ -2128,7 +2165,9 @@ MLINKS+=socket.9 soabort.9 \
 	socket.9 solisten_proto_check.9 \
 	socket.9 sonewconn.9 \
 	socket.9 sooptcopyin.9 \
+	socket.9 sooptcopyinptr.9 \
 	socket.9 sooptcopyout.9 \
+	socket.9 sooptcopyoutptr.9 \
 	socket.9 sopoll.9 \
 	socket.9 sopoll_generic.9 \
 	socket.9 soreceive.9 \

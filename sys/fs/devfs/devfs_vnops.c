@@ -39,6 +39,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/abi_compat.h>
 #include <sys/conf.h>
 #include <sys/dirent.h>
 #include <sys/eventhandler.h>
@@ -67,7 +68,7 @@
 
 static struct vop_vector devfs_vnodeops;
 static struct vop_vector devfs_specops;
-static struct fileops devfs_ops_f;
+static const struct fileops devfs_ops_f;
 
 #include <fs/devfs/devfs.h>
 #include <fs/devfs/devfs_int.h>
@@ -903,12 +904,12 @@ fiodgname_buf_get_ptr(void *fgnp, u_long com)
 		return (fgnup->fgn.buf);
 #ifdef COMPAT_FREEBSD32
 	case FIODGNAME_32:
-		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn32.buf,
+		return (USER_PTR((void *)(uintptr_t)fgnup->fgn32.buf,
 		    fgnup->fgn32.len));
 #endif
 #ifdef COMPAT_FREEBSD64
 	case FIODGNAME_64:
-		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn64.buf,
+		return (USER_PTR((void *)(uintptr_t)fgnup->fgn64.buf,
 		    fgnup->fgn64.len));
 #endif
 	default:
@@ -2053,7 +2054,7 @@ devfs_cmp_f(struct file *fp1, struct file *fp2, struct thread *td)
 	return (kcmp_cmp((uintptr_t)fp1->f_data, (uintptr_t)fp2->f_data));
 }
 
-static struct fileops devfs_ops_f = {
+static const struct fileops devfs_ops_f = {
 	.fo_read =	devfs_read_f,
 	.fo_write =	devfs_write_f,
 	.fo_truncate =	devfs_truncate_f,

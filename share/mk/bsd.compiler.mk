@@ -24,8 +24,9 @@
 # - retpoline: supports the retpoline speculative execution vulnerability
 #              mitigation.
 # - init-all:  supports stack variable initialization.
+# - stackclash:supports stack clash protection
+# - zeroregs:  supports zeroing used registers on return
 # - aarch64-sha512: supports the AArch64 sha512 intrinsic functions.
-# - morello-codeptr-relocs: support code pointer relocations on Morello
 #
 # When bootstrapping on macOS, 'apple-clang' will be set in COMPILER_FEATURES
 # to differentiate Apple's version of Clang. Apple Clang uses a different
@@ -39,7 +40,7 @@
 #
 
 .if !target(__<bsd.compiler.mk>__)
-__<bsd.compiler.mk>__:
+__<bsd.compiler.mk>__:	.NOTMAIN
 
 .include <bsd.opts.mk>
 
@@ -264,6 +265,7 @@ ${X_}COMPILER_FEATURES+=	c++20
 ${X_}COMPILER_FEATURES+=	init-all
 .endif
 .if ${${X_}COMPILER_TYPE} == "clang"
+${X_}COMPILER_FEATURES+=	blocks
 ${X_}COMPILER_FEATURES+=	retpoline
 # PR257638 lld fails with BE compressed debug.  Fixed in main but external tool
 # chains will initially not have the fix.  For now limit the feature to LE
@@ -294,20 +296,26 @@ ${X_}COMPILER_ABSOLUTE_PATH!=	which ${${cc}:N${CCACHE_BIN}:[1]}
 ${X_}COMPILER_FEATURES+=	fileprefixmap
 .endif
 
+.if (${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 70000 \
+	&& ${MACHINE_ARCH:Mriscv*} != "" && ${MACHINE_ARCH:Mpower*} != "") || \
+	(${${X_}COMPILER_TYPE} == "gcc" && ${${X_}COMPILER_VERSION} >= 81000 \
+	&& ${MACHINE_ARCH:Mriscv*} != "")
+${X_}COMPILER_FEATURES+=	stackclash
+.endif
+
+
+.if (${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 150000) || \
+	(${${X_}COMPILER_TYPE} == "gcc" && ${${X_}COMPILER_VERSION} >= 110000) && \
+	${MACHINE_ARCH:Mriscv*} != "" && ${MACHINE_ARCH:Mpower*} != "" && \
+	${MACHINE_ARCH:Marmv7*} != "" 
+${X_}COMPILER_FEATURES+=	zeroregs
+.endif
+
 .if (${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 130000) || \
 	(${${X_}COMPILER_TYPE} == "gcc" && ${${X_}COMPILER_VERSION} >= 90000)
 # AArch64 sha512 intrinsics are supported (and have been tested) in
 # clang 13 and gcc 9.
 ${X_}COMPILER_FEATURES+=	aarch64-sha512
-.endif
-
-.if ${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 150000
-# XXX: This (like aarch64-sha512) depends on the feature only being used
-# on the correct target.  It also isn't completely accurate as revisions
-# of the compiler exist which are based on LLVM 15 and don't support
-# -cheri-codeptr-relocs.  Such systems will fail to build with an error
-# so this should be ok.
-${X_}COMPILER_FEATURES+=	morello-codeptr-relocs
 .endif
 
 .else

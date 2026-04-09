@@ -39,7 +39,11 @@
 #include <machine/riscvreg.h>
 
 #define	TRAPNO_CHERI		(SCAUSE_CHERI)
+#ifdef __riscv_xcheri
 #define	TRAPNO_STORE_CAP_PF	(SCAUSE_STORE_AMO_CAP_PAGE_FAULT)
+#else
+#define	TRAPNO_STORE_CAP_PF	(SCAUSE_STORE_PAGE_FAULT)
+#endif
 #define	TRAPNO_LOAD_STORE	(SCAUSE_CHERI)
 #define	TRAPNO_LOAD_PF		(SCAUSE_LOAD_PAGE_FAULT)
 #define	TRAPNO_STORE_PF		(SCAUSE_STORE_PAGE_FAULT)
@@ -49,6 +53,19 @@
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	XFAIL_VARARG_BOUNDS	"varargs bounds known to be unimplemented"
+#endif
+
+#ifdef __CHERI_TGOT_TLS__
+#define	TLS_EXACT_BOUNDS
+#endif
+
+/* Supported architecture permission bits feature flags */
+#ifdef __riscv_xcheri
+#define	HAS_CHERI_PERM_LOAD_STORE_CAP
+#define	HAS_CHERI_PERM_SEAL
+#else
+#define	HAS_CHERI_PERM_CAP
+#define	HAS_CHERI_PERM_LOAD_MUTABLE
 #endif
 
 #define	CAPREG_PCC(capreg)	((capreg)->sepcc)

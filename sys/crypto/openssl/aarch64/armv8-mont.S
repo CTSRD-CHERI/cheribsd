@@ -17,6 +17,7 @@ bn_mul_mont:
 	cmp	x5,#32
 	b.le	.Lscalar_impl
 #ifndef	__KERNEL__
+#ifndef	__AARCH64EB__
 #ifdef __CHERI_PURE_CAPABILITY__
 	adrp	c17,:got:OPENSSL_armv8_rsa_neonized
 	ldr	c17,[c17,#:got_lo12:OPENSSL_armv8_rsa_neonized]
@@ -26,6 +27,7 @@ bn_mul_mont:
 	ldr	w17,[x17,#:lo12:OPENSSL_armv8_rsa_neonized]
 #endif
 	cbnz	w17, bn_mul8x_mont_neon
+#endif
 #endif
 
 .Lscalar_impl:

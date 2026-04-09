@@ -3,7 +3,7 @@
 # anything in that case.
 .if !make(cleandir)
 .if !targets(__<${_this:T}>__)
-__<${_this:T}>__:
+__<${_this:T}>__:	.NOTMAIN
 
 .include <src.opts.mk>
 
@@ -12,7 +12,12 @@ __<${_this:T}>__:
 .if defined(_LIBCOMPATS)
 COMPAT_ARCH?=	${TARGET_ARCH}
 .for _LIBCOMPAT in ${_ALL_LIBCOMPATS}
+# Inherit CPUTYPE for distinguishing xcheri/rvy
+.if ${COMPAT_ARCH:Mriscv*c*} || ${_LIBCOMPAT:M64C}
+LIB${_LIBCOMPAT}CPUTYPE?=	${CPUTYPE_${_LIBCOMPAT}:U${TARGET_CPUTYPE}}
+.else
 LIB${_LIBCOMPAT}CPUTYPE?=	${CPUTYPE_${_LIBCOMPAT}}
+.endif
 .endfor
 .if (defined(WANT_COMPILER_TYPE) && ${WANT_COMPILER_TYPE} == gcc) || \
     (defined(X_COMPILER_TYPE) && ${X_COMPILER_TYPE} == gcc)
@@ -107,7 +112,7 @@ LIB64_MACHINE_ARCH=aarch64
 LIB64WMAKEENV=	MACHINE_CPU="arm64 cheri"
 LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=morello
 # XXX: clang specific
-LIB64CPUFLAGS=	-target aarch64-unknown-freebsd13.0
+LIB64CPUFLAGS=	-target aarch64-unknown-freebsd${OS_REVISION}
 LIB64CPUFLAGS+=	-march=morello -mabi=aapcs
 .endif
 
@@ -116,10 +121,22 @@ HAS_COMPAT+=	64
 LIB64_RISCV_ABI=	lp64d
 LIB64_MACHINE=	riscv
 LIB64_MACHINE_ARCH=riscv64
-LIB64WMAKEENV=	MACHINE_CPU="riscv cheri"
-LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=cheri
+.if ${LIB64CPUTYPE} == "cheri"
+.if 0
+.warning "CPUTYPE=cheri is deprecated, please use xcheri or rvy"
+.endif
+LIB64_RISCV_CHERI_TYPE=	xcheri
+.elif empty(LIB64CPUTYPE)
+LIB64_RISCV_CHERI_TYPE=	xcheri
+.elif ${LIB64CPUTYPE} == "xcheri" || ${LIB64CPUTYPE} == "rvy"
+LIB64_RISCV_CHERI_TYPE=	${LIB64CPUTYPE}
+.else
+.error "Invalid CHERI variant ${LIB64CPUTYPE}"
+.endif
+LIB64WMAKEENV=	MACHINE_CPU="riscv cheri ${LIB64_RISCV_CHERI_TYPE}"
+LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=${LIB64_RISCV_CHERI_TYPE}
 # XXX: clang specific
-LIB64CPUFLAGS=	-target riscv64-unknown-freebsd13.0
+LIB64CPUFLAGS=	-target riscv64-unknown-freebsd${OS_REVISION}
 LIB64CPUFLAGS+=	-march=${LIB64_RISCV_MARCH} -mabi=${LIB64_RISCV_ABI}
 .endif
 
@@ -136,14 +153,25 @@ LIB64_MACHINE_ABI=	${MACHINE_ABI:Npurecap:Nptr*} ptr64
 HAS_COMPAT+=	64C
 LIB64C_MACHINE=	arm64
 LIB64C_MACHINE_ARCH=	aarch64c
-LIB64CCPUFLAGS=	-target aarch64-unknown-freebsd13.0
+LIB64CCPUFLAGS=	-target aarch64-unknown-freebsd${OS_REVISION}
 LIB64CCPUFLAGS+=	-march=morello -mabi=purecap
 .elif ${COMPAT_ARCH:Mriscv64*} && !${COMPAT_ARCH:Mriscv64*c*}
 HAS_COMPAT+=	64C
 LIB64C_MACHINE=	riscv
 LIB64C_MACHINE_ARCH=	${COMPAT_ARCH}c
-LIB64CWMAKEFLAGS=	CPUTYPE=cheri
-LIB64CCPUFLAGS=	-target riscv64-unknown-freebsd13.0
+.if ${LIB64CCPUTYPE} == "cheri"
+.if 0
+.warning "CPUTYPE=cheri is deprecated, please use xcheri or rvy"
+.endif
+LIB64CWMAKEFLAGS=	CPUTYPE=xcheri
+.elif empty(LIB64CCPUTYPE)
+LIB64CWMAKEFLAGS=	CPUTYPE=xcheri
+.elif ${LIB64CCPUTYPE} == "xcheri" || ${LIB64CCPUTYPE} == "rvy"
+LIB64CWMAKEFLAGS=	${LIB64CCPUTYPE}
+.else
+.error "Invalid CHERI variant ${LIB64CCPUTYPE}"
+.endif
+LIB64CCPUFLAGS=	-target riscv64-unknown-freebsd${OS_REVISION}
 LIB64C_RISCV_ABI=	l64pc128d
 LIB64CCPUFLAGS+=	-march=${LIB64C_RISCV_MARCH} -mabi=${LIB64C_RISCV_ABI}
 .endif	# ${COMPAT_ARCH:Mriscv64*}
@@ -154,7 +182,14 @@ LIB64CCPUFLAGS+=	-march=${LIB64C_RISCV_MARCH} -mabi=${LIB64C_RISCV_ABI}
 # See bsd.cpu.mk
 LIB${_LIBCOMPAT}_RISCV_MARCH=	rv64imafdc
 .if ${COMPAT_ARCH:Mriscv*c*} || ${_LIBCOMPAT:M64C}
+.  if empty(LIB${_LIBCOMPAT}CPUTYPE) || ${LIB${_LIBCOMPAT}CPUTYPE} == "xcheri" || \
+      ${LIB${_LIBCOMPAT}CPUTYPE} == "cheri"
 LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}xcheri
+.  elif ${LIB${_LIBCOMPAT}CPUTYPE} == "rvy"
+LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}zcherihybrid_zcherilevels
+.  else
+.    error "Invalid CHERI variant ${LIB${_LIBCOMPAT}CPUTYPE}"
+.  endif
 .endif
 .endfor
 .endif
@@ -195,7 +230,7 @@ LIB64CCFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
 HAS_COMPAT+=	64CB
 LIB64CB_MACHINE=	arm64
 LIB64CB_MACHINE_ARCH=aarch64cb
-LIB64CBCPUFLAGS=	-target aarch64-unknown-freebsd13.0
+LIB64CBCPUFLAGS=	-target aarch64-unknown-freebsd${OS_REVISION}
 LIB64CBCPUFLAGS+=	-march=morello -mabi=purecap-benchmark
 LIB64CB_MACHINE_ABI=	${MACHINE_ABI:Nptr*:Npurecap} purecap ptr128c benchmark
 

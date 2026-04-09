@@ -45,6 +45,7 @@
 #include <sys/queue.h>
 #include <sys/_rmlock.h>
 #include <sys/resource.h>
+#include <sys/stddef.h>
 #include <sys/_pcpu.h>
 #ifndef PCPU_FUNCS
 #include <sys/pcpu_executive.h>
@@ -141,7 +142,7 @@ extern uintptr_t dpcpu_off[];
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	DPCPU_BIAS	0
 #define	__DPCPU_PTR(b, t, n)						\
-	cheri_setboundsexact((t *)((b) +				\
+	cheri_bounds_set_exact((t *)((b) +				\
 	    ((ptraddr_t)&DPCPU_NAME(n) - (ptraddr_t)DPCPU_START)),	\
 	    CHERI_REPRESENTABLE_LENGTH(sizeof(DPCPU_NAME(n))))
 #else /* __CHERI_PURE_CAPABILITY__ */
@@ -153,7 +154,7 @@ extern uintptr_t dpcpu_off[];
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	DPCPU_BIAS	0
 #define	_DPCPU_PTR(b, n)						\
-	cheri_setboundsexact((__typeof(DPCPU_NAME(n)) *)((b) +		\
+	cheri_bounds_set_exact((__typeof(DPCPU_NAME(n)) *)((b) +		\
 	    ((ptraddr_t)&DPCPU_NAME(n) - (ptraddr_t)DPCPU_START)),	\
 	    CHERI_REPRESENTABLE_LENGTH(sizeof(DPCPU_NAME(n))))
 #else /* __CHERI_PURE_CAPABILITY__ */
@@ -412,7 +413,7 @@ extern struct pcpu *cpuid_to_pcpu[];
 /* Accessor to elements allocated via UMA_ZONE_PCPU zone. */
 #define	_zpcpu_get_obj(base, offset, size) ({				\
 	__typeof(base) _ptr = (void *)((char *)(base) + offset);	\
-	cheri_kern_setbounds(_ptr, size);				\
+	cheri_kern_bounds_set(_ptr, size);				\
 })
 
 #define	zpcpu_get(base)							\

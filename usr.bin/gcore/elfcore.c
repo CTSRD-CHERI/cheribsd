@@ -109,6 +109,7 @@ static void *elf_note_powerpc_vsx(void *, size_t *);
 static void *elf_note_procstat_auxv(void *, size_t *);
 static void *elf_note_procstat_files(void *, size_t *);
 static void *elf_note_procstat_groups(void *, size_t *);
+static void *elf_note_procstat_kqueues(void *, size_t *);
 static void *elf_note_procstat_osrel(void *, size_t *);
 static void *elf_note_procstat_proc(void *, size_t *);
 static void *elf_note_procstat_psstrings(void *, size_t *);
@@ -337,9 +338,9 @@ cb_put_memtag_phdr(struct map_entry *entry, void *closure)
 		phdr->p_filesz = phdr->p_memsz / (sizeof(uintcap_t) * NBBY);
 		phdr->p_align = 0;
 		phdr->p_flags = 0;
-		if (entry->protection & VM_PROT_READ_CAP)
+		if (entry->protection & VM_PROT_READ)
 			phdr->p_flags |= PF_R;
-		if (entry->protection & VM_PROT_WRITE_CAP)
+		if (entry->protection & VM_PROT_WRITE)
 			phdr->p_flags |= PF_W;
 
 		phc->offset += phdr->p_filesz;
@@ -450,6 +451,7 @@ elf_putnotes(pid_t pid, struct sbuf *sb, size_t *sizep)
 	elf_putnote(NT_PROCSTAT_PSSTRINGS, elf_note_procstat_psstrings, &pid,
 	    sb);
 	elf_putnote(NT_PROCSTAT_AUXV, elf_note_procstat_auxv, &pid, sb);
+	elf_putnote(NT_PROCSTAT_KQUEUES, elf_note_procstat_kqueues, &pid, sb);
 #endif
 
 	size = sbuf_end_section(sb, old_len, 1, 0);
@@ -680,10 +682,8 @@ readmap(pid_t pid)
 		if ((kve->kve_protection & KVME_PROT_EXEC) != 0)
 			ent->protection |= VM_PROT_EXECUTE;
 #if __has_feature(capabilities)
-		if ((kve->kve_protection & KVME_PROT_READ_CAP) != 0)
-			ent->protection |= VM_PROT_READ_CAP;
-		if ((kve->kve_protection & KVME_PROT_WRITE_CAP) != 0)
-			ent->protection |= VM_PROT_WRITE_CAP;
+		if ((kve->kve_protection & KVME_PROT_CAP) != 0)
+			ent->protection |= VM_PROT_CAP;
 #endif
 
 		*linkp = ent;
@@ -827,7 +827,7 @@ procstat_sysctl(void *arg, int what, size_t structsz, size_t *sizep)
 {
 	size_t len;
 	pid_t pid;
-	int name[4], structsize;
+	int name[5], structsize;
 	void *buf, *p;
 
 	pid = *(pid_t *)arg;
@@ -910,6 +910,14 @@ elf_note_procstat_auxv(void *arg, size_t *sizep)
 
 	return (procstat_sysctl(arg, KERN_PROC_AUXV,
 	    sizeof(Elf_Auxinfo), sizep));
+}
+
+static void *
+elf_note_procstat_kqueues(void *arg, size_t *sizep)
+{
+
+	return (procstat_sysctl(arg, KERN_PROC_KQUEUE,
+	    sizeof(struct kinfo_knote), sizep));
 }
 
 static void *

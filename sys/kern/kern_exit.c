@@ -375,6 +375,7 @@ exit1(struct thread *td, int rval, int signo)
 	 * Stop the real interval timer.  If the handler is currently
 	 * executing, prevent it from rearming itself and let it finish.
 	 */
+	p->p_flag2 &= ~P2_ITSTOPPED;
 	if (timevalisset(&p->p_realtimer.it_value) &&
 	    callout_stop(&p->p_itcallout) == 0) {
 		timevalclear(&p->p_realtimer.it_interval);
@@ -892,7 +893,7 @@ sys_wait6(struct thread *td, struct wait6_args *uap)
 	    uap->wrusage, sip);
 	if (uap->info != NULL && error == 0) {
 		/*
-		 * This does not use copyoutcap() as a fail-safe.  The
+		 * This does not use copyoutptr() as a fail-safe.  The
 		 * returned signal information object shouldn't
 		 * contain any capabilities as neither the si_addr nor
 		 * si_value fields are relevant for SIGCHLD.
@@ -1023,11 +1024,6 @@ proc_reap(struct thread *td, struct proc *p, int *status, int options)
 	PROC_UNLOCK(q);
 
 	/*
-	 * Decrement the count of procs running with this uid.
-	 */
-	(void)chgproccnt(p->p_ucred->cr_ruidinfo, -1, 0);
-
-	/*
 	 * Destroy resource accounting information associated with the process.
 	 */
 #ifdef RACCT
@@ -1040,9 +1036,10 @@ proc_reap(struct thread *td, struct proc *p, int *status, int options)
 	racct_proc_exit(p);
 
 	/*
-	 * Free credentials, arguments, and sigacts.
+	 * Free credentials, arguments, and sigacts, and decrement the count of
+	 * processes running with this uid.
 	 */
-	proc_unset_cred(p);
+	proc_unset_cred(p, true);
 	pargs_drop(p->p_args);
 	p->p_args = NULL;
 	sigacts_free(p->p_sigacts);

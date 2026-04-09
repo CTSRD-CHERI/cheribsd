@@ -401,7 +401,7 @@ malloc_type_zone_allocated(struct malloc_type *mtp, void *addr,
 		mtsp->mts_memalloced += size;
 		mtsp->mts_numallocs++;
 #ifdef __CHERI_PURE_CAPABILITY__
-		mtsp->mts_memreserved += cheri_getlen(addr);
+		mtsp->mts_memreserved += cheri_length_get(addr);
 #elif __has_feature(capabilities)
 		mtsp->mts_memreserved += size;
 #endif
@@ -453,7 +453,7 @@ malloc_type_freed(struct malloc_type *mtp, void *addr, unsigned long size)
 	mtsp->mts_memfreed += size;
 	mtsp->mts_numfrees++;
 #ifdef __CHERI_PURE_CAPABILITY__
-	mtsp->mts_memunreserved += cheri_getlen(addr);
+	mtsp->mts_memunreserved += cheri_length_get(addr);
 #elif __has_feature(capabilities)
 	mtsp->mts_memunreserved += size;
 #endif
@@ -495,11 +495,18 @@ contigmalloc_size(uma_slab_t slab)
 }
 
 void *
-contigmalloc(unsigned long size, struct malloc_type *type, int flags,
+contigmalloc(unsigned long osize, struct malloc_type *type, int flags,
     vm_paddr_t low, vm_paddr_t high, unsigned long alignment,
     vm_paddr_t boundary)
 {
 	void *ret;
+	unsigned long size;
+
+#ifdef DEBUG_REDZONE
+	size = redzone_size_ntor(osize);
+#else
+	size = osize;
+#endif
 
 	ret = (void *)kmem_alloc_contig(size, flags, low, high, alignment,
 	    boundary, VM_MEMATTR_DEFAULT);
@@ -507,19 +514,29 @@ contigmalloc(unsigned long size, struct malloc_type *type, int flags,
 		/* Use low bits unused for slab pointers. */
 		vsetzoneslab((uintptr_t)ret, NULL, CONTIG_MALLOC_SLAB(size));
 		malloc_type_allocated(type, ret, round_page(size));
+#ifdef DEBUG_REDZONE
+		ret = redzone_setup(ret, osize);
+#endif
 	}
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(ret), ("Expected valid capability"));
+	KASSERT(cheri_tag_get(ret), ("Expected valid capability"));
 #endif
 	return (ret);
 }
 
 void *
-contigmalloc_domainset(unsigned long size, struct malloc_type *type,
+contigmalloc_domainset(unsigned long osize, struct malloc_type *type,
     struct domainset *ds, int flags, vm_paddr_t low, vm_paddr_t high,
     unsigned long alignment, vm_paddr_t boundary)
 {
 	void *ret;
+	unsigned long size;
+
+#ifdef DEBUG_REDZONE
+	size = redzone_size_ntor(osize);
+#else
+	size = osize;
+#endif
 
 	ret = (void *)kmem_alloc_contig_domainset(ds, size, flags, low, high,
 	    alignment, boundary, VM_MEMATTR_DEFAULT);
@@ -527,6 +544,9 @@ contigmalloc_domainset(unsigned long size, struct malloc_type *type,
 		/* Use low bits unused for slab pointers. */
 		vsetzoneslab((uintptr_t)ret, NULL, CONTIG_MALLOC_SLAB(size));
 		malloc_type_allocated(type, ret, round_page(size));
+#ifdef DEBUG_REDZONE
+		ret = redzone_setup(ret, osize);
+#endif
 	}
 	return (ret);
 }
@@ -624,10 +644,10 @@ malloc_large(size_t size, struct malloc_type *mtp, struct domainset *policy,
 		vsetzoneslab((uintptr_t)va, NULL, MALLOC_LARGE_SLAB(size));
 		uma_total_inc(size);
 #ifdef __CHERI_PURE_CAPABILITY__
-		KASSERT(cheri_getlen(va) <= CHERI_REPRESENTABLE_LENGTH(size),
+		KASSERT(cheri_length_get(va) <= CHERI_REPRESENTABLE_LENGTH(size),
 		    ("Invalid bounds: expected %#zx found %#zx",
 		        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
-		        (size_t)cheri_getlen(va)));
+		        (size_t)cheri_length_get(va)));
 #endif
 	}
 	malloc_type_allocated(mtp, va, va == NULL ? 0 : size);
@@ -709,10 +729,10 @@ void *
 		kasan_mark((void *)va, osize, size, KASAN_MALLOC_REDZONE);
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_getlen(va) <= CHERI_REPRESENTABLE_LENGTH(size),
+	KASSERT(cheri_length_get(va) <= CHERI_REPRESENTABLE_LENGTH(size),
 	    ("Invalid bounds: expected %#zx found %#zx",
 	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
-	        (size_t)cheri_getlen(va)));
+	        (size_t)cheri_length_get(va)));
 #endif
 	return ((void *) va);
 }
@@ -738,7 +758,7 @@ malloc_domain(size_t *sizep, int *indxp, struct malloc_type *mtp, int domain,
 		*sizep = zone->uz_size;
 	*indxp = indx;
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(va), ("Expected valid capability"));
+	KASSERT(cheri_tag_get(va), ("Expected valid capability"));
 #endif
 
 	return ((void *)va);
@@ -911,7 +931,7 @@ free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 	 * malloc_type, not a capability to it.
 	 */
 	mtpp = (ptraddr_t *)roundup2(mtpp, sizeof(ptraddr_t));
-	if (cheri_getlen(mtpp) - cheri_getoffset(mtpp) >= sizeof(ptraddr_t))
+	if (cheri_bytes_remaining(mtpp) >= sizeof(ptraddr_t))
 		*mtpp = (ptraddr_t)mtp;
 #else
 	mtpp = (struct malloc_type **)rounddown2(mtpp, sizeof(struct malloc_type *));
@@ -968,9 +988,9 @@ _free(void *addr, struct malloc_type *mtp, bool dozero)
 		return;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	if (__predict_false(!cheri_gettag(addr)))
+	if (__predict_false(!cheri_tag_get(addr)))
 		panic("Expect valid capability");
-	if (__predict_false(cheri_getsealed(addr)))
+	if (__predict_false(cheri_is_sealed(addr)))
 		panic("Expect unsealed capability");
 #endif
 
@@ -983,11 +1003,11 @@ _free(void *addr, struct malloc_type *mtp, bool dozero)
 	case __predict_true(SLAB_COOKIE_SLAB_PTR):
 		size = zone->uz_size;
 #ifdef __CHERI_PURE_CAPABILITY__
-		if (__predict_false(cheri_getlen(addr) !=
+		if (__predict_false(cheri_length_get(addr) !=
 		    CHERI_REPRESENTABLE_LENGTH(size)))
 			panic("Invalid bounds: expected %#zx found %#zx",
 			    (size_t)CHERI_REPRESENTABLE_LENGTH(size),
-			    cheri_getlen(addr));
+			    cheri_length_get(addr));
 #endif
 #if defined(INVARIANTS) && !defined(KASAN)
 		free_save_type(addr, mtp, size);
@@ -1001,11 +1021,11 @@ _free(void *addr, struct malloc_type *mtp, bool dozero)
 	case SLAB_COOKIE_MALLOC_LARGE:
 		size = malloc_large_size(slab);
 #ifdef __CHERI_PURE_CAPABILITY__
-		if (__predict_false(cheri_getlen(addr) !=
+		if (__predict_false(cheri_length_get(addr) !=
 		    CHERI_REPRESENTABLE_LENGTH(size)))
 			panic("Invalid bounds: expected %#zx found %#zx",
 			    (size_t)CHERI_REPRESENTABLE_LENGTH(size),
-			    cheri_getlen(addr));
+			    cheri_length_get(addr));
 #endif
 		if (dozero) {
 			kasan_mark(addr, size, size, 0);
@@ -1071,9 +1091,9 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 	if (addr == NULL)
 		return (malloc(size, mtp, flags));
 #ifdef __CHERI_PURE_CAPABILITY__
-	if (__predict_false(!cheri_gettag(addr)))
+	if (__predict_false(!cheri_tag_get(addr)))
 		panic("Expect valid capability");
-	if (__predict_false(cheri_getsealed(addr)))
+	if (__predict_false(cheri_is_sealed(addr)))
 		panic("Expect unsealed capability");
 #endif
 
@@ -1198,6 +1218,9 @@ malloc_usable_size(const void *addr)
 		break;
 	case SLAB_COOKIE_MALLOC_LARGE:
 		size = malloc_large_size(slab);
+		break;
+	case SLAB_COOKIE_CONTIG_MALLOC:
+		size = round_page(contigmalloc_size(slab));
 		break;
 	default:
 		__assert_unreachable();

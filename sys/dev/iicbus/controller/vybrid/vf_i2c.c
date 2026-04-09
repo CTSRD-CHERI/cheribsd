@@ -193,7 +193,7 @@ vf_i2c_attach_common(device_t dev)
 		return (ENXIO);
 	}
 
-	bus_generic_attach(dev);
+	bus_attach_children(dev);
 
 	return (0);
 }
@@ -210,12 +210,6 @@ i2c_detach(device_t dev)
 	error = bus_generic_detach(dev);
 	if (error != 0) {
 		device_printf(dev, "cannot detach child devices.\n");
-		return (error);
-	}
-
-	error = device_delete_child(dev, sc->iicbus);
-	if (error != 0) {
-		device_printf(dev, "could not delete iicbus child.\n");
 		return (error);
 	}
 

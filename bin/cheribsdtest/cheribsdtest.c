@@ -46,15 +46,13 @@
 #include <sys/ucontext.h>
 #include <sys/wait.h>
 
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-
 #include <machine/frame.h>
 #include <machine/trap.h>
 
 #include <machine/sysarch.h>
 
 #include <assert.h>
+#include <cheriintrin.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>

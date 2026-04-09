@@ -77,13 +77,7 @@
 	mrs	c9, ddc_el0
 	mrs	x10, daif
 	stp	c9, c10, [PTRN(sp)]
-#ifdef __CHERI_PURE_CAPABILITY__
-	adrp	PTR(9), :got:smccc_ddc_el0
-	ldr	c9, [PTR(9), :got_lo12:smccc_ddc_el0]
-#else
-	adrp	PTR(9), smccc_ddc_el0
-	ldr	c9, [PTR(9), :lo12:smccc_ddc_el0]
-#endif
+	LDR_LABEL(c9, PTR(9), smccc_ddc_el0)
 
 	/* Mask interrupts while DDC_EL0 is set. */
 	msr	daifset, #(DAIF_INTR)

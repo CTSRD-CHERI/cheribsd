@@ -119,7 +119,7 @@ sys_thr_create(struct thread *td, struct thr_create_args *uap)
 	struct thr_create_initthr_args args;
 	int error;
 
-	if ((error = copyincap(uap->ctx, &args.ctx, sizeof(args.ctx))))
+	if ((error = copyinptr(uap->ctx, &args.ctx, sizeof(args.ctx))))
 		return (error);
 	args.tid = uap->id;
 	return (thread_create(td, NULL, thr_create_initthr, &args));
@@ -135,7 +135,7 @@ sys_thr_new(struct thread *td, struct thr_new_args *uap)
 	if (uap->param_size < 0 || uap->param_size > sizeof(param))
 		return (EINVAL);
 	bzero(&param, sizeof(param));
-	if ((error = copyincap(uap->param, &param, uap->param_size)))
+	if ((error = copyinptr(uap->param, &param, uap->param_size)))
 		return (error);
 	return (kern_thr_new(td, &param));
 }

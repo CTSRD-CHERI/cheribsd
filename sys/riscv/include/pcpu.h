@@ -42,9 +42,9 @@
 #include <machine/cpufunc.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	__PCPU_PAD	152
+#define	__PCPU_PAD	144
 #else
-#define	__PCPU_PAD	48
+#define	__PCPU_PAD	40
 #endif
 
 /* Keep in sync with db_show_mdpcpu() */
@@ -52,6 +52,7 @@
 	struct pmap *pc_curpmap;	/* Currently active pmap */	\
 	uint32_t pc_pending_ipis;	/* IPIs pending to this CPU */	\
 	uint32_t pc_hart;		/* Hart ID */			\
+	uint64_t pc_clock;						\
 	char __pad[__PCPU_PAD]		/* Pad to factor of PAGE_SIZE */
 
 #ifdef _KERNEL

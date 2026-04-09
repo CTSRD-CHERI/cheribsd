@@ -39,6 +39,8 @@
 
 #define	SIG_FRAME_SIZE			1360
 
+#define	INST_ALIGN		4
+
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 #define	TRUSTED_STACK		rddc_el0
 #define	UNTRUSTED_STACK		csp

@@ -34,6 +34,8 @@
 #ifndef	_VMM_DEV_H_
 #define	_VMM_DEV_H_
 
+#include <machine/vmm.h>
+
 struct vm_memmap {
 	vm_paddr_t	gpa;
 	int		segid;		/* memory segment */
@@ -150,6 +152,13 @@ struct vm_cpu_topology {
 	uint16_t	threads;
 	uint16_t	maxcpus;
 };
+
+#if __has_feature(capabilities)
+struct vm_cheri_capability_tag {
+	vm_paddr_t	gpa;	/* input, must be aligned */
+	uint8_t		tag;	/* output */
+};
+#endif
 
 enum {
 	/* general routines */

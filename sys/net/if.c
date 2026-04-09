@@ -36,6 +36,7 @@
 #include "opt_ddb.h"
 
 #include <sys/param.h>
+#include <sys/abi_compat.h>
 #include <sys/capsicum.h>
 #include <sys/conf.h>
 #include <sys/eventhandler.h>
@@ -346,12 +347,12 @@ static int	if_getgroup(struct ifgroupreq *, struct ifnet *);
 static int	if_getgroupmembers(struct ifgroupreq *);
 static void	if_delgroups(struct ifnet *);
 static void	if_attach_internal(struct ifnet *, bool);
-static int	if_detach_internal(struct ifnet *, bool);
+static void	if_detach_internal(struct ifnet *, bool);
 static void	if_siocaddmulti(void *, int);
 static void	if_link_ifnet(struct ifnet *);
 static bool	if_unlink_ifnet(struct ifnet *, bool);
 #ifdef VIMAGE
-static int	if_vmove(struct ifnet *, struct vnet *);
+static void	if_vmove(struct ifnet *, struct vnet *);
 #endif
 
 #ifdef INET6
@@ -494,7 +495,6 @@ vnet_if_init(const void *unused __unused)
 
 	CK_STAILQ_INIT(&V_ifnet);
 	CK_STAILQ_INIT(&V_ifg_head);
-	vnet_if_clone_init();
 }
 VNET_SYSINIT(vnet_if_init, SI_SUB_INIT_IF, SI_ORDER_SECOND, vnet_if_init,
     NULL);
@@ -1174,7 +1174,7 @@ if_detach(struct ifnet *ifp)
  * on a vnet instance shutdown without this flag being set, e.g., when
  * the cloned interfaces are destoyed as first thing of teardown.
  */
-static int
+static void
 if_detach_internal(struct ifnet *ifp, bool vmove)
 {
 	struct ifaddr *ifa;
@@ -1305,7 +1305,7 @@ finish_vnet_shutdown:
 	ifp->if_afdata_initialized = 0;
 	IF_AFDATA_UNLOCK(ifp);
 	if (i == 0)
-		return (0);
+		return;
 	SLIST_FOREACH(dp, &domains, dom_next) {
 		if (dp->dom_ifdetach && ifp->if_afdata[dp->dom_family]) {
 			(*dp->dom_ifdetach)(ifp,
@@ -1313,8 +1313,6 @@ finish_vnet_shutdown:
 			ifp->if_afdata[dp->dom_family] = NULL;
 		}
 	}
-
-	return (0);
 }
 
 #ifdef VIMAGE
@@ -1322,19 +1320,21 @@ finish_vnet_shutdown:
  * if_vmove() performs a limited version of if_detach() in current
  * vnet and if_attach()es the ifnet to the vnet specified as 2nd arg.
  */
-static int
+static void
 if_vmove(struct ifnet *ifp, struct vnet *new_vnet)
 {
-	int rc;
+#ifdef DEV_BPF
+	/*
+	 * Detach BPF file descriptors from its interface.
+	 */
+	bpf_ifdetach(ifp);
+#endif
 
 	/*
 	 * Detach from current vnet, but preserve LLADDR info, do not
 	 * mark as dead etc. so that the ifnet can be reattached later.
-	 * If we cannot find it, we lost the race to someone else.
 	 */
-	rc = if_detach_internal(ifp, true);
-	if (rc != 0)
-		return (rc);
+	if_detach_internal(ifp, true);
 
 	/*
 	 * Perform interface-specific reassignment tasks, if provided by
@@ -1349,7 +1349,6 @@ if_vmove(struct ifnet *ifp, struct vnet *new_vnet)
 	CURVNET_SET_QUIET(new_vnet);
 	if_attach_internal(ifp, true);
 	CURVNET_RESTORE();
-	return (0);
 }
 
 /*
@@ -1360,8 +1359,7 @@ if_vmove_loan(struct thread *td, struct ifnet *ifp, char *ifname, int jid)
 {
 	struct prison *pr;
 	struct ifnet *difp;
-	int error;
-	bool found __diagused;
+	bool found;
 	bool shutdown;
 
 	MPASS(ifindex_table[ifp->if_index].ife_ifnet == ifp);
@@ -1408,16 +1406,15 @@ if_vmove_loan(struct thread *td, struct ifnet *ifp, char *ifname, int jid)
 	}
 
 	/* Move the interface into the child jail/vnet. */
-	error = if_vmove(ifp, pr->pr_vnet);
+	if_vmove(ifp, pr->pr_vnet);
 
-	/* Report the new if_xname back to the userland on success. */
-	if (error == 0)
-		sprintf(ifname, "%s", ifp->if_xname);
+	/* Report the new if_xname back to the userland. */
+	sprintf(ifname, "%s", ifp->if_xname);
 
 	sx_xunlock(&ifnet_detach_sxlock);
 
 	prison_free(pr);
-	return (error);
+	return (0);
 }
 
 static int
@@ -1426,7 +1423,7 @@ if_vmove_reclaim(struct thread *td, char *ifname, int jid)
 	struct prison *pr;
 	struct vnet *vnet_dst;
 	struct ifnet *ifp;
-	int error, found __diagused;
+	int found __diagused;
  	bool shutdown;
 
 	/* Try to find the prison within our visibility. */
@@ -1467,16 +1464,15 @@ if_vmove_reclaim(struct thread *td, char *ifname, int jid)
 	found = if_unlink_ifnet(ifp, true);
 	MPASS(found);
 	sx_xlock(&ifnet_detach_sxlock);
-	error = if_vmove(ifp, vnet_dst);
+	if_vmove(ifp, vnet_dst);
 	sx_xunlock(&ifnet_detach_sxlock);
 	CURVNET_RESTORE();
 
-	/* Report the new if_xname back to the userland on success. */
-	if (error == 0)
-		sprintf(ifname, "%s", ifp->if_xname);
+	/* Report the new if_xname back to the userland. */
+	sprintf(ifname, "%s", ifp->if_xname);
 
 	prison_free(pr);
-	return (error);
+	return (0);
 }
 #endif /* VIMAGE */
 
@@ -1860,13 +1856,16 @@ ifa_free(struct ifaddr *ifa)
  * structs used to represent other address families, it is necessary
  * to perform a different comparison.
  */
+static bool
+sa_dl_equal(const struct sockaddr *a, const struct sockaddr *b)
+{
+	const struct sockaddr_dl *sdl1 = (const struct sockaddr_dl *)a;
+	const struct sockaddr_dl *sdl2 = (const struct sockaddr_dl *)b;
 
-#define	sa_dl_equal(a1, a2)	\
-	((((const struct sockaddr_dl *)(a1))->sdl_len ==		\
-	 ((const struct sockaddr_dl *)(a2))->sdl_len) &&		\
-	 (bcmp(CLLADDR((const struct sockaddr_dl *)(a1)),		\
-	       CLLADDR((const struct sockaddr_dl *)(a2)),		\
-	       ((const struct sockaddr_dl *)(a1))->sdl_alen) == 0))
+	return (sdl1->sdl_len == sdl2->sdl_len &&
+	    bcmp(sdl1->sdl_data + sdl1->sdl_nlen,
+	    sdl2->sdl_data + sdl2->sdl_nlen, sdl1->sdl_alen) == 0);
+}
 
 /*
  * Locate an interface based on a complete address.
@@ -2349,11 +2348,11 @@ ifr_buffer_get_buffer(u_long cmd, void *data)
 	case sizeof(struct ifreq64):
 #ifdef COMPAT_FREEBSD32
 		if (SV_CURPROC_FLAG(SV_ILP32))
-			return (__USER_CAP(
+			return (USER_PTR(
 			    ifrup->ifr32.ifr_ifru.ifru_buffer.buffer,
 			    ifrup->ifr32.ifr_ifru.ifru_buffer.length));
 #endif
-		return (__USER_CAP(ifrup->ifr64.ifr_ifru.ifru_buffer.buffer,
+		return (USER_PTR(ifrup->ifr64.ifr_ifru.ifru_buffer.buffer,
 		    ifrup->ifr64.ifr_ifru.ifru_buffer.length));
 #endif
 	case sizeof(struct ifreq):
@@ -2468,10 +2467,10 @@ ifr_data_get_ptr(u_long cmd, void *ifrp)
 	case sizeof(struct ifreq64):
 #ifdef COMPAT_FREEBSD32
 		if (SV_CURPROC_FLAG(SV_ILP32))
-			return (__USER_CAP_UNBOUND(
+			return (USER_PTR_UNBOUND(
 			    ifrup->ifr32.ifr_ifru.ifru_data));
 #endif
-		return (__USER_CAP_UNBOUND(ifrup->ifr64.ifr_ifru.ifru_data));
+		return (USER_PTR_UNBOUND(ifrup->ifr64.ifr_ifru.ifru_data));
 #endif
 	case sizeof(struct ifreq):
 #if !__has_feature(capabilities) && defined(COMPAT_FREEBSD32)
@@ -3098,7 +3097,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case SIOCGIFCONF32:
 		ifc32 = (struct ifconf32 *)data;
 		thunk.ifc.ifc_len = ifc32->ifc_len;
-		thunk.ifc.ifc_buf = __USER_CAP(ifc32->ifc_buf, ifc32->ifc_len);
+		thunk.ifc.ifc_buf = USER_PTR(ifc32->ifc_buf, ifc32->ifc_len);
 		data = (caddr_t)&thunk.ifc;
 		cmd = SIOCGIFCONF;
 		break;
@@ -3109,7 +3108,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		    sizeof(thunk.ifd.ifd_name));
 		thunk.ifd.ifd_cmd = ifd32->ifd_cmd;
 		thunk.ifd.ifd_len = ifd32->ifd_len;
-		thunk.ifd.ifd_data = __USER_CAP(ifd32->ifd_data,
+		thunk.ifd.ifd_data = USER_PTR(ifd32->ifd_data,
 		    ifd32->ifd_len);
 		data = (caddr_t)&thunk.ifd;
 		cmd = _IOC_NEWTYPE(cmd, struct ifdrv);
@@ -3130,7 +3129,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 			break;
 		case SIOCGIFGROUP32:
 		case SIOCGIFGMEMB32:
-			thunk.ifgr.ifgr_groups = __USER_CAP(ifgr32->ifgr_groups,
+			thunk.ifgr.ifgr_groups = USER_PTR(ifgr32->ifgr_groups,
 			    ifgr32->ifgr_len);
 			break;
 		}
@@ -3147,7 +3146,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		thunk.ifmr.ifm_status = ifmr32->ifm_status;
 		thunk.ifmr.ifm_active = ifmr32->ifm_active;
 		thunk.ifmr.ifm_count = ifmr32->ifm_count;
-		thunk.ifmr.ifm_ulist = __USER_CAP(ifmr32->ifm_ulist,
+		thunk.ifmr.ifm_ulist = USER_PTR(ifmr32->ifm_ulist,
 		    ifmr32->ifm_count * sizeof(int));
 		data = (caddr_t)&thunk.ifmr;
 		cmd = _IOC_NEWTYPE(cmd, struct ifmediareq);
@@ -3157,7 +3156,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case SIOCGIFCONF64:
 		ifc64 = (struct ifconf64 *)data;
 		thunk.ifc.ifc_len = ifc64->ifc_len;
-		thunk.ifc.ifc_buf = __USER_CAP(ifc64->ifc_buf, ifc64->ifc_len);
+		thunk.ifc.ifc_buf = USER_PTR(ifc64->ifc_buf, ifc64->ifc_len);
 		data = (caddr_t)&thunk.ifc;
 		cmd = SIOCGIFCONF;
 		break;
@@ -3168,7 +3167,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		    sizeof(thunk.ifd.ifd_name));
 		thunk.ifd.ifd_cmd = ifd64->ifd_cmd;
 		thunk.ifd.ifd_len = ifd64->ifd_len;
-		thunk.ifd.ifd_data = __USER_CAP(ifd64->ifd_data,
+		thunk.ifd.ifd_data = USER_PTR(ifd64->ifd_data,
 		    ifd64->ifd_len);
 		data = (caddr_t)&thunk.ifd;
 		cmd = _IOC_NEWTYPE(cmd, struct ifdrv);
@@ -3189,7 +3188,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 			break;
 		case SIOCGIFGROUP64:
 		case SIOCGIFGMEMB64:
-			thunk.ifgr.ifgr_groups = __USER_CAP(ifgr64->ifgr_groups,
+			thunk.ifgr.ifgr_groups = USER_PTR(ifgr64->ifgr_groups,
 			    ifgr64->ifgr_len);
 			break;
 		}
@@ -3206,7 +3205,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		thunk.ifmr.ifm_status = ifmr64->ifm_status;
 		thunk.ifmr.ifm_active = ifmr64->ifm_active;
 		thunk.ifmr.ifm_count = ifmr64->ifm_count;
-		thunk.ifmr.ifm_ulist = __USER_CAP(ifmr64->ifm_ulist,
+		thunk.ifmr.ifm_ulist = USER_PTR(ifmr64->ifm_ulist,
 		    ifmr64->ifm_count * sizeof(int));
 		data = (caddr_t)&thunk.ifmr;
 		cmd = _IOC_NEWTYPE(cmd, struct ifmediareq);
@@ -3215,7 +3214,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		ifcr64 = (struct if_clonereq64 *)data;
 		thunk.ifcr.ifcr_total = ifcr64->ifcr_total;
 		thunk.ifcr.ifcr_count = ifcr64->ifcr_count;
-		thunk.ifcr.ifcr_buffer = __USER_CAP(ifcr64->ifcr_buffer,
+		thunk.ifcr.ifcr_buffer = USER_PTR(ifcr64->ifcr_buffer,
 		    ifcr64->ifcr_count * IFNAMSIZ);
 		data = (caddr_t)&thunk.ifmr;
 		cmd = SIOCIFGCLONERS;
@@ -3284,7 +3283,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 			thunk.ifr.ifr_phys = ifr64->ifr_phys;
 			break;
 		case IFREQ64(SIOCGI2C):
-			thunk.ifr.ifr_ifru.ifru_data = cheri_setbounds(
+			thunk.ifr.ifr_ifru.ifru_data = cheri_bounds_set(
 			    ifr_data_get_ptr(cmd, ifr64),
 			    sizeof(struct ifi2creq));
 			break;
@@ -5270,7 +5269,7 @@ if_setifheaderlen(if_t ifp, int len)
 	return (0);
 }
 
-caddr_t
+char *
 if_getlladdr(const if_t ifp)
 {
 	return (IF_LLADDR(ifp));

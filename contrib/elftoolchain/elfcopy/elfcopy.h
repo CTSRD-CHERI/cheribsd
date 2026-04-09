@@ -27,7 +27,6 @@
  */
 
 #include <sys/queue.h>
-#include <stdbool.h>
 #include <gelf.h>
 #include <libelftc.h>
 
@@ -111,20 +110,6 @@ struct sec_add {
 	STAILQ_ENTRY(sec_add) sadd_list;
 };
 
-struct transplant {
-	bool		isparent;
-	char		*namestr;
-
-	/* Values to be placed in an object header. */
-	uint64_t	id;
-	uint64_t	name;
-	uint64_t	vaddr;
-	uint64_t	msz;
-	uint64_t	dynamicndx;
-
-	TAILQ_ENTRY(transplant) t_list;
-};
-
 struct segment;
 
 /* Internal data structure for sections. */
@@ -150,7 +135,6 @@ struct section {
 	int		 pseudo;
 	int		 nocopy;
 
-	struct transplant *iobject;
 	Elftc_String_Table *strtab;
 
 	TAILQ_ENTRY(section) sec_list;	/* next section */
@@ -160,11 +144,8 @@ TAILQ_HEAD(sectionlist, section);
 
 /* Internal data structure for segments. */
 struct segment {
-	uint64_t	p_type;
 	uint64_t	vaddr;	/* virtual addr (VMA) */
 	uint64_t	paddr;	/* physical addr (LMA) */
-	uint64_t	p_flags;
-	uint64_t	p_align;
 	uint64_t	off;	/* file offset */
 	uint64_t	fsz;	/* file size */
 	uint64_t	msz;	/* memory size */
@@ -209,7 +190,6 @@ struct elfcopy {
 	Elf		*eout;	/* ELF descriptor of output object */
 	int		 iphnum; /* num. of input object phdr entries */
 	int		 ophnum; /* num. of output object phdr entries */
-	int		 oohnum; /* num. of output object object entries */
 	int		 nos;	/* num. of output object sections */
 
 	enum {
@@ -245,7 +225,6 @@ struct elfcopy {
 #define	SEC_COPY	0x01000000U
 #define	DISCARD_LLABEL	0x02000000U
 #define	LOCALIZE_HIDDEN	0x04000000U
-#define	TRANSPLANT	0x08000000U
 
 	int		 flags;		/* elfcopy run control flags. */
 	int64_t		 change_addr;	/* Section address adjustment. */
@@ -261,7 +240,6 @@ struct elfcopy {
 	struct section	*symtab;	/* .symtab section. */
 	struct section	*strtab;	/* .strtab section. */
 	struct section	*shstrtab;	/* .shstrtab section. */
-	struct section	*object;	/* .object section. */
 	uint64_t	*secndx;	/* section index map. */
 	uint64_t	*symndx;	/* symbol index map. */
 	unsigned char	*v_rel;		/* symbols needed by relocation. */
@@ -273,7 +251,6 @@ struct elfcopy {
 	STAILQ_HEAD(, symop) v_symop;	/* list of symbols operations. */
 	STAILQ_HEAD(, symfile) v_symfile; /* list of symlist files. */
 	TAILQ_HEAD(, section) v_sec;	/* list of sections. */
-	TAILQ_HEAD(, transplant) v_transplants; /* list of transplants. */
 
 	/*
 	 * Fields for the ar(1) archive.
@@ -289,7 +266,6 @@ struct elfcopy {
 	size_t		 s_sn_sz;	/* current size of sn table. */
 	off_t		 rela_off;	/* offset relative to pseudo members. */
 	STAILQ_HEAD(, ar_obj) v_arobj;	/* archive object(member) list. */
-	size_t		 phoff;		/* for when you need to move phdrs */
 };
 
 void	add_section(struct elfcopy *_ecp, const char *_optarg);
@@ -323,7 +299,6 @@ void	create_scn(struct elfcopy *_ecp);
 void	create_srec(struct elfcopy *_ecp, int _ifd, int _ofd, const char *_ofn);
 void	create_symtab(struct elfcopy *_ecp);
 void	create_symtab_data(struct elfcopy *_ecp);
-void	create_ohdr(struct elfcopy *_ecp);
 void	create_tempfile(const char *_src, char **_fn, int *_fd);
 void	finalize_external_symtab(struct elfcopy *_ecp);
 void	free_elf(struct elfcopy *_ecp);
@@ -342,10 +317,6 @@ struct symop *lookup_symop_list(struct elfcopy *_ecp, const char *_name,
     unsigned int _op);
 void	resync_sections(struct elfcopy *_ecp);
 void	setup_phdr(struct elfcopy *_ecp);
-void	transplant(struct elfcopy *_ecp);
-void	add_transplant(struct elfcopy *_ecp, const char *_namestr);
-void	add_transplant_parent(struct elfcopy *_ecp, const char *_namestr);
-size_t	first_free_offset(struct elfcopy *ecp);
 void	update_shdr(struct elfcopy *_ecp, int _update_link);
 
 #ifndef LIBELF_AR

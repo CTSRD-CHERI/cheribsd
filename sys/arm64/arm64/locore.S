@@ -193,9 +193,9 @@
 	 * XXXBFG should this be done somewhere else? Maybe eventually per-process or
 	 * compartment?
 	 */
-	mrs x2, cctlr_el0
-	orr x2, x2, #(CCTLR_PERMVCT_MASK | CCTLR_SBL_MASK)
-	msr cctlr_el0, x2
+	mrs	x2, cctlr_el0
+	orr	x2, x2, #(CCTLR_PERMVCT_MASK | CCTLR_SBL_MASK)
+	msr	cctlr_el0, x2
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/*
@@ -246,6 +246,7 @@ ENTRY(_start)
 	 * x26 = Kernel L1 table phys addr
 	 * x24 = TTBR1 table phys addr
 	 * x22 = PTE shareability attributes
+	 * x21 = BTI guarded page attribute if supported
 	 */
 
 	/* Enable the mmu */
@@ -382,7 +383,7 @@ virtdone:
 	bl	cheri_init_capabilities
 #endif
 
-	/* Set this before it's used in kasan_init_early */
+	/* Set these before they are used in kasan_init_early */
 #ifdef __CHERI_PURE_CAPABILITY__
 	adrp	c1, :got:pmap_sh_attr
 	ldr	c1, [c1, :got_lo12:pmap_sh_attr]
@@ -390,6 +391,16 @@ virtdone:
 #else
 	adrp	x1, pmap_sh_attr
 	str	x22, [x1, :lo12:pmap_sh_attr]
+#endif
+#ifdef __ARM_FEATURE_BTI_DEFAULT
+#ifdef __CHERI_PURE_CAPABILITY__
+	adrp	c1, :got:pmap_gp_attr
+	ldr	c1, [c1, :got_lo12:pmap_gp_attr]
+	str	x21, [c1]
+#else
+	adrp	x1, pmap_gp_attr
+	str	x21, [x1, :lo12:pmap_gp_attr]
+#endif
 #endif
 
 #ifdef KASAN
@@ -544,6 +555,10 @@ mp_virtdone:
 	/* Start using the AP boot stack */
 	LDR_LABEL(PTR(4), PTR(4), bootstack)
 	mov	PTRN(sp), PTR(4)
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	LDR_LABEL(c4, c4, resbootstack)
+	msr	rcsp_el0, c4
+#endif
 
 #if defined(PERTHREAD_SSP)
 	/* Set sp_el0 to the boot canary for early per-thread SSP to work */
@@ -638,7 +653,6 @@ LENTRY(enter_kernel_el)
 	isb
 	mrs	x4, hcr_el2
 
-
 	/* Load the Virtualization Process ID Register */
 	mrs	x2, midr_el1
 	msr	vpidr_el2, x2
@@ -722,6 +736,17 @@ LENTRY(enter_kernel_el)
 	/* Set the return PSTATE */
 	msr	spsr_el2, x5
 
+	/*
+	 * Configure the Extended Hypervisor register. This is only valid if
+	 * FEAT_HCX is enabled.
+	 */
+	CHECK_CPU_FEAT(x2, ID_AA64MMFR1, HCX, 2f)
+	/* Extended Hypervisor Configuration */
+	mov x2, xzr
+	msr HCRX_EL2_REG, x2
+	isb
+2:
+
 	/* Don't trap to EL2 for CP15 traps */
 	msr	hstr_el2, xzr
 
@@ -731,18 +756,14 @@ LENTRY(enter_kernel_el)
 	/* Zero vttbr_el2 so a hypervisor can tell the host and guest apart */
 	msr	vttbr_el2, xzr
 
-	/* Configure GICv3 CPU interface */
-	mrs	x2, id_aa64pfr0_el1
-	/* Extract GIC bits from the register */
-	ubfx	x2, x2, #ID_AA64PFR0_GIC_SHIFT, #ID_AA64PFR0_GIC_BITS
-	/* GIC[3:0] != 0000 - GIC CPU interface via special regs. supported */
-	cbz	x2, 2f
+	/* Check the CPU supports GIC, and configure the CPU interface */
+	CHECK_CPU_FEAT(x2, ID_AA64PFR0, GIC, 3f)
 
 	mrs	x2, icc_sre_el2
 	orr	x2, x2, #ICC_SRE_EL2_EN	/* Enable access from insecure EL1 */
 	orr	x2, x2, #ICC_SRE_EL2_SRE	/* Enable system registers */
 	msr	icc_sre_el2, x2
-2:
+3:
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Enter exception handlers in C64 mode */
@@ -829,6 +850,17 @@ LENTRY(create_pagetables)
 	stp	xzr, xzr, [PTR(6)], #16
 	cmp	PTR(6), PTR(27)
 	b.lo	1b
+
+#ifdef __ARM_FEATURE_BTI_DEFAULT
+	/*
+	 * Check if the CPU supports BTI
+	 */
+	mrs	x6, id_aa64pfr1_el1		/* Read the ID register */
+	and	x6, x6, ID_AA64PFR1_BT_MASK	/* Mask the field we need */
+	cmp	x6, xzr				/* Check it's non-zero */
+	cset	x6, ne				/* x6 is set if non-zero */
+	lsl	x21, x6, ATTR_S1_GP_SHIFT	/* Shift to the correct bit */
+#endif
 
 	/*
 	 * Find the shareability attribute we should use. If FEAT_LPA2 is
@@ -1148,7 +1180,7 @@ LENTRY(build_l2_block_pagetable)
 	orr	x12, x12, #(ATTR_AF)
 	orr	x12, x12, #(ATTR_S1_UXN)
 #ifdef __ARM_FEATURE_BTI_DEFAULT
-	orr	x12, x12, #(ATTR_S1_GP)
+	orr	x12, x12, x21
 #endif
 	/* Set the shareability attribute */
 	orr	x12, x12, x22
@@ -1229,7 +1261,7 @@ LENTRY(build_l3_page_pagetable)
 	orr	x12, x12, #(ATTR_AF)
 	orr	x12, x12, #(ATTR_S1_UXN)
 #ifdef __ARM_FEATURE_BTI_DEFAULT
-	orr	x12, x12, #(ATTR_S1_GP)
+	orr	x12, x12, x21
 #endif
 	/* Set the shareability attribute */
 	orr	x12, x12, x22
@@ -1323,20 +1355,15 @@ LENTRY(start_mmu)
 	bfi	x2, x3, #(TCR_ASID_SHIFT), #(TCR_ASID_WIDTH)
 
 	/*
-	 * Check if the HW supports access flag and dirty state updates,
-	 * and set TCR_EL1.HA and TCR_EL1.HD accordingly.
+	 * Check if the HW supports access flag updates, and set
+	 * TCR_EL1.HA accordingly. The TCR_EL1.HD flag to enable
+	 * HW management of dirty state is set in C code as it may
+	 * need to be disabled because of CPU errata.
 	 */
-	mrs	x3, id_aa64mmfr1_el1
-	and	x3, x3, #(ID_AA64MMFR1_HAFDBS_MASK)
-	cmp	x3, #1
-	b.ne	1f
-	orr 	x2, x2, #(TCR_HA)
-	b	2f
+	CHECK_CPU_FEAT(x3, ID_AA64MMFR1, HAFDBS, 1f)
+	orr	x2, x2, #(TCR_HA)
 1:
-	cmp	x3, #2
-	b.ne	2f
-	orr 	x2, x2, #(TCR_HA | TCR_HD)
-2:
+
 	msr	tcr_el1, x2
 
 	/*

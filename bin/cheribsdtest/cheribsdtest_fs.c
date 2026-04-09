@@ -37,8 +37,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include <cheri/cheric.h>
-
 #include "cheribsdtest.h"
 
 static const char *
@@ -81,7 +79,7 @@ CHERIBSDTEST(tmpfs_rw_nocaps,
 
 	/* Just some pointer */
 	c = &fd;
-	CHERIBSDTEST_VERIFY2(cheri_gettag(c) != 0, "tag set on source");
+	CHERIBSDTEST_VERIFY2(cheri_tag_get(c) != 0, "tag set on source");
 
 	rv = CHERIBSDTEST_CHECK_SYSCALL(pwrite(fd, &c, sizeof(c), 0));
 	CHERIBSDTEST_CHECK_EQ_SIZE(rv, sizeof(c));
@@ -89,8 +87,8 @@ CHERIBSDTEST(tmpfs_rw_nocaps,
 	rv = CHERIBSDTEST_CHECK_SYSCALL(pread(fd, &d, sizeof(d), 0));
 	CHERIBSDTEST_CHECK_EQ_SIZE(rv, sizeof(d));
 
-	CHERIBSDTEST_VERIFY2(cheri_gettag(d) == 0, "tag read");
-	CHERIBSDTEST_VERIFY2(cheri_equal_exact(cheri_cleartag(c), d),
+	CHERIBSDTEST_VERIFY2(cheri_tag_get(d) == 0, "tag read");
+	CHERIBSDTEST_VERIFY2(cheri_is_equal_exact(cheri_tag_clear(c), d),
 	    "untagged value not read");
 
 	CHERIBSDTEST_CHECK_SYSCALL(close(fd));

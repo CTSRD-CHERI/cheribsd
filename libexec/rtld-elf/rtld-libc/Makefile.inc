@@ -17,7 +17,7 @@ CFLAGS+=	-I${SRCTOP}/libexec/rtld-elf/rtld-libc
 # redirects all calls to interposed functions to use the non-interposed version
 # instead.
 .PATH: ${LIBC_SRCTOP}/gen
-SRCS+=	opendir.c closedir.c readdir.c telldir.c
+SRCS+=	fdopendir.c opendir.c opendir2.c closedir.c readdir.c telldir.c
 
 # Avoid further dependencies by providing simple implementations of libc
 # functions such as __error(), etc.
@@ -62,13 +62,15 @@ CFLAGS.memset.c+=-I${LIBC_SRCTOP}/include
 _libsys_other_objects= fstat fstatat fstatfs syscall \
     cerror geteuid getegid sigfastblock munmap mprotect \
     sysarch __sysctl issetugid __getcwd utrace getpid \
-    thr_self thr_kill pread mmap lseek _exit \
+    thr_self thr_kill pread lseek _exit \
     getdirentries _close _fcntl _open _openat _read \
     __sysctlbyname \
     _sigprocmask _write readlink ___realpathat
 
 .ifdef CHERI_LIB_C18N
-_libsys_other_objects+=thr_exit _sigaction ftruncate
+_libsys_other_objects+=_mmap _thr_exit _sigaction ftruncate
+.else
+_libsys_other_objects+=mmap
 .endif
 
 # A few other bits from libc_nossp_pic:

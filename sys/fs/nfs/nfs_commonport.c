@@ -259,7 +259,8 @@ newnfs_copycred(struct nfscred *nfscr, struct ucred *cr)
 	KASSERT(nfscr->nfsc_ngroups >= 0,
 	    ("newnfs_copycred: negative nfsc_ngroups"));
 	cr->cr_uid = nfscr->nfsc_uid;
-	crsetgroups(cr, nfscr->nfsc_ngroups, nfscr->nfsc_groups);
+	crsetgroups_fallback(cr, nfscr->nfsc_ngroups, nfscr->nfsc_groups,
+	    GID_NOGROUP);
 }
 
 /*
@@ -452,9 +453,9 @@ nfssvc_call(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 
 	if (uap->flag & NFSSVC_IDNAME) {
 		if ((uap->flag & NFSSVC_NEWSTRUCT) != 0)
-			error = copyincap(uap->argp, &nid, sizeof(nid));
+			error = copyinptr(uap->argp, &nid, sizeof(nid));
 		else {
-			error = copyincap(uap->argp, &onid, sizeof(onid));
+			error = copyinptr(uap->argp, &onid, sizeof(onid));
 			if (error == 0) {
 				nid.nid_flag = onid.nid_flag;
 				nid.nid_uid = onid.nid_uid;

@@ -952,7 +952,8 @@ hdsp_attach(device_t dev)
 		    "Analog input level ('LowGain', '+4dBU', '-10dBV')");
 	}
 
-	return (bus_generic_attach(dev));
+	bus_attach_children(dev);
+	return (0);
 }
 
 static void
@@ -984,7 +985,7 @@ hdsp_detach(device_t dev)
 		return (0);
 	}
 
-	err = device_delete_children(dev);
+	err = bus_generic_detach(dev);
 	if (err)
 		return (err);
 

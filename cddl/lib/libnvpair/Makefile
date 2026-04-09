@@ -25,5 +25,6 @@ CFLAGS+= -I${SRCTOP}/sys
 CFLAGS+= -I${SRCTOP}/cddl/compat/opensolaris/include
 CFLAGS+= -include ${ZFSTOP}/include/os/freebsd/spl/sys/ccompile.h
 CFLAGS+= -DHAVE_ISSETUGID  -DHAVE_CONFIG_H -DHAVE_XDR_BYTESREC
+CFLAGS+= -DXDRPROC_TAKES_TWO_ARGS
 
 .include <bsd.lib.mk>

@@ -1567,12 +1567,12 @@ scheduler::scheduler_handle::debug_test(
     // file, waiting for further output to appear... as this only works on pipes
     // or sockets.  We need a better interface for this whole thing.
     {
-        std::auto_ptr< std::ostream > output = utils::open_ostream(
+        std::unique_ptr< std::ostream > output = utils::open_ostream(
             stdout_target);
         *output << utils::read_file(result_handle->stdout_file());
     }
     {
-        std::auto_ptr< std::ostream > output = utils::open_ostream(
+        std::unique_ptr< std::ostream > output = utils::open_ostream(
             stderr_target);
         *output << utils::read_file(result_handle->stderr_file());
     }
@@ -1632,7 +1632,10 @@ scheduler::generate_config(const config::tree& user_config,
     if (user_config.is_set("unprivileged_user")) {
         const passwd::user& user =
             user_config.lookup< engine::user_node >("unprivileged_user");
+        // The property is duplicated using both ATF and Kyua naming styles
+        // for better UX.
         props["unprivileged-user"] = user.name;
+        props["unprivileged_user"] = user.name;
     }
 
     return props;

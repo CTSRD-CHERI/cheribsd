@@ -29,6 +29,7 @@
  */
 
 #include <sys/counter.h>
+#include <sys/stddef.h>
 #include <sys/_bitset.h>
 #include <sys/_domainset.h>
 #include <sys/_task.h>

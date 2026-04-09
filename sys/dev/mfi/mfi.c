@@ -778,7 +778,7 @@ mfi_attach(struct mfi_softc *sc)
 	    "Don't detach the mfid device for a busy volume that is deleted");
 
 	device_add_child(sc->mfi_dev, "mfip", DEVICE_UNIT_ANY);
-	bus_generic_attach(sc->mfi_dev);
+	bus_attach_children(sc->mfi_dev);
 
 	/* Start the timeout watchdog */
 	callout_init(&sc->mfi_watchdog_callout, 1);
@@ -1934,7 +1934,7 @@ mfi_add_ld_complete(struct mfi_command *cm)
 
 	device_set_ivars(child, ld_info);
 	device_set_desc(child, "MFI Logical Disk");
-	bus_generic_attach(sc->mfi_dev);
+	bus_attach_children(sc->mfi_dev);
 	bus_topo_unlock();
 	mtx_lock(&sc->mfi_io_lock);
 }
@@ -2022,7 +2022,7 @@ mfi_add_sys_pd_complete(struct mfi_command *cm)
 
 	device_set_ivars(child, pd_info);
 	device_set_desc(child, "MFI System PD");
-	bus_generic_attach(sc->mfi_dev);
+	bus_attach_children(sc->mfi_dev);
 	bus_topo_unlock();
 	mtx_lock(&sc->mfi_io_lock);
 }
@@ -3272,7 +3272,7 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 						/* 32bit on 64bit */
 						ioc32 = (struct mfi_ioc_packet32 *)ioc;
 						len = ioc32->mfi_sgl[i].iov_len;
-						addr = __USER_CAP(PTRIN(ioc32->mfi_sgl[i].iov_base), len);
+						addr = USER_PTR(PTRIN(ioc32->mfi_sgl[i].iov_base), len);
 						break;
 #endif
 #ifdef COMPAT_FREEBSD64
@@ -3280,7 +3280,7 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 						/* 64bit on CHERI */
 						ioc64 = (struct mfi_ioc_packet64 *)ioc;
 						len = ioc64->mfi_sgl[i].iov_len;
-						addr = __USER_CAP(ioc64->mfi_sgl[i].iov_base, len);
+						addr = USER_PTR(ioc64->mfi_sgl[i].iov_base, len);
 						break;
 #endif
 					}
@@ -3340,14 +3340,14 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 						/* 32bit on 64bit */
 						ioc32 = (struct mfi_ioc_packet32 *)ioc;
 						len = ioc32->mfi_sgl[i].iov_len;
-						addr = __USER_CAP(PTRIN(ioc32->mfi_sgl[i].iov_base), len);
+						addr = USER_PTR(PTRIN(ioc32->mfi_sgl[i].iov_base), len);
 #endif
 #ifdef COMPAT_FREEBSD64
 					case MFI_CMD64:
 						/* 64bit on CHERI */
 						ioc64 = (struct mfi_ioc_packet64 *)ioc;
 						len = ioc64->mfi_sgl[i].iov_len;
-						addr = __USER_CAP(ioc64->mfi_sgl[i].iov_base, len);
+						addr = USER_PTR(ioc64->mfi_sgl[i].iov_base, len);
 #endif
 					}
 					error = copyout(temp, addr, len);
@@ -3476,7 +3476,7 @@ out:
 		}
 		iop_swab.ioc_frame	= iop32->ioc_frame;
 		iop_swab.buf_size	= iop32->buf_size;
-		iop_swab.buf		= __USER_CAP(PTRIN(iop32->buf),
+		iop_swab.buf		= USER_PTR(PTRIN(iop32->buf),
 		    iop32->buf_size);
 		error = mfi_user_command(sc, &iop_swab);
 		iop32->ioc_frame = iop_swab.ioc_frame;
@@ -3490,7 +3490,7 @@ out:
 		}
 		iop_swab.ioc_frame	= iop64->ioc_frame;
 		iop_swab.buf_size	= iop64->buf_size;
-		iop_swab.buf		= __USER_CAP(iop64->buf,
+		iop_swab.buf		= USER_PTR(iop64->buf,
 		    iop64->buf_size);
 		error = mfi_user_command(sc, &iop_swab);
 		iop64->ioc_frame = iop_swab.ioc_frame;

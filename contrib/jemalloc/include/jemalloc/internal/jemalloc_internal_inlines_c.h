@@ -22,6 +22,63 @@
 #include "jemalloc/internal/witness.h"
 
 JEMALLOC_ALWAYS_INLINE void *
+get_underlying_allocation(tsdn_t *tsdn, void *ptr) {
+	void *ubptr;
+
+#ifndef __CHERI_PURE_CAPABILITY__
+	ubptr = ptr;
+#else
+	rtree_ctx_t *rtree_ctx;
+	rtree_ctx_t rtree_ctx_fallback;
+	extent_t *extent;
+	szind_t szind;
+
+	/*
+	 * These checks catch attacks from an adversary that can manipulate the 
+	 * offset and the bounds of a ptr passed to free() or realloc().
+	 * Reject zero-length capabilities: region arithmetic can misclassify an
+	 * end-of-region pointer as the start of the next region.
+	 */
+	if (unlikely(!cheri_gettag(ptr))) {
+		return NULL;
+	}
+	if (unlikely(cheri_getoffset(ptr) > cheri_getlen(ptr))) {
+		return NULL;
+	}
+	if (unlikely(cheri_getlen(ptr) == 0)) {
+		return NULL;
+	}
+	if (unlikely(cheri_getsealed(ptr))) {
+		return NULL;
+	}
+
+	rtree_ctx = tsdn_rtree_ctx(tsdn, &rtree_ctx_fallback);
+	if (rtree_extent_szind_read(tsdn, &extents_rtree, rtree_ctx,
+	    (uintptr_t)ptr, false, &extent, &szind)) {
+		return NULL;
+	}
+
+	assert(extent_state_get(extent) == extent_state_active);
+	/* Only slab members should be looked up via interior pointers. */
+	assert(extent_addr_get(extent) == ptr || extent_slab_get(extent));
+	assert(szind != SC_NSIZES);
+
+	size_t underlying_size = sz_index2size(szind);
+	void *extent_base = extent->e_addr;
+
+	size_t offset = (uintptr_t)ptr - (uintptr_t)extent_base;
+	size_t region_index = offset / underlying_size;
+	void *region_base = (void *)((uintptr_t)extent_base +
+	    region_index * underlying_size);
+
+	ubptr = cheri_setbounds(
+	    cheri_setaddress(extent_base, (ptraddr_t)region_base),
+	    underlying_size);
+#endif
+	return ubptr;
+}
+
+JEMALLOC_ALWAYS_INLINE void *
 unbound_ptr(tsdn_t *tsdn, void *ptr) {
 	void *ubptr;
 
@@ -41,25 +98,21 @@ unbound_ptr(tsdn_t *tsdn, void *ptr) {
 	 * metadata is required to prevent attacks where bounds are
 	 * manipulated.
 	 */
-	if (unlikely(!cheri_gettag(ptr))) {
-		malloc_write("<jemalloc>: can't unbound invalid cap\n");
-		abort();
+	if (unlikely(!cheri_tag_get(ptr))) {
+		return NULL;
 	}
-	if (unlikely(cheri_getoffset(ptr) != 0)) {
-		malloc_write("<jemalloc>: refusing to unbound cap at "
-		    "non-zero offset\n");
-		abort();
+	if (unlikely(cheri_offset_get(ptr) != 0)) {
+		return NULL;
 	}
-	if (unlikely(cheri_getsealed(ptr))) {
-		malloc_write("<jemalloc>: refusing to unbound sealed cap\n");
-		abort();
+	if (unlikely(cheri_is_sealed(ptr))) {
+		return NULL;
 	}
 
 	rtree_ctx = tsdn_rtree_ctx(tsdn, &rtree_ctx_fallback);
 	extent = rtree_extent_read(tsdn, &extents_rtree,
 	    rtree_ctx, (uintptr_t)ptr, true);
 	assert(extent != NULL);
-	ubptr = cheri_setaddress(extent->e_addr, (ptraddr_t)ptr);
+	ubptr = cheri_address_set(extent->e_addr, (ptraddr_t)ptr);
 	/*
 	 * Compare pointer addresses to work around an issue where
 	 * LLVM's GVN pass replaces ubptr with ptr in the assert
@@ -69,8 +122,8 @@ unbound_ptr(tsdn_t *tsdn, void *ptr) {
 	 * https://github.com/CTSRD-CHERI/llvm-project/issues/619
 	 */
 	assert((ptraddr_t)ptr == (ptraddr_t)ubptr);
-	assert(cheri_getbase(ubptr) == cheri_getbase(extent->e_addr));
-	assert(cheri_getlen(ubptr) == cheri_getlen(extent->e_addr));
+	assert(cheri_base_get(ubptr) == cheri_base_get(extent->e_addr));
+	assert(cheri_length_get(ubptr) == cheri_length_get(extent->e_addr));
 #endif
 	return (ubptr);
 }
