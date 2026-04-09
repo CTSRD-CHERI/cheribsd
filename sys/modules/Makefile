@@ -932,7 +932,9 @@ SUBDIR+=	compartment_test
 # disable sub-module compartmentalization for comparisons with their variants
 # making use of sub-module compartmentalization.
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "riscv"
+SUBDIR+=	pacmanfs_bbn
 SUBDIR+=	sift_sa
+SUBDIR+=	zlib_bbn
 SUBDIR+=	zlib_noc18n
 .endif
 

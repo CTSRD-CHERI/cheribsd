@@ -1,6 +1,6 @@
 .PATH: ${SRCTOP}/sys/fs/pacmanfs
 
-KMOD=	pacmanfs
+KMOD?=	pacmanfs
 SRCS=	pacmanfs.c
 SRCS+=	${LINUXKPI_GENSRCS}
 

@@ -1,0 +1,2378 @@
+{
+    "compartments": {
+        "compart_8": {
+            "symbols": [
+                "deflate"
+            ]
+        },
+        "compart_18": {
+            "symbols": [
+                "adler32"
+            ]
+        },
+        "compart_35": {
+            "symbols": [
+                "zlib_init"
+            ]
+        },
+        "compart_38": {
+            "symbols": [
+                "_tr_flush_block"
+            ]
+        },
+        "compart_82": {
+            "symbols": [
+                "inflate"
+            ]
+        },
+        "compart_158": {
+            "symbols": [
+                "crc32"
+            ]
+        },
+        "compart_165": {
+            "symbols": [
+                "inflateInit2_"
+            ]
+        },
+        "compart_170": {
+            "symbols": [
+                "zmemcpy"
+            ]
+        },
+        "compart_171": {
+            "symbols": [
+                "deflateStateCheck"
+            ]
+        },
+        "compart_255": {
+            "symbols": [
+                "inflateStateCheck"
+            ]
+        },
+        "compart_632": {
+            "symbols": [
+                "deflateReset",
+                "lm_init",
+                "zlib_reset"
+            ]
+        },
+        "compart_644": {
+            "symbols": [
+                "deflate_fast",
+                "deflate_huff",
+                "deflate_rle",
+                "deflate_slow",
+                "longest_match"
+            ]
+        },
+        "compart_683": {
+            "symbols": [
+                "atomic_testandset_64",
+                "atomic_testandset_64_llsc",
+                "atomic_testandset_64_lse",
+                "atomic_testandset_acq_32",
+                "atomic_testandset_acq_32_llsc",
+                "atomic_testandset_acq_32_lse"
+            ]
+        },
+        "compart_684": {
+            "symbols": [
+                "atomic_testandset_acq_64",
+                "atomic_testandset_acq_64_llsc",
+                "atomic_testandset_acq_64_lse",
+                "zcalloc",
+                "zcalloc_nowait"
+            ]
+        },
+        "compart_685": {
+            "symbols": [
+                "_tr_stored_block",
+                "bi_windup",
+                "deflate_stored",
+                "read_buf"
+            ]
+        },
+        "compart_687": {
+            "symbols": [
+                "_tr_init",
+                "deflateResetKeep",
+                "init_block",
+                "tr_static_init"
+            ]
+        },
+        "compart_688": {
+            "symbols": [
+                "bi_reverse",
+                "build_bl_tree",
+                "build_tree",
+                "gen_bitlen",
+                "gen_codes",
+                "pqdownheap",
+                "scan_tree"
+            ]
+        },
+        "compart_690": {
+            "symbols": [
+                "inflateCopy",
+                "inflateGetDictionary",
+                "inflateSetDictionary",
+                "inflateSyncPoint",
+                "inflateUndermine",
+                "updatewindow"
+            ]
+        },
+        "compart_692": {
+            "symbols": [
+                "compress2",
+                "deflateInit_",
+                "zlib_fini",
+                "zlib_stream_free"
+            ]
+        },
+        "compart_693": {
+            "symbols": [
+                "inflateEnd",
+                "inflateInit_",
+                "inflateValidate",
+                "putShortMSB",
+                "uncompress",
+                "uncompress2"
+            ]
+        },
+        "compart_694": {
+            "symbols": [
+                "mstosbt",
+                "nstosbt",
+                "sbttoms",
+                "sbttons",
+                "sbttous",
+                "zcalloc_waitok",
+                "zlib_write"
+            ]
+        },
+        "compart_695": {
+            "symbols": [
+                "compress_block",
+                "detect_data_type",
+                "inflateCodesUsed",
+                "inflateGetHeader",
+                "inflateMark",
+                "inflatePrime",
+                "send_all_trees",
+                "send_tree"
+            ]
+        },
+        "compart_696": {
+            "symbols": [
+                "deflateCopy",
+                "deflateEnd",
+                "deflateGetDictionary",
+                "deflateInit2_"
+            ]
+        },
+        "compart_698": {
+            "symbols": [
+                "adler32_z",
+                "fixedtables",
+                "inflate_fast",
+                "inflate_table",
+                "ustosbt",
+                "zcfree",
+                "zlib_deflate_init",
+                "zlib_inflate_init"
+            ]
+        },
+        "compart_699": {
+            "symbols": [
+                "deflateParams",
+                "deflateSetDictionary",
+                "deflateSetHeader",
+                "deflateTune",
+                "fill_window",
+                "slide_hash",
+                "zmemzero"
+            ]
+        },
+        "compart_700": {
+            "symbols": [
+                "compress",
+                "crc32_combine",
+                "crc32_combine64",
+                "crc32_combine_gen",
+                "crc32_combine_gen64",
+                "crc32_combine_op",
+                "crc32_z",
+                "multmodp",
+                "x2nmodp"
+            ]
+        },
+        "compart_701": {
+            "symbols": [
+                "__builtin_cheri_round_representable_length",
+                "__builtin_constant_p",
+                "__builtin_expect",
+                "__builtin_memset",
+                "adler32_combine",
+                "adler32_combine64",
+                "adler32_combine_",
+                "atomic_add_16",
+                "atomic_add_16_llsc",
+                "atomic_add_16_lse",
+                "zlib_stream_zalloc"
+            ]
+        },
+        "compart_702": {
+            "symbols": [
+                "_tr_align",
+                "_tr_flush_bits",
+                "bi_flush",
+                "deflateBound",
+                "deflatePending",
+                "deflatePrime",
+                "flush_pending"
+            ]
+        },
+        "compart_703": {
+            "symbols": [
+                "atomic_add_32",
+                "atomic_add_32_llsc",
+                "atomic_add_32_lse",
+                "atomic_add_64",
+                "atomic_add_64_llsc",
+                "atomic_add_64_lse",
+                "atomic_readandclear_32",
+                "atomic_readandclear_32_llsc",
+                "atomic_readandclear_32_lse",
+                "atomic_swap_32",
+                "atomic_swap_32_llsc",
+                "atomic_swap_32_lse"
+            ]
+        },
+        "compart_704": {
+            "symbols": [
+                "atomic_add_8",
+                "atomic_add_8_llsc",
+                "atomic_add_8_lse",
+                "atomic_add_acq_16",
+                "atomic_add_acq_16_llsc",
+                "atomic_add_acq_16_lse",
+                "atomic_readandclear_64",
+                "atomic_readandclear_64_llsc",
+                "atomic_readandclear_64_lse",
+                "atomic_swap_64",
+                "atomic_swap_64_llsc",
+                "atomic_swap_64_lse"
+            ]
+        },
+        "compart_705": {
+            "symbols": [
+                "atomic_add_acq_32",
+                "atomic_add_acq_32_llsc",
+                "atomic_add_acq_32_lse",
+                "atomic_add_acq_64",
+                "atomic_add_acq_64_llsc",
+                "atomic_add_acq_64_lse",
+                "inflateReset",
+                "inflateReset2",
+                "inflateResetKeep",
+                "inflateSync",
+                "syncsearch"
+            ]
+        },
+        "compart_706": {
+            "symbols": [
+                "atomic_add_acq_8",
+                "atomic_add_acq_8_llsc",
+                "atomic_add_acq_8_lse",
+                "atomic_add_rel_16",
+                "atomic_add_rel_16_llsc",
+                "atomic_add_rel_16_lse",
+                "atomic_add_rel_32",
+                "atomic_add_rel_32_llsc",
+                "atomic_add_rel_32_lse",
+                "atomic_add_rel_64",
+                "atomic_add_rel_64_llsc",
+                "atomic_add_rel_64_lse"
+            ]
+        },
+        "compart_707": {
+            "symbols": [
+                "atomic_add_rel_8",
+                "atomic_add_rel_8_llsc",
+                "atomic_add_rel_8_lse",
+                "atomic_clear_16",
+                "atomic_clear_16_llsc",
+                "atomic_clear_16_lse",
+                "atomic_clear_32",
+                "atomic_clear_32_llsc",
+                "atomic_clear_32_lse",
+                "atomic_clear_64",
+                "atomic_clear_64_llsc",
+                "atomic_clear_64_lse"
+            ]
+        },
+        "compart_708": {
+            "symbols": [
+                "atomic_clear_8",
+                "atomic_clear_8_llsc",
+                "atomic_clear_8_lse",
+                "atomic_clear_acq_16",
+                "atomic_clear_acq_16_llsc",
+                "atomic_clear_acq_16_lse",
+                "atomic_clear_acq_32",
+                "atomic_clear_acq_32_llsc",
+                "atomic_clear_acq_32_lse",
+                "atomic_clear_acq_64",
+                "atomic_clear_acq_64_llsc",
+                "atomic_clear_acq_64_lse"
+            ]
+        },
+        "compart_709": {
+            "symbols": [
+                "atomic_clear_acq_8",
+                "atomic_clear_acq_8_llsc",
+                "atomic_clear_acq_8_lse",
+                "atomic_clear_rel_16",
+                "atomic_clear_rel_16_llsc",
+                "atomic_clear_rel_16_lse",
+                "atomic_clear_rel_32",
+                "atomic_clear_rel_32_llsc",
+                "atomic_clear_rel_32_lse",
+                "atomic_clear_rel_64",
+                "atomic_clear_rel_64_llsc",
+                "atomic_clear_rel_64_lse"
+            ]
+        },
+        "compart_710": {
+            "symbols": [
+                "atomic_clear_rel_8",
+                "atomic_clear_rel_8_llsc",
+                "atomic_clear_rel_8_lse",
+                "atomic_cmpset_32",
+                "atomic_cmpset_32_llsc",
+                "atomic_cmpset_32_lse",
+                "atomic_cmpset_64",
+                "atomic_cmpset_64_llsc",
+                "atomic_cmpset_64_lse",
+                "atomic_cmpset_acq_16",
+                "atomic_cmpset_acq_16_llsc",
+                "atomic_cmpset_acq_16_lse"
+            ]
+        },
+        "compart_711": {
+            "symbols": [
+                "atomic_cmpset_acq_32",
+                "atomic_cmpset_acq_32_llsc",
+                "atomic_cmpset_acq_32_lse",
+                "atomic_cmpset_acq_64",
+                "atomic_cmpset_acq_64_llsc",
+                "atomic_cmpset_acq_64_lse",
+                "atomic_cmpset_acq_8",
+                "atomic_cmpset_acq_8_llsc",
+                "atomic_cmpset_acq_8_lse",
+                "atomic_cmpset_rel_16",
+                "atomic_cmpset_rel_16_llsc",
+                "atomic_cmpset_rel_16_lse"
+            ]
+        },
+        "compart_712": {
+            "symbols": [
+                "atomic_cmpset_rel_32",
+                "atomic_cmpset_rel_32_llsc",
+                "atomic_cmpset_rel_32_lse",
+                "atomic_cmpset_rel_64",
+                "atomic_cmpset_rel_64_llsc",
+                "atomic_cmpset_rel_64_lse",
+                "atomic_cmpset_rel_8",
+                "atomic_cmpset_rel_8_llsc",
+                "atomic_cmpset_rel_8_lse",
+                "atomic_fcmpset_32",
+                "atomic_fcmpset_32_llsc",
+                "atomic_fcmpset_32_lse"
+            ]
+        },
+        "compart_713": {
+            "symbols": [
+                "atomic_fcmpset_64",
+                "atomic_fcmpset_64_llsc",
+                "atomic_fcmpset_64_lse",
+                "atomic_fcmpset_acq_16",
+                "atomic_fcmpset_acq_16_llsc",
+                "atomic_fcmpset_acq_16_lse",
+                "atomic_fcmpset_acq_32",
+                "atomic_fcmpset_acq_32_llsc",
+                "atomic_fcmpset_acq_32_lse",
+                "atomic_fcmpset_acq_64",
+                "atomic_fcmpset_acq_64_llsc",
+                "atomic_fcmpset_acq_64_lse"
+            ]
+        },
+        "compart_714": {
+            "symbols": [
+                "atomic_fcmpset_acq_8",
+                "atomic_fcmpset_acq_8_llsc",
+                "atomic_fcmpset_acq_8_lse",
+                "atomic_fcmpset_rel_16",
+                "atomic_fcmpset_rel_16_llsc",
+                "atomic_fcmpset_rel_16_lse",
+                "atomic_fcmpset_rel_32",
+                "atomic_fcmpset_rel_32_llsc",
+                "atomic_fcmpset_rel_32_lse",
+                "atomic_fcmpset_rel_64",
+                "atomic_fcmpset_rel_64_llsc",
+                "atomic_fcmpset_rel_64_lse"
+            ]
+        },
+        "compart_715": {
+            "symbols": [
+                "atomic_fcmpset_rel_8",
+                "atomic_fcmpset_rel_8_llsc",
+                "atomic_fcmpset_rel_8_lse",
+                "atomic_fetchadd_32",
+                "atomic_fetchadd_32_llsc",
+                "atomic_fetchadd_32_lse",
+                "atomic_fetchadd_64",
+                "atomic_fetchadd_64_llsc",
+                "atomic_fetchadd_64_lse",
+                "atomic_set_16",
+                "atomic_set_16_llsc",
+                "atomic_set_16_lse"
+            ]
+        },
+        "compart_716": {
+            "symbols": [
+                "atomic_set_32",
+                "atomic_set_32_llsc",
+                "atomic_set_32_lse",
+                "atomic_set_64",
+                "atomic_set_64_llsc",
+                "atomic_set_64_lse",
+                "atomic_set_8",
+                "atomic_set_8_llsc",
+                "atomic_set_8_lse",
+                "atomic_set_acq_16",
+                "atomic_set_acq_16_llsc",
+                "atomic_set_acq_16_lse"
+            ]
+        },
+        "compart_717": {
+            "symbols": [
+                "atomic_set_acq_32",
+                "atomic_set_acq_32_llsc",
+                "atomic_set_acq_32_lse",
+                "atomic_set_acq_64",
+                "atomic_set_acq_64_llsc",
+                "atomic_set_acq_64_lse",
+                "atomic_set_acq_8",
+                "atomic_set_acq_8_llsc",
+                "atomic_set_acq_8_lse",
+                "atomic_set_rel_16",
+                "atomic_set_rel_16_llsc",
+                "atomic_set_rel_16_lse"
+            ]
+        },
+        "compart_718": {
+            "symbols": [
+                "atomic_set_rel_32",
+                "atomic_set_rel_32_llsc",
+                "atomic_set_rel_32_lse",
+                "atomic_set_rel_64",
+                "atomic_set_rel_64_llsc",
+                "atomic_set_rel_64_lse",
+                "atomic_set_rel_8",
+                "atomic_set_rel_8_llsc",
+                "atomic_set_rel_8_lse",
+                "atomic_subtract_16",
+                "atomic_subtract_16_llsc",
+                "atomic_subtract_16_lse"
+            ]
+        },
+        "compart_719": {
+            "symbols": [
+                "atomic_subtract_32",
+                "atomic_subtract_32_llsc",
+                "atomic_subtract_32_lse",
+                "atomic_subtract_64",
+                "atomic_subtract_64_llsc",
+                "atomic_subtract_64_lse",
+                "atomic_subtract_8",
+                "atomic_subtract_8_llsc",
+                "atomic_subtract_8_lse",
+                "atomic_subtract_acq_16",
+                "atomic_subtract_acq_16_llsc",
+                "atomic_subtract_acq_16_lse"
+            ]
+        },
+        "compart_720": {
+            "symbols": [
+                "atomic_subtract_acq_32",
+                "atomic_subtract_acq_32_llsc",
+                "atomic_subtract_acq_32_lse",
+                "atomic_subtract_acq_64",
+                "atomic_subtract_acq_64_llsc",
+                "atomic_subtract_acq_64_lse",
+                "atomic_subtract_acq_8",
+                "atomic_subtract_acq_8_llsc",
+                "atomic_subtract_acq_8_lse",
+                "atomic_subtract_rel_16",
+                "atomic_subtract_rel_16_llsc",
+                "atomic_subtract_rel_16_lse"
+            ]
+        },
+        "compart_721": {
+            "symbols": [
+                "atomic_subtract_rel_32",
+                "atomic_subtract_rel_32_llsc",
+                "atomic_subtract_rel_32_lse",
+                "atomic_subtract_rel_64",
+                "atomic_subtract_rel_64_llsc",
+                "atomic_subtract_rel_64_lse",
+                "atomic_subtract_rel_8",
+                "atomic_subtract_rel_8_llsc",
+                "atomic_subtract_rel_8_lse",
+                "atomic_testandclear_32",
+                "atomic_testandclear_32_llsc",
+                "atomic_testandclear_32_lse"
+            ]
+        },
+        "compart_722": {
+            "symbols": [
+                "atomic_testandclear_64",
+                "atomic_testandclear_64_llsc",
+                "atomic_testandclear_64_lse",
+                "atomic_testandclear_acq_32",
+                "atomic_testandclear_acq_32_llsc",
+                "atomic_testandclear_acq_32_lse",
+                "atomic_testandclear_acq_64",
+                "atomic_testandclear_acq_64_llsc",
+                "atomic_testandclear_acq_64_lse",
+                "atomic_testandset_32",
+                "atomic_testandset_32_llsc",
+                "atomic_testandset_32_lse"
+            ]
+        }
+    },
+    "acls": [
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->strm->avail_out",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->strategy",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_38"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_687",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_8"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_702",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->ins_h",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_699"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_18",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->hash_shift",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_693"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_255",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_684"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "mallocarray",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->strstart",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_8"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_693",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_8"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_158",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_82"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_158",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_8"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_170",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_38"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_688",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_82"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_170",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_696"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_171",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->window",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->lookahead",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "s->prev_match",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_695"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_255",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_38"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "static_ltree",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->match_start",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_693"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_165",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_18"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_698",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_690"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_18",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_696"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_684",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_35"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_696",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->max_lazy_match",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->window_size",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_35"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_692",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->strm->next_in",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->window",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_687"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "static_d_desc",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_688"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "bl_order",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_8"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_18",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->block_start",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_694"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "M_ZLIB",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->strm",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_82"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_18",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_38"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_695",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->insert",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_684"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "M_ZLIB",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_165"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_705",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_632"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_687",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->high_water",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_694"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_82",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "s->match_available",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_694"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "mallocarray",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_694"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "__stime64_scale32_ceil",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->match_length",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_699",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_701"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "M_COMPRESS",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->prev_length",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_699"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_8",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_8"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "z_errmsg",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_38"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "static_dtree",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_35"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_632",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_695"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "extra_dbits",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_170",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_698"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "M_ZLIB",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_687"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "static_l_desc",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_698"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_35",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "s->strstart",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_698"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "__stime64_scale64_ceil",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_698"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "__stime64_scale32_ceil",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->strm",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_696"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_632",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_687"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_158",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_35"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_165",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_702",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_687"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "static_bl_desc",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->strm->avail_in",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "s->block_start",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "s->ins_h",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_695"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "_length_code",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_696"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "z_errmsg",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_694"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "__stime64_scale64_ceil",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "s->match_length",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_695"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "_dist_code",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_158"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_700",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "s->prev_length",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_687"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_171",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_8"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_644",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_693"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_82",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_35"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_701",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_158",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->prev",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_702",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_700"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_692",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "s->insert",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_699"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "configuration_table",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->strm->avail_out",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_698"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "free",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_687"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_18",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->pending_buf_size",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_694"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "__stime64_scale32_floor",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->w_size",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_705"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_255",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_82"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_690",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->block_start",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_632"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "configuration_table",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_165"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_684",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_82"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_255",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->head",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_701"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "malloc",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "s->insert",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_702"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "static_ltree",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->matches",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->w_size",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_18",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_692"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "free",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_702"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_171",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_632"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_699",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->strm->next_out",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_38",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_8"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "configuration_table",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_695"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "bl_order",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->match_available",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_694"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_8",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_690"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_255",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_699"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_170",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "s->block_start",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_82"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_698",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_8"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_685",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "s->matches",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_692"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "M_COMPRESS",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_692"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_8",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_694"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "__stime64_scale64_floor",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->sym_next",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_8"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_699",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->prev_match",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_8"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_171",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->w_mask",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_699"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_685",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_692"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_696",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_700"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "x2n_table",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->strstart",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_685"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "s->bi_valid",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_38"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_685",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_695"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "extra_lbits",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_702"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_170",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_699"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_171",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_690"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_170",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_696"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_170",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_694"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "sdt_zlib__write_iteration",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_694"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "sdt_zlib__write_iteration",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_694"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "sdt_probe",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_694"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "sdt_zlib__write_error3",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_694"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "sdt_zlib__write_error3",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_694"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "sdt_probe6",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_35"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "M_COMPRESS",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_35"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "M_COMPRESS",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_35"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "malloc",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_35"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "free",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_35"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "sdt_zlib__init_error",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_35"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "sdt_zlib__init_error",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_35"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "sdt_probe",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_696"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "deflateInit2_.my_version",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_696"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "deflateInit2_.my_version",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_38"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "bl_order",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_38"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "bl_order",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_695"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "base_dist",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_695"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "base_dist",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_695"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "base_length",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_695"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "base_length",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_698"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "inflate_table.lext",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_698"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "inflate_table.lext",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_698"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "inflate_table.lbase",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_698"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "inflate_table.lbase",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_698"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "inflate_table.dbase",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_698"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "inflate_table.dbase",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_698"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "inflate_table.dext",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_698"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "inflate_table.dext",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_165"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "zcfree",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_696"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "zcfree",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_699"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "crc32",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "zmemcpy",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "_dist_code",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "_dist_code",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "_length_code",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_644"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "_length_code",
+                "type": "symbol"
+            }
+        }
+    ]
+}

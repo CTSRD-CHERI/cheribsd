@@ -1,0 +1,2852 @@
+{
+    "compartments": {
+        "compart_184": {
+            "symbols": [
+                "pacmanfs_get_inode"
+            ]
+        },
+        "compart_192": {
+            "symbols": [
+                "remove_dirent"
+            ]
+        },
+        "compart_202": {
+            "symbols": [
+                "get_nth_block"
+            ]
+        },
+        "compart_763": {
+            "symbols": [
+                "atomic_readandclear_64",
+                "atomic_readandclear_64_llsc",
+                "atomic_readandclear_64_lse",
+                "atomic_swap_64",
+                "atomic_swap_64_llsc",
+                "atomic_swap_64_lse"
+            ]
+        },
+        "compart_766": {
+            "symbols": [
+                "atomic_add_64",
+                "atomic_add_64_llsc",
+                "atomic_add_64_lse",
+                "atomic_add_8",
+                "atomic_add_8_llsc",
+                "atomic_add_8_lse"
+            ]
+        },
+        "compart_767": {
+            "symbols": [
+                "atomic_add_acq_16",
+                "atomic_add_acq_16_llsc",
+                "atomic_add_acq_16_lse",
+                "atomic_add_acq_32",
+                "atomic_add_acq_32_llsc",
+                "atomic_add_acq_32_lse"
+            ]
+        },
+        "compart_768": {
+            "symbols": [
+                "atomic_add_acq_64",
+                "atomic_add_acq_64_llsc",
+                "atomic_add_acq_64_lse",
+                "atomic_add_acq_8",
+                "atomic_add_acq_8_llsc",
+                "atomic_add_acq_8_lse"
+            ]
+        },
+        "compart_769": {
+            "symbols": [
+                "atomic_add_rel_16",
+                "atomic_add_rel_16_llsc",
+                "atomic_add_rel_16_lse",
+                "atomic_add_rel_32",
+                "atomic_add_rel_32_llsc",
+                "atomic_add_rel_32_lse"
+            ]
+        },
+        "compart_770": {
+            "symbols": [
+                "atomic_add_rel_64",
+                "atomic_add_rel_64_llsc",
+                "atomic_add_rel_64_lse",
+                "atomic_add_rel_8",
+                "atomic_add_rel_8_llsc",
+                "atomic_add_rel_8_lse"
+            ]
+        },
+        "compart_771": {
+            "symbols": [
+                "atomic_clear_16",
+                "atomic_clear_16_llsc",
+                "atomic_clear_16_lse",
+                "atomic_clear_32",
+                "atomic_clear_32_llsc",
+                "atomic_clear_32_lse"
+            ]
+        },
+        "compart_772": {
+            "symbols": [
+                "atomic_clear_64",
+                "atomic_clear_64_llsc",
+                "atomic_clear_64_lse",
+                "atomic_clear_8",
+                "atomic_clear_8_llsc",
+                "atomic_clear_8_lse"
+            ]
+        },
+        "compart_773": {
+            "symbols": [
+                "atomic_clear_acq_16",
+                "atomic_clear_acq_16_llsc",
+                "atomic_clear_acq_16_lse",
+                "atomic_clear_acq_32",
+                "atomic_clear_acq_32_llsc",
+                "atomic_clear_acq_32_lse"
+            ]
+        },
+        "compart_774": {
+            "symbols": [
+                "atomic_clear_acq_64",
+                "atomic_clear_acq_64_llsc",
+                "atomic_clear_acq_64_lse",
+                "atomic_clear_acq_8",
+                "atomic_clear_acq_8_llsc",
+                "atomic_clear_acq_8_lse"
+            ]
+        },
+        "compart_775": {
+            "symbols": [
+                "atomic_clear_rel_16",
+                "atomic_clear_rel_16_llsc",
+                "atomic_clear_rel_16_lse",
+                "atomic_clear_rel_32",
+                "atomic_clear_rel_32_llsc",
+                "atomic_clear_rel_32_lse"
+            ]
+        },
+        "compart_776": {
+            "symbols": [
+                "atomic_clear_rel_64",
+                "atomic_clear_rel_64_llsc",
+                "atomic_clear_rel_64_lse",
+                "atomic_clear_rel_8",
+                "atomic_clear_rel_8_llsc",
+                "atomic_clear_rel_8_lse"
+            ]
+        },
+        "compart_777": {
+            "symbols": [
+                "atomic_cmpset_32",
+                "atomic_cmpset_32_llsc",
+                "atomic_cmpset_32_lse",
+                "atomic_cmpset_64",
+                "atomic_cmpset_64_llsc",
+                "atomic_cmpset_64_lse"
+            ]
+        },
+        "compart_778": {
+            "symbols": [
+                "atomic_cmpset_acq_16",
+                "atomic_cmpset_acq_16_llsc",
+                "atomic_cmpset_acq_16_lse",
+                "atomic_cmpset_acq_32",
+                "atomic_cmpset_acq_32_llsc",
+                "atomic_cmpset_acq_32_lse"
+            ]
+        },
+        "compart_779": {
+            "symbols": [
+                "atomic_cmpset_acq_64",
+                "atomic_cmpset_acq_64_llsc",
+                "atomic_cmpset_acq_64_lse",
+                "atomic_cmpset_acq_8",
+                "atomic_cmpset_acq_8_llsc",
+                "atomic_cmpset_acq_8_lse"
+            ]
+        },
+        "compart_780": {
+            "symbols": [
+                "atomic_cmpset_rel_16",
+                "atomic_cmpset_rel_16_llsc",
+                "atomic_cmpset_rel_16_lse",
+                "atomic_cmpset_rel_32",
+                "atomic_cmpset_rel_32_llsc",
+                "atomic_cmpset_rel_32_lse"
+            ]
+        },
+        "compart_781": {
+            "symbols": [
+                "atomic_cmpset_rel_64",
+                "atomic_cmpset_rel_64_llsc",
+                "atomic_cmpset_rel_64_lse",
+                "atomic_cmpset_rel_8",
+                "atomic_cmpset_rel_8_llsc",
+                "atomic_cmpset_rel_8_lse"
+            ]
+        },
+        "compart_782": {
+            "symbols": [
+                "atomic_fcmpset_64",
+                "atomic_fcmpset_64_llsc",
+                "atomic_fcmpset_64_lse",
+                "atomic_fcmpset_acq_16",
+                "atomic_fcmpset_acq_16_llsc",
+                "atomic_fcmpset_acq_16_lse"
+            ]
+        },
+        "compart_783": {
+            "symbols": [
+                "atomic_fcmpset_acq_32",
+                "atomic_fcmpset_acq_32_llsc",
+                "atomic_fcmpset_acq_32_lse",
+                "atomic_fcmpset_acq_64",
+                "atomic_fcmpset_acq_64_llsc",
+                "atomic_fcmpset_acq_64_lse"
+            ]
+        },
+        "compart_784": {
+            "symbols": [
+                "atomic_fcmpset_acq_8",
+                "atomic_fcmpset_acq_8_llsc",
+                "atomic_fcmpset_acq_8_lse",
+                "atomic_fcmpset_rel_16",
+                "atomic_fcmpset_rel_16_llsc",
+                "atomic_fcmpset_rel_16_lse"
+            ]
+        },
+        "compart_786": {
+            "symbols": [
+                "atomic_fcmpset_rel_64",
+                "atomic_fcmpset_rel_64_llsc",
+                "atomic_fcmpset_rel_64_lse",
+                "atomic_fcmpset_rel_8",
+                "atomic_fcmpset_rel_8_llsc",
+                "atomic_fcmpset_rel_8_lse"
+            ]
+        },
+        "compart_787": {
+            "symbols": [
+                "atomic_fetchadd_32",
+                "atomic_fetchadd_32_llsc",
+                "atomic_fetchadd_32_lse",
+                "atomic_fetchadd_64",
+                "atomic_fetchadd_64_llsc",
+                "atomic_fetchadd_64_lse"
+            ]
+        },
+        "compart_788": {
+            "symbols": [
+                "atomic_set_16",
+                "atomic_set_16_llsc",
+                "atomic_set_16_lse",
+                "atomic_set_32",
+                "atomic_set_32_llsc",
+                "atomic_set_32_lse"
+            ]
+        },
+        "compart_789": {
+            "symbols": [
+                "atomic_set_64",
+                "atomic_set_64_llsc",
+                "atomic_set_64_lse",
+                "atomic_set_8",
+                "atomic_set_8_llsc",
+                "atomic_set_8_lse"
+            ]
+        },
+        "compart_790": {
+            "symbols": [
+                "atomic_set_acq_16",
+                "atomic_set_acq_16_llsc",
+                "atomic_set_acq_16_lse",
+                "atomic_set_acq_32",
+                "atomic_set_acq_32_llsc",
+                "atomic_set_acq_32_lse"
+            ]
+        },
+        "compart_791": {
+            "symbols": [
+                "atomic_set_acq_64",
+                "atomic_set_acq_64_llsc",
+                "atomic_set_acq_64_lse",
+                "atomic_set_acq_8",
+                "atomic_set_acq_8_llsc",
+                "atomic_set_acq_8_lse"
+            ]
+        },
+        "compart_792": {
+            "symbols": [
+                "atomic_set_rel_16",
+                "atomic_set_rel_16_llsc",
+                "atomic_set_rel_16_lse",
+                "atomic_set_rel_32",
+                "atomic_set_rel_32_llsc",
+                "atomic_set_rel_32_lse"
+            ]
+        },
+        "compart_793": {
+            "symbols": [
+                "atomic_set_rel_64",
+                "atomic_set_rel_64_llsc",
+                "atomic_set_rel_64_lse",
+                "atomic_set_rel_8",
+                "atomic_set_rel_8_llsc",
+                "atomic_set_rel_8_lse"
+            ]
+        },
+        "compart_794": {
+            "symbols": [
+                "atomic_subtract_16",
+                "atomic_subtract_16_llsc",
+                "atomic_subtract_16_lse",
+                "atomic_subtract_32",
+                "atomic_subtract_32_llsc",
+                "atomic_subtract_32_lse"
+            ]
+        },
+        "compart_795": {
+            "symbols": [
+                "atomic_subtract_64",
+                "atomic_subtract_64_llsc",
+                "atomic_subtract_64_lse",
+                "atomic_subtract_8",
+                "atomic_subtract_8_llsc",
+                "atomic_subtract_8_lse"
+            ]
+        },
+        "compart_796": {
+            "symbols": [
+                "atomic_subtract_acq_16",
+                "atomic_subtract_acq_16_llsc",
+                "atomic_subtract_acq_16_lse",
+                "atomic_subtract_acq_32",
+                "atomic_subtract_acq_32_llsc",
+                "atomic_subtract_acq_32_lse"
+            ]
+        },
+        "compart_797": {
+            "symbols": [
+                "atomic_subtract_acq_64",
+                "atomic_subtract_acq_64_llsc",
+                "atomic_subtract_acq_64_lse",
+                "atomic_subtract_acq_8",
+                "atomic_subtract_acq_8_llsc",
+                "atomic_subtract_acq_8_lse"
+            ]
+        },
+        "compart_798": {
+            "symbols": [
+                "atomic_subtract_rel_16",
+                "atomic_subtract_rel_16_llsc",
+                "atomic_subtract_rel_16_lse",
+                "atomic_subtract_rel_32",
+                "atomic_subtract_rel_32_llsc",
+                "atomic_subtract_rel_32_lse"
+            ]
+        },
+        "compart_799": {
+            "symbols": [
+                "atomic_subtract_rel_64",
+                "atomic_subtract_rel_64_llsc",
+                "atomic_subtract_rel_64_lse",
+                "atomic_subtract_rel_8",
+                "atomic_subtract_rel_8_llsc",
+                "atomic_subtract_rel_8_lse"
+            ]
+        },
+        "compart_800": {
+            "symbols": [
+                "atomic_testandclear_32",
+                "atomic_testandclear_32_llsc",
+                "atomic_testandclear_32_lse",
+                "atomic_testandclear_64",
+                "atomic_testandclear_64_llsc",
+                "atomic_testandclear_64_lse"
+            ]
+        },
+        "compart_801": {
+            "symbols": [
+                "atomic_testandclear_acq_32",
+                "atomic_testandclear_acq_32_llsc",
+                "atomic_testandclear_acq_32_lse",
+                "atomic_testandclear_acq_64",
+                "atomic_testandclear_acq_64_llsc",
+                "atomic_testandclear_acq_64_lse"
+            ]
+        },
+        "compart_802": {
+            "symbols": [
+                "atomic_testandset_32",
+                "atomic_testandset_32_llsc",
+                "atomic_testandset_32_lse",
+                "atomic_testandset_64",
+                "atomic_testandset_64_llsc",
+                "atomic_testandset_64_lse"
+            ]
+        },
+        "compart_803": {
+            "symbols": [
+                "atomic_testandset_acq_32",
+                "atomic_testandset_acq_32_llsc",
+                "atomic_testandset_acq_32_lse",
+                "atomic_testandset_acq_64",
+                "atomic_testandset_acq_64_llsc",
+                "atomic_testandset_acq_64_lse"
+            ]
+        },
+        "compart_804": {
+            "symbols": [
+                "allocate_space",
+                "pacmanfs_create_inode"
+            ]
+        },
+        "compart_806": {
+            "symbols": [
+                "ck_pr_cas_8_value",
+                "ck_pr_dec_8_is_zero",
+                "ck_pr_dec_8_zero",
+                "ck_pr_inc_8_is_zero",
+                "ck_pr_inc_8_zero",
+                "ck_pr_md_load_8",
+                "ck_pr_neg_8_zero"
+            ]
+        },
+        "compart_807": {
+            "symbols": [
+                "ck_pr_cas_char_value",
+                "ck_pr_dec_char_is_zero",
+                "ck_pr_dec_char_zero",
+                "ck_pr_inc_char_is_zero",
+                "ck_pr_inc_char_zero",
+                "ck_pr_md_load_char",
+                "ck_pr_neg_char_zero"
+            ]
+        },
+        "compart_808": {
+            "symbols": [
+                "ck_pr_btc_ptr",
+                "ck_pr_btr_ptr",
+                "ck_pr_bts_ptr",
+                "ck_pr_cas_ptr_value",
+                "ck_pr_dec_ptr_is_zero",
+                "ck_pr_inc_ptr_is_zero",
+                "ck_pr_neg_ptr_zero"
+            ]
+        },
+        "compart_816": {
+            "symbols": [
+                "atomic_and",
+                "atomic_andnot",
+                "atomic_fetch_and",
+                "atomic_fetch_andnot",
+                "atomic_fetch_or",
+                "atomic_fetch_xor",
+                "atomic_or",
+                "atomic_xor"
+            ]
+        },
+        "compart_817": {
+            "symbols": [
+                "ck_pr_fence_acquire",
+                "ck_pr_fence_strict_acquire",
+                "fill_inode",
+                "make_ts64",
+                "pacmanfs_fill_super",
+                "pacmanfs_mkdir"
+            ]
+        },
+        "compart_818": {
+            "symbols": [
+                "ck_pr_fence_atomic",
+                "ck_pr_fence_atomic_load",
+                "ck_pr_fence_atomic_store",
+                "ck_pr_fence_load",
+                "ck_pr_fence_strict_atomic",
+                "ck_pr_fence_strict_atomic_load",
+                "ck_pr_fence_strict_atomic_store",
+                "ck_pr_fence_strict_load"
+            ]
+        },
+        "compart_819": {
+            "symbols": [
+                "ck_pr_fence_load_atomic",
+                "ck_pr_fence_load_depends",
+                "ck_pr_fence_load_store",
+                "ck_pr_fence_lock",
+                "ck_pr_fence_strict_load_atomic",
+                "ck_pr_fence_strict_load_store",
+                "ck_pr_fence_strict_lock",
+                "pacmanfs_destroy_inode"
+            ]
+        },
+        "compart_820": {
+            "symbols": [
+                "ck_pr_fence_memory",
+                "ck_pr_fence_release",
+                "ck_pr_fence_store",
+                "ck_pr_fence_store_atomic",
+                "ck_pr_fence_strict_memory",
+                "ck_pr_fence_strict_release",
+                "ck_pr_fence_strict_store",
+                "ck_pr_fence_strict_store_atomic"
+            ]
+        },
+        "compart_821": {
+            "symbols": [
+                "ck_pr_fence_store_load",
+                "ck_pr_fence_strict_store_load",
+                "ck_pr_fence_strict_unlock",
+                "ck_pr_fence_unlock",
+                "mstosbt",
+                "nstosbt",
+                "pacmanfs_exit",
+                "pacmanfs_init"
+            ]
+        },
+        "compart_822": {
+            "symbols": [
+                "__builtin_expect",
+                "_refcount_release_if_eq",
+                "_refcount_release_if_gt",
+                "atomic_fcmpset_rel_32",
+                "atomic_fcmpset_rel_32_llsc",
+                "atomic_fcmpset_rel_32_lse",
+                "get_nth_block_inner",
+                "pacmanfs_mount"
+            ]
+        },
+        "compart_823": {
+            "symbols": [
+                "atomic_fcmpset_32",
+                "atomic_fcmpset_32_llsc",
+                "atomic_fcmpset_32_lse",
+                "pacmanfs_evict_inode",
+                "pacmanfs_write_inode"
+            ]
+        },
+        "compart_824": {
+            "symbols": [
+                "__builtin_strlen",
+                "pacmanfs_read",
+                "pacmanfs_symlink",
+                "pacmanfs_write",
+                "sbttons",
+                "sbttous",
+                "ustosbt"
+            ]
+        },
+        "compart_825": {
+            "symbols": [
+                "__builtin_strcmp",
+                "find_last_dirent",
+                "find_named_dirent",
+                "pacmanfs_lookup",
+                "pacmanfs_put_super",
+                "pacmanfs_setattr",
+                "pacmanfs_statfs",
+                "sbttoms"
+            ]
+        },
+        "compart_826": {
+            "symbols": [
+                "ck_pr_btc_16",
+                "ck_pr_btr_16",
+                "ck_pr_bts_16",
+                "ck_pr_cas_16_value",
+                "ck_pr_dec_16_is_zero",
+                "ck_pr_dec_16_zero",
+                "ck_pr_inc_16_is_zero",
+                "ck_pr_inc_16_zero",
+                "ck_pr_md_load_16",
+                "ck_pr_neg_16_zero"
+            ]
+        },
+        "compart_827": {
+            "symbols": [
+                "ck_pr_btc_32",
+                "ck_pr_btr_32",
+                "ck_pr_bts_32",
+                "ck_pr_cas_32_value",
+                "ck_pr_dec_32_is_zero",
+                "ck_pr_dec_32_zero",
+                "ck_pr_inc_32_is_zero",
+                "ck_pr_inc_32_zero",
+                "ck_pr_md_load_32",
+                "ck_pr_neg_32_zero"
+            ]
+        },
+        "compart_828": {
+            "symbols": [
+                "ck_pr_btc_64",
+                "ck_pr_btr_64",
+                "ck_pr_bts_64",
+                "ck_pr_cas_64_value",
+                "ck_pr_dec_64_is_zero",
+                "ck_pr_dec_64_zero",
+                "ck_pr_inc_64_is_zero",
+                "ck_pr_inc_64_zero",
+                "ck_pr_md_load_64",
+                "ck_pr_neg_64_zero"
+            ]
+        },
+        "compart_829": {
+            "symbols": [
+                "ck_pr_btc_int",
+                "ck_pr_btr_int",
+                "ck_pr_bts_int",
+                "ck_pr_cas_int_value",
+                "ck_pr_dec_int_is_zero",
+                "ck_pr_dec_int_zero",
+                "ck_pr_inc_int_is_zero",
+                "ck_pr_inc_int_zero",
+                "ck_pr_md_load_int",
+                "ck_pr_neg_int_zero"
+            ]
+        },
+        "compart_830": {
+            "symbols": [
+                "ck_pr_btc_uint",
+                "ck_pr_btr_uint",
+                "ck_pr_bts_uint",
+                "ck_pr_cas_uint_value",
+                "ck_pr_dec_uint_is_zero",
+                "ck_pr_dec_uint_zero",
+                "ck_pr_inc_uint_is_zero",
+                "ck_pr_inc_uint_zero",
+                "ck_pr_md_load_uint",
+                "ck_pr_neg_uint_zero"
+            ]
+        },
+        "compart_831": {
+            "symbols": [
+                "__builtin_memset",
+                "allocate_blocks_recursive",
+                "free_list_tail",
+                "pacmanfs_rmdir",
+                "pacmanfs_unlink",
+                "pop_free_block",
+                "push_free_block",
+                "reclaim_data"
+            ]
+        },
+        "compart_832": {
+            "symbols": [
+                "add_dirent",
+                "ck_pr_fence_acqrel",
+                "ck_pr_fence_strict_acqrel",
+                "get_max_inode",
+                "pacmanfs_get_link",
+                "pacmanfs_iterate",
+                "pacmanfs_link",
+                "pacmanfs_rename",
+                "pacmanfs_sync_fs"
+            ]
+        },
+        "compart_833": {
+            "symbols": [
+                "__builtin_memcpy",
+                "pacmanfs_get_inode_disk"
+            ]
+        },
+        "compart_834": {
+            "symbols": [
+                "atomic_add_16",
+                "atomic_add_16_llsc",
+                "atomic_add_16_lse",
+                "atomic_add_32",
+                "atomic_add_32_llsc",
+                "atomic_add_32_lse",
+                "atomic_readandclear_32",
+                "atomic_readandclear_32_llsc",
+                "atomic_readandclear_32_lse",
+                "atomic_swap_32",
+                "atomic_swap_32_llsc",
+                "atomic_swap_32_lse"
+            ]
+        }
+    },
+    "acls": [
+        {
+            "subject": {
+                "name": "compart_184"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "log",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_819"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "linux_kfree_async",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "inode_nohighmem",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "set_nlink",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "make_kgid",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "lkpi_brelse",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "__stime64_scale32_ceil",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "__ace2_syncpoint",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_file_operations",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_184"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "ERR_PTR",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_831"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_192",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_192"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_831",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_202",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_inode_ops",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_823"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "from_kuid",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_202",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_831"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "lkpi_brelse",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "dir_emit_dots",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "bdev_nr_sectors",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_821"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "register_filesystem",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "d_instantiate",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_822"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "sb_bread",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "inc_nlink",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_822"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "log",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_819"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "kfree",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_822"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "mount_bdev",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "bdev_nr_sectors",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_821"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "unregister_filesystem",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "setattr_prepare",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_831",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "sb_set_blocksize",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "ERR_PTR",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "ERR_PTR",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_822"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_inode_ops",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "mark_inode_dirty",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_823"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "invalidate_inode_buffers",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_192"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "lkpi_brelse",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "init_user_ns",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "mark_inode_dirty",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "copy_from_user",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "d_inode",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_831"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_202",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "insert_inode_hash",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "linux_copyout",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "lkpi_brelse",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_816"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_823",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_184",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "inode_nohighmem",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "inode_get_atime_sec",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_823"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "from_kgid",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "lkpi_brelse",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_192"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "PTR_ERR",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_819"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "get_curthread",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_192"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "log",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "_mtx_init",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "log",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "sb_bread",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "kfree",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "log",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_823"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "inode_get_mtime_sec",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_819"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "free",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "set_delayed_call",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_inode_ops",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_184"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "unlock_new_inode",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_184"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "__destroy_inode",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "simple_inode_init_ts",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "inode_init_owner",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_821"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "log",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_831"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_184",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_202"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_822",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "d_add",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "make_kuid",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_823"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "lkpi_brelse",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "lkpi_kmalloc",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "new_inode",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "__stime64_scale64_floor",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_821"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "__stime64_scale64_ceil",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "strnlen",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_822"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "IS_ERR",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "file_inode",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "dir_emit",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "init_user_ns",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "linux_kfree_async",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_833",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "insert_inode_hash",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "d_inode",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_192"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "mark_buffer_dirty",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_184"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_817",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "free",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "lkpi_brelse",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_833",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "linux_copyin",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_833",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "sb_bread",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_821"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_init.pacmanfs_type",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_808"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "ck_pr_md_load_ptr",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_832",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "sb_bread",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_833"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "log",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "sb_bread",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "mark_buffer_dirty",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "log",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "log",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_822"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "nop_mnt_idmap",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "d_make_root",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_192"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_825",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "mark_buffer_dirty",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_symlink_inode_ops",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_407"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_823",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "inode_init_owner",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "__stime64_scale64_ceil",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_dir_operations",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_823"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "inode_get_atime_sec",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_821"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "__stime64_scale32_ceil",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "lkpi_kmalloc",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "lkpi_kmalloc",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "inode_set_ctime_to_ts",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "new_inode",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "get_curthread",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_202"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "lkpi_brelse",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "__stime64_scale32_floor",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_184"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "lkpi_brelse",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_816"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "atomic_cmpxchg",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_831"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "sb_bread",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_823"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "log",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_831"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "log",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_822"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_dir_operations",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "i_size_read",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "__stime64_scale32_floor",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "mark_inode_dirty",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_202"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "log",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "__stime64_scale64_floor",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "nop_mnt_idmap",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "inode_get_ctime_sec",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "inode_set_atime_to_ts",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "from_kuid",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_833",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "d_inode",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "inode_newsize_ok",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_192"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "IS_ERR",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_823"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "truncate_inode_pages_final",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_467"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "M_KMALLOC",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_831"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "vrele",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_202",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "mark_buffer_dirty",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_symlink_inode_ops",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_833"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "sb_bread",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_804",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_file_operations",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "sb_bread",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "log",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_822"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_mount.pacmanfs_super_operations",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "truncate_setsize",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_dir_operations",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_804",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_804",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_823"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "init_user_ns",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_184"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_833",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_823"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_833",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_822"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "lkpi_brelse",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "copy_to_user",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "inode_set_mtime_to_ts",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "from_kgid",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_823"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "clear_inode",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_202"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_833",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "d_instantiate",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "mark_inode_dirty",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_823"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "mark_buffer_dirty",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_831"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "mark_buffer_dirty",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_192"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_822",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "compart_192",
+                "type": "compartment"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "ihold",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_831"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "iput",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "nop_mnt_idmap",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "inode_get_mtime_sec",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "setattr_copy",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_mount.pacmanfs_super_operations",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "nop_mnt_idmap",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_831"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "inode_dec_link_count",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_819"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "ck_pr_barrier",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "lkpi_brelse",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_184"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "iget_locked",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_822"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "expect",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_192"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "expect",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_202"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "expect",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "strlen",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "strcmp",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_192"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "strcmp",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_831"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "memset",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_192"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "memset",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "memset",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_833"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "memcpy",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_184"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "memcpy",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_202"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "memcpy",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_804"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "memcpy",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "memcpy",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_823"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "memcpy",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_824"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "memcpy",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_832"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "memcpy",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_202"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "sb_bread",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_184"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "sb_bread",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_192"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "get_nth_block",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_192"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "sb_bread",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_192"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "memcpy",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_821"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_init.pacmanfs_type",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_821"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "pacmanfs_init.pacmanfs_type",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_822"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "pacmanfs_fill_super",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_mount.pacmanfs_super_operations",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "pacmanfs_mount.pacmanfs_super_operations",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_823"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "sb_bread",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_819"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "M_KMALLOC",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_819"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "M_KMALLOC",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "M_KMALLOC",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_825"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "M_KMALLOC",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_821"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_type",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_821"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "pacmanfs_type",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "r",
+            "object": {
+                "name": "pacmanfs_super_operations",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_817"
+            },
+            "permissions": "w",
+            "object": {
+                "name": "pacmanfs_super_operations",
+                "type": "symbol"
+            }
+        }
+
+    ]
+}
