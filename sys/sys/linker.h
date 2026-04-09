@@ -45,6 +45,8 @@ struct mod_depend;
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 struct thread;
 struct compartment;
+struct kinfo_cheri_kc18n_compart;
+struct sysctl_req;
 #endif
 
 /*
@@ -219,6 +221,8 @@ int linker_ddb_symbol_values(c_linker_sym_t _sym, linker_symval_t *_symval);
 int linker_ddb_search_symbol_name(ptraddr_t value, char *buf, u_int buflen,
 				  long *offset);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+unsigned int elf_compartments_kinfo_count(linker_file_t lf);
+ssize_t elf_compartments_kinfo_out(linker_file_t lf, struct sysctl_req *req);
 void elf_ddb_kldstat_compartments(linker_file_t lf);
 void elf_ddb_show_compartment_symbols(elf_compartment_t ec);
 #endif

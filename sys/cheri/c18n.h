@@ -113,6 +113,13 @@ struct kinfo_cheri_c18n_compart {
 	char		kccc_name[CHERI_C18N_COMPART_MAXNAME];
 };
 
+struct kinfo_cheri_kc18n_compart {
+	size_t		kckc_structsize;
+	size_t		kckc_id;
+	uint8_t		kckc_executive : 1;
+	char		kckc_name[CHERI_C18N_COMPART_MAXNAME];
+};
+
 #ifndef IN_RTLD
 #undef _Atomic
 #endif

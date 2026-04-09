@@ -14,6 +14,7 @@ SRCS=	_secure_path.c auth.c cpuset.c expand_number.c flopen.c fparseln.c \
 	hexdump.c humanize_number.c kinfo_getfile.c \
 	kinfo_getallproc.c kinfo_getproc.c kinfo_getvmmap.c \
 	kinfo_getvmobject.c kld.c \
+	kinfo_getcheri_kc18n_compart.c \
 	login_auth.c login_cap.c \
 	login_class.c login_crypt.c login_ok.c login_times.c login_tty.c \
 	mntopts.c \

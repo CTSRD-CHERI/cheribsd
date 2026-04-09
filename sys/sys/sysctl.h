@@ -1023,6 +1023,11 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	KERN_MAXPHYS		38	/* int: MAXPHYS value */
 #define	KERN_LOCKF		39	/* struct: lockf reports */
 /*
+ * CHERI-specific KERN subtypes
+ */
+#define	KERN_KC18N_COMPARTS	100
+
+/*
  * KERN_PROC subtypes
  */
 #define	KERN_PROC_ALL		0	/* everything */

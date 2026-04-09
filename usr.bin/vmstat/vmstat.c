@@ -47,6 +47,8 @@
 
 #include <vm/vm_param.h>
 
+#include <cheri/c18n.h>
+
 #include <ctype.h>
 #include <devstat.h>
 #include <errno.h>
@@ -170,6 +172,7 @@ static kvm_t	*kd;
 #define	VMSTAT		0x20
 #define	ZMEMSTAT	0x40
 #define	OBJSTAT		0x80
+#define	COMPARTMENTS	0x100
 
 static void	cpustats(void);
 static void	pcpustats(u_long, int);
@@ -179,6 +182,7 @@ static void	dointr(unsigned int, int);
 static void	doobjstat(void);
 static void	dosum(void);
 static void	dovmstat(unsigned int, int);
+static void	docompartments(void);
 static void	domemstat_malloc(void);
 static void	domemstat_zone(void);
 static void	kread(int, void *, size_t);
@@ -215,7 +219,7 @@ main(int argc, char *argv[])
 
 	hflag = isatty(1);
 
-	while ((c = getopt(argc, argv, "ac:fhHiM:mN:n:oPp:sw:z")) != -1) {
+	while ((c = getopt(argc, argv, "ac:fhHiM:kmN:n:oPp:sw:z")) != -1) {
 		switch (c) {
 		case 'a':
 			aflag++;
@@ -237,6 +241,9 @@ main(int argc, char *argv[])
 			break;
 		case 'i':
 			todo |= INTRSTAT;
+			break;
+		case 'k':
+			todo |= COMPARTMENTS;
 			break;
 		case 'M':
 			memf = optarg;
@@ -385,6 +392,8 @@ nlist_ok:
 		dointr(interval, reps);
 	if (todo & VMSTAT)
 		dovmstat(interval, reps);
+	if (todo & COMPARTMENTS)
+		docompartments();
 	xo_close_container("vmstat");
 	if (xo_finish() < 0)
 		xo_err(EXIT_FAILURE, "stdout");
@@ -1570,6 +1579,17 @@ display_object(struct kinfo_vmobject *kvo)
 }
 
 static void
+display_compartment(struct kinfo_cheri_kc18n_compart *kckc)
+{
+
+	xo_open_instance("compartment");
+	xo_emit("{:id/%5ju} ", (uintmax_t)kckc->kckc_id);
+	xo_emit("{:flags/%s} ", kckc->kckc_executive ? "E" : "-");
+	xo_emit("{:name/%-s}\n", kckc->kckc_name);
+	xo_close_instance("compartment");
+}
+
+static void
 doobjstat(void)
 {
 	struct kinfo_vmobject *kvo;
@@ -1587,6 +1607,25 @@ doobjstat(void)
 		display_object(&kvo[i]);
 	free(kvo);
 	xo_close_list("object");
+}
+
+static void
+docompartments(void)
+{
+	struct kinfo_cheri_kc18n_compart *kckc;
+	int cnt, i;
+
+	kckc = kinfo_getcheri_kc18n_compart(&cnt);
+	if (kckc == NULL) {
+		xo_warn("Failed to fetch kernel compartments list");
+		return;
+	}
+	xo_emit("{T:ID/%s} {T:FLAGS/%s} {T:NAME/%s}\n");
+	xo_open_list("compartment");
+	for (i = 0; i < cnt; i++)
+		display_compartment(&kckc[i]);
+	free(kckc);
+	xo_close_list("compartment");
 }
 
 /*
@@ -1631,7 +1670,7 @@ static void __dead2
 usage(void)
 {
 	xo_error("%s%s",
-	    "usage: vmstat [-afHhimoPsz] [-M core [-N system]] [-c count] [-n devs]\n",
+	    "usage: vmstat [-afHhikmoPsz] [-M core [-N system]] [-c count] [-n devs]\n",
 	    "              [-p type,if,pass] [-w wait] [disks] [wait [count]]\n");
 	if (xo_finish() < 0)
 		xo_err(EXIT_FAILURE, "stdout");
