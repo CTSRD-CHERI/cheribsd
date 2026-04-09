@@ -54,6 +54,10 @@
 #include <machine/elf.h>
 #include <machine/md_var.h>
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#include <cheri/c18n.h>
+#endif
+
 #ifdef DDB
 #include <ddb/ddb.h>
 #endif
@@ -2998,6 +3002,74 @@ elf_pcc_init(elf_pcc_t pcc, caddr_t base, size_t length)
 		return (false);
 	pcc->pcc = cap;
 	return (true);
+}
+
+unsigned int
+elf_compartments_kinfo_count(linker_file_t lf)
+{
+	elf_file_t ef;
+
+	ef = (elf_file_t)lf;
+	return (1 /* default */ + ef->ncompartments);
+}
+
+static ssize_t
+elf_compartment_kinfo_out(linker_file_t lf, elf_compartment_t ec,
+    struct sysctl_req *req)
+{
+	elf_file_t ef;
+	struct kinfo_cheri_kc18n_compart kckc;
+	ssize_t len;
+	int error;
+
+	ef = (elf_file_t)lf;
+	bzero(&kckc, sizeof(kckc));
+
+	kckc.kckc_executive = 0;
+	if (ec == &ef->defcompartment) {
+		if (ef == (elf_file_t)linker_kernel_file)
+			kckc.kckc_executive = 1;
+		snprintf(kckc.kckc_name, sizeof(kckc.kckc_name), "%s",
+		    ec->filename);
+	} else {
+		snprintf(kckc.kckc_name, sizeof(kckc.kckc_name), "%s:%s",
+		    ec->filename, ec->name);
+	}
+
+	len = offsetof(struct kinfo_cheri_kc18n_compart, kckc_name) +
+	    strlen(kckc.kckc_name) + 1;
+	len = roundup2(len, _Alignof(struct kinfo_cheri_kc18n_compart));
+	kckc.kckc_structsize = len;
+	kckc.kckc_id = ec->id;
+
+	/* Copy out userspace structure. */
+	error = SYSCTL_OUT(req, &kckc, len);
+	if (error != 0)
+		return (error);
+
+	return (0);
+}
+
+ssize_t
+elf_compartments_kinfo_out(linker_file_t lf, struct sysctl_req *req)
+{
+	elf_file_t ef;
+	elf_compartment_t ec;
+	unsigned int ii;
+	int error;
+
+	ef = (elf_file_t)lf;
+	ec = &ef->defcompartment;
+	error = elf_compartment_kinfo_out(lf, ec, req);
+	if (error != 0)
+		return (error);
+	for (ii = 0; ii < ef->ncompartments; ii++) {
+		ec = &ef->compartments[ii];
+		error = elf_compartment_kinfo_out(lf, ec, req);
+		if (error != 0)
+			return (error);
+	}
+	return (0);
 }
 
 #ifdef DDB

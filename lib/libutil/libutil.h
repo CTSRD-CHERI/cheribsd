@@ -107,6 +107,8 @@ struct kinfo_vmentry *
 	kinfo_getvmmap(pid_t _pid, int *_cntp);
 struct kinfo_vmobject *
 	kinfo_getvmobject(int *_cntp);
+struct kinfo_cheri_kc18n_compart *
+	kinfo_getcheri_kc18n_compart(int *cntp);
 struct kinfo_vmobject *
 	kinfo_getswapvmobject(int *_cntp);
 struct kinfo_proc *

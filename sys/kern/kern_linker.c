@@ -54,6 +54,8 @@
 #include <sys/sysproto.h>
 #include <sys/vnode.h>
 
+#include <cheri/c18n.h>
+
 #ifdef DDB
 #include <ddb/ddb.h>
 #endif
@@ -2526,6 +2528,41 @@ SYSCTL_PROC(_kern, OID_AUTO, function_list,
     CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
     sysctl_kern_function_list, "",
     "kernel function list");
+
+static int
+sysctl_kern_kc18n_compartments(SYSCTL_HANDLER_ARGS)
+{
+	linker_file_t lf;
+	unsigned int ncompartments;
+	int error;
+
+	/*
+	 * If the old pointer is NULL, output the number of compartments.
+	 */
+	if (req->oldptr == NULL) {
+		ncompartments = 0;
+		TAILQ_FOREACH(lf, &linker_files, link) {
+			ncompartments += elf_compartments_kinfo_count(lf);
+		}
+		error = SYSCTL_OUT(req, NULL, ncompartments *
+		    sizeof(struct kinfo_cheri_kc18n_compart));
+		goto out;
+	}
+
+	TAILQ_FOREACH(lf, &linker_files, link) {
+		error = elf_compartments_kinfo_out(lf, req);
+		if (error != 0)
+			return (error);
+	}
+
+out:
+	return (error);
+}
+
+static SYSCTL_NODE(_kern, KERN_KC18N_COMPARTS, kc18n_compartments,
+	CTLFLAG_RD | CTLFLAG_MPSAFE, sysctl_kern_kc18n_compartments,
+	"Kernel compartment list");
+
 // CHERI CHANGES START
 // {
 //   "updated": 20230509,

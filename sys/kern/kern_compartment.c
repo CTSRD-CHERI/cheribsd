@@ -48,6 +48,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/tree.h>
 
 #include <cheri/cheric.h>
+#include <cheri/c18n.h>
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -736,4 +737,5 @@ DB_SHOW_COMMAND(compartment, db_show_compartment)
 		elf_ddb_show_compartment_symbols(metadata->cm_elf_compartment);
 	}
 }
+
 #endif /* DDB */
