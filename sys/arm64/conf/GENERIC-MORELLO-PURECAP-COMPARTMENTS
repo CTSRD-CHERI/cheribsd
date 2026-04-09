@@ -30,3 +30,6 @@ nodevice	mxge		# Myricom Myri-10G 10GbE NIC
 
 # Do not compile in the em driver that we dynamically load.
 nodevice	em
+
+# Cannot currently mark a module as executive
+device		vmm
