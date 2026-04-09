@@ -586,8 +586,8 @@ static int pacmanfs_open(struct inode *inode, struct file *f)
 	return 0;
 }
 
-static ssize_t pacmanfs_read(struct file *filp, char __user *buf, size_t len,
-			     loff_t *ppos)
+static ssize_t pacmanfs_read(struct file *filp, char __user * __capability buf,
+			     size_t len, loff_t *ppos)
 {
 	struct inode *inode = file_inode(filp);
 	ace2_syncpoint("PACMANFS_EXP1", "inode = %p\n", inode->i_private);
@@ -609,7 +609,7 @@ static ssize_t pacmanfs_read(struct file *filp, char __user *buf, size_t len,
 	loff_t i = (*ppos) / PACMANFS_BLOCKSIZE;
 	size_t have_read = 0;
 	loff_t offset = (*ppos) % PACMANFS_BLOCKSIZE;
-	char __user * __capability current_buf = (__cheri_tocap char * __capability)buf;
+	char __user * __capability current_buf = buf;
 	while (to_read > 0 && (block = get_nth_block(inode, i))) {
 		// Read data block
 		if (!(bh = sb_bread(sb, block))) {
@@ -633,8 +633,9 @@ static ssize_t pacmanfs_read(struct file *filp, char __user *buf, size_t len,
 	return have_read;
 }
 
-static ssize_t pacmanfs_write(struct file *filp, const char __user *buf,
-			      size_t len, loff_t *ppos)
+static ssize_t pacmanfs_write(struct file *filp,
+			      const char __user * __capability buf, size_t len,
+			      loff_t *ppos)
 {
 	struct inode *inode = file_inode(filp);
 	struct super_block *sb = inode->i_sb;
@@ -664,7 +665,7 @@ static ssize_t pacmanfs_write(struct file *filp, const char __user *buf,
 	int i = (*ppos) / PACMANFS_BLOCKSIZE;
 	size_t have_written = 0;
 	loff_t offset = (*ppos) % PACMANFS_BLOCKSIZE;
-	const char __user * __capability current_buf = (__cheri_tocap const char * __capability)buf;
+	const char __user * __capability current_buf = buf;
 	struct buffer_head *block_bh;
 	while (to_write > 0 && (block = get_nth_block(inode, i))) {
 		// Read data block
