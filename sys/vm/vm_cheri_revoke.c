@@ -692,7 +692,7 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc,
 
 		last_timestamp = map->timestamp;
 		vm_map_unlock_read(map);
-		res = vm_fault(map, addr, VM_PROT_READ | VM_PROT_READ_CAP,
+		res = vm_fault(map, addr, VM_PROT_READ | VM_PROT_CAP,
 		    VM_FAULT_NOFILL, &m);
 		vm_map_lock_read(map);
 
@@ -791,7 +791,7 @@ visit_rw_fault:
 	VM_OBJECT_ASSERT_UNLOCKED(obj);
 	m = NULL;
 
-	res = vm_fault(map, addr, VM_PROT_WRITE | VM_PROT_WRITE_CAP,
+	res = vm_fault(map, addr, VM_PROT_WRITE | VM_PROT_CAP,
 	    VM_FAULT_NORMAL, &m);
 	vm_map_lock_read(map);
 	if (res != KERN_SUCCESS) {
@@ -951,7 +951,7 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc,
 	 * Specifically, if one of the following applies:
 	 * 1. OBJ_NOCAP is set (which implies it is set in backing objects), as
 	 *    is the case for the quarantine bitmap,
-	 * 2. the mapping cannot acquire PROT_READ_CAP permission for the rest
+	 * 2. the mapping cannot acquire PROT_CAP permission for the rest
 	 *    of its existence,
 	 * 3. OBJ_HASCAP is unset, meaning that the object and its backing
 	 *    object cannot bear capabilities,
@@ -963,7 +963,7 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc,
 	flags = atomic_load_int(&obj->flags);
 	if ((flags & OBJ_NOCAP) != 0)
 		goto fini;
-	if ((entry->max_protection & VM_PROT_READ_CAP) == 0) {
+	if ((entry->max_protection & VM_PROT_CAP) == 0) {
 		counter_u64_add(cheri_skip_prot_no_readcap,
 		    atop(entry->end - *addr));
 		goto fini;
@@ -1131,7 +1131,7 @@ out:
 	if (pinned)
 		sched_unpin();
 
-	vm_map_lock(crc->map);
+	vm_map_lock(map);
 
 	return (res);
 }
@@ -1183,7 +1183,7 @@ vm_cheri_assert_consistent_clg(struct vm_map *map)
 	if (cheri_revoke_st_is_revoking(map->vm_cheri_revoke_st))
 		return;
 	VM_MAP_ENTRY_FOREACH(entry, map) {
-		if ((entry->max_protection & VM_PROT_READ_CAP) == 0)
+		if ((entry->max_protection & VM_PROT_CAP) == 0)
 			continue;
 		object = entry->object.vm_object;
 		if (object == NULL || (object->flags & OBJ_HASCAP) == 0 ||
@@ -1235,6 +1235,7 @@ vm_cheri_revoke_cookie_init(vm_map_t map, struct vm_cheri_revoke_cookie *crc)
 	    CHERI_PERM_LOAD | CHERI_PERM_GLOBAL,
 	    curproc->p_sysent->sv_cheri_revoke_shadow_base,
 	    curproc->p_sysent->sv_cheri_revoke_shadow_length,
+	    curproc->p_sysent->sv_cheri_revoke_shadow_base +
 	    curproc->p_sysent->sv_cheri_revoke_shadow_offset);
 
 	return (KERN_SUCCESS);
@@ -1380,8 +1381,8 @@ vm_cheri_revoke_publish_epochs(
 	    &info_page->pub.epochs;
 	int res __diagused;
 
-	res = copyoutcap(ip, target, sizeof(*target));
-	KASSERT(res == 0, ("%s: bad copyout %d\n", __func__, res));
+	res = copyout(ip, target, sizeof(*target));
+	KASSERT(res == 0, ("%s: bad copyout %d", __func__, res));
 }
 
 /*
@@ -1410,7 +1411,7 @@ vm_cheri_revoke_shadow_cap(struct sysentvec *sv, int sel, vm_offset_t base,
 		return (cheri_capability_build_user_data(
 		    (pmask & (CHERI_PERM_LOAD | CHERI_PERM_STORE)) |
 		    CHERI_PERM_GLOBAL,
-		    shadow_base, shadow_size, 0));
+		    shadow_base, shadow_size, shadow_base));
 	}
 	case CHERI_REVOKE_SHADOW_OTYPE: {
 		vm_offset_t shadow_base, shadow_size;
@@ -1429,13 +1430,20 @@ vm_cheri_revoke_shadow_cap(struct sysentvec *sv, int sel, vm_offset_t base,
 
 		return (cheri_capability_build_user_data(
 		    CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_GLOBAL,
-		    shadow_base, shadow_size, 0));
+		    shadow_base, shadow_size, shadow_base));
 	}
 	case CHERI_REVOKE_SHADOW_INFO_STRUCT: {
 		return (cheri_capability_build_user_data(
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 		    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | CHERI_PERM_GLOBAL,
+#elif defined(HAS_CHERI_PERM_CAP)
+		    CHERI_PERM_LOAD | CHERI_PERM_CAP | CHERI_PERM_GLOBAL,
+#else
+#error "Missing LOAD_CAP permission"
+#endif
 		    sv->sv_cheri_revoke_info_page,
-		    sizeof(struct cheri_revoke_info), 0));
+		    sizeof(struct cheri_revoke_info),
+		    sv->sv_cheri_revoke_info_page));
 	}
 	case CHERI_REVOKE_SHADOW_NOVMEM_ENTIRE: {
 		vm_offset_t shadow_base, shadow_size;
@@ -1447,7 +1455,7 @@ vm_cheri_revoke_shadow_cap(struct sysentvec *sv, int sel, vm_offset_t base,
 
 		return (cheri_capability_build_user_data(
 		    CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_GLOBAL,
-		    shadow_base, shadow_size, 0));
+		    shadow_base, shadow_size, shadow_base));
 	}
 	default:
 		return ((void * __capability)(uintptr_t)EINVAL);
@@ -1462,9 +1470,17 @@ vm_cheri_revoke_info_page(struct vm_map *map, struct sysentvec *sv,
 	    ("vm_cheri_revoke_page_info req. intraprocess work right now"));
 
 	*ifp = cheri_capability_build_user_data(CHERI_PERM_LOAD |
-	    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+	    CHERI_PERM_STORE |
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
+	    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
+#elif defined(HAS_CHERI_PERM_CAP)
+	    CHERI_PERM_CAP |
+#else
+#error "Missing LOAD/STORE CAP permission"
+#endif
 	    CHERI_PERM_GLOBAL,
-	    sv->sv_cheri_revoke_info_page, PAGE_SIZE, 0);
+	    sv->sv_cheri_revoke_info_page, PAGE_SIZE,
+	    sv->sv_cheri_revoke_info_page);
 }
 
 void
@@ -1474,7 +1490,7 @@ vm_cheri_revoke_cap(const struct vm_cheri_revoke_cookie *crc, uintcap_t *p)
 
 	uintcap_t v = *p;
 
-	if (!cheri_gettag(v))
+	if (!cheri_tag_get(v))
 		return;
 
 	CHERI_REVOKE_STATS_BUMP(crst, caps_found);

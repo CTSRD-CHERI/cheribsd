@@ -453,38 +453,38 @@ fill_capregs(struct thread *td, struct capreg *regs)
 
 	for (i = 0; i < nitems(frame->tf_x); i++) {
 		regs->c[i] = frame->tf_x[i];
-		if (cheri_gettag((void * __capability)frame->tf_x[i]))
+		if (cheri_tag_get((void * __capability)frame->tf_x[i]))
 			regs->tagmask |= (uint64_t)1 << i;
 	}
-	if (cheri_gettag((void * __capability)frame->tf_lr))
+	if (cheri_tag_get((void * __capability)frame->tf_lr))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)frame->tf_sp))
+	if (cheri_tag_get((void * __capability)frame->tf_sp))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)frame->tf_elr))
+	if (cheri_tag_get((void * __capability)frame->tf_elr))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)frame->tf_ddc))
+	if (cheri_tag_get((void * __capability)frame->tf_ddc))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)regs->ctpidr))
+	if (cheri_tag_get((void * __capability)regs->ctpidr))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)regs->ctpidrro))
+	if (cheri_tag_get((void * __capability)regs->ctpidrro))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)regs->cid))
+	if (cheri_tag_get((void * __capability)regs->cid))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
 #ifndef CHERI_COMPARTMENTALIZE_KERNEL
-	if (cheri_gettag((void * __capability)regs->rcsp))
+	if (cheri_tag_get((void * __capability)regs->rcsp))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)regs->rddc))
+	if (cheri_tag_get((void * __capability)regs->rddc))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)regs->rctpidr))
+	if (cheri_tag_get((void * __capability)regs->rctpidr))
 		regs->tagmask |= (uint64_t)1 << i;
 #endif
 
@@ -498,16 +498,16 @@ derive_capreg(uintcap_t reg, uintcap_t in, uintcap_t *out)
 	void * __capability cap;
 	int otype;
 
-	if (!cheri_gettag(reg))
+	if (!cheri_tag_get(reg))
 		return (false);
 
-	if (cheri_equal_exact(cheri_cleartag(reg), in)) {
+	if (cheri_is_equal_exact(cheri_tag_clear(reg), in)) {
 		*out = reg;
 		return (true);
 	}
 
 	/* The only sealed caps that can be derived are sentries. */
-	otype = cheri_gettype(in);
+	otype = cheri_type_get(in);
 	switch (otype) {
 	case CHERI_OTYPE_UNSEALED:
 	case CHERI_OTYPE_SENTRY:
@@ -516,10 +516,10 @@ derive_capreg(uintcap_t reg, uintcap_t in, uintcap_t *out)
 		return (false);
 	}
 
-	cap = cheri_buildcap((void * __capability)reg, in);
+	cap = cheri_cap_build((void * __capability)reg, in);
 	if (otype == CHERI_OTYPE_SENTRY)
-		cap = cheri_sealentry(cap);
-	if (cheri_gettag(cap)) {
+		cap = cheri_sentry_create(cap);
+	if (cheri_tag_get(cap)) {
 		*out = (uintcap_t)cap;
 		return (true);
 	}
@@ -565,7 +565,7 @@ set_capreg(struct thread *td, u_int idx, uint64_t tagmask, uintcap_t old,
 		return (true);
 	}
 
-	if (cheri_gettag(old) && cheri_equal_exact(cheri_cleartag(old), new)) {
+	if (cheri_tag_get(old) && cheri_is_equal_exact(cheri_tag_clear(old), new)) {
 		/* Preserve unchanged registers. */
 		*out = old;
 		return (true);
@@ -786,7 +786,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	tf->tf_sp = mcp->mc_capregs.cap_sp;
 	tf->tf_lr = mcp->mc_capregs.cap_lr;
 	if (SV_PROC_FLAG(td->td_proc, SV_UNBOUND_PCC))
-		tf->tf_elr = cheri_setaddress(tf->tf_elr,
+		tf->tf_elr = cheri_address_set(tf->tf_elr,
 		    (__cheri_addr ptraddr_t)mcp->mc_capregs.cap_elr);
 	else
 		trapframe_set_elr(tf, mcp->mc_capregs.cap_elr);
@@ -1007,7 +1007,7 @@ sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 	ucontext_t uc;
 	int error;
 
-	if (copyincap(uap->sigcntxp, &uc, sizeof(uc)))
+	if (copyinptr(uap->sigcntxp, &uc, sizeof(uc)))
 		return (EFAULT);
 
 	/* Stop an interrupt from causing the sve state to be dropped */
@@ -1161,7 +1161,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	fp = (struct sigframe * __capability)STACKALIGN(fp);
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyoutcap(&frame, fp, sizeof(*fp)) != 0) {
+	if (copyoutptr(&frame, fp, sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td,
 		    (__cheri_fromcap void *)fp);
@@ -1171,9 +1171,9 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	tf->tf_x[0] = sig;
 #if __has_feature(capabilities)
-	tf->tf_x[1] = (uintcap_t)cheri_setbounds(&fp->sf_si,
+	tf->tf_x[1] = (uintcap_t)cheri_bounds_set(&fp->sf_si,
 	    sizeof(fp->sf_si));
-	tf->tf_x[2] = (uintcap_t)cheri_setbounds(&fp->sf_uc,
+	tf->tf_x[2] = (uintcap_t)cheri_bounds_set(&fp->sf_uc,
 	    sizeof(fp->sf_uc));
 #else
 	tf->tf_x[1] = (register_t)&fp->sf_si;

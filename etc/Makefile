@@ -71,7 +71,7 @@ distribution:
 .if ${MK_KERBEROS} != "no"
 	cd ${.CURDIR}/root; \
 	    ${INSTALL} -o ${BINOWN} -g ${BINGRP} -m 644 \
-		-T "package=runtime" \
+		-T "package=runtime,config" \
 		dot.k5login ${DESTDIR}/root/.k5login;
 .endif
 
@@ -116,10 +116,10 @@ MTREES+=	mtree/BSD.pkg${libcompat}.dist	/
 .endfor
 .if ${MK_TESTS} != "no"
 MTREES+=	mtree/BSD.tests.dist		${TESTSBASE}
-MTREES+=	mtree/BSD.tests.dist		/usr/lib/debug/${TESTSBASE}
+MTREES+=	mtree/BSD.tests.dist		/usr/lib/debug${TESTSBASE}
 .if ${MK_LIB64C} != "no"
 MTREES+=	mtree/BSD.tests.dist		${TESTSBASE}/cheri
-MTREES+=	mtree/BSD.tests.dist		/usr/lib/debug/${TESTSBASE}/cheri
+MTREES+=	mtree/BSD.tests.dist		/usr/lib/debug${TESTSBASE}/cheri
 .endif
 .endif
 .if ${MK_SENDMAIL} != "no"

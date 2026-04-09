@@ -43,8 +43,6 @@
 #define	STACKALIGNBYTES	(16 - 1)
 #define	STACKALIGN(p)	(__builtin_align_down((p), STACKALIGNBYTES + 1))
 
-#define	__PCI_REROUTE_INTERRUPT
-
 #ifndef MACHINE
 #define	MACHINE		"arm64"
 #endif

@@ -3273,6 +3273,8 @@ kern___realpathat(struct thread *td, int fd, const char * __capability path,
 
 	if (nd.ni_vp->v_type == VREG && nd.ni_dvp->v_type != VDIR &&
 	    (nd.ni_vp->v_vflag & VV_ROOT) != 0) {
+		struct vnode *covered_vp;
+
 		/*
 		 * This happens if vp is a file mount. The call to
 		 * vn_fullpath_hardlink can panic if path resolution can't be
@@ -3282,7 +3284,6 @@ kern___realpathat(struct thread *td, int fd, const char * __capability path,
 		 * this should have a unique global path since we disallow
 		 * mounting on linked files.
 		 */
-		struct vnode *covered_vp;
 		error = vn_lock(nd.ni_vp, LK_SHARED);
 		if (error != 0)
 			goto out;
@@ -3292,11 +3293,20 @@ kern___realpathat(struct thread *td, int fd, const char * __capability path,
 		error = vn_fullpath(covered_vp, &retbuf, &freebuf);
 		vrele(covered_vp);
 	} else {
-		error = vn_fullpath_hardlink(nd.ni_vp, nd.ni_dvp, nd.ni_cnd.cn_nameptr,
-		    nd.ni_cnd.cn_namelen, &retbuf, &freebuf, &size);
+		error = vn_fullpath_hardlink(nd.ni_vp, nd.ni_dvp,
+		    nd.ni_cnd.cn_nameptr, nd.ni_cnd.cn_namelen, &retbuf,
+		    &freebuf, &size);
 	}
 	if (error == 0) {
-		error = copyout(retbuf, buf, size);
+		size_t len;
+
+		len = strlen(retbuf) + 1;
+		if (size < len)
+			error = ENAMETOOLONG;
+		else if (pathseg == UIO_USERSPACE)
+			error = copyout(retbuf, buf, len);
+		else
+			memcpy((__cheri_fromcap char *)buf, retbuf, len);
 		free(freebuf, M_TEMP);
 	}
 out:
@@ -4461,7 +4471,7 @@ cache_fpl_terminated(struct cache_fpl *fpl)
 	(NC_NOMAKEENTRY | NC_KEEPPOSENTRY | LOCKLEAF | LOCKPARENT | WANTPARENT | \
 	 FAILIFEXISTS | FOLLOW | EMPTYPATH | LOCKSHARED | ISRESTARTED | WILLBEDIR | \
 	 ISOPEN | NOMACCHECK | AUDITVNODE1 | AUDITVNODE2 | NOCAPCHECK | OPENREAD | \
-	 OPENWRITE | WANTIOCTLCAPS)
+	 OPENWRITE | WANTIOCTLCAPS | OPENNAMED)
 
 #define CACHE_FPL_INTERNAL_CN_FLAGS \
 	(ISDOTDOT | MAKEENTRY | ISLASTCN)
@@ -4522,6 +4532,10 @@ cache_can_fplookup(struct cache_fpl *fpl)
 		return (false);
 	}
 	if (ndp->ni_startdir != NULL) {
+		cache_fpl_aborted_early(fpl);
+		return (false);
+	}
+	if ((cnp->cn_flags & OPENNAMED) != 0) {
 		cache_fpl_aborted_early(fpl);
 		return (false);
 	}

@@ -768,11 +768,11 @@ pci_conf_io_init(struct pci_conf_io *cio, caddr_t data, u_long cmd)
 		cio32 = (struct pci_conf_io32 *)data;
 		cio->pat_buf_len = cio32->pat_buf_len;
 		cio->num_patterns = cio32->num_patterns;
-		cio->patterns = __USER_CAP((void *)(uintptr_t)cio32->patterns,
+		cio->patterns = USER_PTR((void *)(uintptr_t)cio32->patterns,
 		    cio32->pat_buf_len);
 		cio->match_buf_len = cio32->match_buf_len;
 		cio->num_matches = cio32->num_matches;
-		cio->matches = __USER_CAP((void *)(uintptr_t)cio32->matches,
+		cio->matches = USER_PTR((void *)(uintptr_t)cio32->matches,
 		    cio32->match_buf_len);
 		cio->offset = cio32->offset;
 		cio->generation = cio32->generation;
@@ -785,11 +785,11 @@ pci_conf_io_init(struct pci_conf_io *cio, caddr_t data, u_long cmd)
 		cio64 = (struct pci_conf_io64 *)data;
 		cio->pat_buf_len = cio64->pat_buf_len;
 		cio->num_patterns = cio64->num_patterns;
-		cio->patterns = __USER_CAP((void *)(uintptr_t)cio64->patterns,
+		cio->patterns = USER_PTR((void *)(uintptr_t)cio64->patterns,
 		    cio64->pat_buf_len);
 		cio->match_buf_len = cio64->match_buf_len;
 		cio->num_matches = cio64->num_matches;
-		cio->matches = __USER_CAP((void *)(uintptr_t)cio64->matches,
+		cio->matches = USER_PTR((void *)(uintptr_t)cio64->matches,
 		    cio64->match_buf_len);
 		cio->offset = cio64->offset;
 		cio->generation = cio64->generation;
@@ -981,10 +981,10 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 	flags = MAP_SHARED;
 #if __has_feature(capabilities)
 	/* Enforce the same policy as for sys_mmap() */
-	if (cheri_gettag(pbm->pbm_map_base)) {
+	if (cheri_tag_get(pbm->pbm_map_base)) {
 		if ((pbm->pbm_flags & PCIIO_BAR_MMAP_FIXED) == 0)
 			return (EPROT);
-		if ((cheri_getperm(pbm->pbm_map_base) &
+		if ((cheri_perms_get(pbm->pbm_map_base) &
 		    CHERI_PERM_SW_VMEM) == 0)
 			return (EACCES);
 	} else {
@@ -1022,7 +1022,7 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 	}
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 	pbm->pbm_map_base = cheri_capability_build_user_data(
-	    vm_map_prot2perms(prot), addr, plen, 0);
+	    vm_prot2perms(0, prot), addr, plen, addr);
 #else
 	pbm->pbm_map_base = (void *)addr;
 #endif
@@ -1302,7 +1302,7 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 			 */
 			cio->status = PCI_GETCONF_ERROR;
 			error = EINVAL;
-                       goto getconfexit;
+			goto getconfexit;
 		}
 
 		/*
@@ -1504,7 +1504,7 @@ getconfexit:
 			lvio = &lvios;
 			lvio->plvi_sel = lvio64->plvi_sel;
 			lvio->plvi_len = lvio64->plvi_len;
-			lvio->plvi_data = __USER_CAP(lvio64->plvi_data,
+			lvio->plvi_data = USER_PTR(lvio64->plvi_data,
 			    lvio64->plvi_len);
 		} else
 #endif
@@ -1534,7 +1534,7 @@ getconfexit:
 		if (cmd == PCIOCBARMMAP64) {
 			pbm64 = (struct pci_bar_mmap64 *)data;
 			pbm = &pbms;
-			pbm->pbm_map_base = __USER_CAP(pbm64->pbm_map_base,
+			pbm->pbm_map_base = USER_PTR(pbm64->pbm_map_base,
 			    pbm64->pbm_map_length);
 			CP(*pbm64, pbms, pbm_map_length);
 			CP(*pbm64, pbms, pbm_bar_length);

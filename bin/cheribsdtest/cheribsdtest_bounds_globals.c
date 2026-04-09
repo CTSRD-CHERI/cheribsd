@@ -38,7 +38,6 @@
 #include <sys/sysctl.h>
 #include <sys/time.h>
 
-#include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
 #include <err.h>
@@ -92,15 +91,15 @@
 static void
 test_bounds_impl(void *__capability allocation, void *__capability global_ptr, size_t size)
 {
-	size_t allocation_offset = cheri_getoffset(allocation);
-	size_t allocation_len = cheri_getlen(allocation);
-	size_t pointer_offset = cheri_getoffset(global_ptr);
-	size_t pointer_len = cheri_getlen(global_ptr);
+	size_t allocation_offset = cheri_offset_get(allocation);
+	size_t allocation_len = cheri_length_get(allocation);
+	size_t pointer_offset = cheri_offset_get(global_ptr);
+	size_t pointer_len = cheri_length_get(global_ptr);
 	size_t rounded_size = CHERI_REPRESENTABLE_LENGTH(size);
 
 	/* Both the local cast and the global pointer should be tagged */
-	CHERIBSDTEST_VERIFY(cheri_gettag(allocation));
-	CHERIBSDTEST_VERIFY(cheri_gettag(global_ptr));
+	CHERIBSDTEST_VERIFY(cheri_tag_get(allocation));
+	CHERIBSDTEST_VERIFY(cheri_tag_get(global_ptr));
 
 	/* Global offset. */
 	if (allocation_offset != 0)

@@ -1059,6 +1059,46 @@ pdeathsig_status(struct thread *td, struct proc *p, void *data)
 	return (0);
 }
 
+static int
+logsigexit_ctl(struct thread *td, struct proc *p, void *data)
+{
+	int state;
+
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	state = *(int *)data;
+
+	switch (state) {
+	case PROC_LOGSIGEXIT_CTL_NOFORCE:
+		p->p_flag2 &= ~(P2_LOGSIGEXIT_CTL | P2_LOGSIGEXIT_ENABLE);
+		break;
+	case PROC_LOGSIGEXIT_CTL_FORCE_ENABLE:
+		p->p_flag2 |= P2_LOGSIGEXIT_CTL | P2_LOGSIGEXIT_ENABLE;
+		break;
+	case PROC_LOGSIGEXIT_CTL_FORCE_DISABLE:
+		p->p_flag2 |= P2_LOGSIGEXIT_CTL;
+		p->p_flag2 &= ~P2_LOGSIGEXIT_ENABLE;
+		break;
+	default:
+		return (EINVAL);
+	}
+	return (0);
+}
+
+static int
+logsigexit_status(struct thread *td, struct proc *p, void *data)
+{
+	int state;
+
+	if ((p->p_flag2 & P2_LOGSIGEXIT_CTL) == 0)
+		state = PROC_LOGSIGEXIT_CTL_NOFORCE;
+	else if ((p->p_flag2 & P2_LOGSIGEXIT_ENABLE) != 0)
+		state = PROC_LOGSIGEXIT_CTL_FORCE_ENABLE;
+	else
+		state = PROC_LOGSIGEXIT_CTL_FORCE_DISABLE;
+	*(int *)data = state;
+	return (0);
+}
+
 enum {
 	PCTL_SLOCKED,
 	PCTL_XLOCKED,
@@ -1072,7 +1112,7 @@ struct procctl_cmd_info {
 	bool copyout_on_error : 1;
 	bool no_nonnull_data : 1;
 	bool need_candebug : 1;
-	bool copyincap : 1;
+	bool copyinptr : 1;
 	int copyin_sz;
 	int copyout_sz;
 	int (*exec)(struct thread *, struct proc *, void *);
@@ -1108,7 +1148,7 @@ static const struct procctl_cmd_info procctl_cmds_info[] = {
 	    { .lock_tree = PCTL_SLOCKED, .one_proc = true,
 	      .esrch_is_einval = false, .no_nonnull_data = false,
 	      .need_candebug = false,
-	      .copyincap = true,
+	      .copyinptr = true,
 	      .copyin_sz = sizeof(struct procctl_reaper_pids),
 	      .copyout_sz = 0,
 	      .exec = reap_getpids, .copyout_on_error = false, },
@@ -1216,6 +1256,18 @@ static const struct procctl_cmd_info procctl_cmds_info[] = {
 	      .need_candebug = false,
 	      .copyin_sz = 0, .copyout_sz = sizeof(int),
 	      .exec = wxmap_status, .copyout_on_error = false, },
+	[PROC_LOGSIGEXIT_CTL] =
+	    { .lock_tree = PCTL_SLOCKED, .one_proc = true,
+	      .esrch_is_einval = false, .no_nonnull_data = false,
+	      .need_candebug = true,
+	      .copyin_sz = sizeof(int), .copyout_sz = 0,
+	      .exec = logsigexit_ctl, .copyout_on_error = false, },
+	[PROC_LOGSIGEXIT_STATUS] =
+	    { .lock_tree = PCTL_UNLOCKED, .one_proc = true,
+	      .esrch_is_einval = false, .no_nonnull_data = false,
+	      .need_candebug = false,
+	      .copyin_sz = 0, .copyout_sz = sizeof(int),
+	      .exec = logsigexit_status, .copyout_on_error = false, },
 #ifdef PROC_CHERI_C18N_CTL
 	[PROC_CHERI_C18N_CTL] =
 	    { .lock_tree = PCTL_UNLOCKED, .one_proc = true,
@@ -1267,8 +1319,8 @@ sys_procctl(struct thread *td, struct procctl_args *uap)
 	bzero(&x, sizeof(x));
 
 	if (cmd_info->copyin_sz > 0) {
-		if (cmd_info->copyincap)
-			error = copyincap(uap->data, &x, cmd_info->copyin_sz);
+		if (cmd_info->copyinptr)
+			error = copyinptr(uap->data, &x, cmd_info->copyin_sz);
 		else
 			error = copyin(uap->data, &x, cmd_info->copyin_sz);
 		if (error != 0)

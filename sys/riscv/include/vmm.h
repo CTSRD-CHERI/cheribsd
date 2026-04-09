@@ -49,6 +49,7 @@ enum vm_suspend_how {
 	VM_SUSPEND_RESET,
 	VM_SUSPEND_POWEROFF,
 	VM_SUSPEND_HALT,
+	VM_SUSPEND_DESTROY,
 	VM_SUSPEND_LAST
 };
 
@@ -102,11 +103,10 @@ enum vm_reg_name {
 #define	VM_INTINFO_HWEXCEPTION	(3 << 8)
 #define	VM_INTINFO_SWINTR	(4 << 8)
 
+#define	VM_MAX_NAMELEN	32
 #define VM_MAX_SUFFIXLEN 15
 
 #ifdef _KERNEL
-
-#define	VM_MAX_NAMELEN	32
 
 struct vm;
 struct vm_exception;
@@ -131,38 +131,6 @@ void vm_unlock_vcpus(struct vm *vm);
 void vm_destroy(struct vm *vm);
 int vm_reinit(struct vm *vm);
 const char *vm_name(struct vm *vm);
-
-/*
- * APIs that modify the guest memory map require all vcpus to be frozen.
- */
-void vm_slock_memsegs(struct vm *vm);
-void vm_xlock_memsegs(struct vm *vm);
-void vm_unlock_memsegs(struct vm *vm);
-int vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, vm_ooffset_t off,
-    size_t len, int prot, int flags);
-int vm_munmap_memseg(struct vm *vm, vm_paddr_t gpa, size_t len);
-int vm_alloc_memseg(struct vm *vm, int ident, size_t len, bool sysmem);
-void vm_free_memseg(struct vm *vm, int ident);
-
-/*
- * APIs that inspect the guest memory map require only a *single* vcpu to
- * be frozen. This acts like a read lock on the guest memory map since any
- * modification requires *all* vcpus to be frozen.
- */
-int vm_mmap_getnext(struct vm *vm, vm_paddr_t *gpa, int *segid,
-    vm_ooffset_t *segoff, size_t *len, int *prot, int *flags);
-int vm_get_memseg(struct vm *vm, int ident, size_t *len, bool *sysmem,
-    struct vm_object **objptr);
-vm_paddr_t vmm_sysmem_maxaddr(struct vm *vm);
-void *vm_gpa_hold(struct vcpu *vcpu, vm_paddr_t gpa, size_t len,
-    int prot, void **cookie);
-void *vm_gpa_hold_global(struct vm *vm, vm_paddr_t gpa, size_t len,
-    int prot, void **cookie);
-void vm_gpa_release(void *cookie);
-bool vm_mem_allocated(struct vcpu *vcpu, vm_paddr_t gpa);
-
-int vm_gla2gpa_nofault(struct vcpu *vcpu, struct vm_guest_paging *paging,
-    uint64_t gla, int prot, uint64_t *gpa, int *is_fault);
 
 uint16_t vm_get_maxcpus(struct vm *vm);
 void vm_get_topology(struct vm *vm, uint16_t *sockets, uint16_t *cores,
@@ -244,6 +212,8 @@ vcpu_should_yield(struct vcpu *vcpu)
 
 void *vcpu_stats(struct vcpu *vcpu);
 void vcpu_notify_event(struct vcpu *vcpu);
+struct vmspace *vm_vmspace(struct vm *vm);
+struct vm_mem *vm_mem(struct vm *vm);
 
 enum vm_reg_name vm_segment_name(int seg_encoding);
 
@@ -276,6 +246,7 @@ struct vre {
  */
 enum vm_cap_type {
 	VM_CAP_UNRESTRICTED_GUEST,
+	VM_CAP_SSTC,
 	VM_CAP_MAX
 };
 

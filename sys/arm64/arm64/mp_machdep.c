@@ -58,6 +58,7 @@
 
 #include <machine/machdep.h>
 #include <machine/cpu.h>
+#include <machine/cpu_feat.h>
 #include <machine/debug_monitor.h>
 #include <machine/intr.h>
 #include <machine/smp.h>
@@ -92,6 +93,7 @@ static struct {
 } fdt_quirks[] = {
 	{ "arm,foundation-aarch64",	MP_QUIRK_CPULIST },
 	{ "arm,fvp-base",		MP_QUIRK_CPULIST },
+	{ "arm,fvp-base-revc",		MP_QUIRK_CPULIST },
 	/* This is incorrect in some DTS files */
 	{ "arm,vfp-base",		MP_QUIRK_CPULIST },
 	{ NULL, 0 },
@@ -122,6 +124,10 @@ uint64_t ap_cpuid;
 /* Stacks for AP initialization, discarded once idle threads are started. */
 void *bootstack;
 static void *bootstacks[MAXCPU];
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+void *resbootstack;
+static void *resbootstacks[MAXCPU];
+#endif
 
 /* Count of started APs, used to synchronize access to bootstack. */
 static volatile int aps_started;
@@ -229,6 +235,9 @@ init_secondary(uint64_t cpu)
 	/* Ensure the stores in identify_cpu have completed */
 	atomic_thread_fence_acq_rel();
 
+	/* Detect early CPU feature support */
+	enable_cpu_feat(CPU_FEAT_EARLY_BOOT);
+
 	/* Signal the BSP and spin until it has released all APs. */
 	atomic_add_int(&aps_started, 1);
 	while (!atomic_load_int(&aps_ready))
@@ -253,6 +262,7 @@ init_secondary(uint64_t cpu)
 	PCPU_REF_SET(pcpup, curpmap, pmap0);
 
 	install_cpu_errata();
+	enable_cpu_feat(CPU_FEAT_AFTER_DEV);
 
 	intr_pic_init_secondary();
 
@@ -264,7 +274,6 @@ init_secondary(uint64_t cpu)
 #endif
 
 	dbg_init();
-	pan_enable();
 
 	mtx_lock_spin(&ap_boot_mtx);
 	atomic_add_rel_32(&smp_cpus, 1);
@@ -304,6 +313,10 @@ smp_after_idle_runnable(void *arg __unused)
 	for (cpu = 1; cpu < mp_ncpus; cpu++) {
 		if (bootstacks[cpu] != NULL)
 			kmem_free(bootstacks[cpu], MP_BOOTSTACK_SIZE);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+		if (resbootstacks[cpu] != NULL)
+			kmem_free(resbootstacks[cpu], MP_BOOTSTACK_SIZE);
+#endif
 	}
 }
 SYSINIT(smp_after_idle_runnable, SI_SUB_SMP, SI_ORDER_ANY,
@@ -492,9 +505,16 @@ start_cpu(u_int cpuid, uint64_t target_cpu, int domain, vm_paddr_t release_addr)
 
 	bootstacks[cpuid] = kmem_malloc_domainset(DOMAINSET_PREF(domain),
 	    MP_BOOTSTACK_SIZE, M_WAITOK | M_ZERO);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	resbootstacks[cpuid] = kmem_malloc_domainset(DOMAINSET_PREF(domain),
+	    MP_BOOTSTACK_SIZE, M_WAITOK | M_ZERO);
+#endif
 
 	naps = atomic_load_int(&aps_started);
 	bootstack = (char *)bootstacks[cpuid] + MP_BOOTSTACK_SIZE;
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	resbootstack = (char *)resbootstacks[cpuid] + MP_BOOTSTACK_SIZE;
+#endif
 
 	printf("Starting CPU %u (%lx)\n", cpuid, target_cpu);
 
@@ -523,8 +543,14 @@ start_cpu(u_int cpuid, uint64_t target_cpu, int domain, vm_paddr_t release_addr)
 		pcpu_destroy(pcpup);
 		dpcpu[cpuid - 1] = NULL;
 		kmem_free(bootstacks[cpuid], MP_BOOTSTACK_SIZE);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+		kmem_free(resbootstacks[cpuid], MP_BOOTSTACK_SIZE);
+#endif
 		kmem_free(pcpup, size);
 		bootstacks[cpuid] = NULL;
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+		resbootstacks[cpuid] = NULL;
+#endif
 		mp_ncpus--;
 		return (false);
 	}

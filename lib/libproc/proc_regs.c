@@ -33,7 +33,7 @@
 #include <sys/reg.h>
 
 #if defined(__aarch64__) && defined(__CHERI_PURE_CAPABILITY__)
-#include <cheri/cheric.h>
+#include <cheriintrin.h>
 #endif
 
 #include <err.h>
@@ -121,7 +121,7 @@ proc_regset(struct proc_handle *phdl, proc_reg_t reg, unsigned long regvalue)
 	switch (reg) {
 	case REG_PC:
 #if defined(__aarch64__) && defined(__CHERI_PURE_CAPABILITY__)
-		capregs.celr = cheri_setaddress(capregs.celr, regvalue);
+		capregs.celr = cheri_address_set(capregs.celr, regvalue);
 		tagmask |= 1ul <<
 		    (__offsetof(struct capreg, celr) / sizeof(uintcap_t));
 #elif defined(__aarch64__)
@@ -140,7 +140,7 @@ proc_regset(struct proc_handle *phdl, proc_reg_t reg, unsigned long regvalue)
 		break;
 	case REG_SP:
 #if defined(__aarch64__) && defined(__CHERI_PURE_CAPABILITY__)
-		capregs.csp = cheri_setaddress(capregs.csp, regvalue);
+		capregs.csp = cheri_address_set(capregs.csp, regvalue);
 		tagmask |= 1ul <<
 		    (__offsetof(struct capreg, csp) / sizeof(uintcap_t));
 #elif defined(__aarch64__)

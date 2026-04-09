@@ -28,16 +28,17 @@
 #ifndef _SYS_SYSCALLSUBR_H_
 #define _SYS_SYSCALLSUBR_H_
 
-#include <sys/acl.h>
-#include <sys/signal.h>
-#include <sys/sem.h>
-#include <sys/socket.h>
-#include <sys/mac.h>
-#include <sys/mman.h>
-#include <sys/mount.h>
+#include <sys/types.h>
 #include <sys/_cpuset.h>
 #include <sys/_domainset.h>
 #include <sys/_uio.h>
+#include <sys/acl.h>
+#include <sys/mac.h>
+#include <sys/mman.h>
+#include <sys/mount.h>
+#include <sys/signal.h>
+#include <sys/sem.h>
+#include <sys/socket.h>
 
 struct __wrusage;
 struct cpuset_copy_cb;
@@ -150,7 +151,6 @@ int	kern_cheri_cidcap_alloc(struct thread *td,
 	    uintcap_t * __capability cidp);
 int	kern_chflagsat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg, u_long flags, int atflag);
-int	kern_chroot(struct thread *td, const char * __capability path);
 int	kern_clock_getcpuclockid2(struct thread *td, id_t id, int which,
 	    clockid_t *clk_id);
 int	kern_clock_getres(struct thread *td, clockid_t clock_id,
@@ -493,7 +493,9 @@ int	kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
 	    struct timeval *tvp, int abi_nfdbits);
 int	kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 	    struct mbuf *control, enum uio_seg segflg);
-int	kern_setgroups(struct thread *td, u_int ngrp, gid_t *groups);
+int	kern_setcred(struct thread *const td, const u_int flags,
+	    struct setcred *const wcred, gid_t *preallocated_groups);
+int	kern_setgroups(struct thread *td, int *ngrpp, gid_t *groups);
 int	kern_setitimer(struct thread *, u_int, struct itimerval *,
 	    struct itimerval *);
 int	kern_setpriority(struct thread *td, int which, int who, int prio);
@@ -613,6 +615,7 @@ int	user_cap_ioctls_limit(struct thread *td, int fd,
 	    const u_long * __capability ucmds, size_t ncmds);
 int	user_cap_rights_limit(struct thread *td, int fd,
 	    cap_rights_t * __capability rightsp);
+int	user_chroot(struct thread *td, const char * __capability path);
 int	user_clock_nanosleep(struct thread *td, clockid_t clock_id,
 	    int flags, const struct timespec * __capability ua_rqtp,
 	    struct timespec * __capability ua_rmtp);
@@ -722,6 +725,8 @@ int	user_sendit(struct thread *td, int s, struct msghdr *mp, int flags);
 int	user_sendto(struct thread *td, int s, const char * __capability buf,
 	    size_t len, int flags, const struct sockaddr * __capability to,
 	    socklen_t tolen);
+int	user_setcred(struct thread *const td, const u_int flags,
+	    struct setcred *const wcred);
 int	user_setgroups(struct thread *td, int gidsetsize,
 	    const gid_t * __capability gidset);
 int	user_settimeofday(struct thread *td,

@@ -371,12 +371,14 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 		return (EINVAL);
 	shmseg = &shmsegs[IPCID_TO_IX(shmmap_s->shmid)];
 #if __has_feature(capabilities)
-	if (!__CAP_CHECK(shmaddr, shmseg->u.shm_segsz)) {
-		KASSERT(SV_PROC_FLAG(td->td_proc, SV_CHERI),
-		    ("!__CAP_CHECK(%#lp, %zx) for non-CheriABI program",
-		    shmaddr, shmseg->u.shm_segsz));
+	/*
+	 * Ideally we'd check CHERI_PERM_STORE when this wasn't attached
+	 * with SHM_RDONLY, but that information isn't available here.
+	 */
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI) &&
+	    !cheri_can_access(shmaddr, CHERI_PERM_SW_VMEM | CHERI_PERM_LOAD,
+	    shmseg->u.shm_segsz))
 		return (EPROT);
-	}
 #endif
 #ifdef MAC
 	error = mac_sysvshm_check_shmdt(td->td_ucred, shmseg);
@@ -396,16 +398,6 @@ sys_shmdt(struct thread *td, struct shmdt_args *uap)
 {
 	const void * __capability shmaddr = uap->shmaddr;
 
-#if __has_feature(capabilities)
-	/*
-	 * Require a valid, unsealed, SW_VMEM bearing capability or NULL.
-	 * length is checked after we find our mapping.
-	 */
-	if (shmaddr != NULL &&
-	    (!cheri_gettag(shmaddr) || cheri_getsealed(shmaddr) ||
-	    (cheri_getperm(shmaddr) & CHERI_PERM_SW_VMEM) == 0))
-		return (EPROT);
-#endif
 	return (kern_shmdt(td, shmaddr));
 }
 
@@ -494,7 +486,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		if (CHERI_REPRESENTABLE_ALIGN_DOWN(attach_va, size) !=
 		    attach_va)
 			return (EINVAL);
-		if (cheri_gettag(shmaddr)) {
+		if (cheri_tag_get(shmaddr)) {
 			int reqperm;
 
 			/*
@@ -504,24 +496,22 @@ kern_shmat_locked(struct thread *td, int shmid,
 			if ((shmflg & SHM_REMAP) == 0)
 				return (EINVAL);
 
-			reqperm = CHERI_PERM_LOAD;
+			reqperm = CHERI_PERM_SW_VMEM | CHERI_PERM_LOAD;
 			if ((shmflg & SHM_RDONLY) == 0)
 				reqperm |= CHERI_PERM_STORE;
-			if ((cheri_getperm(shmaddr) & reqperm) != reqperm)
-				return (EPROT);
 
 			/* XXX: require that a reservation exists. */
 			/* Handle any rounding above */
-			shmaddr = cheri_setaddress(shmaddr, attach_va);
-			if (!__CAP_CHECK(shmaddr, size))
-				return (EINVAL);
+			shmaddr = cheri_address_set(shmaddr, attach_va);
+			if (!cheri_can_access(shmaddr, reqperm, size))
+				return (EPROT);
 		} else {
 			/* As with mmap, untagged implies exclusive. */
 			if ((shmflg & SHM_REMAP) != 0)
 				return (EINVAL);
-			shmaddr = cheri_setaddress(userspace_root_cap,
+			shmaddr = (void * __capability)cheri_address_set(
+			    vm_map_rootcap(&td->td_proc->p_vmspace->vm_map),
 			    attach_va);
-
 		}
 #endif
 		if ((shmflg & SHM_REMAP) != 0)
@@ -547,13 +537,15 @@ kern_shmat_locked(struct thread *td, int shmid,
 			    CHERI_REPRESENTABLE_ALIGNMENT(size) < (1UL << 12) ?
 			    VMFS_OPTIMAL_SPACE :
 			    VMFS_ALIGNED_SPACE(CHERI_ALIGN_SHIFT(size));
-			shmaddr = cheri_setaddress(userspace_root_cap, attach_va);
+			shmaddr = (void * __capability)cheri_address_set(
+			    vm_map_rootcap(&td->td_proc->p_vmspace->vm_map),
+			    attach_va);
 		} else
 #endif
 			find_space = VMFS_OPTIMAL_SPACE;
 	}
 #if __has_feature(capabilities)
-	max_va = cheri_gettop(shmaddr);
+	max_va = cheri_top_get(shmaddr);
 #else
 	max_va = 0;
 #endif
@@ -565,10 +557,10 @@ kern_shmat_locked(struct thread *td, int shmid,
 		return (ENOMEM);
 	}
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(attach_va), ("Expected valid capability"));
-	KASSERT(cheri_getlen(attach_va) == size,
+	KASSERT(cheri_tag_get(attach_va), ("Expected valid capability"));
+	KASSERT(cheri_length_get(attach_va) == size,
 	    ("Inexact bounds expected %zx found %zx",
-	    (size_t)size, (size_t)cheri_getlen(attach_va)));
+	    (size_t)size, (size_t)cheri_length_get(attach_va)));
 #endif
 
 	shmmap_s->va = attach_va;
@@ -583,11 +575,15 @@ kern_shmat_locked(struct thread *td, int shmid,
 		 * and just return attach_va, as the capability will be derived from the
 		 * root map capability.
 		 */
-		shmaddr = cheri_setboundsexact(cheri_setaddress(shmaddr,
+		shmaddr = cheri_bounds_set_exact(cheri_address_set(shmaddr,
 		     attach_va), size);
 		/* Remove inappropriate permissions. */
-		shmaddr = cheri_andperm(shmaddr, ~(CHERI_PERM_EXECUTE |
+		shmaddr = cheri_perms_and(shmaddr, ~(CHERI_PERM_EXECUTE |
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 		    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
+#elif defined(HAS_CHERI_PERM_CAP)
+		    CHERI_PERM_CAP |
+#endif
 		    ((shmflg & SHM_RDONLY) != 0 ? CHERI_PERM_STORE : 0)));
 		td->td_retval[0] = (uintcap_t)__DECONST_CAP(void * __capability,
 		    shmaddr);
@@ -627,8 +623,8 @@ sys_shmat(struct thread *td, struct shmat_args *uap)
 	 * SW_VMEM bearing capability.
 	 */
 	if (!cheri_is_null_derived(shmaddr) &&
-	    (!cheri_gettag(shmaddr) || cheri_getsealed(shmaddr) ||
-	    (cheri_getperm(shmaddr) & CHERI_PERM_SW_VMEM) == 0))
+	    (!cheri_tag_get(shmaddr) || cheri_is_sealed(shmaddr) ||
+	    (cheri_perms_get(shmaddr) & CHERI_PERM_SW_VMEM) == 0))
 		return (EPROT);
 #endif
 	return (kern_shmat(td, uap->shmid, shmaddr, uap->shmflg));
@@ -1858,14 +1854,14 @@ done:
 int
 freebsd64_shmat(struct thread *td, struct freebsd64_shmat_args *uap)
 {
-	return (kern_shmat(td, uap->shmid, __USER_CAP_UNBOUND(uap->shmaddr),
+	return (kern_shmat(td, uap->shmid, USER_PTR_UNBOUND(uap->shmaddr),
 	    uap->shmflg));
 }
 
 int
 freebsd64_shmdt(struct thread *td, struct freebsd64_shmdt_args *uap)
 {
-	return (kern_shmdt(td, __USER_CAP_UNBOUND(uap->shmaddr)));
+	return (kern_shmdt(td, USER_PTR_UNBOUND(uap->shmaddr)));
 }
 
 #ifdef COMPAT_FREEBSD7
@@ -1883,7 +1879,7 @@ freebsd7_freebsd64_shmctl(struct thread *td,
 	size_t sz;
 
 	if (uap->cmd == IPC_SET) {
-		if ((error = copyin(__USER_CAP_OBJ(uap->buf), &shmid_ds64,
+		if ((error = copyin(USER_PTR_OBJ(uap->buf), &shmid_ds64,
 		    sizeof(shmid_ds64))))
 			goto done;
 		ipcperm_old2new(&shmid_ds64.shm_perm, &u.shmid_ds.shm_perm);
@@ -1904,12 +1900,12 @@ freebsd7_freebsd64_shmctl(struct thread *td,
 	switch (uap->cmd) {
 	case IPC_INFO:
 		error = copyout(&u.shminfo,
-		    __USER_CAP(uap->buf, sizeof(u.shminfo)),
+		    USER_PTR(uap->buf, sizeof(u.shminfo)),
 		    sizeof(u.shminfo));
 		break;
 	case SHM_INFO:
 		error = copyout(&u.shm_info,
-		    __USER_CAP(uap->buf, sizeof(u.shm_info)),
+		    USER_PTR(uap->buf, sizeof(u.shm_info)),
 		    sizeof(u.shm_info));
 		break;
 	case SHM_STAT:
@@ -1924,7 +1920,7 @@ freebsd7_freebsd64_shmctl(struct thread *td,
 		CP(u.shmid_ds, shmid_ds64, shm_dtime);
 		CP(u.shmid_ds, shmid_ds64, shm_ctime);
 		shmid_ds64.shm_internal = 0;
-		error = copyout(&shmid_ds64, __USER_CAP_OBJ(uap->buf),
+		error = copyout(&shmid_ds64, USER_PTR_OBJ(uap->buf),
 		    sizeof(shmid_ds64));
 		break;
 	}
@@ -1951,7 +1947,7 @@ freebsd64_shmctl(struct thread *td, struct freebsd64_shmctl_args *uap)
 	size_t sz;
 
 	if (uap->cmd == IPC_SET) {
-		if ((error = copyin(__USER_CAP_OBJ(uap->buf), &shmid_ds64,
+		if ((error = copyin(USER_PTR_OBJ(uap->buf), &shmid_ds64,
 		    sizeof(shmid_ds64))))
 			goto done;
 		CP(shmid_ds64, u.shmid_ds, shm_perm);
@@ -1972,12 +1968,12 @@ freebsd64_shmctl(struct thread *td, struct freebsd64_shmctl_args *uap)
 	switch (uap->cmd) {
 	case IPC_INFO:
 		error = copyout(&u.shminfo,
-		    __USER_CAP(uap->buf, sizeof(u.shminfo)),
+		    USER_PTR(uap->buf, sizeof(u.shminfo)),
 		    sizeof(u.shminfo));
 		break;
 	case SHM_INFO:
 		error = copyout(&u.shm_info,
-		    __USER_CAP(uap->buf, sizeof(u.shm_info)),
+		    USER_PTR(uap->buf, sizeof(u.shm_info)),
 		    sizeof(u.shm_info));
 		break;
 	case SHM_STAT:
@@ -1990,7 +1986,7 @@ freebsd64_shmctl(struct thread *td, struct freebsd64_shmctl_args *uap)
 		CP(u.shmid_ds, shmid_ds64, shm_atime);
 		CP(u.shmid_ds, shmid_ds64, shm_dtime);
 		CP(u.shmid_ds, shmid_ds64, shm_ctime);
-		error = copyout(&shmid_ds64, __USER_CAP_OBJ(uap->buf),
+		error = copyout(&shmid_ds64, USER_PTR_OBJ(uap->buf),
 		    sizeof(shmid_ds64));
 		break;
 	}
@@ -2033,7 +2029,7 @@ freebsd7_shmctl(struct thread *td, struct freebsd7_shmctl_args *uap)
 
 	/* IPC_SET needs to copyin the buffer before calling kern_shmctl */
 	if (uap->cmd == IPC_SET) {
-		if ((error = copyincap(uap->buf, &old, sizeof(old))))
+		if ((error = copyinptr(uap->buf, &old, sizeof(old))))
 			goto done;
 		ipcperm_old2new(&old.shm_perm, &buf.shm_perm);
 		CP(old, buf, shm_segsz);
@@ -2068,7 +2064,7 @@ freebsd7_shmctl(struct thread *td, struct freebsd7_shmctl_args *uap)
 		CP(buf, old, shm_dtime);
 		CP(buf, old, shm_ctime);
 		old.shm_internal = NULL;
-		error = copyoutcap(&old, uap->buf, sizeof(old));
+		error = copyoutptr(&old, uap->buf, sizeof(old));
 		break;
 	}
 

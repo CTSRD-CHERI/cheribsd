@@ -135,3 +135,19 @@ skip_need_cheri_revoke(const struct cheri_test *ctp __unused)
 		return ("Kernel does not support revocation");
 	return (NULL);
 }
+
+const char *
+skip_need_default_cheri_revoke(const struct cheri_test *ctp __unused)
+{
+	int value = 0;
+	size_t len = sizeof(value);
+
+	if (sysctlbyname("security.cheri.runtime_revocation_default",
+	    &value, &len, NULL, 0)) {
+		return ("System does not support revocation");
+	}
+	if (value == 0) {
+		return ("System disables revocation");
+	}
+	return (NULL);
+}

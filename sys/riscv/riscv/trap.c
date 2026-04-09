@@ -368,7 +368,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		 * Enable interrupts for the duration of the page fault. For
 		 * user faults this was done already in do_trap_user().
 		 */
-		if ((frame->tf_sstatus & SSTATUS_SIE) != 0)
+		if ((frame->tf_sstatus & SSTATUS_SPIE) != 0)
 			intr_enable();
 
 		if (stval >= VM_MIN_KERNEL_ADDRESS) {
@@ -395,7 +395,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 			 * UNRESOLVED, then there's no point in trying the pmap
 			 * again.
 			 */
-			ftype = VM_PROT_READ | VM_PROT_READ_CAP;
+			ftype = VM_PROT_READ | VM_PROT_CAP;
 			goto skip_pmap;
 		}
 	}
@@ -407,9 +407,9 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		ftype = VM_PROT_EXECUTE;
 #if __has_feature(capabilities)
 	} else if (frame->tf_scause == SCAUSE_STORE_AMO_CAP_PAGE_FAULT) {
-		ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
+		ftype = VM_PROT_WRITE | VM_PROT_CAP;
 	} else if (frame->tf_scause == SCAUSE_LOAD_CAP_PAGE_FAULT) {
-		ftype = VM_PROT_READ | VM_PROT_READ_CAP;
+		ftype = VM_PROT_READ | VM_PROT_CAP;
 #endif
 	} else {
 		ftype = VM_PROT_READ;
@@ -435,7 +435,7 @@ skip_pmap:
 			if (pcb->pcb_onfault != 0) {
 				frame->tf_a[0] = error;
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-				frame->tf_sepc = cheri_setaddress(
+				frame->tf_sepc = cheri_address_set(
 				    frame->tf_sepc, pcb->pcb_onfault);
 #else
 				frame->tf_sepc = pcb->pcb_onfault;
@@ -540,7 +540,7 @@ do_trap_supervisor(struct trapframe *frame)
 		if (curthread->td_pcb->pcb_onfault != 0) {
 			frame->tf_a[0] = EPROT;
 #ifndef __CHERI_PURE_CAPABILITY__
-			frame->tf_sepc = cheri_setaddress(frame->tf_sepc,
+			frame->tf_sepc = cheri_address_set(frame->tf_sepc,
 			    curthread->td_pcb->pcb_onfault);
 #else
 			frame->tf_sepc = curthread->td_pcb->pcb_onfault;
@@ -670,9 +670,9 @@ do_trap_user(struct trapframe *frame)
 		if (!SV_PROC_FLAG(td->td_proc, SV_CHERI) &&
 		    TVAL_CAP_CAUSE(frame->tf_stval) == CHERI_EXCCODE_LENGTH) {
 			if (TVAL_CAP_IDX(frame->tf_stval) == 32 /* PCC */ &&
-			    cheri_getbase(frame->tf_sepc) ==
+			    cheri_base_get(frame->tf_sepc) ==
 			    CHERI_CAP_USER_DATA_BASE &&
-			    cheri_getlen(frame->tf_sepc) ==
+			    cheri_length_get(frame->tf_sepc) ==
 			    CHERI_CAP_USER_DATA_LENGTH) {
 				call_trapsignal(td, SIGSEGV, SEGV_MAPERR,
 				    (ptraddr_t)frame->tf_sepc,
@@ -689,9 +689,9 @@ do_trap_user(struct trapframe *frame)
 			 * that would have been raised.
 			 */
 			if (TVAL_CAP_IDX(frame->tf_stval) == 33 /* DDC */ &&
-			    cheri_getbase(frame->tf_ddc) ==
+			    cheri_base_get(frame->tf_ddc) ==
 			    CHERI_CAP_USER_DATA_BASE &&
-			    cheri_getlen(frame->tf_ddc) ==
+			    cheri_length_get(frame->tf_ddc) ==
 			    CHERI_CAP_USER_DATA_LENGTH) {
 				call_trapsignal(td, SIGSEGV, SEGV_MAPERR,
 				    0 /* XXX */,

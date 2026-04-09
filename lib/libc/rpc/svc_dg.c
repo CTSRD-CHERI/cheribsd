@@ -33,18 +33,6 @@
 /*
  * Copyright (c) 1986-1991 by Sun Microsystems Inc.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "sunrpc"
- * }
- * CHERI CHANGES END
- */
 
 /*
  * svc_dg.c, Server side for connectionless RPC.
@@ -394,7 +382,7 @@ svc_dg_freeargs(SVCXPRT *xprt, xdrproc_t xdr_args, void *args_ptr)
 	XDR *xdrs = &(su_data(xprt)->su_xdrs);
 
 	xdrs->x_op = XDR_FREE;
-	return (*xdr_args)(xdrs, args_ptr, 0);
+	return (*xdr_args)(xdrs, args_ptr);
 }
 
 static void

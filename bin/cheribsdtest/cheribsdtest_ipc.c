@@ -39,9 +39,6 @@
 #include <sys/sysctl.h>
 #include <sys/time.h>
 
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-
 #include <netinet/in.h>
 
 #include <err.h>
@@ -65,7 +62,7 @@
  * This would previously panic the kernel with a fatal capability page fault as
  * uiomove_fromphys called from pipe_clone_write_buffer would use a plain bcopy
  * and so not strip tags, but the kernel buffer was allocated without
- * VM_PROT_WRITE_CAP.
+ * VM_PROT_CAP.
  */
 
 #define	BUFFER_SIZE	8192
@@ -102,7 +99,7 @@ CHERIBSDTEST(ipc_pipe_nocaps,
 	buffer = calloc(1, len);
 	buffer2 = calloc(1, len);
 	buffer[0] = (__cheri_tocap void * __capability)buffer;
-	CHERIBSDTEST_VERIFY2(cheri_gettag(buffer[0]) != 0,
+	CHERIBSDTEST_VERIFY2(cheri_tag_get(buffer[0]) != 0,
 	    "pretest: tag missing");
 
 	CHERIBSDTEST_CHECK_SYSCALL(pipe(fds));
@@ -111,11 +108,11 @@ CHERIBSDTEST(ipc_pipe_nocaps,
 	rv = CHERIBSDTEST_CHECK_SYSCALL(read(fds[0], buffer2, len));
 	CHERIBSDTEST_CHECK_EQ_SIZE(rv, len);
 
-	CHERIBSDTEST_VERIFY2(cheri_gettag(buffer[0]) != 0,
+	CHERIBSDTEST_VERIFY2(cheri_tag_get(buffer[0]) != 0,
 	    "posttest: source tag missing");
-	CHERIBSDTEST_VERIFY2(cheri_gettag(buffer2[0]) == 0,
+	CHERIBSDTEST_VERIFY2(cheri_tag_get(buffer2[0]) == 0,
 	    "posttest: destination tag present");
-	CHERIBSDTEST_VERIFY2(cheri_equal_exact(cheri_cleartag(buffer[0]),
+	CHERIBSDTEST_VERIFY2(cheri_is_equal_exact(cheri_tag_clear(buffer[0]),
 	     buffer2[0]), "untagged value not copied");
 
 	CHERIBSDTEST_CHECK_SYSCALL(close(fds[0]));

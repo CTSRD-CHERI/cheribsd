@@ -7,7 +7,7 @@
 .include <bsd.compat.mk>
 .endif
 
-__<bsd.lib.mk>__:
+__<bsd.lib.mk>__:	.NOTMAIN
 
 .if defined(LIB_CXX) || defined(SHLIB_CXX)
 _LD=	${CXX}
@@ -112,14 +112,13 @@ LDFLAGS+= -Wl,-zbti-report=error
 .endif
 .endif
 
-# Disable when bootstrapping as host may not support new relocations
-# TODO: Remove after the next release
-.if ${MACHINE_CPUARCH} == "aarch64" && ${MACHINE_CPU:Mcheri} && !defined(BOOTSTRAPPING)
-LDFLAGS+= -Wl,--local-caprelocs=elf
-
-.if ${MK_CHERI_CODEPTR_RELOCS} != "no" && ${COMPILER_FEATURES:Mmorello-codeptr-relocs}
-CFLAGS+=	-cheri-codeptr-relocs
-LDFLAGS+=	-cheri-codeptr-relocs
+.if ${MACHINE_ABI:Mpurecap}
+.if ${OPT_CHERI_TGOT_TLS} == "yes"
+CFLAGS+=	-cheri-tgot-tls
+.elif ${OPT_CHERI_TGOT_TLS} == "compat"
+CFLAGS+=	-cheri-tgot-tls=compat
+.elif ${OPT_CHERI_TGOT_TLS} == "no"
+CFLAGS+=	-no-cheri-tgot-tls
 .endif
 .endif
 
@@ -134,6 +133,15 @@ CXXFLAGS+= -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-cl
 .endif
 .else
 .warning INIT_ALL (${OPT_INIT_ALL}) requested but not supported by compiler
+.endif
+.endif
+
+# Zero used registers on return (mitigate some ROP)
+.if ${MK_ZEROREGS} != "no"
+.if ${COMPILER_FEATURES:Mzeroregs}
+ZEROREG_TYPE?= used
+CFLAGS+= -fzero-call-used-regs=${ZEROREG_TYPE}
+CXXFLAGS+= -fzero-call-used-regs=${ZEROREG_TYPE}
 .endif
 .endif
 
@@ -171,7 +179,8 @@ SHLIB_NAME_FULL=${SHLIB_NAME}.full
 # Use ${DEBUGDIR} for base system debug files, else .debug subdirectory
 .if ${_SHLIBDIR} == "/boot" ||\
     ${SHLIBDIR:C%/lib(/.*)?$%/lib%} == "/lib" ||\
-    ${SHLIBDIR:C%/usr/(tests/)?lib(32|64|64c|64cb|exec)?(/.*)?%/usr/lib%} == "/usr/lib"
+    ${SHLIBDIR:C%/usr/lib(32|64|64c|64cb|exec)?(/.*)?%/usr/lib%} == "/usr/lib" ||\
+    ${SHLIBDIR:C%/usr/tests(/.*)?%/usr/tests%} == "/usr/tests"
 DEBUGFILEDIR=${DEBUGDIR}${_SHLIBDIR}
 .else
 DEBUGFILEDIR=${_SHLIBDIR}/.debug
@@ -224,24 +233,12 @@ _STATICLIB_SUFFIX=	_real
 _LIBS=		lib${LIB_PRIVATE}${LIB}${_STATICLIB_SUFFIX}.a
 
 lib${LIB_PRIVATE}${LIB}${_STATICLIB_SUFFIX}.a: ${OBJS} ${STATICOBJS}
-	@${ECHO} building static ${LIB} library
+	@${ECHO} Building static ${LIB} library
 	@rm -f ${.TARGET}
 	${AR} ${ARFLAGS} ${.TARGET} ${OBJS} ${STATICOBJS} ${ARADD}
 .endif
 
 .if !defined(INTERNALLIB)
-
-.if ${MK_PROFILE} != "no" && defined(LIB) && !empty(LIB)
-_LIBS+=		lib${LIB_PRIVATE}${LIB}_p.a
-POBJS+=		${OBJS:.o=.po} ${STATICOBJS:.o=.po}
-DEPENDOBJS+=	${POBJS}
-CLEANFILES+=	${POBJS}
-
-lib${LIB_PRIVATE}${LIB}_p.a: ${POBJS}
-	@${ECHO} building profiled ${LIB} library
-	@rm -f ${.TARGET}
-	${AR} ${ARFLAGS} ${.TARGET} ${POBJS} ${ARADD}
-.endif
 
 .if defined(LLVM_LINK)
 lib${LIB_PRIVATE}${LIB}.bc: ${BCOBJS}
@@ -294,7 +291,7 @@ CLEANFILES+=	${SHLIB_LINK}
 .endif
 
 ${SHLIB_NAME_FULL}: ${SOBJS}
-	@${ECHO} building shared library ${SHLIB_NAME}
+	@${ECHO} Building shared library ${SHLIB_NAME}
 	@rm -f ${SHLIB_NAME} ${SHLIB_LINK}
 .if defined(SHLIB_LINK) && !commands(${SHLIB_LINK:R}.ld) && ${MK_DEBUG_FILES} == "no"
 	# Note: This uses ln instead of ${INSTALL_LIBSYMLINK} since we are in OBJDIR
@@ -325,7 +322,7 @@ ${SHLIB_NAME}.debug: ${SHLIB_NAME_FULL}
 _LIBS+=		lib${LIB_PRIVATE}${LIB}_pic.a
 
 lib${LIB_PRIVATE}${LIB}_pic.a: ${SOBJS}
-	@${ECHO} building special pic ${LIB} library
+	@${ECHO} Building special pic ${LIB} library
 	@rm -f ${.TARGET}
 	${AR} ${ARFLAGS} ${.TARGET} ${SOBJS} ${ARADD}
 .endif
@@ -337,7 +334,7 @@ CLEANFILES+=	${NOSSPSOBJS}
 _LIBS+=		lib${LIB_PRIVATE}${LIB}_nossp_pic.a
 
 lib${LIB_PRIVATE}${LIB}_nossp_pic.a: ${NOSSPSOBJS}
-	@${ECHO} building special nossp pic ${LIB} library
+	@${ECHO} Building special nossp pic ${LIB} library
 	@rm -f ${.TARGET}
 	${AR} ${ARFLAGS} ${.TARGET} ${NOSSPSOBJS} ${ARADD}
 .endif
@@ -352,7 +349,7 @@ CLEANFILES+=	${PIEOBJS}
 _LIBS+=		lib${LIB_PRIVATE}${LIB}_pie.a
 
 lib${LIB_PRIVATE}${LIB}_pie.a: ${PIEOBJS}
-	@${ECHO} building pie ${LIB} library
+	@${ECHO} Building pie ${LIB} library
 	@rm -f ${.TARGET}
 	${AR} ${ARFLAGS} ${.TARGET} ${PIEOBJS} ${ARADD}
 .endif
@@ -433,10 +430,6 @@ _libinstall:
 .if defined(LIB) && !empty(LIB) && ${MK_INSTALLLIB} != "no"
 	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},dev} -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
 	    ${_INSTALLFLAGS} lib${LIB_PRIVATE}${LIB}${_STATICLIB_SUFFIX}.a ${DESTDIR}${_LIBDIR}/
-.if ${MK_PROFILE} != "no"
-	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},dev} -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
-	    ${_INSTALLFLAGS} lib${LIB_PRIVATE}${LIB}_p.a ${DESTDIR}${_LIBDIR}/
-.endif
 .endif
 .if defined(SHLIB_NAME)
 	${INSTALL} ${TAG_ARGS} -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \

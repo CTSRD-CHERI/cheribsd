@@ -99,7 +99,7 @@ int
 linux_creat(struct thread *td, struct linux_creat_args *args)
 {
 
-	return (kern_openat(td, AT_FDCWD, __USER_CAP_PATH(args->path),
+	return (kern_openat(td, AT_FDCWD, USER_PTR_PATH(args->path),
 	    UIO_USERSPACE, O_WRONLY | O_CREAT | O_TRUNC, args->mode));
 }
 #endif
@@ -604,7 +604,7 @@ linux_access(struct thread *td, struct linux_access_args *args)
 	if (args->amode & ~(F_OK | X_OK | W_OK | R_OK))
 		return (EINVAL);
 
-	return (kern_accessat(td, AT_FDCWD, __USER_CAP_PATH(args->path),
+	return (kern_accessat(td, AT_FDCWD, USER_PTR_PATH(args->path),
 	    UIO_USERSPACE, 0, args->amode));
 }
 #endif
@@ -620,7 +620,7 @@ linux_do_accessat(struct thread *td, int ldfd, const char *filename,
 		return (EINVAL);
 
 	dfd = (ldfd == LINUX_AT_FDCWD) ? AT_FDCWD : ldfd;
-	return (kern_accessat(td, dfd, __USER_CAP_PATH(filename),
+	return (kern_accessat(td, dfd, USER_PTR_PATH(filename),
 	    UIO_USERSPACE, flags, amode));
 }
 
@@ -662,11 +662,11 @@ linux_unlink(struct thread *td, struct linux_unlink_args *args)
 	int error;
 	struct stat st;
 
-	error = kern_funlinkat(td, AT_FDCWD, __USER_CAP_PATH(args->path),
+	error = kern_funlinkat(td, AT_FDCWD, USER_PTR_PATH(args->path),
 	    FD_NONE, UIO_USERSPACE, 0, 0);
 	if (error == EPERM) {
 		/* Introduce POSIX noncompliant behaviour of Linux */
-		if (kern_statat(td, 0, AT_FDCWD, __USER_CAP_PATH(args->path),
+		if (kern_statat(td, 0, AT_FDCWD, USER_PTR_PATH(args->path),
 		    UIO_USERSPACE, &st) == 0) {
 			if (S_ISDIR(st.st_mode))
 				error = EISDIR;
@@ -707,7 +707,7 @@ linux_unlinkat(struct thread *td, struct linux_unlinkat_args *args)
 		return (EINVAL);
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	return (linux_unlinkat_impl(td, UIO_USERSPACE,
-	    __USER_CAP_PATH(args->pathname), dfd, args));
+	    USER_PTR_PATH(args->pathname), dfd, args));
 }
 
 int
@@ -1546,7 +1546,7 @@ linux_fchownat(struct thread *td, struct linux_fchownat_args *args)
 	    AT_EMPTY_PATH;
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD :  args->dfd;
-	return (kern_fchownat(td, dfd, __USER_CAP_PATH(args->filename),
+	return (kern_fchownat(td, dfd, USER_PTR_PATH(args->filename),
 	    UIO_USERSPACE, args->uid, args->gid, flag));
 }
 

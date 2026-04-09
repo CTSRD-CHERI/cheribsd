@@ -54,6 +54,7 @@
 #include <sys/smp.h>
 #include <sys/sysctl.h>
 #include <sys/systm.h>
+#include <sys/taskqueue.h>
 #include <sys/bus.h>
 #include <sys/cpuset.h>
 #ifdef INTRNG
@@ -122,6 +123,8 @@ struct device_prop_elm {
 	device_prop_dtr_t dtr;
 	LIST_ENTRY(device_prop_elm) link;
 };
+
+TASKQUEUE_DEFINE_THREAD(bus);
 
 static void device_destroy_props(device_t dev);
 
@@ -472,7 +475,7 @@ bus_topo_unlock(void)
  */
 
 static driver_list_t passes = TAILQ_HEAD_INITIALIZER(passes);
-int bus_current_pass = BUS_PASS_ROOT;
+static int bus_current_pass = BUS_PASS_ROOT;
 
 /**
  * @internal
@@ -510,13 +513,27 @@ driver_register_pass(struct driverlink *new)
 }
 
 /**
+ * @brief Retrieve the current bus pass
+ *
+ * Retrieves the current bus pass level.  Call the BUS_NEW_PASS()
+ * method on the root bus to kick off a new device tree scan for each
+ * new pass level that has at least one driver.
+ */
+int
+bus_get_pass(void)
+{
+
+	return (bus_current_pass);
+}
+
+/**
  * @brief Raise the current bus pass
  *
  * Raise the current bus pass level to @p pass.  Call the BUS_NEW_PASS()
  * method on the root bus to kick off a new device tree scan for each
  * new pass level that has at least one driver.
  */
-void
+static void
 bus_set_pass(int pass)
 {
 	struct driverlink *dl;
@@ -593,9 +610,7 @@ devclass_find_internal(const char *classname, const char *parentname,
 	if (create && !dc) {
 		PDEBUG(("creating %s", classname));
 		dc = malloc(sizeof(struct devclass) + strlen(classname) + 1,
-		    M_BUS, M_NOWAIT | M_ZERO);
-		if (!dc)
-			return (NULL);
+		    M_BUS, M_WAITOK | M_ZERO);
 		dc->parent = NULL;
 		dc->name = (char*) (dc + 1);
 		strcpy(dc->name, classname);
@@ -729,9 +744,7 @@ devclass_add_driver(devclass_t dc, driver_t *driver, int pass, devclass_t *dcp)
 	if (pass <= BUS_PASS_ROOT)
 		return (EINVAL);
 
-	dl = malloc(sizeof *dl, M_BUS, M_NOWAIT|M_ZERO);
-	if (!dl)
-		return (ENOMEM);
+	dl = malloc(sizeof *dl, M_BUS, M_WAITOK|M_ZERO);
 
 	/*
 	 * Compile the driver's methods. Also increase the reference count
@@ -1324,9 +1337,7 @@ devclass_add_device(devclass_t dc, device_t dev)
 	buflen = snprintf(NULL, 0, "%s%d$", dc->name, INT_MAX);
 	if (buflen < 0)
 		return (ENOMEM);
-	dev->nameunit = malloc(buflen, M_BUS, M_NOWAIT|M_ZERO);
-	if (!dev->nameunit)
-		return (ENOMEM);
+	dev->nameunit = malloc(buflen, M_BUS, M_WAITOK|M_ZERO);
 
 	if ((error = devclass_alloc_unit(dc, dev, &dev->unit)) != 0) {
 		free(dev->nameunit, M_BUS);
@@ -1403,10 +1414,7 @@ make_device(device_t parent, const char *name, int unit)
 		dc = NULL;
 	}
 
-	dev = malloc(sizeof(*dev), M_BUS, M_NOWAIT|M_ZERO);
-	if (!dev)
-		return (NULL);
-
+	dev = malloc(sizeof(*dev), M_BUS, M_WAITOK|M_ZERO);
 	dev->parent = parent;
 	TAILQ_INIT(&dev->children);
 	kobj_init((kobj_t) dev, &null_class);
@@ -2134,7 +2142,7 @@ device_set_desc_copy(device_t dev, const char *desc)
 {
 	char *buf;
 
-	buf = strdup_flags(desc, M_BUS, M_NOWAIT);
+	buf = strdup_flags(desc, M_BUS, M_WAITOK);
 	device_set_desc_internal(dev, buf, true);
 }
 
@@ -2494,13 +2502,7 @@ device_set_driver(device_t dev, driver_t *driver)
 			else
 				policy = DOMAINSET_RR();
 			dev->softc = malloc_domainset(driver->size, M_BUS_SC,
-			    policy, M_NOWAIT | M_ZERO);
-			if (!dev->softc) {
-				kobj_delete((kobj_t) dev, NULL);
-				kobj_init((kobj_t) dev, &null_class);
-				dev->driver = NULL;
-				return (ENOMEM);
-			}
+			    policy, M_WAITOK | M_ZERO);
 		}
 	} else {
 		kobj_init((kobj_t) dev, &null_class);
@@ -2612,7 +2614,13 @@ device_attach(device_t dev)
 	int error;
 
 	if (resource_disabled(dev->driver->name, dev->unit)) {
+		/*
+		 * Mostly detach the device, but leave it attached to
+		 * the devclass to reserve the name and unit.
+		 */
 		device_disable(dev);
+		(void)device_set_driver(dev, NULL);
+		dev->state = DS_NOTPRESENT;
 		if (bootverbose)
 			 device_printf(dev, "disabled via hints entry\n");
 		return (ENXIO);
@@ -2947,9 +2955,7 @@ resource_list_add(struct resource_list *rl, int type, int rid,
 	rle = resource_list_find(rl, type, rid);
 	if (!rle) {
 		rle = malloc(sizeof(struct resource_list_entry), M_BUS,
-		    M_NOWAIT);
-		if (!rle)
-			panic("resource_list_add: can't record entry");
+		    M_WAITOK);
 		STAILQ_INSERT_TAIL(rl, rle, link);
 		rle->type = type;
 		rle->rid = rid;
@@ -3424,6 +3430,22 @@ bus_generic_add_child(device_t dev, u_int order, const char *name, int unit)
 int
 bus_generic_probe(device_t dev)
 {
+	bus_identify_children(dev);
+	return (0);
+}
+
+/**
+ * @brief Ask drivers to add child devices of the given device.
+ *
+ * This function allows drivers for child devices of a bus to identify
+ * child devices and add them as children of the given device.  NB:
+ * The driver for @param dev must implement the BUS_ADD_CHILD method.
+ *
+ * @param dev		the parent device
+ */
+void
+bus_identify_children(device_t dev)
+{
 	devclass_t dc = dev->devclass;
 	driverlink_t dl;
 
@@ -3441,8 +3463,6 @@ bus_generic_probe(device_t dev)
 			continue;
 		DEVICE_IDENTIFY(dl->driver, dev);
 	}
-
-	return (0);
 }
 
 /**
@@ -3455,13 +3475,28 @@ bus_generic_probe(device_t dev)
 int
 bus_generic_attach(device_t dev)
 {
+	bus_attach_children(dev);
+	return (0);
+}
+
+/**
+ * @brief Probe and attach all children of the given device
+ *
+ * This function attempts to attach a device driver to each unattached
+ * child of the given device using device_probe_and_attach().  If an
+ * individual child fails to attach this function continues attaching
+ * other children.
+ *
+ * @param dev		the parent device
+ */
+void
+bus_attach_children(device_t dev)
+{
 	device_t child;
 
 	TAILQ_FOREACH(child, &dev->children, link) {
 		device_probe_and_attach(child);
 	}
-
-	return (0);
 }
 
 /**
@@ -3471,24 +3506,53 @@ bus_generic_attach(device_t dev)
  * attach until after interrupts and/or timers are running.  This function
  * delays their attach until interrupts and timers are enabled.
  */
-int
+void
 bus_delayed_attach_children(device_t dev)
 {
 	/* Probe and attach the bus children when interrupts are available */
-	config_intrhook_oneshot((ich_func_t)bus_generic_attach, dev);
-
-	return (0);
+	config_intrhook_oneshot((ich_func_t)bus_attach_children, dev);
 }
 
 /**
  * @brief Helper function for implementing DEVICE_DETACH()
  *
  * This function can be used to help implement the DEVICE_DETACH() for
- * a bus. It calls device_detach() for each of the device's
- * children.
+ * a bus.  It detaches and deletes all children.  If an individual
+ * child fails to detach, this function stops and returns an error.
+ *
+ * @param dev		the parent device
+ *
+ * @retval 0		success
+ * @retval non-zero	a device would not detach
  */
 int
 bus_generic_detach(device_t dev)
+{
+	int error;
+
+	error = bus_detach_children(dev);
+	if (error != 0)
+		return (error);
+
+	return (device_delete_children(dev));
+}
+
+/**
+ * @brief Detach drivers from all children of a device
+ *
+ * This function attempts to detach a device driver from each attached
+ * child of the given device using device_detach().  If an individual
+ * child fails to detach this function stops and returns an error.
+ * NB: Children that were successfully detached are not re-attached if
+ * an error occurs.
+ *
+ * @param dev		the parent device
+ *
+ * @retval 0		success
+ * @retval non-zero	a device would not detach
+ */
+int
+bus_detach_children(device_t dev)
 {
 	device_t child;
 	int error;
@@ -3821,17 +3885,6 @@ bus_generic_get_property(device_t dev, device_t child, const char *propname,
 		    propname, propvalue, size, type));
 
 	return (-1);
-}
-
-/**
- * @brief Stub function for implementing BUS_GET_RESOURCE_LIST().
- *
- * @returns NULL
- */
-struct resource_list *
-bus_generic_get_resource_list(device_t dev, device_t child)
-{
-	return (NULL);
 }
 
 /**
@@ -5746,7 +5799,7 @@ devctl2_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		memset(&dr, 0, sizeof(dr));
 		memcpy(dr.dr_name, req64->dr_name, sizeof(dr.dr_name));
 		CP(*req64, dr, dr_flags);
-		dr.dr_data = __USER_CAP_STR(req64->dr_data);
+		dr.dr_data = USER_PTR_STR(req64->dr_data);
 		req = &dr;
 		cmd = _IOC_NEWTYPE(cmd, struct devreq);
 	} else
@@ -5821,17 +5874,20 @@ devctl2_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		 * attach the device rather than doing a full probe.
 		 */
 		device_enable(dev);
-		if (device_is_alive(dev)) {
+		if (dev->devclass != NULL) {
 			/*
 			 * If the device was disabled via a hint, clear
 			 * the hint.
 			 */
-			if (resource_disabled(dev->driver->name, dev->unit))
-				resource_unset_value(dev->driver->name,
+			if (resource_disabled(dev->devclass->name, dev->unit))
+				resource_unset_value(dev->devclass->name,
 				    dev->unit, "disabled");
-			error = device_attach(dev);
-		} else
-			error = device_probe_and_attach(dev);
+
+			/* Allow any drivers to rebid. */
+			if (!(dev->flags & DF_FIXEDCLASS))
+				devclass_delete_device(dev->devclass, dev);
+		}
+		error = device_probe_and_attach(dev);
 		break;
 	case DEV_DISABLE:
 		if (!device_is_enabled(dev)) {

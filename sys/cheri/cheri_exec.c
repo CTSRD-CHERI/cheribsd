@@ -82,7 +82,7 @@ cheri_exec_pcc(struct thread *td, struct image_params *imgp)
 	MPASS(code_length == CHERI_REPRESENTABLE_LENGTH(code_length));
 	KASSERT(code_start < code_end, ("%s: truncated PCC", __func__));
 	return (cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
-	    code_start, code_length, imgp->entry_addr - code_start));
+	    code_start, code_length, imgp->entry_addr));
 }
 
 void * __capability
@@ -100,14 +100,14 @@ cheri_sigcode_capability(struct thread *td)
 		return (cheri_capability_build_user_code(td,
 		    CHERI_CAP_USER_CODE_PERMS, CHERI_CAP_USER_CODE_BASE,
 		    CHERI_CAP_USER_CODE_LENGTH,
-		    PROC_SIGCODE(p) - CHERI_CAP_USER_CODE_BASE));
+		    PROC_SIGCODE(p)));
 
-	tmpcap = (void * __capability)cheri_setboundsexact(
-	    cheri_andperm(PROC_SIGCODE(p), CHERI_CAP_USER_CODE_PERMS),
+	tmpcap = (void * __capability)cheri_bounds_set_exact(
+	    cheri_perms_and(PROC_SIGCODE(p), CHERI_CAP_USER_CODE_PERMS),
 	    *sv->sv_szsigcode);
 
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 		tmpcap = cheri_capmode(tmpcap);
 
-	return (cheri_sealentry(tmpcap));
+	return (cheri_sentry_create(tmpcap));
 }

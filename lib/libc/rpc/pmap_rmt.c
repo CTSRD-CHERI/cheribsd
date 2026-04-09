@@ -29,18 +29,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
  * POSSIBILITY OF SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "sunrpc"
- * }
- * CHERI CHANGES END
- */
 
 /*
  * pmap_rmt.c
@@ -138,7 +126,7 @@ xdr_rmtcall_args(XDR *xdrs, struct rmtcallargs *cap)
 		if (! xdr_u_long(xdrs, &(cap->arglen)))
 		    return (FALSE);
 		argposition = XDR_GETPOS(xdrs);
-		if (! (*(cap->xdr_args))(xdrs, cap->args_ptr, 0))
+		if (! (*(cap->xdr_args))(xdrs, cap->args_ptr))
 		    return (FALSE);
 		position = XDR_GETPOS(xdrs);
 		cap->arglen = (u_long)position - (u_long)argposition;
@@ -167,7 +155,7 @@ xdr_rmtcallres(XDR *xdrs, struct rmtcallres *crp)
 	if (xdr_reference(xdrs, &port_ptr, sizeof (u_long),
 	    (xdrproc_t)xdr_u_long) && xdr_u_long(xdrs, &crp->resultslen)) {
 		crp->port_ptr = (u_long *)(void *)port_ptr;
-		return ((*(crp->xdr_results))(xdrs, crp->results_ptr, 0));
+		return ((*(crp->xdr_results))(xdrs, crp->results_ptr));
 	}
 	return (FALSE);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: map.c,v 1.55 2022/10/30 19:11:31 christos Exp $	*/
+/*	$NetBSD: map.c,v 1.56 2025/01/03 00:40:08 rillig Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)map.c	8.1 (Berkeley) 6/4/93";
 #else
-__RCSID("$NetBSD: map.c,v 1.55 2022/10/30 19:11:31 christos Exp $");
+__RCSID("$NetBSD: map.c,v 1.56 2025/01/03 00:40:08 rillig Exp $");
 #endif
 #endif /* not lint && not SCCSID */
 
@@ -1023,39 +1023,6 @@ map_init_meta(EditLine *el)
 	map[(int) buf[0]] = ED_SEQUENCE_LEAD_IN;
 }
 
-/* set_expected_default_key_bindings():
- *	Ensure that most key sequences sent by terminal emulator (such as
- * 	Home/End/Delete/Insert) work by default e.g. in /bin/sh.
- */
-static void
-set_expected_default_key_bindings(EditLine *e)
-{
-	/*
-	 * Allow the use of Home/End keys.
-	 */
-	el_set(e, EL_BIND, "\\e[1~", "ed-move-to-beg", NULL);
-	el_set(e, EL_BIND, "\\e[4~", "ed-move-to-end", NULL);
-	el_set(e, EL_BIND, "\\e[7~", "ed-move-to-beg", NULL);
-	el_set(e, EL_BIND, "\\e[8~", "ed-move-to-end", NULL);
-	el_set(e, EL_BIND, "\\e[H", "ed-move-to-beg", NULL);
-	el_set(e, EL_BIND, "\\e[F", "ed-move-to-end", NULL);
-
-	/*
-	 * Allow the use of the Delete/Insert keys.
-	 */
-	el_set(e, EL_BIND, "\\e[3~", "ed-delete-next-char", NULL);
-	el_set(e, EL_BIND, "\\e[2~", "ed-quoted-insert", NULL);
-
-	/*
-	 * Ctrl-left-arrow and Ctrl-right-arrow for word moving.
-	 */
-	el_set(e, EL_BIND, "\\e[1;5C", "em-next-word", NULL);
-	el_set(e, EL_BIND, "\\e[1;5D", "ed-prev-word", NULL);
-	el_set(e, EL_BIND, "\\e[5C", "em-next-word", NULL);
-	el_set(e, EL_BIND, "\\e[5D", "ed-prev-word", NULL);
-	el_set(e, EL_BIND, "\\e\\e[C", "em-next-word", NULL);
-	el_set(e, EL_BIND, "\\e\\e[D", "ed-prev-word", NULL);
-}
 
 /* map_init_vi():
  *	Initialize the vi bindings
@@ -1084,7 +1051,6 @@ map_init_vi(EditLine *el)
 
 	tty_bind_char(el, 1);
 	terminal_bind_arrow(el);
-	set_expected_default_key_bindings(el);
 }
 
 
@@ -1119,7 +1085,6 @@ map_init_emacs(EditLine *el)
 
 	tty_bind_char(el, 1);
 	terminal_bind_arrow(el);
-	set_expected_default_key_bindings(el);
 }
 
 
@@ -1425,7 +1390,6 @@ map_bind(EditLine *el, int argc, const wchar_t **argv)
 	/* coverity[dead_error_begin] */
 	default:
 		EL_ABORT((el->el_errfile, "Bad XK_ type %d\n", ntype));
-		break;
 	}
 	return 0;
 }

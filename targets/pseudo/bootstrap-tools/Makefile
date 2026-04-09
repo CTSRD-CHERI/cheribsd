@@ -41,7 +41,7 @@ BSARGS= 	DESTDIR= \
 		-DNO_LINT \
 		-DNO_PIC \
 		-DNO_SHARED \
-		MK_CHERI_CODEPTR_RELOCS=no \
+		OPT_CHERI_TGOT_TLS=native \
 		MK_COMPARTMENT_POLICY=no \
 		MK_CTF=no \
 		MK_CLANG_EXTRAS=no \
@@ -49,7 +49,6 @@ BSARGS= 	DESTDIR= \
 		MK_CLANG_FULL=no \
 		MK_HTML=no \
 		MK_MAN=no \
-		MK_PROFILE=no \
 		MK_RETPOLINE=no \
 		MK_SSP=no \
 		MK_TESTS=no \

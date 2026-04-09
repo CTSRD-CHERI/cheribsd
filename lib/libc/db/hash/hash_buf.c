@@ -31,17 +31,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20180629,
- *   "target_type": "lib",
- *   "changes": [
- *     "pointer_bit_flags"
- *   ]
- * }
- * CHERI CHANGES END
- */
 
 /*
  * PACKAGE: hash
@@ -145,7 +134,7 @@ __get_buf(HTAB *hashp, u_int32_t addr,
 			return (NULL);
 		if (!prev_bp)
 			segp[segment_ndx] =
-			    (BUFHEAD *)((intptr_t)bp | (intptr_t)is_disk_mask);
+			    (BUFHEAD *)((intptr_t)bp | is_disk_mask);
 	} else {
 		BUF_REMOVE(bp);
 		MRU_INSERT(bp);

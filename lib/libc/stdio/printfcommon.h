@@ -64,6 +64,10 @@
 #include "floatio.h"
 #include "gdtoa.h"
 
+#if __has_feature(capabilities)
+#include <cheri/cherireg.h>
+#endif
+
 #define	DEFPREC		6
 
 static int exponent(CHAR *, int, CHAR);
@@ -329,15 +333,15 @@ __cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
 	if (cheri_is_null_derived(pointer))
 		goto address;
 
-	tagged = cheri_gettag(pointer);
+	tagged = cheri_tag_get(pointer);
 	have_attributes = !tagged;
-	if (cheri_gettype(pointer) != CHERI_OTYPE_UNSEALED)
+	if (cheri_type_get(pointer) != CHERI_OTYPE_UNSEALED)
 		have_attributes = true;
 
 #ifdef CHERI_FLAGS_CAP_MODE
 	capmode = false;
-	if ((cheri_getperm(pointer) & CHERI_PERM_EXECUTE) != 0 &&
-	    cheri_getflags(pointer) == CHERI_FLAGS_CAP_MODE) {
+	if ((cheri_perms_get(pointer) & CHERI_PERM_EXECUTE) != 0 &&
+	    cheri_flags_get(pointer) == CHERI_FLAGS_CAP_MODE) {
 		capmode = true;
 		have_attributes = true;
 	}
@@ -357,7 +361,7 @@ __cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
 		if (capmode)
 			PREPEND_ATTR(cp, "capmode");
 #endif
-		switch (cheri_gettype(pointer)) {
+		switch (cheri_type_get(pointer)) {
 		case CHERI_OTYPE_UNSEALED:
 			break;
 		case CHERI_OTYPE_SENTRY:
@@ -381,7 +385,7 @@ __cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
 	*--cp = ']';
 
 	/* top */
-	ujval = cheri_gettop(pointer);
+	ujval = cheri_top_get(pointer);
 	scp = cp;
 	cp = __ujtoa(ujval, cp, 16, 0, xdigs);
 	size = scp - cp;
@@ -396,7 +400,7 @@ __cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
 	*--cp = '-';
 
 	/* base */
-	ujval = cheri_getbase(pointer);
+	ujval = cheri_base_get(pointer);
 	scp = cp;
 	cp = __ujtoa(ujval, cp, 16, 0, xdigs);
 	size = scp - cp;
@@ -411,11 +415,21 @@ __cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
 	*--cp = ',';
 
 	/* permissions */
-	ujval = cheri_getperm(pointer);
+	ujval = cheri_perms_get(pointer);
+#ifdef HAS_CHERI_PERM_LOAD_MUTABLE
+	if (ujval & CHERI_PERM_LOAD_MUTABLE)
+		*--cp = 'M';
+#endif
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	if (ujval & CHERI_PERM_STORE_CAP)
 		*--cp = 'W';
 	if (ujval & CHERI_PERM_LOAD_CAP)
 		*--cp = 'R';
+#endif
+#ifdef HAS_CHERI_PERM_CAP
+	if (ujval & CHERI_PERM_CAP)
+		*--cp = 'C';
+#endif
 	if (ujval & CHERI_PERM_EXECUTE)
 		*--cp = 'x';
 	if (ujval & CHERI_PERM_STORE)
@@ -428,7 +442,7 @@ __cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
 
 address:
 	/* address */
-	ujval = cheri_getaddress(pointer);
+	ujval = cheri_address_get(pointer);
 	scp = cp;
 	cp = __ujtoa(ujval, cp, 16, 0, xdigs);
 	size = scp - cp;

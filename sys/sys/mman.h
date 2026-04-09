@@ -52,11 +52,17 @@
 #define	PROT_READ	0x01	/* pages can be read */
 #define	PROT_WRITE	0x02	/* pages can be written */
 #define	PROT_EXEC	0x04	/* pages can be executed */
+#if __has_feature(capabilities)
 #define	PROT_CAP	0x08	/* capabilities can be read/written */
 #define	PROT_NO_CAP	0x10	/* honor PROT_CAP absense */
+#endif
 #if __BSD_VISIBLE
+#if __has_feature(capabilities)
 #define	_PROT_CAP	(PROT_CAP | PROT_NO_CAP)
 #define	_PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC | _PROT_CAP)
+#else
+#define	_PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC)
+#endif
 #define	PROT_EXTRACT(prot)	((prot) & _PROT_ALL)
 
 #define	_PROT_MAX_SHIFT	16
@@ -324,7 +330,7 @@ bool	shm_largepage(struct shmfd *shmfd);
 void	shm_remove_prison(struct prison *pr);
 int	shm_get_path(struct vm_object *obj, char *path, size_t sz);
 
-extern struct fileops shm_ops;
+extern const struct fileops shm_ops;
 
 #define	MAP_32BIT_MAX_ADDR	((vm_offset_t)1 << 31)
 

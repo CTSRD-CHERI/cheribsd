@@ -135,7 +135,6 @@ linux_to_bsd_ip_sockopt(int opt)
 		LINUX_RATELIMIT_MSG_NOTTESTED("IPv4 socket option IP_RECVTTL");
 		return (IP_RECVTTL);
 	case LINUX_IP_RECVTOS:
-		LINUX_RATELIMIT_MSG_NOTTESTED("IPv4 socket option IP_RECVTOS");
 		return (IP_RECVTOS);
 	case LINUX_IP_FREEBIND:
 		LINUX_RATELIMIT_MSG_NOTTESTED("IPv4 socket option IP_FREEBIND");
@@ -663,6 +662,8 @@ bsd_to_linux_ip_cmsg_type(int cmsg_type)
 	switch (cmsg_type) {
 	case IP_RECVORIGDSTADDR:
 		return (LINUX_IP_RECVORIGDSTADDR);
+	case IP_RECVTOS:
+		return (LINUX_IP_TOS);
 	}
 	return (-1);
 }
@@ -1285,7 +1286,7 @@ linux_sendto(struct thread *td, struct linux_sendto_args *args)
 		return (error);
 	so = fp->f_data;
 	if ((so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING)) == 0) {
-		msg.msg_name = __USER_CAP(PTRIN(args->to), args->tolen);
+		msg.msg_name = USER_PTR(PTRIN(args->to), args->tolen);
 		msg.msg_namelen = args->tolen;
 	}
 	msg.msg_iov = &aiov;
@@ -1855,7 +1856,7 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 		lcm->cmsg_level = bsd_to_linux_sockopt_level(cm->cmsg_level);
 
 		if (lcm->cmsg_type == -1 ||
-		    cm->cmsg_level == -1) {
+		    lcm->cmsg_level == -1) {
 			LINUX_RATELIMIT_MSG_OPT2(
 			    "unsupported recvmsg cmsg level %d type %d",
 			    cm->cmsg_level, cm->cmsg_type);
@@ -2535,6 +2536,13 @@ sendfile_sendfile(struct thread *td, struct file *fp, l_int out,
 		current_offset = *offset;
 	error = fo_sendfile(fp, out, NULL, NULL, current_offset, count,
 	    sbytes, 0, td);
+	if (error == EAGAIN && *sbytes > 0) {
+		/*
+		 * The socket is non-blocking and we didn't finish sending.
+		 * Squash the error, since that's what Linux does.
+		 */
+		error = 0;
+	}
 	if (error == 0) {
 		current_offset += *sbytes;
 		if (offset != NULL)

@@ -17,6 +17,9 @@ CRUNCH_BUILDOPTS+=	MK_PIE=no NO_SHARED=yes
 LDFLAGS+=	-Wl,--allow-multiple-definition
 .endif
 
+# ld.lld: error: could not determine size of cap reloc against local object snl_f_p_empty
+LD_FATAL_WARNINGS=	no
+
 PROG=	rescue
 BINDIR?=/rescue
 
@@ -143,7 +146,7 @@ CRUNCH_PROGS_usr.sbin+= zdb
 # CRUNCH_PROGS+= devd
 
 CRUNCH_LIBS+= -l80211 -lalias -lcam -lncursesw -ldevstat -lipsec -llzma
-CRUNCH_LIBS_camcontrol+= ${LIBNVMF}
+CRUNCH_LIBS_camcontrol+= ${LIBNVMF} ${LIBNV}
 .if ${MK_ZFS} != "no"
 CRUNCH_LIBS+= -lavl -lpthread -luutil -lumem -ltpool -lspl -lrt
 CRUNCH_LIBS_zfs+=	${LIBBE} \

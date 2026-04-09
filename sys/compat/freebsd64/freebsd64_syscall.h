@@ -445,7 +445,7 @@
 #define	FREEBSD64_SYS_freebsd64_symlinkat	502
 #define	FREEBSD64_SYS_freebsd64_unlinkat	503
 #define	FREEBSD64_SYS_posix_openpt	504
-#define	FREEBSD64_SYS_freebsd64_gssd_syscall	505
+				/* 505 is obsolete kgssapi */
 #define	FREEBSD64_SYS_freebsd64_jail_get	506
 #define	FREEBSD64_SYS_freebsd64_jail_set	507
 #define	FREEBSD64_SYS_jail_remove	508
@@ -515,7 +515,7 @@
 #define	FREEBSD64_SYS_freebsd64_sigfastblock	573
 #define	FREEBSD64_SYS_freebsd64___realpathat	574
 #define	FREEBSD64_SYS_close_range	575
-#define	FREEBSD64_SYS_freebsd64_rpctls_syscall	576
+#define	FREEBSD64_SYS_rpctls_syscall	576
 #define	FREEBSD64_SYS_freebsd64___specialfd	577
 #define	FREEBSD64_SYS_freebsd64_aio_writev	578
 #define	FREEBSD64_SYS_freebsd64_aio_readv	579
@@ -529,4 +529,6 @@
 #define	FREEBSD64_SYS_freebsd64_timerfd_settime	587
 #define	FREEBSD64_SYS_freebsd64_kcmp	588
 #define	FREEBSD64_SYS_freebsd64_getrlimitusage	589
-#define	FREEBSD64_SYS_MAXSYSCALL	590
+#define	FREEBSD64_SYS_fchroot	590
+#define	FREEBSD64_SYS_freebsd64_setcred	591
+#define	FREEBSD64_SYS_MAXSYSCALL	592

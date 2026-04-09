@@ -87,10 +87,9 @@ struct ktr_header {
  * is the public interface.
  */
 #define	KTRCHECK(td, type)	((td)->td_proc->p_traceflag & (1 << type))
-#define KTRPOINT(td, type)  (__predict_false(KTRCHECK((td), (type))))
-#define	KTRCHECKDRAIN(td)	(!(STAILQ_EMPTY(&(td)->td_proc->p_ktr)))
+#define	KTRPOINT(td, type)	(__predict_false(KTRCHECK((td), (type))))
 #define	KTRUSERRET(td) do {						\
-	if (__predict_false(KTRCHECKDRAIN(td)))				\
+	if (__predict_false(!STAILQ_EMPTY_ATOMIC(&(td)->td_proc->p_ktr))) \
 		ktruserret(td);						\
 } while (0)
 
@@ -264,6 +263,16 @@ struct ktr_struct_array {
 };
 
 /*
+ * KTR_ARGS - arguments of execve()
+ */
+#define KTR_ARGS 16
+
+/*
+ * KTR_ENVS - environment variables of execve()
+ */
+#define KTR_ENVS 17
+
+/*
  * KTR_SYSERRCAUSE - String detailing cause of next syscall error
  */
 #define	KTR_SYSERRCAUSE	19
@@ -301,6 +310,8 @@ struct ktr_struct_array {
 #define KTRFAC_FAULT	(1<<KTR_FAULT)
 #define KTRFAC_FAULTEND	(1<<KTR_FAULTEND)
 #define	KTRFAC_STRUCT_ARRAY (1<<KTR_STRUCT_ARRAY)
+#define KTRFAC_ARGS     (1<<KTR_ARGS)
+#define KTRFAC_ENVS     (1<<KTR_ENVS)
 #define	KTRFAC_SYSERRCAUSE	(1<<KTR_SYSERRCAUSE)
 
 /*
@@ -345,6 +356,7 @@ void	ktrstruct_error(const char *, const void *, size_t, int);
 void	ktrstructarray(const char *, enum uio_seg, const void * __capability,
 	    int, size_t);
 void	ktrcapfail(enum ktr_cap_violation, const void *);
+void	ktrdata(int, const void *, size_t);
 #define ktrcaprights(s) \
 	ktrstruct("caprights", (s), sizeof(cap_rights_t))
 #define	ktritimerval(s) \

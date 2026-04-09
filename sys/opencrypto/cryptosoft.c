@@ -1752,13 +1752,3 @@ extern int crypto_modevent(struct module *, int, void *);
 DRIVER_MODULE(cryptosoft, nexus, swcr_driver, crypto_modevent, NULL);
 MODULE_VERSION(cryptosoft, 1);
 MODULE_DEPEND(cryptosoft, crypto, 1, 1, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "iovec-macros",
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

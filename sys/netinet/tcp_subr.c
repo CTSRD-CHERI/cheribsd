@@ -58,7 +58,6 @@
 #include <sys/refcount.h>
 #include <sys/mbuf.h>
 #include <sys/priv.h>
-#include <sys/proc.h>
 #include <sys/sdt.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -110,9 +109,6 @@
 #include <netinet/tcpip.h>
 #include <netinet/tcp_fastopen.h>
 #include <netinet/tcp_accounting.h>
-#ifdef TCPPCAP
-#include <netinet/tcp_pcap.h>
-#endif
 #ifdef TCP_OFFLOAD
 #include <netinet/tcp_offload.h>
 #endif
@@ -1385,7 +1381,7 @@ deregister_tcp_functions(struct tcp_function_block *blk, bool quiesce,
 }
 
 static void
-tcp_drain(void)
+tcp_drain(void *ctx __unused, int flags __unused)
 {
 	struct epoch_tracker et;
 	VNET_ITERATOR_DECL(vnet_iter);
@@ -1416,13 +1412,6 @@ tcp_drain(void)
 				tcp_clean_sackreport(tcpb);
 #ifdef TCP_BLACKBOX
 				tcp_log_drain(tcpb);
-#endif
-#ifdef TCPPCAP
-				if (tcp_pcap_aggressive_free) {
-					/* Free the TCP PCAP queues. */
-					tcp_pcap_drain(&(tcpb->t_inpkts));
-					tcp_pcap_drain(&(tcpb->t_outpkts));
-				}
 #endif
 			}
 		}
@@ -1536,9 +1525,6 @@ tcp_init(void *arg __unused)
 	tcp_bad_csums = counter_u64_alloc(M_WAITOK);
 	tcp_pacing_failures = counter_u64_alloc(M_WAITOK);
 	tcp_dgp_failures = counter_u64_alloc(M_WAITOK);
-#ifdef TCPPCAP
-	tcp_pcap_init();
-#endif
 
 	hashsize = tcp_tcbhashsize;
 	if (hashsize == 0) {
@@ -1593,24 +1579,10 @@ SYSINIT(tcp_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_THIRD, tcp_init, NULL);
 static void
 tcp_destroy(void *unused __unused)
 {
-	int n;
 #ifdef TCP_HHOOK
 	int error;
 #endif
 
-	/*
-	 * All our processes are gone, all our sockets should be cleaned
-	 * up, which means, we should be past the tcp_discardcb() calls.
-	 * Sleep to let all tcpcb timers really disappear and cleanup.
-	 */
-	for (;;) {
-		INP_INFO_WLOCK(&V_tcbinfo);
-		n = V_tcbinfo.ipi_count;
-		INP_INFO_WUNLOCK(&V_tcbinfo);
-		if (n == 0)
-			break;
-		pause("tcpdes", hz / 10);
-	}
 	tcp_hc_destroy();
 	syncache_destroy();
 	in_pcbinfo_destroy(&V_tcbinfo);
@@ -2114,7 +2086,7 @@ tcp_respond(struct tcpcb *tp, void *ipgen, struct tcphdr *th, struct mbuf *m,
 			union tcp_log_stackspecific log;
 			struct timeval tv;
 
-			memset(&log.u_bbr, 0, sizeof(log.u_bbr));
+			memset(&log, 0, sizeof(log));
 			log.u_bbr.inhpts = tcp_in_hpts(tp);
 			log.u_bbr.flex8 = 4;
 			log.u_bbr.pkts_out = tp->t_maxseg;
@@ -2215,6 +2187,8 @@ tcp_send_challenge_ack(struct tcpcb *tp, struct tcphdr *th, struct mbuf *m)
 		tcp_respond(tp, mtod(m, void *), th, m, tp->rcv_nxt,
 		    tp->snd_nxt, TH_ACK);
 		tp->last_ack_sent = tp->rcv_nxt;
+	} else {
+		m_freem(m);
 	}
 }
 
@@ -2352,12 +2326,6 @@ tcp_newtcpcb(struct inpcb *inp, struct tcpcb *listening_tcb)
 	 * which may match an IPv4-mapped IPv6 address.
 	 */
 	inp->inp_ip_ttl = V_ip_defttl;
-#ifdef TCPPCAP
-	/*
-	 * Init the TCP PCAP queues.
-	 */
-	tcp_pcap_tcpcb_init(tp);
-#endif
 #ifdef TCP_BLACKBOX
 	/* Initialize the per-TCPCB log data. */
 	tcp_log_tcpcbinit(tp);
@@ -2434,11 +2402,6 @@ tcp_discardcb(struct tcpcb *tp)
 	if (tp->t_flags & TF_TOE)
 		tcp_offload_detach(tp);
 #endif
-#ifdef TCPPCAP
-	/* Free the TCP PCAP queues. */
-	tcp_pcap_drain(&(tp->t_inpkts));
-	tcp_pcap_drain(&(tp->t_outpkts));
-#endif
 
 	/* Allow the CC algorithm to clean up after itself. */
 	if (CC_ALGO(tp)->cb_destroy != NULL)
@@ -2484,10 +2447,8 @@ tcp_discardcb(struct tcpcb *tp)
 	 * XXXRRS: Updating must be after the stack fini() since
 	 * that may be converting some internal representation of
 	 * say srtt etc into the general one used by other stacks.
-	 * Lets also at least protect against the so being NULL
-	 * as RW stated below.
 	 */
-	if ((tp->t_rttupdated >= 4) && (so != NULL)) {
+	if (tp->t_rttupdated >= 4) {
 		struct hc_metrics_lite metrics;
 		uint32_t ssthresh;
 
@@ -2497,9 +2458,6 @@ tcp_discardcb(struct tcpcb *tp)
 		 * are satisfied. This gives us better new start value
 		 * for the congestion avoidance for new connections.
 		 * ssthresh is only set if packet loss occurred on a session.
-		 *
-		 * XXXRW: 'so' may be NULL here, and/or socket buffer may be
-		 * being torn down.  Ideally this code would not use 'so'.
 		 */
 		ssthresh = tp->snd_ssthresh;
 		if (ssthresh != 0 && ssthresh < so->so_snd.sb_hiwat / 2) {
@@ -2522,13 +2480,13 @@ tcp_discardcb(struct tcpcb *tp)
 			    );
 		} else
 			ssthresh = 0;
-		metrics.rmx_ssthresh = ssthresh;
+		metrics.hc_ssthresh = ssthresh;
 
-		metrics.rmx_rtt = tp->t_srtt;
-		metrics.rmx_rttvar = tp->t_rttvar;
-		metrics.rmx_cwnd = tp->snd_cwnd;
-		metrics.rmx_sendpipe = 0;
-		metrics.rmx_recvpipe = 0;
+		metrics.hc_rtt = tp->t_srtt;
+		metrics.hc_rttvar = tp->t_rttvar;
+		metrics.hc_cwnd = tp->snd_cwnd;
+		metrics.hc_sendpipe = 0;
+		metrics.hc_recvpipe = 0;
 
 		tcp_hc_update(&inp->inp_inc, &metrics);
 	}
@@ -2718,6 +2676,8 @@ tcp_getcred(SYSCTL_HANDLER_ARGS)
 	struct inpcb *inp;
 	int error;
 
+	if (req->newptr == NULL)
+		return (EINVAL);
 	error = priv_check(req->td, PRIV_NETINET_GETCRED);
 	if (error)
 		return (error);
@@ -2760,6 +2720,8 @@ tcp6_getcred(SYSCTL_HANDLER_ARGS)
 	int mapped = 0;
 #endif
 
+	if (req->newptr == NULL)
+		return (EINVAL);
 	error = priv_check(req->td, PRIV_NETINET_GETCRED);
 	if (error)
 		return (error);
@@ -3346,7 +3308,7 @@ tcp_mtudisc(struct inpcb *inp, int mtuoffer)
 	tcp_mss_update(tp, -1, mtuoffer, NULL, NULL);
 
 	so = inp->inp_socket;
-	SOCKBUF_LOCK(&so->so_snd);
+	SOCK_SENDBUF_LOCK(so);
 	/* If the mss is larger than the socket buffer, decrease the mss. */
 	if (so->so_snd.sb_hiwat < tp->t_maxseg) {
 		tp->t_maxseg = so->so_snd.sb_hiwat;
@@ -3361,7 +3323,7 @@ tcp_mtudisc(struct inpcb *inp, int mtuoffer)
 			tp->t_flags2 &= ~TF2_PROC_SACK_PROHIBIT;
 		}
 	}
-	SOCKBUF_UNLOCK(&so->so_snd);
+	SOCK_SENDBUF_UNLOCK(so);
 
 	TCPSTAT_INC(tcps_mturesent);
 	tp->t_rtttime = 0;
@@ -4404,7 +4366,7 @@ tcp_req_log_req_info(struct tcpcb *tp, struct tcp_sendfile_track *req,
 		union tcp_log_stackspecific log;
 		struct timeval tv;
 
-		memset(&log.u_bbr, 0, sizeof(log.u_bbr));
+		memset(&log, 0, sizeof(log));
 		log.u_bbr.inhpts = tcp_in_hpts(tp);
 		log.u_bbr.flex8 = val;
 		log.u_bbr.rttProp = req->timestamp;
@@ -4796,12 +4758,3 @@ tcp_account_for_send(struct tcpcb *tp, uint32_t len, uint8_t is_rxt,
 	}
 #endif
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "subobject_bounds"
-//   ]
-// }
-// CHERI CHANGES END

@@ -30,7 +30,7 @@
 #
 
 .if !target(__<bsd.opts.mk>__)
-__<bsd.opts.mk>__:
+__<bsd.opts.mk>__:	.NOTMAIN
 
 .if !defined(_WITHOUT_SRCCONF)
 #
@@ -52,7 +52,6 @@ __<bsd.opts.mk>__:
 
 __DEFAULT_YES_OPTIONS = \
     ASSERT_DEBUG \
-    CHERI_CODEPTR_RELOCS \
     DEBUG_FILES \
     DOCCOMPRESS \
     INCLUDES \
@@ -79,11 +78,11 @@ __DEFAULT_NO_OPTIONS = \
     CCACHE_BUILD \
     CTF \
     INSTALL_AS_USER \
-    PROFILE \
     RETPOLINE \
     STALE_STAGED \
     UBSAN \
-    UNDEFINED_VERSION
+    UNDEFINED_VERSION \
+    ZEROREGS
 
 __DEFAULT_DEPENDENT_OPTIONS = \
     MAKE_CHECK_USE_SANDBOX/TESTS \
@@ -115,7 +114,11 @@ BROKEN_OPTIONS+=	BRANCH_PROTECTION
 .endif
 
 __SINGLE_OPTIONS = \
+   CHERI_TGOT_TLS \
    INIT_ALL
+
+__CHERI_TGOT_TLS_OPTIONS=	native no compat yes
+__CHERI_TGOT_TLS_DEFAULT=	native
 
 __INIT_ALL_OPTIONS=	none pattern zero
 __INIT_ALL_DEFAULT=	none

@@ -32,18 +32,6 @@
 /*
  * Copyright (c) 1986-1991 by Sun Microsystems Inc. 
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20221129,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "sunrpc"
- * }
- * CHERI CHANGES END
- */
 
 /*
  * svc_auth.c, Server-side rpc authenticator interface.
@@ -159,7 +147,7 @@ static bool_t
 svcauth_null_wrap(SVCAUTH *auth, XDR *xdrs, xdrproc_t xdr_func, caddr_t xdr_ptr)
 {
 
-	return (xdr_func(xdrs, xdr_ptr, 0));
+	return (xdr_func(xdrs, xdr_ptr));
 }
 
 struct svc_auth_ops svc_auth_null_ops = {

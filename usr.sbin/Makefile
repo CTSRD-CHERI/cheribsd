@@ -180,7 +180,6 @@ SUBDIR.${MK_NIS}+=	yppush
 SUBDIR.${MK_NIS}+=	ypserv
 SUBDIR.${MK_NIS}+=	ypset
 SUBDIR.${MK_NTP}+=	ntp
-SUBDIR.${MK_OPENSSL}+=	keyserv
 SUBDIR.${MK_OPENSSL_KTLS}+=	rpc.tlsclntd
 SUBDIR.${MK_OPENSSL_KTLS}+=	rpc.tlsservd
 SUBDIR.${MK_PF}+=	ftp-proxy
@@ -215,6 +214,7 @@ SUBDIR.${MK_UTMPX}+=	ac
 SUBDIR.${MK_UTMPX}+=	lastlogin
 SUBDIR.${MK_UTMPX}+=	utx
 SUBDIR.${MK_WIRELESS}+=	wlandebug
+SUBDIR.${MK_WIRELESS}+=	wlanstats
 SUBDIR.${MK_WIRELESS}+=	wpa
 
 .if !${MACHINE_ABI:Mpurecap}

@@ -57,30 +57,8 @@ spibus_attach(device_t dev)
 
 	sc->dev = dev;
 	bus_enumerate_hinted_children(dev);
-	return (bus_generic_attach(dev));
-}
-
-/*
- * Since this is not a self-enumerating bus, and since we always add
- * children in attach, we have to always delete children here.
- */
-int
-spibus_detach(device_t dev)
-{
-	return (device_delete_children(dev));
-}
-
-static int
-spibus_suspend(device_t dev)
-{
-	return (bus_generic_suspend(dev));
-}
-
-static
-int
-spibus_resume(device_t dev)
-{
-	return (bus_generic_resume(dev));
+	bus_attach_children(dev);
+	return (0);
 }
 
 static int
@@ -256,10 +234,10 @@ static device_method_t spibus_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		spibus_probe),
 	DEVMETHOD(device_attach,	spibus_attach),
-	DEVMETHOD(device_detach,	spibus_detach),
+	DEVMETHOD(device_detach,	bus_generic_detach),
 	DEVMETHOD(device_shutdown,	bus_generic_shutdown),
-	DEVMETHOD(device_suspend,	spibus_suspend),
-	DEVMETHOD(device_resume,	spibus_resume),
+	DEVMETHOD(device_suspend,	bus_generic_suspend),
+	DEVMETHOD(device_resume,	bus_generic_resume),
 
 	/* Bus interface */
 	DEVMETHOD(bus_setup_intr,	bus_generic_setup_intr),

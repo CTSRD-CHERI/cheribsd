@@ -28,6 +28,7 @@
  */
 
 #include <sys/param.h>
+#include <sys/abi_compat.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
 #include <sys/ioccom.h>
@@ -169,7 +170,7 @@ mem_read_cheri_caps(struct cdev *dev, const struct mem_cheri_cap_arg *arg)
 
 		src = (uintcap_t *)((char *)mapped_ptr + page_off);
 		while (todo != 0) {
-			capbuf[0] = cheri_gettag(*src);
+			capbuf[0] = cheri_tag_get(*src);
 			memcpy(capbuf + 1, src, sizeof(*src));
 
 			error = copyout(capbuf, dst, sizeof(capbuf));
@@ -236,7 +237,7 @@ memioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags,
 	case MEM_READ_CHERI_CAP64:
 		cap_arg64 = (const struct mem_cheri_cap_arg64 *)data;
 		cap_arg_thunk.vaddr = cap_arg64->vaddr;
-		cap_arg_thunk.buf = __USER_CAP(cap_arg64->buf, cap_arg64->len);
+		cap_arg_thunk.buf = USER_PTR(cap_arg64->buf, cap_arg64->len);
 		cap_arg_thunk.len = cap_arg64->len;
 		error = mem_read_cheri_caps(dev, &cap_arg_thunk);
 		break;

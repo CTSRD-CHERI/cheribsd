@@ -45,9 +45,11 @@
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <machine/cherireg.h>
 #endif
+#include <machine/cpu.h>
 #include <machine/param.h>
-#include <machine/riscvreg.h>
 #include <machine/pte.h>
+#include <machine/riscvreg.h>
+#include <machine/sbi.h>
 
 	.globl	kernbase
 	.set	kernbase, KERNBASE
@@ -88,11 +90,7 @@ _alt_start:
 	csetaddr ct1, ct1, t0
 	li	t0, 1
 	csetflags ct1, ct1, t0
-#ifdef __riscv_xcheri_mode_dependent_jumps
 	jr.cap	ct1
-#else
-	cjr	ct1
-#endif
 1:
 .option pop
 #endif
@@ -123,8 +121,12 @@ _alt_start:
 	sw	a0, 0(t0)
 #endif
 
-	/* Load zero as modulep */
-	mv	a0, zero
+	/*
+	 * Stash the DTB pointer in the callee-saved register s4, and zero s3
+	 * to indicate that we have no loader metadata.
+	 */
+	mv	s4, a1
+	mv	s3, zero
 	j	pagetables
 
 /*
@@ -148,10 +150,16 @@ _start:
 #endif
 
 	/*
-	 * Zero a1 to indicate that we have no DTB pointer. It is already
-	 * included in the loader(8) metadata.
+	 * Stash modulep in the callee-saved register s3, and zero s4 to
+	 * indicate that we have no DTB pointer. It is already included in the
+	 * loader(8) metadata.
 	 */
-	mv	a1, zero
+#ifdef __CHERI_PURE_CAPABILITY__
+	cmove	cs3, ca0
+#else	
+	mv	s3, a0
+#endif
+	mv	s4, zero
 
 	/*
 	 * Set up page tables: Our goal is to enable virtual memory, doing the
@@ -172,16 +180,22 @@ _start:
 	 * here and will conditionally enable Sv48 (or higher) later.
 	 *
 	 * We arrive here with:
-	 *  a0 - modulep or zero
-	 *  a1 - zero or dtbp
+	 *  s3 - modulep or zero
+	 *  s4 - zero or dtbp
 	 */
 pagetables:
 	/* Get the kernel's load address (kernstart) in s9 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	cllc	cra, get_physmem
-	cjalr	cra
+	cjal	get_physmem
 #else
 	jal	get_physmem
+#endif
+
+	/* Get PTE attribute bits in s8 */
+#ifdef __CHERI_PURE_CAPABILITY__
+	cjal	get_pte_fixup_bits
+#else
+	jal	get_pte_fixup_bits
 #endif
 
 	/* Construct 1GB Identity Map (1:1 PA->VA) */
@@ -194,6 +208,7 @@ pagetables:
 	srli	s2, s9, L1_SHIFT	/* kernstart >> L1_SHIFT */
 	andi	a5, s2, Ln_ADDR_MASK	/* & Ln_ADDR_MASK */
 	li	t4, (PTE_KERN)
+	or	t4, t4, s8		/* t4 |= pte bits */
 	slli	s2, s2, PTE_PPN2_S	/* (s2 << PTE_PPN2_S) */
 	or	t6, t4, s2
 
@@ -248,6 +263,7 @@ pagetables:
 	li	t2, Ln_ENTRIES		/* Build 512 entries */
 	add	t3, t4, t2
 	li	t0, (PTE_KERN_CAP | PTE_X)
+	or	t0, t0, s8		/* t0 |= pte bits */
 1:
 	slli	t2, t4, PTE_PPN1_S	/* << PTE_PPN1_S */
 	or	t5, t0, t2
@@ -348,13 +364,13 @@ va:
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Initialize stack pointer */
-	cllc	cs3, initstack
+	cllc	cs2, initstack
 	cllc	ct0, initstack_end
-	sub	t0, t0, s3
-	csetbounds cs3, cs3, t0
+	sub	t0, t0, s2
+	csetbounds cs2, cs2, t0
 	li	t1, CHERI_PERMS_KERNEL_DATA
-	candperm cs3, cs3, t1
-	cincoffset csp, cs3, t0
+	candperm cs2, cs2, t1
+	cincoffset csp, cs2, t0
 
 	/* Allocate space for thread0 PCB and riscv_bootparams */
 	cincoffset csp, csp, -(PCB_SIZE + RISCV_BOOTPARAMS_SIZE) & ~STACKALIGNBYTES
@@ -371,12 +387,6 @@ va:
 	cspecialr cs0, ddc
 	cmove	ct0, cnull
 	cspecialw ddc, ct0
-
-	/* Save modulep in cs2. */
-	cmove	cs2, ca0
-
-	/* Save DTB physical pointer in s1. */
-	mv	s1, a1
 
 	/*
 	 * Initialize kernel's ELF file.
@@ -411,15 +421,14 @@ va:
 
 	/* Initialize capabilities. */
 	cmove	ca0, cs0
-	clgc	cra, _C_LABEL(cheri_init_capabilities)
-	cjalr	cra
+	ccall	_C_LABEL(cheri_init_capabilities)
 
 	/* Fill riscv_bootparams */
 	csd	s9, RISCV_BOOTPARAMS_KERN_PHYS(csp)
 
-	csc	cs3, RISCV_BOOTPARAMS_KERN_STACK(csp)
-	csd	s1, RISCV_BOOTPARAMS_DTBP_PHYS(csp)
-	csc	cs2, RISCV_BOOTPARAMS_MODULEP(csp)
+	csc	cs2, RISCV_BOOTPARAMS_KERN_STACK(csp)
+	csd	s4, RISCV_BOOTPARAMS_DTBP_PHYS(csp)
+	csc	cs3, RISCV_BOOTPARAMS_MODULEP(csp)
 
 	/* Discard omnipotent cs0. */
 	cmove	cs0, cnull
@@ -430,10 +439,8 @@ va:
 	cmove	cs3, cnull
 
 	csetbounds ca0, csp, RISCV_BOOTPARAMS_SIZE
-	clgc	cra, _C_LABEL(initriscv)
-	cjalr	cra			/* Off we go */
-	clgc	cra, _C_LABEL(mi_startup)
-	cjalr	cra
+	ccall	_C_LABEL(initriscv)
+	ccall	_C_LABEL(mi_startup)
 #else
 	/* Initialize stack pointer */
 	la	sp, initstack_end
@@ -451,12 +458,6 @@ va:
 	sd	zero, 0(t0)
 	addi	t0, t0, 8
 	bltu	t0, t1, 1b
-
-	/* Save modulep in s2. */
-	mv	s2, a0
-
-	/* Save DTB physical pointer in s1. */
-	mv	s1, a1
 
 	/*
 	 * Initialize kernel's ELF file.
@@ -479,8 +480,8 @@ va:
 
 	la	t0, initstack
 	sd	t0, RISCV_BOOTPARAMS_KERN_STACK(sp)
-	sd	s1, RISCV_BOOTPARAMS_DTBP_PHYS(sp)
-	sd	s2, RISCV_BOOTPARAMS_MODULEP(sp)
+	sd	s4, RISCV_BOOTPARAMS_DTBP_PHYS(sp)
+	sd	s3, RISCV_BOOTPARAMS_MODULEP(sp)
 
 	mv	a0, sp
 	call	_C_LABEL(initriscv)	/* Off we go */
@@ -506,6 +507,28 @@ get_physmem:
 	sub	t1, t1, t0	/* calculate phys->virt delta */
 	li	t2, KERNBASE
 	sub	s9, t2, t1	/* s9 = physmem base */
+	RETURN
+
+/*
+ * T-HEAD CPUs implement an alternate scheme for PTE attributes that is
+ * incompatible with the RISC-V PTE specification (see the definitions in
+ * pte.h). Worse, it defines a non-zero value for "main" memory, and this must
+ * be set in order to proceed with our new page tables.
+ *
+ * Therefore, we are forced to check the CPU identity here, which is both
+ * inconvenient and fragile.
+ *
+ * Return the required attribute bits in s8. For sane implementations this is
+ * zero.
+ */
+get_pte_fixup_bits:
+	mv	s8, zero
+	SBI_CALL(SBI_EXT_ID_BASE, SBI_BASE_GET_MVENDORID)
+	li	t0, MVENDORID_THEAD
+	xor	t0, t0, a1
+	bnez	t0, 1f		/* branch if a1 != t0 */
+	li	s8, PTE_THEAD_MA_NONE
+1:
 	RETURN
 
 	.align  4
@@ -567,8 +590,7 @@ ENTRY(mpentry)
 	clc	csp, 0(ct0)
 
 	/* Get the kernel's load address */
-	cllc	cra, get_physmem
-	cjalr	cra
+	cjal	get_physmem
 
 	/* Setup supervisor trap vector */
 	cllc	ct0, mpva
@@ -670,8 +692,7 @@ mpva:
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	clgc	cra, init_secondary
-	cjalr	cra
+	ccall	init_secondary
 #else
 	call	init_secondary
 #endif

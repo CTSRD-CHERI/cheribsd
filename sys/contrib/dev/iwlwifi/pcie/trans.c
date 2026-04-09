@@ -2754,7 +2754,7 @@ static int iwl_dbgfs_tx_queue_open(struct inode *inode, struct file *filp)
 }
 
 static ssize_t iwl_dbgfs_rx_queue_read(struct file *file,
-				       char __user *user_buf,
+				       char __user * __capability user_buf,
 				       size_t count, loff_t *ppos)
 {
 	struct iwl_trans *trans = file->private_data;
@@ -2803,7 +2803,7 @@ static ssize_t iwl_dbgfs_rx_queue_read(struct file *file,
 }
 
 static ssize_t iwl_dbgfs_interrupt_read(struct file *file,
-					char __user *user_buf,
+					char __user * __capability user_buf,
 					size_t count, loff_t *ppos)
 {
 	struct iwl_trans *trans = file->private_data;
@@ -2861,7 +2861,7 @@ static ssize_t iwl_dbgfs_interrupt_read(struct file *file,
 }
 
 static ssize_t iwl_dbgfs_interrupt_write(struct file *file,
-					 const char __user *user_buf,
+					 const char __user * __capability user_buf,
 					 size_t count, loff_t *ppos)
 {
 	struct iwl_trans *trans = file->private_data;
@@ -2880,7 +2880,7 @@ static ssize_t iwl_dbgfs_interrupt_write(struct file *file,
 }
 
 static ssize_t iwl_dbgfs_csr_write(struct file *file,
-				   const char __user *user_buf,
+				   const char __user * __capability user_buf,
 				   size_t count, loff_t *ppos)
 {
 	struct iwl_trans *trans = file->private_data;
@@ -2891,7 +2891,7 @@ static ssize_t iwl_dbgfs_csr_write(struct file *file,
 }
 
 static ssize_t iwl_dbgfs_fh_reg_read(struct file *file,
-				     char __user *user_buf,
+				     char __user * __capability user_buf,
 				     size_t count, loff_t *ppos)
 {
 	struct iwl_trans *trans = file->private_data;
@@ -2909,7 +2909,7 @@ static ssize_t iwl_dbgfs_fh_reg_read(struct file *file,
 }
 
 static ssize_t iwl_dbgfs_rfkill_read(struct file *file,
-				     char __user *user_buf,
+				     char __user * __capability user_buf,
 				     size_t count, loff_t *ppos)
 {
 	struct iwl_trans *trans = file->private_data;
@@ -2926,7 +2926,7 @@ static ssize_t iwl_dbgfs_rfkill_read(struct file *file,
 }
 
 static ssize_t iwl_dbgfs_rfkill_write(struct file *file,
-				      const char __user *user_buf,
+				      const char __user * __capability user_buf,
 				      size_t count, loff_t *ppos)
 {
 	struct iwl_trans *trans = file->private_data;
@@ -2977,7 +2977,7 @@ static int iwl_dbgfs_monitor_data_release(struct inode *inode,
 	return 0;
 }
 
-static bool iwl_write_to_user_buf(char __user *user_buf, ssize_t count,
+static bool iwl_write_to_user_buf(char __user * __capability user_buf, ssize_t count,
 				  void *buf, ssize_t *size,
 				  ssize_t *bytes_copied)
 {
@@ -2996,7 +2996,7 @@ static bool iwl_write_to_user_buf(char __user *user_buf, ssize_t count,
 }
 
 static ssize_t iwl_dbgfs_monitor_data_read(struct file *file,
-					   char __user *user_buf,
+					   char __user * __capability user_buf,
 					   size_t count, loff_t *ppos)
 {
 	struct iwl_trans *trans = file->private_data;
@@ -3079,7 +3079,7 @@ static ssize_t iwl_dbgfs_monitor_data_read(struct file *file,
 }
 
 static ssize_t iwl_dbgfs_rf_read(struct file *file,
-				 char __user *user_buf,
+				 char __user * __capability user_buf,
 				 size_t count, loff_t *ppos)
 {
 	struct iwl_trans *trans = file->private_data;

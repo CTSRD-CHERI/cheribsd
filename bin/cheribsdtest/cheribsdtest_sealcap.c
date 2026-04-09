@@ -32,6 +32,7 @@
 
 #include "cheribsdtest.h"
 
+#ifdef HAS_CHERI_PERM_SEAL
 static void * __capability
 get_sealcap(void)
 {
@@ -53,31 +54,31 @@ CHERIBSDTEST(sealcap_sysctl, "Retrieve sealcap using sysctl(3)")
 	sealcap = get_sealcap();
 
 	/* Base. */
-	v = cheri_getbase(sealcap);
+	v = cheri_base_get(sealcap);
 	if (v != CHERI_SEALCAP_USERSPACE_BASE)
 		cheribsdtest_failure_errx("base %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_SEALCAP_USERSPACE_BASE);
 
 	/* Length. */
-	v = cheri_getlen(sealcap);
+	v = cheri_length_get(sealcap);
 	if (v != CHERI_SEALCAP_USERSPACE_LENGTH)
 		cheribsdtest_failure_errx("length 0x%jx (expected 0x%jx)", v,
 		    (uintmax_t)CHERI_SEALCAP_USERSPACE_LENGTH);
 
 	/* Offset. */
-	v = cheri_getoffset(sealcap);
+	v = cheri_offset_get(sealcap);
 	if (v != CHERI_SEALCAP_USERSPACE_OFFSET)
 		cheribsdtest_failure_errx("offset %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_SEALCAP_USERSPACE_OFFSET);
 
 	/* Type -- should have unsealed type. */
-	v = cheri_gettype(sealcap);
+	v = cheri_type_get(sealcap);
 	if (v != (u_register_t)CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_OTYPE_UNSEALED);
 
 	/* Permissions. */
-	v = cheri_getperm(sealcap);
+	v = cheri_perms_get(sealcap);
 	if (v != CHERI_SEALCAP_USERSPACE_PERMS)
 		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_SEALCAP_USERSPACE_PERMS);
@@ -98,11 +99,16 @@ CHERIBSDTEST(sealcap_sysctl, "Retrieve sealcap using sysctl(3)")
 	if ((v & CHERI_PERM_STORE) != 0)
 		cheribsdtest_failure_errx("perms %jx (store present)", v);
 
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	if ((v & CHERI_PERM_LOAD_CAP) != 0)
 		cheribsdtest_failure_errx("perms %jx (loadcap present)", v);
-
 	if ((v & CHERI_PERM_STORE_CAP) != 0)
 		cheribsdtest_failure_errx("perms %jx (storecap present)", v);
+#endif
+#ifdef HAS_CHERI_PERM_CAP
+        if ((v & CHERI_PERM_CAP) != 0)
+		cheribsdtest_failure_errx("perms %jx (cap permission present)", v);
+#endif
 
 	if ((v & CHERI_PERM_STORE_LOCAL_CAP) != 0)
 		cheribsdtest_failure_errx("perms %jx (store_local_cap present)",
@@ -120,11 +126,12 @@ CHERIBSDTEST(sealcap_sysctl, "Retrieve sealcap using sysctl(3)")
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheribsdtest_failure_errx("perms %jx (system_regs present)", v);
 
-#ifdef __aarch64__
+#ifdef HAS_CHERI_PERM_EXECUTIVE
 	if ((v & CHERI_PERM_EXECUTIVE) != 0)
 		cheribsdtest_failure_errx("perms %jx (executive present)", v);
-
-	if ((v & CHERI_PERM_MUTABLE_LOAD) != 0)
+#endif
+#ifdef HAS_CHERI_PERM_LOAD_MUTABLE
+	if ((v & CHERI_PERM_LOAD_MUTABLE) != 0)
 		cheribsdtest_failure_errx("perms %jx (mutable_load present)", v);
 #endif
 
@@ -132,12 +139,12 @@ CHERIBSDTEST(sealcap_sysctl, "Retrieve sealcap using sysctl(3)")
 		cheribsdtest_failure_errx("perms %jx (swperms present)", v);
 
 	/* Sealed bit. */
-	v = cheri_getsealed(sealcap);
+	v = cheri_is_sealed(sealcap);
 	if (v != 0)
 		cheribsdtest_failure_errx("sealed %jx (expected 0)", v);
 
 	/* Tag bit. */
-	v = cheri_gettag(sealcap);
+	v = cheri_tag_get(sealcap);
 	if (v != 1)
 		cheribsdtest_failure_errx("tag %jx (expected 1)", v);
 	cheribsdtest_success();
@@ -158,44 +165,44 @@ CHERIBSDTEST(sealcap_seal, "Use sealcap to seal a capability")
 	sealed = cheri_seal(sealdatap, sealcap);
 
 	/* Base. */
-	v = cheri_getbase(sealed);
-	if (v != cheri_getbase(sealdatap))
+	v = cheri_base_get(sealed);
+	if (v != cheri_base_get(sealdatap))
 		cheribsdtest_failure_errx("base %jx (expected %jx)", v,
-		    (uintmax_t)cheri_getbase(sealdatap));
+		    (uintmax_t)cheri_base_get(sealdatap));
 
 	/* Length. */
-	v = cheri_getlen(sealed);
-	if (v != cheri_getlen(sealdatap))
+	v = cheri_length_get(sealed);
+	if (v != cheri_length_get(sealdatap))
 		cheribsdtest_failure_errx("length 0x%jx (expected 0x%jx)", v,
-		    (uintmax_t)cheri_getlen(sealdatap));
+		    (uintmax_t)cheri_length_get(sealdatap));
 
 	/* Offset. */
-	v = cheri_getoffset(sealed);
-	if (v != cheri_getoffset(sealdatap))
+	v = cheri_offset_get(sealed);
+	if (v != cheri_offset_get(sealdatap))
 		cheribsdtest_failure_errx("offset %jx (expected %jx)", v,
-		    (uintmax_t)cheri_getoffset(sealdatap));
+		    (uintmax_t)cheri_offset_get(sealdatap));
 
 	/* Type. */
-	v = cheri_gettype(sealed);
-	if (v != cheri_getaddress(sealcap))
+	v = cheri_type_get(sealed);
+	if (v != cheri_address_get(sealcap))
 		cheribsdtest_failure_errx("otype %jx (expected %jx)", v,
-		    (uintmax_t)cheri_getaddress(sealcap));
+		    (uintmax_t)cheri_address_get(sealcap));
 
 	/* Sealed bit. */
-	v = cheri_getsealed(sealed);
+	v = cheri_is_sealed(sealed);
 	if (v != 1)
 		cheribsdtest_failure_errx("sealed %jx (expected 0)", v);
 
 	/* Tag bit. */
-	v = cheri_gettag(sealed);
+	v = cheri_tag_get(sealed);
 	if (v != 1)
 		cheribsdtest_failure_errx("tag %jx (expected 1)", v);
 
 	/* Permissions. */
-	v = cheri_getperm(sealed);
-	if (v != cheri_getperm(sealdatap))
+	v = cheri_perms_get(sealed);
+	if (v != cheri_perms_get(sealdatap))
 		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
-		    cheri_getperm(sealdatap));
+		    (uintmax_t)cheri_perms_get(sealdatap));
 
 	cheribsdtest_success();
 }
@@ -216,44 +223,45 @@ CHERIBSDTEST(sealcap_seal_unseal,
 	unsealed = cheri_unseal(sealed, sealcap);
 
 	/* Base. */
-	v = cheri_getbase(unsealed);
-	if (v != cheri_getbase(sealdatap))
+	v = cheri_base_get(unsealed);
+	if (v != cheri_base_get(sealdatap))
 		cheribsdtest_failure_errx("base %jx (expected %jx)", v,
-		    (uintmax_t)cheri_getbase(sealdatap));
+		    (uintmax_t)cheri_base_get(sealdatap));
 
 	/* Length. */
-	v = cheri_getlen(unsealed);
-	if (v != cheri_getlen(sealdatap))
+	v = cheri_length_get(unsealed);
+	if (v != cheri_length_get(sealdatap))
 		cheribsdtest_failure_errx("length 0x%jx (expected 0x%jx)", v,
-		    (uintmax_t)cheri_getlen(sealdatap));
+		    (uintmax_t)cheri_length_get(sealdatap));
 
 	/* Offset. */
-	v = cheri_getoffset(unsealed);
-	if (v != cheri_getoffset(sealdatap))
+	v = cheri_offset_get(unsealed);
+	if (v != cheri_offset_get(sealdatap))
 		cheribsdtest_failure_errx("offset %jx (expected %jx)", v,
-		    (uintmax_t)cheri_getoffset(sealdatap));
+		    (uintmax_t)cheri_offset_get(sealdatap));
 
 	/* Type -- should have unsealed type. */
-	v = cheri_gettype(unsealed);
+	v = cheri_type_get(unsealed);
 	if (v != (u_register_t)CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_OTYPE_UNSEALED);
 
 	/* Sealed bit. */
-	v = cheri_getsealed(unsealed);
+	v = cheri_is_sealed(unsealed);
 	if (v != 0)
 		cheribsdtest_failure_errx("sealed %jx (expected 0)", v);
 
 	/* Tag bit. */
-	v = cheri_gettag(unsealed);
+	v = cheri_tag_get(unsealed);
 	if (v != 1)
 		cheribsdtest_failure_errx("tag %jx (expected 1)", v);
 
 	/* Permissions. */
-	v = cheri_getperm(unsealed);
-	if (v != cheri_getperm(sealdatap))
+	v = cheri_perms_get(unsealed);
+	if (v != cheri_perms_get(sealdatap))
 		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
-		    cheri_getperm(sealdatap));
+		    (uintmax_t)cheri_perms_get(sealdatap));
 
 	cheribsdtest_success();
 }
+#endif /* defined(HAS_CHERI_PERM_SEAL) */

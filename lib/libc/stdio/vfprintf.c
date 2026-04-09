@@ -58,7 +58,6 @@
 #include <sys/types.h>
 
 #if __has_feature(capabilities)
-#include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #endif
 
@@ -307,12 +306,9 @@ vfprintf(FILE * __restrict fp, const char * __restrict fmt0, va_list ap)
 /*
  * The size of the buffer we use as scratch space for integer
  * conversions, among other things.  We need enough space to
- * write a uintmax_t in octal (plus one byte).
+ * write a uintmax_t in binary.
  */
-#if UINTMAX_MAX <= UINT64_MAX
-#if !__has_feature(capabilities)
-#define	BUF	32
-#else
+#if __has_feature(capabilities)
 /* For CHERI we need enough space to print a capability dump:
  * 0x0000007ffffecc10 [rwxRW,0x0000007ffffecc10-0x0000007ffffecc50] (invalid,sealed,capmode)
  *
@@ -321,9 +317,8 @@ vfprintf(FILE * __restrict fp, const char * __restrict fmt0, va_list ap)
  * stack space here anyway.
 */
 #define BUF	128
-#endif
 #else
-#error "BUF must be large enough to format a uintmax_t"
+#define BUF	(sizeof(uintmax_t) * CHAR_BIT)
 #endif
 
 /*
@@ -922,7 +917,7 @@ fp_common:
 #endif
 			{
 				cap = GETARG(void * __capability);
-				ujval = cheri_getaddress(cap);
+				ujval = cheri_address_get(cap);
 			}
 			if (flags & ALT) {
 				cp = buf + BUF;

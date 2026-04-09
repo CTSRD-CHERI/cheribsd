@@ -356,7 +356,6 @@ MIASM =  \
 	symlinkat.o \
 	unlinkat.o \
 	posix_openpt.o \
-	gssd_syscall.o \
 	jail_get.o \
 	jail_set.o \
 	jail_remove.o \
@@ -436,4 +435,6 @@ MIASM =  \
 	timerfd_gettime.o \
 	timerfd_settime.o \
 	kcmp.o \
-	getrlimitusage.o
+	getrlimitusage.o \
+	fchroot.o \
+	setcred.o

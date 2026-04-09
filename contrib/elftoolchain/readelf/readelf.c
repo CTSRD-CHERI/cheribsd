@@ -3949,6 +3949,19 @@ dump_notes_data(struct readelf *re, const char *name, uint32_t type,
 			case 0: /* CHERI_TLS_ABI_TRAD */
 				printf("   TLS ABI: traditional\n");
 				return;
+			case 1: /* CHERI_TLS_ABI_TGOT */
+				printf("   TLS ABI: TGOT-based\n");
+				return;
+			case 0x80000000: /* CHERI_TLS_ABI_MORELLO_MIXED */
+				if (re->ehdr.e_machine != EM_AARCH64)
+					break;
+				printf("   TLS ABI: mixed traditional/TGOT-based\n");
+				return;
+			case 0x80000001: /* CHERI_TLS_ABI_MORELLO_TGOT_COMPAT */
+				if (re->ehdr.e_machine != EM_AARCH64)
+					break;
+				printf("   TLS ABI: TGOT-based, traditional-compatible\n");
+				return;
 			}
 			break;
 		case 0x80000000: /* NT_CHERI_MORELLO_PURECAP_BENCHMARK_ABI */

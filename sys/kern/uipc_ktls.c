@@ -137,7 +137,7 @@ SYSCTL_UINT(_kern_ipc_tls, OID_AUTO, ifnet_max_rexmit_pct, CTLFLAG_RWTUN,
     &ktls_ifnet_max_rexmit_pct, 2,
     "Max percent bytes retransmitted before ifnet TLS is disabled");
 
-static bool ktls_offload_enable;
+static bool ktls_offload_enable = true;
 SYSCTL_BOOL(_kern_ipc_tls, OID_AUTO, enable, CTLFLAG_RWTUN,
     &ktls_offload_enable, 0,
     "Enable support for kernel TLS offload");
@@ -274,7 +274,7 @@ SYSCTL_COUNTER_U64(_kern_ipc_tls_ifnet, OID_AUTO, reset_failed, CTLFLAG_RD,
     &ktls_ifnet_reset_failed,
     "TLS sessions that failed to allocate a new ifnet send tag");
 
-static int ktls_ifnet_permitted;
+static int ktls_ifnet_permitted = 1;
 SYSCTL_UINT(_kern_ipc_tls_ifnet, OID_AUTO, permitted, CTLFLAG_RWTUN,
     &ktls_ifnet_permitted, 1,
     "Whether to permit hardware (ifnet) TLS sessions");
@@ -311,7 +311,7 @@ ktls_copyin_tls_enable(struct sockopt *sopt, struct tls_enable *tls)
 	uint8_t *cipher_key = NULL, *iv = NULL, *auth_key = NULL;
 
 	if (sopt->sopt_valsize == sizeof(tls_v0)) {
-		error = sooptcopyincap(sopt, &tls_v0, sizeof(tls_v0), sizeof(tls_v0));
+		error = sooptcopyinptr(sopt, &tls_v0, sizeof(tls_v0), sizeof(tls_v0));
 		if (error != 0)
 			goto done;
 		memset(tls, 0, sizeof(*tls));
@@ -327,7 +327,7 @@ ktls_copyin_tls_enable(struct sockopt *sopt, struct tls_enable *tls)
 		tls->tls_vmajor = tls_v0.tls_vmajor;
 		tls->tls_vminor = tls_v0.tls_vminor;
 	} else
-		error = sooptcopyincap(sopt, tls, sizeof(*tls), sizeof(*tls));
+		error = sooptcopyinptr(sopt, tls, sizeof(*tls), sizeof(*tls));
 
 	if (error != 0)
 		return (error);
@@ -456,7 +456,7 @@ ktls_buffer_import(void *arg, void **store, int count, int domain, int flags)
 		if (m == NULL)
 			break;
 		store[i] = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-		store[i] = cheri_kern_setbounds(store[i], ktls_maxlen);
+		store[i] = cheri_kern_bounds_set(store[i], ktls_maxlen);
 	}
 	return (i);
 }
@@ -483,7 +483,7 @@ ktls_free_mext_contig(struct mbuf *m)
 
 	M_ASSERTEXTPG(m);
 	epg = (void *)PHYS_TO_DMAP(m->m_epg_pa[0]);
-	uma_zfree(ktls_buffer_zone, cheri_kern_setbounds(epg, ktls_maxlen));
+	uma_zfree(ktls_buffer_zone, cheri_kern_bounds_set(epg, ktls_maxlen));
 }
 
 static int
@@ -504,7 +504,7 @@ ktls_init(void)
 		ktls_buffer_zone = uma_zcache_create("ktls_buffers",
 		    roundup2(ktls_maxlen, PAGE_SIZE), NULL, NULL, NULL, NULL,
 		    ktls_buffer_import, ktls_buffer_release, NULL,
-		    UMA_ZONE_FIRSTTOUCH);
+		    UMA_ZONE_FIRSTTOUCH | UMA_ZONE_NOTRIM);
 	}
 
 	/*
@@ -1343,7 +1343,11 @@ ktls_enable_rx(struct socket *so, struct tls_enable *en)
 
 	/* Mark the socket as using TLS offload. */
 	SOCK_RECVBUF_LOCK(so);
-	if (__predict_false(so->so_rcv.sb_tls_info != NULL)) {
+	if (__predict_false(so->so_rcv.sb_tls_info != NULL))
+		error = EALREADY;
+	else if ((so->so_rcv.sb_flags & SB_SPLICED) != 0)
+		error = EINVAL;
+	if (error != 0) {
 		SOCK_RECVBUF_UNLOCK(so);
 		SOCK_IO_RECV_UNLOCK(so);
 		ktls_free(tls);
@@ -1443,12 +1447,16 @@ ktls_enable_tx(struct socket *so, struct tls_enable *en)
 	inp = so->so_pcb;
 	INP_WLOCK(inp);
 	SOCK_SENDBUF_LOCK(so);
-	if (__predict_false(so->so_snd.sb_tls_info != NULL)) {
+	if (__predict_false(so->so_snd.sb_tls_info != NULL))
+		error = EALREADY;
+	else if ((so->so_snd.sb_flags & SB_SPLICED) != 0)
+		error = EINVAL;
+	if (error != 0) {
 		SOCK_SENDBUF_UNLOCK(so);
 		INP_WUNLOCK(inp);
 		SOCK_IO_SEND_UNLOCK(so);
 		ktls_free(tls);
-		return (EALREADY);
+		return (error);
 	}
 	so->so_snd.sb_tls_seqno = be64dec(en->rec_seq);
 	so->so_snd.sb_tls_info = tls;

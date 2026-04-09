@@ -77,12 +77,3 @@ linux_getcwd(struct thread *td, struct linux_getcwd_args *uap)
 	free(buf, M_TEMP);
 	return (error);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

@@ -31,7 +31,7 @@ options		CHERI_CAPREVOKE_STATS
 options		CHERI_CAPREVOKE_FAST_COPYIN
 options		CHERI_CAPREVOKE_CLEARTAGS
 
-# Needs porting to use __USER_CAP
+# Needs porting to use USER_PTR
 nooptions 	COMPAT_FREEBSD32
 
 # Doesn't build with Morello LLVM

@@ -1,4 +1,3 @@
-# $FreeBSD$
 # We build a statically linked non-CHERI shell for atf-sh tests
 # This is noticeably faster on QEMU since we don't have to emulate
 # CHERI instructions (shouldn't make much of a difference on HW though).
@@ -13,5 +12,6 @@ NEED_COMPAT=	64
 PROG=	sh_static
 NO_SHARED=	yes
 MAN=
+CONFGROUPS=
 
 .include	"${SRCTOP}/bin/sh/Makefile"

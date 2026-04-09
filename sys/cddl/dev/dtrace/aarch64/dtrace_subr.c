@@ -418,13 +418,20 @@ dtrace_invop_start(struct trapframe *frame)
 	}
 
 	if (invop == RET_INSTR) {
-#if __has_feature(capabilities)
-		trapframe_set_elr(frame, frame->tf_lr);
+#ifdef __CHERI_PURE_CAPABILITY__
+		frame->tf_elr = cheri_address_set(frame->tf_elr,
+		    frame->tf_lr);
 #else
 		frame->tf_elr = frame->tf_lr;
 #endif
 		return (0);
 	}
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (invop == RETC_INSTR) {
+		trapframe_set_elr(frame, frame->tf_lr);
+		return (0);
+	}
+#endif
 
 	return (-1);
 }

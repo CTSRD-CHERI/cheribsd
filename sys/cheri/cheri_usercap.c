@@ -42,7 +42,8 @@
 #include <cheri/cheric.h>
 
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
-void * __capability userspace_root_cap = (void * __capability)(intcap_t)-1;
+static void * __capability userspace_root_cap =
+    (void * __capability)(intcap_t)-1;
 
 static u_int cheri_ptrace_caps;
 SYSCTL_UINT(_security_cheri, OID_AUTO, ptrace_caps, CTLFLAG_RWTUN,
@@ -59,6 +60,12 @@ SYSCTL_ULONG(_security_cheri_stats, OID_AUTO, untagged_ptrace_caps, CTLFLAG_RD,
     &cheri_untagged_ptrace_caps, 0,
     "Number of capabilities injected via ptrace that failed to tag");
 
+void
+userspace_root_cap_init(void * __capability cap)
+{
+	userspace_root_cap = cap;
+}
+
 /*
  * Build a new userspace capability derived from userspace_root_cap.
  * The resulting capability may include both read and execute permissions,
@@ -68,7 +75,7 @@ SYSCTL_ULONG(_security_cheri_stats, OID_AUTO, untagged_ptrace_caps, CTLFLAG_RD,
  */
 void * __capability
 _cheri_capability_build_user_code(struct thread *td, uint32_t perms,
-    ptraddr_t basep, size_t length, off_t off, const char* func, int line)
+    ptraddr_t basep, size_t length, ptraddr_t addr, const char* func, int line)
 {
 	void * __capability tmpcap;
 
@@ -77,13 +84,13 @@ _cheri_capability_build_user_code(struct thread *td, uint32_t perms,
 	    func, line, perms, CHERI_CAP_USER_CODE_PERMS));
 
 	tmpcap = _cheri_capability_build_user_rwx(
-	    perms & CHERI_CAP_USER_CODE_PERMS, basep, length, off, func, line,
+	    perms & CHERI_CAP_USER_CODE_PERMS, basep, length, addr, func, line,
 	    true);
 
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 		tmpcap = cheri_capmode(tmpcap);
 
-	return (cheri_sealentry(tmpcap));
+	return (cheri_sentry_create(tmpcap));
 }
 
 /*
@@ -93,7 +100,7 @@ _cheri_capability_build_user_code(struct thread *td, uint32_t perms,
  */
 void * __capability
 _cheri_capability_build_user_data(uint32_t perms, ptraddr_t basep,
-    size_t length, off_t off, const char* func, int line, bool exact)
+    size_t length, ptraddr_t addr, const char* func, int line, bool exact)
 {
 
 	KASSERT((perms & ~CHERI_CAP_USER_DATA_PERMS) == 0,
@@ -101,7 +108,7 @@ _cheri_capability_build_user_data(uint32_t perms, ptraddr_t basep,
 	    func, line, perms, CHERI_CAP_USER_DATA_PERMS));
 
 	return (_cheri_capability_build_user_rwx(
-	    perms & CHERI_CAP_USER_DATA_PERMS, basep, length, off, func, line,
+	    perms & CHERI_CAP_USER_DATA_PERMS, basep, length, addr, func, line,
 	    exact));
 }
 
@@ -114,7 +121,7 @@ _cheri_capability_build_user_data(uint32_t perms, ptraddr_t basep,
  */
 void * __capability
 _cheri_capability_build_user_rwx(uint32_t perms, ptraddr_t basep, size_t length,
-    off_t off, const char* func __unused, int line __unused, bool exact)
+    ptraddr_t addr, const char* func __unused, int line __unused, bool exact)
 {
 	void * __capability tmpcap;
 #ifdef INVARIANTS
@@ -136,8 +143,8 @@ _cheri_capability_build_user_rwx(uint32_t perms, ptraddr_t basep, size_t length,
 		vm_map_lock_read(map);
 		KASSERT(vm_map_lookup_entry(map, basep, &entry),
 		    ("%s:%d: vm_map does not contain basep 0x%zx "
-		    "(length 0x%zu, offset 0x%ju)", func, line,
-		    (size_t)basep, length, (uintmax_t)off));
+		    "(length 0x%zu, address 0x%ju)", func, line,
+		    (size_t)basep, length, (uintmax_t)addr));
 		reservation = entry->reservation;
 		for( ; basep + length > entry->end;
 		    entry = vm_map_entry_succ(entry)) {
@@ -163,22 +170,67 @@ _cheri_capability_build_user_rwx(uint32_t perms, ptraddr_t basep, size_t length,
 #endif
 
 	tmpcap = _cheri_capability_build_user_rwx_unchecked(perms, basep,
-	    length, off, func, line, exact);
+	    length, addr, func, line, exact);
 
-	KASSERT(!exact || cheri_getlen(tmpcap) == length,
+	KASSERT(!exact || cheri_length_get(tmpcap) == length,
 	    ("%s:%d: Constructed capability has wrong length 0x%zx != 0x%zx: "
-	     "%#lp", func, line, cheri_getlen(tmpcap), length, tmpcap));
+	     "%#lp", func, line, cheri_length_get(tmpcap), length, tmpcap));
 
 	return (tmpcap);
 }
 
 void * __capability
 _cheri_capability_build_user_rwx_unchecked(uint32_t perms, ptraddr_t basep,
-    size_t length, off_t off, const char* func __unused, int line __unused,
+    size_t length, ptraddr_t addr, const char* func __unused, int line __unused,
     bool exact)
 {
-	return (cheri_setoffset(cheri_andperm(cheri_setbounds(
-	    cheri_setoffset(userspace_root_cap, basep), length), perms), off));
+	return (cheri_address_set(cheri_perms_and(cheri_bounds_set(
+	    cheri_address_set(userspace_root_cap, basep), length), perms), addr));
+}
+
+void
+cheri_sysvec_init(struct sysentvec *sv)
+{
+	ptraddr_t minuser, maxuser, padded_minuser;
+	size_t user_length;
+
+	KASSERT(sv->sv_vmspace_cap == 0, ("sv_vmspace_cap already set"));
+
+	minuser = sv->sv_minuser;
+	maxuser = sv->sv_maxuser;
+
+	KASSERT(minuser >= VM_MINUSER_ADDRESS,
+	    ("sv_minuser < VM_MINUSER_ADDRESS"));
+	KASSERT(maxuser <= VM_MAXUSER_ADDRESS,
+	    ("sv_maxuser > VM_MAXUSER_ADDRESS"));
+	KASSERT("maxuser > minuser", ("sv_maxuser <= sv_minuser"));
+
+	/*
+	 * Create a userspace capability for maps created for this
+	 * sysvec, nominally bounded by sv_minuser and sv_maxuser.
+	 * Allow the lower bound to be imprecise if sv_minuser excludes
+	 * the first page.
+	 */
+	user_length = maxuser - minuser;
+	padded_minuser = CHERI_REPRESENTABLE_ALIGN_DOWN(minuser,
+	    user_length);
+	KASSERT(padded_minuser == minuser ||
+	    minuser <= PAGE_SIZE, ("Unrepresentable base"));
+	user_length = CHERI_REPRESENTABLE_LENGTH(user_length);
+	KASSERT(maxuser - padded_minuser == user_length,
+	    ("Unrepresentable length"));
+	/*
+	 * Use the unchecked version here because we're not in a syscall
+	 * and the associated map is probably the kernel map.
+	 */
+	sv->sv_vmspace_cap = (uintcap_t)
+	    cheri_capability_build_user_rwx_unchecked(
+	    CHERI_CAP_USER_CODE_PERMS | CHERI_CAP_USER_DATA_PERMS |
+	    CHERI_PERMS_SWALL, padded_minuser, user_length,
+	    minuser - padded_minuser);
+	KASSERT(cheri_tag_get(sv->sv_vmspace_cap),
+	    ("sv_vmspace_cap untagged %#lp",
+	     (void * __capability)sv->sv_vmspace_cap));
 }
 
 /*
@@ -191,7 +243,9 @@ ptrace_derive_cap(struct proc *p, uintcap_t in, uintcap_t *out)
 {
 	struct thread *td;
 	void * __capability cap;
+#ifdef HAS_CHERI_PERM_SEAL
 	void * __capability sealcap;
+#endif
 
 	/*
 	 * Try to derive from existing user registers in this
@@ -210,10 +264,12 @@ ptrace_derive_cap(struct proc *p, uintcap_t in, uintcap_t *out)
 
 	if (cheri_ptrace_caps >= 2) {
 		/* If forging is allowed, derive from the userspace root. */
-		cap = cheri_buildcap(userspace_root_cap, in);
-		sealcap = cheri_copytype(userspace_root_sealcap, in);
-		cap = cheri_condseal(cap, sealcap);
-		if (cheri_gettag(cap)) {
+		cap = cheri_cap_build(userspace_root_cap, in);
+#ifdef HAS_CHERI_PERM_SEAL
+		sealcap = cheri_type_copy(userspace_root_sealcap, in);
+		cap = cheri_seal_conditionally(cap, sealcap);
+#endif
+		if (cheri_tag_get(cap)) {
 			atomic_add_long(&cheri_forged_ptrace_caps, 1);
 			*out = (uintcap_t)cap;
 			return (true);

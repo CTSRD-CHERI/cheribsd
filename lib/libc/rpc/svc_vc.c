@@ -29,18 +29,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
  * POSSIBILITY OF SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "sunrpc"
- * }
- * CHERI CHANGES END
- */
 
 /*
  * svc_vc.c, Server side for Connection Oriented based RPC. 
@@ -624,7 +612,7 @@ svc_vc_freeargs(SVCXPRT *xprt, xdrproc_t xdr_args, void *args_ptr)
 	xdrs = &(((struct cf_conn *)(xprt->xp_p1))->xdrs);
 
 	xdrs->x_op = XDR_FREE;
-	return ((*xdr_args)(xdrs, args_ptr, 0));
+	return ((*xdr_args)(xdrs, args_ptr));
 }
 
 static bool_t

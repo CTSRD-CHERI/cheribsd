@@ -20,16 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * CHERI CHANGES START
- * {
- *   "updated": 20230509,
- *   "target_type": "lib",
- *   "changes": [],
- *   "change_comment": "duplicate definition of vwarn()"
- * }
- * CHERI CHANGES END
- */
-/*
  * Copyright (c) 1998-2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */

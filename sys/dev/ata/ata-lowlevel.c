@@ -839,7 +839,7 @@ ata_pio_read(struct ata_request *request, int length)
 				    bio->bio_ma[moff / PAGE_SIZE]);
 				moff %= PAGE_SIZE;
 				size = min(size, PAGE_SIZE - moff);
-				addr = (uint8_t *)cheri_kern_setbounds(page + off, size);
+				addr = (uint8_t *)cheri_kern_bounds_set(page + off, size);
 			}
 		} else
 			panic("ata_pio_read: Unsupported CAM data type %x\n",
@@ -925,7 +925,7 @@ ata_pio_write(struct ata_request *request, int length)
 				    bio->bio_ma[moff / PAGE_SIZE]);
 				moff %= PAGE_SIZE;
 				size = min(size, PAGE_SIZE - moff);
-				addr = (uint8_t *)cheri_kern_setbounds(page + moff, size);
+				addr = (uint8_t *)cheri_kern_bounds_set(page + moff, size);
 			}
 		} else
 			panic("ata_pio_write: Unsupported CAM data type %x\n",

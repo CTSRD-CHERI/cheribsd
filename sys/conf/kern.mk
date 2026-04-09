@@ -153,11 +153,9 @@ INLINE_LIMIT?=	8000
 .if ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-march=morello
 CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs
-
-.if ${MK_CHERI_CODEPTR_RELOCS} != "no" && ${COMPILER_FEATURES:Mmorello-codeptr-relocs}
 CFLAGS+=	-cheri-codeptr-relocs
 LDFLAGS+=	-cheri-codeptr-relocs
-.endif
+LDFLAGS+=	-Wl,--local-caprelocs=elf
 .endif
 
 .if ${MACHINE_ARCH:Maarch*c*}
@@ -168,6 +166,16 @@ CFLAGS+=	-mabi=purecap
 .endif
 .else
 CFLAGS+=	-mabi=aapcs
+.endif
+.endif
+
+.if ${MACHINE_ABI:Mpurecap}
+.if ${OPT_CHERI_TGOT_TLS} == "yes"
+CFLAGS+=	-cheri-tgot-tls
+.elif ${OPT_CHERI_TGOT_TLS} == "compat"
+CFLAGS+=	-cheri-tgot-tls=compat
+.elif ${OPT_CHERI_TGOT_TLS} == "no"
+CFLAGS+=	-no-cheri-tgot-tls
 .endif
 .endif
 
@@ -184,8 +192,10 @@ CFLAGS+=	-mabi=aapcs
 #
 .if ${MACHINE_CPUARCH} == "riscv"
 RISCV_MARCH=	rv64imafdch
-.if ${MACHINE_CPU:Mcheri}
+.if ${MACHINE_CPU:Mxcheri}
 RISCV_MARCH:=	${RISCV_MARCH}xcheri
+.elif ${MACHINE_CPU:Mrvy}
+RISCV_MARCH:=	${RISCV_MARCH}zcherihybrid_zcherilevels
 .endif
 
 RISCV_ABI=	lp64
@@ -262,7 +272,7 @@ CFLAGS+=	-ffreestanding
 CFLAGS+=	-fwrapv
 
 #
-# GCC SSP support
+# Stack Smashing Protection (SSP) support
 #
 .if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap}
 CFLAGS+=	-fstack-protector
@@ -275,6 +285,86 @@ CFLAGS+=	-fstack-protector
     ${MK_KERNEL_RETPOLINE} != "no"
 CFLAGS+=	-mretpoline
 .endif
+
+#
+# Kernel Address SANitizer support
+#
+.if !empty(KASAN_ENABLED)
+SAN_CFLAGS+=	-DSAN_NEEDS_INTERCEPTORS -DSAN_INTERCEPTOR_PREFIX=kasan \
+		-fsanitize=kernel-address
+.if ${COMPILER_TYPE} == "clang"
+SAN_CFLAGS+=	-mllvm -asan-stack=true \
+		-mllvm -asan-instrument-dynamic-allocas=true \
+		-mllvm -asan-globals=true \
+		-mllvm -asan-use-after-scope=true \
+		-mllvm -asan-instrumentation-with-call-threshold=0 \
+		-mllvm -asan-instrument-byval=false
+.endif
+
+.if ${MACHINE_CPUARCH} == "aarch64"
+# KASAN/ARM64 TODO: -asan-mapping-offset is calculated from:
+#	   (VM_KERNEL_MIN_ADDRESS >> KASAN_SHADOW_SCALE_SHIFT) + $offset = KASAN_MIN_ADDRESS
+#
+#	This is different than amd64, where we have a different
+#	KASAN_MIN_ADDRESS, and this offset value should eventually be
+#	upstreamed similar to: https://reviews.llvm.org/D98285
+#
+.if ${COMPILER_TYPE} == "clang"
+SAN_CFLAGS+=	-mllvm -asan-mapping-offset=0xdfff208000000000
+.else
+SAN_CFLAGS+=	-fasan-shadow-offset=0xdfff208000000000
+.endif
+.elif ${MACHINE_CPUARCH} == "amd64" && \
+      ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 180000
+# Work around https://github.com/llvm/llvm-project/issues/87923, which leads to
+# an assertion failure compiling dtrace.c with asan enabled.
+SAN_CFLAGS+=	-mllvm -asan-use-stack-safety=0
+.endif
+.endif # !empty(KASAN_ENABLED)
+
+#
+# Kernel Concurrency SANitizer support
+#
+.if !empty(KCSAN_ENABLED)
+SAN_CFLAGS+=	-DSAN_NEEDS_INTERCEPTORS -DSAN_INTERCEPTOR_PREFIX=kcsan \
+		-fsanitize=thread
+.endif
+
+#
+# Kernel Memory SANitizer support
+#
+.if !empty(KMSAN_ENABLED)
+# Disable -fno-sanitize-memory-param-retval until interceptors have been
+# updated to work properly with it.
+MSAN_CFLAGS+=	-DSAN_NEEDS_INTERCEPTORS -DSAN_INTERCEPTOR_PREFIX=kmsan \
+		-fsanitize=kernel-memory
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 160000
+MSAN_CFLAGS+=	-fno-sanitize-memory-param-retval
+.endif
+SAN_CFLAGS+=	${MSAN_CFLAGS}
+.endif # !empty(KMSAN_ENABLED)
+
+#
+# Kernel Undefined Behavior SANitizer support
+#
+.if !empty(KUBSAN_ENABLED)
+SAN_CFLAGS+=	-fsanitize=undefined
+.endif
+
+#
+# Generic Kernel Coverage support
+#
+.if !empty(COVERAGE_ENABLED)
+.if ${COMPILER_TYPE} == "clang" || \
+    (${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 80100)
+SAN_CFLAGS+=	-fsanitize-coverage=trace-pc,trace-cmp
+.else
+SAN_CFLAGS+=	-fsanitize-coverage=trace-pc
+.endif
+.endif # !empty(COVERAGE_ENABLED)
+
+# Add the sanitizer C flags
+CFLAGS+=	${SAN_CFLAGS}
 
 #
 # Initialize stack variables on function entry
@@ -337,7 +427,7 @@ PHONY_NOTMAIN = afterdepend afterinstall all beforedepend beforeinstall \
 .PHONY: ${PHONY_NOTMAIN}
 .NOTMAIN: ${PHONY_NOTMAIN}
 
-CSTD?=		gnu99
+CSTD?=		gnu17
 
 # c99/gnu99 is the minimum C standard version supported for kernel build
 .if ${CSTD} == "k&r" || ${CSTD} == "c89" || ${CSTD} == "c90" || \

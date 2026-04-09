@@ -368,6 +368,10 @@ exec_sysvec_init(void *param)
 		    (char *)fxrng_shpage_mapping - shared_page_mapping;
 	}
 #endif
+
+#if __has_feature(capabilities)
+	cheri_sysvec_init(sv);
+#endif
 }
 
 void
@@ -383,6 +387,10 @@ exec_sysvec_init_secondary(struct sysentvec *sv, struct sysentvec *sv2)
 	sv2->sv_shared_page_obj = sv->sv_shared_page_obj;
 	sv2->sv_sigcode_offset = sv->sv_sigcode_offset;
 	sv2->sv_vdso_offset = sv->sv_vdso_offset;
+#if __has_feature(capabilities)
+	/* Need to compute a new sv_vmspace_cap */
+	cheri_sysvec_init(sv2);
+#endif
 	if ((sv2->sv_flags & SV_ABI_MASK) != SV_ABI_FREEBSD)
 		return;
 	sv2->sv_timekeep_offset = sv->sv_timekeep_offset;

@@ -29,18 +29,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
  * POSSIBILITY OF SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "sunrpc"
- * }
- * CHERI CHANGES END
- */
 
 /*
  * clnt_raw.c
@@ -175,7 +163,7 @@ call_again:
 	if ((! XDR_PUTBYTES(xdrs, clp->u.mashl_callmsg, clp->mcnt)) ||
 	    (! XDR_PUTINT32(xdrs, &proc)) ||
 	    (! AUTH_MARSHALL(h->cl_auth, xdrs)) ||
-	    (! (*xargs)(xdrs, argsp, 0))) {
+	    (! (*xargs)(xdrs, argsp))) {
 		return (RPC_CANTENCODEARGS);
 	}
 	(void)XDR_GETPOS(xdrs);  /* called just to cause overhead */
@@ -260,7 +248,7 @@ clnt_raw_freeres(CLIENT *cl, xdrproc_t xdr_res, void *res_ptr)
 	}
 	mutex_unlock(&clntraw_lock);
 	xdrs->x_op = XDR_FREE;
-	return ((*xdr_res)(xdrs, res_ptr, 0));
+	return ((*xdr_res)(xdrs, res_ptr));
 }
 
 /*ARGSUSED*/

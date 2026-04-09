@@ -1972,11 +1972,7 @@ mskc_attach(device_t dev)
 		device_set_ivars(sc->msk_devs[MSK_PORT_B], mmd);
 	}
 
-	error = bus_generic_attach(dev);
-	if (error) {
-		device_printf(dev, "failed to attach port(s)\n");
-		goto fail;
-	}
+	bus_attach_children(dev);
 
 	/* Hook interrupt last to avoid having to lock softc. */
 	error = bus_setup_intr(dev, sc->msk_irq[0], INTR_TYPE_NET |
@@ -2024,17 +2020,6 @@ msk_detach(device_t dev)
 		MSK_IF_LOCK(sc_if);
 	}
 
-	/*
-	 * We're generally called from mskc_detach() which is using
-	 * device_delete_child() to get to here. It's already trashed
-	 * miibus for us, so don't do it here or we'll panic.
-	 *
-	 * if (sc_if->msk_miibus != NULL) {
-	 * 	device_delete_child(dev, sc_if->msk_miibus);
-	 * 	sc_if->msk_miibus = NULL;
-	 * }
-	 */
-
 	msk_rx_dma_jfree(sc_if);
 	msk_txrx_dma_free(sc_if);
 	bus_generic_detach(dev);
@@ -2062,15 +2047,7 @@ mskc_detach(device_t dev)
 	sc = device_get_softc(dev);
 	KASSERT(mtx_initialized(&sc->msk_mtx), ("msk mutex not initialized"));
 
-	if (device_is_alive(dev)) {
-		if (sc->msk_devs[MSK_PORT_A] != NULL) {
-			device_delete_child(dev, sc->msk_devs[MSK_PORT_A]);
-		}
-		if (sc->msk_devs[MSK_PORT_B] != NULL) {
-			device_delete_child(dev, sc->msk_devs[MSK_PORT_B]);
-		}
-		bus_generic_detach(dev);
-	}
+	bus_generic_detach(dev);
 
 	/* Disable all interrupts. */
 	CSR_WRITE_4(sc, B0_IMSK, 0);

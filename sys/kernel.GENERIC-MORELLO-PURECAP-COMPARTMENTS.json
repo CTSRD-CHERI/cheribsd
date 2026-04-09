@@ -219,7 +219,6 @@
 				"cheri_syscall.o",
 				"cheri_sysctl.o",
 				"cheri_tags.o",
-				"cheri_usercap.o",
 				"ciphy.o",
 				"ck_array.o",
 				"ck_barrier_centralized.o",

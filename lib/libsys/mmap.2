@@ -30,7 +30,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd August 14, 2023
+.Dd February 19, 2026
 .Dt MMAP 2
 .Os
 .Sh NAME
@@ -113,6 +113,11 @@ Pages may be read.
 Pages may be written.
 .It Dv PROT_EXEC
 Pages may be executed.
+.El
+.Pp
+For CHERI ABIs, two additional values are defined:
+.Pp
+.Bl -tag -width PROT_NO_CAP -compact
 .It Dv PROT_CAP
 CHERI capabilities may be read or written as dictated by
 .Dv PROT_READ
@@ -123,20 +128,20 @@ Respect the absence of
 .Dv PROT_CAP .
 .El
 .Pp
-On CHERI platforms, compatability is retained with unmodified POSIX
+Compatibility with non-CHERI ABIs is retained in unmodified POSIX
 programs by implying
 .Dv PROT_CAP
 if either of
 .Dv PROT_READ
 and
 .Dv PROT_WRITE
-is set unless the underlying backing store can not safety support
+is set unless the underlying backing store cannot safety support
 capabilities (e.g., a
 .Dv MAP_SHARED
 mapping of a file).
-If either of
+If
 .Dv PROT_NO_CAP
-are set, then capability permissions will not be implied.
+is set, then capability permissions will not be implied.
 When
 .Dv PROT_CAP
 is passed, at least one of
@@ -144,11 +149,11 @@ is passed, at least one of
 and
 .Dv PROT_WRITE
 is required.
-On non-CHERI platforms the
+On non-CHERI ABIs the
 .Dv PROT_CAP
 and
 .Dv PROT_NO_CAP
-flags have no effect.
+flags are not defined.
 .Pp
 In addition to these protection flags,
 .Fx
@@ -265,7 +270,7 @@ Under CheriABI
 may be used with a NULL-derived capability, in which case
 .Dv MAP_EXCL
 is implied, or with a valid capability to an existing mapping.
-The former is allowed for compatability purposes and should be avoided
+The former is allowed for compatibility purposes and should be avoided
 in new code.
 .It Dv MAP_GUARD
 Instead of a mapping, create a guard of the specified size.

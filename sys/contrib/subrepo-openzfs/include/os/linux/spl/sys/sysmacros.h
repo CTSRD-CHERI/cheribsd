@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *  Copyright (C) 2007-2010 Lawrence Livermore National Security, LLC.
  *  Copyright (C) 2007 The Regents of the University of California.
@@ -211,6 +212,18 @@ makedev(unsigned int major, unsigned int minor)
 /* avoid any possibility of clashing with <stddef.h> version */
 
 #define	offsetof(s, m)  ((size_t)(&(((s *)0)->m)))
+#endif
+
+#if !defined(__CHERI__) && !defined(__CHERI_HYBRID__)
+#ifndef __capability
+#define	__capability
+#endif
+#ifndef __cheri_fromcap
+#define	__cheri_fromcap
+#endif
+#ifndef PTR2CAP
+#define	PTR2CAP(x)	(x)
+#endif
 #endif
 
 #endif  /* _SPL_SYSMACROS_H */

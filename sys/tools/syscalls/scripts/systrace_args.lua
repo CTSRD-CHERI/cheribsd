@@ -68,6 +68,10 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 
 	for _, v in pairs(s) do
 
+		gen:write(v.prolog);
+		gen:store(v.prolog, 1);
+		gen:store(v.prolog, 2);
+
 		-- Handle non compat:
 		if v:native() then
 			gen:write(string.format([[
@@ -213,6 +217,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		end
 	end
 
+	gen:write(tbl.epilog)
 	gen:write([[
 	default:
 		*n_args = 0;
@@ -220,6 +225,8 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	};
 }
 ]])
+
+	gen:store(tbl.epilog, 1)
 	gen:store([[
 	default:
 		break;
@@ -228,6 +235,8 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		strlcpy(desc, p, descsz);
 }
 ]], 1)
+
+	gen:store(tbl.epilog, 2)
 	gen:store([[
 	default:
 		break;

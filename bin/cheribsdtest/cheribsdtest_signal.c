@@ -38,8 +38,6 @@
 
 #include <machine/vmparam.h>
 
-#include <cheri/cheri.h>
-
 #include <errno.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -262,7 +260,7 @@ CHERIBSDTEST(signal_returncap,
 		                       strerror(errno));
 
 	/* Length. */
-	v = cheri_getlen(handler_returncap);
+	v = cheri_length_get(handler_returncap);
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/* The purecap benchmark ABI does not bound PCC capabilities. */
 	expect = CHERI_CAP_USER_CODE_LENGTH;
@@ -277,24 +275,30 @@ CHERIBSDTEST(signal_returncap,
 	    v, expect);
 
 	/* Type -- should be a sentry capability. */
-	v = cheri_gettype(handler_returncap);
+	v = cheri_type_get(handler_returncap);
 	CHERIBSDTEST_VERIFY2(v == (uintmax_t)CHERI_OTYPE_SENTRY,
 	    "otype %jx (expected %jx)", v, (uintmax_t)CHERI_OTYPE_SENTRY);
 
 	/* Sealed bit. */
-	CHERIBSDTEST_VERIFY(cheri_getsealed(handler_returncap));
+	CHERIBSDTEST_VERIFY(cheri_is_sealed(handler_returncap));
 
 	/* Tag bit. */
-	CHERIBSDTEST_VERIFY(cheri_gettag(handler_returncap));
+	CHERIBSDTEST_VERIFY(cheri_tag_get(handler_returncap));
 
 	/* Permissions -- should have execute but no store permissions. */
-	v = cheri_getperm(handler_returncap);
+	v = cheri_perms_get(handler_returncap);
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_EXECUTE) == CHERI_PERM_EXECUTE,
 	    "perms %jx (execute missing)", v);
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_STORE) == 0,
 	    "perms %jx (store present)", v);
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_STORE_CAP) == 0,
 	    "perms %jx (storecap present)", v);
+#endif
+#ifdef HAS_CHERI_PERM_CAP
+	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_CAP) != 0,
+	    "perms %jx (cap missing)", v);
+#endif
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_STORE_LOCAL_CAP) == 0,
 	    "perms %jx (store_local_cap present)", v);
 
@@ -340,7 +344,7 @@ CHERIBSDTEST(null_pointer_exec_sigsegv,
     .ct_si_code = SEGV_MAPERR,
     .ct_si_trapno = TRAPNO_EXEC_PF)
 {
-	void (*p)(void) = (void *)(uintptr_t)1;
+	void (*p)(void) = (void *)(uintptr_t)4;
 
 	p();
 	cheribsdtest_failure_errx("Unexpected branch to NULL pointer");

@@ -368,8 +368,6 @@ exec_aout_imgact(struct image_params *imgp)
 	imgp->interpreted = 0;
 	imgp->entry_addr = a_out->a_entry;
 
-	imgp->proc->p_sysent = &aout_sysvec;
-
 	return (0);
 }
 

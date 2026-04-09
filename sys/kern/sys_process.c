@@ -386,12 +386,18 @@ proc_rwmem(struct proc *p, struct uio *uio)
 	/*
 	 * If we are writing, then we request vm_fault() to create a private
 	 * copy of each page.  Since these copies will not be writeable by the
-	 * process, we must explicity request that they be dirtied.
+	 * process, we must explicitly request that they be dirtied.
 	 */
 	writing = uio->uio_rw == UIO_WRITE;
 	reqprot = writing ? VM_PROT_COPY | VM_PROT_READ : VM_PROT_READ;
 	fault_flags = writing ? VM_FAULT_DIRTY : VM_FAULT_NORMAL;
 	fault_flags |= VM_FAULT_NOPMAP;
+
+	if (writing) {
+		error = priv_check_cred(p->p_ucred, PRIV_PROC_MEM_WRITE);
+		if (error)
+			return (error);
+	}
 
 	/*
 	 * Only map in one page at a time.  We don't have to, but it
@@ -413,7 +419,7 @@ proc_rwmem(struct proc *p, struct uio *uio)
 		/*
 		 * How many bytes to copy
 		 */
-		len = min(PAGE_SIZE - page_offset, uio->uio_resid);
+		len = MIN(PAGE_SIZE - page_offset, uio->uio_resid);
 
 		/*
 		 * Fault and hold the page on behalf of the process.
@@ -623,7 +629,7 @@ proc_read_cheri_cap_page(vm_map_t map, vm_offset_t va, struct uio *uio)
 	src = (uintcap_t *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(m)) + pageoff /
 	    sizeof(uintcap_t);
 	while (todo > 0) {
-		capbuf[0] = cheri_gettag(*src);
+		capbuf[0] = cheri_tag_get(*src);
 		memcpy(capbuf + 1, src, sizeof(*src));
 
 		error = uiomove(capbuf, sizeof(capbuf), uio);
@@ -683,7 +689,7 @@ proc_write_cheri_cap_page(struct proc *p, vm_map_t map, vm_offset_t va,
 	todo = MIN(todo, uio->uio_resid);
 	va = trunc_page(va);
 
-	error = vm_fault(map, va, VM_PROT_WRITE | VM_PROT_WRITE_CAP,
+	error = vm_fault(map, va, VM_PROT_WRITE | VM_PROT_CAP,
 	    VM_FAULT_NOPMAP, &m);
 	if (error != KERN_SUCCESS)
 		return (EFAULT);
@@ -925,7 +931,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		break;
 	case PT_GETREGSET:
 	case PT_SETREGSET:
-		error = copyincap(uap->addr, &r.vec, sizeof(r.vec));
+		error = copyinptr(uap->addr, &r.vec, sizeof(r.vec));
 		break;
 	case PT_SETREGS:
 		error = copyin(uap->addr, &r.reg, sizeof(r.reg));
@@ -948,10 +954,10 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 			error = copyin(uap->addr, &r.ptevents, uap->data);
 		break;
 	case PT_IO:
-		error = copyincap(uap->addr, &r.piod, sizeof(r.piod));
+		error = copyinptr(uap->addr, &r.piod, sizeof(r.piod));
 		break;
 	case PT_VM_ENTRY:
-		error = copyincap(uap->addr, &r.pve, sizeof(r.pve));
+		error = copyinptr(uap->addr, &r.pve, sizeof(r.pve));
 		break;
 	case PT_COREDUMP:
 		if (uap->data != sizeof(r.pc))
@@ -992,7 +998,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	case PT_VM_ENTRY:
 		/*
 		 * Only copy out updated fields prior to pve_path to
-		 * avoid the use of copyoutcap.
+		 * avoid the use of copyoutptr.
 		 */
 		error = copyout(&r.pve, uap->addr,
 		    offsetof(struct ptrace_vm_entry, pve_path));
@@ -1000,7 +1006,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	case PT_IO:
 		/*
 		 * Only copy out the updated piod_len to avoid the use
-		 * of copyoutcap.
+		 * of copyoutptr.
 		 */
 		error = copyout(&r.piod.piod_len, uap->addr +
 		    offsetof(struct ptrace_io_desc, piod_len),
@@ -1236,12 +1242,10 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 	}
 
 	if (tid == 0) {
-		if ((p->p_flag & P_STOPPED_TRACE) != 0) {
-			KASSERT(p->p_xthread != NULL, ("NULL p_xthread"));
+		if ((p->p_flag & P_STOPPED_TRACE) != 0)
 			td2 = p->p_xthread;
-		} else {
+		if (td2 == NULL)
 			td2 = FIRST_THREAD_IN_PROC(p);
-		}
 		tid = td2->td_tid;
 	}
 
@@ -1474,7 +1478,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 
 	case PT_GET_SC_ARGS:
 		CTR1(KTR_PTRACE, "PT_GET_SC_ARGS: pid %d", p->p_pid);
-		if ((td2->td_dbgflags & (TDB_SCE | TDB_SCX)) == 0
+		if (((td2->td_dbgflags & (TDB_SCE | TDB_SCX)) == 0 &&
+		     td2->td_sa.code == 0)
 #ifdef COMPAT_FREEBSD32
 		    || (wrap32 && !safe)
 #endif
@@ -1628,16 +1633,19 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 
 		/*
 		 * Clear the pending event for the thread that just
-		 * reported its event (p_xthread).  This may not be
-		 * the thread passed to PT_CONTINUE, PT_STEP, etc. if
-		 * the debugger is resuming a different thread.
+		 * reported its event (p_xthread), if any.  This may
+		 * not be the thread passed to PT_CONTINUE, PT_STEP,
+		 * etc. if the debugger is resuming a different
+		 * thread.  There might be no reporting thread if
+		 * the process was just attached.
 		 *
 		 * Deliver any pending signal via the reporting thread.
 		 */
-		MPASS(p->p_xthread != NULL);
-		p->p_xthread->td_dbgflags &= ~TDB_XSIG;
-		p->p_xthread->td_xsig = data;
-		p->p_xthread = NULL;
+		if (p->p_xthread != NULL) {
+			p->p_xthread->td_dbgflags &= ~TDB_XSIG;
+			p->p_xthread->td_xsig = data;
+			p->p_xthread = NULL;
+		}
 		p->p_xsig = data;
 
 		/*
@@ -1688,6 +1696,10 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 
 	case PT_IO:
 		piod = (__cheri_fromcap void *)addr;
+		if (piod->piod_len > SSIZE_MAX) {
+			error = EINVAL;
+			goto out;
+		}
 		IOVEC_INIT_C(&iov, piod->piod_addr, piod->piod_len);
 		uio.uio_offset = (__cheri_addr off_t)piod->piod_offs;
 		uio.uio_resid = piod->piod_len;
@@ -1868,12 +1880,9 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		pl->pl_sigmask = td2->td_sigmask;
 		pl->pl_siglist = td2->td_siglist;
 		strcpy(pl->pl_tdname, td2->td_name);
-		if ((td2->td_dbgflags & (TDB_SCE | TDB_SCX)) != 0) {
+		if (td2->td_sa.code != 0) {
 			pl->pl_syscall_code = td2->td_sa.code;
 			pl->pl_syscall_narg = td2->td_sa.callp->sy_narg;
-		} else {
-			pl->pl_syscall_code = 0;
-			pl->pl_syscall_narg = 0;
 		}
 		CTR6(KTR_PTRACE,
     "PT_LWPINFO: tid %d (pid %d) event %d flags %#x child pid %d syscall %d",

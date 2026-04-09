@@ -32,18 +32,6 @@
 /*
  * Copyright (c) 1986-1991 by Sun Microsystems Inc. 
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "sunrpc"
- * }
- * CHERI CHANGES END
- */
 
 /*
  * svc_raw.c,   This a toy for simple testing and timing.
@@ -235,7 +223,7 @@ svc_raw_freeargs(SVCXPRT *xprt, xdrproc_t xdr_args, void *args_ptr)
 
 	xdrs = &srp->xdr_stream;
 	xdrs->x_op = XDR_FREE;
-	return (*xdr_args)(xdrs, args_ptr, 0);
+	return (*xdr_args)(xdrs, args_ptr);
 }
 
 /*ARGSUSED*/

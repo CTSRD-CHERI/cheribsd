@@ -153,7 +153,7 @@ int __elfN(nxstack) =
 #endif
 SYSCTL_INT(ELF_NODE_OID, OID_AUTO,
     nxstack, CTLFLAG_RW, &__elfN(nxstack), 0,
-    ELF_ABI_NAME ": enable non-executable stack");
+    ELF_ABI_NAME ": support PT_GNU_STACK for non-executable stack control");
 #endif
 
 #if defined(__amd64__)
@@ -609,8 +609,14 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
     void * __capability *imgact_cap, const Elf_Ehdr *hdr, const Elf_Phdr *phdr,
     Elf_Addr *preferred_rbase)
 {
-	u_long perm = CHERI_PERM_STORE | CHERI_PERM_GLOBAL |
-	    CHERI_PERM_STORE_CAP;
+	u_long perm = CHERI_PERM_STORE |
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
+	    CHERI_PERM_STORE_CAP |
+#endif
+#ifdef HAS_CHERI_PERM_CAP
+	    CHERI_PERM_CAP |
+#endif
+	    CHERI_PERM_GLOBAL;
 	vm_offset_t start = (vm_offset_t)-1;
 	vm_offset_t end = 0;
 	vm_offset_t seg_addr;
@@ -667,10 +673,10 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 #ifdef __CHERI_PURE_CAPABILITY__
 	reservation_cap = (void *)reservation;
 #else
-	reservation_cap = cheri_setbounds(
-	    cheri_setaddress(userspace_root_cap, reservation), end - start);
+	reservation_cap = (void * __capability)vm_map_buildcap(map, reservation,
+	    end - start, VM_PROT_ALL);
 #endif
-	*imgact_cap = cheri_andperm(reservation_cap, perm);
+	*imgact_cap = cheri_perms_and(reservation_cap, perm);
 
 	return (0);
 }
@@ -832,7 +838,7 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 	else
 		map_len = round_page(offset + filsz) - file_addr;
 #if __has_feature(capabilities)
-	map_addr = cheri_setbounds(map_addr, map_len);
+	map_addr = cheri_bounds_set(map_addr, map_len);
 #endif
 
 	if (map_len != 0) {
@@ -861,7 +867,7 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 	map_addr = trunc_page(vmaddr + filsz);
 	map_len = (ptraddr_t)round_page(vmaddr + memsz) - (ptraddr_t)map_addr;
 #if __has_feature(capabilities)
-	map_addr = cheri_setbounds(map_addr, map_len);
+	map_addr = cheri_bounds_set(map_addr, map_len);
 #endif
 
 	/* This had damn well better be true! */
@@ -918,7 +924,7 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 
 		/* Loadable segment */
 #if __has_feature(capabilities)
-		section_addr = (uintcap_t)cheri_setaddress(
+		section_addr = (uintcap_t)cheri_address_set(
 		    imgp->imgact_capability, phdr[i].p_vaddr + rbase);
 #else
 		section_addr = phdr[i].p_vaddr + rbase;
@@ -1575,7 +1581,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 
 	error = exec_new_vmspace(imgp, sv);
 
-	imgp->proc->p_sysent = sv;
 	imgp->proc->p_elf_brandinfo = brand_info;
 
 	vmspace = imgp->proc->p_vmspace;
@@ -1737,7 +1742,7 @@ prog_cap(struct image_params *imgp, uint64_t perms)
 	    (uintmax_t)prog_base, (uintmax_t)imgp->end_addr, prog_len));
 
 	return (cheri_capability_build_user_rwx(perms, prog_base, prog_len,
-	    imgp->start_addr - prog_base));
+	    imgp->start_addr));
 }
 
 static void * __capability
@@ -1762,7 +1767,7 @@ interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
 	MPASS(args->base >= interp_base);
 
 	return (cheri_capability_build_user_rwx(perms, interp_base, interp_len,
-	    args->base - interp_base));
+	    args->base));
 }
 
 static void * __capability
@@ -1783,8 +1788,8 @@ timekeep_cap(struct image_params *imgp)
 	KASSERT(timekeep_len == CHERI_REPRESENTABLE_LENGTH(timekeep_len),
 	    ("timekeep_len needs rounding"));
 
-	tmpcap = (void * __capability)cheri_setboundsexact(
-	    cheri_andperm(timekeep_base, CHERI_PERMS_USERSPACE_RODATA),
+	tmpcap = (void * __capability)cheri_bounds_set_exact(
+	    cheri_perms_and(timekeep_base, CHERI_PERMS_USERSPACE_RODATA),
 	    timekeep_len);
 
 	return (tmpcap);
@@ -1818,7 +1823,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	 * program and AT_PHDR a writable one.  RTLD is responsible for
 	 * setting bounds.  Needs SW_VMEM so relro pages can be made RO.
 	 */
-	AUXARGS_ENTRY_PTR(pos, AT_PHDR, cheri_setaddress(prog_cap(imgp,
+	AUXARGS_ENTRY_PTR(pos, AT_PHDR, cheri_address_set(prog_cap(imgp,
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM),
 	    args->phdr));
 #else
@@ -1829,14 +1834,14 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY(pos, AT_PAGESZ, args->pagesz);
 	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
 #ifdef __ELF_CHERI
-	entry = cheri_setaddress(prog_cap(imgp, CHERI_CAP_USER_CODE_PERMS),
+	entry = cheri_address_set(prog_cap(imgp, CHERI_CAP_USER_CODE_PERMS),
 	    args->entry);
 #ifdef CHERI_FLAGS_CAP_MODE
 	/*
 	 * On architectures with a mode flag bit, we must ensure the flag is set in
 	 * AT_ENTRY for RTLD to be able to jump to it.
 	 */
-	entry = cheri_setflags(entry, CHERI_FLAGS_CAP_MODE);
+	entry = cheri_flags_set(entry, CHERI_FLAGS_CAP_MODE);
 #endif
 	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, entry);
 
@@ -1868,7 +1873,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		exec_base = interp_cap(imgp, args,
 		    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
 	}
-	AUXARGS_ENTRY_PTR(pos, AT_BASE, cheri_setaddress(exec_base,
+	AUXARGS_ENTRY_PTR(pos, AT_BASE, cheri_address_set(exec_base,
 	    args->base));
 #else
 	AUXARGS_ENTRY(pos, AT_ENTRY, args->entry);
@@ -1983,7 +1988,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	imgp->auxargs = NULL;
 	KASSERT(pos - argarray <= AT_COUNT, ("Too many auxargs"));
 
-	error = copyoutcap(argarray, (void * __capability)base,
+	error = copyoutptr(argarray, (void * __capability)base,
 	    sizeof(*argarray) * AT_COUNT);
 	free(argarray, M_TEMP);
 	return (error);
@@ -2050,6 +2055,7 @@ static void __elfN(note_threadmd)(void *, struct sbuf *, size_t *);
 static void __elfN(note_procstat_auxv)(void *, struct sbuf *, size_t *);
 static void __elfN(note_procstat_proc)(void *, struct sbuf *, size_t *);
 static void __elfN(note_procstat_psstrings)(void *, struct sbuf *, size_t *);
+static void __elfN(note_procstat_kqueues)(void *, struct sbuf *, size_t *);
 static void note_procstat_files(void *, struct sbuf *, size_t *);
 static void note_procstat_groups(void *, struct sbuf *, size_t *);
 static void note_procstat_osrel(void *, struct sbuf *, size_t *);
@@ -2160,11 +2166,13 @@ __elfN(coredump)(struct thread *td, struct vnode *vp, off_t limit, int flags)
 		php = (Elf_Phdr *)((char *)hdr + sizeof(Elf_Ehdr)) + 1;
 		for (i = 0; i < seginfo.count; i++) {
 #if __has_feature(capabilities)
-			section_cap = cheri_capability_build_user_data(
-			    CHERI_PERM_LOAD,
+			ptraddr_t section_addr =
 			    CHERI_REPRESENTABLE_ALIGN_DOWN(php->p_vaddr,
-			    php->p_filesz),
-			    CHERI_REPRESENTABLE_LENGTH(php->p_filesz), 0);
+			    php->p_filesz);
+			section_cap = cheri_capability_build_user_data(
+			    CHERI_PERM_LOAD, section_addr,
+			    CHERI_REPRESENTABLE_LENGTH(php->p_filesz),
+			    section_addr);
 #else
 			section_cap = (char *)(uintptr_t)php->p_vaddr;
 #endif
@@ -2442,6 +2450,8 @@ __elfN(prepare_notes)(struct thread *td, struct note_info_list *list,
 	    __elfN(note_procstat_psstrings), p);
 	size += __elfN(register_note)(td, list, NT_PROCSTAT_AUXV,
 	    __elfN(note_procstat_auxv), p);
+	size += __elfN(register_note)(td, list, NT_PROCSTAT_KQUEUES,
+	    __elfN(note_procstat_kqueues), p);
 
 	*sizep = size;
 }
@@ -3019,6 +3029,9 @@ __elfN(prepare_register_notes)(struct thread *td, struct note_info_list *list,
 
 	size = 0;
 
+	if (target_td == td)
+		cpu_update_pcb(target_td);
+
 	/* NT_PRSTATUS must be the first register set note. */
 	size += __elfN(register_regset_note)(td, list, &__elfN(regset_prstatus),
 	    target_td);
@@ -3310,6 +3323,54 @@ __elfN(note_procstat_auxv)(void *arg, struct sbuf *sb, size_t *sizep)
 	}
 }
 
+static void
+__elfN(note_procstat_kqueues)(void *arg, struct sbuf *sb, size_t *sizep)
+{
+	struct proc *p;
+	size_t size, sect_sz, i;
+	ssize_t start_len, sect_len;
+	int structsize;
+	bool compat32;
+
+#if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
+	compat32 = true;
+	structsize = sizeof(struct kinfo_knote32);
+#else
+	compat32 = false;
+	structsize = sizeof(struct kinfo_knote);
+#endif
+	p = arg;
+	if (sb == NULL) {
+		size = 0;
+		sb = sbuf_new(NULL, NULL, 128, SBUF_FIXEDLEN);
+		sbuf_set_drain(sb, sbuf_count_drain, &size);
+		sbuf_bcat(sb, &structsize, sizeof(structsize));
+		kern_proc_kqueues_out(p, sb, -1, compat32);
+		sbuf_finish(sb);
+		sbuf_delete(sb);
+		*sizep = size;
+	} else {
+		sbuf_start_section(sb, &start_len);
+
+		sbuf_bcat(sb, &structsize, sizeof(structsize));
+		kern_proc_kqueues_out(p, sb, *sizep - sizeof(structsize),
+		    compat32);
+
+		sect_len = sbuf_end_section(sb, start_len, 0, 0);
+		if (sect_len < 0)
+			return;
+		sect_sz = sect_len;
+
+		KASSERT(sect_sz <= *sizep,
+		    ("kern_proc_kqueue_out did not respect maxlen; "
+		     "requested %zu, got %zu", *sizep - sizeof(structsize),
+		     sect_sz - sizeof(structsize)));
+
+		for (i = 0; i < *sizep - sect_sz && sb->s_error == 0; i++)
+			sbuf_putc(sb, 0);
+	}
+}
+
 #define	MAX_NOTES_LOOP	4096
 bool
 __elfN(parse_notes)(const struct image_params *imgp, const Elf_Note *checknote,
@@ -3494,9 +3555,9 @@ __elfN(trans_prot)(Elf_Word flags)
 	if (flags & PF_X)
 		prot |= VM_PROT_EXECUTE;
 	if (flags & PF_W)
-		prot |= VM_PROT_WRITE | VM_PROT_WRITE_CAP;
+		prot |= VM_PROT_WRITE | VM_PROT_CAP;
 	if (flags & PF_R)
-		prot |= VM_PROT_READ | VM_PROT_READ_CAP;
+		prot |= VM_PROT_READ | VM_PROT_CAP;
 #if __ELF_WORD_SIZE == 32 && (defined(__amd64__) || defined(__i386__))
 	if (i386_read_exec && (flags & PF_R))
 		prot |= VM_PROT_EXECUTE;
@@ -3526,10 +3587,12 @@ __elfN(untrans_capprot)(vm_prot_t prot)
 	Elf_Word flags;
 
 	flags = 0;
-	if (prot & VM_PROT_READ_CAP)
-		flags |= PF_R;
-	if (prot & VM_PROT_WRITE_CAP)
-		flags |= PF_W;
+        if (prot & VM_PROT_CAP) {
+                if (prot & VM_PROT_READ)
+                        flags |= PF_R;
+                if (prot & VM_PROT_WRITE)
+                        flags |= PF_W;
+        }
 	return (flags);
 }
 #endif

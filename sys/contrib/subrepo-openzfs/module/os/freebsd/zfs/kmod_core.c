@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-2-Clause
 /*
  * Copyright (c) 2020 iXsystems, Inc.
  * All rights reserved.
@@ -140,7 +141,7 @@ zfsdev_ioctl(struct cdev *dev, ulong_t zcmd, caddr_t arg, int flag,
 	if (len != sizeof (zfs_iocparm_t))
 		return (EINVAL);
 
-	uaddr = (void * __capability)(uintcap_t)zp->zfs_cmd;
+	uaddr = (void * __capability)(__uintcap_t)zp->zfs_cmd;
 	zc = vmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
 #ifdef ZFS_LEGACY_SUPPORT
 	/*
@@ -160,7 +161,7 @@ zfsdev_ioctl(struct cdev *dev, ulong_t zcmd, caddr_t arg, int flag,
 		zfs_cmd_legacy_to_ozfs(zcl, zc);
 	} else
 #endif
-	if (copyincap(uaddr, zc, sizeof (zfs_cmd_t))) {
+	if (copyinptr(uaddr, zc, sizeof (zfs_cmd_t))) {
 		error = SET_ERROR(EFAULT);
 		goto out;
 	}
@@ -172,7 +173,7 @@ zfsdev_ioctl(struct cdev *dev, ulong_t zcmd, caddr_t arg, int flag,
 	} else
 #endif
 	{
-		rc = copyoutcap(zc, uaddr, sizeof (*zc));
+		rc = copyoutptr(zc, uaddr, sizeof (*zc));
 	}
 	if (error == 0 && rc != 0)
 		error = SET_ERROR(EFAULT);

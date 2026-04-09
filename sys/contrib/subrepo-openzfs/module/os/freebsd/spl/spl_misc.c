@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-2-Clause
 /*
  * Copyright (c) 2007 Pawel Jakub Dawidek <pjd@FreeBSD.org>
  * All rights reserved.
@@ -75,7 +76,7 @@ ddi_copyin(const void * __capability from, void *to, size_t len, int flags)
 		return (0);
 	}
 
-	return (copyincap(from, to, len));
+	return (copyinptr(from, to, len));
 }
 
 int
@@ -87,7 +88,7 @@ ddi_copyout(const void *from, void * __capability to, size_t len, int flags)
 		return (0);
 	}
 
-	return (copyoutcap(from, to, len));
+	return (copyoutptr(from, to, len));
 }
 
 void

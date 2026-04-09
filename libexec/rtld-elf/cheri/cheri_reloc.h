@@ -58,10 +58,6 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		    symname(obj, r_symndx));
 		return -1;
 	}
-#if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE >= 2
-	dbg("%s: found %s from obj=%s in defobj=%s", __func__,
-	    symname(obj, r_symndx), obj->path, defobj->path);
-#endif
 
 	/*
 	 * If symbol is IFUNC, only perform relocation
@@ -95,7 +91,7 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		    symname(obj, r_symndx), obj->path, def->st_value,
 		    def->st_size, ELF_ST_TYPE(def->st_info),
 		    ELF_ST_BIND(def->st_info), ELF_ST_BIND(src_sym->st_info));
-		dbg_assert(ELF_ST_BIND(src_sym->st_info) == STB_WEAK);
+		assert(ELF_ST_BIND(src_sym->st_info) == STB_WEAK);
 #endif
 		assert(def == &sym_zero && "Undef weak symbol is non-canonical!");
 		is_undef_weak = true;
@@ -152,31 +148,26 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 #endif
 	} else {
 		/* Remove execute permissions and set bounds */
-		symval = cheri_incoffset(make_data_cap(def, defobj), addend);
+		symval = (const char * __capability)make_data_cap(def, defobj) +
+		    addend;
 	}
 #ifdef DEBUG
 	// FIXME: this warning breaks some tests that expect clean stdout/stderr
 	// FIXME: See https://github.com/CTSRD-CHERI/cheribsd/issues/257
 	// TODO: or use this approach:
 	// https://github.com/CTSRD-CHERI/cheribsd/commit/c1920496c0086d9c5214fb0f491e4d6cdff3828e?
-	if (__predict_false(symval != NULL && cheri_getlen(symval) <= 0)) {
+	if (__predict_false(symval != NULL && cheri_length_get(symval) <= 0)) {
 		rtld_fdprintf(STDERR_FILENO,
 		    "Warning: created zero length "
 		    "capability for %s (in %s): %#lp\n",
 		    symname(obj, r_symndx), obj->path, symval);
 	}
 #endif
-	if (__predict_false(!cheri_gettag(symval) && !is_undef_weak)) {
+	if (__predict_false(!cheri_tag_get(symval) && !is_undef_weak)) {
 		_rtld_error("%s: constructed invalid capability for %s: %#lp",
 		    obj->path, symname(obj, r_symndx), symval);
 		return -1;
 	}
 	*((const void * __capability *)where) = symval;
-#if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE >= 2
-	dbg("CAP(%p/0x%lx) %s in %s --> %#lp in %s", where,
-	    (const char *)where - (const char *)obj->relocbase,
-	    symname(obj, r_symndx), obj->path,
-	    *((void * __capability *)where), defobj->path);
-#endif
 	return 0;
 }

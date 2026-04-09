@@ -46,7 +46,20 @@
  */
 
 vm_offset_t preload_addr_relocate = 0;
-caddr_t preload_metadata;
+caddr_t preload_metadata, preload_kmdp;
+
+const char preload_modtype[] = MODTYPE;
+const char preload_kerntype[] = KERNTYPE;
+const char preload_modtype_obj[] = MODTYPE_OBJ;
+
+void
+preload_initkmdp(bool fatal)
+{
+	preload_kmdp = preload_search_by_type(preload_kerntype);
+
+	if (preload_kmdp == NULL && fatal)
+		panic("unable to find kernel metadata");
+}
 
 /*
  * Search for the preloaded module (name)
@@ -193,7 +206,7 @@ preload_search_info(caddr_t mod, int inf)
 	 * data.
 	 */
 	if (hdr[0] == inf)
-	    return (cheri_kern_setbounds(curp + (sizeof(uint32_t) * 2),
+	    return (cheri_kern_bounds_set(curp + (sizeof(uint32_t) * 2),
 	        hdr[1]));
 
 	/* skip to next field */
@@ -269,7 +282,7 @@ preload_fetch_addr(caddr_t mod)
 #ifdef __CHERI_PURE_CAPABILITY__
 	mod_size = preload_fetch_size(mod);
 	/* XXX-AM: Which permission do we leave? */
-	return (cheri_setbounds(cheri_setaddress(kernel_root_cap,
+	return (cheri_bounds_set(cheri_address_set(kernel_root_cap,
 	    *mdp + preload_addr_relocate), mod_size));
 #else
 	return ((void *)(*mdp + preload_addr_relocate));
@@ -444,6 +457,11 @@ preload_modinfo_type(struct sbuf *sbp, int type)
 		sbuf_cat(sbp, "MODINFOMD_SPLASH");
 		break;
 #endif
+#ifdef MODINFOMD_BOOT_HARTID
+	case MODINFOMD_BOOT_HARTID:
+		sbuf_cat(sbp, "MODINFOMD_BOOT_HARTID");
+		break;
+#endif
 	default:
 		sbuf_cat(sbp, "unrecognized metadata type");
 	}
@@ -504,6 +522,11 @@ preload_modinfo_value(struct sbuf *sbp, uint32_t *bptr, int type, int len)
 	case MODINFO_METADATA | MODINFOMD_HOWTO:
 		sbuf_printf(sbp, "0x%08x", *bptr);
 		break;
+#ifdef MODINFOMD_BOOT_HARTID
+	case MODINFO_METADATA | MODINFOMD_BOOT_HARTID:
+		sbuf_printf(sbp, "0x%lu", *(uint64_t *)bptr);
+		break;
+#endif
 	case MODINFO_METADATA | MODINFOMD_SHDR:
 	case MODINFO_METADATA | MODINFOMD_ELFHDR:
 	case MODINFO_METADATA | MODINFOMD_FW_HANDLE:

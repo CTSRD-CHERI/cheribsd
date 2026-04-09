@@ -15,7 +15,7 @@ SRCS=	sshd-session.c auth-rhosts.c auth-passwd.c \
 	sftp-server.c sftp-common.c \
 	sandbox-null.c sandbox-rlimit.c sandbox-systrace.c sandbox-darwin.c \
 	sandbox-seccomp-filter.c sandbox-capsicum.c sandbox-pledge.c \
-	sandbox-solaris.c uidswap.c
+	sandbox-solaris.c uidswap.c $(SKSRCS)
 PACKAGE=	ssh
 
 # gss-genr.c really belongs in libssh; see src/secure/lib/libssh/Makefile
@@ -25,12 +25,6 @@ MAN=
 
 # pam should always happen before ssh here for static linking
 LIBADD=	pam ssh util
-
-.if ${MK_LDNS} != "no"
-CFLAGS+=	-DHAVE_LDNS=1
-#DPADD+=	${LIBLDNS}
-#LDADD+=	-lldns
-.endif
 
 .if ${MK_AUDIT} != "no"
 CFLAGS+= -DUSE_BSM_AUDIT=1 -DHAVE_GETAUDIT_ADDR=1
@@ -45,8 +39,6 @@ LDFLAGS+=-L${LIBBLACKLISTDIR}
 .endif
 
 .if ${MK_GSSAPI} != "no" && ${MK_KERBEROS_SUPPORT} != "no"
-CFLAGS+= -include krb5_config.h
-SRCS+=	krb5_config.h
 LIBADD+=	gssapi_krb5 gssapi krb5
 .endif
 
@@ -56,10 +48,6 @@ LIBADD+=	wrap
 .endif
 
 LIBADD+=	crypto
-
-.if defined(LOCALBASE)
-CFLAGS+= -DXAUTH_PATH=\"${LOCALBASE}/bin/xauth\"
-.endif
 
 .include <bsd.prog.mk>
 

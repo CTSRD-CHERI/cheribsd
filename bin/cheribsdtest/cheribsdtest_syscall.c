@@ -43,11 +43,6 @@
 #include <sys/time.h>
 #include <sys/ptrace.h>
 
-#include <machine/sysarch.h>
-
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-
 #include <assert.h>
 #include <err.h>
 #include <errno.h>

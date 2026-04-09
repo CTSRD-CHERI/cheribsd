@@ -34,8 +34,13 @@
 #ifndef __SYS_CHERI_REVOKE_H__
 #define	__SYS_CHERI_REVOKE_H__
 
+#include <sys/stddef.h>
+
 #if __has_feature(capabilities)
 #include <cheri/cherireg.h> /* For CHERI_OTYPE_BITS */
+#ifndef _KERNEL
+#include <cheriintrin.h>
+#endif
 #endif
 
 typedef	uint64_t	cheri_revoke_epoch_t;
@@ -85,11 +90,13 @@ cheri_revoke_epoch_clears(cheri_revoke_epoch_t now, cheri_revoke_epoch_t then)
 static inline int
 cheri_revoke_is_revoked(const void * __capability cap)
 {
+	int is_revoked;
+
+	is_revoked = (cheri_tag_get(cap) == 0);
 #ifndef CHERI_CAPREVOKE_CLEARTAGS
-	return (__builtin_cheri_perms_get(cap) == 0);
-#else
-	return (__builtin_cheri_tag_get(cap) == 0);
+	is_revoked |= (cheri_perms_get(cap) == 0);
 #endif
+	return (is_revoked);
 }
 
 /*************************** SHADOW BITMAP LAYOUT ***************************/

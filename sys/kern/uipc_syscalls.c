@@ -895,7 +895,7 @@ sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 	struct iovec *iov;
 	int error;
 
-	error = copyincap(uap->msg, &msg, sizeof(msg));
+	error = copyinptr(uap->msg, &msg, sizeof(msg));
 	if (error != 0)
 		return (error);
 	error = copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
@@ -1192,7 +1192,7 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 	struct iovec * __capability uiov, *iov;
 	int error;
 
-	error = copyincap(uap->msg, &msg, sizeof(msg));
+	error = copyinptr(uap->msg, &msg, sizeof(msg));
 	if (error != 0)
 		return (error);
 	error = copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
@@ -1208,7 +1208,7 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 	error = recvit(td, uap->s, &msg, NULL);
 	if (error == 0) {
 		msg.msg_iov = uiov;
-		error = copyoutcap(&msg, uap->msg, sizeof(msg));
+		error = copyoutptr(&msg, uap->msg, sizeof(msg));
 	}
 	free(iov, M_IOV);
 	return (error);
@@ -1488,7 +1488,9 @@ kern_getpeername(struct thread *td, int fd, struct sockaddr *sa)
 		error = ENOTCONN;
 		goto done;
 	}
+	CURVNET_SET(so->so_vnet);
 	error = sopeeraddr(so, sa);
+	CURVNET_RESTORE();
 #ifdef KTRACE
 	if (error == 0 && KTRPOINT(td, KTR_STRUCT))
 		ktrsockaddr(sa);

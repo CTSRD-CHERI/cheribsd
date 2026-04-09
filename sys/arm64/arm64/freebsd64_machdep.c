@@ -68,6 +68,7 @@
 
 #include <cheri/cheric.h>
 
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_util.h>
@@ -181,7 +182,7 @@ mcontext_to_mcontext64(mcontext_t *mc, mcontext64_t *mc64)
 	greg = (register_t *)&mc64->mc_gpregs;
 	for (i = 0; i < CONTEXT64_COPYREGS; i++)
 		greg[i] = (register_t)creg[i];
-	mc64->mc_gpregs.gp_elr = cheri_getoffset(mc->mc_capregs.cap_elr);
+	mc64->mc_gpregs.gp_elr = cheri_offset_get(mc->mc_capregs.cap_elr);
 	mc64->mc_gpregs.gp_spsr = mc->mc_spsr;
 	mc64->mc_flags = mc->mc_flags;
 	if (mc->mc_flags & _MC_FP_VALID)
@@ -214,7 +215,7 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 
 	memset(&mc, 0, sizeof(mc));
 	if (mcp->mc_flags & _MC_CAP_VALID) {
-		error = copyincap(__USER_CAP(mcp->mc_capregs,
+		error = copyinptr(USER_PTR(mcp->mc_capregs,
 		    sizeof(mc.mc_capregs)), &mc.mc_capregs,
 		    sizeof(mc.mc_capregs));
 		if (error)
@@ -223,7 +224,7 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 		/* XXX: Permit userland to change GPRs for sigreturn? */
 
 		/* Honor 64-bit PC. */
-		mc.mc_capregs.cap_elr = cheri_setoffset(mc.mc_capregs.cap_elr,
+		mc.mc_capregs.cap_elr = cheri_offset_set(mc.mc_capregs.cap_elr,
 		    mcp->mc_gpregs.gp_elr);
 	} else {
 		creg = (uintcap_t *)&mc.mc_capregs;
@@ -231,7 +232,7 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 		for (i = 0; i < CONTEXT64_COPYREGS; i++)
 			creg[i] = (uintcap_t)greg[i];
 
-		mc.mc_capregs.cap_elr = cheri_setoffset(td->td_frame->tf_elr,
+		mc.mc_capregs.cap_elr = cheri_offset_set(td->td_frame->tf_elr,
 		    mcp->mc_gpregs.gp_elr);
 		mc.mc_capregs.cap_ddc = td->td_frame->tf_ddc;
 	}
@@ -308,7 +309,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_UNLOCK(td->td_proc);
 
 	/* Copy the capability registers out to the user's stack. */
-	if (copyoutcap(&mc.mc_capregs, __USER_CAP(capregs,
+	if (copyoutptr(&mc.mc_capregs, USER_PTR(capregs,
 	    sizeof(mc.mc_capregs)), sizeof(mc.mc_capregs)) != 0) {
 		PROC_LOCK(p);
 		printf("pid %d, tid %d: could not copy out cap registers\n",
@@ -318,7 +319,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyoutcap(&frame, __USER_CAP(fp, sizeof(struct sigframe64)),
+	if (copyoutptr(&frame, USER_PTR(fp, sizeof(struct sigframe64)),
 	    sizeof(struct sigframe64)) != 0) {
 		/* Process has trashed its stack. Kill it. */
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%lx", td, fp);
@@ -331,7 +332,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_x[2] = (uintcap_t)fp + offsetof(struct sigframe64, sf_uc);
 	tf->tf_x[8] = (uintcap_t)catcher;
 	tf->tf_sp = (uintcap_t)fp;
-	trapframe_set_elr(tf, (uintcap_t)cheri_setaddress(catcher,
+	trapframe_set_elr(tf, (uintcap_t)cheri_address_set(catcher,
 	    PROC_SIGCODE(p)));
 
 	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_elr,
@@ -347,7 +348,7 @@ freebsd64_sigreturn(struct thread *td, struct freebsd64_sigreturn_args *uap)
 	ucontext64_t uc;
 	int error;
 
-	error = copyincap(__USER_CAP_OBJ(uap->sigcntxp), &uc, sizeof(uc));
+	error = copyinptr(USER_PTR_OBJ(uap->sigcntxp), &uc, sizeof(uc));
 	if (error != 0)
 		return (error);
 

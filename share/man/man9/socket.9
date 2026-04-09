@@ -24,7 +24,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd September 6, 2022
+.Dd December 9, 2025
 .Dt SOCKET 9
 .Os
 .Sh NAME
@@ -146,7 +146,10 @@
 .Ft int
 .Fn sooptcopyin "struct sockopt *sopt" "void *buf" "size_t len" "size_t minlen"
 .Ft int
+.Fn sooptcopyinptr "struct sockopt *sopt" "void *buf" "size_t len" "size_t minlen"
+.Ft int
 .Fn sooptcopyout "struct sockopt *sopt" "const void *buf" "size_t len"
+.Fn sooptcopyoutptr "struct sockopt *sopt" "const void *buf" "size_t len"
 .Sh DESCRIPTION
 The kernel
 .Nm
@@ -577,6 +580,12 @@ and
 are useful for transferring
 .Vt struct sockopt
 data between user and kernel code.
+They do not preserve pointer provenance.
+If the copied data contains pointers, the
+.Fn sooptcopyinptr
+and
+.Fn sooptcopyoutptr
+functions must be used instead.
 .Sh SEE ALSO
 .Xr bind 2 ,
 .Xr close 2 ,

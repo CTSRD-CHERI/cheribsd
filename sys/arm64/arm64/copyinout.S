@@ -269,9 +269,9 @@ ending:
  * Copy specified amount of data from the user to kernel space, preserving
  * capability tags
  *
- * int copyincap(const void * __capability uaddr, void *kdaddr, size_t len)
+ * int copyinptr(const void * __capability uaddr, void *kdaddr, size_t len)
  */
-ENTRY(copyincap)
+ENTRY(copyinptr)
 	cbz	x2, 1f
 	check_user_access 0, 2, copyio_fault_nopcb
 
@@ -295,15 +295,15 @@ ENTRY(copyincap)
 
 1:	mov	x0, xzr		/* return 0 */
 	RETURN
-END(copyincap)
+END(copyinptr)
 
 /*
  * Copy specified amount of data from kernel to the user space, preserving
  * capability tags
  *
- * int copyoutcap(const void *kaddr, void * __capability udaddr, size_t len)
+ * int copyoutptr(const void *kaddr, void * __capability udaddr, size_t len)
  */
-ENTRY(copyoutcap)
+ENTRY(copyoutptr)
 	cbz	x2, 1f
 	check_user_access 1, 2, copyio_fault_nopcb
 
@@ -327,7 +327,7 @@ ENTRY(copyoutcap)
 
 1:	mov	x0, xzr		/* return 0 */
 	RETURN
-END(copyoutcap)
+END(copyoutptr)
 
 /*
  * Local helpers to copy through capabilities

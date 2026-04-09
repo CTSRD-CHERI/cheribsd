@@ -663,8 +663,7 @@ cuio_apply(struct uio *uio, int off, int len,
 		KASSERT(iol >= 0, ("%s: empty", __func__));
 		count = min(iov->iov_len - off, len);
 		rval = (*f)(arg,
-		    __DECAP_CHECK(((char * __capability)iov->iov_base) + off,
-		    count), count);
+		    ((__cheri_fromcap char *)iov->iov_base) + off, count);
 		if (rval)
 			return (rval);
 		len -= count;

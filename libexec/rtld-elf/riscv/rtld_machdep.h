@@ -79,16 +79,11 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
 #define make_function_pointer(def, defobj) \
 	make_function_cap(def, defobj)
 
-/* ignore _init/_fini */
-#define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
-#define call_init_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
+#define call_initfini_pointer(obj, target)				\
+	(((InitFunc)(target))())
 
-/* TODO: Per-function captable/PLT/FNDESC support (needs CGP) */
-#define call_init_array_pointer(obj, target)				\
-	(((InitArrFunc)(target).value)(main_argc, main_argv, environ))
-
-#define call_fini_array_pointer(obj, target)				\
-	(((InitFunc)(target).value)())
+#define call_init_pointer(obj, target)					\
+	(((InitArrFunc)(target))(main_argc, main_argv, environ))
 
 #else /* __CHERI_PURE_CAPABILITY__ */
 
@@ -125,11 +120,18 @@ extern unsigned long elf_hwcap;
 
 #define round(size, align) \
     (((size) + (align) - 1) & ~((align) - 1))
+#ifdef TLS_TGOT
+#define calculate_first_tgot_offset(size, align, offset)	\
+    TLS_TCB_SIZE
+#define calculate_tgot_offset(prev_offset, prev_size, size, align, offset) \
+    round(prev_offset + prev_size, align)
+#else
 #define calculate_first_tls_offset(size, align, offset)	\
     TLS_TCB_SIZE
 #define calculate_tls_offset(prev_offset, prev_size, size, align, offset) \
     round(prev_offset + prev_size, align)
 #define calculate_tls_post_size(align)  0
+#endif
 
 typedef struct {
 	unsigned long ti_module;

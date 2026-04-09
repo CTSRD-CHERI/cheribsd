@@ -717,8 +717,8 @@ superio_attach(device_t dev)
 		    sc->known_devices[i].ldn);
 	}
 
-	bus_generic_probe(dev);
-	bus_generic_attach(dev);
+	bus_identify_children(dev);
+	bus_attach_children(dev);
 
 	sc->chardev = make_dev(&superio_cdevsw, device_get_unit(dev),
 	    UID_ROOT, GID_WHEEL, 0600, "superio%d", device_get_unit(dev));
@@ -740,7 +740,6 @@ superio_detach(device_t dev)
 		return (error);
 	if (sc->chardev != NULL)
 		destroy_dev(sc->chardev);
-	device_delete_children(dev);
 	bus_release_resource(dev, SYS_RES_IOPORT, sc->io_rid, sc->io_res);
 	mtx_destroy(&sc->conf_lock);
 	return (0);

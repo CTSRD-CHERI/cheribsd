@@ -103,13 +103,14 @@ SUBDIR=	\
 	dummymbuf \
 	dummynet \
 	${_dwwdt} \
-	${_e6000sw} \
+	e6000sw \
 	${_efirt} \
 	${_em} \
 	${_ena} \
 	${_enic} \
 	${_enetc} \
 	${_et} \
+	etherswitch \
 	evdev \
 	${_exca} \
 	ext2fs \
@@ -196,11 +197,10 @@ SUBDIR=	\
 	${_iwi} \
 	${_iwifw} \
 	${_iwlwifi} \
-	${_iwlwififw} \
 	${_iwm} \
-	${_iwmfw} \
 	${_iwn} \
 	${_iwnfw} \
+	${_iwx} \
 	${_ix} \
 	${_ixv} \
 	${_ixl} \
@@ -253,6 +253,7 @@ SUBDIR=	\
 	mem \
 	mfi \
 	mii \
+	miiproxy \
 	mlx \
 	mlxfw \
 	${_mlx4} \
@@ -421,6 +422,7 @@ SUBDIR=	\
 	wlan_acl \
 	wlan_amrr \
 	wlan_ccmp \
+	wlan_gcmp \
 	wlan_rssadapt \
 	wlan_tkip \
 	wlan_wep \
@@ -572,9 +574,6 @@ _mlx5ib=	mlx5ib
 _ena=		ena
 _gve=		gve
 _iwlwifi=	iwlwifi
-.if ${MK_SOURCELESS_UCODE} != "no"
-_iwlwififw=	iwlwififw
-.endif
 _rtw88=		rtw88
 _rtw89=		rtw89
 _vmware=	vmware
@@ -620,7 +619,6 @@ _mac_veriexec_sha512= mac_veriexec_sha512
 _netgraph=	netgraph
 .endif
 
-.if !${MACHINE_ABI:Mpurecap}
 .if (${MK_PF} != "no" && (${MK_INET_SUPPORT} != "no" || \
 	${MK_INET6_SUPPORT} != "no")) || defined(ALL_MODULES)
 _pf=		pf
@@ -628,7 +626,6 @@ _pflog=		pflog
 _pflow=		pflow
 .if ${MK_INET_SUPPORT} != "no"
 _pfsync=	pfsync
-.endif
 .endif
 .endif
 
@@ -724,7 +721,6 @@ _rockchip=	rockchip
 .if !empty(OPT_FDT)
 _sdhci_fdt=	sdhci_fdt
 .endif
-_e6000sw=	e6000sw
 _neta=		neta
 .endif
 
@@ -813,7 +809,6 @@ _iwn=		iwn
 .if ${MK_SOURCELESS_UCODE} != "no"
 _ipwfw=		ipwfw
 _iwifw=		iwifw
-_iwmfw=		iwmfw
 _iwnfw=		iwnfw
 .endif
 _nfe=		nfe
@@ -843,6 +838,7 @@ _ccp=		ccp
 _enic=		enic
 _iavf=		iavf
 _ioat=		ioat
+_iwx=		iwx
 _ixl=		ixl
 _nvdimm=	nvdimm
 _pms=		pms
@@ -864,10 +860,13 @@ _smartpqi=	smartpqi
 _p2sb=		p2sb
 .endif
 
-.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64"
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
+    ${MACHINE_CPUARCH} == "riscv"
 .if ${MK_BHYVE} != "no" || defined(ALL_MODULES)
 .if ${KERN_OPTS:MSMP}
+.if ${MACHINE_CPUARCH} != "riscv" || !${MACHINE_CPU:Mcheri}
 _vmm=		vmm
+.endif
 .endif
 .endif
 .endif

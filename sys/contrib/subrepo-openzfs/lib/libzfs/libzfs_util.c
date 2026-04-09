@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: CDDL-1.0
 /*
  * CDDL HEADER START
  *
@@ -932,6 +933,7 @@ libzfs_run_process_impl(const char *path, char *argv[], char *env[], int flags,
 	pid = fork();
 	if (pid == 0) {
 		/* Child process */
+		setpgid(0, 0);
 		devnull_fd = open("/dev/null", O_WRONLY | O_CLOEXEC);
 
 		if (devnull_fd < 0)
@@ -1255,7 +1257,7 @@ zcmd_write_src_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t *nvl)
 int
 zcmd_read_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t **nvlp)
 {
-	if (nvlist_unpack((__cheri_fromcap void *)(uintcap_t)zc->zc_nvlist_dst,
+	if (nvlist_unpack((__cheri_fromcap void *)(__uintcap_t)zc->zc_nvlist_dst,
 	    zc->zc_nvlist_dst_size, nvlp, 0) != 0)
 		return (no_memory(hdl));
 

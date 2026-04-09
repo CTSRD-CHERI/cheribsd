@@ -32,6 +32,7 @@
 #include <machine/cherireg.h>
 
 #include "assym.inc"
+#include <sys/intr.h>
 
 	.text
 

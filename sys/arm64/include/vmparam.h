@@ -256,14 +256,14 @@
 /* True if va is in the dmap range */
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	VIRT_IN_DMAP(va)					\
-    cheri_is_address_inbounds(dmap_base_cap, (va))
+    cheri_is_address_inbounds(dmap_capability, (va))
 #else
 #define	VIRT_IN_DMAP(va)	((va) >= DMAP_MIN_ADDRESS &&	\
     (va) < (dmap_max_addr))
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	_DMAP_BASE dmap_base_cap
+#define	_DMAP_BASE dmap_capability
 #else
 #define	_DMAP_BASE (void *)DMAP_MIN_ADDRESS
 #endif
@@ -328,7 +328,7 @@ extern vm_paddr_t dmap_phys_base;
 extern vm_paddr_t dmap_phys_max;
 extern vm_offset_t dmap_max_addr;
 #ifdef __CHERI_PURE_CAPABILITY__
-extern void *dmap_base_cap;
+extern void *dmap_capability;
 #endif
 
 #endif
