@@ -383,10 +383,6 @@ _kmodinstall: .PHONY
 	${INSTALL} -T dbg -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
 	    ${_INSTALLFLAGS} ${PROG}.debug ${DESTDIR}${KERN_DEBUGDIR}${KMODDIR}/
 .endif
-.if defined(COMPILE_IR)
-	${INSTALL} -T release -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
-	    ${_INSTALLFLAGS} ${PROG}.ll ${DESTDIR}${KMODDIR}/
-.endif
 
 .include <bsd.links.mk>
 
