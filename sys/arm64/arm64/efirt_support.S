@@ -73,20 +73,30 @@ ENTRY(efi_rt_arch_call_nofault)
 	/* Get target function pointer */
 	ldr	c6, [c0, #EC_FPTR]
 
+	/*
+	 * Load the arguments into registers.
+	 *
+	 * Use direct branches rather than an indirect BR into the middle of the
+	 * load sequence: BTI requires indirect branch targets to be marked with
+	 * landing pads, while these internal offsets are not function entries.
+	 */
 	/* Jump to 0f + 4 * (5 - ec_argcnt) + 1 */
-	adr	c9, 0f
-	mov	x10, #20
-	sub	x8, x10, x8, lsl #2
-	add	c9, c9, x8, uxtx
-	br	x9
+	cbz	x8, 0f
+	cmp	x8, #1
+	b.eq	2f
+	cmp	x8, #2
+	b.eq	3f
+	cmp	x8, #3
+	b.eq	4f
+	cmp	x8, #4
+	b.eq	5f
 
-	/* Load the arguments into registers */
-0:	ldr	x4, [c0, #EC_ARG5]
-	ldr	x3, [c0, #EC_ARG4]
-	ldr	x2, [c0, #EC_ARG3]
-	ldr	x1, [c0, #EC_ARG2]
-	ldr	x0, [c0, #EC_ARG1]
-
+	ldr	x4, [c0, #EC_ARG5]
+5:	ldr	x3, [c0, #EC_ARG4]
+4:	ldr	x2, [c0, #EC_ARG3]
+3:	ldr	x1, [c0, #EC_ARG2]
+2:	ldr	x0, [c0, #EC_ARG1]
+0:
 	/* Install almighty DDC just for EFI (and our CSP restore) */
 	adrp	c7, :got:kernel_root_cap
 	ldr	c7, [c7, :got_lo12:kernel_root_cap]
