@@ -2271,7 +2271,8 @@ elf_compartment_entry(linker_file_t lf, uintcap_t ptr, u_long *idp,
 	*idp = ec->id;
 	cap = cheri_setaddress((uintcap_t)ec->pcc->pcc, ptr);
 	cap = cheri_andperm(cap, cheri_getperm(ptr));
-	cap = cheri_sealentry(cheri_capmode(cap));
+	cap = cheri_flags_set(cap, cheri_flags_get(ptr));
+	cap = cheri_sealentry(cap);
 	*ptrp = (uintptr_t)cap;
 }
 #endif
