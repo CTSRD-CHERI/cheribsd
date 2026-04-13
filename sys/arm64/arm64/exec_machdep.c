@@ -777,6 +777,13 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 		trapframe_set_elr(tf, mcp->mc_capregs.cap_elr);
 	tf->tf_ddc = mcp->mc_capregs.cap_ddc;
 	tf->tf_spsr = mcp->mc_spsr;
+	if ((tf->tf_spsr & PSR_SS) != 0) {
+		td->td_pcb->pcb_flags |= PCB_SINGLE_STEP;
+
+		WRITE_SPECIALREG(mdscr_el1,
+		    READ_SPECIALREG(mdscr_el1) | MDSCR_SS);
+		isb();
+	}
 	set_fpcontext(td, mcp);
 
 	return (0);
