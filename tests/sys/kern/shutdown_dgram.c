@@ -69,14 +69,14 @@ static void
 shutdown_thread(int s)
 {
 	pthread_t t;
-	int rv;
+	void *thread_ret;
 
 	ATF_REQUIRE(pthread_create(&t, NULL, blocking_thread, &s) == 0);
 	usleep(1000);
 	ATF_REQUIRE(shutdown(s, SHUT_RD) == -1);
 	ATF_REQUIRE(errno == ENOTCONN);
-	ATF_REQUIRE(pthread_join(t, (void *)&rv) == 0);
-	ATF_REQUIRE(rv == 0);
+	ATF_REQUIRE(pthread_join(t, &thread_ret) == 0);
+	ATF_REQUIRE((uintptr_t)thread_ret == 0);
 	close(s);
 }
 
