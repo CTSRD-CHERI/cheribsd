@@ -6291,7 +6291,7 @@ tls_get_tgot(struct tcb *tcb, int index)
 	dtv = tcb->tcb_dtv;
 	/* Check dtv generation in case new modules have arrived */
 	if (__predict_true(dtv->dtv_gen == tls_dtv_generation &&
-	    dtv->dtv_slots[index - 1].dtvs_tls != 0))
+	    dtv->dtv_slots[index - 1].dtvs_tgot != 0))
 		return (dtv->dtv_slots[index - 1].dtvs_tgot);
 	return (tls_get_tgot_slow(tcb, index, NULL));
 }
