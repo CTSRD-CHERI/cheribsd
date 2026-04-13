@@ -135,7 +135,10 @@ CHERIBSDTEST(sig_dfl_ign, "Test proper handling of SIG_DFL and SIG_IGN")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(ptrace_basic, "Test basic handling of ptrace functionality")
+CHERIBSDTEST(ptrace_basic,
+    "Test basic handling of ptrace functionality",
+    /* Tracked as https://github.com/CTSRD-CHERI/cheribsd/issues/2621 */
+    .ct_xfail_reason = "ptrace(PT_KILL) does not appear to deliver signal")
 {
 	int cpid, res;
 	int pfd[2];
