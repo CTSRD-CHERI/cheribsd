@@ -530,8 +530,7 @@ start_cpu(u_int cpuid, uint64_t target_cpu, int domain, vm_paddr_t release_addr)
 	} else {
 		pa = pmap_extract(kernel_pmap,
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-		    (vm_offset_t)executive_get_function(
-		    (uintptr_t)mpentry_psci) - 1
+		    (vm_offset_t)executive_get_function((uintptr_t)mpentry_psci)
 #else
 		    (vm_offset_t)mpentry_psci
 #endif

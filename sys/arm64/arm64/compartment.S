@@ -60,7 +60,7 @@ compartment_entries_length:
 
 .macro template_entry_trampoline type
 \type\()_entry_id:
-	.long		0
+	.quad		0
 \type\()_entry_type:
 	.word		0
 	.p2align 4
@@ -113,7 +113,7 @@ compartment_entries_length:
 
 	/* Get or allocate a callee stack. */
 	ldr	x0, \type\()_entry_id
-	ldr	x1, \type\()_entry_type
+	ldr	w1, \type\()_entry_type
 	ldr	c16, \type\()_entry_stackptr_func
 	blr	c16
 
