@@ -1775,7 +1775,7 @@ tramp_get_header(const void *data)
 	    (cheri_perms_get(data) & CHERI_PERM_LOAD) == 0 ||
 	    (cheri_perms_get(data) & CHERI_PERM_EXECUTE) == 0
 #ifdef HAS_RESTRICTED_MODE
-	    || (cheri_perms_get(data) & CHERI_PERM_EXECUTIVE) == 0)
+	    || (cheri_perms_get(data) & CHERI_PERM_EXECUTIVE) == 0
 #endif
 	    )
 		return (NULL);

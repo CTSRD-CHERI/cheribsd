@@ -328,8 +328,11 @@ TRAMP(tramp_push_frame)
 	 */
 	scaddr		csp, cs11, sp
 	sc		csp, 0(STACK_TABLE_C)
-	sc		csp, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + TRUSTED_FRAME_SP_OSP + CLEN_BYTES)(TRUSTED_STACK_C)
 
+	/*
+	 * Save the caller's old stack top.
+	 */
+	sc		cs11, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + TRUSTED_FRAME_SP_OSP + CLEN_BYTES)(TRUSTED_STACK_C)
 	/*
 	 * Get the length of the stack lookup table.
 	 */
@@ -404,7 +407,8 @@ TRAMP(tramp_push_frame)
 	sc		cs1, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 0)(TRUSTED_STACK_C)
 	gctag		s1, cra
 	/*
-	 * Save the return address, the frame pointer, and the caller's current stack top.
+	 * Save the return address, the frame pointer, and the caller's current
+	 * stack top.
 	 */
 	sc		cs0, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 11)(TRUSTED_STACK_C)
 	sc		cra, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 12)(TRUSTED_STACK_C)
