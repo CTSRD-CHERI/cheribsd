@@ -34,6 +34,9 @@ SRCS+=	cheribsdtest_bounds_subobject.c					\
 	cheribsdtest_bounds_varargs.c					\
 	cheribsdtest_malloc.c						\
 	cheribsdtest_sentries.c
+.if ${MACHINE_ARCH:Mriscv*c*}
+SRCS+=	cheribsdtest_poison.c
+.endif
 .endif
 
 CHERIBSDTEST_DIR:=	${.PARSEDIR}
