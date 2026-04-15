@@ -45,4 +45,33 @@ extern void * __capability cheri_buildcap_safe(void * __capability, intcap_t);
 #define	cheri_buildcap(x, y)	cheri_buildcap_safe((x), (y))
 #endif
 
+#define	cheri_poison_get(x) ({						\
+	int is_poison = 0;						\
+	asm volatile("cgetpoison %0, %1" : "=r" (is_poison) : "C" (x)); \
+	is_poison;							\
+})
+
+#define	cheri_poison_set(x)					\
+        asm volatile("cpoison %0, 0(%1)" : : "C" (x), "C" (x))
+
+#define	cheri_is_poison(x) ({						\
+	int version = 0;						\
+	asm volatile("cgetcappoison %0, %1" : "=r" (version) : "C" (x)); \
+	version;							\
+})
+
+#define	cheri_poison_clear(x)						\
+        asm volatile("cclearpoison %0, 0(%1)" : : "C" (x), "C" (x))
+
+#define	cheri_poison_set_version(x, v) ({				\
+	void *c;							\
+        asm volatile("csetcappver %0, %1, %2" : : "C" (c), "C "(x), "r" (v)); \
+	c;								\
+})
+
+#define	cheri_poison_get_version(x) ({					\
+	int v;								\
+	asm volatile("cgetcappver %0, %1" : "=r" (v) : "C" (x));	\
+	v;								\
+})
 #endif /* !_MACHINE_CHERIC_H_ */
