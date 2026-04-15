@@ -265,7 +265,7 @@ scan(struct cdev *cd, char * __capability ustack_ptr_ctx)
 			// capability suitable for dereferencing something in
 			// user space.
 			uptr = cheri_capability_build_user_data(
-			    CHERI_CAP_USER_DATA_PERMS, ptr, PAGE_SIZE, 0);
+			    CHERI_CAP_USER_DATA_PERMS, ptr, PAGE_SIZE, ptr);
 
 			ret = scan_page(cd, ustack_ptr_ctx, kpage, vme->eflags,
 			    uptr);
@@ -365,19 +365,16 @@ scan_and_stash(struct cdev *cd, int fd)
 	// ustack_ptr = (uintptr_t)curthread->td_frame->tf_rsp; /* old way */
 	ustack_ptr = (char * __capability)cpu_getstack(curthread);
 
-	printf("True user stack ptr:            %p\n",
-	    (__cheri_fromcap char *)ustack_ptr);
+	printf("True user stack ptr:            %lp\n", ustack_ptr);
 
 	// coarsify the pointer to align to a 64-byte boundary.
 	// ustack_ptr_ctx = ustack_ptr & ~(63UL);
 	/* This implements (I believe) the above line and also limits the scope
 	   of the pointer to by the exact bytes we're gonna read from it. */
-	uintptr_t xxx = ((uintptr_t)(__cheri_fromcap char *)ustack_ptr) &
-	    ~(63UL);
-	ustack_ptr_ctx = cheri_ptr((char * __capability)xxx, 24);
+	ustack_ptr_ctx = cheri_bounds_set((char * __capability)
+	    ((uintcap_t)ustack_ptr & ~(63UL)), 24);
 
-	printf("64-byte aligned user stack ptr: %p\n",
-	    (__cheri_fromcap char *)ustack_ptr_ctx);
+	printf("64-byte aligned user stack ptr: %lp\n", ustack_ptr_ctx);
 
 	// Find the secret, stash a pointer to it in cd->si_drv1.
 	ret = scan(cd, ustack_ptr_ctx);
