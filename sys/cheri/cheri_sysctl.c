@@ -101,6 +101,10 @@ SYSCTL_BOOL(_security_cheri, OID_AUTO, check_perm_syscall,
     "Forbid system calls from code without CHERI_PERM_SYSCALL");
 
 #ifdef CHERI_CAPREVOKE
+#ifdef CHERI_CAPREVOKE_POISON
+FEATURE(cheri_caprevoke_poison, "CHERI poison revocation support");
+#endif
+
 /*
  * Set the default state of revocation in userspace.  This is used to
  * compute the revocation flags in AT_BSDFLAGS but can be overridden
