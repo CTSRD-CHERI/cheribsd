@@ -52,7 +52,7 @@ extern void * __capability cheri_buildcap_safe(void * __capability, intcap_t);
 })
 
 #define	cheri_poison_set(x)					\
-        asm volatile("cpoison %0, 0(%1)" : : "C" (x), "C" (x))
+	asm volatile("cpoison %0, 0(%1)" : : "C" (x), "C" (x))
 
 #define	cheri_is_poison(x) ({						\
 	int version = 0;						\
@@ -61,11 +61,11 @@ extern void * __capability cheri_buildcap_safe(void * __capability, intcap_t);
 })
 
 #define	cheri_poison_clear(x)						\
-        asm volatile("cclearpoison %0, 0(%1)" : : "C" (x), "C" (x))
+	asm volatile("cclearpoison %0, 0(%1)" : : "C" (x), "C" (x))
 
 #define	cheri_poison_set_version(x, v) ({				\
 	void *c;							\
-        asm volatile("csetcappver %0, %1, %2" : : "C" (c), "C "(x), "r" (v)); \
+	asm volatile("csetcappver %0, %1, %2" : : "C" (c), "C" (x), "r" (v)); \
 	c;								\
 })
 
