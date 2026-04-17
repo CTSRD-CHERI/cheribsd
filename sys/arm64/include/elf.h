@@ -82,7 +82,15 @@ typedef struct {	/* Auxiliary vector entry on initial stack */
 #endif
 
 #ifdef __ELF_CHERI
+/*
+ * We need __ELF_CHERI for stand, but currently don't built with capabilities,
+ * so can't provide a proper Elf_Auxinfo. We could use fake int128-ish types
+ * but don't actually need Elf_Auxinfo at all in stand, so just don't provide
+ * it at all.
+ */
+#if __has_feature(capabilities) || !defined(_STANDALONE)
 typedef Elf64C_Auxinfo Elf_Auxinfo;
+#endif
 #else
 __ElfType(Auxinfo);
 #endif
