@@ -313,6 +313,18 @@ __elfN(load_elf_header)(char *filename, elf_file_t ef)
 		goto error;
 	}
 
+#if defined(__ELF_CHERI)
+	if (!ELF_IS_CHERI(ehdr)) {
+		err = EFTYPE;
+		goto error;
+	}
+#elif defined(ELF_IS_CHERI)
+	if (ELF_IS_CHERI(ehdr)) {
+		err = EFTYPE;
+		goto error;
+	}
+#endif
+
 	err = elf_header_convert(ehdr);
 	if (err)
 		goto error;
@@ -965,6 +977,20 @@ fake_modname(const char *name)
 	return fp;
 }
 
+#if defined(__ELF_CHERI)
+typedef struct { Elf_Addr words[2]; } __aligned(2 * sizeof(Elf_Addr)) Elf_Ptr;
+#else
+typedef Elf_Addr Elf_Ptr;
+#endif
+
+#if defined(__ELF_CHERI)
+struct mod_metadata64c {
+	int		md_version;	/* structure version MDTV_* */
+	int		md_type;	/* type of entry MDT_* */
+	Elf_Ptr		md_data;	/* specific data */
+	Elf_Ptr		md_cval;	/* common string label */
+};
+#endif
 #if (defined(__i386__) || defined(__powerpc__)) && __ELF_WORD_SIZE == 64
 struct mod_metadata64 {
 	int		md_version;	/* structure version MDTV_* */
@@ -1114,7 +1140,9 @@ __elfN(parse_modmetadata)(struct preloaded_file *fp, elf_file_t ef,
     Elf_Addr p_start, Elf_Addr p_end)
 {
 	struct mod_metadata md;
-#if (defined(__i386__) || defined(__powerpc__)) && __ELF_WORD_SIZE == 64
+#if defined(__ELF_CHERI)
+	struct mod_metadata64c md64c;
+#elif (defined(__i386__) || defined(__powerpc__)) && __ELF_WORD_SIZE == 64
 	struct mod_metadata64 md64;
 #elif defined(__amd64__) && __ELF_WORD_SIZE == 32
 	struct mod_metadata32 md32;
@@ -1123,20 +1151,38 @@ __elfN(parse_modmetadata)(struct preloaded_file *fp, elf_file_t ef,
 	struct mod_version mver;
 	char *s;
 	int error, modcnt, minfolen;
-	Elf_Addr v, p;
+	Elf_Addr va, p;
+	Elf_Ptr vp;
 
 	modcnt = 0;
 	p = p_start;
 	while (p < p_end) {
-		COPYOUT(p, &v, sizeof(v));
-		error = __elfN(reloc_ptr)(fp, ef, p, &v, sizeof(v));
+		COPYOUT(p, &vp, sizeof(vp));
+		error = __elfN(reloc_ptr)(fp, ef, p, &vp, sizeof(vp));
+#if defined(__ELF_CHERI)
+		va = vp.words[0];
+#else
+		va = vp;
+#endif
 		if (error == EOPNOTSUPP)
-			v += ef->off;
+			va += ef->off;
 		else if (error != 0)
 			return (error);
-#if (defined(__i386__) || defined(__powerpc__)) && __ELF_WORD_SIZE == 64
-		COPYOUT(v, &md64, sizeof(md64));
-		error = __elfN(reloc_ptr)(fp, ef, v, &md64, sizeof(md64));
+#if defined(__ELF_CHERI)
+		COPYOUT(va, &md64c, sizeof(md64c));
+		error = __elfN(reloc_ptr)(fp, ef, va, &md64c, sizeof(md64c));
+		if (error == EOPNOTSUPP) {
+			md64c.md_cval.words[0] += ef->off;
+			md64c.md_data.words[0] += ef->off;
+		} else if (error != 0)
+			return (error);
+		md.md_version = md64c.md_version;
+		md.md_type = md64c.md_type;
+		md.md_cval = (const char *)(uintptr_t)md64c.md_cval.words[0];
+		md.md_data = (void *)(uintptr_t)md64c.md_data.words[0];
+#elif (defined(__i386__) || defined(__powerpc__)) && __ELF_WORD_SIZE == 64
+		COPYOUT(va, &md64, sizeof(md64));
+		error = __elfN(reloc_ptr)(fp, ef, va, &md64, sizeof(md64));
 		if (error == EOPNOTSUPP) {
 			md64.md_cval += ef->off;
 			md64.md_data += ef->off;
@@ -1147,8 +1193,8 @@ __elfN(parse_modmetadata)(struct preloaded_file *fp, elf_file_t ef,
 		md.md_cval = (const char *)(uintptr_t)md64.md_cval;
 		md.md_data = (void *)(uintptr_t)md64.md_data;
 #elif defined(__amd64__) && __ELF_WORD_SIZE == 32
-		COPYOUT(v, &md32, sizeof(md32));
-		error = __elfN(reloc_ptr)(fp, ef, v, &md32, sizeof(md32));
+		COPYOUT(va, &md32, sizeof(md32));
+		error = __elfN(reloc_ptr)(fp, ef, va, &md32, sizeof(md32));
 		if (error == EOPNOTSUPP) {
 			md32.md_cval += ef->off;
 			md32.md_data += ef->off;
@@ -1159,8 +1205,8 @@ __elfN(parse_modmetadata)(struct preloaded_file *fp, elf_file_t ef,
 		md.md_cval = (const char *)(uintptr_t)md32.md_cval;
 		md.md_data = (void *)(uintptr_t)md32.md_data;
 #else
-		COPYOUT(v, &md, sizeof(md));
-		error = __elfN(reloc_ptr)(fp, ef, v, &md, sizeof(md));
+		COPYOUT(va, &md, sizeof(md));
+		error = __elfN(reloc_ptr)(fp, ef, va, &md, sizeof(md));
 		if (error == EOPNOTSUPP) {
 			md.md_cval += ef->off;
 			md.md_data = (void *)((uintptr_t)md.md_data +
@@ -1168,7 +1214,7 @@ __elfN(parse_modmetadata)(struct preloaded_file *fp, elf_file_t ef,
 		} else if (error != 0)
 			return (error);
 #endif
-		p += sizeof(Elf_Addr);
+		p += sizeof(vp);
 		switch(md.md_type) {
 		case MDT_DEPEND:
 			if (ef->kernel) /* kernel must not depend on anything */
@@ -1305,6 +1351,9 @@ __elfN(reloc_ptr)(struct preloaded_file *mp, elf_file_t ef,
 		if (error != 0)
 			return (error);
 	}
+#ifdef __ELF_CHERI
+	/* TODO: __cap_relocs */
+#endif
 
 	return (0);
 }

@@ -48,8 +48,71 @@ int
 __elfN(reloc)(struct elf_file *ef, symaddr_fn *symaddr, const void *reldata,
     int reltype, Elf_Addr relbase, Elf_Addr dataaddr, void *data, size_t len)
 {
-#if (defined(__aarch64__) || defined(__amd64__) || defined(__i386__)) && \
-    __ELF_WORD_SIZE == 64
+#if defined(__aarch64__) && __ELF_WORD_SIZE == 64 && defined(__ELF_CHERI)
+	Elf64_Addr *where, val;
+	Elf_Addr addend, addr;
+	Elf_Size rtype;
+	const Elf_Rel *rel;
+	const Elf_Rela *rela;
+
+	switch (reltype) {
+	case ELF_RELOC_REL:
+		rel = (const Elf_Rel *)reldata;
+		where = (Elf_Addr *)((char *)data + relbase + rel->r_offset -
+		    dataaddr);
+		addend = 0;
+		rtype = ELF_R_TYPE(rel->r_info);
+		addend = 0;
+		break;
+	case ELF_RELOC_RELA:
+		rela = (const Elf_Rela *)reldata;
+		where = (Elf_Addr *)((char *)data + relbase + rela->r_offset -
+		    dataaddr);
+		addend = rela->r_addend;
+		rtype = ELF_R_TYPE(rela->r_info);
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	if ((char *)where < (char *)data || (char *)where >= (char *)data + len)
+		return (0);
+
+#if defined(__aarch64__)
+#define	RELOC_RELATIVE		R_AARCH64_RELATIVE
+#define	RELOC_RELATIVE_CAP	R_MORELLO_RELATIVE
+#endif
+
+	switch (rtype) {
+	case RELOC_RELATIVE:
+		addr = (Elf_Addr)addend + relbase;
+		val = addr;
+		memcpy(where, &val, sizeof(val));
+		break;
+	case RELOC_RELATIVE_CAP:
+		if (reltype == ELF_RELOC_REL) {
+			printf("\ninvalid Elf_Rel for relocation type %u\n",
+			    (u_int)rtype);
+			return (EINVAL);
+		}
+		/*
+		 * We currently can't use capabilities in loader, but also only
+		 * need the address anyway so just fake a null-derived one.
+		 */
+		addr = (Elf_Addr)addend + relbase + *where;
+		val = 0;
+		memcpy(where + 1, &val, sizeof(val));
+		val = addr;
+		memcpy(where, &val, sizeof(val));
+		break;
+	default:
+		printf("\nunhandled relocation type %u\n", (u_int)rtype);
+		return (EFTYPE);
+	}
+
+	return (0);
+#elif (defined(__aarch64__) || defined(__amd64__) || defined(__i386__)) && \
+    __ELF_WORD_SIZE == 64 && !defined(__ELF_CHERI)
 	Elf64_Addr *where, val;
 	Elf_Addr addend, addr;
 	Elf_Size rtype;
@@ -128,7 +191,7 @@ __elfN(reloc)(struct elf_file *ef, symaddr_fn *symaddr, const void *reldata,
 	}
 
 	return (0);
-#elif defined(__i386__) && __ELF_WORD_SIZE == 32
+#elif defined(__i386__) && __ELF_WORD_SIZE == 32 && !defined(__ELF_CHERI)
 	Elf_Addr addend, addr, *where, val;
 	Elf_Size rtype, symidx;
 	const Elf_Rel *rel;
