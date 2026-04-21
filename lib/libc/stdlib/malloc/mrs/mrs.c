@@ -353,7 +353,7 @@ static size_t page_size;
 static void *entire_shadow;
 static bool quarantining = true;
 static bool revoke_every_free = false;
-static bool revoke_async = false;
+static bool revoke_async = true;
 static bool bound_pointers = false;
 static bool abort_on_validation_failure = true;
 static bool mrs_initialized = false;
@@ -1876,6 +1876,10 @@ mrs_realloc(void *ptr, size_t size)
 		return (ptr);
 
 	void *new_alloc = mrs_malloc(size);
+#ifdef CLEAR_ON_ALLOC_PVER
+	int old_pver = cgetpver(ptr);
+	csetpver(new_alloc,old_pver);
+#endif 
 
 	/*
 	 * Per the C standard, copy and free IFF the old pointer is valid
