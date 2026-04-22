@@ -19,10 +19,10 @@ PROG:=	${.PARSEDIR:tA:T}-${.CURDIR:T}
 SRCS:=	${.PARSEDIR:tA:T}.c
 MAN=
 
-.if ${.CURDIR:T:M*-mt*}
+.if ${.CURDIR:T:M*mt*}
 LIBADD+=	pthread
 .endif
 
-.if ${.CURDIR:T:M*static*}
+.if !${.CURDIR:T:M*dynamic*} && !${.CURDIR:T:M*-c18n*}
 NO_SHARED=t
 .endif
