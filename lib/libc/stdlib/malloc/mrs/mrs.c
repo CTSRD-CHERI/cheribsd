@@ -97,7 +97,7 @@
  */
 
 #define POISON_ON_FREE 1
-#define CLEAR_ON_ALLOC_PVER 1
+#define CLEAR_ON_ALLOC_PVER_INIT 1
 #define PTRAP_ENABLE 1
 
 #ifdef QUARANTINE_RATIO
@@ -131,6 +131,10 @@ extern void snmalloc_flush_message_queue(void);
 #define	MALLOC_QUARANTINE_ENABLE_ENV	"_RUNTIME_REVOCATION_ENABLE"
 #define	MALLOC_ABORT_DISABLE_ENV	"_RUNTIME_ABORT_DISABLE"
 #define	MALLOC_ABORT_ENABLE_ENV		"_RUNTIME_ABORT_ENABLE"
+
+#define	MALLOC_INIT_DISABLE_ENV	"_RUNTIME_INIT_DISABLE"
+#define	MALLOC_INIT_ENABLE_ENV		"_RUNTIME_INIT_ENABLE"
+
 
 #define	MALLOC_REVOKE_EVERY_FREE_DISABLE_ENV \
 	"_RUNTIME_REVOCATION_EVERY_FREE_DISABLE"
@@ -354,6 +358,7 @@ static void *entire_shadow;
 static bool quarantining = true;
 static bool revoke_every_free = false;
 static bool revoke_async = true;
+static bool init_enable = false;
 static bool bound_pointers = false;
 static bool abort_on_validation_failure = true;
 static bool mrs_initialized = false;
@@ -1429,6 +1434,11 @@ mrs_init_impl_locked(void)
 			quarantining = true;
 		}
 
+		if (getenv(MALLOC_INIT_DISABLE_ENV) != NULL) {
+			init_enable = false;
+		} else if (getenv(MALLOC_INIT_ENABLE_ENV) != NULL) {
+			init_enable = true;
+		}
 		if (getenv(MALLOC_ABORT_DISABLE_ENV) != NULL)
 			abort_on_validation_failure = false;
 		else if (getenv(MALLOC_ABORT_ENABLE_ENV) != NULL)
@@ -1571,6 +1581,14 @@ mrs_malloc(size_t size)
 		    allocated_region);
 		return (allocated_region);
 	}
+#ifdef CLEAR_ON_ALLOC_PVER_INIT
+	csetpver(allocated_region, 0);
+	if(init_enable){
+		for(int i =0 ; i< cheri_getlen(allocated_region); i+=16)
+			cpoison(allocated_region + i);
+		csetpver(allocated_region, 1);
+	}
+#endif 
 
 #ifdef CLEAR_ON_ALLOC
 	clear_region(allocated_region, cheri_getlen(allocated_region));
@@ -1682,6 +1700,7 @@ mrs_calloc(size_t number, size_t size)
 #ifdef PTRAP_ENABLE 
 	allocated_region = cclearpoisonperm(allocated_region);
 #endif 
+	csetpver(allocated_region, 0);
 	return (allocated_region);
 }
 
@@ -1760,6 +1779,7 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 #ifdef PTRAP_ENABLE 
 	*ptr = cclearpoisonperm(*ptr);
 #endif 
+	csetpver(*ptr , 0);
 	return (ret);
 }
 
@@ -1833,6 +1853,7 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 #ifdef PTRAP_ENABLE 
 	allocated_region= cclearpoisonperm(allocated_region);
 #endif 
+	csetpver(allocated_region , 0);
 	return (allocated_region);
 }
 
@@ -1876,6 +1897,7 @@ mrs_realloc(void *ptr, size_t size)
 		return (ptr);
 
 	void *new_alloc = mrs_malloc(size);
+	csetpver(new_alloc , 0);
 #ifdef CLEAR_ON_ALLOC_PVER
 	int old_pver = cgetpver(ptr);
 	csetpver(new_alloc,old_pver);
@@ -1936,7 +1958,7 @@ mrs_free(void *ptr)
 #endif
 #ifdef CLEAR_ON_ALLOC_PVER
 	//if(versioning)
-	csetpver(ins, cgetpver(ptr));
+	//csetpver(ins, cgetpver(ptr));
 #endif
 #ifdef POISON_ON_FREE_LINE
 	
@@ -1963,7 +1985,7 @@ mrs_free(void *ptr)
 	}
 #endif
 #ifdef CLEAR_ON_ALLOC_PVER
-	csetpver(ins, cgetpver(ptr));
+	//csetpver(ins, cgetpver(ptr));
 #endif 
 	mrs_lock(&app_quarantine_lock);
 	quarantine_insert(app_quarantine, ins, cheri_getlen(ins));
