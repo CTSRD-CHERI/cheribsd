@@ -2,7 +2,10 @@
 
 BINDIR=	/usr/libexec
 
-.if ${.CURDIR:T:M*benchmark*}
+VARIANT=		${.CURDIR:T}
+VARIANT_SUFFICES=	${VARIANT:S/-/ /g}
+
+.if ${VARIANT_SUFFICES:Mbenchmark}
 .if !${MACHINE_ABI:Mbenchmark}
 NEED_COMPAT=	64CB
 .include <bsd.compat.mk>
@@ -14,15 +17,15 @@ NEED_COMPAT=    64C
 .endif
 .endif
 
-PROG:=	${.PARSEDIR:tA:T}-${.CURDIR:T}
+PROG:=	${.PARSEDIR:tA:T}-${VARIANT}
 .PATH: ${.PARSEDIR}
 SRCS:=	${.PARSEDIR:tA:T}.c
 MAN=
 
-.if ${.CURDIR:T:M*mt*}
+.if ${VARIANT_SUFFICES:Mmt}
 LIBADD+=	pthread
 .endif
 
-.if !${.CURDIR:T:M*dynamic*} && !${.CURDIR:T:M*-c18n*}
+.if !${VARIANT_SUFFICES:Mdynamic} && !${VARIANT_SUFFICES:Mc18n}
 NO_SHARED=t
 .endif
