@@ -2,7 +2,7 @@
 
 BINDIR=	/usr/libexec
 
-.if ${.CURDIR:M*benchmark*}
+.if ${.CURDIR:T:M*benchmark*}
 .if !${MACHINE_ABI:Mbenchmark}
 NEED_COMPAT=	64CB
 .include <bsd.compat.mk>
@@ -19,10 +19,10 @@ PROG:=	${.PARSEDIR:tA:T}-${.CURDIR:T}
 SRCS:=	${.PARSEDIR:tA:T}.c
 MAN=
 
-.if ${.CURDIR:M*-mt*}
+.if ${.CURDIR:T:M*-mt*}
 LIBADD+=	pthread
 .endif
 
-.if ${.CURDIR:M*static*}
+.if ${.CURDIR:T:M*static*}
 NO_SHARED=t
 .endif
