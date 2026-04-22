@@ -28,10 +28,6 @@
 #ifndef RTLD_PRINTF_H
 #define RTLD_PRINTF_H 1
 
-#if defined(IN_RTLD) && defined(__CHERI_PURE_CAPABILITY__)
-#include <simple_printf.h>
-#else
-
 #include <sys/cdefs.h>
 #include <stdarg.h>
 #include <unistd.h>
@@ -52,7 +48,5 @@ void rtld_fdputchar(int fd, int c);
 #define	rtld_putchar(c) rtld_fdputchar(STDOUT_FILENO, (c))
 #define rtld_write(fd, s, n) write(fd, s, n)
 __END_DECLS
-
-#endif  /* !defined(__CHERI_PURE_CAPABILITY__) */
 
 #endif

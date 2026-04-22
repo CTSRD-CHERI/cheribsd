@@ -56,10 +56,9 @@ SRCS= \
 	debug.c \
 	libmap.c
 .if !${MACHINE_ABI:Mpurecap}
-SRCS+= \
-	rtld_malloc.c \
-	rtld_printf.c
+SRCS+=	rtld_malloc.c
 .endif
+SRCS+=	rtld_printf.c
 MAN?=		rtld.1
 ACFLAGS+=	-DLOCORE
 CFLAGS+=	-Wall -DIN_RTLD -ffreestanding
@@ -153,9 +152,6 @@ rtld_c18n_mi.o: rtld_c18n_policy.txt
 .if ${MACHINE_ABI:Mpurecap}
 .PATH: ${SRCTOP}/lib/libmalloc_simple
 SRCS+=		heap.c malloc.c
-
-SIMPLE_PRINTF_PREFIX=rtld
-.include "${SRCTOP}/lib/libsimple_printf/Makefile.inc"
 .endif
 
 .if ${.CURDIR} == ${RTLD_ELF_DIR}

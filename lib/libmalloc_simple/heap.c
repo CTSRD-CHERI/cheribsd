@@ -63,7 +63,7 @@ static char *rcsid = "$FreeBSD$";
 #include "malloc_heap.h"
 
 #ifdef IN_RTLD
-#include "simple_printf.h"
+#include "rtld_printf.h"
 #define	error_printf(...)	rtld_fdprintf(STDERR_FILENO, __VA_ARGS__)
 #elif defined(IN_LIBTHR)
 #include "thr_private.h"
