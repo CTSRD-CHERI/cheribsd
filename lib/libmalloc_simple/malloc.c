@@ -66,7 +66,7 @@ static char *rcsid = "$FreeBSD$";
 #include "malloc_heap.h"
 
 #ifdef IN_RTLD
-#include "simple_printf.h"
+#include "rtld_printf.h"
 
 #undef assert
 #define	assert	ASSERT
