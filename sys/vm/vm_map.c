@@ -3788,19 +3788,25 @@ vm_map_msetname(vm_map_t map, vm_offset_t start, vm_offset_t end,
     const char *name)
 {
 	vm_map_entry_t entry;
+	int rv;
 
 	vm_map_lock(map);
 	VM_MAP_RANGE_CHECK(map, start, end);
 	if (!vm_map_lookup_entry(map, start, &entry))
 		entry = vm_map_entry_succ(entry);
 
-	if (entry->start >= end)
-		return (KERN_INVALID_ARGUMENT);	/* nothing to name */
+	if (entry->start >= end) {
+		/* nothing to name */
+		rv = KERN_INVALID_ARGUMENT;
+		goto unlock;
+	}
 
 	for (; entry->start < end; entry = vm_map_entry_succ(entry))
 		strlcpy(entry->name, name, sizeof(entry->name));
+	rv = KERN_SUCCESS;
+unlock:
 	vm_map_unlock(map);
-	return (0);
+	return (rv);
 }
 
 /*
