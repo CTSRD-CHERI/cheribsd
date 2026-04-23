@@ -31,7 +31,8 @@
 #ifndef COPYRIGHT_Vendor
 #define	COPYRIGHT_Vendor \
 	"Copyright 2011-2026 University of Cambridge.\n" \
-	"Copyright 2012-2025 SRI International.\n"
+	"Copyright 2012-2025 SRI International.\n" \
+	"Copyright 2023-2026 Capabilities Limited.\n"
 #endif
 
 /* FreeBSD */
