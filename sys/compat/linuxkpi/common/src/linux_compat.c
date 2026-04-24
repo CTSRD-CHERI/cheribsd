@@ -59,6 +59,7 @@
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pager.h>
+#include <vm/vm_radix.h>
 
 #include <machine/stdarg.h>
 
@@ -96,6 +97,8 @@
 #include <linux/rcupdate.h>
 #include <linux/interval_tree.h>
 #include <linux/interval_tree_generic.h>
+#include <linux/printk.h>
+#include <linux/seq_file.h>
 
 #if defined(__i386__) || defined(__amd64__)
 #include <asm/smp.h>
@@ -645,6 +648,7 @@ int
 zap_vma_ptes(struct vm_area_struct *vma, unsigned long address,
     unsigned long size)
 {
+	struct pctrie_iter pages;
 	vm_object_t obj;
 	vm_page_t m;
 
@@ -652,9 +656,8 @@ zap_vma_ptes(struct vm_area_struct *vma, unsigned long address,
 	if (obj == NULL || (obj->flags & OBJ_UNMANAGED) != 0)
 		return (-ENOTSUP);
 	VM_OBJECT_RLOCK(obj);
-	for (m = vm_page_find_least(obj, OFF_TO_IDX(address));
-	    m != NULL && m->pindex < OFF_TO_IDX(address + size);
-	    m = TAILQ_NEXT(m, listq))
+	vm_page_iter_limit_init(&pages, obj, OFF_TO_IDX(address + size));
+	VM_RADIX_FOREACH_FROM(m, &pages, OFF_TO_IDX(address))
 		pmap_remove_all(m);
 	VM_OBJECT_RUNLOCK(obj);
 	return (0);
@@ -1438,7 +1441,7 @@ linux_file_read(struct file *file, struct uio *uio, struct ucred *active_cred,
 	linux_get_fop(filp, &fop, &ldev);
 	if (fop->read != NULL) {
 		bytes = OPW(file, td, fop->read(filp,
-		    (__cheri_fromcap void *)uio->uio_iov->iov_base,
+		    uio->uio_iov->iov_base,
 		    uio->uio_iov->iov_len, &uio->uio_offset));
 		if (bytes >= 0) {
 			IOVEC_ADVANCE(uio->uio_iov, bytes);
@@ -1477,7 +1480,7 @@ linux_file_write(struct file *file, struct uio *uio, struct ucred *active_cred,
 	linux_get_fop(filp, &fop, &ldev);
 	if (fop->write != NULL) {
 		bytes = OPW(file, td, fop->write(filp,
-		    (__cheri_fromcap void *)uio->uio_iov->iov_base,
+		    uio->uio_iov->iov_base,
 		    uio->uio_iov->iov_len, &uio->uio_offset));
 		if (bytes >= 0) {
 			IOVEC_ADVANCE(uio->uio_iov, bytes);
@@ -1963,6 +1966,84 @@ kasprintf(gfp_t gfp, const char *fmt, ...)
 	return (p);
 }
 
+int
+__lkpi_hexdump_printf(void *arg1 __unused, const char *fmt, ...)
+{
+	va_list ap;
+	int result;
+
+	va_start(ap, fmt);
+	result = vprintf(fmt, ap);
+	va_end(ap);
+	return (result);
+}
+
+int
+__lkpi_hexdump_sbuf_printf(void *arg1, const char *fmt, ...)
+{
+	va_list ap;
+	int result;
+
+	va_start(ap, fmt);
+	result = sbuf_vprintf(arg1, fmt, ap);
+	va_end(ap);
+	return (result);
+}
+
+void
+lkpi_hex_dump(int(*_fpf)(void *, const char *, ...), void *arg1,
+    const char *level, const char *prefix_str,
+    const int prefix_type, const int rowsize, const int groupsize,
+    const void *buf, size_t len, const bool ascii)
+{
+	typedef const struct { long long value; } __packed *print_64p_t;
+	typedef const struct { uint32_t value; } __packed *print_32p_t;
+	typedef const struct { uint16_t value; } __packed *print_16p_t;
+	const void *buf_old = buf;
+	int row;
+
+	while (len > 0) {
+		if (level != NULL)
+			_fpf(arg1, "%s", level);
+		if (prefix_str != NULL)
+			_fpf(arg1, "%s ", prefix_str);
+
+		switch (prefix_type) {
+		case DUMP_PREFIX_ADDRESS:
+			_fpf(arg1, "[%p] ", buf);
+			break;
+		case DUMP_PREFIX_OFFSET:
+			_fpf(arg1, "[%#tx] ", ((const char *)buf -
+			    (const char *)buf_old));
+			break;
+		default:
+			break;
+		}
+		for (row = 0; row != rowsize; row++) {
+			if (groupsize == 8 && len > 7) {
+				_fpf(arg1, "%016llx ", ((print_64p_t)buf)->value);
+				buf = (const uint8_t *)buf + 8;
+				len -= 8;
+			} else if (groupsize == 4 && len > 3) {
+				_fpf(arg1, "%08x ", ((print_32p_t)buf)->value);
+				buf = (const uint8_t *)buf + 4;
+				len -= 4;
+			} else if (groupsize == 2 && len > 1) {
+				_fpf(arg1, "%04x ", ((print_16p_t)buf)->value);
+				buf = (const uint8_t *)buf + 2;
+				len -= 2;
+			} else if (len > 0) {
+				_fpf(arg1, "%02x ", *(const uint8_t *)buf);
+				buf = (const uint8_t *)buf + 1;
+				len--;
+			} else {
+				break;
+			}
+		}
+		_fpf(arg1, "\n");
+	}
+}
+
 static void
 linux_timer_callback_wrapper(void *context)
 {
@@ -1985,7 +2066,7 @@ linux_timer_callback_wrapper(void *context)
 }
 
 int
-mod_timer(struct timer_list *timer, int expires)
+mod_timer(struct timer_list *timer, unsigned long expires)
 {
 	int ret;
 
@@ -2181,12 +2262,12 @@ intr:
 /*
  * Time limited wait for done != 0 with or without signals.
  */
-int
-linux_wait_for_timeout_common(struct completion *c, int timeout, int flags)
+unsigned long
+linux_wait_for_timeout_common(struct completion *c, unsigned long timeout,
+    int flags)
 {
 	struct task_struct *task;
-	int end = jiffies + timeout;
-	int error;
+	unsigned long end = jiffies + timeout, error;
 
 	if (SCHEDULER_STOPPED())
 		return (0);
@@ -2761,8 +2842,8 @@ linux_compat_init(void *arg)
 	boot_cpu_data.x86_model = CPUID_TO_MODEL(cpu_id);
 	boot_cpu_data.x86_vendor = x86_vendor;
 
-	__cpu_data = mallocarray(mp_maxid + 1,
-	    sizeof(*__cpu_data), M_KMALLOC, M_WAITOK | M_ZERO);
+	__cpu_data = kmalloc_array(mp_maxid + 1,
+	    sizeof(*__cpu_data), M_WAITOK | M_ZERO);
 	CPU_FOREACH(i) {
 		__cpu_data[i].x86_clflush_size = cpu_clflush_line_size;
 		__cpu_data[i].x86_max_cores = mp_ncpus;
@@ -2804,8 +2885,8 @@ linux_compat_init(void *arg)
 	 * This is used by cpumask_of() (and possibly others in the future) for,
 	 * e.g., drivers to pass hints to irq_set_affinity_hint().
 	 */
-	static_single_cpu_mask = mallocarray(mp_maxid + 1,
-	    sizeof(static_single_cpu_mask), M_KMALLOC, M_WAITOK | M_ZERO);
+	static_single_cpu_mask = kmalloc_array(mp_maxid + 1,
+	    sizeof(static_single_cpu_mask), M_WAITOK | M_ZERO);
 
 	/*
 	 * When the number of CPUs reach a threshold, we start to save memory
@@ -2824,9 +2905,9 @@ linux_compat_init(void *arg)
 		 * (_BITSET_BITS / 8)' bytes (for comparison with the
 		 * overlapping scheme).
 		 */
-		static_single_cpu_mask_lcs = mallocarray(mp_ncpus,
+		static_single_cpu_mask_lcs = kmalloc_array(mp_ncpus,
 		    sizeof(*static_single_cpu_mask_lcs),
-		    M_KMALLOC, M_WAITOK | M_ZERO);
+		    M_WAITOK | M_ZERO);
 
 		sscm_ptr = static_single_cpu_mask_lcs;
 		CPU_FOREACH(i) {

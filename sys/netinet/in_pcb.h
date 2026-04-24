@@ -64,7 +64,6 @@
  * protocol-specific control block) are stored here.
  */
 CK_LIST_HEAD(inpcbhead, inpcb);
-CK_LIST_HEAD(inpcbporthead, inpcbport);
 CK_LIST_HEAD(inpcblbgrouphead, inpcblbgroup);
 typedef	uint64_t	inp_gen_t;
 
@@ -221,7 +220,6 @@ struct inpcb {
 		short	in6p_hops;
 	};
 	CK_LIST_ENTRY(inpcb) inp_portlist;	/* (r:e/w:h) port list */
-	struct	inpcbport *inp_phd;	/* (r:e/w:h) head of this list */
 	inp_gen_t	inp_gencnt;	/* (c) generation count */
 	void		*spare_ptr;	/* Spare pointer. */
 	rt_gen_t	inp_rt_cookie;	/* generation for route entry */
@@ -370,7 +368,7 @@ struct inpcbinfo {
 	/*
 	 * Global hash of inpcbs, hashed by only local port number.
 	 */
-	struct inpcbporthead	*ipi_porthashbase;	/* (h) */
+	struct inpcbhead	*ipi_porthashbase;	/* (h) */
 	u_long			 ipi_porthashmask;	/* (h) */
 
 	/*
@@ -392,11 +390,9 @@ struct inpcbinfo {
  */
 struct inpcbstorage {
 	uma_zone_t	ips_zone;
-	uma_zone_t	ips_portzone;
 	uma_init	ips_pcbinit;
 	size_t		ips_size;
 	const char *	ips_zone_name;
-	const char *	ips_portzone_name;
 	const char *	ips_infolock_name;
 	const char *	ips_hashlock_name;
 };
@@ -414,7 +410,6 @@ static struct inpcbstorage prot = {					\
 	.ips_size = sizeof(struct ppcb),				\
 	.ips_pcbinit = prot##_inpcb_init,				\
 	.ips_zone_name = zname,						\
-	.ips_portzone_name = zname " ports",				\
 	.ips_infolock_name = iname,					\
 	.ips_hashlock_name = hname,					\
 };									\
@@ -645,12 +640,9 @@ int	in_pcbbind(struct inpcb *, struct sockaddr_in *, int, struct ucred *);
 int	in_pcbbind_setup(struct inpcb *, struct sockaddr_in *, in_addr_t *,
 	    u_short *, int, struct ucred *);
 int	in_pcbconnect(struct inpcb *, struct sockaddr_in *, struct ucred *);
-int	in_pcbconnect_setup(const struct inpcb *, struct sockaddr_in *,
-	    in_addr_t *, u_short *, in_addr_t *, u_short *, struct ucred *);
 void	in_pcbdisconnect(struct inpcb *);
 void	in_pcbdrop(struct inpcb *);
 void	in_pcbfree(struct inpcb *);
-int	in_pcbinshash(struct inpcb *);
 int	in_pcbladdr(const struct inpcb *, struct in_addr *, struct in_addr *,
 	    struct ucred *);
 int	in_pcblbgroup_numa(struct inpcb *, int arg);
@@ -662,8 +654,6 @@ struct inpcb *
 	in_pcblookup_mbuf(struct inpcbinfo *, struct in_addr, u_int,
 	    struct in_addr, u_int, int, struct ifnet *, struct mbuf *);
 void	in_pcbref(struct inpcb *);
-void	in_pcbrehash(struct inpcb *);
-void	in_pcbremhash_locked(struct inpcb *);
 bool	in_pcbrele(struct inpcb *, inp_lookup_t);
 bool	in_pcbrele_rlocked(struct inpcb *);
 bool	in_pcbrele_wlocked(struct inpcb *);

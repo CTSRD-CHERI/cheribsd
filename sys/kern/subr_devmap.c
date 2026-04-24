@@ -37,9 +37,16 @@
 #include <vm/pmap.h>
 #include <machine/vmparam.h>
 
+#ifdef __arm__
+#include <machine/pte.h>
+#endif
+
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
 #endif
+
+#ifdef __HAVE_STATIC_DEVMAP
+#define	DEVMAP_PADDR_NOTFOUND	((vm_paddr_t)(-1))
 
 static const struct devmap_entry *devmap_table;
 static boolean_t devmap_bootstrap_done = false;
@@ -53,6 +60,7 @@ static boolean_t devmap_bootstrap_done = false;
 #define	AKVA_DEVMAP_MAX_ENTRIES	32
 static struct devmap_entry	akva_devmap_entries[AKVA_DEVMAP_MAX_ENTRIES];
 static u_int			akva_devmap_idx;
+#endif
 static vm_offset_t		akva_devmap_vaddr = DEVMAP_MAX_VADDR;
 
 #if defined(__aarch64__) || defined(__riscv)
@@ -62,6 +70,7 @@ extern int early_boot;
 static void * __capability devmap_capability;
 #endif
 
+#ifdef __HAVE_STATIC_DEVMAP
 /*
  * Print the contents of the static mapping table using the provided printf-like
  * output function (which will be either printf or db_printf).
@@ -141,17 +150,14 @@ devmap_add_entry(vm_paddr_t pa, vm_size_t sz)
 		devmap_register_table(akva_devmap_entries);
 
 	 /* Allocate virtual address space from the top of kva downwards. */
-#ifdef __arm__
 	/*
 	 * If the range being mapped is aligned and sized to 1MB boundaries then
 	 * also align the virtual address to the next-lower 1MB boundary so that
 	 * we end with a nice efficient section mapping.
 	 */
-	if ((pa & 0x000fffff) == 0 && (sz & 0x000fffff) == 0) {
+	if ((pa & L1_S_OFFSET) == 0 && (sz & L1_S_OFFSET) == 0) {
 		va = trunc_1mpage(akva_devmap_vaddr - sz);
-	} else
-#endif
-	{
+	} else {
 		va = trunc_page(akva_devmap_vaddr - sz);
 	}
 
@@ -204,12 +210,8 @@ devmap_bootstrap(void)
 		return;
 
 	for (pd = devmap_table; pd->pd_size != 0; ++pd) {
-#if defined(__arm__)
 		pmap_preboot_map_attr(pd->pd_pa, pd->pd_va, pd->pd_size,
 		    VM_PROT_READ | VM_PROT_WRITE, VM_MEMATTR_DEVICE);
-#elif defined(__aarch64__) || defined(__riscv)
-		pmap_kenter_device(pd->pd_va, pd->pd_size, pd->pd_pa);
-#endif
 	}
 }
 
@@ -217,7 +219,7 @@ devmap_bootstrap(void)
  * Look up the given physical address in the static mapping data and return the
  * corresponding virtual address, or NULL if not found.
  */
-void *
+static void *
 devmap_ptov(vm_paddr_t pa, vm_size_t size)
 {
 	const struct devmap_entry *pd;
@@ -248,7 +250,7 @@ devmap_ptov(vm_paddr_t pa, vm_size_t size)
  * Look up the given virtual address in the static mapping data and return the
  * corresponding physical address, or DEVMAP_PADDR_NOTFOUND if not found.
  */
-vm_paddr_t
+static vm_paddr_t
 devmap_vtop(void * vpva, vm_size_t size)
 {
 	const struct devmap_entry *pd;
@@ -265,6 +267,7 @@ devmap_vtop(void * vpva, vm_size_t size)
 
 	return (DEVMAP_PADDR_NOTFOUND);
 }
+#endif
 
 /*
  * Map a set of physical memory pages into the kernel virtual address space.
@@ -282,11 +285,13 @@ pmap_mapdev(vm_paddr_t pa, vm_size_t size)
 {
 	vm_pointer_t va;
 	vm_offset_t offset;
+#ifdef __HAVE_STATIC_DEVMAP
 	void * rva;
 
 	/* First look in the static mapping table. */
 	if ((rva = devmap_ptov(pa, size)) != NULL)
 		return (rva);
+#endif
 
 	offset = pa & PAGE_MASK;
 	pa = trunc_page(pa);
@@ -335,12 +340,14 @@ void *
 pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 {
 	vm_pointer_t va;
-	void * rva;
 	vm_offset_t offset;
+#ifdef __HAVE_STATIC_DEVMAP
+	void * rva;
 
 	/* First look in the static mapping table. */
 	if ((rva = devmap_ptov(pa, size)) != NULL)
 		return (rva);
+#endif
 
 	offset = pa & PAGE_MASK;
 	pa = trunc_page(pa);
@@ -392,9 +399,11 @@ pmap_unmapdev(void *p, vm_size_t size)
 	vm_pointer_t va;
 	vm_offset_t offset;
 
+#ifdef __HAVE_STATIC_DEVMAP
 	/* Nothing to do if we find the mapping in the static table. */
 	if (devmap_vtop(p, size) != DEVMAP_PADDR_NOTFOUND)
 		return;
+#endif
 
 	va = (vm_pointer_t)p;
 	offset = va & PAGE_MASK;
@@ -420,6 +429,7 @@ devmap_init_capability(void * __capability cap)
 #endif
 
 #ifdef DDB
+#ifdef __HAVE_STATIC_DEVMAP
 #include <ddb/ddb.h>
 
 DB_SHOW_COMMAND_FLAGS(devmap, db_show_devmap, DB_CMD_MEMSAFE)
@@ -427,6 +437,7 @@ DB_SHOW_COMMAND_FLAGS(devmap, db_show_devmap, DB_CMD_MEMSAFE)
 	devmap_dump_table(db_printf);
 }
 
+#endif
 #endif /* DDB */
 // CHERI CHANGES START
 // {

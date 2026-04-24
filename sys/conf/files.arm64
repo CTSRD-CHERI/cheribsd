@@ -6,6 +6,7 @@
 kern/msi_if.m					optional intrng
 kern/pic_if.m					optional intrng
 kern/subr_devmap.c				standard
+kern/subr_efi_map.c				standard
 kern/subr_intr.c				optional intrng
 kern/subr_physmem.c				standard
 libkern/bcopy.c					optional cpu_cheri
@@ -600,7 +601,9 @@ arm/annapurna/alpine/alpine_serdes.c		optional al_serdes fdt		\
 
 # Apple
 arm64/apple/apple_aic.c				optional soc_apple_t8103 fdt
+arm64/apple/apple_pinctrl.c			optional soc_apple_t8103 fdt
 arm64/apple/apple_wdog.c			optional soc_apple_t8103 fdt
+arm64/apple/exynos_uart.c			optional soc_apple_t8103 fdt
 
 # Broadcom
 arm64/broadcom/brcmmdio/mdio_mux_iproc.c		optional soc_brcm_ns2 fdt
@@ -797,6 +800,7 @@ dev/iicbus/pmic/rockchip/rk805.c		optional fdt rk805 soc_rockchip_rk3328
 dev/iicbus/pmic/rockchip/rk808.c		optional fdt rk808 soc_rockchip_rk3399
 dev/iicbus/pmic/rockchip/rk817.c		optional fdt rk817 soc_rockchip_rk3568
 arm64/rockchip/rk_grf.c				optional fdt soc_rockchip
+arm64/rockchip/rk_grf_gpio.c			optional fdt soc_rockchip
 arm64/rockchip/rk_pinctrl.c			optional fdt rk_pinctrl soc_rockchip
 arm64/rockchip/rk_gpio.c			optional fdt rk_gpio soc_rockchip
 arm64/rockchip/rk_iodomain.c			optional fdt rk_iodomain

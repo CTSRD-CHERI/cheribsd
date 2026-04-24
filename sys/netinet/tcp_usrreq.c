@@ -95,9 +95,6 @@
 #include <netinet/cc/cc.h>
 #include <netinet/tcp_fastopen.h>
 #include <netinet/tcp_hpts.h>
-#ifdef TCPPCAP
-#include <netinet/tcp_pcap.h>
-#endif
 #ifdef TCP_OFFLOAD
 #include <netinet/tcp_offload.h>
 #endif
@@ -526,7 +523,7 @@ tcp_usr_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 	}
 	if ((error = prison_remote_ip4(td->td_ucred, &sinp->sin_addr)) != 0)
 		goto out;
-	if (SOLISTENING(so)) {
+	if (SOLISTENING(so) || so->so_options & SO_REUSEPORT_LB) {
 		error = EOPNOTSUPP;
 		goto out;
 	}
@@ -593,8 +590,8 @@ tcp6_usr_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 		error = EAFNOSUPPORT;
 		goto out;
 	}
-	if (SOLISTENING(so)) {
-		error = EINVAL;
+	if (SOLISTENING(so) || so->so_options & SO_REUSEPORT_LB) {
+		error = EOPNOTSUPP;
 		goto out;
 	}
 #ifdef INET
@@ -1422,6 +1419,7 @@ struct protosw tcp_protosw = {
 	.pr_rcvd =		tcp_usr_rcvd,
 	.pr_rcvoob =		tcp_usr_rcvoob,
 	.pr_send =		tcp_usr_send,
+	.pr_sendfile_wait =	sendfile_wait_generic,
 	.pr_ready =		tcp_usr_ready,
 	.pr_shutdown =		tcp_usr_shutdown,
 	.pr_sockaddr =		in_getsockaddr,
@@ -1450,6 +1448,7 @@ struct protosw tcp6_protosw = {
 	.pr_rcvd =		tcp_usr_rcvd,
 	.pr_rcvoob =		tcp_usr_rcvoob,
 	.pr_send =		tcp_usr_send,
+	.pr_sendfile_wait =	sendfile_wait_generic,
 	.pr_ready =		tcp_usr_ready,
 	.pr_shutdown =		tcp_usr_shutdown,
 	.pr_sockaddr =		in6_mapped_sockaddr,
@@ -2342,26 +2341,6 @@ unlock_and_done:
 				    TP_MAXIDLE(tp));
 			goto unlock_and_done;
 
-#ifdef TCPPCAP
-		case TCP_PCAP_OUT:
-		case TCP_PCAP_IN:
-			INP_WUNLOCK(inp);
-			error = sooptcopyin(sopt, &optval, sizeof optval,
-			    sizeof optval);
-			if (error)
-				return (error);
-
-			INP_WLOCK_RECHECK(inp);
-			if (optval >= 0)
-				tcp_pcap_set_sock_max(
-					(sopt->sopt_name == TCP_PCAP_OUT) ?
-					&(tp->t_outpkts) : &(tp->t_inpkts),
-					optval);
-			else
-				error = EINVAL;
-			goto unlock_and_done;
-#endif
-
 		case TCP_FASTOPEN: {
 			struct tcp_fastopen tfo_optval;
 
@@ -2592,16 +2571,6 @@ unhold:
 			INP_WUNLOCK(inp);
 			error = sooptcopyout(sopt, &ui, sizeof(ui));
 			break;
-#ifdef TCPPCAP
-		case TCP_PCAP_OUT:
-		case TCP_PCAP_IN:
-			optval = tcp_pcap_get_sock_max(
-					(sopt->sopt_name == TCP_PCAP_OUT) ?
-					&(tp->t_outpkts) : &(tp->t_inpkts));
-			INP_WUNLOCK(inp);
-			error = sooptcopyout(sopt, &optval, sizeof optval);
-			break;
-#endif
 		case TCP_FASTOPEN:
 			optval = tp->t_flags & TF_FASTOPEN;
 			INP_WUNLOCK(inp);

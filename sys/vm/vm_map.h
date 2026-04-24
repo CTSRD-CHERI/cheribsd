@@ -235,6 +235,9 @@ struct cheri_revoke_stats;
  */
 struct vm_map {
 	struct vm_map_entry header;	/* List of entries */
+#if __has_feature(capabilities)
+	uintcap_t map_capability;	/* (c) Capability spanning the map */
+#endif
 	union {
 		struct sx lock;			/* Lock for map data */
 		struct mtx system_mtx;
@@ -280,9 +283,6 @@ struct vm_map {
 	pmap_t pmap;			/* (c) Physical map */
 	vm_offset_t anon_loc;
 	int busy;
-#if __has_feature(capabilities)
-	intcap_t map_capability;	/* Capability spanning the whole map */
-#endif
 #ifdef DIAGNOSTIC
 	int nupdates;
 #endif
@@ -581,7 +581,7 @@ int vm_map_alignspace(vm_map_t, vm_object_t, vm_ooffset_t,
     vm_offset_t *, vm_size_t, vm_offset_t, vm_offset_t);
 int vm_map_inherit (vm_map_t, vm_offset_t, vm_offset_t, vm_inherit_t);
 void vm_map_init(vm_map_t, pmap_t, uintcap_t, uintcap_t);
-void vm_map_init_system(vm_map_t, pmap_t, vm_pointer_t, vm_pointer_t);
+void vm_map_init_system(vm_map_t, pmap_t, uintcap_t, uintcap_t);
 int vm_map_insert (vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t,
     vm_pointer_t, vm_prot_t, vm_prot_t, int, vm_offset_t);
 int vm_map_lookup (vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, vm_object_t *,

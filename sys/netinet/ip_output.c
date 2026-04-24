@@ -368,7 +368,7 @@ ip_output(struct mbuf *m, struct mbuf *opt, struct route *ro, int flags,
 	if ((flags & (IP_FORWARDING|IP_RAWOUTPUT)) == 0) {
 		ip->ip_v = IPVERSION;
 		ip->ip_hl = hlen >> 2;
-		ip_fillid(ip);
+		ip_fillid(ip, V_ip_random_id);
 	} else {
 		/* Header already set, fetch hlen from there */
 		hlen = ip->ip_hl << 2;
@@ -751,7 +751,7 @@ sendit:
 				error = ENOBUFS;
 			}
 			IPSTAT_INC(ips_odropped);
-			goto bad;
+			goto done;
 		} else {
 			m = m1;
 		}
@@ -859,7 +859,7 @@ sendit:
 
 done:
 	return (error);
- bad:
+bad:
 	m_freem(m);
 	goto done;
 }

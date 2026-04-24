@@ -111,31 +111,6 @@ pfr_get_tables(struct pfr_table *filter, struct pfr_table *tbl, int *size,
 }
 
 int
-pfr_get_tstats(struct pfr_table *filter, struct pfr_tstats *tbl, int *size,
-	int flags)
-{
-	struct pfioc_table io;
-
-	if (size == NULL || *size < 0 || (*size && tbl == NULL)) {
-		errno = EINVAL;
-		return (-1);
-	}
-	bzero(&io, sizeof io);
-	io.pfrio_flags = flags;
-	if (filter != NULL)
-		io.pfrio_table = *filter;
-	io.pfrio_buffer = tbl;
-	io.pfrio_esize = sizeof(*tbl);
-	io.pfrio_size = *size;
-	if (ioctl(dev, DIOCRGETTSTATS, &io)) {
-		pfr_report_error(filter, &io, "get tstats for");
-		return (-1);
-	}
-	*size = io.pfrio_size;
-	return (0);
-}
-
-int
 pfr_clr_addrs(struct pfr_table *tbl, int *ndel, int flags)
 {
 	struct pfioc_table io;
@@ -254,29 +229,6 @@ pfr_clr_astats(struct pfr_table *tbl, struct pfr_addr *addr, int size,
 	io.pfrio_size = size;
 	if (ioctl(dev, DIOCRCLRASTATS, &io) == -1)
 		return (-1);
-	if (nzero)
-		*nzero = io.pfrio_nzero;
-	return (0);
-}
-
-int
-pfr_clr_tstats(struct pfr_table *tbl, int size, int *nzero, int flags)
-{
-	struct pfioc_table io;
-
-	if (size < 0 || (size && !tbl)) {
-		errno = EINVAL;
-		return (-1);
-	}
-	bzero(&io, sizeof io);
-	io.pfrio_flags = flags;
-	io.pfrio_buffer = tbl;
-	io.pfrio_esize = sizeof(*tbl);
-	io.pfrio_size = size;
-	if (ioctl(dev, DIOCRCLRTSTATS, &io)) {
-		pfr_report_error(tbl, &io, "clear tstats from");
-		return (-1);
-	}
 	if (nzero)
 		*nzero = io.pfrio_nzero;
 	return (0);
@@ -454,8 +406,7 @@ pfr_buf_clear(struct pfr_buffer *b)
 {
 	if (b == NULL)
 		return;
-	if (b->pfrb_caddr != NULL)
-		free(b->pfrb_caddr);
+	free(b->pfrb_caddr);
 	b->pfrb_caddr = NULL;
 	b->pfrb_size = b->pfrb_msize = 0;
 }

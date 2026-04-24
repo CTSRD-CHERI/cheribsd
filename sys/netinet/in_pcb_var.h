@@ -55,12 +55,9 @@ int	in_pcb_lport_dest(const struct inpcb *inp, struct sockaddr *lsa,
             struct ucred *cred, int lookupflags);
 struct inpcb *in_pcblookup_local(struct inpcbinfo *, struct in_addr, u_short,
 	    int, int, struct ucred *);
-
-struct inpcbport {
-	struct inpcbhead phd_pcblist;
-	CK_LIST_ENTRY(inpcbport) phd_hash;
-	u_short phd_port;
-};
+int     in_pcbinshash(struct inpcb *);
+void    in_pcbrehash(struct inpcb *);
+void    in_pcbremhash_locked(struct inpcb *);
 
 /*
  * Load balance groups used for the SO_REUSEPORT_LB socket option. Each group

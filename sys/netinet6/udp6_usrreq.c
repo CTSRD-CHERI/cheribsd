@@ -617,6 +617,8 @@ udp6_getcred(SYSCTL_HANDLER_ARGS)
 	struct inpcb *inp;
 	int error;
 
+	if (req->newptr == NULL)
+		return (EINVAL);
 	error = priv_check(req->td, PRIV_NETINET_GETCRED);
 	if (error)
 		return (error);
@@ -858,14 +860,18 @@ udp6_send(struct socket *so, int flags_arg, struct mbuf *m,
 	hlen = sizeof(struct ip6_hdr);
 
 	/*
-	 * Calculate data length and get a mbuf
-	 * for UDP and IP6 headers.
+	 * Calculate data length and get a mbuf for UDP, IP6, and possible
+	 * link-layer headers.  Immediate slide the data pointer back forward
+	 * since we won't use that space at this layer.
 	 */
-	M_PREPEND(m, hlen + sizeof(struct udphdr), M_NOWAIT);
+	M_PREPEND(m, hlen + sizeof(struct udphdr) + max_linkhdr, M_NOWAIT);
 	if (m == NULL) {
 		error = ENOBUFS;
 		goto release;
 	}
+	m->m_data += max_linkhdr;
+	m->m_len -= max_linkhdr;
+	m->m_pkthdr.len -= max_linkhdr;
 
 	/*
 	 * Stuff checksum and output datagram.

@@ -90,11 +90,7 @@ _alt_start:
 	csetaddr ct1, ct1, t0
 	li	t0, 1
 	csetflags ct1, ct1, t0
-#ifdef __riscv_xcheri_mode_dependent_jumps
 	jr.cap	ct1
-#else
-	cjr	ct1
-#endif
 1:
 .option pop
 #endif
@@ -190,16 +186,14 @@ _start:
 pagetables:
 	/* Get the kernel's load address (kernstart) in s9 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	cllc	cra, get_physmem
-	cjalr	cra
+	cjal	get_physmem
 #else
 	jal	get_physmem
 #endif
 
 	/* Get PTE attribute bits in s8 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	cllc	cra, get_pte_fixup_bits
-	cjalr	cra
+	cjal	get_pte_fixup_bits
 #else
 	jal	get_pte_fixup_bits
 #endif
@@ -407,13 +401,11 @@ va:
 	mv	a4, zero		/* TODO: true for PT_CHERI_PCC */
 	cllc	ca5, _C_LABEL(kernel_cap_relocs_cb)
 	csetflags ca6, ca5, zero
-	cllc	cra, _C_LABEL(init_linker_file_cap_relocs)
-	cjalr	cra
+	ccall	_C_LABEL(init_linker_file_cap_relocs)
 
 	/* Initialize capabilities. */
 	cmove	ca0, cs0
-	clgc	cra, _C_LABEL(cheri_init_capabilities)
-	cjalr	cra
+	ccall	_C_LABEL(cheri_init_capabilities)
 
 	/* Fill riscv_bootparams */
 	csd	s9, RISCV_BOOTPARAMS_KERN_PHYS(csp)
@@ -431,10 +423,8 @@ va:
 	cmove	cs3, cnull
 
 	csetbounds ca0, csp, RISCV_BOOTPARAMS_SIZE
-	clgc	cra, _C_LABEL(initriscv)
-	cjalr	cra			/* Off we go */
-	clgc	cra, _C_LABEL(mi_startup)
-	cjalr	cra
+	ccall	_C_LABEL(initriscv)
+	ccall	_C_LABEL(mi_startup)
 #else
 	/* Initialize stack pointer */
 	la	sp, initstack_end
@@ -574,8 +564,7 @@ ENTRY(mpentry)
 	clc	csp, 0(ct0)
 
 	/* Get the kernel's load address */
-	cllc	cra, get_physmem
-	cjalr	cra
+	cjal	get_physmem
 
 	/* Setup supervisor trap vector */
 	cllc	ct0, mpva
@@ -677,8 +666,7 @@ mpva:
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	clgc	cra, init_secondary
-	cjalr	cra
+	ccall	init_secondary
 #else
 	call	init_secondary
 #endif

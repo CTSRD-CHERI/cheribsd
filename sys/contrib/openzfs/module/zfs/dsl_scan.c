@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: CDDL-1.0
 /*
  * CDDL HEADER START
  *
@@ -1433,7 +1434,7 @@ dsl_scan_restart_resilver(dsl_pool_t *dp, uint64_t txg)
 	if (txg == 0) {
 		dmu_tx_t *tx;
 		tx = dmu_tx_create_dd(dp->dp_mos_dir);
-		VERIFY(0 == dmu_tx_assign(tx, TXG_WAIT));
+		VERIFY(0 == dmu_tx_assign(tx, DMU_TX_WAIT));
 
 		txg = dmu_tx_get_txg(tx);
 		dp->dp_scan->scn_restart_txg = txg;
@@ -2305,7 +2306,7 @@ dsl_scan_recurse(dsl_scan_t *scn, dsl_dataset_t *ds, dmu_objset_type_t ostype,
 			    DMU_USERUSED_OBJECT, tx);
 		}
 		arc_buf_destroy(buf, &buf);
-	} else if (!zfs_blkptr_verify(spa, bp,
+	} else if (zfs_blkptr_verify(spa, bp,
 	    BLK_CONFIG_NEEDED, BLK_VERIFY_LOG)) {
 		/*
 		 * Sanity check the block pointer contents, this is handled

@@ -846,6 +846,7 @@ typedef struct {
 #define	NT_FREEBSD_FCTL_WXNEEDED	0x00000008
 #define	NT_FREEBSD_FCTL_LA48		0x00000010
 #define	NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE	0x00000020 /* was ASG_DISABLE */
+#define	NT_FREEBSD_FCTL_LA57		0x00000040
 #define	NT_FREEBSD_FCTL_CHERI_C18N_DISABLE	0x20000000
 #define	NT_FREEBSD_FCTL_CHERI_C18N_ENABLE	0x40000000
 #define	NT_FREEBSD_FCTL_CHERI_REVOKE_ENABLE	0x80000000
@@ -870,6 +871,7 @@ typedef struct {
 #define	NT_PROCSTAT_PSSTRINGS	15	/* Procstat ps_strings data. */
 #define	NT_PROCSTAT_AUXV	16	/* Procstat auxv data. */
 #define	NT_PTLWPINFO		17	/* Thread ptrace miscellaneous info. */
+#define	NT_PROCSTAT_KQUEUES	18	/* Procstat kqueues events. */
 #define	NT_CAPREGS		20	/* Capability registers. */
 #define	NT_PPC_VMX	0x100	/* PowerPC Altivec/VMX registers */
 #define	NT_PPC_VSX	0x102	/* PowerPC VSX registers */

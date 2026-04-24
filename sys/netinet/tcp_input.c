@@ -112,9 +112,6 @@
 #include <netinet/tcpip.h>
 #include <netinet/cc/cc.h>
 #include <netinet/tcp_fastopen.h>
-#ifdef TCPPCAP
-#include <netinet/tcp_pcap.h>
-#endif
 #include <netinet/tcp_syncache.h>
 #ifdef TCP_OFFLOAD
 #include <netinet/tcp_offload.h>
@@ -1456,7 +1453,7 @@ drop:
  *     is at least 3/8 of the current socket buffer size.
  *  3. receive buffer size has not hit maximal automatic size;
  *
- * If all of the criteria are met we increaset the socket buffer
+ * If all of the criteria are met, we increase the socket buffer
  * by a 1/2 (bounded by the max). This allows us to keep ahead
  * of slow-start but also makes it so our peer never gets limited
  * by our rwnd which we then open up causing a burst.
@@ -1546,10 +1543,6 @@ tcp_do_segment(struct tcpcb *tp, struct mbuf *m, struct tcphdr *th,
 	KASSERT(tp->t_state != TCPS_TIME_WAIT, ("%s: TCPS_TIME_WAIT",
 	    __func__));
 
-#ifdef TCPPCAP
-	/* Save segment, if requested. */
-	tcp_pcap_add(th, m, &(tp->t_inpkts));
-#endif
 	TCP_LOG_EVENT(tp, th, &so->so_rcv, &so->so_snd, TCP_LOG_IN, 0,
 	    tlen, NULL, true);
 

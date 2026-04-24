@@ -32,6 +32,7 @@
 
 #include "cheribsdtest.h"
 
+#ifdef HAS_CHERI_PERM_SEAL
 static void * __capability
 get_sealcap(void)
 {
@@ -98,11 +99,16 @@ CHERIBSDTEST(sealcap_sysctl, "Retrieve sealcap using sysctl(3)")
 	if ((v & CHERI_PERM_STORE) != 0)
 		cheribsdtest_failure_errx("perms %jx (store present)", v);
 
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	if ((v & CHERI_PERM_LOAD_CAP) != 0)
 		cheribsdtest_failure_errx("perms %jx (loadcap present)", v);
-
 	if ((v & CHERI_PERM_STORE_CAP) != 0)
 		cheribsdtest_failure_errx("perms %jx (storecap present)", v);
+#endif
+#ifdef HAS_CHERI_PERM_CAP
+        if ((v & CHERI_PERM_CAP) != 0)
+		cheribsdtest_failure_errx("perms %jx (cap permission present)", v);
+#endif
 
 	if ((v & CHERI_PERM_STORE_LOCAL_CAP) != 0)
 		cheribsdtest_failure_errx("perms %jx (store_local_cap present)",
@@ -120,11 +126,12 @@ CHERIBSDTEST(sealcap_sysctl, "Retrieve sealcap using sysctl(3)")
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheribsdtest_failure_errx("perms %jx (system_regs present)", v);
 
-#ifdef __aarch64__
+#ifdef HAS_CHERI_PERM_EXECUTIVE
 	if ((v & CHERI_PERM_EXECUTIVE) != 0)
 		cheribsdtest_failure_errx("perms %jx (executive present)", v);
-
-	if ((v & CHERI_PERM_MUTABLE_LOAD) != 0)
+#endif
+#ifdef HAS_CHERI_PERM_LOAD_MUTABLE
+	if ((v & CHERI_PERM_LOAD_MUTABLE) != 0)
 		cheribsdtest_failure_errx("perms %jx (mutable_load present)", v);
 #endif
 
@@ -257,3 +264,4 @@ CHERIBSDTEST(sealcap_seal_unseal,
 
 	cheribsdtest_success();
 }
+#endif /* defined(HAS_CHERI_PERM_SEAL) */

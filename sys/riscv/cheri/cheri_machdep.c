@@ -53,10 +53,12 @@ cheri_init_capabilities(void * __capability kroot)
 {
 	void * __capability ctemp;
 
+#ifdef HAS_CHERI_PERM_SEAL
 	ctemp = cheri_address_set(kroot, CHERI_SEALCAP_KERNEL_BASE);
 	ctemp = cheri_bounds_set(ctemp, CHERI_SEALCAP_KERNEL_LENGTH);
 	ctemp = cheri_perms_and(ctemp, CHERI_SEALCAP_KERNEL_PERMS);
 	kernel_root_sealcap = ctemp;
+#endif
 
 	ctemp = cheri_address_set(kroot, CHERI_CAP_USER_DATA_BASE);
 	ctemp = cheri_bounds_set(ctemp, CHERI_CAP_USER_DATA_LENGTH);
@@ -64,10 +66,12 @@ cheri_init_capabilities(void * __capability kroot)
 	    CHERI_CAP_USER_CODE_PERMS | CHERI_PERM_SW_VMEM);
 	userspace_root_cap_init(ctemp);
 
+#ifdef HAS_CHERI_PERM_SEAL
 	ctemp = cheri_address_set(kroot, CHERI_SEALCAP_USERSPACE_BASE);
 	ctemp = cheri_bounds_set(ctemp, CHERI_SEALCAP_USERSPACE_LENGTH);
 	ctemp = cheri_perms_and(ctemp, CHERI_SEALCAP_USERSPACE_PERMS);
 	userspace_root_sealcap = ctemp;
+#endif
 
 	swap_restore_cap = kroot;
 
@@ -78,8 +82,12 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_perms_and(ctemp, CHERI_PERMS_KERNEL_DATA);
 	devmap_init_capability(ctemp);
 
+#ifdef HAS_CHERI_PERM_SEAL
 	kernel_root_cap = cheri_perms_and(kroot,
 	    ~(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL));
+#else
+	kernel_root_cap = kroot;
+#endif
 #endif
 }
 
@@ -94,7 +102,7 @@ hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 	tf->tf_ddc = (uintcap_t)cheri_capability_build_user_rwx(
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERMS_SWALL,
 	    CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
-	    CHERI_CAP_USER_DATA_OFFSET);
+	    CHERI_CAP_USER_DATA_BASE);
 
 	/* Use 'entry_addr' as offset of PCC. */
 	tf->tf_sepc = (uintcap_t)cheri_capability_build_user_code(
@@ -106,23 +114,31 @@ int
 vm_prot2perms(int base, vm_prot_t prot)
 {
 	int perms = 0;
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
+	const int perm_load_cap = CHERI_PERM_LOAD_CAP;
+	const int perm_store_cap = CHERI_PERM_STORE_CAP |
+	    CHERI_PERM_STORE_LOCAL_CAP;
+#else
+	const int perm_load_cap = CHERI_PERM_CAP |
+	    CHERI_PERM_LOAD_MUTABLE;
+	const int perm_store_cap = CHERI_PERM_CAP |
+	    CHERI_PERM_STORE_LOCAL_CAP;
+#endif
 
 	if (prot & (VM_PROT_CAP | VM_PROT_NO_IMPLY_CAP)) {
 		if (prot & (VM_PROT_READ | VM_PROT_COPY))
 			perms |= CHERI_PERM_LOAD;
 		if (VM_PROT_HAS_READ_CAP(prot))
-			perms |= CHERI_PERM_LOAD_CAP;
+			perms |= perm_load_cap;
 		if (prot & VM_PROT_WRITE)
 			perms |= CHERI_PERM_STORE;
 		if (VM_PROT_HAS_WRITE_CAP(prot))
-			perms |= CHERI_PERM_STORE_CAP |
-			    CHERI_PERM_STORE_LOCAL_CAP;
+			perms |= perm_store_cap;
 	} else {
 		if (prot & (VM_PROT_READ | VM_PROT_COPY))
-			perms |= CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP;
+			perms |= CHERI_PERM_LOAD | perm_load_cap;
 		if (prot & VM_PROT_WRITE)
-			perms |= CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
-			    CHERI_PERM_STORE_LOCAL_CAP;
+			perms |= CHERI_PERM_STORE | perm_store_cap;
 	}
 	if (prot & VM_PROT_EXECUTE)
 		perms |= CHERI_PERM_EXECUTE | CHERI_PERM_LOAD |

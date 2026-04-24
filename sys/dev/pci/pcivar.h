@@ -51,9 +51,7 @@ struct pcicfg_bridge {
 /* Interesting values for PCI power management */
 struct pcicfg_pp {
     uint16_t	pp_cap;		/* PCI power management capabilities */
-    uint8_t	pp_status;	/* conf. space addr. of PM control/status reg */
-    uint8_t	pp_bse;		/* conf. space addr. of PM BSE reg */
-    uint8_t	pp_data;	/* conf. space addr. of PM data reg */
+    uint8_t	pp_location;	/* Offset of power management registers */
 };
 
 struct pci_map {
@@ -124,8 +122,8 @@ struct pcicfg_msix {
 };
 
 struct pci_id_ofw_iommu {
+	uintptr_t xref;
 	uint32_t id;
-	uint32_t xref;
 };
 
 /* Interesting values for HyperTransport */
@@ -686,6 +684,9 @@ void	pci_restore_state(device_t dev);
 void	pci_save_state(device_t dev);
 int	pci_set_max_read_req(device_t dev, int size);
 int	pci_power_reset(device_t dev);
+void	pci_clear_pme(device_t dev);
+void	pci_enable_pme(device_t dev);
+bool	pci_has_pm(device_t dev);
 uint32_t pcie_read_config(device_t dev, int reg, int width);
 void	pcie_write_config(device_t dev, int reg, uint32_t value, int width);
 uint32_t pcie_adjust_config(device_t dev, int reg, uint32_t mask,

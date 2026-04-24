@@ -214,14 +214,13 @@ in6_pcbbind_avail(struct inpcb *inp, const struct sockaddr_in6 *sin6, int fib,
 		}
 
 		/*
-		 * XXX: bind to an anycast address might accidentally
-		 * cause sending a packet with anycast source address.
-		 * We should allow to bind to a deprecated address, since
-		 * the application dares to use it.
+		 * We used to prohibit binding to an anycast address here,
+		 * based on RFC3513, but that restriction was removed in
+		 * RFC4291.
 		 */
 		if (ifa != NULL &&
 		    ((struct in6_ifaddr *)ifa)->ia6_flags &
-		    (IN6_IFF_ANYCAST | IN6_IFF_NOTREADY | IN6_IFF_DETACHED)) {
+		    (IN6_IFF_NOTREADY | IN6_IFF_DETACHED)) {
 			NET_EPOCH_EXIT(et);
 			return (EADDRNOTAVAIL);
 		}
@@ -523,7 +522,8 @@ in6_pcbconnect(struct inpcb *inp, struct sockaddr_in6 *sin6, struct ucred *cred,
 	if ((inp->inp_flags & INP_INHASHLIST) != 0) {
 		in_pcbrehash(inp);
 	} else {
-		in_pcbinshash(inp);
+		error = in_pcbinshash(inp);
+		MPASS(error == 0);
 	}
 
 	return (0);
@@ -767,56 +767,45 @@ in6_pcblookup_local(struct inpcbinfo *pcbinfo, const struct in6_addr *laddr,
 		 */
 		return (NULL);
 	} else {
-		struct inpcbporthead *porthash;
-		struct inpcbport *phd;
+		struct inpcbhead *porthash;
 		struct inpcb *match = NULL;
+
 		/*
-		 * Best fit PCB lookup.
-		 *
-		 * First see if this local port is in use by looking on the
-		 * port hash list.
+		 * Port is in use by one or more PCBs. Look for best
+		 * fit.
 		 */
 		porthash = &pcbinfo->ipi_porthashbase[INP_PCBPORTHASH(lport,
 		    pcbinfo->ipi_porthashmask)];
-		CK_LIST_FOREACH(phd, porthash, phd_hash) {
-			if (phd->phd_port == lport)
-				break;
-		}
-		if (phd != NULL) {
-			/*
-			 * Port is in use by one or more PCBs. Look for best
-			 * fit.
-			 */
-			CK_LIST_FOREACH(inp, &phd->phd_pcblist, inp_portlist) {
-				wildcard = 0;
-				if (!prison_equal_ip6(cred->cr_prison,
-				    inp->inp_cred->cr_prison))
-					continue;
-				/* XXX inp locking */
-				if ((inp->inp_vflag & INP_IPV6) == 0)
-					continue;
-				if (fib != RT_ALL_FIBS &&
-				    inp->inp_inc.inc_fibnum != fib)
-					continue;
-				if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr))
+		CK_LIST_FOREACH(inp, porthash, inp_portlist) {
+			if (inp->inp_lport != lport)
+				continue;
+			if (!prison_equal_ip6(cred->cr_prison,
+			    inp->inp_cred->cr_prison))
+				continue;
+			/* XXX inp locking */
+			if ((inp->inp_vflag & INP_IPV6) == 0)
+				continue;
+			if (fib != RT_ALL_FIBS &&
+			    inp->inp_inc.inc_fibnum != fib)
+				continue;
+			wildcard = 0;
+			if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr))
+				wildcard++;
+			if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr)) {
+				if (IN6_IS_ADDR_UNSPECIFIED(laddr))
 					wildcard++;
-				if (!IN6_IS_ADDR_UNSPECIFIED(
-					&inp->in6p_laddr)) {
-					if (IN6_IS_ADDR_UNSPECIFIED(laddr))
-						wildcard++;
-					else if (!IN6_ARE_ADDR_EQUAL(
-					    &inp->in6p_laddr, laddr))
-						continue;
-				} else {
-					if (!IN6_IS_ADDR_UNSPECIFIED(laddr))
-						wildcard++;
-				}
-				if (wildcard < matchwild) {
-					match = inp;
-					matchwild = wildcard;
-					if (matchwild == 0)
-						break;
-				}
+				else if (!IN6_ARE_ADDR_EQUAL(
+				    &inp->in6p_laddr, laddr))
+					continue;
+			} else {
+				if (!IN6_IS_ADDR_UNSPECIFIED(laddr))
+					wildcard++;
+			}
+			if (wildcard < matchwild) {
+				match = inp;
+				matchwild = wildcard;
+				if (matchwild == 0)
+					break;
 			}
 		}
 		return (match);

@@ -47,10 +47,6 @@ MAN=		atf-check.1
 CFLAGS+=	-I${ATF}
 CFLAGS+=	-DATF_SHELL='"/usr/libexec/sh_static"'
 
-# Silence warnings about usage of deprecated std::auto_ptr
-CXXWARNFLAGS+=	-Wno-deprecated-declarations
-CXXSTD=		c++11
-
 LIBADD=		atf_cxx
 
 HAS_TESTS=

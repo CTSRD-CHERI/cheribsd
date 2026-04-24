@@ -25,7 +25,7 @@
 #
 
 .if !target(__<bsd.linker.mk>__)
-__<bsd.linker.mk>__:
+__<bsd.linker.mk>__:	.NOTMAIN
 
 .if defined(_NO_INCLUDE_LINKERMK) || defined(_NO_INCLUDE_COMPILERMK)
 # If _NO_INCLUDE_COMPILERMK is set we are doing a make obj/cleandir/cleanobj

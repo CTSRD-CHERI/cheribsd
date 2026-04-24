@@ -5,6 +5,10 @@
  * Copyright (c) 1999 Cameron Grant <cg@FreeBSD.org>
  * Copyright (c) 1995 Hannu Savolainen
  * All rights reserved.
+ * Copyright (c) 2024-2025 The FreeBSD Foundation
+ *
+ * Portions of this software were developed by Christos Margiolis
+ * <christos@FreeBSD.org> under sponsorship from the FreeBSD Foundation.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -84,7 +88,6 @@ struct snd_mixer;
 #include <dev/sound/pcm/buffer.h>
 #include <dev/sound/pcm/matrix.h>
 #include <dev/sound/pcm/channel.h>
-#include <dev/sound/pcm/pcm.h>
 #include <dev/sound/pcm/feeder.h>
 #include <dev/sound/pcm/mixer.h>
 #include <dev/sound/pcm/dsp.h>
@@ -100,7 +103,7 @@ struct snd_mixer;
 #define SOUND_MAXVER	SOUND_MODVER
 
 #define SD_F_SIMPLEX		0x00000001
-#define SD_F_AUTOVCHAN		0x00000002
+/* unused			0x00000002 */
 #define SD_F_SOFTPCMVOL		0x00000004
 #define SD_F_BUSY		0x00000008
 #define SD_F_MPSAFE		0x00000010
@@ -118,12 +121,9 @@ struct snd_mixer;
 #define SD_F_EQ_MASK		(SD_F_EQ | SD_F_EQ_ENABLED |		\
 				 SD_F_EQ_BYPASSED | SD_F_EQ_PC)
 
-#define SD_F_PRIO_RD		0x10000000
-#define SD_F_PRIO_WR		0x20000000
-
 #define SD_F_BITS		"\020"					\
 				"\001SIMPLEX"				\
-				"\002AUTOVCHAN"				\
+				/* "\002 */				\
 				"\003SOFTPCMVOL"			\
 				"\004BUSY"				\
 				"\005MPSAFE"				\
@@ -135,9 +135,7 @@ struct snd_mixer;
 				"\013EQ_BYPASSED"			\
 				"\014EQ_PC"				\
 				"\015PVCHANS"				\
-				"\016RVCHANS"				\
-				"\035PRIO_RD"				\
-				"\036PRIO_WR"
+				"\016RVCHANS"
 
 #define PCM_ALIVE(x)		((x) != NULL && (x)->lock != NULL)
 #define PCM_REGISTERED(x)	(PCM_ALIVE(x) && ((x)->flags & SD_F_REGISTERED))
@@ -448,15 +446,17 @@ int	sound_oss_card_info(oss_card_info *);
 #endif /* _KERNEL */
 
 /* make figuring out what a format is easier. got AFMT_STEREO already */
-#define AFMT_32BIT (AFMT_S32_LE | AFMT_S32_BE | AFMT_U32_LE | AFMT_U32_BE)
+#define AFMT_32BIT (AFMT_S32_LE | AFMT_S32_BE | AFMT_U32_LE | AFMT_U32_BE | \
+			AFMT_F32_LE | AFMT_F32_BE)
 #define AFMT_24BIT (AFMT_S24_LE | AFMT_S24_BE | AFMT_U24_LE | AFMT_U24_BE)
 #define AFMT_16BIT (AFMT_S16_LE | AFMT_S16_BE | AFMT_U16_LE | AFMT_U16_BE)
 #define AFMT_G711  (AFMT_MU_LAW | AFMT_A_LAW)
 #define AFMT_8BIT (AFMT_G711 | AFMT_U8 | AFMT_S8)
-#define AFMT_SIGNED (AFMT_S32_LE | AFMT_S32_BE | AFMT_S24_LE | AFMT_S24_BE | \
+#define AFMT_SIGNED (AFMT_S32_LE | AFMT_S32_BE | AFMT_F32_LE | AFMT_F32_BE | \
+			AFMT_S24_LE | AFMT_S24_BE | \
 			AFMT_S16_LE | AFMT_S16_BE | AFMT_S8)
-#define AFMT_BIGENDIAN (AFMT_S32_BE | AFMT_U32_BE | AFMT_S24_BE | AFMT_U24_BE | \
-			AFMT_S16_BE | AFMT_U16_BE)
+#define AFMT_BIGENDIAN (AFMT_S32_BE | AFMT_U32_BE | AFMT_F32_BE | \
+			AFMT_S24_BE | AFMT_U24_BE | AFMT_S16_BE | AFMT_U16_BE)
 
 #define AFMT_CONVERTIBLE	(AFMT_8BIT | AFMT_16BIT | AFMT_24BIT |	\
 				 AFMT_32BIT)
@@ -506,7 +506,8 @@ int	sound_oss_card_info(oss_card_info *);
 #define AFMT_U8_NE	AFMT_U8
 #define AFMT_S8_NE	AFMT_S8
 
-#define AFMT_SIGNED_NE	(AFMT_S8_NE | AFMT_S16_NE | AFMT_S24_NE | AFMT_S32_NE)
+#define AFMT_SIGNED_NE	(AFMT_S8_NE | AFMT_S16_NE | AFMT_S24_NE | \
+			AFMT_S32_NE | AFMT_F32_NE)
 
 #define AFMT_NE		(AFMT_SIGNED_NE | AFMT_U8_NE | AFMT_U16_NE |	\
 			 AFMT_U24_NE | AFMT_U32_NE)

@@ -3,7 +3,7 @@
 # anything in that case.
 .if !make(cleandir)
 .if !targets(__<${_this:T}>__)
-__<${_this:T}>__:
+__<${_this:T}>__:	.NOTMAIN
 
 .include <src.opts.mk>
 

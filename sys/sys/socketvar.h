@@ -81,6 +81,7 @@ struct so_splice {
 	struct mtx mtx;
 	unsigned int wq_index;
 	enum so_splice_state {
+		SPLICE_INIT,	/* embryonic state, don't queue work yet */
 		SPLICE_IDLE,	/* waiting for work to arrive */
 		SPLICE_QUEUED,	/* a wakeup has queued some work */
 		SPLICE_RUNNING,	/* currently transferring data */
@@ -531,6 +532,7 @@ struct socket *
 struct socket *
 	sopeeloff(struct socket *);
 int	sopoll_generic(struct socket *so, int events, struct thread *td);
+int	sokqfilter_generic(struct socket *so, struct knote *kn);
 int	soaio_queue_generic(struct socket *so, struct kaiocb *job);
 int	soreceive(struct socket *so, struct sockaddr **paddr, struct uio *uio,
 	    struct mbuf **mp0, struct mbuf **controlp, int *flagsp);
@@ -558,6 +560,7 @@ int	sosend_dgram(struct socket *so, struct sockaddr *addr,
 int	sosend_generic(struct socket *so, struct sockaddr *addr,
 	    struct uio *uio, struct mbuf *top, struct mbuf *control,
 	    int flags, struct thread *td);
+int	sendfile_wait_generic(struct socket *so, off_t need, int *space);
 int	sosetfib(struct socket *so, int fibnum);
 int	soshutdown(struct socket *so, enum shutdown_how);
 void	soupcall_clear(struct socket *, sb_which);

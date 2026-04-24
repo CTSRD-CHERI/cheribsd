@@ -76,6 +76,15 @@
 #define	CHERI_PERM_INVOKE CHERI_PERM_BRANCH_SEALED_PAIR
 #endif
 
+/* Supported architecture permission bits feature flags */
+#define	HAS_CHERI_PERM_LOAD_STORE_CAP
+#define	HAS_CHERI_PERM_LOAD_MUTABLE
+#define	HAS_CHERI_PERM_EXECUTIVE
+#define	HAS_CHERI_PERM_SEAL
+
+/* Define alias for MUTABLE_LOAD permission bit to have consistent spelling */
+#define	CHERI_PERM_LOAD_MUTABLE CHERI_PERM_MUTABLE_LOAD
+
 /*
  * Macros defining initial permission sets:
  *

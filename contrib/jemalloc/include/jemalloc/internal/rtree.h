@@ -6,9 +6,9 @@
  *   "updated": 201906024,
  *   "target_type": "lib",
  *   "changes": [
- *     "pointer_bit_flags",
- *     "pointer_shape",
- *     "virtual_address"
+ *     "intcap_arithmetic",
+ *     "bounds_compression",
+ *     "pointer_shape"
  *   ]
  * }
  * CHERI CHANGES END
@@ -56,6 +56,18 @@ struct rtree_node_elm_s {
 	atomic_p_t	child; /* (rtree_{node,leaf}_elm_t *) */
 };
 
+/*
+ * Ensure that CHERI architectures use the same layout as the
+ * non-CHERI baseline.
+ */
+#if defined(__aarch64__) || defined(__riscv)
+#ifndef RTREE_LEAF_COMPACT
+#error  "Using inefficient rtree leaf encoding"
+#endif
+#elif defined(__CHERI_PURE_CAPABILITY__)
+#error	"Unknown rtree layout for non-CHERI baseline"
+#endif
+
 struct rtree_leaf_elm_s {
 #ifdef RTREE_LEAF_COMPACT
 	/*
@@ -82,9 +94,7 @@ struct rtree_leaf_elm_s {
 	 * further bits of the offset are maintained 0.
 	 */
 	atomic_p_t	le_bits;
-// #pragma message("Using packed rtree leaf encoding")
 #else
-#pragma message("Using inefficient rtree leaf encoding")
 	atomic_p_t	le_extent; /* (extent_t *) */
 	atomic_u_t	le_szind; /* (szind_t) */
 	atomic_b_t	le_slab; /* (bool) */

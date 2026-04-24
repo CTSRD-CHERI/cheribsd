@@ -4,6 +4,9 @@
 
 SSHDIR=		${SRCTOP}/crypto/openssh
 
+SFTP_CLIENT_SRCS=sftp-common.c sftp-client.c sftp-glob.c
+SKSRCS=	ssh-sk-client.c
+
 CFLAGS+= -I${SSHDIR} -include ssh_namespace.h
 
 .if ${MK_GSSAPI} != "no" && ${MK_KERBEROS_SUPPORT} != "no"
@@ -24,3 +27,5 @@ CFLAGS+= -DLIBWRAP=1
 # Built-in security key support
 CFLAGS+= -include sk_config.h
 .endif
+
+CFLAGS+= -DOPENSSL_API_COMPAT=0x10100000L

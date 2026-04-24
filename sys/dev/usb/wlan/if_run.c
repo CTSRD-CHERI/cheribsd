@@ -17,7 +17,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/cdefs.h>
 /*-
  * Ralink Technology RT2700U/RT2800U/RT3000U/RT3900E chipset driver.
  * http://www.ralinktech.com/
@@ -325,6 +324,7 @@ static const STRUCT_USB_HOST_ID run_devs[] = {
     RUN_DEV(SITECOMEU,		RT2870_3),
     RUN_DEV(SITECOMEU,		RT2870_4),
     RUN_DEV(SITECOMEU,		RT3070),
+    RUN_DEV(SITECOMEU,		RT3070_1),
     RUN_DEV(SITECOMEU,		RT3070_2),
     RUN_DEV(SITECOMEU,		RT3070_3),
     RUN_DEV(SITECOMEU,		RT3070_4),

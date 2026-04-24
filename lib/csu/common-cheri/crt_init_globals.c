@@ -153,6 +153,31 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 		}
 	}
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * Pure capability executables with multiple compartments
+	 * might have multiple writable and executable segments.
+	 * However, the capabilities for `phdr` and the current PCC
+	 * should be constrained to the executable.  Trust relocations
+	 * to further narrow bounds as needed.
+	 *
+	 * XXX: Once PT_CHERI_PCC is required for pure capability
+	 * binaries, the purecap version of this function should be
+	 * simplified such that the phdrs are only examined for
+	 * hybrid.
+	 */
+	if (use_code_bounds) {
+		code_cap = cheri_pcc_get();
+		data_cap = __DECONST(void *, phdr);
+		data_cap = cheri_perms_clear(data_cap,
+		    CHERI_PERM_EXECUTE | CHERI_PERM_SW_VMEM);
+		rodata_cap = cheri_perms_clear(data_cap,
+		    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+		    CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_SW_VMEM);
+		goto handle_relocs;
+	}
+#endif
+
 	if (!have_text_segment) {
 		/* No text segment??? Must be an error somewhere else. */
 		__builtin_trap();
@@ -201,7 +226,10 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 
 		code_cap = cheri_pcc_get();
 		rodata_cap = cheri_perms_clear(data_cap,
-		    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+		    CHERI_PERM_STORE |
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
+		    CHERI_PERM_STORE_CAP |
+#endif
 		    CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_SW_VMEM);
 
 		data_cap = cheri_address_set(data_cap, writable_start);
@@ -221,6 +249,9 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 			__builtin_trap();
 	}
 
+#ifdef __CHERI_PURE_CAPABILITY__
+handle_relocs:
+#endif
 	start_relocs = CHERI_RODATA_PTR(__start___cap_relocs);
 	stop_relocs = CHERI_RODATA_PTR(__stop___cap_relocs);
 

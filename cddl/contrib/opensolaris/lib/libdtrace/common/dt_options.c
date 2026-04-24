@@ -21,10 +21,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20230509,
+ *   "updated": 20260211,
  *   "target_type": "lib",
  *   "changes": [
- *     "pointer_bit_flags"
+ *     "intcap_arithmetic"
  *   ]
  * }
  * CHERI CHANGES END

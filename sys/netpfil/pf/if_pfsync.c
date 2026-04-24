@@ -1052,7 +1052,7 @@ relock:
 			LIST_FOREACH(s, &ih->states, entry) {
 				if (s->creatorid == creatorid) {
 					s->state_flags |= PFSTATE_NOSYNC;
-					pf_unlink_state(s);
+					pf_remove_state(s);
 					goto relock;
 				}
 			}
@@ -1441,7 +1441,7 @@ pfsync_in_del_c(struct mbuf *m, int offset, int count, int flags, int action)
 		}
 
 		st->state_flags |= PFSTATE_NOSYNC;
-		pf_unlink_state(st);
+		pf_remove_state(st);
 	}
 
 	return (len);
@@ -1903,7 +1903,7 @@ pfsync_sendout(int schedswi, int c)
 
 		len -= sizeof(union inet_template) - sizeof(struct ip);
 		ip->ip_len = htons(len);
-		ip_fillid(ip);
+		ip_fillid(ip, V_ip_random_id);
 		break;
 	    }
 #endif

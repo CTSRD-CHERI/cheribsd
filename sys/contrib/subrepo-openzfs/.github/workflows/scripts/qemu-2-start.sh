@@ -68,25 +68,12 @@ case "$OS" in
     OSv="fedora-unknown"
     URL="https://download.fedoraproject.org/pub/fedora/linux/releases/41/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-41-1.4.x86_64.qcow2"
     ;;
-  freebsd13-3r)
-    OSNAME="FreeBSD 13.3-RELEASE"
-    OSv="freebsd13.0"
-    URLzs="$FREEBSD/amd64-freebsd-13.3-RELEASE.qcow2.zst"
-    BASH="/usr/local/bin/bash"
-    NIC="rtl8139"
-    ;;
   freebsd13-4r)
     OSNAME="FreeBSD 13.4-RELEASE"
     OSv="freebsd13.0"
     URLzs="$FREEBSD/amd64-freebsd-13.4-RELEASE.qcow2.zst"
     BASH="/usr/local/bin/bash"
     NIC="rtl8139"
-    ;;
-  freebsd14-1r)
-    OSNAME="FreeBSD 14.1-RELEASE"
-    OSv="freebsd14.0"
-    URLzs="$FREEBSD/amd64-freebsd-14.1-RELEASE.qcow2.zst"
-    BASH="/usr/local/bin/bash"
     ;;
   freebsd14-2r)
     OSNAME="FreeBSD 14.2-RELEASE"
@@ -219,6 +206,15 @@ sudo virt-install \
   --cloud-init user-data=/tmp/user-data \
   --disk $DISK,bus=virtio,cache=none,format=$FORMAT,driver.discard=unmap \
   --import --noautoconsole >/dev/null
+
+# Give the VMs hostnames so we don't have to refer to them with
+# hardcoded IP addresses.
+#
+# vm0:          Initial VM we install dependencies and build ZFS on.
+# vm1..2        Testing VMs
+for i in {0..9} ; do
+  echo "192.168.122.1$i vm$i" | sudo tee -a /etc/hosts
+done
 
 # in case the directory isn't there already
 mkdir -p $HOME/.ssh

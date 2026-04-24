@@ -48,6 +48,7 @@ void	__sys_exit(int) __dead2;
 int	__sys_fstat(int fd, struct stat *);
 int	__sys_fstatat(int, const char *, struct stat *, int);
 int	__sys___getcwd(char *, size_t);
+void	*__sys_mmap(void *, size_t, int, int, int, off_t);
 int	__sys_sigprocmask(int, const sigset_t *, sigset_t *);
 int	__sys_thr_kill(long, int);
 int	__sys_thr_self(long *);
@@ -75,6 +76,8 @@ int __getosreldate(void);
 #define exit(status)	__sys_exit(status)
 #define _exit(status)	__sys_exit(status)
 #define _fstat(fd, sb)	__sys_fstat(fd, sb)
+#define mmap(addr, len, prot, flags, fd, pos) \
+	__sys_mmap((addr), (len), (prot),(flags), (fd), (pos))
 #define pread(fd, buf, nbytes, offset)	__sys_pread(fd, buf, nbytes, offset)
 #define read(fd, buf, nbytes)	__sys_read(fd, buf, nbytes)
 #define sigprocmask(how, set, oset)	__sys_sigprocmask(how, set, oset)

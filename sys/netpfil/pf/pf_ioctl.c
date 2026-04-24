@@ -342,7 +342,7 @@ pfattach_vnet(void)
 	/* default rule should never be garbage collected */
 	V_pf_default_rule.entries.tqe_prev = &V_pf_default_rule.entries.tqe_next;
 	V_pf_default_rule.action = V_default_to_drop ? PF_DROP : PF_PASS;
-	V_pf_default_rule.nr = -1;
+	V_pf_default_rule.nr = (uint32_t)-1;
 	V_pf_default_rule.rtableid = -1;
 
 	pf_counter_u64_init(&V_pf_default_rule.evaluations, M_WAITOK);
@@ -2215,17 +2215,31 @@ pf_ioctl_addrule(struct pf_krule *rule, uint32_t ticket,
 	}
 
 	pf_mv_kpool(&V_pf_pabuf[0], &rule->nat.list);
-	pf_mv_kpool(&V_pf_pabuf[1], &rule->rdr.list);
-	pf_mv_kpool(&V_pf_pabuf[2], &rule->route.list);
-	if (((((rule->action == PF_NAT) || (rule->action == PF_RDR) ||
-	    (rule->action == PF_BINAT)) && rule->anchor == NULL) ||
-	    (rule->rt > PF_NOPFROUTE)) &&
-	    (TAILQ_FIRST(&rule->rdr.list) == NULL &&
-	     TAILQ_FIRST(&rule->route.list) == NULL))
-		error = EINVAL;
 
-	if (rule->action == PF_PASS && rule->rdr.opts & PF_POOL_STICKYADDR &&
-	    !rule->keep_state) {
+	/*
+	 * Old version of pfctl provide route redirection pools in single
+	 * common redirection pool rdr. New versions use rdr only for
+	 * rdr-to rules.
+	 */
+	if (rule->rt > PF_NOPFROUTE && TAILQ_EMPTY(&V_pf_pabuf[2])) {
+		pf_mv_kpool(&V_pf_pabuf[1], &rule->route.list);
+	} else {
+		pf_mv_kpool(&V_pf_pabuf[1], &rule->rdr.list);
+		pf_mv_kpool(&V_pf_pabuf[2], &rule->route.list);
+	}
+
+	if (((rule->action == PF_NAT) || (rule->action == PF_RDR) ||
+	    (rule->action == PF_BINAT))	&& rule->anchor == NULL &&
+	    TAILQ_FIRST(&rule->rdr.list) == NULL) {
+		error = EINVAL;
+	}
+
+	if (rule->rt > PF_NOPFROUTE && (TAILQ_FIRST(&rule->route.list) == NULL)) {
+		error = EINVAL;
+	}
+
+	if (rule->action == PF_PASS && (rule->rdr.opts & PF_POOL_STICKYADDR ||
+	    rule->nat.opts & PF_POOL_STICKYADDR) && !rule->keep_state) {
 		error = EINVAL;
 	}
 
@@ -2296,7 +2310,7 @@ pf_kill_matching_state(struct pf_state_key_cmp *key, int dir)
 		return (0);
 	}
 
-	pf_unlink_state(s);
+	pf_remove_state(s);
 	return (1);
 }
 
@@ -2393,7 +2407,7 @@ relock_DIOCKILLSTATES:
 			match_key.port[1] = s->key[idx]->port[0];
 		}
 
-		pf_unlink_state(s);
+		pf_remove_state(s);
 		killed++;
 
 		if (psk->psk_kill_match)
@@ -2404,6 +2418,12 @@ relock_DIOCKILLSTATES:
 	PF_HASHROW_UNLOCK(ih);
 
 	return (killed);
+}
+
+void
+unhandled_af(int af)
+{
+	panic("unhandled af %d", af);
 }
 
 int
@@ -2565,14 +2585,20 @@ pf_ioctl_add_addr(struct pf_nl_pooladdr *pp)
 	    pp->which != PF_RT)
 		return (EINVAL);
 
-#ifndef INET
-	if (pp->af == AF_INET)
-		return (EAFNOSUPPORT);
+	switch (pp->af) {
+#ifdef INET
+	case AF_INET:
+		/* FALLTHROUGH */
 #endif /* INET */
-#ifndef INET6
-	if (pp->af == AF_INET6)
-		return (EAFNOSUPPORT);
+#ifdef INET6
+	case AF_INET6:
+		/* FALLTHROUGH */
 #endif /* INET6 */
+	case AF_UNSPEC:
+		break;
+	default:
+		return (EAFNOSUPPORT);
+	}
 
 	if (pp->addr.addr.type != PF_ADDR_ADDRMASK &&
 	    pp->addr.addr.type != PF_ADDR_DYNIFTL &&
@@ -5969,7 +5995,7 @@ relock:
 			s->timeout = PFTM_PURGE;
 			/* Don't send out individual delete messages. */
 			s->state_flags |= PFSTATE_NOSYNC;
-			pf_unlink_state(s);
+			pf_remove_state(s);
 			goto relock;
 		}
 		PF_HASHROW_UNLOCK(ih);
@@ -6127,7 +6153,7 @@ relock_DIOCCLRSTATES:
 			 * delete messages.
 			 */
 			s->state_flags |= PFSTATE_NOSYNC;
-			pf_unlink_state(s);
+			pf_remove_state(s);
 			killed++;
 
 			if (kill->psk_kill_match)
@@ -6156,7 +6182,7 @@ pf_killstates(struct pf_kstate_kill *kill, unsigned int *killed)
 			kill->psk_pfcmp.creatorid = V_pf_status.hostid;
 		if ((s = pf_find_state_byid(kill->psk_pfcmp.id,
 		    kill->psk_pfcmp.creatorid))) {
-			pf_unlink_state(s);
+			pf_remove_state(s);
 			*killed = 1;
 		}
 		return;

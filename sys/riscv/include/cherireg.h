@@ -51,6 +51,7 @@
  * XXXRW: CHERI_UNSEALED is not currently considered part of the perms word,
  * but perhaps it should be.
  */
+#ifdef __riscv_xcheri
 #define	CHERI_PERM_GLOBAL			(1 << 0)	/* 0x00000001 */
 #define	CHERI_PERM_EXECUTE			(1 << 1)	/* 0x00000002 */
 #define	CHERI_PERM_LOAD				(1 << 2)	/* 0x00000004 */
@@ -69,17 +70,61 @@
 #define	CHERI_PERM_SW1			(1 << 16)	/* 0x00010000 */
 #define	CHERI_PERM_SW2			(1 << 17)	/* 0x00020000 */
 #define	CHERI_PERM_SW3			(1 << 18)	/* 0x00040000 */
+#else /* !defined(__riscv_xcheri) */
+#define	CHERI_PERM_WRITE		(1 << 0)	/* 0x00000001 */
+#define	CHERI_PERM_LOAD_MUTABLE		(1 << 1)	/* 0x00000002 */
+#define	CHERI_PERM_ELEVATE_LEVEL	(1 << 2)	/* 0x00000004 */
+#define	CHERI_PERM_STORE_LEVEL		(1 << 3)	/* 0x00000008 */
+#define	CHERI_PERM_CAPABILITY_LEVEL	(1 << 4)	/* 0x00000010 */
+#define	CHERI_PERM_CAP			(1 << 5)	/* 0x00000020 */
+#define	CHERI_PERM_SYSTEM_REGS		(1 << 16)	/* 0x00010000 */
+#define	CHERI_PERM_EXECUTE		(1 << 17)	/* 0x00020000 */
+#define	CHERI_PERM_READ			(1 << 18)	/* 0x00040000 */
+
+/* User-defined permission bits. */
+#define	CHERI_PERM_SW0			(1 << 6)	/* 0x00000040 */
+#define	CHERI_PERM_SW1			(1 << 7)	/* 0x00000080 */
+#define	CHERI_PERM_SW2			(1 << 8)	/* 0x00000100 */
+#define	CHERI_PERM_SW3			(1 << 9)	/* 0x00000200 */
+#endif /* !defined(__riscv_xcheri) */
+
 #else /* !_KERNEL */
 /*
  * These should be defined in cheriintrin.h, but aren't yet.
  */
+#ifdef __riscv_xcheri
 #define	CHERI_PERM_SET_CID		(1 << 11)	/* 0x00000800 */
 #define	CHERI_PERM_SW0			(1 << 15)	/* 0x00008000 */
 #define	CHERI_PERM_SW1			(1 << 16)	/* 0x00010000 */
 #define	CHERI_PERM_SW2			(1 << 17)	/* 0x00020000 */
 #define	CHERI_PERM_SW3			(1 << 18)	/* 0x00040000 */
+#else
+#define	CHERI_PERM_SW0			(1 << 6)	/* 0x00000040 */
+#define	CHERI_PERM_SW1			(1 << 7)	/* 0x00000080 */
+#define	CHERI_PERM_SW2			(1 << 8)	/* 0x00000100 */
+#define	CHERI_PERM_SW3			(1 << 9)	/* 0x00000200 */
+#endif
 #endif /* !_KERNEL */
 
+#ifdef __riscv_zcheripurecap
+/*
+ * Re-define these because RVY cheriintrin.h uses different names.
+ * XXX-AM: Ideally we unify on a single naming convention.
+ */
+#define	CHERI_PERM_STORE		CHERI_PERM_WRITE
+#define	CHERI_PERM_LOAD			CHERI_PERM_READ
+#define	CHERI_PERM_GLOBAL		CHERI_PERM_CAPABILITY_LEVEL
+#define	CHERI_PERM_STORE_LOCAL_CAP	CHERI_PERM_STORE_LEVEL
+#endif
+
+/* Supported architecture permission bits feature flags */
+#ifdef __riscv_xcheri
+#define	HAS_CHERI_PERM_LOAD_STORE_CAP
+#define	HAS_CHERI_PERM_SEAL
+#else
+#define	HAS_CHERI_PERM_CAP
+#define	HAS_CHERI_PERM_LOAD_MUTABLE
+#endif
 
 /*
  * CHERI_PERMS_SWALL: Mask of all available software-defined permissions
@@ -89,12 +134,20 @@
 	(CHERI_PERM_SW0 | CHERI_PERM_SW1 | CHERI_PERM_SW2 |		\
 	CHERI_PERM_SW3)
 
-#define	CHERI_PERMS_HWALL						\
+#define	_CHERI_PERMS_HWALL_COMMON					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_EXECUTE |			\
-	CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_LOAD_CAP |	\
-	CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP |		\
-	CHERI_PERM_SEAL | CHERI_PERM_INVOKE | CHERI_PERM_UNSEAL |	\
-	CHERI_PERM_SYSTEM_REGS | CHERI_PERM_SET_CID)
+	CHERI_PERM_LOAD | CHERI_PERM_STORE |				\
+	CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_SYSTEM_REGS)
+#ifdef __riscv_xcheri
+#define	CHERI_PERMS_HWALL						\
+	(CHERI_PERM_SEAL | CHERI_PERM_INVOKE | CHERI_PERM_UNSEAL |	\
+	CHERI_PERM_SET_CID | CHERI_PERM_LOAD_CAP |			\
+	CHERI_PERM_STORE_CAP | _CHERI_PERMS_HWALL_COMMON)
+#else /* !defined(__riscv_xcheri) */
+#define	CHERI_PERMS_HWALL						\
+	(CHERI_PERM_CAP | CHERI_PERM_ELEVATE_LEVEL |			\
+	CHERI_PERM_LOAD_MUTABLE | _CHERI_PERMS_HWALL_COMMON)
+#endif /* !defined(__riscv_xcheri) */
 
 /*
  * Hardware defines a kind of tripartite taxonomy: memory, type, and CID.
@@ -102,13 +155,22 @@
  * that give us a kind of "kind" for capabilities.  A capability may belong
  * to zero, one, or more than one of these.
  */
-
-#define CHERI_PERMS_HWALL_MEMORY                                        \
-	(CHERI_PERM_EXECUTE | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |   \
-		CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |               \
-		CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_INVOKE)
+#define _CHERI_PERMS_HWALL_MEMORY_COMMON				\
+	(CHERI_PERM_EXECUTE | CHERI_PERM_LOAD | CHERI_PERM_STORE |	\
+	CHERI_PERM_STORE_LOCAL_CAP)
+#ifdef __riscv_xcheri
+#define CHERI_PERMS_HWALL_MEMORY					\
+	(CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |			\
+	CHERI_PERM_INVOKE | _CHERI_PERMS_HWALL_MEMORY_COMMON)
 
 #define CHERI_PERMS_HWALL_OTYPE	(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
+#else /* !defined(__riscv_xcheri) */
+#define CHERI_PERMS_HWALL_MEMORY					\
+	(CHERI_PERM_CAP | CHERI_PERM_LOAD_MUTABLE |			\
+	CHERI_PERM_ELEVATE_LEVEL | _CHERI_PERMS_HWALL_MEMORY_COMMON)
+
+#define CHERI_PERMS_HWALL_OTYPE
+#endif /* !defined(__riscv_xcheri) */
 
 /*
  * Basic userspace permission mask; CHERI_PERM_EXECUTE will be added for
@@ -119,13 +181,13 @@
  * CHERI_PERM_SYSCALL.  CHERI_PERM_SW_VMEM will be added for
  * permissions returned from mmap().
  */
-#define	CHERI_PERMS_USERSPACE						\
-	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |	\
-	CHERI_PERM_INVOKE |						\
+#define	_CHERI_PERMS_USERSPACE_COMMON					\
+	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD  |				\
 	(CHERI_PERMS_SWALL & ~(CHERI_PERM_SW_VMEM | CHERI_PERM_SYSCALL)))
-
-#define	CHERI_PERMS_USERSPACE_CODE					\
-	(CHERI_PERMS_USERSPACE | CHERI_PERM_EXECUTE | CHERI_PERM_SYSCALL)
+#ifdef __riscv_xcheri
+#define	CHERI_PERMS_USERSPACE						\
+	(CHERI_PERM_LOAD_CAP | CHERI_PERM_INVOKE |			\
+	_CHERI_PERMS_USERSPACE_COMMON)
 
 #define	CHERI_PERMS_USERSPACE_SEALCAP					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
@@ -133,6 +195,18 @@
 #define	CHERI_PERMS_USERSPACE_DATA					\
 	(CHERI_PERMS_USERSPACE | CHERI_PERM_STORE |			\
 	CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP)
+#else /* !defined(__riscv_xcheri) */
+#define	CHERI_PERMS_USERSPACE						\
+	(CHERI_PERM_CAP | CHERI_PERM_LOAD_MUTABLE |			\
+	CHERI_PERM_ELEVATE_LEVEL | _CHERI_PERMS_USERSPACE_COMMON)
+
+#define	CHERI_PERMS_USERSPACE_DATA					\
+	(CHERI_PERMS_USERSPACE | CHERI_PERM_STORE |			\
+	CHERI_PERM_STORE_LOCAL_CAP)
+#endif /* !defined(__riscv_xcheri) */
+
+#define	CHERI_PERMS_USERSPACE_CODE					\
+	(CHERI_PERMS_USERSPACE | CHERI_PERM_EXECUTE | CHERI_PERM_SYSCALL)
 
 #define	CHERI_PERMS_USERSPACE_RODATA					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD)
@@ -142,21 +216,35 @@
  * currently a bit broad, and should be narrowed over time as the kernel
  * becomes more capability-aware.
  */
+#ifdef __riscv_xcheri
 #define	CHERI_PERMS_KERNEL						\
-	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)	\
-
-#define	CHERI_PERMS_KERNEL_CODE						\
-	(CHERI_PERMS_KERNEL | CHERI_PERM_EXECUTE | CHERI_PERM_SYSTEM_REGS)
+	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
 
 #define	CHERI_PERMS_KERNEL_DATA				       		\
 	(CHERI_PERMS_KERNEL | CHERI_PERM_STORE | CHERI_PERM_STORE_CAP | \
 	CHERI_PERM_STORE_LOCAL_CAP)
 
+#else /* !defined(__riscv_xcheri) */
+#define	CHERI_PERMS_KERNEL						\
+	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_CAP |		\
+	CHERI_PERM_LOAD_MUTABLE | CHERI_PERM_ELEVATE_LEVEL)
+
+#define	CHERI_PERMS_KERNEL_DATA				       		\
+	(CHERI_PERMS_KERNEL | CHERI_PERM_STORE |			\
+	CHERI_PERM_STORE_LOCAL_CAP)
+
+#endif /* !defined(__riscv_xcheri) */
+
+#define	CHERI_PERMS_KERNEL_CODE						\
+	(CHERI_PERMS_KERNEL | CHERI_PERM_EXECUTE | CHERI_PERM_SYSTEM_REGS)
+
 #define	CHERI_PERMS_KERNEL_RODATA			       		\
 	(CHERI_PERMS_KERNEL)
 
+#ifdef __riscv_xcheri
 #define	CHERI_PERMS_KERNEL_SEALCAP					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
+#endif
 
 /*
  * Permission mask that encodes the permission bits associated to
@@ -164,12 +252,26 @@
  * These are separate from the permission bits that encode other
  * properties of capabilities (e.g. sealing or ASR).
  */
+#ifdef __riscv_xcheri
 #define	CHERI_PERMS_RWX_MASK						\
 	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE |	\
 	CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP |		\
 	CHERI_PERM_EXECUTE | CHERI_PERM_SYSCALL)
+#else
+#define	CHERI_PERMS_RWX_MASK						\
+	(CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_CAP |		\
+	CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_LOAD_MUTABLE |		\
+	CHERI_PERM_EXECUTE | CHERI_PERM_SYSCALL)
+#endif
 
+#ifdef __riscv_xcheri
 #define	CHERI_FLAGS_CAP_MODE	0x1
+#else
+#define	CHERI_FLAGS_CAP_MODE	0x0
+#endif
+#define	CHERI_FLAGS_CAP_MODE_MASK	0x1
+#define	CHERI_FLAGS_INT_MODE				\
+	(~CHERI_FLAGS_CAP_MODE & CHERI_FLAGS_CAP_MODE_MASK)
 
 /*
  * The CHERI object-type space is split between userspace and kernel,
@@ -179,6 +281,7 @@
  * User and kernel software should be written so as to not place assumptions
  * about the specific values used here, as they may change.
  */
+#ifdef __riscv_xcheri
 #define	CHERI_OTYPE_BITS	(18)
 #define	CHERI_OTYPE_USER_MIN	(0)
 #define	CHERI_OTYPE_USER_MAX	((1 << (CHERI_OTYPE_BITS - 1)) - 1)
@@ -193,6 +296,14 @@
 #define	CHERI_OTYPE_UNSEALED	(-1l)
 #define	CHERI_OTYPE_SENTRY	(-2l)
 #endif
+#else /* !defined(__riscv_xcheri) */
+#define	CHERI_OTYPE_BITS	(1)
+
+#ifdef _KERNEL
+#define	CHERI_OTYPE_UNSEALED	(0l)
+#define	CHERI_OTYPE_SENTRY	(1l)
+#endif
+#endif /* !defined(__riscv_xcheri) */
 
 /*
  * List of CHERI capability cause code constants.

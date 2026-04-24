@@ -291,8 +291,7 @@ ENTRY(cpu_throw)
 	/* Activate the new thread's pmap. */
 	cmove	cs0, ca1
 	cmove	ca0, ca1
-	clgc	cra, _C_LABEL(pmap_activate_sw)
-	cjalr	cra
+	ccall	_C_LABEL(pmap_activate_sw)
 	cmove	ca0, cs0
 
 	/* Store the new curthread */
@@ -481,8 +480,7 @@ ENTRY(cpu_switch)
 	cmove	cs1, ca1
 	cmove	cs2, ca2
 	cmove	ca0, ca1
-	clgc	cra, _C_LABEL(pmap_activate_sw)
-	cjalr	cra
+	ccall	_C_LABEL(pmap_activate_sw)
 	cmove	ca1, cs1
 #else
 	mv	s0, a0
@@ -627,8 +625,7 @@ ENTRY(fork_trampoline)
 	cmove	ca0, cs0
 	cmove	ca1, cs1
 	cmove	ca2, csp
-	clgc	cra, _C_LABEL(fork_exit)
-	cjalr	cra
+	ccall	_C_LABEL(fork_exit)
 #else
 	mv	a0, s0
 	mv	a1, s1
@@ -655,11 +652,7 @@ ENTRY(fork_trampoline)
 	csetaddr ct1, ct1, t0
 	li	t0, 1
 	csetflags ct1, ct1, t0
-#ifdef __riscv_xcheri_mode_dependent_jumps
 	jr.cap	ct1
-#else
-	cjr	ct1
-#endif
 .option push
 .option capmode
 1:

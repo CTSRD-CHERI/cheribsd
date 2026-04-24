@@ -1,0 +1,14 @@
+{
+  "compartments": {
+    "one": {
+      "symbols": [
+        "compartment_one_foo"
+      ]
+    },
+    "two": {
+      "symbols": [
+        "compartment_two_foo"
+      ]
+    }
+  }
+}

@@ -34,7 +34,7 @@ malformed_head()
 {
 	atf_set descr 'Test that we do not log malformed packets as passing'
 	atf_set require.user root
-	atf_set require.progs scapy
+	atf_set require.progs python3 scapy
 }
 
 malformed_body()
@@ -238,13 +238,25 @@ state_max_body()
 	    cat pflog.txt
 
 	# Second ping is blocked due to the state limit.
-	atf_check -o match:".*rule 0/0\(match\): block in on ${epair}a: 192.0.2.2 > 192.0.2.1: ICMP echo request.*" \
+	atf_check -o match:".*rule 0/12\(state-limit\): block in on ${epair}a: 192.0.2.2 > 192.0.2.1: ICMP echo request.*" \
 	    cat pflog.txt
 
 	# At most three lines should be written: one for the first ping, and
 	# two for the second: one for the initial pass through the ruleset, and
 	# then a drop because of the state limit.  Ideally only the drop would
 	# be logged; if this is fixed, the count will be 2 instead of 3.
+	atf_check -o match:3 grep -c . pflog.txt
+
+	# If the rule doesn't specify logging, we shouldn't log drops
+	# due to state limits.
+	pft_set_rules alcatraz "pass inet keep state (max 1)"
+
+	atf_check -s exit:0 -o ignore \
+	    ping -c 1 192.0.2.1
+
+	atf_check -s exit:2 -o ignore \
+	    ping -c 1 192.0.2.1
+
 	atf_check -o match:3 grep -c . pflog.txt
 }
 
@@ -331,6 +343,8 @@ rdr_head()
 
 rdr_action_body()
 {
+	pflog_init
+
 	j="pflog:rdr_action"
 	epair_c=$(vnet_mkepair)
 	epair_srv=$(vnet_mkepair)

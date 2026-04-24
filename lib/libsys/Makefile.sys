@@ -102,28 +102,26 @@ INTERPOSED = \
 
 .ifdef CHERI_LIB_C18N
 # Pseudo implementations of system calls with special behavior under c18n
-SRCS+= \
-	mmap_c18n.c \
-	rfork_c18n.c \
-	thr_exit_c18n.c \
-	vfork_c18n.c
-
-NO_UNDERSCORE+= \
+C18N_WRAPPED=	\
 	mmap \
 	rfork \
 	thr_exit \
 	vfork
+
+SRCS+=		${C18N_WRAPPED:S/$/_c18n.c/}
+PSEUDO+=	${C18N_WRAPPED}
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}
 # Var-args calling convention different for purecap
 NO_UNDERSCORE=	fcntl ioctl open openat
+
 .for _nu in ${NO_UNDERSCORE}
 INTERPOSED:=	${INTERPOSED:N${_nu}}
 .endfor
 S_NU+=		${NO_UNDERSCORE:C/^.*$/_&.S/}
 SRCS+=		${NO_UNDERSCORE:S/$/.c/} ${S_NU}
-NOASM+=		${NO_UNDERSCORE:S/$/.o/}
+NOASM+=		${NO_UNDERSCORE}
 .endif
 
 PSEUDO+=	${INTERPOSED}

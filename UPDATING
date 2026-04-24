@@ -27,6 +27,30 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 15.x IS SLOW:
 	world, or to merely disable the most expensive debugging functionality
 	at runtime, run "ln -s 'abort:false,junk:false' /etc/malloc.conf".)
 
+20250412:
+	LinuxKPI alloc routines were changed to return physically contiguous
+	memory where expected. These changes may require out-of-tree drivers
+	to be recompiled.
+	Bump __FreeBSD_version to 1500037 to be able to detect this change.
+
+20250409:
+	Intel iwlwifi firmware has been removed from the src repository.
+	Before updating their system, users of iwlwifi(4) or iwx(4) must
+	install the appropriate firmware for their chipset using fwget(8) or
+	building it from ports.
+
+20250314:
+	We now use LLVM's binary utilities (nm, objcopy, etc.) by default.
+	The WITHOUT_LLVM_BINUTILS src.conf(5) knob can be used to revert to
+	ELF Tool Chain tools if desired.
+
+20250303:
+	Commit 4a77657cbc01 changed the ABI between ipfw(8) and ipfw(4).
+	Please note that the old ipfw(8) binary will not work with the new
+	ipfw(4) module. Therefore, it is recommended to disable ipfw during
+	the upgrade, otherwise the host system may become inaccessible because
+	ipfw rules cannot be installed with the old binary.
+
 20250214:
 	Commit 4517fbfd4251 modified the internal API between the
 	nfscommon and nfscl modules.  As such, both of these modules
@@ -71,6 +95,12 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 15.x IS SLOW:
 	The OpenBSD derived bc and dc implementations and the WITHOUT_GH_BC
 	option that allowed building them instead of the advanced version
 	imported more than 4 years ago have been removed.
+
+20241107:
+	The ng_ubt(4) driver now requires firmwares to be loaded on Realtek
+	adaptors with rtlbtfw(8) utility. It no longer attaches to devices
+	standing in bootloader mode. Firmware files are available in the
+	comms/rtlbt-firmware port.
 
 20241025:
 	The support for the rc_fast_and_loose variable has been removed from
@@ -2176,7 +2206,7 @@ FOOTNOTES:
 	happens automatically. If all your modules come from ports, then adding
 	the port origin directories to PORTS_MODULES instead is also automatic
 	and effective, eg:
-	     PORTS_MODULES+=x11/nvidia-driver
+	     PORTS_MODULES+=graphics/drm-kmod graphics/nvidia-drm-kmod
 
 	[3] From the bootblocks, boot -s, and then do
 		fsck -p

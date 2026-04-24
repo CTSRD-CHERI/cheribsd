@@ -40,32 +40,32 @@
 #include <sys/efiio.h>
 
 #ifdef COMPAT_FREEBSD64
-struct efi_get_table_ioc64
+struct efi_get_table_ioctl64
 {
 	uint64_t buf;	/* void * */
-	struct uuid uuid;
+	efi_guid_t guid;
 	uint64_t table_len;
 	uint64_t buf_len;
 };
 
-struct efi_var_ioc64
+struct efi_var_ioctl64
 {
 	uint64_t name;		/* efi_char * */
 	uint64_t namesize;
-	struct uuid vendor;
+	efi_guid_t vendor;
 	uint32_t attrib;
 	uint64_t data;		/* void * */
 	uint64_t datasize;
 };
 
 #define	EFIIOC_GET_TABLE64 \
-    _IOC_NEWTYPE(EFIIOC_GET_TABLE, struct efi_get_table_ioc64)
+    _IOC_NEWTYPE(EFIIOC_GET_TABLE, struct efi_get_table_ioctl64)
 #define	EFIIOC_VAR_GET64 \
-    _IOC_NEWTYPE(EFIIOC_VAR_GET, struct efi_var_ioc64)
+    _IOC_NEWTYPE(EFIIOC_VAR_GET, struct efi_var_ioctl64)
 #define	EFIIOC_VAR_NEXT64 \
-    _IOC_NEWTYPE(EFIIOC_VAR_NEXT, struct efi_var_ioc64)
+    _IOC_NEWTYPE(EFIIOC_VAR_NEXT, struct efi_var_ioctl64)
 #define	EFIIOC_VAR_SET64 \
-    _IOC_NEWTYPE(EFIIOC_VAR_SET, struct efi_var_ioc64)
+    _IOC_NEWTYPE(EFIIOC_VAR_SET, struct efi_var_ioctl64)
 #endif
 
 static d_ioctl_t efidev_ioctl;
@@ -84,8 +84,8 @@ efidev_ioctl(struct cdev *dev __unused, u_long cmd, caddr_t addr,
 #ifdef COMPAT_FREEBSD64
 	u_long orig_cmd;
 	caddr_t orig_addr;
-	struct efi_get_table_ioc local_egtioc;
-	struct efi_var_ioc local_ev;
+	struct efi_get_table_ioctl local_egtioc;
+	struct efi_var_ioctl local_ev;
 #endif
 
 #ifdef COMPAT_FREEBSD64
@@ -94,14 +94,14 @@ efidev_ioctl(struct cdev *dev __unused, u_long cmd, caddr_t addr,
 	switch (cmd) {
 	case EFIIOC_GET_TABLE64:
 	{
-		struct efi_get_table_ioc64 *egtioc64 =
-		    (struct efi_get_table_ioc64 *)addr;
-		struct efi_get_table_ioc *egtioc = &local_egtioc;
+		struct efi_get_table_ioctl64 *egtioc64 =
+		    (struct efi_get_table_ioctl64 *)addr;
+		struct efi_get_table_ioctl *egtioc = &local_egtioc;
 
-		cmd = _IOC_NEWTYPE(cmd, struct efi_get_table_ioc);
+		cmd = _IOC_NEWTYPE(cmd, struct efi_get_table_ioctl);
 		addr = (caddr_t)egtioc;
 		egtioc->buf = USER_PTR(egtioc64->buf, egtioc64->buf_len);
-		CP(*egtioc64, *egtioc, uuid);
+		CP(*egtioc64, *egtioc, guid);
 		CP(*egtioc64, *egtioc, table_len);
 		CP(*egtioc64, *egtioc, buf_len);
 		break;
@@ -110,10 +110,10 @@ efidev_ioctl(struct cdev *dev __unused, u_long cmd, caddr_t addr,
 	case EFIIOC_VAR_NEXT64:
 	case EFIIOC_VAR_SET64:
 	{
-		struct efi_var_ioc64 *ev64 = (struct efi_var_ioc64 *)addr;
-		struct efi_var_ioc *ev = &local_ev;
+		struct efi_var_ioctl64 *ev64 = (struct efi_var_ioctl64 *)addr;
+		struct efi_var_ioctl *ev = &local_ev;
 
-		cmd = _IOC_NEWTYPE(cmd, struct efi_var_ioc);
+		cmd = _IOC_NEWTYPE(cmd, struct efi_var_ioctl);
 		addr = (caddr_t)ev;
 		ev->name = USER_PTR(ev64->name, ev64->namesize);
 		CP(*ev64, *ev, namesize);
@@ -129,12 +129,13 @@ efidev_ioctl(struct cdev *dev __unused, u_long cmd, caddr_t addr,
 	switch (cmd) {
 	case EFIIOC_GET_TABLE:
 	{
-		struct efi_get_table_ioc *egtioc =
-		    (struct efi_get_table_ioc *)addr;
+		struct efi_get_table_ioctl *egtioc =
+		    (struct efi_get_table_ioctl *)addr;
 		void *buf = NULL;
 
-		error = efi_copy_table(&egtioc->uuid, egtioc->buf ? &buf : NULL,
-		    egtioc->buf_len, &egtioc->table_len);
+		error = efi_copy_table(&egtioc->guid,
+		    egtioc->buf != NULL ? &buf : NULL, egtioc->buf_len,
+		    &egtioc->table_len);
 
 		if (error != 0 || egtioc->buf == NULL)
 			break;
@@ -166,7 +167,7 @@ efidev_ioctl(struct cdev *dev __unused, u_long cmd, caddr_t addr,
 	}
 	case EFIIOC_GET_WAKETIME:
 	{
-		struct efi_waketime_ioc *wt = (struct efi_waketime_ioc *)addr;
+		struct efi_waketime_ioctl *wt = (struct efi_waketime_ioctl *)addr;
 
 		error = efi_get_waketime(&wt->enabled, &wt->pending,
 		    &wt->waketime);
@@ -174,14 +175,14 @@ efidev_ioctl(struct cdev *dev __unused, u_long cmd, caddr_t addr,
 	}
 	case EFIIOC_SET_WAKETIME:
 	{
-		struct efi_waketime_ioc *wt = (struct efi_waketime_ioc *)addr;
+		struct efi_waketime_ioctl *wt = (struct efi_waketime_ioctl *)addr;
 
 		error = efi_set_waketime(wt->enabled, &wt->waketime);
 		break;
 	}
 	case EFIIOC_VAR_GET:
 	{
-		struct efi_var_ioc *ev = (struct efi_var_ioc *)addr;
+		struct efi_var_ioctl *ev = (struct efi_var_ioctl *)addr;
 		void *data;
 		efi_char *name;
 
@@ -217,7 +218,7 @@ vg_out:
 	}
 	case EFIIOC_VAR_NEXT:
 	{
-		struct efi_var_ioc *ev = (struct efi_var_ioc *)addr;
+		struct efi_var_ioctl *ev = (struct efi_var_ioctl *)addr;
 		efi_char *name;
 
 		name = malloc(ev->namesize, M_TEMP, M_WAITOK);
@@ -239,7 +240,7 @@ vg_out:
 	}
 	case EFIIOC_VAR_SET:
 	{
-		struct efi_var_ioc *ev = (struct efi_var_ioc *)addr;
+		struct efi_var_ioctl *ev = (struct efi_var_ioctl *)addr;
 		void *data = NULL;
 		efi_char *name;
 
@@ -278,17 +279,17 @@ vs_out:
 	switch (cmd) {
 	case EFIIOC_GET_TABLE64:
 	{
-		struct efi_get_table_ioc64 *egtioc64 =
-		    (struct efi_get_table_ioc64 *)addr;
-		struct efi_get_table_ioc *egtioc = &local_egtioc;
+		struct efi_get_table_ioctl64 *egtioc64 =
+		    (struct efi_get_table_ioctl64 *)addr;
+		struct efi_get_table_ioctl *egtioc = &local_egtioc;
 
 		CP(*egtioc, *egtioc64, table_len);
 		break;
 	}
 	case EFIIOC_VAR_GET64:
 	{
-		struct efi_var_ioc64 *ev64 = (struct efi_var_ioc64 *)addr;
-		struct efi_var_ioc *ev = &local_ev;
+		struct efi_var_ioctl64 *ev64 = (struct efi_var_ioctl64 *)addr;
+		struct efi_var_ioctl *ev = &local_ev;
 
 		CP(*ev, *ev64, attrib);
 		/* Can be replaced with NULL */
@@ -298,8 +299,8 @@ vs_out:
 	}
 	case EFIIOC_VAR_NEXT64:
 	{
-		struct efi_var_ioc64 *ev64 = (struct efi_var_ioc64 *)addr;
-		struct efi_var_ioc *ev = &local_ev;
+		struct efi_var_ioctl64 *ev64 = (struct efi_var_ioctl64 *)addr;
+		struct efi_var_ioctl *ev = &local_ev;
 
 		/* Can be replaced with NULL */
 		ev64->name = (__cheri_addr uint64_t)ev->name;

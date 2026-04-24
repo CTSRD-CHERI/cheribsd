@@ -153,7 +153,8 @@ extern pt_entry_t pmap_sh_attr;
 #define	pmap_vm_page_alloc_check(m)
 
 void	pmap_activate_vm(pmap_t);
-void	pmap_bootstrap(vm_size_t);
+void	pmap_bootstrap_dmap(vm_size_t);
+void	pmap_bootstrap(void);
 int	pmap_change_attr(vm_pointer_t va, vm_size_t size, int mode);
 int	pmap_change_prot(vm_pointer_t va, vm_size_t size, vm_prot_t prot);
 void	pmap_kenter(vm_offset_t sva, vm_size_t size, vm_paddr_t pa, int mode);
@@ -166,6 +167,7 @@ void	*pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma);
 bool	pmap_page_is_mapped(vm_page_t m);
 int	pmap_pinit_stage(pmap_t, enum pmap_stage, int);
 bool	pmap_ps_enabled(pmap_t pmap);
+bool	pmap_vs_enabled(void);
 uint64_t pmap_to_ttbr0(pmap_t pmap);
 void	pmap_disable_promotion(vm_offset_t sva, vm_size_t size);
 void	pmap_map_delete(pmap_t, vm_offset_t, vm_offset_t);

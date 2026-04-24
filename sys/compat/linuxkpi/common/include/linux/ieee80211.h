@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2020-2024 The FreeBSD Foundation
+ * Copyright (c) 2020-2025 The FreeBSD Foundation
  *
  * This software was developed by Björn Zeeb under sponsorship from
  * the FreeBSD Foundation.
@@ -64,6 +64,7 @@ struct ieee80211_mmie_16 {
 #define	IEEE80211_GCMP_MIC_LEN			16
 #define	IEEE80211_GCMP_PN_LEN			6
 #define	IEEE80211_GMAC_PN_LEN			6
+#define	IEEE80211_CMAC_PN_LEN			6
 
 #define	IEEE80211_MAX_PN_LEN			16
 
@@ -146,6 +147,7 @@ enum ieee80211_key_len {
 	WLAN_KEY_LEN_WEP104			= 13,
 	WLAN_KEY_LEN_TKIP			= 32,
 	WLAN_KEY_LEN_CCMP			= 16,
+	WLAN_KEY_LEN_CCMP_256			= 32,
 	WLAN_KEY_LEN_GCMP			= 16,
 	WLAN_KEY_LEN_AES_CMAC			= 16,
 	WLAN_KEY_LEN_GCMP_256			= 32,
@@ -347,6 +349,7 @@ enum ieee80211_chanctx_change_flags {
 	IEEE80211_CHANCTX_CHANGE_WIDTH		= BIT(3),
 	IEEE80211_CHANCTX_CHANGE_CHANNEL	= BIT(4),
 	IEEE80211_CHANCTX_CHANGE_PUNCTURING	= BIT(5),
+	IEEE80211_CHANCTX_CHANGE_MIN_DEF	= BIT(6),
 };
 
 enum ieee80211_frame_release_type {
@@ -506,6 +509,12 @@ struct ieee80211_mgmt {
 			uint16_t	capab_info;
 			uint8_t		variable[0];
 		} beacon;
+		/* 9.3.3.5 Association Request frame format */
+		struct  {
+			uint16_t	capab_info;
+			uint16_t	listen_interval;
+			uint8_t		variable[0];
+		} assoc_req;
 		/* 9.3.3.10 Probe Request frame format */
 		struct {
 			uint8_t		variable[0];
@@ -774,6 +783,20 @@ struct ieee80211_bss_load_elem {
 	uint8_t					channel_util;
 	uint16_t				avail_adm_capa;
 };
+
+struct ieee80211_p2p_noa_desc {
+	uint32_t				count;		/* uint8_t ? */
+	uint32_t				duration;
+	uint32_t				interval;
+	uint32_t				start_time;
+};
+
+struct ieee80211_p2p_noa_attr {
+	uint8_t					index;
+	uint8_t					oppps_ctwindow;
+	struct ieee80211_p2p_noa_desc		desc[4];
+};
+
 
 /* net80211: IEEE80211_IS_CTL() */
 static __inline bool
@@ -1216,6 +1239,5 @@ ieee80211_get_qos_ctl(struct ieee80211_hdr *hdr)
         else
                 return (u8 *)hdr + 24;
 }
-
 
 #endif	/* _LINUXKPI_LINUX_IEEE80211_H */

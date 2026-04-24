@@ -271,8 +271,8 @@ typedef int (*filldir_t)(void *, const char *, int, off_t, u64, unsigned);
 
 struct file_operations {
 	struct module *owner;
-	ssize_t (*read)(struct linux_file *, char __user *, size_t, off_t *);
-	ssize_t (*write)(struct linux_file *, const char __user *, size_t, off_t *);
+	ssize_t (*read)(struct linux_file *, char __user * __capability, size_t, off_t *);
+	ssize_t (*write)(struct linux_file *, const char __user * __capability, size_t, off_t *);
 	unsigned int (*poll) (struct linux_file *, struct poll_table_struct *);
 	long (*unlocked_ioctl)(struct linux_file *, unsigned int, uintcap_t);
 	long (*compat_ioctl)(struct linux_file *, unsigned int, uintcap_t);
@@ -286,6 +286,11 @@ struct file_operations {
  * an illegal seek error
  */
 	off_t (*llseek)(struct linux_file *, off_t, int);
+/*
+ * Not supported in FreeBSD. That's ok, we never call it and it allows some
+ * drivers like DRM drivers to compile without changes.
+ */
+	void (*show_fdinfo)(struct seq_file *, struct file *);
 #if 0
 	/* We do not support these methods.  Don't permit them to compile. */
 	loff_t (*llseek)(struct file *, loff_t, int);
@@ -493,30 +498,26 @@ i_size_write(struct inode *inode, loff_t i_size)
  * On failure, negative value.
  */
 static inline ssize_t
-simple_read_from_buffer(void __user *dest, size_t read_size, loff_t *ppos,
+simple_read_from_buffer(void __user * __capability dest, size_t read_size, loff_t *ppos,
     void *orig, size_t buf_size)
 {
-	void *p, *read_pos = ((char *) orig) + *ppos;
+	void *read_pos = ((char *) orig) + *ppos;
 	size_t buf_remain = buf_size - *ppos;
+	ssize_t num_read;
 
-	if (buf_remain < 0 || buf_remain > buf_size)
-		return -EINVAL;
+	if (*ppos >= buf_size || read_size == 0)
+		return (0);
 
 	if (read_size > buf_remain)
 		read_size = buf_remain;
 
-	/*
-	 * XXX At time of commit only debugfs consumers could be
-	 * identified.  If others will use this function we may
-	 * have to revise this: normally we would call copy_to_user()
-	 * here but lindebugfs will return the result and the
-	 * copyout is done elsewhere for us.
-	 */
-	p = memcpy(dest, read_pos, read_size);
-	if (p != NULL)
-		*ppos += read_size;
+	/* copy_to_user returns number of bytes NOT read */
+	num_read = read_size - copy_to_user(dest, read_pos, read_size);
+	if (num_read == 0)
+		return -EFAULT;
+	*ppos += num_read;
 
-	return (read_size);
+	return (num_read);
 }
 
 MALLOC_DECLARE(M_LSATTR);
@@ -547,11 +548,13 @@ int simple_attr_open(struct inode *inode, struct file *filp,
 
 int simple_attr_release(struct inode *inode, struct file *filp);
 
-ssize_t simple_attr_read(struct file *filp, char *buf, size_t read_size, loff_t *ppos);
+ssize_t simple_attr_read(struct file *filp, char __user * __capability buf, size_t read_size,
+    loff_t *ppos);
 
-ssize_t simple_attr_write(struct file *filp, const char *buf, size_t write_size, loff_t *ppos);
+ssize_t simple_attr_write(struct file *filp, const char __user * __capability buf,
+    size_t write_size, loff_t *ppos);
 
-ssize_t simple_attr_write_signed(struct file *filp, const char *buf,
+ssize_t simple_attr_write_signed(struct file *filp, const char __user * __capability buf,
 	    size_t write_size, loff_t *ppos);
 
 void	setattr_copy(struct mnt_idmap *idmap, struct inode *inode, const struct iattr *attr);

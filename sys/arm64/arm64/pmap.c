@@ -186,7 +186,8 @@
 #define	pmap_l2_pindex(v)	((v) >> L2_SHIFT)
 
 #ifdef __ARM_FEATURE_BTI_DEFAULT
-#define	ATTR_KERN_GP		ATTR_S1_GP
+pt_entry_t __read_mostly pmap_gp_attr;
+#define	ATTR_KERN_GP		pmap_gp_attr
 #else
 #define	ATTR_KERN_GP		0
 #endif
@@ -815,6 +816,17 @@ pmap_ps_enabled(pmap_t pmap)
 }
 
 bool
+pmap_vs_enabled(void)
+{
+	/*
+	 * 8 and 16 are the only values hardware can support, but allow for the
+	 * possibility of artificially restricting the bits, e.g. for testing.
+	 */
+	KASSERT(vmids.asid_bits <= 16, ("VMID bits %d > 16", vmids.asid_bits));
+	return (vmids.asid_bits > 8);
+}
+
+bool
 pmap_get_tables(pmap_t pmap, vm_offset_t va, pd_entry_t **l0, pd_entry_t **l1,
     pd_entry_t **l2, pt_entry_t **l3)
 {
@@ -1334,10 +1346,33 @@ pmap_bootstrap_l3_page(struct pmap_bootstrap_state *state, int i)
 	MPASS(state->va == (state->pa - dmap_phys_base + DMAP_MIN_ADDRESS));
 }
 
-static void
-pmap_bootstrap_dmap(void)
+void
+pmap_bootstrap_dmap(vm_size_t kernlen)
 {
+	vm_paddr_t start_pa, pa;
+	uint64_t tcr;
 	int i;
+
+	tcr = READ_SPECIALREG(tcr_el1);
+
+	/* Verify that the ASID is set through TTBR0. */
+	KASSERT((tcr & TCR_A1) == 0, ("pmap_bootstrap: TCR_EL1.A1 != 0"));
+
+	if ((tcr & TCR_DS) != 0)
+		pmap_lpa_enabled = true;
+
+	pmap_l1_supported = L1_BLOCKS_SUPPORTED;
+
+	start_pa = pmap_early_vtophys(KERNBASE);
+
+	bs_state.freemempos = KERNBASE;
+#ifdef __CHERI_PURE_CAPABILITY__
+	bs_state.freemempos = (vm_pointer_t)cheri_address_set(kernel_root_cap,
+	    bs_state.freemempos);
+	bs_state.freemempos = cheri_bounds_set(bs_state.freemempos,
+	    VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE - KERNBASE);
+#endif
+	bs_state.freemempos = roundup2(bs_state.freemempos + kernlen, PAGE_SIZE);
 
 	/* Fill in physmap array. */
 	physmap_idx = physmem_avail(physmap, nitems(physmap));
@@ -1409,6 +1444,12 @@ pmap_bootstrap_dmap(void)
 #endif
 
 	cpu_tlb_flushID();
+
+	bs_state.dmap_valid = true;
+
+	/* Exclude the kernel and DMAP region */
+	pa = pmap_early_vtophys(bs_state.freemempos);
+	physmem_exclude_region(start_pa, pa - start_pa, EXFLAG_NOALLOC);
 }
 
 static void
@@ -1439,21 +1480,11 @@ pmap_bootstrap_l3(vm_offset_t va)
  *	Bootstrap the system enough to run with virtual memory.
  */
 void
-pmap_bootstrap(vm_size_t kernlen)
+pmap_bootstrap(void)
 {
 	vm_pointer_t dpcpu, msgbufpv;
 	vm_paddr_t start_pa, pa;
-	uint64_t tcr;
-
-	tcr = READ_SPECIALREG(tcr_el1);
-
-	/* Verify that the ASID is set through TTBR0. */
-	KASSERT((tcr & TCR_A1) == 0, ("pmap_bootstrap: TCR_EL1.A1 != 0"));
-
-	if ((tcr & TCR_DS) != 0)
-		pmap_lpa_enabled = true;
-
-	pmap_l1_supported = L1_BLOCKS_SUPPORTED;
+	size_t largest_phys_size;
 
 	/* Set this early so we can use the pagetable walking functions */
 	kernel_pmap_store.pm_l0 = pagetable_l0_ttbr1;
@@ -1468,18 +1499,14 @@ pmap_bootstrap(vm_size_t kernlen)
 	kernel_pmap->pm_ttbr = kernel_pmap->pm_l0_paddr;
 	kernel_pmap->pm_asid_set = &asids;
 
-	bs_state.freemempos = KERNBASE;
-#ifdef __CHERI_PURE_CAPABILITY__
-	bs_state.freemempos = (vm_pointer_t)cheri_address_set(kernel_root_cap,
-	    bs_state.freemempos);
-	bs_state.freemempos = cheri_bounds_set(bs_state.freemempos,
-	    VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE - KERNBASE);
-#endif
-	bs_state.freemempos = roundup2(bs_state.freemempos + kernlen, PAGE_SIZE);
+	/* Reserve some VA space for early BIOS/ACPI mapping */
+	preinit_map_va = roundup2(bs_state.freemempos, L2_SIZE);
 
-	/* Create a direct map region early so we can use it for pa -> va */
-	pmap_bootstrap_dmap();
-	bs_state.dmap_valid = true;
+	virtual_avail = preinit_map_va + PMAP_PREINIT_MAPPING_SIZE;
+	virtual_avail = roundup2(virtual_avail, L1_SIZE);
+	virtual_end = cheri_kern_address_set(virtual_avail,
+	    VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE);
+	kernel_vm_end = virtual_avail;
 
 	/*
 	 * We only use PXN when we know nothing will be executed from it, e.g.
@@ -1487,7 +1514,28 @@ pmap_bootstrap(vm_size_t kernlen)
 	 */
 	bs_state.table_attrs &= ~TATTR_PXN_TABLE;
 
-	start_pa = pa = pmap_early_vtophys(KERNBASE);
+	/*
+	 * Find the physical memory we could use. This needs to be after we
+	 * exclude any memory that is mapped into the DMAP region but should
+	 * not be used by the kernel, e.g. some UEFI memory types.
+	 */
+	physmap_idx = physmem_avail(physmap, nitems(physmap));
+
+	/*
+	 * Find space for early allocations. We search for the largest
+	 * region. This is because the user may choose a large msgbuf.
+	 * This could be smarter, e.g. to allow multiple regions to be
+	 * used & switch to the next when one is full.
+	 */
+	largest_phys_size = 0;
+	for (int i = 0; i < physmap_idx; i += 2) {
+		if ((physmap[i + 1] - physmap[i]) > largest_phys_size) {
+			largest_phys_size = physmap[i + 1] - physmap[i];
+			bs_state.freemempos = PHYS_TO_DMAP(physmap[i]);
+		}
+	}
+
+	start_pa = pmap_early_vtophys(bs_state.freemempos);
 
 	/*
 	 * Create the l2 tables up to VM_MAX_KERNEL_ADDRESS.  We assume that the
@@ -1520,20 +1568,9 @@ pmap_bootstrap(vm_size_t kernlen)
 	alloc_pages(msgbufpv, round_page(msgbufsize) / PAGE_SIZE);
 	msgbufp = (void *)msgbufpv;
 
-	/* Reserve some VA space for early BIOS/ACPI mapping */
-	preinit_map_va = roundup2(bs_state.freemempos, L2_SIZE);
-
-	virtual_avail = preinit_map_va + PMAP_PREINIT_MAPPING_SIZE;
-	virtual_avail = roundup2(virtual_avail, L1_SIZE);
-	virtual_end = cheri_kern_address_set(virtual_avail,
-	    VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE);
-	kernel_vm_end = virtual_avail;
-
 	pa = pmap_early_vtophys(bs_state.freemempos);
 
 	physmem_exclude_region(start_pa, pa - start_pa, EXFLAG_NOALLOC);
-
-	cpu_tlb_flushID();
 }
 
 #if defined(KASAN) || defined(KMSAN)
@@ -2244,6 +2281,56 @@ pmap_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 	}
 	PMAP_UNLOCK(pmap);
 	return (m);
+}
+
+/*
+ * Returns true if the entire kernel virtual address range is mapped
+ */
+static bool
+pmap_kmapped_range(vm_offset_t sva, vm_size_t size)
+{
+	pt_entry_t *pte, tpte;
+	vm_offset_t eva;
+
+	KASSERT(sva >= VM_MIN_KERNEL_ADDRESS,
+	    ("%s: Invalid virtual address: %lx", __func__, sva));
+	MPASS(size != 0);
+	eva = sva + size - 1;
+	KASSERT(eva > sva, ("%s: Size too large: sva %lx, size %lx", __func__,
+	    sva, size));
+
+	while (sva <= eva) {
+		pte = pmap_l1(kernel_pmap, sva);
+		if (pte == NULL)
+			return (false);
+		tpte = pmap_load(pte);
+		if (tpte == 0)
+			return (false);
+		if ((tpte & ATTR_DESCR_TYPE_MASK) == ATTR_DESCR_TYPE_BLOCK) {
+			sva = (sva & ~L1_OFFSET) + L1_SIZE;
+			continue;
+		}
+
+		pte = pmap_l1_to_l2(&tpte, sva);
+		tpte = pmap_load(pte);
+		if (tpte == 0)
+			return (false);
+		if ((tpte & ATTR_DESCR_TYPE_MASK) == ATTR_DESCR_TYPE_BLOCK) {
+			sva = (sva & ~L2_OFFSET) + L2_SIZE;
+			continue;
+		}
+		pte = pmap_l2_to_l3(&tpte, sva);
+		tpte = pmap_load(pte);
+		if (tpte == 0)
+			return (false);
+		MPASS((tpte & ATTR_DESCR_TYPE_MASK) == ATTR_DESCR_TYPE_PAGE);
+		if ((tpte & ATTR_CONTIGUOUS) == ATTR_CONTIGUOUS)
+			sva = (sva & ~L3C_OFFSET) + L3C_SIZE;
+		else
+			sva = (sva & ~L3_OFFSET) + L3_SIZE;
+	}
+
+	return (true);
 }
 
 /*
@@ -6214,32 +6301,33 @@ void
 pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
     vm_page_t m_start, vm_prot_t prot)
 {
+	struct pctrie_iter pages;
 	struct rwlock *lock;
 	vm_offset_t va;
 	vm_page_t m, mpte;
-	vm_pindex_t diff, psize;
 	int rv;
 
 	VM_OBJECT_ASSERT_LOCKED(m_start->object);
 
-	psize = atop(end - start);
 	mpte = NULL;
-	m = m_start;
+	vm_page_iter_limit_init(&pages, m_start->object,
+	    m_start->pindex + atop(end - start));
+	m = vm_radix_iter_lookup(&pages, m_start->pindex);
 	lock = NULL;
 	PMAP_LOCK(pmap);
-	while (m != NULL && (diff = m->pindex - m_start->pindex) < psize) {
-		va = start + ptoa(diff);
+	while (m != NULL) {
+		va = start + ptoa(m->pindex - m_start->pindex);
 		if ((va & L2_OFFSET) == 0 && va + L2_SIZE <= end &&
 		    m->psind == 2 && pmap_ps_enabled(pmap) &&
 		    ((rv = pmap_enter_l2_rx(pmap, va, m, prot, &lock)) ==
-		    KERN_SUCCESS || rv == KERN_NO_SPACE))
-			m = &m[L2_SIZE / PAGE_SIZE - 1];
-		else if ((va & L3C_OFFSET) == 0 && va + L3C_SIZE <= end &&
+		    KERN_SUCCESS || rv == KERN_NO_SPACE)) {
+			m = vm_radix_iter_jump(&pages, L2_SIZE / PAGE_SIZE);
+		} else if ((va & L3C_OFFSET) == 0 && va + L3C_SIZE <= end &&
 		    m->psind >= 1 && pmap_ps_enabled(pmap) &&
 		    ((rv = pmap_enter_l3c_rx(pmap, va, m, &mpte, prot,
-		    &lock)) == KERN_SUCCESS || rv == KERN_NO_SPACE))
-			m = &m[L3C_ENTRIES - 1];
-		else {
+		    &lock)) == KERN_SUCCESS || rv == KERN_NO_SPACE)) {
+			m = vm_radix_iter_jump(&pages, L3C_ENTRIES);
+		} else {
 			/*
 			 * In general, if a superpage mapping were possible,
 			 * it would have been created above.  That said, if
@@ -6251,8 +6339,8 @@ pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
 			 */
 			mpte = pmap_enter_quick_locked(pmap, va, m, prot |
 			    VM_PROT_NO_PROMOTE, mpte, &lock);
+			m = vm_radix_iter_step(&pages);
 		}
-		m = TAILQ_NEXT(m, listq);
 	}
 	if (lock != NULL)
 		rw_wunlock(lock);
@@ -8461,6 +8549,11 @@ pmap_mapbios(vm_paddr_t pa, vm_size_t size)
 	vm_offset_t offset;
 	int i, lvl, l2_blocks, free_l2_count, start_idx;
 
+	/* Use the DMAP region if we can */
+	if (PHYS_IN_DMAP(pa) && PHYS_IN_DMAP(pa + size - 1) &&
+	    pmap_kmapped_range(PHYS_TO_DMAP(pa), size))
+		return ((void *)PHYS_TO_DMAP(pa));
+
 	if (!vm_initialized) {
 		/*
 		 * No L3 ptables so map entire L2 blocks where start VA is:
@@ -8577,10 +8670,25 @@ pmap_unmapbios(void *p, vm_size_t size)
 	vm_offset_t offset, va_trunc;
 	pd_entry_t *pde;
 	pt_entry_t *l2;
-	int i, lvl, l2_blocks, block;
+	int error __diagused, i, lvl, l2_blocks, block;
 	bool preinit_map;
 
 	va = (vm_pointer_t)p;
+	if (VIRT_IN_DMAP(va)) {
+		KASSERT(VIRT_IN_DMAP(va + size - 1),
+		    ("%s: End address not in DMAP region: %lx", __func__,
+		    (vm_offset_t)va + size - 1));
+		/* Ensure the attributes are as expected for the DMAP region */
+		PMAP_LOCK(kernel_pmap);
+		error = pmap_change_props_locked(va, size,
+		    PROT_READ | PROT_WRITE, VM_MEMATTR_DEFAULT, false);
+		PMAP_UNLOCK(kernel_pmap);
+		KASSERT(error == 0, ("%s: Failed to reset DMAP attributes: %d",
+		    __func__, error));
+
+		return;
+	}
+
 	l2_blocks =
 	   ((ptraddr_t)roundup2(va + size, L2_SIZE) -
 	    (ptraddr_t)rounddown2(va, L2_SIZE)) >> L2_SHIFT;

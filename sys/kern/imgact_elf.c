@@ -609,8 +609,14 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
     void * __capability *imgact_cap, const Elf_Ehdr *hdr, const Elf_Phdr *phdr,
     Elf_Addr *preferred_rbase)
 {
-	u_long perm = CHERI_PERM_STORE | CHERI_PERM_GLOBAL |
-	    CHERI_PERM_STORE_CAP;
+	u_long perm = CHERI_PERM_STORE |
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
+	    CHERI_PERM_STORE_CAP |
+#endif
+#ifdef HAS_CHERI_PERM_CAP
+	    CHERI_PERM_CAP |
+#endif
+	    CHERI_PERM_GLOBAL;
 	vm_offset_t start = (vm_offset_t)-1;
 	vm_offset_t end = 0;
 	vm_offset_t seg_addr;
@@ -1736,7 +1742,7 @@ prog_cap(struct image_params *imgp, uint64_t perms)
 	    (uintmax_t)prog_base, (uintmax_t)imgp->end_addr, prog_len));
 
 	return (cheri_capability_build_user_rwx(perms, prog_base, prog_len,
-	    imgp->start_addr - prog_base));
+	    imgp->start_addr));
 }
 
 static void * __capability
@@ -1761,7 +1767,7 @@ interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
 	MPASS(args->base >= interp_base);
 
 	return (cheri_capability_build_user_rwx(perms, interp_base, interp_len,
-	    args->base - interp_base));
+	    args->base));
 }
 
 static void * __capability
@@ -2049,6 +2055,7 @@ static void __elfN(note_threadmd)(void *, struct sbuf *, size_t *);
 static void __elfN(note_procstat_auxv)(void *, struct sbuf *, size_t *);
 static void __elfN(note_procstat_proc)(void *, struct sbuf *, size_t *);
 static void __elfN(note_procstat_psstrings)(void *, struct sbuf *, size_t *);
+static void __elfN(note_procstat_kqueues)(void *, struct sbuf *, size_t *);
 static void note_procstat_files(void *, struct sbuf *, size_t *);
 static void note_procstat_groups(void *, struct sbuf *, size_t *);
 static void note_procstat_osrel(void *, struct sbuf *, size_t *);
@@ -2159,11 +2166,13 @@ __elfN(coredump)(struct thread *td, struct vnode *vp, off_t limit, int flags)
 		php = (Elf_Phdr *)((char *)hdr + sizeof(Elf_Ehdr)) + 1;
 		for (i = 0; i < seginfo.count; i++) {
 #if __has_feature(capabilities)
-			section_cap = cheri_capability_build_user_data(
-			    CHERI_PERM_LOAD,
+			ptraddr_t section_addr =
 			    CHERI_REPRESENTABLE_ALIGN_DOWN(php->p_vaddr,
-			    php->p_filesz),
-			    CHERI_REPRESENTABLE_LENGTH(php->p_filesz), 0);
+			    php->p_filesz);
+			section_cap = cheri_capability_build_user_data(
+			    CHERI_PERM_LOAD, section_addr,
+			    CHERI_REPRESENTABLE_LENGTH(php->p_filesz),
+			    section_addr);
 #else
 			section_cap = (char *)(uintptr_t)php->p_vaddr;
 #endif
@@ -2441,6 +2450,8 @@ __elfN(prepare_notes)(struct thread *td, struct note_info_list *list,
 	    __elfN(note_procstat_psstrings), p);
 	size += __elfN(register_note)(td, list, NT_PROCSTAT_AUXV,
 	    __elfN(note_procstat_auxv), p);
+	size += __elfN(register_note)(td, list, NT_PROCSTAT_KQUEUES,
+	    __elfN(note_procstat_kqueues), p);
 
 	*sizep = size;
 }
@@ -3309,6 +3320,54 @@ __elfN(note_procstat_auxv)(void *arg, struct sbuf *sb, size_t *sizep)
 		PHOLD(p);
 		proc_getauxv(curthread, p, sb);
 		PRELE(p);
+	}
+}
+
+static void
+__elfN(note_procstat_kqueues)(void *arg, struct sbuf *sb, size_t *sizep)
+{
+	struct proc *p;
+	size_t size, sect_sz, i;
+	ssize_t start_len, sect_len;
+	int structsize;
+	bool compat32;
+
+#if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
+	compat32 = true;
+	structsize = sizeof(struct kinfo_knote32);
+#else
+	compat32 = false;
+	structsize = sizeof(struct kinfo_knote);
+#endif
+	p = arg;
+	if (sb == NULL) {
+		size = 0;
+		sb = sbuf_new(NULL, NULL, 128, SBUF_FIXEDLEN);
+		sbuf_set_drain(sb, sbuf_count_drain, &size);
+		sbuf_bcat(sb, &structsize, sizeof(structsize));
+		kern_proc_kqueues_out(p, sb, -1, compat32);
+		sbuf_finish(sb);
+		sbuf_delete(sb);
+		*sizep = size;
+	} else {
+		sbuf_start_section(sb, &start_len);
+
+		sbuf_bcat(sb, &structsize, sizeof(structsize));
+		kern_proc_kqueues_out(p, sb, *sizep - sizeof(structsize),
+		    compat32);
+
+		sect_len = sbuf_end_section(sb, start_len, 0, 0);
+		if (sect_len < 0)
+			return;
+		sect_sz = sect_len;
+
+		KASSERT(sect_sz <= *sizep,
+		    ("kern_proc_kqueue_out did not respect maxlen; "
+		     "requested %zu, got %zu", *sizep - sizeof(structsize),
+		     sect_sz - sizeof(structsize)));
+
+		for (i = 0; i < *sizep - sect_sz && sb->s_error == 0; i++)
+			sbuf_putc(sb, 0);
 	}
 }
 

@@ -92,18 +92,36 @@ test_strfcap_C_cap_one(void * __capability p, int expected_tokens,
 			    descr);
 		permsp++;
 	}
-	if ((cheri_perms_get(p) & CHERI_PERM_LOAD) != 0) {
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
+	if ((cheri_perms_get(p) & CHERI_PERM_LOAD_CAP) != 0) {
 		if (*permsp != 'R')
 			cheribsdtest_failure_errx("Missing 'R' permission for %s",
 			    descr);
 		permsp++;
 	}
-	if ((cheri_perms_get(p) & CHERI_PERM_STORE) != 0) {
+	if ((cheri_perms_get(p) & CHERI_PERM_STORE_CAP) != 0) {
 		if (*permsp != 'W')
 			cheribsdtest_failure_errx("Missing 'W' permission for %s",
 			    descr);
 		permsp++;
 	}
+#endif
+#ifdef HAS_CHERI_PERM_CAP
+	if ((cheri_perms_get(p) & CHERI_PERM_CAP) != 0) {
+		if (*permsp != 'C')
+			cheribsdtest_failure_errx("Missing 'C' permission for %s",
+			    descr);
+		permsp++;
+	}
+#endif
+#ifdef HAS_CHERI_PERM_LOAD_MUTABLE
+	if ((cheri_perms_get(p) & CHERI_PERM_LOAD_MUTABLE) != 0) {
+		if (*permsp != 'M')
+			cheribsdtest_failure_errx("Missing 'l' permission for %s",
+			    descr);
+		permsp++;
+	}
+#endif
 #ifdef __aarch64__
 	if ((cheri_perms_get(p) & CHERI_PERM_EXECUTIVE) != 0) {
 		if (*permsp != 'E')
@@ -379,7 +397,7 @@ CHERIBSDTEST(strfcap_C, "Various checks of %C (%A and %P indirectly)")
 
 #ifdef CHERI_FLAGS_CAP_MODE
 #ifdef __CHERI_PURE_CAPABILITY__
-	pcc_alt = cheri_flags_set(pcc_alt, 0);
+	pcc_alt = cheri_flags_set(pcc_alt, CHERI_FLAGS_INT_MODE);
 	test_strfcap_C_cap_one(pcc_alt, 4, "non-capability mode PCC");
 #else
 	pcc_alt = cheri_flags_set(pcc_alt, CHERI_FLAGS_CAP_MODE);

@@ -429,6 +429,10 @@ SYSCTL_BOOL(_hw_pci, OID_AUTO, enable_mps_tune, CTLFLAG_RWTUN,
     &pci_enable_mps_tune, 1,
     "Enable tuning of MPS(maximum payload size)." );
 
+static bool pci_intx_reroute = true;
+SYSCTL_BOOL(_hw_pci, OID_AUTO, intx_reroute, CTLFLAG_RWTUN,
+    &pci_intx_reroute, 0, "Re-route INTx interrupts when scanning devices");
+
 static int
 pci_has_quirk(uint32_t devid, int quirk)
 {
@@ -908,13 +912,8 @@ pci_read_cap(device_t pcib, pcicfgregs *cfg)
 		/* Process this entry */
 		switch (REG(ptr + PCICAP_ID, 1)) {
 		case PCIY_PMG:		/* PCI power management */
-			if (cfg->pp.pp_cap == 0) {
-				cfg->pp.pp_cap = REG(ptr + PCIR_POWER_CAP, 2);
-				cfg->pp.pp_status = ptr + PCIR_POWER_STATUS;
-				cfg->pp.pp_bse = ptr + PCIR_POWER_BSE;
-				if ((nextptr - ptr) > PCIR_POWER_DATA)
-					cfg->pp.pp_data = ptr + PCIR_POWER_DATA;
-			}
+			cfg->pp.pp_location = ptr;
+			cfg->pp.pp_cap = REG(ptr + PCIR_POWER_CAP, 2);
 			break;
 		case PCIY_HT:		/* HyperTransport */
 			/* Determine HT-specific capability type. */
@@ -2838,7 +2837,7 @@ pci_set_powerstate_method(device_t dev, device_t child, int state)
 	uint16_t status;
 	int oldstate, highest, delay;
 
-	if (cfg->pp.pp_cap == 0)
+	if (cfg->pp.pp_location == 0)
 		return (EOPNOTSUPP);
 
 	/*
@@ -2869,8 +2868,8 @@ pci_set_powerstate_method(device_t dev, device_t child, int state)
 	    delay = 200;
 	else
 	    delay = 0;
-	status = PCI_READ_CONFIG(dev, child, cfg->pp.pp_status, 2)
-	    & ~PCIM_PSTAT_DMASK;
+	status = PCI_READ_CONFIG(dev, child, cfg->pp.pp_location +
+	    PCIR_POWER_STATUS, 2) & ~PCIM_PSTAT_DMASK;
 	switch (state) {
 	case PCI_POWERSTATE_D0:
 		status |= PCIM_PSTAT_D0;
@@ -2896,7 +2895,8 @@ pci_set_powerstate_method(device_t dev, device_t child, int state)
 		pci_printf(cfg, "Transition from D%d to D%d\n", oldstate,
 		    state);
 
-	PCI_WRITE_CONFIG(dev, child, cfg->pp.pp_status, status, 2);
+	PCI_WRITE_CONFIG(dev, child, cfg->pp.pp_location + PCIR_POWER_STATUS,
+	    status, 2);
 	if (delay)
 		DELAY(delay);
 	return (0);
@@ -2910,8 +2910,9 @@ pci_get_powerstate_method(device_t dev, device_t child)
 	uint16_t status;
 	int result;
 
-	if (cfg->pp.pp_cap != 0) {
-		status = PCI_READ_CONFIG(dev, child, cfg->pp.pp_status, 2);
+	if (cfg->pp.pp_location != 0) {
+		status = PCI_READ_CONFIG(dev, child, cfg->pp.pp_location +
+		    PCIR_POWER_STATUS, 2);
 		switch (status & PCIM_PSTAT_DMASK) {
 		case PCIM_PSTAT_D0:
 			result = PCI_POWERSTATE_D0;
@@ -2934,6 +2935,50 @@ pci_get_powerstate_method(device_t dev, device_t child)
 		result = PCI_POWERSTATE_D0;
 	}
 	return (result);
+}
+
+/* Clear any active PME# and disable PME# generation. */
+void
+pci_clear_pme(device_t dev)
+{
+	struct pci_devinfo *dinfo = device_get_ivars(dev);
+	pcicfgregs *cfg = &dinfo->cfg;
+	uint16_t status;
+
+	if (cfg->pp.pp_location != 0) {
+		status = pci_read_config(dev, dinfo->cfg.pp.pp_location +
+		    PCIR_POWER_STATUS, 2);
+		status &= ~PCIM_PSTAT_PMEENABLE;
+		status |= PCIM_PSTAT_PME;
+		pci_write_config(dev, dinfo->cfg.pp.pp_location +
+		    PCIR_POWER_STATUS, status, 2);
+	}
+}
+
+/* Clear any active PME# and enable PME# generation. */
+void
+pci_enable_pme(device_t dev)
+{
+	struct pci_devinfo *dinfo = device_get_ivars(dev);
+	pcicfgregs *cfg = &dinfo->cfg;
+	uint16_t status;
+
+	if (cfg->pp.pp_location != 0) {
+		status = pci_read_config(dev, dinfo->cfg.pp.pp_location +
+		    PCIR_POWER_STATUS, 2);
+		status |= PCIM_PSTAT_PME | PCIM_PSTAT_PMEENABLE;
+		pci_write_config(dev, dinfo->cfg.pp.pp_location +
+		    PCIR_POWER_STATUS, status, 2);
+	}
+}
+
+bool
+pci_has_pm(device_t dev)
+{
+	struct pci_devinfo *dinfo = device_get_ivars(dev);
+	pcicfgregs *cfg = &dinfo->cfg;
+
+	return (cfg->pp.pp_location != 0);
 }
 
 /*
@@ -3039,10 +3084,11 @@ pci_print_verbose(struct pci_devinfo *dinfo)
 		if (cfg->intpin > 0)
 			printf("\tintpin=%c, irq=%d\n",
 			    cfg->intpin +'a' -1, cfg->intline);
-		if (cfg->pp.pp_cap) {
+		if (cfg->pp.pp_location) {
 			uint16_t status;
 
-			status = pci_read_config(cfg->dev, cfg->pp.pp_status, 2);
+			status = pci_read_config(cfg->dev, cfg->pp.pp_location +
+			    PCIR_POWER_STATUS, 2);
 			printf("\tpowerspec %d  supports D0%s%s D3  current D%d\n",
 			    cfg->pp.pp_cap & PCIM_PCAP_SPEC,
 			    cfg->pp.pp_cap & PCIM_PCAP_D1SUPP ? " D1" : "",
@@ -4133,7 +4179,8 @@ pci_add_resources(device_t bus, device_t dev, int force, uint32_t prefetchmask)
 		if (q->devid == devid && q->type == PCI_QUIRK_MAP_REG)
 			pci_add_map(bus, dev, q->arg1, rl, force, 0);
 
-	if (cfg->intpin > 0 && PCI_INTERRUPT_VALID(cfg->intline)) {
+	if (cfg->intpin > 0 && PCI_INTERRUPT_VALID(cfg->intline) &&
+	    pci_intx_reroute) {
 		/*
 		 * Try to re-route interrupts. Sometimes the BIOS or
 		 * firmware may leave bogus values in these registers.
@@ -4472,6 +4519,7 @@ pci_add_child(device_t bus, struct pci_devinfo *dinfo)
 	resource_list_init(&dinfo->resources);
 	pci_cfg_save(dev, dinfo, 0);
 	pci_cfg_restore(dev, dinfo);
+	pci_clear_pme(dev);
 	pci_print_verbose(dinfo);
 	pci_add_resources(bus, dev, 0, 0);
 	if (pci_enable_mps_tune)
@@ -4662,6 +4710,7 @@ pci_resume_child(device_t dev, device_t child)
 
 	dinfo = device_get_ivars(child);
 	pci_cfg_restore(child, dinfo);
+	pci_clear_pme(child);
 	if (!device_is_attached(child))
 		pci_cfg_save(child, dinfo, 1);
 

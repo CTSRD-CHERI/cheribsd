@@ -217,7 +217,7 @@ struct bpf_dltlist64 {
  * frames, ethernet frames, etc).
  */
 CK_LIST_HEAD(bpf_iflist, bpf_if);
-static struct bpf_iflist bpf_iflist;
+static struct bpf_iflist bpf_iflist = CK_LIST_HEAD_INITIALIZER();
 static struct sx	bpf_sx;		/* bpf global lock */
 static int		bpf_bpfd_cnt;
 
@@ -1148,13 +1148,15 @@ bpfread(struct cdev *dev, struct uio *uio, int ioflag)
 	error = bpf_uiomove(d, d->bd_hbuf, d->bd_hlen, uio);
 
 	BPFD_LOCK(d);
-	KASSERT(d->bd_hbuf != NULL, ("bpfread: lost bd_hbuf"));
-	d->bd_fbuf = d->bd_hbuf;
-	d->bd_hbuf = NULL;
-	d->bd_hlen = 0;
-	bpf_buf_reclaimed(d);
-	d->bd_hbuf_in_use = 0;
-	wakeup(&d->bd_hbuf_in_use);
+	if (d->bd_hbuf_in_use) {
+		KASSERT(d->bd_hbuf != NULL, ("bpfread: lost bd_hbuf"));
+		d->bd_fbuf = d->bd_hbuf;
+		d->bd_hbuf = NULL;
+		d->bd_hlen = 0;
+		bpf_buf_reclaimed(d);
+		d->bd_hbuf_in_use = 0;
+		wakeup(&d->bd_hbuf_in_use);
+	}
 	BPFD_UNLOCK(d);
 
 	return (error);
@@ -3044,8 +3046,6 @@ bpf_drvinit(void *unused)
 	struct cdev *dev;
 
 	sx_init(&bpf_sx, "bpf global lock");
-	CK_LIST_INIT(&bpf_iflist);
-
 	dev = make_dev(&bpf_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600, "bpf");
 	/* For compatibility */
 	make_dev_alias(dev, "bpf0");

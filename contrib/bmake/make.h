@@ -1,4 +1,4 @@
-/*	$NetBSD: make.h,v 1.349 2025/01/19 10:57:10 rillig Exp $	*/
+/*	$NetBSD: make.h,v 1.352 2025/03/30 21:24:57 sjg Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1990, 1993
@@ -553,6 +553,7 @@ extern enum PosixState {
 	PS_NOT_YET,
 	PS_MAYBE_NEXT_LINE,
 	PS_NOW_OR_NEVER,
+	PS_SET,
 	PS_TOO_LATE
 } posix_state;
 
@@ -889,7 +890,6 @@ void Error(const char *, ...) MAKE_ATTR_PRINTFLIKE(1, 2);
 void Fatal(const char *, ...) MAKE_ATTR_PRINTFLIKE(1, 2) MAKE_ATTR_DEAD;
 void Punt(const char *, ...) MAKE_ATTR_PRINTFLIKE(1, 2) MAKE_ATTR_DEAD;
 void DieHorribly(void) MAKE_ATTR_DEAD;
-void Finish(int) MAKE_ATTR_DEAD;
 int unlink_file(const char *) MAKE_ATTR_USE;
 void execDie(const char *, const char *);
 char *getTmpdir(void) MAKE_ATTR_USE;
@@ -1079,7 +1079,7 @@ void Global_Append(const char *, const char *);
 void Global_Delete(const char *);
 void Global_Set_ReadOnly(const char *, const char *);
 
-void EvalStack_PrintDetails(void);
+bool EvalStack_PrintDetails(void) MAKE_ATTR_USE;
 
 /* util.c */
 typedef void (*SignalProc)(int);

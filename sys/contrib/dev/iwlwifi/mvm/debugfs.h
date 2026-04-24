@@ -13,7 +13,7 @@ static const struct file_operations iwl_dbgfs_##name##_ops = {		\
 
 #define MVM_DEBUGFS_WRITE_WRAPPER(name, buflen, argtype)		\
 static ssize_t _iwl_dbgfs_##name##_write(struct file *file,		\
-					 const char __user *user_buf,	\
+					 const char __user * __capability user_buf,	\
 					 size_t count, loff_t *ppos)	\
 {									\
 	argtype *arg = file->private_data;				\

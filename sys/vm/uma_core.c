@@ -86,7 +86,6 @@
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/vm_domainset.h>
-#include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pageout.h>
 #include <vm/vm_phys.h>
@@ -2009,7 +2008,7 @@ pcpu_page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 		}
 		if (__predict_false(p == NULL))
 			goto fail;
-		TAILQ_INSERT_TAIL(&alloctail, p, listq);
+		TAILQ_INSERT_TAIL(&alloctail, p, plinks.q);
 	}
 	if ((addr = kva_alloc(bytes)) == 0)
 		goto fail;
@@ -2020,13 +2019,13 @@ pcpu_page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	        cheri_length_get(addr)));
 #endif
 	zkva = addr;
-	TAILQ_FOREACH(p, &alloctail, listq) {
+	TAILQ_FOREACH(p, &alloctail, plinks.q) {
 		pmap_qenter(zkva, &p, 1);
 		zkva += PAGE_SIZE;
 	}
 	return ((void*)addr);
 fail:
-	TAILQ_FOREACH_SAFE(p, &alloctail, listq, p_next) {
+	TAILQ_FOREACH_SAFE(p, &alloctail, plinks.q, p_next) {
 		vm_page_unwire_noq(p);
 		vm_page_free(p);
 	}
@@ -2065,11 +2064,7 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 	while (npages > 0) {
 		p = vm_page_alloc_noobj_domain(domain, req);
 		if (p != NULL) {
-			/*
-			 * Since the page does not belong to an object, its
-			 * listq is unused.
-			 */
-			TAILQ_INSERT_TAIL(&alloctail, p, listq);
+			TAILQ_INSERT_TAIL(&alloctail, p, plinks.q);
 			npages--;
 			continue;
 		}
@@ -2077,7 +2072,7 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 		 * Page allocation failed, free intermediate pages and
 		 * exit.
 		 */
-		TAILQ_FOREACH_SAFE(p, &alloctail, listq, p_next) {
+		TAILQ_FOREACH_SAFE(p, &alloctail, plinks.q, p_next) {
 			vm_page_unwire_noq(p);
 			vm_page_free(p); 
 		}
@@ -2087,7 +2082,7 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 	zkva = keg->uk_kva +
 	    atomic_fetchadd_long(&keg->uk_offset, round_page(bytes));
 	retkva = zkva;
-	TAILQ_FOREACH(p, &alloctail, listq) {
+	TAILQ_FOREACH(p, &alloctail, plinks.q) {
 		pmap_qenter(zkva, &p, 1);
 		zkva += PAGE_SIZE;
 	}
@@ -5429,6 +5424,13 @@ uma_reclaim_domain(int req, int domain)
 		zone_foreach(uma_reclaim_domain_cb, &args);
 		break;
 	case UMA_RECLAIM_DRAIN_CPU:
+		/*
+		 * Reclaim globally visible free items from all zones, then drain
+		 * per-CPU buckets, then reclaim items freed while draining.
+		 * This approach minimizes expensive context switching needed to
+		 * drain each zone's per-CPU buckets.
+		 */
+		args.req = UMA_RECLAIM_DRAIN;
 		zone_foreach(uma_reclaim_domain_cb, &args);
 		pcpu_cache_drain_safe(NULL);
 		zone_foreach(uma_reclaim_domain_cb, &args);

@@ -110,6 +110,7 @@ CHERIBSDTEST(nofault_perm_load,
 	cheribsdtest_success();
 }
 
+#ifdef HAS_CHERI_PERM_SEAL
 CHERIBSDTEST(illegal_perm_seal,
     "Exercise capability seal permission failure",
     CT_SEAL_VIOLATION_EXCEPTION)
@@ -142,6 +143,7 @@ CHERIBSDTEST(illegal_perm_seal,
 	cheribsdtest_failure_errx("cheri_seal() performed successfully "
 	    "%#lp with bad sealcap %#lp", sealed, sealcap);
 }
+#endif
 
 CHERIBSDTEST(fault_perm_store,
     "Exercise capability store permission failure",
@@ -165,6 +167,7 @@ CHERIBSDTEST(nofault_perm_store,
 	cheribsdtest_success();
 }
 
+#ifdef HAS_CHERI_PERM_SEAL
 CHERIBSDTEST(illegal_perm_unseal,
     "Exercise capability unseal permission failure",
     CT_SEAL_VIOLATION_EXCEPTION)
@@ -201,6 +204,7 @@ CHERIBSDTEST(illegal_perm_unseal,
 	cheribsdtest_failure_errx("cheri_unseal() performed successfully "
 	    "%#lp with bad unsealcap %#lp", unsealed, sealcap);
 }
+#endif
 
 CHERIBSDTEST(fault_tag, "Store via untagged capability",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
@@ -222,20 +226,7 @@ CHERIBSDTEST(nofault_cfromptr, "Exercise CFromPtr success")
 	char * __capability cd; /* stored into here */
 
 	cb = cheri_ptr(buf, 256);
-#if defined(__aarch64__) || defined(__riscv_xcheri_no_relocation)
-	/*
-	 * morello-llvm emits cvtz for this intrinsic, which has an
-	 * address interpretation by default (unlike CFromPtr, which
-	 * has an offset interpretation).
-	 * https://git.morello-project.org/morello/llvm-project/-/issues/16
-	 *
-	 * Similarly, CHERI-RISC-V with ISAv9 always uses address
-	 * interpretation instead of offsetting from the base.
-	 */
 	cd = __builtin_cheri_cap_from_pointer(cb, (ptraddr_t)buf + 10);
-#else
-	cd = __builtin_cheri_cap_from_pointer(cb, 10);
-#endif
 	*cd = '\0';
 	cheribsdtest_success();
 }

@@ -372,7 +372,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	    cheri_address_get(source_cap) + cheri_length_get(source_cap))) {
 		SYSERRCAUSE("MAP_FIXED and too little space in "
 		    "capablity (0x%zx < 0x%zx)",
-		    cheri_length_get(source_cap) - cheri_offset_get(source_cap),
+		    cheri_bytes_remaining(source_cap),
 		    roundup2(uap->len, PAGE_SIZE));
 		return (EPROT);
 	}
@@ -1917,9 +1917,6 @@ vm_mmap_cdev(struct thread *td, vm_size_t objsize, vm_prot_t *protp,
 	    td->td_ucred);
 	if (obj == NULL)
 		return (EINVAL);
-	VM_OBJECT_WLOCK(obj);
-	vm_object_set_flag(obj, OBJ_CDEVH);
-	VM_OBJECT_WUNLOCK(obj);
 	*objp = obj;
 	*flagsp = flags;
 	return (0);

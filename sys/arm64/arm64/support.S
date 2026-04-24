@@ -72,13 +72,8 @@ ENTRY(swapueword8_llsc)
 	ldrb	w7, [PTR(1)]
 
 	ENTER_C64
-#if __has_feature(capabilities)
-	ldxrb	w2, [c0]
-	stxrb	w3, w7, [c0]
-#else
-	ldxrb	w2, [x0]
-	stxrb	w3, w7, [x0]
-#endif
+	ldxrb	w2, [CAP(0)]
+	stxrb	w3, w7, [CAP(0)]
 	EXIT_C64
 	cbnz	w3, 1f
 
@@ -103,11 +98,7 @@ ENTRY(swapueword8_lse)
 
 	.arch_extension lse
 	ENTER_C64
-#if __has_feature(capabilities)
-	swpb	w7, w2, [c0]
-#else
-	swpb	w7, w2, [x0]
-#endif
+	swpb	w7, w2, [CAP(0)]
 	EXIT_C64
 	.arch_extension nolse
 
@@ -131,13 +122,8 @@ ENTRY(swapueword32_llsc)
 	ldr	w7, [PTR(1)]
 
 	ENTER_C64
-#if __has_feature(capabilities)
-	ldxr	w2, [c0]		/* Stash the old value in w2 */
-	stxr	w3, w7, [c0]		/* Store new value */
-#else
-	ldxr	w2, [x0]		/* Stash the old value in w2 */
-	stxr	w3, w7, [x0]		/* Store new value */
-#endif
+	ldxr	w2, [CAP(0)]		/* Stash the old value in w2 */
+	stxr	w3, w7, [CAP(0)]	/* Store new value */
 	EXIT_C64
 	cbnz	w3, 1f
 
@@ -162,11 +148,7 @@ ENTRY(swapueword32_lse)
 
 	.arch_extension lse
 	ENTER_C64
-#if __has_feature(capabilities)
-	swp	w7, w2, [c0]
-#else
-	swp	w7, w2, [x0]
-#endif
+	swp	w7, w2, [CAP(0)]
 	EXIT_C64
 	.arch_extension nolse
 
@@ -189,18 +171,10 @@ ENTRY(casueword32_llsc)
 	SET_FAULT_HANDLER(PTR(6), PTR(4))	/* And set it */
 	ENTER_USER_ACCESS(w6, PTR(4))
 	ENTER_C64
-#if __has_feature(capabilities)
-	ldxr	w4, [c0]		/* Load-exclusive the data */
-#else
-	ldxr	w4, [x0]		/* Load-exclusive the data */
-#endif
+	ldxr	w4, [CAP(0)]		/* Load-exclusive the data */
 	cmp	w4, w1			/* Compare */
 	b.ne	1f			/* Not equal, exit */
-#if __has_feature(capabilities)
-	stxr	w5, w3, [c0]		/* Store the new data */
-#else
-	stxr	w5, w3, [x0]		/* Store the new data */
-#endif
+	stxr	w5, w3, [CAP(0)]	/* Store the new data */
 1:	EXIT_C64
 	EXIT_USER_ACCESS(w6)
 	SET_FAULT_HANDLER(xzr, PTR(6))	/* Reset the fault handler */
@@ -220,11 +194,7 @@ ENTRY(casueword32_lse)
 	mov	w7, w1			/* Back up the compare value */
 	.arch_extension lse
 	ENTER_C64
-#if __has_feature(capabilities)
-	cas	w1, w3, [c0]		/* Compare and Swap */
-#else
-	cas	w1, w3, [x0]		/* Compare and Swap */
-#endif
+	cas	w1, w3, [CAP(0)]	/* Compare and Swap */
 	EXIT_C64
 	.arch_extension nolse
 	cmp	w1, w7			/* Check if successful */
@@ -245,18 +215,10 @@ ENTRY(casueword_llsc)
 	SET_FAULT_HANDLER(PTR(6), PTR(4))	/* And set it */
 	ENTER_USER_ACCESS(w6, PTR(4))
 	ENTER_C64
-#if __has_feature(capabilities)
-	ldxr	x4, [c0]		/* Load-exclusive the data */
-#else
-	ldxr	x4, [x0]		/* Load-exclusive the data */
-#endif
+	ldxr	x4, [CAP(0)]		/* Load-exclusive the data */
 	cmp	x4, x1			/* Compare */
 	b.ne	1f			/* Not equal, exit */
-#if __has_feature(capabilities)
-	stxr	w5, x3, [c0]		/* Store the new data */
-#else
-	stxr	w5, x3, [x0]		/* Store the new data */
-#endif
+	stxr	w5, x3, [CAP(0)]	/* Store the new data */
 1:	EXIT_C64
 	EXIT_USER_ACCESS(w6)
 	SET_FAULT_HANDLER(xzr, PTR(6))	/* Reset the fault handler */
@@ -276,11 +238,7 @@ ENTRY(casueword_lse)
 	mov	x7, x1			/* Back up the compare value */
 	.arch_extension lse
 	ENTER_C64
-#if __has_feature(capabilities)
-	cas	x1, x3, [c0]		/* Compare and Swap */
-#else
-	cas	x1, x3, [x0]		/* Compare and Swap */
-#endif
+	cas	x1, x3, [CAP(0)]	/* Compare and Swap */
 	EXIT_C64
 	.arch_extension nolse
 	cmp	x1, x7			/* Check if successful */

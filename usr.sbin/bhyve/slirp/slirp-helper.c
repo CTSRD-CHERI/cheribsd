@@ -38,8 +38,6 @@
 #include "config.h"
 #include "libslirp.h"
 
-#define	SLIRP_MTU	2048
-
 struct slirp_priv {
 	Slirp *slirp;		/* libslirp handle */
 	int sock;		/* data and control socket */
@@ -48,6 +46,8 @@ struct slirp_priv {
 	struct pollfd *pollfds;
 	size_t npollfds;
 	size_t lastpollfd;
+	size_t mtu;
+	uint8_t *buf;
 };
 
 typedef int (*slirp_add_hostxfwd_p_t)(Slirp *,
@@ -105,7 +105,7 @@ slirp_cb_send_packet(const void *buf, size_t len, void *param)
 
 	priv = param;
 
-	assert(len <= SLIRP_MTU);
+	assert(len <= priv->mtu);
 	n = send(priv->sock, buf, len, MSG_EOR);
 	if (n < 0) {
 		warn("slirp_cb_send_packet: send");
@@ -293,16 +293,14 @@ slirp_pollfd_loop(struct slirp_priv *priv)
 			ssize_t n;
 
 			do {
-				uint8_t buf[SLIRP_MTU];
-
-				n = recv(priv->sock, buf, sizeof(buf),
+				n = recv(priv->sock, priv->buf, priv->mtu,
 				    MSG_DONTWAIT);
 				if (n < 0) {
 					if (errno == EWOULDBLOCK)
 						break;
 					err(1, "recv");
 				}
-				slirp_input_p(priv->slirp, buf, (int)n);
+				slirp_input_p(priv->slirp, priv->buf, (int)n);
 			} while (n >= 0);
 		}
 	}
@@ -466,8 +464,10 @@ main(int argc, char **argv)
 	Slirp *slirp;
 	nvlist_t *config;
 	const char *hostfwd, *vmname;
+	unsigned int index;
 	int ch, fd, pipe, sd;
 	bool restricted;
+	size_t mtu;
 
 	sd = -1;
 	while ((ch = getopt(argc, argv, "P:S:")) != -1) {
@@ -516,6 +516,8 @@ main(int argc, char **argv)
 	memset(&priv, 0, sizeof(priv));
 	priv.sock = sd;
 	priv.pipe = pipe;
+	if (ioctl(priv.sock, FIONBIO, &(int){0}) == -1)
+		err(1, "ioctl(FIONBIO)");
 	if (pipe2(priv.wakeup, O_CLOEXEC | O_NONBLOCK) != 0)
 		err(1, "pipe2");
 
@@ -525,21 +527,33 @@ main(int argc, char **argv)
 	config = nvlist_recv(sd, 0);
 	if (config == NULL)
 		err(1, "nvlist_recv");
+
+	index = nvlist_get_number(config, "index") + 2;
+	if (index > 0xff)
+		errx(1, "index %u out of range", index);
+
+	mtu = nvlist_get_number(config, "mtui");
+	priv.mtu = mtu;
+	priv.buf = malloc(mtu);
+	if (priv.buf == NULL)
+		err(1, "malloc");
+
 	vmname = get_config_value_node(config, "vmname");
 	if (vmname != NULL)
 		setproctitle("%s", vmname);
 	restricted = !get_config_bool_node_default(config, "open", false);
 
+	index <<= 8;
 	slirpconfig = (SlirpConfig){
 		.version = 4,
-		.if_mtu = SLIRP_MTU,
+		.if_mtu = mtu,
 		.restricted = restricted,
 		.in_enabled = true,
-		.vnetwork.s_addr = htonl(0x0a000200),	/* 10.0.2.0/24 */
+		.vnetwork.s_addr = htonl(0x0a000000 | index), /* 10.0.n.0/24 */
 		.vnetmask.s_addr = htonl(0xffffff00),	/* 255.255.255.0 */
-		.vdhcp_start.s_addr = htonl(0x0a00020f),/* 10.0.2.15 */
-		.vhost.s_addr = htonl(0x0a000202),	/* 10.0.2.2 */
-		.vnameserver.s_addr = htonl(0x0a000203),/* 10.0.2.3 */
+		.vdhcp_start.s_addr = htonl(0x0a00000f | index), /* 10.0.2.15 */
+		.vhost.s_addr = htonl(0x0a000002 | index), /* 10.0.2.2 */
+		.vnameserver.s_addr = htonl(0x0a000003 | index), /* 10.0.2.3 */
 		.enable_emu = false,
 	};
 	libslirp_init();

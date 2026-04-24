@@ -148,7 +148,8 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 #endif
 	} else {
 		/* Remove execute permissions and set bounds */
-		symval = cheri_offset_inc(make_data_cap(def, defobj), addend);
+		symval = (const char * __capability)make_data_cap(def, defobj) +
+		    addend;
 	}
 #ifdef DEBUG
 	// FIXME: this warning breaks some tests that expect clean stdout/stderr
