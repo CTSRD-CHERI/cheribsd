@@ -50,11 +50,11 @@ __elf_phdr_match_addr(struct dl_phdr_info *phdr_info, void *addr)
 	const Elf_Phdr *ph;
 	int i;
 #ifdef CHERI_LIB_C18N
-	ptraddr_t target;
+	uintptr_t target;
 
 	target = dl_c18n_get_trampoline_target(addr);
 	if (target != 0)
-		addr = (void *)(uintptr_t)target;
+		addr = (void *)target;
 #endif
 
 	for (i = 0; i < phdr_info->dlpi_phnum; i++) {
