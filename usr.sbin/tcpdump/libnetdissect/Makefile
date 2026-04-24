@@ -6,6 +6,8 @@ PRIVATELIB=
 MAN=
 SHLIB_MAJOR=1
 
+MK_COMPARTMENT_POLICY=yes
+
 SRCS=	\
 	addrtostr.c \
 	af.c \

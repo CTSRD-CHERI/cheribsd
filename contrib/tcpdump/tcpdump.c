@@ -1269,10 +1269,13 @@ static pcap_t *
 open_interface(const char *device, netdissect_options *ndo, char *ebuf)
 {
 	pcap_t *pc;
+	struct netdissect_runtime_state *ndo_rt;
 #ifdef HAVE_PCAP_CREATE
 	int status;
 	char *cp;
 #endif
+
+	ndo_rt = nd_runtime_state(ndo);
 
 #ifdef HAVE_PCAP_OPEN
 	/*
@@ -1324,11 +1327,11 @@ open_interface(const char *device, netdissect_options *ndo, char *ebuf)
 		show_tstamp_types_and_exit(pc, device);
 #endif
 #ifdef HAVE_PCAP_SET_TSTAMP_PRECISION
-	status = pcap_set_tstamp_precision(pc, ndo->ndo_tstamp_precision);
+	status = pcap_set_tstamp_precision(pc, ndo_rt->ndo_tstamp_precision);
 	if (status != 0)
 		error("%s: Can't set %ssecond time stamp precision: %s",
 		    device,
-		    tstamp_precision_to_string(ndo->ndo_tstamp_precision),
+		    tstamp_precision_to_string(ndo_rt->ndo_tstamp_precision),
 		    pcap_statustostr(status));
 #endif
 
@@ -1528,6 +1531,9 @@ main(int argc, char **argv)
 	netdissect_options Ndo;
 	netdissect_options *ndo = &Ndo;
 
+	struct netdissect_runtime_state Ndo_rt;
+	struct netdissect_runtime_state *ndo_rt;
+
 	/*
 	 * Initialize the netdissect code.
 	 */
@@ -1536,6 +1542,9 @@ main(int argc, char **argv)
 
 	memset(ndo, 0, sizeof(*ndo));
 	ndo_set_function_pointers(ndo);
+
+	nd_init_options(ndo, &Ndo_rt);
+	ndo_rt = nd_runtime_state(ndo);
 
 	cnt = -1;
 	device = NULL;
@@ -1546,9 +1555,9 @@ main(int argc, char **argv)
 	WFileName = NULL;
 	dlt = -1;
 	if ((cp = strrchr(argv[0], PATH_SEPARATOR)) != NULL)
-		ndo->program_name = program_name = cp + 1;
+		ndo_rt->program_name = program_name = cp + 1;
 	else
-		ndo->program_name = program_name = argv[0];
+		ndo_rt->program_name = program_name = argv[0];
 
 #if defined(HAVE_PCAP_WSOCKINIT)
 	if (pcap_wsockinit() != 0)
@@ -1920,7 +1929,7 @@ main(int argc, char **argv)
 			break;
 
 		case '#':
-			ndo->ndo_packet_number = 1;
+			ndo_rt->ndo_packet_number = 1;
 			break;
 
 		case OPTION_VERSION:
@@ -1930,8 +1939,8 @@ main(int argc, char **argv)
 
 #ifdef HAVE_PCAP_SET_TSTAMP_PRECISION
 		case OPTION_TSTAMP_PRECISION:
-			ndo->ndo_tstamp_precision = tstamp_precision_from_string(optarg);
-			if (ndo->ndo_tstamp_precision < 0)
+			ndo_rt->ndo_tstamp_precision = tstamp_precision_from_string(optarg);
+			if (ndo_rt->ndo_tstamp_precision < 0)
 				error("unsupported time stamp precision");
 			break;
 #endif
@@ -1948,11 +1957,11 @@ main(int argc, char **argv)
 
 #ifdef HAVE_PCAP_SET_TSTAMP_PRECISION
 		case OPTION_TSTAMP_MICRO:
-			ndo->ndo_tstamp_precision = PCAP_TSTAMP_PRECISION_MICRO;
+			ndo_rt->ndo_tstamp_precision = PCAP_TSTAMP_PRECISION_MICRO;
 			break;
 
 		case OPTION_TSTAMP_NANO:
-			ndo->ndo_tstamp_precision = PCAP_TSTAMP_PRECISION_NANO;
+			ndo_rt->ndo_tstamp_precision = PCAP_TSTAMP_PRECISION_NANO;
 			break;
 #endif
 
@@ -2080,7 +2089,7 @@ main(int argc, char **argv)
 
 #ifdef HAVE_PCAP_SET_TSTAMP_PRECISION
 		pd = pcap_open_offline_with_tstamp_precision(RFileName,
-		    ndo->ndo_tstamp_precision, ebuf);
+		    ndo_rt->ndo_tstamp_precision, ebuf);
 #else
 		pd = pcap_open_offline(RFileName, ebuf);
 #endif
@@ -2507,7 +2516,7 @@ DIAG_ON_ASSIGN_ENUM
 		}
 		if (print) {
 			dlt = pcap_datalink(pd);
-			ndo->ndo_if_printer = get_if_printer(dlt);
+			ndo_rt->ndo_if_printer = get_if_printer(dlt);
 			dumpinfo.ndo = ndo;
 		} else
 			dumpinfo.ndo = NULL;
@@ -2518,7 +2527,7 @@ DIAG_ON_ASSIGN_ENUM
 #endif
 	} else {
 		dlt = pcap_datalink(pd);
-		ndo->ndo_if_printer = get_if_printer(dlt);
+		ndo_rt->ndo_if_printer = get_if_printer(dlt);
 		callback = print_packet;
 		pcap_userdata = (u_char *)ndo;
 	}
@@ -2698,7 +2707,7 @@ DIAG_ON_ASSIGN_ENUM
 					 * the new DLT.
 					 */
 					dlt = new_dlt;
-					ndo->ndo_if_printer = get_if_printer(dlt);
+					ndo_rt->ndo_if_printer = get_if_printer(dlt);
 					/* Free the old filter */
 					pcap_freecode(&fcode);
 					if (pcap_compile(pd, &fcode, cmdbuf, Oflag, netmask) < 0)

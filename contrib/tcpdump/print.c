@@ -333,13 +333,16 @@ pretty_print_packet(netdissect_options *ndo, const struct pcap_pkthdr *h,
 {
 	u_int hdrlen = 0;
 	int invalid_header = 0;
+	struct netdissect_runtime_state *ndo_rt;
+
+	ndo_rt = nd_runtime_state(ndo);
 
 #ifdef ENABLE_INSTRUMENT_FUNCTIONS
 	if (pretty_print_packet_level == -1)
 		pretty_print_packet_level = profile_func_level;
 #endif
 
-	if (ndo->ndo_packet_number)
+	if (ndo_rt->ndo_packet_number)
 		ND_PRINT("%5u  ", packets_captured);
 
 	/* Sanity checks on packet length / capture length */
@@ -417,10 +420,10 @@ pretty_print_packet(netdissect_options *ndo, const struct pcap_pkthdr *h,
 
 	ndo->ndo_protocol = "";
 	ndo->ndo_ll_hdr_len = 0;
-	switch (setjmp(ndo->ndo_early_end)) {
+	switch (setjmp(ndo_rt->ndo_early_end)) {
 	case 0:
 		/* Print the packet. */
-		(ndo->ndo_if_printer)(ndo, h, sp);
+		(ndo_rt->ndo_if_printer)(ndo, h, sp);
 		break;
 	case ND_TRUNCATED:
 		/* A printer quit because the packet was truncated; report it */
@@ -529,9 +532,12 @@ ndo_error(netdissect_options *ndo, status_exit_codes_t status,
 	  const char *fmt, ...)
 {
 	va_list ap;
+	struct netdissect_runtime_state *ndo_rt;
 
-	if (ndo->program_name)
-		(void)fprintf(stderr, "%s: ", ndo->program_name);
+	ndo_rt = nd_runtime_state(ndo);
+
+	if (ndo_rt->program_name)
+		(void)fprintf(stderr, "%s: ", ndo_rt->program_name);
 	va_start(ap, fmt);
 	(void)vfprintf(stderr, fmt, ap);
 	va_end(ap);
@@ -550,9 +556,12 @@ static void
 ndo_warning(netdissect_options *ndo, const char *fmt, ...)
 {
 	va_list ap;
+	struct netdissect_runtime_state *ndo_rt;
 
-	if (ndo->program_name)
-		(void)fprintf(stderr, "%s: ", ndo->program_name);
+	ndo_rt = nd_runtime_state(ndo);
+
+	if (ndo_rt->program_name)
+		(void)fprintf(stderr, "%s: ", ndo_rt->program_name);
 	(void)fprintf(stderr, "WARNING: ");
 	va_start(ap, fmt);
 	(void)vfprintf(stderr, fmt, ap);

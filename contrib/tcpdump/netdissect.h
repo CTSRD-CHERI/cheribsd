@@ -201,6 +201,17 @@ struct netdissect_saved_packet_info {
   struct netdissect_saved_packet_info *ndspi_prev;	/* previous buffer on the stack */
 };
 
+struct netdissect_runtime_state {
+  jmp_buf ndo_early_end;	/* jmp_buf for setjmp()/longjmp() */
+  void *ndo_last_mem_p;		/* pointer to the last allocated memory chunk */
+  int ndo_packet_number;	/* print a packet number in the beginning of line */
+  int ndo_tstamp_precision;	/* requested time stamp precision */
+  const char *program_name;	/* Name of the program using the library */
+  struct netdissect_saved_packet_info *ndo_packet_info_stack;
+				/* stack of saved packet boundary and buffer information */
+  if_printer ndo_if_printer;	/* pointer to the if_printer function */
+};
+
 /* 'val' value(s) for longjmp */
 #define ND_TRUNCATED 1
 
@@ -223,12 +234,8 @@ struct netdissect_options {
 				 */
   int ndo_Hflag;		/* dissect 802.11s draft mesh standard */
   const char *ndo_protocol;	/* protocol */
-  jmp_buf ndo_early_end;	/* jmp_buf for setjmp()/longjmp() */
-  void *ndo_last_mem_p;		/* pointer to the last allocated memory chunk */
-  int ndo_packet_number;	/* print a packet number in the beginning of line */
+  void *ndo_rt;			/* pointer to runtime state (sealed on CHERI) */
   int ndo_suppress_default_print; /* don't use default_print() for unknown packet types */
-  int ndo_tstamp_precision;	/* requested time stamp precision */
-  const char *program_name;	/* Name of the program using the library */
 
   char *ndo_espsecret;
   struct sa_list *ndo_sa_list_head;  /* used by print-esp.c */
@@ -244,12 +251,6 @@ struct netdissect_options {
   /*global pointers to beginning and end of current packet (during printing) */
   const u_char *ndo_packetp;
   const u_char *ndo_snapend;
-
-  /* stack of saved packet boundary and buffer information */
-  struct netdissect_saved_packet_info *ndo_packet_info_stack;
-
-  /* pointer to the if_printer function */
-  if_printer ndo_if_printer;
 
   /* pointer to void function to output stuff */
   void (*ndo_default_print)(netdissect_options *,
@@ -270,6 +271,8 @@ struct netdissect_options {
 		      PRINTFLIKE_FUNCPTR(2, 3);
 };
 
+extern void nd_init_options(netdissect_options *, struct netdissect_runtime_state *);
+extern struct netdissect_runtime_state *nd_runtime_state(netdissect_options *);
 extern WARN_UNUSED_RESULT int nd_push_buffer(netdissect_options *, u_char *, const u_char *, const u_int);
 extern WARN_UNUSED_RESULT int nd_push_snaplen(netdissect_options *, const u_char *, const u_int);
 extern void nd_change_snaplen(netdissect_options *, const u_char *, const u_int);

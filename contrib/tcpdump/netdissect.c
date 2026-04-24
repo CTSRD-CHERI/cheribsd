@@ -30,9 +30,72 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <sys/sysctl.h>
+#include <cheri/cheric.h>
+#endif
+
 #ifdef USE_LIBSMI
 #include <smi.h>
 #endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+static void *nd_runtime_unsealer;
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+static void *
+nd_seal_runtime(struct netdissect_runtime_state *ndo_rt)
+{
+	return cheri_seal(ndo_rt, nd_runtime_unsealer);
+}
+
+static struct netdissect_runtime_state *
+nd_unseal_runtime(void *ndo_rt)
+{
+	return cheri_unseal(ndo_rt, nd_runtime_unsealer);
+}
+#else
+static void *
+nd_seal_runtime(struct netdissect_runtime_state *ndo_rt)
+{
+	return ndo_rt;
+}
+
+static struct netdissect_runtime_state *
+nd_unseal_runtime(void *ndo_rt)
+{
+	return ndo_rt;
+}
+#endif
+
+static int
+nd_init_runtime_unsealer(void)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	size_t sealcap_size;
+
+	sealcap_size = sizeof(nd_runtime_unsealer);
+	if (sysctlbyname("security.cheri.sealcap", &nd_runtime_unsealer,
+	    &sealcap_size, NULL, 0) < 0)
+		return (-1);
+#endif
+	return (0);
+}
+
+void
+nd_init_options(netdissect_options *ndo,
+    struct netdissect_runtime_state *ndo_rt)
+{
+	memset(ndo_rt, 0, sizeof(*ndo_rt));
+	ndo->ndo_rt = nd_seal_runtime(ndo_rt);
+}
+
+struct netdissect_runtime_state *
+nd_runtime_state(netdissect_options *ndo)
+{
+	return nd_unseal_runtime(ndo->ndo_rt);
+}
 
 /*
  * Initialize anything that must be initialized before dissecting
@@ -69,6 +132,12 @@ nd_init(char *errbuf, size_t errbuf_size)
 	 */
 	smiInit("tcpdump");
 #endif
+
+	if (nd_init_runtime_unsealer() == -1) {
+		strlcpy(errbuf, "Failed to allocate unsealer",
+		    errbuf_size);
+		return (-1);
+	}
 
 	/*
 	 * Clears the error buffer, and uses it so we don't get
@@ -150,6 +219,9 @@ nd_push_buffer(netdissect_options *ndo, u_char *new_buffer,
 	       const u_char *new_packetp, const u_int newlen)
 {
 	struct netdissect_saved_packet_info *ndspi;
+	struct netdissect_runtime_state *ndo_rt;
+
+	ndo_rt = nd_runtime_state(ndo);
 
 	ndspi = (struct netdissect_saved_packet_info *)malloc(sizeof(struct netdissect_saved_packet_info));
 	if (ndspi == NULL)
@@ -157,11 +229,11 @@ nd_push_buffer(netdissect_options *ndo, u_char *new_buffer,
 	ndspi->ndspi_buffer = new_buffer;
 	ndspi->ndspi_packetp = ndo->ndo_packetp;
 	ndspi->ndspi_snapend = ndo->ndo_snapend;
-	ndspi->ndspi_prev = ndo->ndo_packet_info_stack;
+	ndspi->ndspi_prev = ndo_rt->ndo_packet_info_stack;
 
 	ndo->ndo_packetp = new_packetp;
 	ndo->ndo_snapend = new_packetp + newlen;
-	ndo->ndo_packet_info_stack = ndspi;
+	ndo_rt->ndo_packet_info_stack = ndspi;
 
 	return (1);	/* success */
 }
@@ -183,7 +255,10 @@ int
 nd_push_snaplen(netdissect_options *ndo, const u_char *bp, const u_int newlen)
 {
 	struct netdissect_saved_packet_info *ndspi;
+	struct netdissect_runtime_state *ndo_rt;
 	u_int snaplen_remaining;
+
+	ndo_rt = nd_runtime_state(ndo);
 
 	ndspi = (struct netdissect_saved_packet_info *)malloc(sizeof(struct netdissect_saved_packet_info));
 	if (ndspi == NULL)
@@ -191,12 +266,12 @@ nd_push_snaplen(netdissect_options *ndo, const u_char *bp, const u_int newlen)
 	ndspi->ndspi_buffer = NULL;	/* no new buffer */
 	ndspi->ndspi_packetp = ndo->ndo_packetp;
 	ndspi->ndspi_snapend = ndo->ndo_snapend;
-	ndspi->ndspi_prev = ndo->ndo_packet_info_stack;
+	ndspi->ndspi_prev = ndo_rt->ndo_packet_info_stack;
 
 	/*
 	 * Push the saved previous data onto the stack.
 	 */
-	ndo->ndo_packet_info_stack = ndspi;
+	ndo_rt->ndo_packet_info_stack = ndspi;
 
 	/*
 	 * Find out how many bytes remain after the current snapend.
@@ -246,7 +321,7 @@ nd_change_snaplen(netdissect_options *ndo, const u_char *bp, const u_int newlen)
 	const u_char *previous_snapend;
 	u_int snaplen_remaining;
 
-	ndspi = ndo->ndo_packet_info_stack;
+	ndspi = nd_runtime_state(ndo)->ndo_packet_info_stack;
 	if (ndspi->ndspi_prev != NULL)
 		previous_snapend = ndspi->ndspi_prev->ndspi_snapend;
 	else
@@ -281,11 +356,14 @@ void
 nd_pop_packet_info(netdissect_options *ndo)
 {
 	struct netdissect_saved_packet_info *ndspi;
+	struct netdissect_runtime_state *ndo_rt;
 
-	ndspi = ndo->ndo_packet_info_stack;
+	ndo_rt = nd_runtime_state(ndo);
+
+	ndspi = ndo_rt->ndo_packet_info_stack;
 	ndo->ndo_packetp = ndspi->ndspi_packetp;
 	ndo->ndo_snapend = ndspi->ndspi_snapend;
-	ndo->ndo_packet_info_stack = ndspi->ndspi_prev;
+	ndo_rt->ndo_packet_info_stack = ndspi->ndspi_prev;
 
 	free(ndspi->ndspi_buffer);
 	free(ndspi);
@@ -294,14 +372,14 @@ nd_pop_packet_info(netdissect_options *ndo)
 void
 nd_pop_all_packet_info(netdissect_options *ndo)
 {
-	while (ndo->ndo_packet_info_stack != NULL)
+	while (nd_runtime_state(ndo)->ndo_packet_info_stack != NULL)
 		nd_pop_packet_info(ndo);
 }
 
 NORETURN void
 nd_trunc_longjmp(netdissect_options *ndo)
 {
-	longjmp(ndo->ndo_early_end, ND_TRUNCATED);
+	longjmp(nd_runtime_state(ndo)->ndo_early_end, ND_TRUNCATED);
 #ifdef _AIX
 	/*
 	 * In AIX <setjmp.h> decorates longjmp() with "#pragma leaves", which tells

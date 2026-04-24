@@ -35,11 +35,14 @@ static void nd_add_alloc_list(netdissect_options *, nd_mem_chunk_t *);
 static void
 nd_add_alloc_list(netdissect_options *ndo, nd_mem_chunk_t *chunkp)
 {
-	if (ndo->ndo_last_mem_p == NULL)	/* first memory allocation */
+	struct netdissect_runtime_state *ndo_rt;
+
+	ndo_rt = nd_runtime_state(ndo);
+	if (ndo_rt->ndo_last_mem_p == NULL)	/* first memory allocation */
 		chunkp->prev_mem_p = NULL;
 	else					/* previous memory allocation */
-		chunkp->prev_mem_p = ndo->ndo_last_mem_p;
-	ndo->ndo_last_mem_p = chunkp;
+		chunkp->prev_mem_p = ndo_rt->ndo_last_mem_p;
+	ndo_rt->ndo_last_mem_p = chunkp;
 }
 
 /* malloc replacement, with tracking in a linked list */
@@ -58,11 +61,14 @@ void
 nd_free_all(netdissect_options *ndo)
 {
 	nd_mem_chunk_t *current, *previous;
-	current = ndo->ndo_last_mem_p;
+	struct netdissect_runtime_state *ndo_rt;
+
+	ndo_rt = nd_runtime_state(ndo);
+	current = ndo_rt->ndo_last_mem_p;
 	while (current != NULL) {
 		previous = current->prev_mem_p;
 		free(current);
 		current = previous;
 	}
-	ndo->ndo_last_mem_p = NULL;
+	ndo_rt->ndo_last_mem_p = NULL;
 }

@@ -212,7 +212,7 @@ static void
 ts_frac_print(netdissect_options *ndo, const struct timeval *tv)
 {
 #ifdef HAVE_PCAP_SET_TSTAMP_PRECISION
-	switch (ndo->ndo_tstamp_precision) {
+	switch (nd_runtime_state(ndo)->ndo_tstamp_precision) {
 
 	case PCAP_TSTAMP_PRECISION_MICRO:
 		ND_PRINT(".%06u", (unsigned)tv->tv_usec);
@@ -311,7 +311,7 @@ ts_print(netdissect_options *ndo,
 	case 3: /* Microseconds/nanoseconds since previous packet */
         case 5: /* Microseconds/nanoseconds since first packet */
 #ifdef HAVE_PCAP_SET_TSTAMP_PRECISION
-		switch (ndo->ndo_tstamp_precision) {
+		switch (nd_runtime_state(ndo)->ndo_tstamp_precision) {
 		case PCAP_TSTAMP_PRECISION_MICRO:
 			nano_prec = 0;
 			break;
