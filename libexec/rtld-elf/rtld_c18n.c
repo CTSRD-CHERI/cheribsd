@@ -1701,7 +1701,8 @@ dl_c18n_get_trampoline_target(const void *addr)
 	if (header == NULL)
 		return (0);
 
-	return ((ptraddr_t)header->target);
+	return ((ptraddr_t)atomic_load_explicit(&header->target,
+	    memory_order_relaxed));
 }
 
 /*
@@ -2314,7 +2315,8 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	 * in one.
 	 */
 	callee = compart_id_for_address(header->defobj,
-	    (ptraddr_t)header->target);
+	    (ptraddr_t)atomic_load_explicit(&header->target,
+		memory_order_relaxed));
 	callee_idx = cid_to_index(callee);
 
 	/*
