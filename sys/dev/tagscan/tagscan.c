@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2025 Robert N. M. Watson
+ * Copyright (c) 2025-2026 Robert N. M. Watson
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -66,29 +66,31 @@ tagscan_page_process(vm_page_t m)
 	/*
 	 * Handle counters purely related to the page-level metadata.
 	 */
-	if (m->oflags & VPO_UNMANAGED)
-		ts.ts_unmanaged_count++;
-	if (m->a.flags & PGA_REFERENCED)
-		ts.ts_referenced_count++;
-	if (m->a.flags & PGA_CAPSTORE)
-		ts.ts_capstore_count++;
-	if (m->a.flags & PGA_CAPDIRTY)
-		ts.ts_capdirty_count++;
-	if (m->flags & PG_PCPU_CACHE)
-		ts.ts_pcpu_count++;
-	if (m->flags & PG_FICTITIOUS)
-		ts.ts_fict_count++;
-	if (m->flags & PG_ZERO)
-		ts.ts_zero_count++;
-	if (m->flags & PG_NODUMP)
-		ts.ts_nodump_count++;
-	if (m->flags & PG_NOFREE)
-		ts.ts_nofree_count++;
+	if (!(m->order < VM_NFREEORDER)) {
+		if (m->oflags & VPO_UNMANAGED)
+			ts.ts_unmanaged_count++;
+		if (m->a.flags & PGA_REFERENCED)
+			ts.ts_referenced_count++;
+		if (m->a.flags & PGA_CAPSTORE)
+			ts.ts_capstore_count++;
+		if (m->a.flags & PGA_CAPDIRTY)
+			ts.ts_capdirty_count++;
+		if (m->flags & PG_PCPU_CACHE)
+			ts.ts_pcpu_count++;
+		if (m->flags & PG_FICTITIOUS)
+			ts.ts_fict_count++;
+		if (m->flags & PG_ZERO)
+			ts.ts_zero_count++;
+		if (m->flags & PG_NODUMP)
+			ts.ts_nodump_count++;
+		if (m->flags & PG_NOFREE)
+			ts.ts_nofree_count++;
+	}
 
 	/*
 	 * Handle counters relating to the VM object for the page, if present.
 	 */
-	obj = m->object;
+	obj = atomic_load_ptr(&m->object);
 	if (obj != NULL) {
 		ts.ts_obj_count++;
 		if (obj->flags & OBJ_HASCAP)
