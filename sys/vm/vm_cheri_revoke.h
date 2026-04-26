@@ -132,6 +132,11 @@ enum {
 
 	/* If no rev_entry selected in the vm_map */
 	VM_CHERI_REVOKE_CF_NO_REV_ENTRY = 0x08,
+
+#ifdef CHERI_CAPREVOKE_POISON
+	/* If poison is used in place of the shadow bitmap */
+	VM_CHERI_REVOKE_CF_POISON = 0x10,
+#endif
 };
 void vm_cheri_revoke_set_test(struct vm_map *map, int flags);
 

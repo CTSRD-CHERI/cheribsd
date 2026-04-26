@@ -163,6 +163,12 @@ extern int security_cheri_runtime_revocation_async;
 
 struct vmspace;
 void cheri_revoke_vmspace_fork(struct vmspace *dst, struct vmspace *src);
+
+#ifdef CHERI_CAPREVOKE_POISON
+uintcap_t	fupoison(volatile void * __capability uaddr);
+int	vm_cheri_revoke_probe_poison(vm_map_t map, vm_offset_t vaddr,
+    uintcap_t *poison);
+#endif
 #endif
 
 #endif /* !__SYS_CHERI_REVOKE_KERN_H__ */

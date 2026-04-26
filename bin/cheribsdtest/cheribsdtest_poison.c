@@ -37,9 +37,12 @@
 
 #include <sys/mman.h>
 #include <sys/sysctl.h>
+#include <sys/types.h>
 
+#include <cheri/revoke.h>
 #include <cheri/cheric.h>
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -54,14 +57,14 @@ skip_need_poison(const struct cheri_test *ctp __unused)
 	return (NULL);
 }
 
-CHERIBSDTEST(cap_poison_mmap,
+CHERIBSDTEST(cheri_poison_mmap,
     "check that mmap returns a capability that permits poisoning",
     .ct_check_skip = skip_need_poison)
 {
 	void *mem = CHERIBSDTEST_CHECK_SYSCALL(
-		mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	    mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
 	CHERIBSDTEST_VERIFY2((cheri_getperm(mem) & CHERI_PERM_POISON) != 0,
-		"missing PERM_POISON");
+	    "missing PERM_POISON");
 
 	/* Attempt to poison the memory */
 	cheri_poison_set(mem);
@@ -70,5 +73,43 @@ CHERIBSDTEST(cap_poison_mmap,
 	CHERIBSDTEST_VERIFY2(cheri_poison_get(mem) == 0, "did not clear poison");
 
 	CHERIBSDTEST_CHECK_SYSCALL(munmap(mem, 0x1000));
+	cheribsdtest_success();
+}
+
+/* CHERIBSDTEST(cheri_poison_strip, "strip PERM_POISON") {} */
+/* CHERIBSDTEST(cheri_double_poison, "try to poison twice") {} */
+
+CHERIBSDTEST(cheri_poison_revoke,
+    "check revocation of poisoned allocation",
+    .ct_check_skip = skip_need_poison)
+{
+	struct cheri_revoke_syscall_info crsi;
+	unsigned long i;
+
+	void *mem = CHERIBSDTEST_CHECK_SYSCALL(
+	    mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERIBSDTEST_VERIFY2((cheri_getperm(mem) & CHERI_PERM_POISON) != 0,
+	    "missing PERM_POISON");
+
+	void *cap = cheri_clearperm(mem, CHERI_PERM_POISON);
+	cap = cheri_setboundsexact(cap, 0x100);
+
+	/* Stash the capability */
+	void **mb = mem;
+	mb[0x20] = cap;
+
+	/* Trigger sync revocation */
+	for (i = 0; i < 0x100 / sizeof(void *); i++) {
+		cheri_poison_set((uintptr_t)mem + i * sizeof(void *));
+	}
+	crsi.epochs.enqueue = 0xC0FFEE;
+	crsi.epochs.dequeue = 0xB00;
+
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_IGNORE_START |
+	    CHERI_REVOKE_TAKE_STATS , 0, &crsi));
+
+	/* Check that we revoked the capabilities */
+	CHERIBSDTEST_VERIFY2(cheri_gettag(mb[0x20]) == 0, "unrevoked capability");
 	cheribsdtest_success();
 }

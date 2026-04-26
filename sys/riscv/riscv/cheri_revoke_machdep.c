@@ -509,3 +509,44 @@ vm_cheri_revoke_page_ro(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 
 	return (res);
 }
+
+#ifdef CHERI_CAPREVOKE_POISON
+/*
+ * Emulate poison probe via the direct map
+ */
+int
+vm_cheri_revoke_probe_poison(struct vm_map *map, vm_offset_t vaddr,
+    uintcap_t *poison)
+{
+	uintcap_t *probe;
+	vm_page_t m;
+
+	m = pmap_extract_and_hold(map->pmap, vaddr, VM_PROT_READ);
+	if (m == NULL) {
+		/* We expect to always find the page here */
+		panic("Poison probe missing page %#lx", vaddr);
+	}
+
+	/* Now that we are holding the page, we can look in the DMAP */
+	/* XXX-AM: should set bounds but probably not worth it */
+	probe = (uintcap_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m) +
+	    (vaddr & PAGE_MASK));
+
+	/*
+	 * XXX-AM: this is very much open to races of anything overwriting
+	 * poison. The expectation is that the allocators do not touch
+	 * the poison until the revocation is done.
+	 * If we miss setting the poison, this is fine, because surely
+	 * we will pick it up in the next revocation pass.
+	 */
+	if (cheri_is_poison(*probe)) {
+		*poison = *probe;
+	} else {
+		*poison = (uintcap_t)NULL;
+	}
+
+	vm_page_unwire_in_situ(m);
+
+	return (KERN_SUCCESS);
+}
+#endif

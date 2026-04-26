@@ -317,6 +317,71 @@ ENTRY(fuecap)
 	li	a0, 0			/* Success */
 	RETURN				/* Return */
 END(fuecap)
+
+#ifdef CHERI_CAPREVOKE_POISON
+/*
+ * This is a special pcb_onfault value that will
+ * cause the kernel trap handler to deal with CRG faults
+ * in a special manner.
+ *
+ * XXX-AM: This is gross.
+ */
+ENTRY(fsu_fault_poison)
+#ifdef __CHERI_PURE_CAPABILITY__
+	SET_FAULT_HANDLER(cnull, ca1)
+#else
+	SET_FAULT_HANDLER(x0, a1)
+#endif
+	EXIT_USER_ACCESS(a1)
+
+	/*
+	 * Note: probed poison set in ca0 by trap handler.
+	 * XXX-AM: This is either valid poison or an untagged value.
+	 * Squash the untagged value to NULL, because this is polluted
+	 * with an error code sometimes.
+	 */
+	cgettag a1, ca0
+	bnez	a1, 1f
+	cmove	ca0, cnull
+1:
+	RETURN
+END(fsu_fault_poison)
+
+/*
+ * uintcap_t fupoison(volatile void * __capability)
+ */
+ENTRY(fupoison)
+	li	a2, VM_MAXUSER_ADDRESS
+	bgeu	a0, a2, fsu_fault_nopcb
+
+	/* Use a dedicate fault handler to distinguish poison probes */
+#ifdef __CHERI_PURE_CAPABILITY__
+	clgc	ca6, fsu_fault_poison
+	SET_FAULT_HANDLER(ca6, ca2)
+#else
+	la	a6, fsu_fault_poison
+	SET_FAULT_HANDLER(a6, a2)
+
+	cspecialr	ca6, ddc
+	csetaddr	ca0, ca6, a0
+#endif
+	ENTER_USER_ACCESS(a2)
+	CLC		ca0, (ca0)
+	cgettag	a5, ca0
+	cgetcappoison	a6, ca0
+	and	a6, a6, a5
+	bnez	a6, 1f
+	cmove	ca0, cnull
+1:
+	EXIT_USER_ACCESS(a2)
+#ifdef __CHERI_PURE_CAPABILITY__
+	SET_FAULT_HANDLER(cnull, ca2)
+#else
+	SET_FAULT_HANDLER(x0, a2)
+#endif
+	RETURN
+END(fuepoison)
+#endif
 #endif
 
 /*

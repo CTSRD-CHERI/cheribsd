@@ -363,6 +363,12 @@ vm_fault_must_cheri_revoke(vm_map_t map, vm_prot_t prot, vm_page_t m,
 	if ((fault_flags & VM_FAULT_NOPMAP) != 0)
 		return (false);
 
+#ifdef CHERI_CAPREVOKE_POISON
+	/* Or we are just probing for poison */
+	if ((fault_flags & VM_FAULT_POISON_PROBE) != 0)
+		return (false);
+#endif
+
 	return (true);
 }
 
@@ -2107,6 +2113,19 @@ found:
 	 */
 	vm_prot_t realprot = VM_OBJECT_MASK_CAP_PROT(fs.object, fs.prot);
 	realprot = vm_page_mask_cap_prot(fs.m, realprot);
+#ifdef CHERI_CAPREVOKE_POISON
+	/*
+	 * If probing for poison, we did not perform the revocation scan,
+	 * so we will map it withouth CAP_RW prot.
+	 * XXX-AM: Is this a problem if we are racing with the background
+	 * revoker? Can we end up in a situation in which nobody observes the
+	 * page? I think this should be fine because before pmap_fault when
+	 * we take a LOAD/STORE_CAP page fault we will scan the page.
+	 */
+	if ((fault_flags & VM_FAULT_POISON_PROBE) != 0) {
+		realprot &= ~(VM_PROT_READ_CAP | VM_PROT_WRITE_CAP);
+	}
+#endif
 
 	pmap_enter(fs.map->pmap, vaddr, fs.m, realprot,
 	    fs.fault_type | (fs.wired ? PMAP_ENTER_WIRED : 0), 0);

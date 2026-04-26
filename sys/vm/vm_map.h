@@ -480,6 +480,9 @@ long vmspace_resident_count(struct vmspace *vmspace);
 #define	VM_FAULT_DIRTY	0x02	/* Dirty the page; use w/VM_PROT_COPY */
 #define	VM_FAULT_NOFILL	0x04	/* Fail if the pager doesn't have a copy */
 #define	VM_FAULT_NOPMAP	0x08	/* Do not update the pmap, just hold the page */
+#ifdef CHERI_CAPREVOKE_POISON
+#define	VM_FAULT_POISON_PROBE 0x10 /* Poison probe fault */
+#endif
 
 /*
  * Initially, mappings are slightly sequential.  The maximum window size must

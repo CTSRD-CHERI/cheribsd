@@ -567,8 +567,9 @@ enum vm_cro_at {
  * caller should just repeat the call.  On failure, *ooff will not be modified.
  */
 static enum vm_cro_at
-vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc,
-    vm_map_entry_t entry, vm_offset_t ioff, vm_offset_t *ooff, int *vmres)
+vm_cheri_revoke_object_at(struct vmspace *vm,
+    const struct vm_cheri_revoke_cookie *crc, vm_map_entry_t entry,
+    vm_offset_t ioff, vm_offset_t *ooff, int *vmres)
 {
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 	vm_map_t map = crc->map;
@@ -692,8 +693,22 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc,
 
 		last_timestamp = map->timestamp;
 		vm_map_unlock_read(map);
+#ifdef CHERI_CAPREVOKE_POISON
+		/*
+		 * XXX-AM: This is a significant problem.
+		 * We can't fault and scan together because the page is
+		 * xbusied in vm_fault and scanned before pmap_enter.
+		 * This may cause recursive faults and an xbusy deadlock
+		 * if the page contains capabilities referencing itself.
+		 * To avoid this, fault it without PROT_READ_CAP and then
+		 * perform the visit.
+		 */
+		res = vm_fault(map, addr, VM_PROT_READ | VM_PROT_READ_CAP,
+		    VM_FAULT_NOFILL | VM_FAULT_POISON_PROBE, &m);
+#else
 		res = vm_fault(map, addr, VM_PROT_READ | VM_PROT_READ_CAP,
 		    VM_FAULT_NOFILL, &m);
+#endif
 		vm_map_lock_read(map);
 
 		if (last_timestamp != map->timestamp) {
@@ -718,6 +733,12 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc,
 			return (VM_CHERI_REVOKE_AT_VMERR);
 		}
 
+#ifdef CHERI_CAPREVOKE_POISON
+		/* res == KERN_SUCCESS */
+		/* Ensure that we still update LCLG and such. */
+		mwired = true;
+		goto visit_ro;
+#else
 		/*
 		 * vm_fault will have scanned this page for us, so we're good
 		 * to jump out.  The pmap will have been updated by vm_fault.
@@ -725,6 +746,7 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc,
 		mdidvm = true;
 		mwired = true;
 		goto ok;
+#endif
 	}
 
 	KASSERT(m->object == obj, ("Page lookup bad object?"));
@@ -991,7 +1013,7 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc,
 		/* Find ourselves in this object */
 		ooffset = *addr - entry->start + entry->offset;
 
-		res = vm_cheri_revoke_object_at(crc, entry, ooffset, &ooffset,
+		res = vm_cheri_revoke_object_at(vm, crc, entry, ooffset, &ooffset,
 		    &vmres);
 		switch (res) {
 		case VM_CHERI_REVOKE_AT_VMERR:

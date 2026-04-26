@@ -183,6 +183,104 @@ vm_cheri_revoke_test_mem_fine_range(const uint8_t * __capability crshadow,
 	return (0);
 }
 
+#ifdef CHERI_CAPREVOKE_POISON
+static unsigned long
+vm_cheri_revoke_test_poison(const uint8_t * __capability crshadow __unused,
+    uintcap_t cut, unsigned long perms, vm_offset_t start __unused,
+    vm_offset_t end __unused)
+{
+	void * __capability rw_cut;
+	uintcap_t poison;
+
+	/*
+	 * In principle we should look for poison capabilities anywhere in
+	 * the [base(cut), top(cut)), but we rely on the following:
+	 * 1. If `cut` is quarantined, then the full range [base, top) is
+	 * poisoned
+	 * 2. If `cut` is an allocator capability that is not quarantined,
+	 * but happens to have the first word containing poison, then
+	 * it will bear both PERM_SW_VMEM and PERM_POISON and we will leave
+	 * it alone regardless.
+	 * 3. Loading a poison capability does not cause a CRG load trap
+	 *  (not currently the case), or probing for poison does not cause
+	 *  a CRG load trap.
+	 *
+	 * As a result, we can only check the first capability at the base
+	 * of the allocation for poison.
+	 */
+	if ((perms & CHERI_PERM_SW_VMEM) == 0) {
+		KASSERT(cheri_gettag(cut),
+		    ("Attempt to check poison on invalid cap %#p",
+			(void * __capability)cut));
+		KASSERT(cheri_is_poison(cut) == 0,
+		    ("Attempt to check poison on poison cap %#p",
+			(void * __capability)cut));
+		/*
+		 * We must tolerate page faults at this stage.
+		 * These are user page faults coming from kernel space.
+		 * To do this we either need CAPREVOKE_FAST_COPYIN to
+		 * install a custom pcb_onfault, or we have to fuecap.
+		 * Both a quite expensive if we get a page fault, and
+		 * this also means that we may get a recursive
+		 * page scan because the revoker needs to observe
+		 * that page.
+		 * The recursive page scan can occur regardless of
+		 * FAST_COPYIN and MUST be avoided, because the poison
+		 * lookup needs to be computationally bounded.
+		 * The page scan can be triggered in multiple ways:
+		 * 1. recursive CRG fault due to the capability load.
+		 * 2. recursive page scan due to mapping a CAPDIRTY page.
+		 */
+
+		/*
+		 * Note: we need to re-derive the cut capability,
+		 * because we will try to load poison from it, so:
+		 * - It can not be sealed
+		 * - It must permit LOAD_CAP
+		 * - It must be valid
+		 *
+		 * XXX-AM: We should use cheri_capability_build_user_rwx, but
+		 * it will lock the curthread map and lookup the mapping to
+		 * check that the reservation layout is sensible.
+		 * We use the userspace root cap here to avoid doing
+		 * this in the revoker loop.
+		 *
+		 * XXX-AM: It is unclear what to do if the original capability
+		 * has length < sizeof(uintcap_t).
+		 * This may occur due to delegation of an allocation sub-object,
+		 * and therefore it should be revoked.
+		 * At the same time, accessing outside the bounds means that
+		 * we are potentially doing an OOB access from the kernel and
+		 * violating monotonicity.
+		 * Similarly, we need to round the address to a capability
+		 * boundary.
+		 */
+		rw_cut = cheri_setoffset(userspace_root_cap, cheri_getbase(cut));
+		rw_cut = rounddown2(rw_cut, sizeof(uintcap_t));
+		rw_cut = cheri_setbounds(rw_cut, sizeof(uintcap_t));
+		poison = fupoison(rw_cut);
+
+		/*
+		 * The poison probe can fail legitimately in some
+		 * cases.
+		 * - The page is not mapped (e.g. stack guard page)
+		 * In these cases, we accept that the capability
+		 * can not be poisoned, because poisoning requires
+		 * that the memory has been mapped to write poison into.
+		 *
+		 * XXX-AM: It is unclear whether this failure mode
+		 * can cause invalid poison detection in corner
+		 * cases.
+		 * Currently this is indistinguishable from no-poison
+		 * in the fupoison return value.
+		 */
+		return ((void * __capability)poison != NULL);
+	}
+
+	return (0);
+}
+#endif
+
 void
 vm_cheri_revoke_set_test(vm_map_t map, int flags)
 {
@@ -208,6 +306,14 @@ vm_cheri_revoke_set_test(vm_map_t map, int flags)
 
 		map->vm_cheri_revoke_test = vm_cheri_revoke_test_just_mem;
 		break;
+
+#ifdef CHERI_CAPREVOKE_POISON
+	case VM_CHERI_REVOKE_CF_POISON:
+	case VM_CHERI_REVOKE_CF_POISON | VM_CHERI_REVOKE_CF_NO_REV_ENTRY:
+
+		map->vm_cheri_revoke_test = vm_cheri_revoke_test_poison;
+		break;
+#endif
 
 	default:
 		panic("Bad cheri_revoke cookie flags 0x%x\n", flags);

@@ -340,6 +340,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	vm_offset_t va;
 	struct proc *p;
 	int error, sig, ucode;
+	int fault_flags;
 #ifdef KDB
 	bool handled;
 #endif
@@ -426,7 +427,26 @@ skip_pmap:
 	    "Kernel page fault") != 0)
 		goto fatal;
 
-	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
+	fault_flags = VM_FAULT_NORMAL;
+#ifdef CHERI_CAPREVOKE_POISON
+	if (pcb->pcb_onfault == (vm_pointer_t)fsu_fault_poison) {
+		/*
+		 * XXX-AM: This is necessary to prevent the vm_fault
+		 * machinery from recursively scanning the page.
+		 * However, this means that the resulting PTE will
+		 * fault again when accessed for cap load or store.
+		 * Note that we should never reach here with ftype
+		 * VM_PROT_READ_CAP or VM_PROT_WRITE_CAP.
+		 * These are handled separately in the kernel trap
+		 * handler.
+		 */
+		KASSERT((ftype & (VM_PROT_READ_CAP | VM_PROT_WRITE_CAP)) == 0,
+		    ("Invalid poison probe fault type"));
+		fault_flags |= VM_FAULT_POISON_PROBE;
+	}
+#endif
+
+	error = vm_fault_trap(map, va, ftype, fault_flags, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
 			call_trapsignal(td, sig, ucode, stval,
@@ -462,9 +482,55 @@ fatal:
 			return;
 	}
 #endif
-	panic("Fatal page fault at %#lx: %#lx", (unsigned long)frame->tf_sepc,
-	    stval);
+	panic("Fatal page fault at %#lx: %#lx (u=%d)", (unsigned long)frame->tf_sepc,
+	    stval, usermode);
 }
+
+#if __has_feature(capabilities) && defined(CHERI_CAPREVOKE_POISON)
+/*
+ * Handle a kernel CRG fault while probing for a poison capability.
+ *
+ * This can only occur when the kernel revoker probes a capability
+ * to determine whether it is poisoned.
+ * This emulates a cgetpoison probe that is immune to CRG faults
+ * but will only ever load a valid poison capability, in any other
+ * case cnull is placed in a0.
+ *
+ * The resulting poison capability is returned in ca0 to fsu_fault_poison.
+ *
+ * XXX-AM: This is gross.
+ */
+static void
+poison_probe_handler(struct trapframe *frame)
+{
+	int error;
+
+	/* Ensure the fault involves an user address */
+	KASSERT(frame->tf_stval <= VM_MAX_USER_ADDRESS,
+	    ("Invalid poison probe address %#lx", frame->tf_stval));
+	/* Ensure that the probe is aligned */
+	KASSERT(is_aligned(frame->tf_stval, sizeof(uintcap_t)),
+	    ("Unaligned poison probe address %#lx", frame->tf_stval));
+
+	/*
+	 * Assume that if we got a CRG fault we have a PTE, it just
+	 * has the wrong CRG.
+	 * The vm layer will probe the poison using the direct map,
+	 * while holding the page.
+	 */
+	error = vm_cheri_revoke_probe_poison(&curproc->p_vmspace->vm_map,
+	    frame->tf_stval, &frame->tf_a[0]);
+	if (error)
+		panic("Poison probe failed %#lx", frame->tf_stval);
+
+#ifndef __CHERI_PURE_CAPABILITY__
+	frame->tf_sepc = cheri_setaddress(frame->tf_sepc,
+	    curthread->td_pcb->pcb_onfault);
+#else
+	frame->tf_sepc = curthread->td_pcb->pcb_onfault;
+#endif
+}
+#endif
 
 void
 do_trap_supervisor(struct trapframe *frame)
@@ -566,6 +632,17 @@ do_trap_supervisor(struct trapframe *frame)
 			break;
 		}
 		}
+#endif
+#if __has_feature(capabilities) && defined(CHERI_CAPREVOKE_POISON)
+	case SCAUSE_LOAD_CAP_PAGE_FAULT:
+		if (curthread->td_pcb->pcb_onfault ==
+		    (vm_pointer_t)fsu_fault_poison) {
+			poison_probe_handler(frame);
+		} else {
+			dump_regs(frame);
+			panic("Unexpected CRG fault in kernel");
+		}
+		break;
 #endif
 	default:
 		dump_regs(frame);
