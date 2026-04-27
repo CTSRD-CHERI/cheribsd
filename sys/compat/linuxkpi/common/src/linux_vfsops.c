@@ -767,15 +767,19 @@ mount_bdev(struct file_system_type *fs_type, int flags, const char *dev_name,
 	vref(devvp); // XXX needed?
 	sb->s_devvp = devvp;
 
-	if (!vn_isdisk_error(devvp, &error))
-		goto fail2;
+	if (!vn_isdisk_error(devvp, &error)) {
+		vput(devvp);
+		goto fail;
+	}
 
 	/* Check the access rights on the mount device */
 	error = VOP_ACCESS(devvp, VREAD | VWRITE, td->td_ucred, td);
 	if (error != 0)
 		error = priv_check(td, PRIV_VFS_MOUNT_PERM);
-	if (error != 0)
-		goto fail2;
+	if (error != 0) {
+		vput(devvp);
+		goto fail;
+	}
 
 	_g_topology_lock();
 	error = g_vfs_open(devvp, &cp, fs_type->name,
