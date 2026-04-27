@@ -584,6 +584,9 @@ vm_cheri_revoke_object_at(struct vmspace *vm,
 	bool mxbusy = false;
 	bool mdidvm = false;
 	bool viscap = false;
+#ifdef CHERI_CAPREVOKE_POISON
+	bool faultrw = false;
+#endif
 
 	VM_OBJECT_ASSERT_WLOCKED(obj);
 
@@ -735,7 +738,7 @@ vm_cheri_revoke_object_at(struct vmspace *vm,
 
 #ifdef CHERI_CAPREVOKE_POISON
 		/* res == KERN_SUCCESS */
-		/* Ensure that we still update LCLG and such. */
+		mdidvm = true;
 		mwired = true;
 		goto visit_ro;
 #else
@@ -829,6 +832,9 @@ visit_rw_fault:
 
 	mwired = true;
 	mdidvm = true;
+#ifdef CHERI_CAPREVOKE_POISON
+	faultrw = true;
+#endif
 
 ok:
 	VM_OBJECT_ASSERT_UNLOCKED(obj);
@@ -885,6 +891,30 @@ ok:
 		mwired = false;
 		mxbusy = false;
 	} else {
+#ifdef CHERI_CAPREVOKE_POISON
+		/*
+		 * In this case, the fault did not map the page for PROT_CAP.
+		 * We need to re-engage the pmap machinery to update the
+		 * mapping to be cap-permissive if necessary.
+		 */
+		vm_map_unlock_read(map);
+		if (faultrw) {
+			res = vm_fault(map, addr,
+			    VM_PROT_WRITE | VM_PROT_WRITE_CAP,
+			    VM_FAULT_NORMAL, &m);
+		} else {
+			res = vm_fault(map, addr,
+			    VM_PROT_READ | VM_PROT_READ_CAP,
+			    VM_FAULT_NOFILL, &m);
+		}
+		/*
+		 * XXX-AM: I guess we should also check again the
+		 * map->timestamp and do something about it...
+		 */
+		vm_map_lock_read(map);
+		if (res != KERN_SUCCESS)
+			panic("Unexpected secondary fault failure");
+#endif
 #ifdef INVARIANTS
 		vm_page_t m2 = m;
 
