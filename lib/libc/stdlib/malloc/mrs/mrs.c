@@ -1575,11 +1575,11 @@ mrs_malloc(size_t size)
 		return (allocated_region);
 	}
 #ifdef CLEAR_ON_ALLOC_PVER_INIT
-	csetpver(allocated_region, 0);
-	if(init_enable){
-		for(int i =0 ; i< cheri_getlen(allocated_region); i+=16)
-			cpoison(allocated_region + i);
-		csetpver(allocated_region, 1);
+	cheri_poison_set_version(allocated_region, 0);
+	if (init_enable) {
+		for(int i = 0; i < cheri_getlen(allocated_region); i += 16)
+			cheri_poison_set(allocated_region + i);
+		cheri_poison_set_version(allocated_region, 1);
 	}
 #endif
 
@@ -1692,7 +1692,7 @@ mrs_calloc(size_t number, size_t size)
 #ifdef PTRAP_ENABLE 
 	allocated_region = cclearpoisonperm(allocated_region);
 #endif 
-	csetpver(allocated_region, 0);
+	cheri_poison_set_version(allocated_region, 0);
 	return (allocated_region);
 }
 
@@ -1770,7 +1770,7 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 #ifdef PTRAP_ENABLE 
 	*ptr = cclearpoisonperm(*ptr);
 #endif 
-	csetpver(*ptr , 0);
+	cheri_poison_set_version(*ptr , 0);
 	return (ret);
 }
 
@@ -1844,7 +1844,7 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 #ifdef PTRAP_ENABLE 
 	allocated_region = cclearpoisonperm(allocated_region);
 #endif 
-	csetpver(allocated_region , 0);
+	cheri_poison_set_version(allocated_region , 0);
 	return (allocated_region);
 }
 
@@ -1888,10 +1888,10 @@ mrs_realloc(void *ptr, size_t size)
 		return (ptr);
 
 	void *new_alloc = mrs_malloc(size);
-	csetpver(new_alloc , 0);
+	cheri_poison_set_version(new_alloc , 0);
 #ifdef CLEAR_ON_ALLOC_PVER
-	int old_pver = cgetpver(ptr);
-	csetpver(new_alloc,old_pver);
+	int old_pver = cheri_poison_get_version(ptr);
+	cheri_poison_set_version(new_alloc, old_pver);
 #endif 
 
 	/*
