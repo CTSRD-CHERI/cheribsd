@@ -87,7 +87,8 @@ struct fileattr;
 #define	DT_UNKNOWN	0x0
 #endif
 #define	kfree_link NULL // XXX
-#define	ATTR_SIZE	0x01
+#define	ATTR_MODE	0x01
+#define	ATTR_SIZE	0x08
 #define	brelse lkpi_brelse
 
 struct super_block {
