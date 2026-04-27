@@ -518,6 +518,7 @@ lkpi_setattr(struct vop_setattr_args *ap)
 		return (EINVAL);
 	}
 	if (vap->va_mode != (mode_t)VNOVAL) {
+		ia.ia_valid |= ATTR_MODE;
 		ia.ia_mode = vap->va_mode;
 	}
 	if (vap->va_size != VNOVAL) {
@@ -997,8 +998,9 @@ register_filesystem(struct file_system_type *fst)
 void
 setattr_copy(struct mnt_idmap *idmap, struct vnode *vp, const struct iattr *ia)
 {
-	if (ia->ia_mode != 0) {
-		vp->i_mode = ia->ia_mode;
+	if ((ia->ia_valid & ATTR_MODE) != 0) {
+		vp->i_mode &= ~ALLPERMS;
+		vp->i_mode |= ia->ia_mode & ALLPERMS;
 	}
 }
 
