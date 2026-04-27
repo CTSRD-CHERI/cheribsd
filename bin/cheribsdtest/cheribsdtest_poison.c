@@ -91,7 +91,7 @@ CHERIBSDTEST(cheri_poison_revoke,
 	CHERIBSDTEST_VERIFY2((cheri_getperm(mem) & CHERI_PERM_POISON) != 0,
 	    "missing PERM_POISON");
 
-	void *cap = cheri_clearperm(mem, CHERI_PERM_POISON);
+	void *cap = cheri_clearperm(mem, CHERI_PERM_POISON | CHERI_PERM_SW_VMEM);
 	cap = cheri_setboundsexact(cap, 0x100);
 
 	/* Stash the capability */
