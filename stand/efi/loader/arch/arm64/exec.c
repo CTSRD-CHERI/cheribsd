@@ -24,77 +24,13 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stand.h>
-#include <string.h>
-
-#include <sys/param.h>
-#include <sys/linker.h>
-#include <machine/elf.h>
-
 #include <bootstrap.h>
 
-#include <efi.h>
-#include <efilib.h>
-
-#include "loader_efi.h"
-#include "cache.h"
-
-static int elf64_exec(struct preloaded_file *amp);
-static int elf64_obj_exec(struct preloaded_file *amp);
-
-static struct file_format arm64_elf = {
-	elf64_loadfile,
-	elf64_exec
-};
+extern struct file_format elf64_arm64;
+extern struct file_format elf64c_arm64;
 
 struct file_format *file_formats[] = {
-	&arm64_elf,
+	&elf64_arm64,
+	&elf64c_arm64,
 	NULL
 };
-
-static int
-elf64_exec(struct preloaded_file *fp)
-{
-	vm_offset_t modulep, kernendp;
-	vm_offset_t clean_addr;
-	size_t clean_size;
-	struct file_metadata *md;
-	Elf_Ehdr *ehdr;
-	int err;
-	void (*entry)(vm_offset_t);
-
-	if ((md = file_findmetadata(fp, MODINFOMD_ELFHDR)) == NULL)
-        	return(EFTYPE);
-
-	ehdr = (Elf_Ehdr *)&(md->md_data);
-	entry = efi_translate(ehdr->e_entry);
-
-	efi_time_fini();
-	err = bi_load(fp->f_args, &modulep, &kernendp, true);
-	if (err != 0) {
-		efi_time_init();
-		return (err);
-	}
-
-	dev_cleanup();
-
-	/* Clean D-cache under kernel area and invalidate whole I-cache */
-	clean_addr = (vm_offset_t)efi_translate(fp->f_addr);
-	clean_size = (vm_offset_t)efi_translate(kernendp) - clean_addr;
-
-	cpu_flush_dcache((void *)clean_addr, clean_size);
-	cpu_inval_icache();
-
-	(*entry)(modulep);
-	panic("exec returned");
-}
-
-static int
-elf64_obj_exec(struct preloaded_file *fp)
-{
-
-	printf("%s called for preloaded file %p (=%s):\n", __func__, fp,
-	    fp->f_name);
-	return (ENOSYS);
-}
-

@@ -190,48 +190,67 @@ compartment_cpu_cache_fill(u_int cpuid)
 }
 
 static void
-compartment_cpu_cache_init(void *arg __unused)
+compartment_cpu_cache_init_cpu(u_int cpuid)
 {
 	struct compartment_list *critical_compartments;
 	struct compartment *compartment;
 	struct mtx *critical_compartments_spinlock;
 	u_long ii, ncritical_compartments;
-	u_int cpuid;
 
+	ncritical_compartments = COMPARTMENT_CACHE_SIZE;
+	critical_compartments = DPCPU_ID_PTR(cpuid, critical_compartments);
+	STAILQ_INIT(critical_compartments);
+	for (ii = 0; ii < ncritical_compartments; ii++) {
+		compartment = compartment_alloc();
+		STAILQ_INSERT_HEAD(critical_compartments, compartment,
+		    c_critical_next);
+	}
+
+	DPCPU_ID_SET(cpuid, ncritical_compartments, ncritical_compartments);
+
+	critical_compartments_spinlock = DPCPU_ID_PTR(cpuid,
+	    critical_compartments_spinlock);
+	mtx_init(critical_compartments_spinlock,
+	    "critical_compartments_spinlock", NULL, MTX_SPIN);
+}
+
+static void
+compartment_cpu_cache_init_bsp(void *arg __unused)
+{
 	compartment_zone = uma_zcreate("compartment_zone",
 	    sizeof(struct compartment), NULL, NULL, NULL, NULL,
 	    UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
 	if (compartment_zone == NULL)
-		panic("compartment_cpu_cache_init: unable to allocate a zone.");
+		panic("%s: unable to allocate a zone", __func__);
 
-	ncritical_compartments = COMPARTMENT_CACHE_SIZE;
+	compartment_cpu_cache_init_cpu(0);
+}
+
+static void
+compartment_cpu_cache_init_aps(void *arg __unused)
+{
+	u_int cpuid;
+
 	CPU_FOREACH(cpuid) {
-		critical_compartments = DPCPU_ID_PTR(cpuid,
-		    critical_compartments);
-		STAILQ_INIT(critical_compartments);
-		for (ii = 0; ii < ncritical_compartments; ii++) {
-			compartment = compartment_alloc();
-			STAILQ_INSERT_HEAD(critical_compartments, compartment,
-			    c_critical_next);
-		}
+		if (cpuid == 0)
+			continue;
 
-		DPCPU_ID_SET(cpuid, ncritical_compartments,
-		    ncritical_compartments);
-
-		critical_compartments_spinlock = DPCPU_ID_PTR(cpuid,
-		    critical_compartments_spinlock);
-		mtx_init(critical_compartments_spinlock,
-		    "critical_compartments_spinlock", NULL, MTX_SPIN);
+		compartment_cpu_cache_init_cpu(cpuid);
 	}
 }
 
 /*
  * NB: The zone and critical compartments can be allocated after PCPU/DPCPU
  * storage is initialised (on boot) and after the UMA subsystem is sufficiently
- * initialised (as part of SI_SUB_{VM_CONF,COUNTER} but not SI_SUB_TASKQ).
+ * initialised. BSP must be initialised prior to module loading in case of new
+ * SYSINITs, IFUNC resolvers, constructors, etc. APs cannot be initialised
+ * until after mp_start (currently SI_SUB_CPU, SI_ORDER_THIRD) as we need
+ * mp_maxid and all_cpus initialised for CPU_FOREACH to work.
  */
-SYSINIT(compartment_cpu_cache_init, SI_SUB_RUN_QUEUE, SI_ORDER_ANY,
-    compartment_cpu_cache_init, NULL);
+SYSINIT(compartment_cpu_cache_init_bsp, SI_SUB_KLD, SI_ORDER_FIRST,
+    compartment_cpu_cache_init_bsp, NULL);
+SYSINIT(compartment_cpu_cache_init_aps, SI_SUB_CPU, SI_ORDER_ANY,
+    compartment_cpu_cache_init_aps, NULL);
 
 void
 compartment_metadata_create(u_long id, const char *name, uintcap_t base,
