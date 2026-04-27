@@ -610,9 +610,6 @@ lkpi_write(struct vop_write_args *ap)
 	uio->uio_resid -= nbytes;
 	uio->uio_offset += nbytes;
 
-	// XXX: Is this the right way?
-	vp->i_size = uio->uio_offset + uio->uio_resid;
-
 	return (0);
 }
 
