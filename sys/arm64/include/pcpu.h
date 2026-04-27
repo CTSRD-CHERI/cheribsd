@@ -76,16 +76,10 @@ PCPU_DECLARE(struct pmap *, curvmpmap);
 PCPU_DECLARE(uint64_t, mpidr);
 PCPU_DECLARE(u_int, bcast_tlbi_workaround);
 
-#ifdef __CHERI_PURE_CAPABILITY__
 /*
  * XXXKW: pcpu should be stored in ctpidr_el1 but rctpidr_el0 should hold a
  * capability to pcpu with bounds narrowed to pc_curthread.
  */
-register struct pcpu *pcpup __asm ("c18");
-#else
-register struct pcpu *pcpup __asm ("x18");
-#endif
-
 static inline struct pcpu *
 get_pcpu(void)
 {
@@ -128,9 +122,9 @@ void init_cpu_pcpup(void *pcpup);
 #endif
 
 #ifdef PCPU_FUNCS
-#define	__PCPU_PTR(_member)		__pcpu_ptr ## _member (pcpup)
+#define	__PCPU_PTR(_member)		__pcpu_ptr ## _member (get_pcpu())
 #else
-#define	__PCPU_PTR(_member)		__PCPU_REF_PTR(pcpup, _member)
+#define	__PCPU_PTR(_member)		__PCPU_REF_PTR(get_pcpu(), _member)
 #endif
 #define	PCPU_PTR(member)						\
 	(__PCPU_PTR(_ ## member))
