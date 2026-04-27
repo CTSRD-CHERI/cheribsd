@@ -63,12 +63,6 @@ struct debug_monitor_state;
 struct pcb;
 struct pcpu;
 
-#ifdef __CHERI_PURE_CAPABILITY__
-register struct pcpu *pcpup __asm ("c18");
-#else
-register struct pcpu *pcpup __asm ("x18");
-#endif
-
 static inline struct pcpu *
 get_pcpu(void)
 {
@@ -115,10 +109,10 @@ init_cpu_pcpup(void *pcpup)
 
 #define	curthread get_curthread()
 
-#define	PCPU_GET(member)	(pcpup->pc_ ## member)
-#define	PCPU_ADD(member, value)	(pcpup->pc_ ## member += (value))
-#define	PCPU_PTR(member)	(&pcpup->pc_ ## member)
-#define	PCPU_SET(member,value)	(pcpup->pc_ ## member = (value))
+#define	PCPU_GET(member)	(get_pcpu()->pc_ ## member)
+#define	PCPU_ADD(member, value)	(get_pcpu()->pc_ ## member += (value))
+#define	PCPU_PTR(member)	(&get_pcpu()->pc_ ## member)
+#define	PCPU_SET(member,value)	(get_pcpu()->pc_ ## member = (value))
 
 #define	PCPU_GET_MPIDR(pc)	((pc)->pc_mpidr)
 
