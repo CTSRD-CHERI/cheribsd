@@ -23,6 +23,9 @@ CFLAGS+= -DHAVE_LIBCRYPTO -DHAVE_OPENSSL_EVP_H
 CFLAGS+= -DOPENSSL_API_COMPAT=0x10100000L
 .endif
 
+CFLAGS+=-I/usr/local/include
+LDFLAGS+=-L/usr/local/lib -lcheritree
+
 .include <bsd.prog.mk>
 
 .for mp in ${MAN}

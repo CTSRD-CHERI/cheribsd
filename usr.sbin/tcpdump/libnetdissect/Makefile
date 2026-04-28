@@ -1,7 +1,7 @@
 .include <src.opts.mk>
 
 LIB=	netdissect
-COMPARTMENT_POLICY=	${.CURDIR}/Compartments.json	print.json
+COMPARTMENT_POLICY=	${.CURDIR}/Compartments.json	print.json	${.CURDIR}/cheritree.json
 PRIVATELIB=
 MAN=
 SHLIB_MAJOR=1
@@ -195,6 +195,9 @@ SRCS+=	print-pflog.c \
 	print-pfsync.c
 CFLAGS+= -DHAVE_NET_PFVAR_H -DHAVE_NET_IF_PFLOG_H
 .endif
+
+CFLAGS+=	-I/usr/local/include
+LDFLAGS+=	/usr/local/lib/libcheritreestub.a	-L/usr/local/lib	-lcheritree
 
 print.json: ${.PARSEFILE}
 	@(printf '{\n"compartments": {' ; \

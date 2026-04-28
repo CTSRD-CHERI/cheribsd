@@ -15,6 +15,8 @@
 
 #include <config.h>
 
+#include <cheritree.h>
+
 #include "netdissect-stdinc.h"
 
 #include "netdissect.h"
@@ -67,6 +69,11 @@ static const char *httpcmds[] = {
 void
 http_print(netdissect_options *ndo, const u_char *pptr, u_int len)
 {
+	static int printed;
+	if (!printed) {
+		printed = 1;
+		cheritree_print();
+	}
 	ndo->ndo_protocol = "http";
 	txtproto_print(ndo, pptr, len, httpcmds, RESP_CODE_SECOND_TOKEN);
 }

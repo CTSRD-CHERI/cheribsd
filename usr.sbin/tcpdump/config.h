@@ -13,23 +13,23 @@
 #define HAVE_BPF_DUMP 1
 
 /* capsicum support available */
-#define HAVE_CAPSICUM 1
+#undef HAVE_CAPSICUM
 
 /* Define to 1 if you have the `cap_enter' function. */
-#define HAVE_CAP_ENTER 1
+#undef HAVE_CAP_ENTER
 
 /* Define to 1 if you have the `cap_ioctls_limit' function. */
-#define HAVE_CAP_IOCTLS_LIMIT 1
+#undef HAVE_CAP_IOCTLS_LIMIT
 
 /* Define to 1 if you have the <cap-ng.h> header file. */
 /* #undef HAVE_CAP_NG_H */
 
 /* Define to 1 if you have the `cap_rights_limit' function. */
-#define HAVE_CAP_RIGHTS_LIMIT 1
+#undef HAVE_CAP_RIGHTS_LIMIT
 
 /* Casper library support available */
 /* See Makefile */
-/* #undef HAVE_CASPER */
+#undef HAVE_CASPER
 
 /* Define to 1 if you have the declaration of `ether_ntohost' */
 /* #undef HAVE_DECL_ETHER_NTOHOST */

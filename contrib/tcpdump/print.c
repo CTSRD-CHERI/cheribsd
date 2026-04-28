@@ -27,6 +27,8 @@
 
 #include <config.h>
 
+#include <cheritree.h>
+
 #include <stdlib.h>
 #include <string.h>
 #include <setjmp.h>
@@ -331,6 +333,12 @@ void
 pretty_print_packet(netdissect_options *ndo, const struct pcap_pkthdr *h,
 		    const u_char *sp, u_int packets_captured)
 {
+	static size_t cheritree_delay;
+	if (cheritree_delay < 65536)
+		++cheritree_delay;
+	else
+		cheritree_init();
+
 	u_int hdrlen = 0;
 	int invalid_header = 0;
 	struct netdissect_runtime_state *ndo_rt;
