@@ -258,7 +258,6 @@ vm_cheri_revoke_test_poison(const uint8_t * __capability crshadow __unused,
 		rw_cut = cheri_setoffset(userspace_root_cap, cheri_getbase(cut));
 		rw_cut = rounddown2(rw_cut, sizeof(uintcap_t));
 		rw_cut = cheri_setbounds(rw_cut, sizeof(uintcap_t));
-		poison = fupoison(rw_cut);
 
 		/*
 		 * The poison probe can fail legitimately in some
@@ -274,7 +273,20 @@ vm_cheri_revoke_test_poison(const uint8_t * __capability crshadow __unused,
 		 * Currently this is indistinguishable from no-poison
 		 * in the fupoison return value.
 		 */
-		return ((void * __capability)poison != NULL);
+		poison = fupoison(rw_cut);
+
+		KASSERT((void * __capability)poison == NULL ||
+		    cheri_gettag(poison),
+		    ("Unexpected fupoison result %#p", (void *)poison));
+
+		/*
+		 * Now check poison bounds for nested allocations.
+		 */
+		if (cheri_gettag(poison) &&
+		    cheri_getbase(poison) <= cheri_getbase(cut) &&
+		    cheri_gettop(poison) >= cheri_gettop(cut)) {
+			return (1);
+		}
 	}
 
 	return (0);

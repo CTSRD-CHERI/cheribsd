@@ -47,11 +47,11 @@ extern void * __capability cheri_buildcap_safe(void * __capability, intcap_t);
 
 #define	cheri_poison_get(x) ({						\
 	int is_poison = 0;						\
-	asm volatile("cgetpoison %0, %1" : "=r" (is_poison) : "C" (x)); \
+	asm volatile("cgetpoison %0, %1" : "=r" (is_poison) : "C" (x));	\
 	is_poison;							\
 })
 
-#define	cheri_poison_set(x)					\
+#define	cheri_poison_set(x)						\
 	asm volatile("cpoison %0, 0(%1)" : : "C" (x), "C" (x))
 
 #define	cheri_is_poison(x) ({						\
