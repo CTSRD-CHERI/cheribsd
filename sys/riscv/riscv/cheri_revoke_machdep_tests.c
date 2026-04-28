@@ -210,10 +210,10 @@ vm_cheri_revoke_test_poison(const uint8_t * __capability crshadow __unused,
 	 */
 	if ((perms & CHERI_PERM_SW_VMEM) == 0) {
 		KASSERT(cheri_gettag(cut),
-		    ("Attempt to check poison on invalid cap %#p",
+		    ("Attempt to check poison on invalid cap %#lp",
 			(void * __capability)cut));
 		KASSERT(cheri_is_poison(cut) == 0,
-		    ("Attempt to check poison on poison cap %#p",
+		    ("Attempt to check poison on poison cap %#lp",
 			(void * __capability)cut));
 		/*
 		 * We must tolerate page faults at this stage.
@@ -277,7 +277,8 @@ vm_cheri_revoke_test_poison(const uint8_t * __capability crshadow __unused,
 
 		KASSERT((void * __capability)poison == NULL ||
 		    cheri_gettag(poison),
-		    ("Unexpected fupoison result %#p", (void *)poison));
+		    ("Unexpected fupoison result %#lp",
+			(void * __capability)poison));
 
 		/*
 		 * Now check poison bounds for nested allocations.
