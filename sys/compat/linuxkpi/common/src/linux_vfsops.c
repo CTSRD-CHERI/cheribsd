@@ -322,6 +322,15 @@ lkpi_read(struct vop_read_args *ap)
 	if (uio->uio_offset < 0)
 		return (EINVAL);
 
+	/*
+	 * Don't call ->read for kernel UIOs, it can only handle userspace
+	 * pointers.
+	 */
+	if (uio->uio_segflg != UIO_USERSPACE) {
+		//printf("%s: uio_segflg %d, should be %d<UIO_USERSPACE>, returning EINVAL\n", __func__, uio->uio_segflg, UIO_USERSPACE);
+		return (EINVAL);
+	}
+
 	// XXX: not this
 	iov = uio->uio_iov;
 	base = iov[0].iov_base;
@@ -581,6 +590,15 @@ lkpi_write(struct vop_write_args *ap)
 	off = uio->uio_offset;
 	if (uio->uio_offset < 0)
 		return (EINVAL);
+
+	/*
+	 * Don't call ->write for kernel UIOs, it can only handle userspace
+	 * pointers.
+	 */
+	if (uio->uio_segflg != UIO_USERSPACE) {
+		//printf("%s: uio_segflg %d, should be %d<UIO_USERSPACE>, returning EINVAL\n", __func__, uio->uio_segflg, UIO_USERSPACE);
+		return (EINVAL);
+	}
 
 	// XXX: not this
 	iov = uio->uio_iov;
