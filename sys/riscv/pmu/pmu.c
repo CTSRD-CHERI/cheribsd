@@ -167,10 +167,25 @@ pmu_attach(device_t dev)
 	return (0);
 }
 
+static int
+pmu_detach(device_t dev)
+{
+	int error;
+
+	error = hwc_backend_unregister(&pmu_backend);
+	if (error) {
+		device_printf(dev, "Could not unregister HWC\n");
+		return (error);
+	}
+
+	return (0);
+}
+
 static device_method_t pmu_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		pmu_probe),
 	DEVMETHOD(device_attach,	pmu_attach),
+	DEVMETHOD(device_detach,	pmu_detach),
 	DEVMETHOD_END
 };
 
