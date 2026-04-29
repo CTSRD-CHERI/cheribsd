@@ -710,7 +710,12 @@ _vpaes_schedule_core:
 	ld1	{v1.2d}, [PTR(8)]		// vmovdqa	(%r8,%r10),	%xmm1
 	tbl	v3.16b, {v3.16b}, v1.16b	// vpshufb  %xmm1,	%xmm3,	%xmm3
 	st1	{v3.2d}, [$out]			// vmovdqu	%xmm3,	(%rdx)
+#ifdef __CHERI_PURE_CAPABILITY__
+	eor	x9, x8, #0x30			// xor	\$0x30, %r8
+	scvalue	c8, c8, x9
+#else
 	eor	x8, x8, #0x30			// xor	\$0x30, %r8
+#endif
 
 .Lschedule_go:
 	cmp	$bits, #192			// cmp	\$192,	%esi
