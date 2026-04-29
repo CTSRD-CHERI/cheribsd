@@ -161,7 +161,8 @@ _vpaes_encrypt_core:
 	tbl	v4.16b, {v3.16b}, v1.16b	// vpshufb	%xmm1,	%xmm3,	%xmm4	# 0 = 2B+C
 	eor	v0.16b, v0.16b, v3.16b		// vpxor	%xmm3,	%xmm0,	%xmm0	# 3 = 2A+B+D
 #ifdef __CHERI_PURE_CAPABILITY__
-	alignd	c11, c11, #6			// and		$0x30,	%r11		# ... mod 4
+	and	x12, x11, #~(1<<6)		// and		$0x30,	%r11		# ... mod 4
+	scvalue	c11, c11, x12
 #else
 	and	x11, x11, #~(1<<6)		// and		$0x30,	%r11		# ... mod 4
 #endif
@@ -270,7 +271,8 @@ _vpaes_encrypt_2x:
 	eor	v0.16b,  v0.16b,  v3.16b	// vpxor	%xmm3,	%xmm0,	%xmm0	# 3 = 2A+B+D
 	eor	v8.16b,  v8.16b,  v11.16b
 #ifdef __CHERI_PURE_CAPABILITY__
-	alignd	c11, c11, #6			// and		$0x30,	%r11		# ... mod 4
+	and	x12, x11, #~(1<<6)		// and		$0x30,	%r11		# ... mod 4
+	scvalue	c11, c11, x12
 #else
 	and	x11, x11, #~(1<<6)		// and		$0x30,	%r11		# ... mod 4
 #endif
@@ -988,7 +990,8 @@ _vpaes_schedule_mangle:
 	tbl	v3.16b, {v3.16b}, v1.16b	// vpshufb	%xmm1,	%xmm3,	%xmm3
 	add	PTR(8), PTR(8), #64-16		// add	$-16,	%r8
 #ifdef __CHERI_PURE_CAPABILITY__
-	alignd	c8, c8, #6			// and	$0x30,	%r8
+	and	x9, x8, #~(1<<6)		// and	$0x30,	%r8
+	scvalue	c8, c8, x9
 #else
 	and	x8, x8, #~(1<<6)		// and	$0x30,	%r8
 #endif
