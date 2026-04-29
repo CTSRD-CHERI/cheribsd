@@ -162,7 +162,7 @@ _vpaes_encrypt_core:
 	eor	v0.16b, v0.16b, v3.16b		// vpxor	%xmm3,	%xmm0,	%xmm0	# 3 = 2A+B+D
 #ifdef __CHERI_PURE_CAPABILITY__
 	alignd	c11, c11, #6			// and		$0x30,	%r11		# ... mod 4
-#else		     
+#else
 	and	x11, x11, #~(1<<6)		// and		$0x30,	%r11		# ... mod 4
 #endif
 	eor	v0.16b, v0.16b, v4.16b		// vpxor	%xmm4,	%xmm0, %xmm0	# 0 = 2A+3B+C+D
@@ -271,7 +271,7 @@ _vpaes_encrypt_2x:
 	eor	v8.16b,  v8.16b,  v11.16b
 #ifdef __CHERI_PURE_CAPABILITY__
 	alignd	c11, c11, #6			// and		$0x30,	%r11		# ... mod 4
-#else		     
+#else
 	and	x11, x11, #~(1<<6)		// and		$0x30,	%r11		# ... mod 4
 #endif
 	eor	v0.16b,  v0.16b,  v4.16b	// vpxor	%xmm4,	%xmm0, %xmm0	# 0 = 2A+3B+C+D
@@ -984,7 +984,7 @@ _vpaes_schedule_mangle:
 	add	PTR(8), PTR(8), #64-16		// add	$-16,	%r8
 #ifdef __CHERI_PURE_CAPABILITY__
 	alignd	c8, c8, #6			// and	$0x30,	%r8
-#else		     
+#else
 	and	x8, x8, #~(1<<6)		// and	$0x30,	%r8
 #endif
 	st1	{v3.2d}, [PTR(2)]			// vmovdqu	%xmm3,	(%rdx)
