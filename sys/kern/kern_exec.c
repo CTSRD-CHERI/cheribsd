@@ -1753,6 +1753,10 @@ exec_args_add_str(struct image_args *args, const char * __capability str,
 {
 	int error;
 	size_t length;
+#if __has_feature(capabilities)
+	size_t rounded_length;
+	size_t base_pad;
+#endif
 
 	KASSERT(args->endp != NULL, ("endp not initialized"));
 	KASSERT(args->begin_argv != NULL, ("begin_argp not initialized"));
@@ -1765,7 +1769,16 @@ exec_args_add_str(struct image_args *args, const char * __capability str,
 		    &length);
 	if (error != 0)
 		return (error == ENAMETOOLONG ? E2BIG : error);
+#if __has_feature(capabilities)
+	rounded_length = CHERI_REPRESENTABLE_LENGTH(length);
+	base_pad = CHERI_REPRESENTABLE_ALIGN_UP(args->endp, rounded_length) -
+	    args->endp;
+	if (rounded_length + base_pad > args->stringspace)
+		return (E2BIG);
+	args->stringspace -= base_pad + rounded_length;
+#else
 	args->stringspace -= length;
+#endif
 	args->endp += length;
 	(*countp)++;
 
@@ -1828,9 +1841,6 @@ exec_args_get_begin_envv(struct image_args *args)
  * Copy strings out to the new process address space, constructing new arg
  * and env vector tables. Return a pointer to the base so that it can be used
  * as the initial stack pointer.
- *
- * XXX: We may want a wrapper of cheri_bounds_set() that warns about
- * capabilities that are overly broad.
  */
 int
 exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
@@ -1843,9 +1853,15 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	struct proc *p;
 	struct sysentvec *sysent;
 	size_t execpath_len, len;
+	size_t strings_len;
 	int error, szsigcode;
 	char canary[sizeof(long) * 8];
 	bool strings_on_stack;
+#if __has_feature(capabilities)
+	size_t rounded_len;
+	size_t argv_space, envv_space;
+	uintcap_t vecstr_cap;
+#endif
 
 	p = imgp->proc;
 	sysent = p->p_sysent;
@@ -1929,11 +1945,16 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 
 	/*
 	 * Allocate room for the argument and environment strings.
+	 * On CHERI, ensure that the entire stringspace sub-allocation is
+	 * representable.
 	 */
-	destp -= ARG_MAX - imgp->args->stringspace;
+	strings_len = ARG_MAX - imgp->args->stringspace;
+	destp -= strings_len;
 	destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
-	ustringp = cheri_bounds_set(destp, ARG_MAX - imgp->args->stringspace);
+	strings_len = CHERI_REPRESENTABLE_LENGTH(strings_len);
+	destp = CHERI_REPRESENTABLE_ALIGN_DOWN(destp, strings_len);
+	ustringp = cheri_bounds_set_exact(destp, strings_len);
 #else
 	ustringp = destp;
 #endif
@@ -1965,7 +1986,18 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Allocate room for the argv[] and env vectors including the
 	 * terminating NULL pointers.
 	 */
+#if __has_feature(capabilities)
+	argv_space = (imgp->args->argc + 1) * sizeof(*vectp);
+	envv_space = (imgp->args->envc + 1) * sizeof(*vectp);
+	envv_space = CHERI_REPRESENTABLE_LENGTH(envv_space);
+	vectp -= imgp->args->envc + 1;
+	vectp = CHERI_REPRESENTABLE_ALIGN_DOWN(vectp, envv_space);
+	argv_space = CHERI_REPRESENTABLE_LENGTH(argv_space);
+	vectp -= imgp->args->argc + 1;
+	vectp = CHERI_REPRESENTABLE_ALIGN_DOWN(vectp, argv_space);
+#else
 	vectp -= imgp->args->argc + 1 + imgp->args->envc + 1;
+#endif
 
 	if (!strings_on_stack) {
 		*stack_base = (uintcap_t)imgp->stack;
@@ -1982,17 +2014,23 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 
 	/*
 	 * Copy out strings - arguments and environment.
+	 *
+	 * For CHERI, strings are copied out individually when populating the
+	 * string vectors to account for padding. For non-CHERI, the buffer is
+	 * packed and copied out as one buffer.
 	 */
+#if !__has_feature(capabilities)
 	error = copyout(stringp, (void * __capability)ustringp,
 	    ARG_MAX - imgp->args->stringspace);
 	if (error != 0)
 		return (error);
+#endif
 
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
 #if __has_feature(capabilities)
-	imgp->argv = cheri_bounds_set(vectp, (argc + 1) * sizeof(*vectp));
+	imgp->argv = cheri_bounds_set_exact(vectp, argv_space);
 #else
 	imgp->argv = vectp;
 #endif
@@ -2006,14 +2044,21 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; argc > 0; --argc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, cheri_bounds_set(ustringp, len)) != 0)
+		rounded_len = CHERI_REPRESENTABLE_LENGTH(len);
+		ustringp = CHERI_REPRESENTABLE_ALIGN_UP(ustringp, rounded_len);
+		error = copyout(stringp, (void * __capability)ustringp, len);
+		if (error != 0)
+			return (error);
+		vecstr_cap = cheri_bounds_set_exact(ustringp, rounded_len);
+		if (sucap(vectp++, vecstr_cap) != 0)
 			return (EFAULT);
+		ustringp += rounded_len;
 #else
 		if (suptr(vectp++, ustringp) != 0)
 			return (EFAULT);
+		ustringp += len;
 #endif
 		stringp += len;
-		ustringp += len;
 	}
 
 	/* a null vector table pointer separates the argp's from the envp's */
@@ -2021,7 +2066,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		return (EFAULT);
 
 #if __has_feature(capabilities)
-	imgp->envv = cheri_bounds_set(vectp, (envc + 1) * sizeof(*vectp));
+	vectp = CHERI_REPRESENTABLE_ALIGN_UP(vectp, argv_space);
+	imgp->envv = cheri_bounds_set_exact(vectp, envv_space);
 #else
 	imgp->envv = vectp;
 #endif
@@ -2035,14 +2081,22 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; envc > 0; --envc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, cheri_bounds_set(ustringp, len)) != 0)
+		rounded_len = CHERI_REPRESENTABLE_LENGTH(len);
+		ustringp = CHERI_REPRESENTABLE_ALIGN_UP(ustringp, rounded_len);
+		error = copyout(stringp, (void * __capability)ustringp,
+		    rounded_len);
+		if (error != 0)
+			return (error);
+		vecstr_cap = cheri_bounds_set_exact(ustringp, rounded_len);
+		if (sucap(vectp++, vecstr_cap) != 0)
 			return (EFAULT);
+		ustringp += rounded_len;
 #else
 		if (suptr(vectp++, ustringp) != 0)
 			return (EFAULT);
+		ustringp += len;
 #endif
 		stringp += len;
-		ustringp += len;
 	}
 
 	/* end of vector table is a null pointer */
@@ -2052,7 +2106,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	if (imgp->auxargs) {
 		vectp++;
 #if __has_feature(capabilities)
-		imgp->auxv = cheri_bounds_set(vectp,
+		imgp->auxv = cheri_bounds_set_exact(vectp,
 		    AT_COUNT * sizeof(Elf_Auxinfo));
 #else
 		imgp->auxv = vectp;
