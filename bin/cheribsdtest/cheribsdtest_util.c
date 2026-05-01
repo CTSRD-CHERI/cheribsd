@@ -59,7 +59,11 @@
 static void
 vcheribsdtest_failure_errx(const char *msg, va_list ap)
 {
-
+	if (ccsp == NULL) {
+		vfprintf(stderr, msg, ap);
+		fprintf(stderr, "\n");
+		return;
+	}
 	ccsp->ccs_testresult = TESTRESULT_FAILURE;
 	vsnprintf(ccsp->ccs_testresult_str, sizeof(ccsp->ccs_testresult_str),
 	    msg, ap);
@@ -71,6 +75,11 @@ vcheribsdtest_failure_errc(int code, const char *msg, va_list ap)
 	size_t buflen;
 	int len;
 
+	if (ccsp == NULL) {
+		vfprintf(stderr, msg, ap);
+		fprintf(stderr, "\n");
+		return;
+	}
 	ccsp->ccs_testresult = TESTRESULT_FAILURE;
 	buflen = sizeof(ccsp->ccs_testresult_str);
 	len = vsnprintf(ccsp->ccs_testresult_str, buflen, msg, ap);
