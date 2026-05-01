@@ -90,6 +90,7 @@ static int tests_run, tests_skipped;
 static int tests_failed, tests_passed, tests_xfailed, tests_xpassed;
 static int expected_failures;
 static int is_execed_child;
+static int execed_child_has_extra_argv;
 static int list;
 static int run_all;
 static int fast_tests_only;
@@ -667,16 +668,23 @@ cheribsdtest_run_child_name(const char *name)
 }
 
 static char **
-mk_exec_args(const struct cheri_test *ctp)
+mk_exec_args(const struct cheri_test *ctp, char **extra_args)
 {
 	char *execpath;
 	char const **exec_args;
-	int argc = 0, error;
+	int argc = 0;
+	int extra_argc = 0;
+	int error;
+
+	if (extra_args) {
+		while (extra_args[extra_argc] != NULL)
+			extra_argc++;
+	}
 
 	execpath = malloc(PATH_MAX);
 	if (execpath == NULL)
 		err(EX_OSERR, "malloc");
-	exec_args = calloc(5, sizeof(*exec_args));
+	exec_args = calloc(6 + extra_argc, sizeof(*exec_args));
 	if (exec_args == NULL)
 		err(EX_OSERR, "calloc");
 
@@ -692,29 +700,38 @@ mk_exec_args(const struct cheri_test *ctp)
 		errx(EX_OSERR, "elf_aux_info: %s", strerror(error));
 	exec_args[argc++] = execpath;
 	exec_args[argc++] = "-E";
+	if (extra_argc > 0)
+		exec_args[argc++] = "-K";
 	if (coredump_enabled)
 		exec_args[argc++] = "-c";
 	if (verbose)
 		exec_args[argc++] = "-v";
 	exec_args[argc++] = ctp->ct_name;
+	while (extra_argc > 0) {
+		exec_args[argc++] = *(extra_args++);
+		extra_argc--;
+	}
 	exec_args[argc++] = NULL;
 
 	return (__DECONST(char **, exec_args));
 }
 
 pid_t
-cheribsdtest_spawn_child(enum spawn_child_mode mode)
+cheribsdtest_spawn_child_args(enum spawn_child_mode mode, char **argv,
+    char **envv)
 {
 	char **exec_args;
 	int error;
 	pid_t pid;
 
-	exec_args = mk_exec_args(running_test);
+	exec_args = mk_exec_args(running_test, argv);
 
 	switch (mode) {
 	case SC_MODE_POSIX_SPAWN:
+		if (envv == NULL)
+			envv = environ;
 		error = posix_spawn(&pid, exec_args[0], NULL, NULL, exec_args,
-		    environ);
+		    envv);
 		if (error != 0) {
 			errno = error;
 			pid = -1;
@@ -738,8 +755,14 @@ cheribsdtest_spawn_child(enum spawn_child_mode mode)
 	if (pid == -1)
 		err(EX_OSERR, "%s: fork/spawn error (mode = %d)", __func__, mode);
 	if (mode != SC_MODE_POSIX_SPAWN && pid == 0)
-		execve(exec_args[0], exec_args, NULL);
+		execve(exec_args[0], exec_args, envv);
 	return (pid);
+}
+
+pid_t
+cheribsdtest_spawn_child(enum spawn_child_mode mode)
+{
+	return (cheribsdtest_spawn_child_args(mode, NULL, NULL));
 }
 
 static const char *
@@ -810,7 +833,7 @@ main(int argc, char *argv[])
 	argc = xo_parse_args(argc, argv);
 	if (argc < 0)
 		errx(1, "xo_parse_args failed\n");
-	while ((opt = getopt(argc, argv, "acdEfglQqsuvx")) != -1) {
+	while ((opt = getopt(argc, argv, "acdEfgKlQqsuvx")) != -1) {
 		switch (opt) {
 		case 'a':
 			run_all = 1;
@@ -829,6 +852,9 @@ main(int argc, char *argv[])
 			break;
 		case 'g':
 			glob = 1;
+			break;
+		case 'K':
+			execed_child_has_extra_argv = 1;
 			break;
 		case 'l':
 			list = 1;
@@ -866,12 +892,16 @@ main(int argc, char *argv[])
 	}
 	argc -= optind;
 	argv += optind;
+	if (execed_child_has_extra_argv && !is_execed_child) {
+		warnx("-K requires -E");
+		usage();
+	}
 	if (is_execed_child) {
 		if (run_all || glob || list) {
 			warnx("-E is incompatible with -a, -g, and -l");
 			usage();
 		}
-		if (argc != 1) {
+		if (argc != 1 && !execed_child_has_extra_argv) {
 			warnx("-E requires exactly one test argument");
 			usage();
 		}

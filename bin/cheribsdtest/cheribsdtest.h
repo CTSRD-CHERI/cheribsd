@@ -386,6 +386,8 @@ extern ptraddr_t find_address_space_gap(size_t len, size_t align);
  * function.
  */
 extern pid_t cheribsdtest_spawn_child(enum spawn_child_mode mode);
+extern pid_t cheribsdtest_spawn_child_args(enum spawn_child_mode mode,
+    char **argv, char **envv);
 
 const char *skip_need_cheri_revoke(const struct cheri_test *ctp);
 const char *skip_need_default_cheri_revoke(const struct cheri_test *ctp);
