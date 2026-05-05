@@ -16,3 +16,5 @@
 20220512  # TLS and varargs ABI changes on Morello
 # https://github.com/CTSRD-CHERI/cheribsd/commit/6a6e2329153bab6126dc36d3c74871ca75b0c75f
 20240315  # Switch to final ABI for passing memory arguments on Morello
+# https://github.com/CTSRD-CHERI/cheribsd/commit/58148940eb25f74991336171b68ddffe85c342a7
+20260417  # bsd.opts.mk: Switch to new TGOT-based TLS ABI by default for CHERI

@@ -547,6 +547,9 @@ alloc_descriptor_slab(void)
 		mrs_debug_printf("alloc_descriptor_slab: mapping new memory\n");
 		void *ret = mmap(NULL, sizeof(struct mrs_descriptor_slab),
 		    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0);
+		if (ret != NULL)
+			(void)msetname(ret, sizeof(struct mrs_descriptor_slab),
+			    "mrs:alloc_descriptor_slab");
 		return ((ret == MAP_FAILED) ? NULL : ret);
 	} else {
 		mrs_debug_printf("alloc_descriptor_slab: reusing memory\n");

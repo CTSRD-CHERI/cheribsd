@@ -231,6 +231,7 @@
 #define	FREEBSD32_SYS_freebsd32_lio_listio	257
 #define	FREEBSD32_SYS_kbounce	258
 #define	FREEBSD32_SYS_flag_captured	259
+#define	FREEBSD32_SYS_msetname	262
 #define	FREEBSD32_SYS_freebsd11_getdents	272
 #define	FREEBSD32_SYS_lchmod	274
 				/* 275 is obsolete netbsd_lchown */

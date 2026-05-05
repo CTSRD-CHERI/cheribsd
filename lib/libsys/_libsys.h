@@ -222,6 +222,7 @@ typedef int (__sys_lio_listio_t)(int, struct aiocb * __kerncap const * __kerncap
 typedef int (__sys_kbounce_t)(const void * __kerncap, void * __kerncap, size_t, int);
 typedef int (__sys_cheri_revoke_get_shadow_t)(int, void * __kerncap, void * __kerncap);
 typedef void * (__sys_cheri_revoke_t)(int, uint64_t, struct cheri_revoke_syscall_info * __kerncap);
+typedef int (__sys_msetname_t)(void * __kerncap, size_t, const char * __kerncap);
 typedef int (__sys_lchmod_t)(const char * __kerncap, mode_t);
 typedef int (__sys_lutimes_t)(const char * __kerncap, const struct timeval * __kerncap);
 typedef ssize_t (__sys_preadv_t)(int, struct iovec * __kerncap, u_int, off_t);
@@ -627,6 +628,7 @@ int __sys_lio_listio(int mode, struct aiocb * __kerncap const * __kerncap acb_li
 int __sys_kbounce(const void * __kerncap src, void * __kerncap dst, size_t len, int flags);
 int __sys_cheri_revoke_get_shadow(int flags, void * __kerncap arena, void * __kerncap shadow);
 void * __sys_cheri_revoke(int flags, uint64_t start_epoch, struct cheri_revoke_syscall_info * __kerncap crsi);
+int __sys_msetname(void * __kerncap addr, size_t len, const char * __kerncap name);
 int __sys_lchmod(const char * __kerncap path, mode_t mode);
 int __sys_lutimes(const char * __kerncap path, const struct timeval * __kerncap tptr);
 ssize_t __sys_preadv(int fd, struct iovec * __kerncap iovp, u_int iovcnt, off_t offset);

@@ -527,6 +527,7 @@ struct kinfo_lockf {
 #define	KVME_FLAG_GUARD		0x01000000
 #define	KVME_FLAG_UNMAPPED	0x02000000
 #define	KVME_FLAG_HASCAP	0x04000000
+#define	KVME_FLAG_PATH_IS_NAME	0x08000000
 
 #if defined(__amd64__)
 #define	KINFO_OVMENTRY_SIZE	1168

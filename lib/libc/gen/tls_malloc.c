@@ -181,6 +181,7 @@ __morepages(int n)
 	if ((newpp = mmap(0, size, PROT_READ|PROT_WRITE, MAP_ANON, -1,
 	    0)) == MAP_FAILED)
 		return (0);
+	(void)msetname(newpp, size, "libc:tls_malloc");
 
 	newpp->ph_size = size;
 	SLIST_INSERT_HEAD(&curpp, newpp, ph_next);

@@ -1510,6 +1510,78 @@ done2:
 }
 
 #ifndef _SYS_SYSPROTO_H_
+struct msetname_args {
+	const void *addr;
+	size_t len;
+	const char *name;
+};
+#endif
+
+int
+sys_msetname(struct thread *td, struct msetname_args *uap)
+{
+#if __has_feature(capabilities)
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (EPROT);
+	if ((cheri_perms_get(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
+		return (EPROT);
+#endif
+
+	return (kern_msetname(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
+	    uap->name));
+}
+
+int
+kern_msetname(struct thread *td, uintptr_t addr0, size_t len,
+    const char * __capability name)
+{
+	char *lname;
+	vm_offset_t addr;
+	vm_size_t size, pageoff;
+	int error;
+
+	addr = (vm_offset_t)addr0;
+	size = len;
+
+	pageoff = (addr & PAGE_MASK);
+	addr -= pageoff;
+	size += pageoff;
+	size = (vm_size_t) round_page(size);
+	if (addr + size < addr)
+		return (EINVAL);
+
+	/*
+	 * We copy into a larger buffer setting a notional administrative
+	 * limit in length to PATH_MAX, but in fact install a potentially
+	 * truncated version without an error.  This is because VM mapping
+	 * labels are advisory, and it's better to have a shortened version
+	 * than no information.  If use cases change, then an error here
+	 * might be preferable to truncation.
+	 */
+	lname = malloc(PATH_MAX, M_TEMP, M_ZERO | M_WAITOK);
+	error = copyinstr(name, lname, PATH_MAX, NULL);
+	if (error != 0)
+		goto out;
+
+	switch (vm_map_msetname(&td->td_proc->p_vmspace->vm_map, addr,
+	    addr + size, lname)) {
+	case KERN_SUCCESS:
+		error = 0;
+		break;
+
+	case KERN_PROTECTION_FAILURE:
+		error = EACCES;
+		break;
+
+	default:
+		error = EINVAL;
+	}
+out:
+	free(lname, M_TEMP);
+	return (error);
+}
+
+#ifndef _SYS_SYSPROTO_H_
 struct mlock_args {
 	const void *addr;
 	size_t len;
