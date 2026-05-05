@@ -23,7 +23,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd February 25, 2026
+.Dd May 11, 2026
 .Dt COMPARTMENTALIZATION 7
 .Os
 .Sh NAME
@@ -61,8 +61,6 @@ and
 .Ev LD_COMPARTMENT_DISABLE .
 If both environtment variables are set, c18n is disabled.
 Note that environment variables are not reliable inherited when processes fork.
-.Xr rtld 1
-automatically searches from this path first when c18n is enabled.
 .Ss COMPARTMENT TRANSITION TRACING
 Compartment transitions can be traced with the
 .Xr ktrace 1
