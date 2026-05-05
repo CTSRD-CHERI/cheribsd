@@ -42,7 +42,9 @@
 #include <sys/signal.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 
+#include <assert.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -53,9 +55,13 @@
 #include <sysexits.h>
 #include <unistd.h>
 
+#include <cheri/cheric.h>
+
 #include "cheribsdtest.h"
 
 #define	MINCORE_PAGES	3
+
+extern char **environ;
 
 CHERIBSDTEST(cheriabi_mincore,
     "Test CheriABI mincore() with various permissions and bounds")
@@ -779,5 +785,173 @@ CHERIBSDTEST(cheriabi_shmdt_invalid_ptr,
 
 	/* Unmapping the original capabilities should succeed. */
 	free_adjacent_mappings_shm(&mappings);
+	cheribsdtest_success();
+}
+
+/*
+ * Verify that the argv/envv array elements are precisely bounded and
+ * do not have overlapping bounds.
+ */
+static void
+check_string_array_bounds(char **argp)
+{
+	int i;
+
+	for (i = 0; argp[i] != NULL; i++) {
+		char *arg = argp[i];
+
+		CHERIBSDTEST_VERIFY2(
+			cheri_base_get(arg) == cheri_address_get(arg),
+			"unexpected argp[%d] addr and base %#p", i, arg);
+		if (argp[i + 1] != NULL) {
+			char *next = argp[i + 1];
+			CHERIBSDTEST_VERIFY2(cheri_base_get(arg) <
+			    cheri_base_get(next),
+			    "Invalid argp[%d] base: expect %#p < %#p",
+			    i, arg, next);
+			CHERIBSDTEST_VERIFY2(cheri_top_get(arg) <=
+			    cheri_base_get(next),
+			    "Invalid argp[%d] top: %#p overlaps %#p",
+			    i, arg, next);
+		}
+	}
+}
+
+/*
+ * Verify that the argv and envv vectors are precisely bounded.
+ * Verify that each individual string in argv and envv is precisely
+ * bounded and bounds do not overlap.
+ * This assumes that the kernel lays out the argv and envv arrays in-order,
+ * meaning that if the string index i < j, then base(argv[i]) < base(argv[j]).
+ */
+static void
+cheriabi_check_argv_envv_bounds(void)
+{
+	char **argv = entrystate.es_argv;
+	ptraddr_t argv_top = cheri_top_get(argv) - 1;
+	ptraddr_t envv_top = cheri_top_get(environ) - 1;
+
+	if (verbose)
+		fprintf(stderr, "argv=%#p\n", argv);
+
+	/*
+	 * Verify that the argv array is precisely bounded and
+	 * does not overlap envv.
+	 */
+	CHERIBSDTEST_VERIFY2(cheri_base_get(argv) ==
+	    cheri_address_get(argv),
+	    "invalid argv base %#p", argv);
+	CHERIBSDTEST_VERIFY2(!cheri_is_address_inbounds(environ, argv_top) &&
+	    !cheri_is_address_inbounds(argv, envv_top),
+	    "invalid argv bounds %#p overlap envv %#p",
+	    argv, environ);
+
+	check_string_array_bounds(argv);
+	check_string_array_bounds(environ);
+
+	exit(0);
+}
+
+CHERIBSDTEST(cheriabi_argv_bounds,
+    "Check that argv strings are aligned for representability",
+    .ct_child_func = cheriabi_check_argv_envv_bounds)
+{
+	char *argv[2];
+	char *envv[1];
+	char *large_entry;
+	pid_t pid;
+	int res;
+	/*
+	 * Note: the child process is run with <execpath> -E -K <testname> which
+	 * means that we don't have full control over the argv data.
+	 *
+	 * The large_entry_size of 50000 bytes string should be unrepresentable
+	 * everywhere and allows some slack on alignment of the kernel string
+	 * buffer.
+	 * On RISC-V expect CRAM(large_entry_size) = 0xffffffffffffffc0.
+	 */
+	const size_t large_entry_size = 50000;
+
+	large_entry = malloc(large_entry_size);
+	memset(large_entry, 'A', large_entry_size - 1);
+	large_entry[large_entry_size - 1] = '\0';
+
+	argv[0] = large_entry;
+	argv[1] = NULL;
+	envv[0] = NULL;
+
+	pid = cheribsdtest_spawn_child_args(SC_MODE_FORK, argv, envv);
+	CHERIBSDTEST_VERIFY2(pid > 0, "spawning child process failed");
+	waitpid(pid, &res, 0);
+	free(large_entry);
+
+	if (res != 0)
+		cheribsdtest_failure_errx("argv bounds check failed: %d", res);
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(cheriabi_envv_bounds,
+    "Check that envv strings are aligned for representability",
+    .ct_child_func = cheriabi_check_argv_envv_bounds)
+{
+	char *envv[3];
+	char small_entry[] = "XX";
+	char *large_entry;
+	pid_t pid;
+	int res;
+	/* See cheriabi_argv_bounds */
+	const size_t large_entry_size = 50000;
+
+	large_entry = malloc(large_entry_size);
+	memset(large_entry, 'A', large_entry_size - 1);
+	envv[0] = small_entry;
+	envv[1] = large_entry;
+	envv[2] = NULL;
+
+	pid = cheribsdtest_spawn_child_args(SC_MODE_FORK, NULL, envv);
+	CHERIBSDTEST_VERIFY2(pid > 0, "spawning child process failed");
+	waitpid(pid, &res, 0);
+	free(large_entry);
+
+	if (res != 0)
+		cheribsdtest_failure_errx("envv bounds check failed");
+
+	cheribsdtest_success();
+}
+
+/*
+ * To verify argv and envv arrays representability, generate a 5000 entry
+ * argv vector and check that the envv vector sub-allocation is padded.
+ * This assumes that the argv vector begins at a pointer-aligned boundary, but
+ * not necessarily a representable boundary.
+ */
+CHERIBSDTEST(cheriabi_argv_array_bounds,
+    "Check that the argv capability is precisely bounded",
+    .ct_child_func = cheriabi_check_argv_envv_bounds)
+{
+	char **argv;
+	char empty_arg[] = "";
+	char *envv[2]= { empty_arg, NULL };
+	const size_t large_argv_size = 5000;
+	size_t i;
+	pid_t pid;
+	int res;
+
+	/* Note: expect extra argv -E -K <testname> */
+	argv = malloc((large_argv_size + 1) * sizeof(char *));
+	for (i = 0; i < large_argv_size; i++) {
+		argv[i] = empty_arg;
+	}
+	argv[large_argv_size] = NULL;
+
+	pid = cheribsdtest_spawn_child_args(SC_MODE_FORK, argv, envv);
+	CHERIBSDTEST_VERIFY2(pid > 0, "spawning child process failed");
+	waitpid(pid, &res, 0);
+	free(argv);
+
+	if (res != 0)
+		cheribsdtest_failure_errx("argv array bounds check failed");
+
 	cheribsdtest_success();
 }
