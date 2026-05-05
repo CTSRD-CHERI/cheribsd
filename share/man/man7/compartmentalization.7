@@ -41,6 +41,7 @@ dynamically-linked pure-capability programs.
 .Pp
 A new process inherits the compartmentalization setting of its parent.
 To enable c18n for all new processes across the entire system, run
+.Pp
 .Dl sysctl security.cheri.lib_based_c18n_default=1
 .Pp
 To override this and permanently enable or disable c18n for a particular
@@ -50,9 +51,13 @@ tool to write the setting into the executable.
 .Pp
 To override this and temporarily enable or disable c18n for a particular
 executable, run
+.Pp
 .Dl proccontrol -m cheric18n -s enable Ar executable
+.Pp
 or
+.Pp
 .Dl proccontrol -m cheric18n -s disable Ar executable
+.Pp
 as appropriate.
 .Pp
 Overriding this still are the environment variables
@@ -60,7 +65,7 @@ Overriding this still are the environment variables
 and
 .Ev LD_COMPARTMENT_DISABLE .
 If both environtment variables are set, c18n is disabled.
-Note that environment variables are not reliable inherited when processes fork.
+Note that environment variables are not reliably inherited when processes fork.
 .Ss COMPARTMENT TRANSITION TRACING
 Compartment transitions can be traced with the
 .Xr ktrace 1
@@ -133,8 +138,11 @@ C/C++ runtime, threading library, and a few highly-privileged standard library
 functions.
 It is integrated into
 .Xr rtld 1 ,
+the
 .Lb libc ,
+the
 .Lb libsys ,
+the
 .Lb libthr ,
 and various C++ runtime libraries.
 The startup code linked into every executable that executes prior to
