@@ -137,6 +137,9 @@ It is integrated into
 .Lb libsys ,
 .Lb libthr ,
 and various C++ runtime libraries.
+The startup code linked into every executable that executes prior to
+.Fn main
+is also part of the TCB.
 The threat model assumes that attackers can exploit existing vulnerabilities in
 application code to achieve arbitrary code execution.
 However, the compiler toolchain used to build all application code is trusted
