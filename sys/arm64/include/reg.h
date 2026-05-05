@@ -103,7 +103,15 @@ struct arm64_addr_mask {
 	__uint64_t	data;
 };
 
-#if __has_feature(capabilities)
+#if !__has_feature(capabilities)
+struct __chericap {
+	__uint64_t	addr;
+	__uint64_t	meta;
+} __aligned(16);
+
+#define	__uintcap_t	struct __chericap
+#endif
+
 struct capreg {
 	__uintcap_t c[30];
 	__uintcap_t clr;
@@ -119,9 +127,13 @@ struct capreg {
 	__uint64_t tagmask;
 	__uint64_t pad;
 };
+
+#if !__has_feature(capabilities)
+#undef	__uintcap_t
 #endif
 
 #define	__HAVE_REG32
+#define	__HAVE_CAPREG
 
 #endif /* !_MACHINE_REG_H_ */
 
