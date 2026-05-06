@@ -1,0 +1,109 @@
+.\"-
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.\" Copyright (c) 2026 Capabilities Limited
+.\"
+.\" This software was developed by SRI International, the University of
+.\" Cambridge Computer Laboratory (Department of Computer Science and
+.\" Technology), and Capabilities Limited under Defense Advanced Research
+.\" Projects Agency / Air Force Research Laboratory (DARPA/AFRL) Contract
+.\" No. FA8750-24-C-B047 ("DEC").
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd April 8, 2026
+.Dt MSETNAME 2
+.Os
+.Sh NAME
+.Nm msetname
+.Nd associate an advisory name with an anonymous memory mapping
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In sys/mman.h
+.Ft int
+.Fn msetname "void *addr" "size_t len" "const char *name"
+.Sh DESCRIPTION
+The
+.Fn msetname
+system call causes the pages starting at
+.Fa addr
+and continuing for at most
+.Fa len
+bytes to a character string
+.Fa name
+associated with them in the kernel metadata for any underlying mappings.
+Mapping names are used only for the purposes of reporting via
+.Xr libprocstat 3
+and
+.Xr procstat 2 .
+.Ss Namespace
+The
+.Fa name
+is not associated have a structured namespace, but by convention names consist
+of a tuple of subsystem and instance type; for example:
+.Pp
+.Bl -tag -width jemalloc:extent
+.It kernel:vm-guard
+Guard page
+.It kernel:vm-stack
+Kernel-mapped user stack
+.It jemalloc:extent
+Mapping created to hold
+.Xr jemalloc 3
+extents
+.It c81n:stack
+Mapping created to hold a
+.Xr c18n 3
+stack
+.It libthr:stack
+Mapping created to hold a
+.Xr pthread 3
+stack
+.El
+.Sh RETURN VALUES
+.Rv -std msetname
+.Sh ERRORS
+The
+.Fn msetname
+system call will fail if:
+.Bl -tag -width Er
+.It Bq Er EINVAL
+The virtual address range specified by the
+.Fa addr
+and
+.Fa len
+arguments is not valid.
+.El
+.Sh SEE ALSO
+.Xr procstat 1 ,
+.Xr mmap 2 ,
+.Xr libprocstat 3
+.Sh AUTHORS
+.An Robert N M Watson Aq Mt rwatson@FreeBSD.org .
+.Pp
+This manual page was
+developed by SRI International, the University of Cambridge Computer
+Laboratory (Department of Computer Science and Technology), and
+Capabilities Limited under contract
+.Pq FA8750-24-C-B047
+.Pq Do DEC Dc .

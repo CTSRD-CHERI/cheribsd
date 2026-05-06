@@ -1350,6 +1350,15 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
+	/* msetname */
+	case 262: {
+		struct msetname_args *p = params;
+		uarg[a++] = (intcap_t)p->addr; /* void * __kerncap */
+		uarg[a++] = p->len; /* size_t */
+		uarg[a++] = (intcap_t)p->name; /* const char * __kerncap */
+		*n_args = 3;
+		break;
+	}
 	/* lchmod */
 	case 274: {
 		struct lchmod_args *p = params;
@@ -5651,6 +5660,22 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 2:
 			p = "userland struct cheri_revoke_syscall_info * __kerncap";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* msetname */
+	case 262:
+		switch (ndx) {
+		case 0:
+			p = "userland void * __kerncap";
+			break;
+		case 1:
+			p = "size_t";
+			break;
+		case 2:
+			p = "userland const char * __kerncap";
 			break;
 		default:
 			break;
@@ -10189,6 +10214,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 261:
 		if (ndx == 0 || ndx == 1)
 			p = "void *";
+		break;
+	/* msetname */
+	case 262:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
 		break;
 	/* lchmod */
 	case 274:

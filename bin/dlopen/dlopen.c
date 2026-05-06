@@ -6,7 +6,8 @@
  * This software was developed by SRI International, the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
  * Technology), and Capabilities Limited under Defense Advanced Research
- * Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
+ * Projects Agency / Air Force Research Laboratory (DARPA/AFRL) Contract
+ * No. FA8750-24-C-B047 ("DEC").
  */
 
 #include <sys/cdefs.h>

@@ -319,6 +319,8 @@ FBSDprivate_1.0 {
 	__sys_cheri_revoke_get_shadow;
 	_cheri_revoke;
 	__sys_cheri_revoke;
+	_msetname;
+	__sys_msetname;
 	_lchmod;
 	__sys_lchmod;
 	_lutimes;

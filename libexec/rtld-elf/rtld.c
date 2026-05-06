@@ -6132,9 +6132,6 @@ tls_get_slot_remote(struct tcb *tcb, int index)
 			defer->index = index;
 			SLIST_INSERT_HEAD(dtv->dtv_defer, defer, next);
 		}
-
-		rtld_printf("DTV %#p: deferring module %d @ %#p\n", dtv,
-		    defer->index, defer);
 		return (&defer->slot);
 	}
 
@@ -6170,9 +6167,6 @@ tls_get_slot_slow(struct tcb *tcb, int index, bool locked)
 		if (dtv->dtv_defer != NULL) {
 			SLIST_FOREACH_SAFE(defer, dtv->dtv_defer, next,
 			    ndefer) {
-				rtld_printf(
-				    "DTV %#p: installing deferred module %d to %#p\n",
-				    dtv, defer->index, newdtv);
 				newdtv->dtv_slots[defer->index - 1] =
 				    defer->slot;
 				free(defer);
@@ -6297,7 +6291,7 @@ tls_get_tgot(struct tcb *tcb, int index)
 	dtv = tcb->tcb_dtv;
 	/* Check dtv generation in case new modules have arrived */
 	if (__predict_true(dtv->dtv_gen == tls_dtv_generation &&
-	    dtv->dtv_slots[index - 1].dtvs_tls != 0))
+	    dtv->dtv_slots[index - 1].dtvs_tgot != 0))
 		return (dtv->dtv_slots[index - 1].dtvs_tgot);
 	return (tls_get_tgot_slow(tcb, index, NULL));
 }

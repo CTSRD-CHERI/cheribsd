@@ -167,10 +167,10 @@ linux_map_vdso(struct proc *p, vm_object_t obj, vm_offset_t base,
 	map = &vmspace->vm_map;
 
 	vm_object_reference(obj);
-	error = vm_map_fixed(map, obj, 0, base, &addr, size,
+	error = vm_map_fixed_name(map, obj, 0, base, &addr, size,
 	    VM_PROT_READ | VM_PROT_EXECUTE,
 	    VM_PROT_READ | VM_PROT_EXECUTE,
-	    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE);
+	    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE, "linux:vdso");
 	if (error != KERN_SUCCESS) {
 		vm_object_deallocate(obj);
 		return (vm_mmap_to_errno(error));

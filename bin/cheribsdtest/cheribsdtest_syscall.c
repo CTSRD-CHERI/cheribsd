@@ -135,36 +135,67 @@ CHERIBSDTEST(sig_dfl_ign, "Test proper handling of SIG_DFL and SIG_IGN")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(ptrace_basic, "Test basic handling of ptrace functionality")
+CHERIBSDTEST(ptrace_basic,
+    "Test basic handling of ptrace functionality",
+    /* Tracked as https://github.com/CTSRD-CHERI/cheribsd/issues/2621 */
+    .ct_xfail_reason = "ptrace(PT_KILL) does not appear to deliver signal")
 {
 	int cpid, res;
+	int pfd[2];
+	char c;
+
+	CHERIBSDTEST_CHECK_SYSCALL(pipe(pfd));
 
 	cpid = fork();
 	if (cpid != 0) {
-		int status;
+		int status, stopsig, termsig, exitcode;
+
+		/* Wait for child to start. */
+		close(pfd[1]);
+		CHERIBSDTEST_CHECK_EQ_SIZE(read(pfd[0], &c, 1), 1);
+		CHERIBSDTEST_VERIFY(c == 'c');
+		status = 0;
+		res = waitpid(cpid, &status, WNOHANG | WNOWAIT);
+		CHERIBSDTEST_CHECK_EQ_INT(status, 0);
 
 		/* Attach to process */
-		res = ptrace(PT_ATTACH, cpid, NULL, 0);
-		assert(res == 0);
-
-		/* Stop it */
-		kill(cpid, SIGURG);
+		CHERIBSDTEST_CHECK_SYSCALL(ptrace(PT_ATTACH, cpid, NULL, 0));
 		res = waitpid(cpid, &status, WTRAPPED);
-		assert(res == cpid);
+		stopsig = WIFSTOPPED(status) ? WSTOPSIG(status) : -1;
+		CHERIBSDTEST_CHECK_EQ_INT(res, cpid);
+		CHERIBSDTEST_CHECK_EQ_INT(stopsig, SIGSTOP);
 
 		/* Kill it */
-		res = ptrace(PT_KILL, cpid, NULL, 0);
-		assert(res == 0);
+		CHERIBSDTEST_CHECK_SYSCALL(ptrace(PT_KILL, cpid, NULL, 0));
+		/* In case PT_KILL fails, notify child to exit */
+		res = write(pfd[0], "x", 1);
+		close(pfd[0]);
 
 		/* Reap it */
 		res = waitpid(cpid, &status, 0);
-		assert (res == cpid);
-
-		cheribsdtest_success();
+		CHERIBSDTEST_CHECK_EQ_INT(res, cpid);
+		exitcode = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+		termsig = WIFSIGNALED(status) ? WTERMSIG(status) : -1;
+		stopsig = WIFSTOPPED(status) ? WSTOPSIG(status) : -1;
+		/* Should exit with SIGKILL signal code */
+		if (termsig == SIGKILL)
+			cheribsdtest_success();
+		else
+			cheribsdtest_failure_errx("Unexpected child exit: "
+			    "status=%#x code=%d termsig=%d stopsig=%d\n",
+			    status, exitcode, termsig, stopsig);
 	} else {
-		sigset_t ss;
-		sigemptyset(&ss);
-		sigsuspend(&ss);
+		close(pfd[0]);
+		res = write(pfd[1], "c", 1);
+		assert(res == 1);
+		/*
+		 * Block by reading from the pipe. This should never be reached
+		 * since the parent kills this process using PT_KILL.
+		 */
+		res = read(pfd[1], &c, 1);
+		assert(c == 'x');
+		fprintf(stderr, "got exit message, this should not happen!\n");
+		close(pfd[1]);
 		exit(23);
 	}
 }

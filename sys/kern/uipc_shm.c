@@ -1664,8 +1664,9 @@ again:
 		    max_prot);
 		if (rv != KERN_SUCCESS)
 			goto fail1;
-		rv = vm_map_insert(map, shmfd->shm_object, foff, start,
-		    start + size, prot, max_prot, docow, start);
+		rv = vm_map_insert_name(map, shmfd->shm_object, foff, start,
+		    start + size, prot, max_prot, docow, start,
+		    "sys:posix_shm");
 		if (rv != KERN_SUCCESS) {
 			vm_map_reservation_delete_locked(map, start);
 			goto fail1;
@@ -1698,8 +1699,9 @@ again:
 				goto fail1;
 			}
 		}
-		rv = vm_map_insert(map, shmfd->shm_object, foff, start,
-		    start + size, prot, max_prot, docow, reservation_id);
+		rv = vm_map_insert_name(map, shmfd->shm_object, foff, start,
+		    start + size, prot, max_prot, docow, reservation_id,
+		    "sys:posix_shm");
 		if (rv != KERN_SUCCESS && new_reservation)
 			vm_map_reservation_delete_locked(map, start);
 		if (rv == KERN_NO_SPACE && (flags & MAP_EXCL) != 0) {

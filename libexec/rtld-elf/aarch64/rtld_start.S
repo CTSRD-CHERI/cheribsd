@@ -520,14 +520,14 @@ ENTRY(_rtld_tgot_tlsdesc_dynamic)
 	cmp	x3, x4
 	b.ne	1f			/* dtv[0] != tlsdec->dtv_gen */
 
-	ldr	w3, [c2, #16]		/* tlsdesc->tls_index */
+	ldr	w3, [c2, #8]		/* tlsdesc->tls_index */
 	lsl	w3, w3, #1
 	add	w3, w3, #1
 	ldr     c3, [c0, w3, sxtw #4]	/* dtv->dtv_slots[tlsdesc->tls_index - 1].dtvs_tgot */
 	cbz	x3, 1f
 
 	/* Return (*(dtv->dtv_slots[tlsdesc->tls_index - 1].dtvs_tgot + tlsdesc->tgot_offs)) */
-	ldr	x4, [c2, #24]		/* tlsdesc->tgot_offs */
+	ldr	x4, [c2, #16]		/* tlsdesc->tgot_offs */
 	ldr	c0, [c3, x4]
 
 	/* Restore registers and return */

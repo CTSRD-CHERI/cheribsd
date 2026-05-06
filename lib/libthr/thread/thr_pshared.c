@@ -247,6 +247,7 @@ __thr_pshared_offpage(void *key, int doalloc)
 	close(fd);
 	if (res == MAP_FAILED)
 		return (NULL);
+	(void)msetname(res, page_size, "libthr:pshared");
 	pshared_wlock(curthread);
 	ins_done = pshared_insert(key, &res);
 	pshared_unlock(curthread);

@@ -140,6 +140,7 @@ SUBDIR=	\
 	${_hptmv} \
 	${_hptnr} \
 	${_hptrr} \
+	${_hwc} \
 	hwpmc \
 	${_hyperv} \
 	i2c \
@@ -318,6 +319,7 @@ SUBDIR=	\
 	${_pfsync} \
 	plip \
 	${_pms} \
+	${_pmu} \
 	ppbus \
 	ppc \
 	ppi \
@@ -871,6 +873,11 @@ _vmm=		vmm
 .endif
 .endif
 .endif
+.endif
+
+.if ${MACHINE_CPUARCH} == "riscv"
+_hwc=		hwc
+_pmu=		pmu
 .endif
 
 .if ${MACHINE_CPUARCH} == "i386"
