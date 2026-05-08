@@ -1,9 +1,0 @@
-{
-	"default-compartment": {
-		"files": [
-			"bcopy.o"
-		]
-	},
-	"compartments": {
-	}
-}
