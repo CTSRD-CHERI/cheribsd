@@ -45,10 +45,9 @@ LDSCRIPT?=	$S/conf/${LDSCRIPT_NAME}
 .if empty(CHERI_COMPARTMENT_POLICY)
 CHERI_COMPARTMENT_POLICY=	${KERN_IDENT}
 .endif
-.for directory in / /kern /libkern
-LDFLAGS+=	--compartment-policy=${SRCTOP}/sys${directory}/executive.${CHERI_COMPARTMENT_POLICY}.json
-LDFLAGS+=	--compartment-policy=${SRCTOP}/sys${directory}/kernel.${CHERI_COMPARTMENT_POLICY}.json
-.endfor
+.if exists($S/${MACHINE}/conf/policy.${CHERI_COMPARTMENT_POLICY}.json)
+LDFLAGS+=	--compartment-policy=$S/${MACHINE}/conf/policy.${CHERI_COMPARTMENT_POLICY}.json
+.endif
 .endif
 
 M=		${MACHINE}
