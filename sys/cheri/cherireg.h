@@ -69,6 +69,16 @@
     CHERI_PERM_SW_VMEM
 
 /*
+ * A software-defined permission to bypass quarantine and revocation
+ * when freed.  This permission is normally stripped from malloc'd memory
+ * but a special malloc_no_quarantine() keeps the permission bit allowing
+ * free() to bypass quarantine procedures.
+ *
+ * XXX: We could concivably used CHERI_PERM_SYSCALL here.
+ */
+#define	CHERI_PERM_NO_QUARANTINE		CHERI_PERM_SW2
+
+/*
  * Definition for a highly privileged kernel capability able to name the
  * entire address space, and suitable to derive all other kernel-related
  * capabilities from, including sealing capabilities.

@@ -3808,8 +3808,11 @@ je_malloc_underlying_allocation(void *ptr) {
 	 * Check that ptr corresponds to a ptr returned by malloc.
 	 */
 	if (ret != NULL) {
-		void *ret_check = cheri_andperm(ret, ~CHERI_PERM_SW_VMEM);
-		if (unlikely(!cheri_equal_exact(ptr, ret_check))) {
+		void *ret_check = cheri_perms_clear(ret,
+		    CHERI_PERM_SW_VMEM | CHERI_PERM_NO_QUARANTINE);
+		void *ptr_check = cheri_perms_clear(ptr,
+		    CHERI_PERM_NO_QUARANTINE);
+		if (unlikely(!cheri_equal_exact(ptr_check, ret_check))) {
 			ret = NULL;
 		}
 	}

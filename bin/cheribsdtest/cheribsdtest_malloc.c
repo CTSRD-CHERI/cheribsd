@@ -155,6 +155,31 @@ CHERIBSDTEST(malloc_revoke_quarantine_force_flush_twice,
 	cheribsdtest_success();
 }
 
+CHERIBSDTEST(malloc_no_quarantine_not_revoked,
+    "verify that a malloc_no_quarantine is not revoked",
+    .ct_check_skip = skip_malloc_revocation_disabled)
+{
+	volatile void *ptr __unused;
+	int ret;
+
+	/*
+	 * Try to get the compiler to spill the pointer to memory.
+	 */
+	eptr = ptr = malloc_no_quarantine(1);
+
+	free(__DEVOLATILE(void *, ptr));
+
+	CHERIBSDTEST_VERIFY2((ret = malloc_revoke_quarantine_force_flush()) == 0,
+	    "malloc_revoke_quarantine_force_flush returned %d", ret);
+	CHERIBSDTEST_VERIFY2(cheri_tag_get(ptr),
+	    "freed no-quarantine ptr revoked %#lp", ptr);
+	CHERIBSDTEST_VERIFY2(cheri_tag_get(eptr),
+	    "freed no-quarantine eptr revoked %#lp", eptr);
+
+	cheribsdtest_success();
+}
+
+
 CHERIBSDTEST(malloc_zero_size,
     "Check that allocators return non-NULL for size=0")
 {

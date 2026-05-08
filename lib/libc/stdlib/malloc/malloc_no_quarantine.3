@@ -1,0 +1,66 @@
+.\"-
+.\" Copyright (c) 2026 (holder)
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.\" This software was developed by Capabilities Limited with funding from
+.\" Innovate UK and the Department for Science, Innovation and Technology
+.\" for the adoption and diffusion of CHERI technology under project
+.\" 10168042 (“CheriBSD feature extraction, maturity, and testing”).
+.\"
+.Dd July 17, 2026
+.Dt MALLOC_NO_QUARANTINE 3
+.Os
+.Sh NAME
+.Nm malloc_no_quarantine
+.Nd malloc memory that will pass through quarantine when freed
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In sys/errno.h
+.In stdlib.h
+.Ft void *
+.Fn malloc_no_quarantine "size_t"
+.Sh DESCRIPTION
+On systems which support heap temporal safety through a quarantine and
+sweep mechanism (such as CHERI systems), malloc_no_quarantine allocates
+memory tagged such that it will not enter quarantine when passed to
+.Xr free 3 .
+On other systems,
+.Fn malloc_no_quarantine
+is a wrapper for
+.Xr malloc 3 .
+.Pp
+The
+.Fn malloc_no_quarantine
+function is an unstable prototype intended to allow exploration of
+the performance properties of type-stable or otherwise type-aware
+allocation techniques without the cost of a implementing a
+full-fledged, type-aware allocator.
+This has both security and performance implications.
+See the
+.Sx SECURITY CONSIDERATIONS
+section for more information.
+.Sh RETURN VALUES
+The
+.Fn malloc_no_quarantine
+function has the same return values and error status as
+.Xr malloc 3 .
+.Sh SEE ALSO
+.Xr jemalloc 3,
+.Xr mrs 3
+.Sh AUTHORS
+This software and this manual page were developed by Capabilities
+Limited with funding from Innovate UK and the Department for Science,
+Innovation and Technology for the adoption and diffusion of CHERI
+technology under project 10168042
+.Pq Do CheriBSD feature extraction, maturity, and testing Dc .
+.Sh SECURITY CONSIDERATIONS
+The
+.Fn malloc_no_quarantine
+function does not currently use type-stable memory and allocations may
+have been previously used for any purpose and may be reused by any
+purpose.
+A more complete implementation would certainly segregate quarantined
+and non-quarantined memory and might well provide fully type-stable
+pools.
