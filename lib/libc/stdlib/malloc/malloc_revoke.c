@@ -50,3 +50,9 @@ malloc_is_revoking(void)
 {
 	return (false);
 }
+
+void *
+malloc_no_quarantine(size_t s __unused)
+{
+	return (NULL);
+}
