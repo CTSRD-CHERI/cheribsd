@@ -11,6 +11,7 @@ FBSD_1.0 {
 	malloc_is_revoking;
 	malloc_revoke_quarantine_force_flush;
 	malloc_revoke_enabled;
+	malloc_no_quarantine;
 };
 
 FBSD_1.3 {

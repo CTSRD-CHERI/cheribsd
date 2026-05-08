@@ -7,7 +7,10 @@ MLINKS+=	malloc_revoke.3 malloc_is_revoking.3
 MLINKS+=	malloc_revoke.3 malloc_revoke_enabled.3
 MLINKS+=	malloc_revoke.3 malloc_revoke_quarantine_force_flush.3
 
+MAN+=		malloc_no_quarantine.3
+
 .if ${MK_MALLOC_REVOCATION_SHIM} == no || !${MACHINE_ABI:Mpurecap}
+MISRCS+=	malloc_no_quarantine.c
 MISRCS+=	malloc_quarantine.c
 MISRCS+=	malloc_revoke.c
 .endif

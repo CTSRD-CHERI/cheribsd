@@ -104,6 +104,7 @@ void	*malloc(size_t) __malloc_like __result_use_check __alloc_size(1);
 void	 malloc_revoke(void)
 	    __deprecated1("use malloc_revoke_quarantine_force_flush() instead");
 int	 malloc_revoke_quarantine_force_flush(void);
+void	*malloc_no_quarantine(size_t);
 int	 mblen(const char *, size_t);
 size_t	 mbstowcs(wchar_t * __restrict , const char * __restrict, size_t);
 int	 mbtowc(wchar_t * __restrict, const char * __restrict, size_t);

@@ -173,6 +173,7 @@ void REAL(sdallocx)(void *, size_t, int);
 /* functions */
 
 static void *mrs_malloc(size_t);
+static void *mrs_malloc_no_quarantine(size_t);
 static void mrs_free(void *);
 static void *mrs_calloc(size_t, size_t);
 static void *mrs_realloc(void *, size_t);
@@ -188,6 +189,12 @@ void *
 malloc(size_t size)
 {
 	return (mrs_malloc(size));
+}
+
+void *
+malloc_no_quarantine(size_t size)
+{
+	return (mrs_malloc_no_quarantine(size));
 }
 
 void
@@ -346,6 +353,9 @@ static spinlock_t mrs_init_lock = _SPINLOCK_INITIALIZER;
 static void *
 mrs_bound_pointer(void *p, size_t size)
 {
+	/* XXX: this is the wrong place, but it's easy */
+	p = cheri_perms_clear(p, CHERI_PERM_NO_QUARANTINE);
+
 	if (p != NULL && bound_pointers && size > 0)
 		p = cheri_bounds_set(p, size);
 	return (p);
@@ -1543,6 +1553,50 @@ mrs_malloc(size_t size)
 }
 
 static void *
+mrs_malloc_no_quarantine(size_t size)
+{
+	mrs_init();
+
+	if (!quarantining)
+		return (mrs_real_malloc(size));
+
+	/*mrs_debug_printf("mrs_malloc: called\n");*/
+
+	check_and_perform_flush(false);
+
+	void *allocated_region;
+
+	/*
+	 * Round up here to make sure there is only one allocation per
+	 * granule without requiring modifications to the underlying
+	 * allocator.
+	 *
+	 * XXX: If an allocator produced special, non-writable capabilities
+	 * for size=0 we might want to pass those calls through, but none
+	 * of the currently supported allocators do.
+	 */
+	if (size < CAPREVOKE_BITMAP_ALIGNMENT)
+		allocated_region = REAL(malloc)(CAPREVOKE_BITMAP_ALIGNMENT);
+	else
+		allocated_region = REAL(malloc)(size);
+	if (allocated_region == NULL) {
+		MRS_UTRACE(UTRACE_MRS_MALLOC_NO_QUARANTINE, NULL, size, 0,
+		    allocated_region);
+		return (allocated_region);
+	}
+
+#ifdef CLEAR_ON_ALLOC
+	clear_region(allocated_region, cheri_length_get(allocated_region));
+#endif /* CLEAR_ON_ALLOC */
+
+	increment_allocated_size(allocated_region);
+
+	MRS_UTRACE(UTRACE_MRS_MALLOC_NO_QUARANTINE, NULL, size, 0,
+	    allocated_region);
+	return (allocated_region);
+}
+
+static void *
 mrs_real_calloc(size_t number, size_t size)
 {
 	return (mrs_bound_pointer(REAL(calloc)(number, size), number * size));
@@ -1745,6 +1799,18 @@ mrs_free(void *ptr)
 	if (!quarantining)
 		return (REAL(free)(ptr));
 
+	if ((cheri_perms_get(ptr) & CHERI_PERM_NO_QUARANTINE) != 0) {
+		/*
+		 * XXX: ideally we'd validate the pointer below and us
+		 * it's length here to insure accurate accounting, but
+		 * that involves painting the bitmap so trust the
+		 * caller is being careful given they opted in to
+		 * this interface.
+		 */
+		allocated_size -= cheri_length_get(ptr);
+		return (REAL(free)(ptr));
+	}
+
 	/*mrs_debug_printf("mrs_free: called address %p\n", ptr);*/
 
 	MRS_UTRACE(UTRACE_MRS_FREE, ptr, 0, 0, 0);
@@ -1774,6 +1840,7 @@ mrs_free(void *ptr)
 #endif
 
 	mrs_lock(&app_quarantine_lock);
+	assert((cheri_perms_get(ptr) & CHERI_PERM_NO_QUARANTINE) == 0);
 	quarantine_insert(app_quarantine, ins);
 	mrs_unlock(&app_quarantine_lock);
 
