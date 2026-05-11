@@ -149,7 +149,7 @@ The startup code linked into every executable that executes prior to
 .Fn main
 is also part of the TCB.
 The threat model assumes that attackers can exploit existing vulnerabilities in
-application code to achieve arbitrary code execution.
+application (non-TCB) code to achieve arbitrary code execution.
 However, the compiler toolchain used to build all application code is trusted
 to produce ELF files that a) are well-formed and do not trigger parsing errors
 and b) faithfully enact the compartmentalization policy, effectively excluding
