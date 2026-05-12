@@ -97,7 +97,7 @@ init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
 	}
 	if (perms == MORELLO_FRAG_RWDATA || perms == MORELLO_FRAG_RODATA) {
 		cap = cheri_perms_clear(cap, CHERI_PERM_SEAL |
-		    CHERI_PERM_EXECUTE);
+		    CHERI_PERM_EXECUTE | CHERI_PERM_EXECUTIVE);
 	}
 
 	cap += addend;
