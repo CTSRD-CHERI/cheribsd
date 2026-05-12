@@ -416,7 +416,7 @@ build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
 	if (perms == MORELLO_FRAG_RWDATA ||
 	    perms == MORELLO_FRAG_RODATA) {
 		cap = cheri_perms_clear(cap, CHERI_PERM_SEAL |
-		    CHERI_PERM_EXECUTE);
+		    CHERI_PERM_EXECUTE | CHERI_PERM_EXECUTIVE);
 	}
 	cap += offset;
 	if (perms == MORELLO_FRAG_EXECUTABLE) {
