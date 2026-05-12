@@ -473,9 +473,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		attach_va = (__cheri_addr vm_offset_t)shmaddr;
 		if ((shmflg & SHM_RND) != 0)
 			attach_va = rounddown2(attach_va, SHMLBA);
-		else if (((__cheri_addr vm_offset_t)shmaddr & (SHMLBA-1)) == 0)
-			attach_va = (__cheri_addr vm_offset_t)shmaddr;
-		else
+		else if (!__is_aligned(attach_va, SHMLBA))
 			return (EINVAL);
 #if __has_feature(capabilities)
 		/*
