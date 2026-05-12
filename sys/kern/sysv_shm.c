@@ -571,6 +571,8 @@ kern_shmat_locked(struct thread *td, int shmid,
 	shmseg->u.shm_nattch++;
 #if __has_feature(capabilities)
 	if (SV_CURPROC_FLAG(SV_CHERI)) {
+		int perm;
+
 		/*
 		 * XXX-AM: The purecap kernel reservations should have taken care of this
 		 * and just return attach_va, as the capability will be derived from the
@@ -578,14 +580,14 @@ kern_shmat_locked(struct thread *td, int shmid,
 		 */
 		shmaddr = cheri_bounds_set_exact(cheri_address_set(shmaddr,
 		     attach_va), size);
-		/* Remove inappropriate permissions. */
-		shmaddr = cheri_perms_and(shmaddr, ~(CHERI_PERM_EXECUTE |
-#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
-		    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
-#elif defined(HAS_CHERI_PERM_CAP)
-		    CHERI_PERM_CAP |
-#endif
-		    ((shmflg & SHM_RDONLY) != 0 ? CHERI_PERM_STORE : 0)));
+
+		/* Set appropriate permissions. */
+		if ((shmflg & SHM_RDONLY) != 0)
+			perm = CHERI_PERMS_USERSPACE_RODATA;
+		else
+			perm = CHERI_PERMS_USERSPACE_DATA;
+		perm |= CHERI_PERM_SW_VMEM;
+		shmaddr = cheri_perms_and(shmaddr, perm);
 		td->td_retval[0] = (uintcap_t)__DECONST_CAP(void * __capability,
 		    shmaddr);
 	} else
