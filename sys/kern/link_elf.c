@@ -801,7 +801,10 @@ elf_init(elf_file_t ef, Elf_Dyn *dynp, void *relocbase, ptraddr_t baseend,
 			break;
 		}
 	}
-	if (error == 0 && ef->npccs > 0) {
+	if (ef->npccs == 0) {
+		error = ENOEXEC;
+	}
+	if (error == 0) {
 		/*
 		 * XXXKW: Use cheri_kern_bounds_set_exact() and pad pccs?
 		 */
@@ -1504,7 +1507,10 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 			break;
 		}
 	}
-	if (error == 0 && ef->npccs > 0) {
+	if (ef->npccs == 0) {
+		error = ENOEXEC;
+	}
+	if (error == 0) {
 		if (!link_elf_load_pccs(lf, phtable, phlimit)) {
 			error = ENOEXEC;
 		}
@@ -1917,6 +1923,11 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		goto out;
 	}
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	if (ef->npccs == 0) {
+		link_elf_error(filename, "No CHERI_PCC headers");
+		error = ENOEXEC;
+		goto out;
+	}
 	if (ef->ncompartments > MAXC18NS) {
 		link_elf_error(filename, "Exceeded number of extra compartments");
 		error = ENOEXEC;
