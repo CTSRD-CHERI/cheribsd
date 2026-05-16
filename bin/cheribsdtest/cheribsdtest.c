@@ -89,16 +89,16 @@ static const struct cheri_test *running_test;
 static int tests_run, tests_skipped;
 static int tests_failed, tests_passed, tests_xfailed, tests_xpassed;
 static int expected_failures;
-static int is_execed_child;
-static int execed_child_has_extra_argv;
-static int list;
-static int run_all;
-static int fast_tests_only;
-static int qtrace;
-static int qtrace_user_mode_only;
-static int sleep_after_test;
-static int coredump_enabled;
-static int debugger_enabled;
+static bool is_execed_child;
+static bool execed_child_has_extra_argv;
+static bool list;
+static bool run_all;
+static bool fast_tests_only;
+static bool qtrace;
+static bool qtrace_user_mode_only;
+static bool sleep_after_test;
+static bool coredump_enabled;
+static bool debugger_enabled;
 
 int verbose;
 struct cheribsdtest_entrystate entrystate;
@@ -836,31 +836,31 @@ main(int argc, char *argv[])
 	while ((opt = getopt(argc, argv, "acdEfgKlQqsuvx")) != -1) {
 		switch (opt) {
 		case 'a':
-			run_all = 1;
+			run_all = true;
 			break;
 		case 'c':
-			coredump_enabled = 1;
+			coredump_enabled = true;
 			break;
 		case 'd':
-			debugger_enabled = 1;
+			debugger_enabled = true;
 			break;
 		case 'E':
-			is_execed_child = 1;
+			is_execed_child = true;
 			break;
 		case 'f':
-			fast_tests_only = 1;
+			fast_tests_only = true;
 			break;
 		case 'g':
-			glob = 1;
+			glob = true;
 			break;
 		case 'K':
-			execed_child_has_extra_argv = 1;
+			execed_child_has_extra_argv = true;
 			break;
 		case 'l':
-			list = 1;
+			list = true;
 			break;
 		case 'Q':
-			qtrace_user_mode_only = 1;
+			qtrace_user_mode_only = true;
 			/* FALLTHROUGH */
 		case 'q':
 			len = sizeof(qemu_trace_perthread);
@@ -872,10 +872,10 @@ main(int argc, char *argv[])
 			if (!qemu_trace_perthread)
 				errx(EX_USAGE, "-%c requires sysctl "
 				    "hw.qemu_trace_perthread=1", opt);
-			qtrace = 1;
+			qtrace = true;
 			break;
 		case 's':
-			sleep_after_test = 1;
+			sleep_after_test = true;
 			break;
 		case 'v':
 			verbose++;
