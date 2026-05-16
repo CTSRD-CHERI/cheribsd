@@ -634,12 +634,13 @@ __elfN(loadimage)(struct preloaded_file *fp, elf_file_t ef, uint64_t off)
 	if (ef->kernel)
 		__elfN(relocation_offset) = off;
 
-	if ((ehdr->e_phoff + ehdr->e_phnum * sizeof(*phdr)) > ef->firstlen) {
-		printf("elf" __XSTRING(__ELF_WORD_SIZE)
-		    "_loadimage: program header not within first page\n");
+	phdr = alloc_pread(VECTX_HANDLE(ef), ehdr->e_phoff, ehdr->e_phnum *
+	    sizeof(*phdr));
+	if (phdr == NULL) {
+		printf("\nelf" __XSTRING(__ELF_WORD_SIZE)
+		    "_loadimage: failed to read program headers");
 		goto out;
 	}
-	phdr = (Elf_Phdr *)(ef->firstpage + ehdr->e_phoff);
 
 	for (i = 0; i < ehdr->e_phnum; i++) {
 		if (elf_program_header_convert(ehdr, phdr))
@@ -944,6 +945,8 @@ out:
 		free(dp);
 	if (shdr)
 		free(shdr);
+	if (phdr)
+		free(phdr);
 	return ret;
 }
 
