@@ -114,10 +114,6 @@
     ..
     cheri
     ..
-    compat
-        cheriabi
-	..
-    ..
     casper
     ..
     crypto

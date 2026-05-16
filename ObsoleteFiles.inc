@@ -51,6 +51,10 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20260516: Stop creating compat/cheriabi include directories
+OLD_DIRS+=usr/include/compat/cheriabi
+OLD_DIRS+=usr/include/compat
+
 # 20250409: removal of iwlwifi firmware files
 OLD_FILES+=usr/share/doc/legal/intel_iwlwifi_firmware.LICENCE
 
