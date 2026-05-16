@@ -63,6 +63,8 @@ typedef struct elf_file {
 	int		fd;
 	caddr_t	firstpage;
 	size_t	firstlen;
+	caddr_t	phdrpages;
+	size_t	phdrslen;
 	int		kernel;
 	uint64_t	off;
 #ifdef LOADER_VERIEXEC_VECTX
@@ -335,8 +337,26 @@ __elfN(load_elf_header)(char *filename, elf_file_t ef)
 		goto error;
 	}
 
+	ef->phdrslen = roundup2(ehdr->e_phoff + ehdr->e_phnum *
+	    sizeof(Elf_Phdr), PAGE_SIZE) - rounddown2(ehdr->e_phoff, PAGE_SIZE);
+	ef->phdrpages = malloc(ef->phdrslen);
+	if (ef->phdrpages == NULL) {
+		err = ENOMEM;
+		goto error;
+	}
+	if (VECTX_LSEEK(VECTX_HANDLE(ef), rounddown2(ehdr->e_phoff, PAGE_SIZE),
+	    SEEK_SET) == -1) {
+		err = EFTYPE;
+		goto error;
+	}
+	if (VECTX_READ(VECTX_HANDLE(ef), ef->phdrpages, ef->phdrslen) !=
+	    ef->phdrslen) {
+		err = EFTYPE;
+		goto error;
+	}
+
 #if defined(LOADER_VERIEXEC) && !defined(LOADER_VERIEXEC_VECTX)
-	if (verify_file(ef->fd, filename, bytes_read, VE_MUST, __func__) < 0) {
+	if (verify_file(ef->fd, filename, ef->firstlen, VE_MUST, __func__) < 0) {
 		err = EAUTH;
 		goto error;
 	}
@@ -344,6 +364,10 @@ __elfN(load_elf_header)(char *filename, elf_file_t ef)
 	return (0);
 
 error:
+	if (ef->phdrpages != NULL) {
+		free(ef->phdrpages);
+		ef->phdrpages = NULL;
+	}
 	if (ef->firstpage != NULL) {
 		free(ef->firstpage);
 		ef->firstpage = NULL;
@@ -511,6 +535,8 @@ ioerr:
 oerr:
 	file_discard(fp);
 out:
+	if (ef.phdrpages)
+		free(ef.phdrpages);
 	if (ef.firstpage)
 		free(ef.firstpage);
 	if (ef.fd != -1) {
@@ -556,7 +582,6 @@ __elfN(loadimage)(struct preloaded_file *fp, elf_file_t ef, uint64_t off)
 	int		symstrindex;
 	int		symtabindex;
 	Elf_Size	size;
-	u_int		fpcopy;
 	Elf_Sym		sym;
 	Elf_Addr	p_start, p_end;
 
@@ -634,12 +659,7 @@ __elfN(loadimage)(struct preloaded_file *fp, elf_file_t ef, uint64_t off)
 	if (ef->kernel)
 		__elfN(relocation_offset) = off;
 
-	if ((ehdr->e_phoff + ehdr->e_phnum * sizeof(*phdr)) > ef->firstlen) {
-		printf("elf" __XSTRING(__ELF_WORD_SIZE)
-		    "_loadimage: program header not within first page\n");
-		goto out;
-	}
-	phdr = (Elf_Phdr *)(ef->firstpage + ehdr->e_phoff);
+	phdr = (Elf_Phdr *)(ef->phdrpages + ehdr->e_phoff % PAGE_SIZE);
 
 	for (i = 0; i < ehdr->e_phnum; i++) {
 		if (elf_program_header_convert(ehdr, phdr))
@@ -665,21 +685,11 @@ __elfN(loadimage)(struct preloaded_file *fp, elf_file_t ef, uint64_t off)
 				printf(" ");
 			}
 		}
-		fpcopy = 0;
-		if (ef->firstlen > phdr[i].p_offset) {
-			fpcopy = ef->firstlen - phdr[i].p_offset;
-			archsw.arch_copyin(ef->firstpage + phdr[i].p_offset,
-			    phdr[i].p_vaddr + off, fpcopy);
-		}
-		if (phdr[i].p_filesz > fpcopy) {
-			if (kern_pread(VECTX_HANDLE(ef),
-			    phdr[i].p_vaddr + off + fpcopy,
-			    phdr[i].p_filesz - fpcopy,
-			    phdr[i].p_offset + fpcopy) != 0) {
-				printf("\nelf" __XSTRING(__ELF_WORD_SIZE)
-				    "_loadimage: read failed\n");
-				goto out;
-			}
+		if (kern_pread(VECTX_HANDLE(ef), phdr[i].p_vaddr + off,
+		    phdr[i].p_filesz, phdr[i].p_offset) != 0) {
+			printf("\nelf" __XSTRING(__ELF_WORD_SIZE)
+			    "_loadimage: read failed\n");
+			goto out;
 		}
 		/* clear space from oversized segments; eg: bss */
 		if (phdr[i].p_filesz < phdr[i].p_memsz) {
@@ -1116,6 +1126,8 @@ out:
 		free(shstrtab);
 	if (shdr != NULL)
 		free(shdr);
+	if (ef.phdrpages != NULL)
+		free(ef.phdrpages);
 	if (ef.firstpage != NULL)
 		free(ef.firstpage);
 	if (ef.fd != -1) {
