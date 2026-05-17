@@ -121,7 +121,7 @@
 #endif
 
 /* Maximum number of PLTs in the kernel binary. */
-#define	KERNEL_MAXPLTS		11
+#define	KERNEL_MAXPLTS		256
 /* Maximum number of PCCs in the kernel binary. */
 #define	KERNEL_MAXPCCS		KERNEL_MAXPLTS
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL

@@ -84,7 +84,7 @@ SECTIONS
   .init_pagetable : { *(.init_pagetable) }
   .data    :
   {
-    *(.data)
+    *(.data .data.[a-df-qs-zA-Z0-9_.]* .data.e[a-wy-zA-Z0-9_]* .data.ex[a-bd-zA-Z0-9_]* .data.r[a-df-zA-Z0-9_]* .data.re[b-zA-Z0-9_]* data.rea[a-ce-zA-Z0-9_]* .data.read[a-zA-Z0-9]* .data.read_[a-eg-ln-zA-Z0-9]* .data.read_m[a-np-zA-Z0-9]*)
     *(.gnu.linkonce.d*)
   }
   . = ALIGN(128);
@@ -141,11 +141,11 @@ SECTIONS
   PROVIDE (edata = .);
   . = ALIGN(16);
   _bss_start = .;
-  .sbss      : { *(.sbss) *(.scommon) }
+  .sbss      : { *(.sbss .sbss.*) *(.scommon) }
   .bss       :
   {
    *(.dynbss)
-   *(.bss)
+   *(.bss .bss.*)
    *(COMMON)
    . = ALIGN(16);
    __bss_end = .;
