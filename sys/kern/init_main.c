@@ -135,6 +135,20 @@ int	bootverbose = BOOTVERBOSE;
 SYSCTL_INT(_debug, OID_AUTO, bootverbose, CTLFLAG_RW, &bootverbose, 0,
 	"Control the output of verbose kernel messages");
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static void
+sift_print_debug_bootverbose_ptr(void *arg __unused)
+{
+	printf("SIFT_ACE2 DEBUG_BOOTVERBOSE_ADDRESS=%p\n",
+	    &sysctl___debug_bootverbose.oid_arg1);
+	printf("SIFT_ACE2 DEBUG_BOOTVERBOSE_CAPABILITY=%#p\n",
+	    &sysctl___debug_bootverbose.oid_arg1);
+}
+
+SYSINIT(bootverbose_sysctl_ptr, SI_SUB_TUNABLES, SI_ORDER_ANY,
+    sift_print_debug_bootverbose_ptr, NULL);
+#endif
+
 #ifdef VERBOSE_SYSINIT
 /*
  * We'll use the defined value of VERBOSE_SYSINIT from the kernel config to
