@@ -749,6 +749,18 @@ static char localbase[MAXPATHLEN] = "";
 SYSCTL_STRING(_user, USER_LOCALBASE, localbase, CTLFLAG_RWTUN,
     localbase, sizeof(localbase), "Prefix used to install and locate add-on packages");
 
+static void
+sift_print_localbase_sysctl_ptr(void *arg __unused)
+{
+	printf("SIFT_ACE2 USER_LOCALBASE_ADDRESS=%p\n",
+	    &sysctl___user_localbase.oid_arg1);
+	printf("SIFT_ACE2 USER_LOCALBASE_CAPABILITY=%#p\n",
+	    &sysctl___user_localbase.oid_arg1);
+}
+
+SYSINIT(localbase_sysctl_ptr, SI_SUB_TUNABLES, SI_ORDER_ANY,
+    sift_print_localbase_sysctl_ptr, NULL);
+
 #include <sys/vnode.h>
 SYSCTL_INT(_debug_sizeof, OID_AUTO, vnode, CTLFLAG_RD,
     SYSCTL_NULL_INT_PTR, sizeof(struct vnode), "sizeof(struct vnode)");
