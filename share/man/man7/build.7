@@ -877,6 +877,11 @@ Only build worlds for each supported architecture.
 Only build kernels for each supported architecture.
 .It Va WITHOUT_KERNELS
 Only build worlds for each supported architecture.
+.It Va UNIVERSE_LOGDIR
+Write all build logs to this directory for each supported architecture.
+When invoking
+.Cm tinderbox ,
+also write the summary of all failed targets to this directory.
 .It Va UNIVERSE_TARGET
 Execute the specified
 .Xr make 1
