@@ -63,7 +63,7 @@ typedef struct elf_file {
 	int		fd;
 	caddr_t	firstpage;
 	size_t	firstlen;
-	caddr_t	phdrpages;
+	caddr_t	phdrs;
 	size_t	phdrslen;
 	int		kernel;
 	uint64_t	off;
@@ -337,19 +337,17 @@ __elfN(load_elf_header)(char *filename, elf_file_t ef)
 		goto error;
 	}
 
-	ef->phdrslen = roundup2(ehdr->e_phoff + ehdr->e_phnum *
-	    sizeof(Elf_Phdr), PAGE_SIZE) - rounddown2(ehdr->e_phoff, PAGE_SIZE);
-	ef->phdrpages = malloc(ef->phdrslen);
-	if (ef->phdrpages == NULL) {
+	ef->phdrslen = ehdr->e_phnum * sizeof(Elf_Phdr);
+	ef->phdrs = malloc(ef->phdrslen);
+	if (ef->phdrs == NULL) {
 		err = ENOMEM;
 		goto error;
 	}
-	if (VECTX_LSEEK(VECTX_HANDLE(ef), rounddown2(ehdr->e_phoff, PAGE_SIZE),
-	    SEEK_SET) == -1) {
+	if (VECTX_LSEEK(VECTX_HANDLE(ef), ehdr->e_phoff, SEEK_SET) == -1) {
 		err = EFTYPE;
 		goto error;
 	}
-	if (VECTX_READ(VECTX_HANDLE(ef), ef->phdrpages, ef->phdrslen) !=
+	if (VECTX_READ(VECTX_HANDLE(ef), ef->phdrs, ef->phdrslen) !=
 	    ef->phdrslen) {
 		err = EFTYPE;
 		goto error;
@@ -364,9 +362,9 @@ __elfN(load_elf_header)(char *filename, elf_file_t ef)
 	return (0);
 
 error:
-	if (ef->phdrpages != NULL) {
-		free(ef->phdrpages);
-		ef->phdrpages = NULL;
+	if (ef->phdrs != NULL) {
+		free(ef->phdrs);
+		ef->phdrs = NULL;
 	}
 	if (ef->firstpage != NULL) {
 		free(ef->firstpage);
@@ -535,8 +533,8 @@ ioerr:
 oerr:
 	file_discard(fp);
 out:
-	if (ef.phdrpages)
-		free(ef.phdrpages);
+	if (ef.phdrs)
+		free(ef.phdrs);
 	if (ef.firstpage)
 		free(ef.firstpage);
 	if (ef.fd != -1) {
@@ -660,7 +658,7 @@ __elfN(loadimage)(struct preloaded_file *fp, elf_file_t ef, uint64_t off)
 	if (ef->kernel)
 		__elfN(relocation_offset) = off;
 
-	phdr = (Elf_Phdr *)(ef->phdrpages + ehdr->e_phoff % PAGE_SIZE);
+	phdr = (Elf_Phdr *)ef->phdrs;
 
 	for (i = 0; i < ehdr->e_phnum; i++) {
 		if (elf_program_header_convert(ehdr, phdr))
@@ -1137,8 +1135,8 @@ out:
 		free(shstrtab);
 	if (shdr != NULL)
 		free(shdr);
-	if (ef.phdrpages != NULL)
-		free(ef.phdrpages);
+	if (ef.phdrs != NULL)
+		free(ef.phdrs);
 	if (ef.firstpage != NULL)
 		free(ef.firstpage);
 	if (ef.fd != -1) {
