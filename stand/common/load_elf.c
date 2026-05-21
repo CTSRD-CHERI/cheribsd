@@ -36,6 +36,10 @@
 #include "bootstrap.h"
 #include "modinfo.h"
 
+#ifdef EFI
+#include "loader_efi.h"
+#endif
+
 #define COPYOUT(s,d,l)	archsw.arch_copyout((vm_offset_t)(s), d, l)
 
 #if defined(__i386__) && __ELF_WORD_SIZE == 64
@@ -63,7 +67,7 @@ typedef struct elf_file {
 	int		fd;
 	caddr_t	firstpage;
 	size_t	firstlen;
-	caddr_t	phdrpages;
+	caddr_t	phdrs;
 	size_t	phdrslen;
 	int		kernel;
 	uint64_t	off;
@@ -337,19 +341,17 @@ __elfN(load_elf_header)(char *filename, elf_file_t ef)
 		goto error;
 	}
 
-	ef->phdrslen = roundup2(ehdr->e_phoff + ehdr->e_phnum *
-	    sizeof(Elf_Phdr), PAGE_SIZE) - rounddown2(ehdr->e_phoff, PAGE_SIZE);
-	ef->phdrpages = malloc(ef->phdrslen);
-	if (ef->phdrpages == NULL) {
+	ef->phdrslen = ehdr->e_phnum * sizeof(Elf_Phdr);
+	ef->phdrs = malloc(ef->phdrslen);
+	if (ef->phdrs == NULL) {
 		err = ENOMEM;
 		goto error;
 	}
-	if (VECTX_LSEEK(VECTX_HANDLE(ef), rounddown2(ehdr->e_phoff, PAGE_SIZE),
-	    SEEK_SET) == -1) {
+	if (VECTX_LSEEK(VECTX_HANDLE(ef), ehdr->e_phoff, SEEK_SET) == -1) {
 		err = EFTYPE;
 		goto error;
 	}
-	if (VECTX_READ(VECTX_HANDLE(ef), ef->phdrpages, ef->phdrslen) !=
+	if (VECTX_READ(VECTX_HANDLE(ef), ef->phdrs, ef->phdrslen) !=
 	    ef->phdrslen) {
 		err = EFTYPE;
 		goto error;
@@ -364,9 +366,9 @@ __elfN(load_elf_header)(char *filename, elf_file_t ef)
 	return (0);
 
 error:
-	if (ef->phdrpages != NULL) {
-		free(ef->phdrpages);
-		ef->phdrpages = NULL;
+	if (ef->phdrs != NULL) {
+		free(ef->phdrs);
+		ef->phdrs = NULL;
 	}
 	if (ef->firstpage != NULL) {
 		free(ef->firstpage);
@@ -535,8 +537,8 @@ ioerr:
 oerr:
 	file_discard(fp);
 out:
-	if (ef.phdrpages)
-		free(ef.phdrpages);
+	if (ef.phdrs)
+		free(ef.phdrs);
 	if (ef.firstpage)
 		free(ef.firstpage);
 	if (ef.fd != -1) {
@@ -582,6 +584,7 @@ __elfN(loadimage)(struct preloaded_file *fp, elf_file_t ef, uint64_t off)
 	int		symstrindex;
 	int		symtabindex;
 	Elf_Size	size;
+	u_int		fpcopy;
 	Elf_Sym		sym;
 	Elf_Addr	p_start, p_end;
 
@@ -659,8 +662,35 @@ __elfN(loadimage)(struct preloaded_file *fp, elf_file_t ef, uint64_t off)
 	if (ef->kernel)
 		__elfN(relocation_offset) = off;
 
-	phdr = (Elf_Phdr *)(ef->phdrpages + ehdr->e_phoff % PAGE_SIZE);
+#ifdef EFI
+	if (ehdr->e_phoff + ef->phdrslen > PAGE_SIZE) {
+		/*
+		 * In case program headers reside on multiple pages, the static
+		 * linker with a linker script for the kernel will not emit a
+		 * PT_LOAD header for the program headers but it will leave
+		 * enough virtual address space for them and shift .text, which
+		 * is reflected in the address of the kernel's entry point.
+		 * Given that this case only applies to the compartmentalized
+		 * kernel that is only supported on arm64 at the moment, we can
+		 * copyin the ELF headers and the program headers ahead of
+		 * processing program headers as well as we can assume the entry
+		 * point address aligned to 2M gives us the correct base VA of
+		 * the kernel. This of course also assumes that the ELF header
+		 * and program headers don't take more than 2M.
+		 */
+		if (ehdr->e_phoff + ef->phdrslen > M(2)) {
+			printf("\nelf" __XSTRING(__ELF_WORD_SIZE)
+			   "_loadimage: program headers exceed 2M");
+			goto out;
+		}
+		firstaddr = rounddown2(ehdr->e_entry, M(2));
+		archsw.arch_copyin(ef->firstpage, firstaddr, ef->firstlen);
+		archsw.arch_copyin(ef->phdrs, firstaddr + ehdr->e_phoff,
+		    ef->phdrslen);
+	}
+#endif
 
+	phdr = (Elf_Phdr *)ef->phdrs;
 	for (i = 0; i < ehdr->e_phnum; i++) {
 		if (elf_program_header_convert(ehdr, phdr))
 			continue;
@@ -685,11 +715,21 @@ __elfN(loadimage)(struct preloaded_file *fp, elf_file_t ef, uint64_t off)
 				printf(" ");
 			}
 		}
-		if (kern_pread(VECTX_HANDLE(ef), phdr[i].p_vaddr + off,
-		    phdr[i].p_filesz, phdr[i].p_offset) != 0) {
-			printf("\nelf" __XSTRING(__ELF_WORD_SIZE)
-			    "_loadimage: read failed\n");
-			goto out;
+		fpcopy = 0;
+		if (ef->firstlen > phdr[i].p_offset) {
+			fpcopy = ef->firstlen - phdr[i].p_offset;
+			archsw.arch_copyin(ef->firstpage + phdr[i].p_offset,
+			    phdr[i].p_vaddr + off, fpcopy);
+		}
+		if (phdr[i].p_filesz > fpcopy) {
+			if (kern_pread(VECTX_HANDLE(ef),
+			    phdr[i].p_vaddr + off + fpcopy,
+			    phdr[i].p_filesz - fpcopy,
+			    phdr[i].p_offset + fpcopy) != 0) {
+				printf("\nelf" __XSTRING(__ELF_WORD_SIZE)
+				    "_loadimage: read failed\n");
+				goto out;
+			}
 		}
 		/* clear space from oversized segments; eg: bss */
 		if (phdr[i].p_filesz < phdr[i].p_memsz) {
@@ -1126,8 +1166,8 @@ out:
 		free(shstrtab);
 	if (shdr != NULL)
 		free(shdr);
-	if (ef.phdrpages != NULL)
-		free(ef.phdrpages);
+	if (ef.phdrs != NULL)
+		free(ef.phdrs);
 	if (ef.firstpage != NULL)
 		free(ef.firstpage);
 	if (ef.fd != -1) {
