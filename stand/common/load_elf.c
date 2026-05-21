@@ -582,6 +582,7 @@ __elfN(loadimage)(struct preloaded_file *fp, elf_file_t ef, uint64_t off)
 	int		symstrindex;
 	int		symtabindex;
 	Elf_Size	size;
+	u_int		fpcopy;
 	Elf_Sym		sym;
 	Elf_Addr	p_start, p_end;
 
@@ -685,11 +686,21 @@ __elfN(loadimage)(struct preloaded_file *fp, elf_file_t ef, uint64_t off)
 				printf(" ");
 			}
 		}
-		if (kern_pread(VECTX_HANDLE(ef), phdr[i].p_vaddr + off,
-		    phdr[i].p_filesz, phdr[i].p_offset) != 0) {
-			printf("\nelf" __XSTRING(__ELF_WORD_SIZE)
-			    "_loadimage: read failed\n");
-			goto out;
+		fpcopy = 0;
+		if (ef->firstlen > phdr[i].p_offset) {
+			fpcopy = ef->firstlen - phdr[i].p_offset;
+			archsw.arch_copyin(ef->firstpage + phdr[i].p_offset,
+			    phdr[i].p_vaddr + off, fpcopy);
+		}
+		if (phdr[i].p_filesz > fpcopy) {
+			if (kern_pread(VECTX_HANDLE(ef),
+			    phdr[i].p_vaddr + off + fpcopy,
+			    phdr[i].p_filesz - fpcopy,
+			    phdr[i].p_offset + fpcopy) != 0) {
+				printf("\nelf" __XSTRING(__ELF_WORD_SIZE)
+				    "_loadimage: read failed\n");
+				goto out;
+			}
 		}
 		/* clear space from oversized segments; eg: bss */
 		if (phdr[i].p_filesz < phdr[i].p_memsz) {
