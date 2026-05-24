@@ -569,6 +569,7 @@ MAN=	aac.4 \
 	syncer.4 \
 	syscons.4 \
 	sysmouse.4 \
+	${_tagscan}.4 \
 	tap.4 \
 	tarfs.4 \
 	targ.4 \
@@ -935,6 +936,10 @@ _vmx.4=		vmx.4
 	 ${MACHINE_CPUARCH} == "riscv"
 _cgem.4=	cgem.4
 MLINKS+=cgem.4 if_cgem.4
+.endif
+
+.if ${MACHINE_CPU:Mcheri}
+_tagscan.4=       tagscan.4
 .endif
 
 .if empty(MAN_ARCH) || ${MAN_ARCH} == "all"
