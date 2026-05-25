@@ -411,7 +411,7 @@ ENTRY(handle_el0_serror)
 	save_registers 0
 	KMSAN_ENTER
 #ifdef CHERI_BOUNDED_KSTACK
-	mov	PTR(0), PTR(19)
+	mov	PTR(0), PTR(20)
 #else
 	mov	PTR(0), PTRN(sp)
 #endif
