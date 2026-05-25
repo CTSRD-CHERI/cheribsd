@@ -142,16 +142,22 @@ vm_prot2perms(int base, vm_prot_t prot)
 			perms |= CHERI_PERM_LOAD_CAP | CHERI_PERM_MUTABLE_LOAD;
 		if (prot & VM_PROT_WRITE)
 			perms |= CHERI_PERM_STORE;
-		if (VM_PROT_HAS_WRITE_CAP(prot))
-			perms |= CHERI_PERM_STORE_CAP |
-			    CHERI_PERM_STORE_LOCAL_CAP;
+		if (VM_PROT_HAS_WRITE_CAP(prot)) {
+			perms |= CHERI_PERM_STORE_CAP;
+#ifndef CHERI_RESTRICT_KERNCAP_FLOW
+			perms |= CHERI_PERM_STORE_LOCAL_CAP;
+#endif
+		}
 	} else {
 		if (prot & (VM_PROT_READ | VM_PROT_COPY))
 			perms |= CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |
 			    CHERI_PERM_MUTABLE_LOAD;
-		if (prot & VM_PROT_WRITE)
-			perms |= CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
-			    CHERI_PERM_STORE_LOCAL_CAP;
+		if (prot & VM_PROT_WRITE) {
+			perms |= CHERI_PERM_STORE | CHERI_PERM_STORE_CAP;
+#ifndef CHERI_RESTRICT_KERNCAP_FLOW
+			perms |= CHERI_PERM_STORE_LOCAL_CAP;
+#endif
+		}
 	}
 	if (prot & VM_PROT_EXECUTE)
 		perms |= CHERI_PERM_EXECUTE | CHERI_PERM_EXECUTIVE |
