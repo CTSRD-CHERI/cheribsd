@@ -660,6 +660,28 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+		KASSERT(cheri_is_kernel_lvl(tf), ("td_frame: !KernelLevel"));
+		KASSERT(!cheri_has_store_kernel_lvl(tf),
+		    ("td_frame: StoreKernelLevel allowed"));
+		KASSERT(cheri_is_kernel_lvl(pcb), ("td_pcb: !KernelLevel"));
+		KASSERT(!cheri_is_kernel_lvl(imgp->auxv),
+		    ("auxv: KernelLevel"));
+		KASSERT(!cheri_has_store_kernel_lvl(imgp->auxv),
+		    ("auxv: StoreKernelLevel allowed"));
+		KASSERT(!cheri_is_kernel_lvl(stack), ("ustack: KernelLevel"));
+		KASSERT(!cheri_has_store_kernel_lvl(stack),
+		    ("ustack: StoreKernelLevel allowed"));
+		void *pcc = cheri_exec_pcc(td, imgp);
+		KASSERT(!cheri_is_kernel_lvl(pcc), ("user pcc: KernelLevel"));
+		KASSERT(!cheri_has_store_kernel_lvl(pcc),
+		    ("user pcc: StoreKernelLevel allowed"));
+		void *sigcode_cap = cheri_sigcode_capability(td);
+		KASSERT(!cheri_is_kernel_lvl(sigcode_cap),
+		    ("sigcode: KernelLevel"));
+		KASSERT(!cheri_has_store_kernel_lvl(sigcode_cap),
+		    ("sigcode: StoreKernelLevel allowed"));
+#endif
 		tf->tf_x[0] = (uintcap_t)imgp->auxv;
 		tf->tf_sp = stack;
 		tf->tf_lr = (uintcap_t)cheri_exec_pcc(td, imgp);

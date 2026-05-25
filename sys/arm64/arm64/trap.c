@@ -666,6 +666,11 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 	esr = frame->tf_esr;
 	exception = ESR_ELx_EXCEPTION(esr);
 
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	KASSERT(cheri_is_kernel_lvl(frame), ("kernel frame: !KernelLevel"));
+	KASSERT(cheri_has_store_kernel_lvl(frame),
+	    ("kernel frame: StoreKernelLevel forbidden"));
+#endif
 #ifdef KDTRACE_HOOKS
 	if (dtrace_trap_func != NULL && (*dtrace_trap_func)(frame, exception))
 		return;
@@ -795,6 +800,13 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 	KASSERT(cheri_top_get(cheri_stack_get()) <= (ptraddr_t)td->td_frame,
 	    ("Invalid kernel stack length: %#p overlaps frame %#p",
 		cheri_stack_get(), td->td_frame));
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	KASSERT(cheri_is_kernel_lvl(frame), ("kernel frame: !KernelLevel"));
+	KASSERT(!cheri_has_store_kernel_lvl(frame),
+	    ("kernel frame: StoreKernelLevel allowed"));
+	KASSERT(!cheri_has_store_kernel_lvl(td->td_frame),
+	    ("td_frame: StoreKernelLevel allowed"));
+#endif
 #endif
 
 	kasan_mark(frame, sizeof(*frame), sizeof(*frame), 0);
