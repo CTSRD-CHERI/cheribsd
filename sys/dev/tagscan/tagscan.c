@@ -36,6 +36,7 @@
  * system with 64GiB of DRAM), so this is done once on load, and then again
  * only on demand.  In the future it might be useful to develop somes of
  * continuous background re-measurement.
+ */
 
 /*
  * The page set statistics structure describes both direct measurements and
