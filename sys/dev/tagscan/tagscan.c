@@ -125,7 +125,7 @@ tagscan_pageset_stats_update(struct tagscan_pageset_stats *tpsp,
 }
 
 static void
-tagscan_rescan_page(vm_page_t m)
+tagscan_scan_page(vm_page_t m)
 {
 	uintcap_t c, *cp;
 	vm_object_t obj;
@@ -188,9 +188,9 @@ tagscan_rescan_page(vm_page_t m)
 }
 
 /*
- * Recalculate various derived metrics after a rescan.  Most derived metrics
- * are relative the pages scanned of a particular memory type; the only
- * exception is the % of overall system memory.
+ * Recalculate various derived metrics after a scan.  Most derived metrics are
+ * relative the pages scanned of a particular memory type; the only exception
+ * is the % of overall system memory.
  *
  * XXX: Some values here use floor rather than proper rounding.
  */
@@ -274,7 +274,7 @@ tagscan_pageset_stats_recalculate(struct tagscan_pageset_stats *tpsp)
 }
 
 static void
-tagscan_rescan(void)
+tagscan_scan(void)
 {
 	long pi;
 
@@ -295,7 +295,7 @@ tagscan_rescan(void)
 	bzero(&tps_no_object, sizeof(tps_misc_object));
 	bzero(&tps_no_object, sizeof(tps_no_object));
 	for (pi = 0; pi < vm_page_array_size; pi++)
-		tagscan_rescan_page(&vm_page_array[pi]);
+		tagscan_scan_page(&vm_page_array[pi]);
 	tagscan_pageset_stats_recalculate(&tps_global);
 	tagscan_pageset_stats_recalculate(&tps_allocated);
 	tagscan_pageset_stats_recalculate(&tps_unallocated);
@@ -319,7 +319,7 @@ sysctl_dev_tagscan_rescan(SYSCTL_HANDLER_ARGS)
 	error = sysctl_handle_int(oidp, &value, 0, req);
 	if (error || !req->newptr)
 		return (error);
-	tagscan_rescan();
+	tagscan_scan();
 	return (0);
 }
 SYSCTL_PROC(_dev_tagscan, OID_AUTO, rescan,
@@ -412,7 +412,7 @@ tagscan_modevent(module_t mod __unused, int type, void *data __unused)
 {
 	switch(type) {
 	case MOD_LOAD:
-		tagscan_rescan();
+		tagscan_scan();
 		break;
 
 	case MOD_UNLOAD:
