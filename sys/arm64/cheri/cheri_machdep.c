@@ -168,3 +168,11 @@ vm_prot2perms(int base, vm_prot_t prot)
 
 	return ((base & ~CHERI_PERMS_RWX_MASK) | perms);
 }
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_RESTRICT_KERNCAP_FLOW) && defined(INVARIANTS)
+void
+cheri_assert_no_store_local(void *cap)
+{
+	panic("Unexpected capability with StoreLocal %#p\n", cap);
+}
+#endif
