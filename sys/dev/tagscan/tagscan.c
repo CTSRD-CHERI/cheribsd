@@ -24,16 +24,24 @@
 #include <vm/vm_page.h>
 #include <vm/vm_param.h>
 
-#define	TS_INTERVAL_SECS_DEFAULT	10
-#define	TS_INTERVAL_SECS_MIN		10
-#define	TS_INTERVAL_SECS_MAX		120
-
-/* static int	tps_interval_secs = TS_INTERVAL_SECS_DEFAULT; */
+/*
+ * tagscan walks the physical page index scanning pages and gathering
+ * statistics.  Statistics are associated with "page sets" -- sets of pages
+ * with common properties, such as the type of VM object (if any) that they
+ * are associated with.  Although we count scan each page only once per
+ * full-system scan, it may be a member of multiple page sets.  Statistics are
+ * exported in a simple text format via sysctl.
+ *
+ * Walking the page list is quite expensive (several seconds on a Morello
+ * system with 64GiB of DRAM), so this is done once on load, and then again
+ * only on demand.  In the future it might be useful to develop somes of
+ * continuous background re-measurement.
 
 /*
- * Statistics structure decribing both direct measurements and summary stats +
- * overhead estimates for a set of pages.  Most (but not all) stats are
- * calculated relative to its own total pages/words/bytes counted.
+ * The page set statistics structure describes both direct measurements and
+ * derived summary statistics for a set of pages with common properties.  For
+ * estimated overheads, these are calculated relative to the set rather than
+ * globally [except, of course, for the global set].
  */
 struct tagscan_pageset_stats {
 	/*
