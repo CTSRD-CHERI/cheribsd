@@ -29,6 +29,7 @@
 
 #include <machine/asm.h>
 #include <machine/armreg.h>
+#include <machine/cherireg.h>
 
 #include "assym.inc"
 #include <sys/intr.h>
@@ -427,6 +428,10 @@ ENTRY(handle_empty_exception)
 #ifdef CHERI_BOUNDED_KSTACK
 	mov	x1, #TF_SIZE
 	scbndse	PTR(0), PTR(0), x1
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	mov	x1, #CHERI_PERM_STORE_LOCAL_CAP
+	clrperm	PTR(0), PTR(0), x1
+#endif
 #endif
 1:	bl	unhandled_exception
 	b	1b

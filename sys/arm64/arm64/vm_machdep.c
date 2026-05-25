@@ -138,6 +138,14 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	    cheri_bounds_set_exact(td2->td_kstack, (ptraddr_t)tf -
 		td2->td_kstack),
 	    (ptraddr_t)tf);
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+        /*
+	 * NB: The trap handler continues to access the frame via the
+	 * root kstack capability. This enforces capability flow via
+	 * kernel C code.
+	 */
+	tf = cheri_perms_clear(tf, CHERI_PERM_STORE_LOCAL_CAP);
+#endif
 #else
 	tf = (struct trapframe *)STACKALIGN((struct trapframe *)pcb2 - 1);
 #endif
@@ -345,6 +353,10 @@ cpu_thread_alloc(struct thread *td)
 	td->td_pcb = cheri_bounds_set_exact(td->td_pcb, sizeof(struct pcb));
 	td->td_frame = cheri_bounds_set_exact(td->td_frame,
 	    sizeof(struct trapframe));
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	td->td_frame = cheri_perms_clear(td->td_frame,
+	    CHERI_PERM_STORE_LOCAL_CAP);
+#endif
 
 	td->td_md.md_kstack = (void *)cheri_address_set(
 	    cheri_bounds_set_exact(td->td_kstack,
