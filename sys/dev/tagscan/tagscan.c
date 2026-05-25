@@ -370,7 +370,7 @@ sysctl_dev_tagscan_dump(SYSCTL_HANDLER_ARGS)
 	struct sbuf sb;
 	int error;
 
-	sbuf_new(&sb, NULL, 256, SBUF_AUTOEXTEND | SBUF_INCLUDENUL);
+	sbuf_new(&sb, NULL, 8192, SBUF_AUTOEXTEND | SBUF_INCLUDENUL);
 	sbuf_printf(&sb, "global:\n");
 	tagscan_pageset_stats_dump(&sb, &tps_global);
 	sbuf_printf(&sb, "allocated:\n");
