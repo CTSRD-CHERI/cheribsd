@@ -31,18 +31,6 @@
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "sunrpc"
- * }
- * CHERI CHANGES END
- */
-/*
  * xdr_sizeof.c
  *
  * General purpose routine to see how much space something will use
