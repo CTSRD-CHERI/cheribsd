@@ -4956,8 +4956,14 @@ dladdr(const void *addr, Dl_info *info)
 	info->dli_fname = obj->path;
 	info->dli_fbase = obj->mapbase;
 #ifdef __CHERI_PURE_CAPABILITY__
-	/* Clear all permissions from dli_fbase to avoid direct access */
-	info->dli_fbase = cheri_perms_and(info->dli_fbase, 0);
+	/*
+	 * Clear all permissions from dli_fbase to avoid direct access.
+	 * Retain the non-memory access permission, in particular the
+	 * PERM_GLOBAL may be necessary if user capabilities do not
+	 * have PERM_STORE_LOCAL_CAP.
+	 */
+	info->dli_fbase = cheri_perms_clear(info->dli_fbase,
+	    CHERI_PERMS_RWX_MASK);
 #endif
 	info->dli_saddr = (void *)0;
 	info->dli_sname = NULL;
@@ -4984,7 +4990,8 @@ dladdr(const void *addr, Dl_info *info)
 		symbol_addr = obj->relocbase + def->st_value;
 #ifdef __CHERI_PURE_CAPABILITY__
 		/* Clear all permissions from the symbol_addr */
-		symbol_addr = cheri_perms_and(symbol_addr, 0);
+		symbol_addr = cheri_perms_clear(symbol_addr,
+		    CHERI_PERMS_RWX_MASK);
 #endif
 		if (symbol_addr > addr || symbol_addr < info->dli_saddr)
 			continue;
