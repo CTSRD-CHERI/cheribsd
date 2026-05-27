@@ -570,11 +570,8 @@ kern_shmat_locked(struct thread *td, int shmid,
 #endif
 
 		/* Set appropriate permissions. */
-		if ((shmflg & SHM_RDONLY) != 0)
-			perm = CHERI_PERMS_USERSPACE_RODATA;
-		else
-			perm = CHERI_PERMS_USERSPACE_DATA;
-		perm |= CHERI_PERM_SW_VMEM;
+		perm = vm_prot2perms(cheri_perms_get(retaddr),
+		    (shmflg & SHM_RDONLY) != 0 ? VM_PROT_READ : VM_PROT_RW);
 		retaddr = cheri_perms_and(retaddr, perm);
 		td->td_retval[0] = retaddr;
 	} else
