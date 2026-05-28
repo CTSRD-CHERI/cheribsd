@@ -51,8 +51,8 @@ struct dtv {
 };
 
 struct tcb {
-	struct dtv		* __kerncap tcb_dtv;	/* required by rtld */
-	struct pthread		* __kerncap tcb_thread;
+	struct dtv		*tcb_dtv;	/* required by rtld */
+	struct pthread		*tcb_thread;
 };
 
 #define	TLS_TCB_SIZE	sizeof(struct tcb)
