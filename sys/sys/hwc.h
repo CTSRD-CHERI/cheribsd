@@ -58,9 +58,9 @@ struct hwc_alloc64 {
 struct hwc_alloc {
 	int		mode;
 	pid_t		pid;		/* thread mode */
-	const char	* __capability backend_name;
+	const char	*backend_name;
 	size_t		backend_name_len;
-	int		* __capability ident;
+	int		*ident;
 } __aligned(16);
 
 struct hwc_configure {
