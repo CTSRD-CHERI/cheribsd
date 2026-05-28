@@ -1,0 +1,64 @@
+.\"-
+.\" Copyright (c) 2026 Konrad Witaszczyk
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.\" This software was developed by SRI International, the University of
+.\" Cambridge Computer Laboratory (Department of Computer Science and
+.\" Technology), and Capabilities Limited under Defense Advanced Research
+.\" Projects Agency / Air Force Research Laboratory (DARPA/AFRL) Contract
+.\" No. FA8750-24-C-B047 ("DEC").
+.\"
+.Dd May 28, 2026
+.Dt KINFO_GETCOMPARTMENTS 3
+.Os
+.Sh NAME
+.Nm kinfo_getcompartments
+.Nd function for getting system-wide information on kernel compartments
+.Sh LIBRARY
+.Lb libutil
+.Sh SYNOPSIS
+.In sys/types.h
+.In cheri/c18n.h
+.In libutil.h
+.Ft struct kinfo_cheri_kc18n_compart *
+.Fn kinfo_getcompartments "int *cntp"
+.Sh DESCRIPTION
+This function is used to obtain information about compartments defined in the
+kernel binary and kernel modules.
+.Pp
+The
+.Ar cntp
+argument allows the caller to know how many records are returned.
+.Pp
+This function is a wrapper around the
+.Dq kern.kc18n_compartments
+.Xr sysctl 3
+MIB.
+While the kernel returns a packed structure, this function expands the
+data into a fixed record format.
+.Sh RETURN VALUES
+On success the
+.Fn kinfo_getcompartments
+function returns a pointer to an array of
+.Vt struct kinfo_cheri_kc18n_compart
+structures as defined by
+.In cheri/c18n.h .
+The array is allocated by an internal call to
+.Xr malloc 3
+and must be freed by the caller with a call to
+.Xr free 3 .
+On failure the
+.Fn kinfo_getcompartments
+function returns
+.Dv NULL .
+.Sh SEE ALSO
+.Xr free 3 ,
+.Xr malloc 3
+.Sh AUTHORS
+This software and this manual page were
+developed by SRI International, the University of Cambridge Computer
+Laboratory (Department of Computer Science and Technology), and
+Capabilities Limited under contract
+.Pq FA8750-24-C-B047
+.Pq Do DEC Dc .
