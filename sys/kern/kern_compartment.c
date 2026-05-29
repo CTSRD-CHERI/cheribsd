@@ -437,8 +437,11 @@ compartment_create(struct thread *td, u_long id, bool usecache)
 
 	if (usecache)
 		compartment = compartment_alloc_from_cache(td);
-	else
+	else {
+		curthread->td_incachefill = true;
 		compartment = compartment_alloc();
+		curthread->td_incachefill = false;
+	}
 	compartment_linkup(compartment, id, td);
 
 	/* NB: compartment_maxnid can be unlocked as it never decreases. */
