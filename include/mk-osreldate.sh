@@ -39,6 +39,7 @@ ${ECHO} creating osreldate.h from newvers.sh
 set +e
 COPYRIGHT=$(sh ${NEWVERS_SH:=$CURDIR/../sys/conf/newvers.sh} -c) || exit 1
 eval $(sh ${NEWVERS_SH} -V RELDATE) || exit 1
+eval $(sh ${NEWVERS_SH} -V CHERIBSDVER) || exit 1
 set -e
 cat > $tmpfile <<EOF
 $COPYRIGHT
@@ -47,6 +48,8 @@ $COPYRIGHT
 #else
 #undef __FreeBSD_version
 #define __FreeBSD_version $RELDATE
+#undef __CheriBSD_version
+#define __CheriBSD_version $CHERIBSDVER
 #endif
 EOF
 chmod 644 $tmpfile
