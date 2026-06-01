@@ -45,8 +45,8 @@
 #
 #	-V var	Print ${var}="${val-of-var}" and exit
 #
-#	-v	Print TYPE REVISION BRANCH RELEASE VERSION RELDATE variables
-#		like the -V command
+#	-v	Print TYPE REVISION BRANCH RELEASE VERSION RELDATE CHERIBSDVER
+#		variables like the -V command
 #
 
 TYPE="FreeBSD"
@@ -73,8 +73,10 @@ done
 
 RELEASE="${RELEASE:-${REVISION}-${BRANCH}}"
 VERSION="${VERSION:-${TYPE} ${RELEASE}}"
+PARAMFILE="${PARAMFILE:-${SYSDIR}/sys/param.h}"
 
-RELDATE=$(awk '/^#define[[:space:]]*__FreeBSD_version/ {print $3}' ${PARAMFILE:-${SYSDIR}/sys/param.h})
+RELDATE=$(awk '/^#define[[:space:]]*__FreeBSD_version/ {print $3}' ${PARAMFILE})
+CHERIBSDVER=$(awk '/^#define[[:space:]]*__CheriBSD_version/ {print $3}' ${PARAMFILE})
 
 if [ -r "${SYSDIR}/../COPYRIGHT" ]; then
 	year=$(sed -Ee '/^Copyright .* The FreeBSD Project/!d;s/^.*1992-([0-9]*) .*$/\1/g' ${SYSDIR}/../COPYRIGHT)
@@ -126,7 +128,8 @@ while getopts crRvV: opt; do
 		;;
 	v)
 		# Only put variables that are single lines here.
-		for v in TYPE REVISION BRANCH RELEASE VERSION RELDATE; do
+		for v in TYPE REVISION BRANCH RELEASE VERSION RELDATE \
+		    CHERIBSDVER; do
 			eval val=\$${v}
 			echo ${v}=\"${val}\"
 		done
