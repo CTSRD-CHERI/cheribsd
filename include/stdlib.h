@@ -373,6 +373,9 @@ __BEGIN_DECLS
 
 int timsort(void *base, size_t nel, size_t width,
 	    int (*compar) (const void *, const void *));
+#ifdef __BLOCKS__
+int	 timsort_b(void *, size_t, size_t, int (^)(const void *, const void *));
+#endif
 
 extern char *suboptarg;			/* getsubopt(3) external variable */
 #endif /* __BSD_VISIBLE */

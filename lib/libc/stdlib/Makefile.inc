@@ -24,8 +24,9 @@ CLEANFILES+=C99_Exit.c
 C99_Exit.c: ${LIBC_SRCTOP}/stdlib/_Exit.c .NOMETA
 	ln -sf ${.ALLSRC} ${.TARGET}
 
-.PATH:	${LIBC_SRCTOP}/../../contrib/timsort
-MISRCS+=	timsort.c
+.PATH:	${SRCTOP}/contrib/timsort
+MISRCS+=	timsort.c timsort_b.c
+CFLAGS.timsort_b.c+=	-I${SRCTOP}/contrib/timsort
 
 SYM_MAPS+= ${LIBC_SRCTOP}/stdlib/Symbol.map
 

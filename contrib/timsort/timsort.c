@@ -104,8 +104,15 @@ typedef int (*comparator) (const void *x, const void *y, void *thunk);
 #define CMP(compar, thunk, x, y) (compar((x), (y), (thunk)))
 #define TIMSORT timsort_r
 
-#else
+#elif defined(IS_TIMSORT_B)
+#include "block_abi.h"
+typedef	DECLARE_BLOCK(int, comparator, const void *, const void *);
+#define CMPPARAMS(compar, thunk) comparator compar
+#define CMPARGS(compar, thunk) (compar)
+#define CMP(compar, thunk, x, y) CALL_BLOCK((compar), (x), (y))
+#define TIMSORT timsort_b
 
+#else
 typedef int (*comparator) (const void *x, const void *y);
 #define CMPPARAMS(compar, thunk) comparator compar
 #define CMPARGS(compar, thunk) (compar)
