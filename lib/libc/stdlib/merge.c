@@ -108,6 +108,9 @@ static void insertionsort(u_char *, size_t, size_t, cmp_t);
 
 #ifdef I_AM_MERGESORT_B
 int mergesort_b(void *, size_t, size_t, cmp_t);
+#ifdef __CHERI__
+int timsort_b(void *, size_t, size_t, cmp_t);
+#endif
 #else
 int mergesort(void *, size_t, size_t, cmp_t);
 #endif
@@ -251,7 +254,7 @@ COPY:	    			b = t;
 	return (0);
 #else /* __CHERI_PURE_CAPABILITY__ */
 #ifdef I_AM_MERGESORT_B
-	return (EINVAL);
+	return (timsort_b(base, nmemb, size, cmp));
 #else
 	return (timsort(base, nmemb, size, cmp));
 #endif
