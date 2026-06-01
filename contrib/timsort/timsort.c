@@ -426,3 +426,14 @@ int TIMSORT(void *a, size_t nel, size_t width, CMPPARAMS(c, carg))
 		return timsort_width(a, nel, width, CMPARGS(c, carg));
 	}
 }
+
+#ifdef TIMSORT_IS_MERGESORT
+#include <sys/cdefs.h>
+#ifdef IS_TIMSORT_R
+__strong_reference(timsort_r, mergesort_r);
+#elif defined(IS_TIMSORT_B)
+__strong_reference(timsort_b, mergesort_b);
+#else
+__strong_reference(timsort, mergesort);
+#endif
+#endif

@@ -31,18 +31,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20221129,
- *   "target_type": "lib",
- *   "changes": [
- *     "integer_provenance"
- *   ],
- *   "change_comment": "replace with call to timsort"
- * }
- * CHERI CHANGES END
- */
 
 /*
  * Hybrid exponential search/linear search merge sort with hybrid
@@ -66,6 +54,7 @@
 
 #ifdef I_AM_MERGESORT_B
 #include "block_abi.h"
+#define	DECLARE_CMP	DECLARE_BLOCK(int, cmp, const void *, const void *)
 typedef DECLARE_BLOCK(int, cmp_t, const void *, const void *);
 #define	CMP(x, y)	CALL_BLOCK(cmp, x, y)
 #else
@@ -73,7 +62,6 @@ typedef int (*cmp_t)(const void *, const void *);
 #define	CMP(x, y)	cmp(x, y)
 #endif
 
-#ifndef __CHERI_PURE_CAPABILITY__
 static void setup(u_char *, u_char *, size_t, size_t, cmp_t);
 static void insertionsort(u_char *, size_t, size_t, cmp_t);
 
@@ -104,13 +92,9 @@ static void insertionsort(u_char *, size_t, size_t, cmp_t);
  */
 /* Assumption: PSIZE is a power of 2. */
 #define EVAL(p) (u_char **)roundup2((uintptr_t)p, PSIZE)
-#endif /* !__CHERI_PURE_CAPABILITY__ */
 
 #ifdef I_AM_MERGESORT_B
 int mergesort_b(void *, size_t, size_t, cmp_t);
-#ifdef __CHERI__
-int timsort_b(void *, size_t, size_t, cmp_t);
-#endif
 #else
 int mergesort(void *, size_t, size_t, cmp_t);
 #endif
@@ -125,7 +109,6 @@ mergesort_b(void *base, size_t nmemb, size_t size, cmp_t cmp)
 mergesort(void *base, size_t nmemb, size_t size, cmp_t cmp)
 #endif
 {
-#ifndef __CHERI_PURE_CAPABILITY__
 	size_t i;
 	int sense;
 	int big, iflag;
@@ -252,16 +235,8 @@ COPY:	    			b = t;
 	}
 	free(list2);
 	return (0);
-#else /* __CHERI_PURE_CAPABILITY__ */
-#ifdef I_AM_MERGESORT_B
-	return (timsort_b(base, nmemb, size, cmp));
-#else
-	return (timsort(base, nmemb, size, cmp));
-#endif
-#endif /* __CHERI_PURE_CAPABILITY__ */
 }
 
-#ifndef __CHERI_PURE_CAPABILITY__
 #define	swap(a, b) {					\
 		s = b;					\
 		i = size;				\
@@ -372,4 +347,3 @@ insertionsort(u_char *a, size_t n, size_t size, cmp_t cmp)
 			swap(u, t);
 		}
 }
-#endif /* !__CHERI_PURE_CAPABILITY__ */
