@@ -66,9 +66,6 @@ typedef	intptr_t word;		/* "word" used for optimal copy speed */
 #undef memcpy	/* _FORTIFY_SOURCE */
 #undef memmove	/* _FORTIFY_SOURCE */
 
-#ifdef IN_LIBSYSCALLS
-__attribute__((weak, visibility("hidden")))
-#endif
 void *
 #ifdef MEMCOPY
 memcpy
