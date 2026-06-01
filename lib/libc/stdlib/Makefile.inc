@@ -8,7 +8,7 @@ MISRCS+=C99_Exit.c a64l.c abort.c abs.c atexit.c atof.c atoi.c atol.c atoll.c \
 	getsubopt.c hcreate.c hcreate_r.c hdestroy_r.c heapsort.c heapsort_b.c \
 	hsearch_r.c imaxabs.c imaxdiv.c \
 	insque.c l64a.c labs.c ldiv.c llabs.c lldiv.c lsearch.c \
-	merge.c mergesort_b.c ptsname.c qsort.c qsort_r.c qsort_r_compat.c \
+	ptsname.c qsort.c qsort_r.c qsort_r_compat.c \
 	qsort_s.c quick_exit.c radixsort.c rand.c \
 	random.c reallocarray.c reallocf.c realpath.c remque.c \
 	set_constraint_handler_s.c strfmon.c strtoimax.c \
@@ -26,6 +26,8 @@ C99_Exit.c: ${LIBC_SRCTOP}/stdlib/_Exit.c .NOMETA
 
 .PATH:	${SRCTOP}/contrib/timsort
 MISRCS+=	timsort.c timsort_b.c
+CFLAGS.timsort.c+=	-DTIMSORT_IS_MERGESORT
+CFLAGS.timsort_b.c+=	-DTIMSORT_IS_MERGESORT
 CFLAGS.timsort_b.c+=	-I${SRCTOP}/contrib/timsort
 
 SYM_MAPS+= ${LIBC_SRCTOP}/stdlib/Symbol.map

@@ -88,6 +88,7 @@ _libc_other_objects+=syncicache
 .if ${MACHINE_ABI:Mpurecap}
 # In purecap, mergesort uses timsort
 _libc_other_objects+=timsort
+SRCS:=${SRCS:Nmerge.c}
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}
