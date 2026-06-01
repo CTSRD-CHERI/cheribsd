@@ -660,7 +660,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+#if defined(CHERI_RESTRICT_KERNCAP_FLOW) && defined(INVARIANTS)
 		KASSERT(cheri_is_kernel_lvl(tf), ("td_frame: !KernelLevel"));
 		KASSERT(!cheri_has_store_kernel_lvl(tf),
 		    ("td_frame: StoreKernelLevel allowed"));
