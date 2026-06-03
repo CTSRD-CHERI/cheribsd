@@ -41,7 +41,6 @@
 #define opt_utrace JEMALLOC_N(opt_utrace)
 #define opt_xmalloc JEMALLOC_N(opt_xmalloc)
 #define opt_zero JEMALLOC_N(opt_zero)
-#define opt_zero_free JEMALLOC_N(opt_zero_free)
 #define opt_zero_realloc_action JEMALLOC_N(opt_zero_realloc_action)
 #define sdallocx_default JEMALLOC_N(sdallocx_default)
 #define zero_realloc_count JEMALLOC_N(zero_realloc_count)

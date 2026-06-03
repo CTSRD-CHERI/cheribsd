@@ -28,7 +28,6 @@ extern bool opt_utrace;
 extern bool opt_xmalloc;
 extern bool opt_experimental_infallible_new;
 extern bool opt_zero;
-extern bool opt_zero_free;
 extern unsigned opt_narenas;
 extern zero_realloc_action_t opt_zero_realloc_action;
 extern malloc_init_t malloc_init_state;

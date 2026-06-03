@@ -134,7 +134,6 @@ CTL_PROTO(opt_stats_interval)
 CTL_PROTO(opt_stats_interval_opts)
 CTL_PROTO(opt_junk)
 CTL_PROTO(opt_zero)
-CTL_PROTO(opt_zero_free)
 CTL_PROTO(opt_utrace)
 CTL_PROTO(opt_xmalloc)
 CTL_PROTO(opt_experimental_infallible_new)
@@ -456,7 +455,6 @@ static const ctl_named_node_t opt_node[] = {
 	{NAME("stats_interval_opts"),	CTL(opt_stats_interval_opts)},
 	{NAME("junk"),		CTL(opt_junk)},
 	{NAME("zero"),		CTL(opt_zero)},
-	{NAME("zero_free"),	CTL(opt_zero_free)},
 	{NAME("utrace"),	CTL(opt_utrace)},
 	{NAME("xmalloc"),	CTL(opt_xmalloc)},
 	{NAME("experimental_infallible_new"),
@@ -2188,7 +2186,6 @@ CTL_RO_NL_GEN(opt_stats_interval, opt_stats_interval, int64_t)
 CTL_RO_NL_GEN(opt_stats_interval_opts, opt_stats_interval_opts, const char *)
 CTL_RO_NL_CGEN(config_fill, opt_junk, opt_junk, const char *)
 CTL_RO_NL_CGEN(config_fill, opt_zero, opt_zero, bool)
-CTL_RO_NL_CGEN(config_fill, opt_zero_free, opt_zero_free, bool)
 CTL_RO_NL_CGEN(config_utrace, opt_utrace, opt_utrace, bool)
 CTL_RO_NL_CGEN(config_xmalloc, opt_xmalloc, opt_xmalloc, bool)
 CTL_RO_NL_CGEN(config_enable_cxx, opt_experimental_infallible_new,
