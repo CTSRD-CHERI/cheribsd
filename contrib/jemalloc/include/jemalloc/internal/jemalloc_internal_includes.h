@@ -85,8 +85,4 @@
 #include "jemalloc/internal/prof_inlines.h"
 #include "jemalloc/internal/background_thread_inlines.h"
 
-/* Check that we are using je_assert instead of assert(): */
-_Static_assert(__CONCAT(_assert_macro_expansion_is_, assert) == 1,
-    "Should be using je_assert and not assert() from assert.h");
-
 #endif /* JEMALLOC_INTERNAL_INCLUDES_H */
