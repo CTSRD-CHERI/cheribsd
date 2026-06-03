@@ -269,7 +269,7 @@
 .if \el == 0
 	add	PTRN(sp), PTRN(sp), #(TF_SIZE)
 .else
-	add	PTRN(sp), PTRN(sp), #(128 + TF_SIZE)
+	mov	PTRN(sp), PTR(18)
 	mrs	PTR(18), PTRN(tpidr_el1)
 .endif
 .endm
