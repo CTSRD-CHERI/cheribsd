@@ -120,7 +120,7 @@ bool	opt_trust_madvise =
     ;
 
 bool opt_cache_oblivious =
-#ifdef JEMALLOC_CACHE_OBLIVIOUS
+#if defined(JEMALLOC_CACHE_OBLIVIOUS) && !defined(__CHERI__)
     true
 #else
     false
