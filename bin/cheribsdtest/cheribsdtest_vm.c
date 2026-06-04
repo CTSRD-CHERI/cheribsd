@@ -83,6 +83,17 @@
 static const char *skip_need_writable_tmp(
     const struct cheri_test *ctp __unused);
 
+static int
+create_tempfile(void)
+{
+	char template[] = "/tmp/cheribsdtest.XXXXXXXX";
+	int fd = CHERIBSDTEST_CHECK_SYSCALL2(mkstemp(template),
+	    "mkstemp %s", template);
+	CHERIBSDTEST_CHECK_SYSCALL(unlink(template));
+	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
+	return fd;
+}
+
 /*
  * Tests to check that tags are ... or aren't ... preserved for various page
  * types.  'Anonymous' pages provided by the VM subsystem should always
@@ -170,10 +181,16 @@ CHERIBSDTEST(vm_notag_mprotect_no_cap,
 }
 
 static void
-mmap_check_bad_protections(int prot, int expected_errno)
+mmap_check_bad_protections_fd(int prot, int fd, int expected_errno)
 {
 	CHERIBSDTEST_CHECK_CALL_ERROR(mmap(NULL, getpagesize(),
-	    prot, MAP_ANON, -1, 0), expected_errno);
+	    prot, fd == -1 ? MAP_ANON : MAP_SHARED, fd, 0), expected_errno);
+}
+
+static void
+mmap_check_bad_protections(int prot, int expected_errno)
+{
+	mmap_check_bad_protections_fd(prot, -1, expected_errno);
 }
 
 CHERIBSDTEST(vm_mmap_diallowed_prot,
@@ -190,6 +207,11 @@ CHERIBSDTEST(vm_mmap_diallowed_prot,
 	/* Disallowed explicit capability protection combinations */
 	mmap_check_bad_protections(PROT_CAP, ENOTSUP);
 	mmap_check_bad_protections(PROT_MAX(PROT_CAP), ENOTSUP);
+
+	int fd = CHERIBSDTEST_CHECK_SYSCALL(create_tempfile());
+	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
+	mmap_check_bad_protections_fd(PROT_READ|PROT_WRITE|PROT_CAP, fd,
+	    EACCES);
 
 	cheribsdtest_success();
 }
@@ -554,17 +576,6 @@ CHERIBSDTEST(vm_tag_dev_zero_private,
 	int fd = CHERIBSDTEST_CHECK_SYSCALL(open("/dev/zero", O_RDWR));
 	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE, MAP_PRIVATE);
 	cheribsdtest_success();
-}
-
-static int
-create_tempfile(void)
-{
-	char template[] = "/tmp/cheribsdtest.XXXXXXXX";
-	int fd = CHERIBSDTEST_CHECK_SYSCALL2(mkstemp(template),
-	    "mkstemp %s", template);
-	CHERIBSDTEST_CHECK_SYSCALL(unlink(template));
-	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
-	return fd;
 }
 
 /*
