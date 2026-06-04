@@ -668,7 +668,7 @@ executive_get_function(uintptr_t func)
 	     (void *)func));
 
 	trampoline = cheri_kern_address_set(kernel_executive_root_cap,
-	    func - 1);
+	    func & ~0x1);
 	trampoline = __containerof((char (*)[])trampoline,
 	    struct compartment_trampoline, ct_code);
 	KASSERT(trampoline->ct_type == TRAMPOLINE_TYPE_EXECUTIVE_ENTRY,
