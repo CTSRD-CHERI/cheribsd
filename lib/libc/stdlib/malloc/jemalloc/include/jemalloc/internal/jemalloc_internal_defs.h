@@ -10,7 +10,7 @@
  *     "unsupported",
  *     "other"
  *   ],
- *   "change_comment": "sbrk, use C11 atomics, etc",
+ *   "change_comment": "sbrk, etc",
  *   "hybrid_specific": false
  * }
  * CHERI CHANGES END
@@ -67,12 +67,9 @@
 #define JEMALLOC_GCC_U8_ATOMIC_ATOMICS 
 
 /* Defined if GCC __sync atomics are available. */
-#ifndef __CHERI_PURE_CAPABILITY__
 #define JEMALLOC_GCC_SYNC_ATOMICS 
 /* and the 8-bit variant support. */
 #define JEMALLOC_GCC_U8_SYNC_ATOMICS 
-
-#endif
 
 /*
  * Defined if __builtin_clz() and __builtin_clzl() are available.
