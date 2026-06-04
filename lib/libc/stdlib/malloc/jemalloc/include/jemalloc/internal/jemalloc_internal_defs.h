@@ -72,21 +72,6 @@
 /* and the 8-bit variant support. */
 #define JEMALLOC_GCC_U8_SYNC_ATOMICS 
 
-/*
- * Defined if __sync_add_and_fetch(uint32_t *, uint32_t) and
- * __sync_sub_and_fetch(uint32_t *, uint32_t) are available, despite
- * __GCC_HAVE_SYNC_COMPARE_AND_SWAP_4 not being defined (which means the
- * functions are defined in libgcc instead of being inlines).
- */
-#define JE_FORCE_SYNC_COMPARE_AND_SWAP_4 
-
-/*
- * Defined if __sync_add_and_fetch(uint64_t *, uint64_t) and
- * __sync_sub_and_fetch(uint64_t *, uint64_t) are available, despite
- * __GCC_HAVE_SYNC_COMPARE_AND_SWAP_8 not being defined (which means the
- * functions are defined in libgcc instead of being inlines).
- */
-#define JE_FORCE_SYNC_COMPARE_AND_SWAP_8 
 #endif
 
 /*
