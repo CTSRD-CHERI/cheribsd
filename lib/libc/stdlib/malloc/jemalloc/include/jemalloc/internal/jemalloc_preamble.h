@@ -61,7 +61,6 @@ static const bool config_debug =
     false
 #endif
     ;
-
 static const bool have_dss =
 #ifdef JEMALLOC_DSS
     true
