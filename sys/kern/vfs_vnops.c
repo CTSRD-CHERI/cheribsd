@@ -2980,6 +2980,8 @@ vn_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 			maxprot |= VM_PROT_WRITE;
 		else if ((prot & VM_PROT_WRITE) != 0)
 			return (EACCES);
+		if (((prot | cap_maxprot) & VM_PROT_CAP) != 0)
+			return (EACCES);
 	} else {
 		maxprot |= VM_PROT_WRITE;
 		cap_maxprot |= VM_PROT_WRITE;
