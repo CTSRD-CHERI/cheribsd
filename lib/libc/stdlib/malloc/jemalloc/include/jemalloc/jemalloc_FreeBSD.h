@@ -26,7 +26,12 @@
 
 #undef JEMALLOC_BACKGROUND_THREAD
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
+/*
+ * We can't merge adjacent mmap reservations (similar to VirtualAlloc
+ * allocated regions on Windows) so we have to disable merging across
+ * mmap regions.
+ */
 #undef JEMALLOC_MAPS_COALESCE
 #endif
 
