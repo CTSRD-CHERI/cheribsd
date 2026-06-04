@@ -2,20 +2,6 @@
 #ifndef JEMALLOC_INTERNAL_DEFS_H_
 #define JEMALLOC_INTERNAL_DEFS_H_
 /*
- * CHERI CHANGES START
- * {
- *   "updated": 20221129,
- *   "target_type": "lib",
- *   "changes": [
- *     "unsupported",
- *     "other"
- *   ],
- *   "change_comment": "sbrk, etc",
- *   "hybrid_specific": false
- * }
- * CHERI CHANGES END
- */
-/*
  * If JEMALLOC_PREFIX is defined via --with-jemalloc-prefix, it will cause all
  * public APIs to be prefixed.  This makes it possible, with some care, to use
  * multiple allocators simultaneously.
@@ -180,9 +166,7 @@
  * JEMALLOC_DSS enables use of sbrk(2) to allocate extents from the data storage
  * segment (DSS).
  */
-#if !defined(__CHERI_PURE_CAPABILITY__)
 #define JEMALLOC_DSS 
-#endif
 
 /* Support memory filling (junk/zero). */
 #define JEMALLOC_FILL 
