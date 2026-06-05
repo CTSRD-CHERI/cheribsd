@@ -1,15 +1,3 @@
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20221129,
- *   "target_type": "lib",
- *   "changes": [
- *     "support"
- *   ],
- *   "change_comment": "cheriabi support"
- * }
- * CHERI CHANGES END
- */
 #include "jemalloc/internal/jemalloc_preamble.h"
 #include "jemalloc/internal/jemalloc_internal_includes.h"
 
