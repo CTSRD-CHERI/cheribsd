@@ -1,16 +1,3 @@
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20221129,
- *   "target_type": "lib",
- *   "changes": [
- *     "pointer_alignment",
- *     "virtual_address",
- *     "support"
- *   ]
- * }
- * CHERI CHANGES END
- */
 #define JEMALLOC_BASE_C_
 #include "jemalloc/internal/jemalloc_preamble.h"
 #include "jemalloc/internal/jemalloc_internal_includes.h"
@@ -288,7 +275,7 @@ base_block_alloc(tsdn_t *tsdn, base_t *base, extent_hooks_t *extent_hooks,
 
 	if (metadata_thp_madvise()) {
 		void *addr = (void *)block;
-		assert(__builtin_is_aligned(addr, HUGEPAGE) &&
+		assert(((uintptr_t)addr & HUGEPAGE_MASK) == 0 &&
 		    (block_size & HUGEPAGE_MASK) == 0);
 		if (opt_metadata_thp == metadata_thp_always) {
 			pages_huge(addr, block_size);
