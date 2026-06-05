@@ -440,10 +440,9 @@ arena_cache_oblivious_randomize(tsdn_t *tsdn, arena_t *arena, edata_t *edata,
 			uint64_t stack_value = (uint64_t)(uintptr_t)&r;
 			r = (size_t)prng_lg_range_u64(&stack_value, lg_range);
 		}
-		uintptr_t random_offset = ((uintptr_t)r) << (LG_PAGE -
-		    lg_range);
+		size_t random_offset = r << (LG_PAGE - lg_range);
 		edata->e_addr = (void *)((uintptr_t)edata->e_addr +
-		    (ptraddr_t)random_offset);
+		    random_offset);
 		assert(ALIGNMENT_ADDR2BASE(edata->e_addr, alignment) ==
 		    edata->e_addr);
 	}
