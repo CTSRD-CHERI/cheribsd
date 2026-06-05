@@ -1,18 +1,5 @@
 #ifndef JEMALLOC_INTERNAL_TYPES_H
 #define JEMALLOC_INTERNAL_TYPES_H
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20221129,
- *   "target_type": "lib",
- *   "changes": [
- *     "pointer_alignment",
- *     "pointer_shape",
- *     "virtual_address"
- *   ]
- * }
- * CHERI CHANGES END
- */
 
 #include "jemalloc/internal/quantum.h"
 
@@ -115,22 +102,12 @@ typedef enum malloc_init_e malloc_init_t;
 	((void *)((uintptr_t)(a) & ((~(alignment)) + 1)))
 
 /* Return the offset between a and the nearest aligned address at or below a. */
-#if __has_builtin(__builtin_align_down)
-#define ALIGNMENT_ADDR2OFFSET(a, alignment)				\
-	((size_t)((a) - __builtin_align_down((a), alignment)))
-#else
 #define ALIGNMENT_ADDR2OFFSET(a, alignment)				\
 	((size_t)((uintptr_t)(a) & (alignment - 1)))
-#endif
 
 /* Return the smallest alignment multiple that is >= s. */
-#if __has_builtin(__builtin_align_up)
-#define ALIGNMENT_CEILING(s, alignment)					\
-	__builtin_align_up((s), (alignment))
-#else
 #define ALIGNMENT_CEILING(s, alignment)					\
 	(((s) + (alignment - 1)) & ((~(alignment)) + 1))
-#endif
 
 /* Declare a variable-length array. */
 #if __STDC_VERSION__ < 199901L
