@@ -331,6 +331,7 @@ ENTRY(handle_el1t_sync)
 	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
 	mov	PTR(1), PTRN(sp)
 	bl	do_el1t_sync
+	KMSAN_LEAVE
 	restore_registers 1
 	ERET
 END(handle_el1t_sync)
@@ -360,9 +361,8 @@ END(handle_el1t_fiq)
 ENTRY(handle_el1t_serror)
 	save_registers 1
 	KMSAN_ENTER
-	mov	x0, sp
-1:
-	bl	do_serror
+	mov	PTR(0), PTRN(sp)
+1:	bl	do_serror
 	b	1b
 	KMSAN_LEAVE
 END(handle_el1t_serror)
