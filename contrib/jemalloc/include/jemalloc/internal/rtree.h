@@ -374,24 +374,6 @@ rtree_leaf_elm_lookup_fast(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
 	return false;
 }
 
-
-/* Work around a clang false positive in -Warray-bounds */
-#if defined(__clang__) && defined(__has_warning)
-# if __has_warning("-Warray-bounds")
-#  define DISABLE_ARRAY_BOUNDS_WARNING() \
-    _Pragma("clang diagnostic push")  \
-    _Pragma("clang diagnostic ignored \"-Warray-bounds\"")
-#  define ENABLE_ARRAY_BOUNDS_WARNING() \
-    _Pragma("clang diagnostic pop")
-# endif
-#endif
-#ifndef DISABLE_ARRAY_BOUNDS_WARNING
-# define DISABLE_ARRAY_BOUNDS_WARNING()
-#endif
-#ifndef ENABLE_ARRAY_BOUNDS_WARNING
-# define ENABLE_ARRAY_BOUNDS_WARNING()
-#endif
-
 JEMALLOC_ALWAYS_INLINE rtree_leaf_elm_t *
 rtree_leaf_elm_lookup(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
     uintptr_t key, bool dependent, bool init_missing) {
@@ -419,7 +401,6 @@ rtree_leaf_elm_lookup(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
 		assert(leaf != NULL);					\
 		if (i > 0) {						\
 			/* Bubble up by one. */				\
-			DISABLE_ARRAY_BOUNDS_WARNING() /* i > 1, safe */	\
 			rtree_ctx->l2_cache[i].leafkey =		\
 				rtree_ctx->l2_cache[i - 1].leafkey;	\
 			rtree_ctx->l2_cache[i].leaf =			\
@@ -428,7 +409,6 @@ rtree_leaf_elm_lookup(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
 			    rtree_ctx->cache[slot].leafkey;		\
 			rtree_ctx->l2_cache[i - 1].leaf =		\
 			    rtree_ctx->cache[slot].leaf;		\
-			ENABLE_ARRAY_BOUNDS_WARNING()			\
 		} else {						\
 			rtree_ctx->l2_cache[0].leafkey =		\
 			    rtree_ctx->cache[slot].leafkey;		\
