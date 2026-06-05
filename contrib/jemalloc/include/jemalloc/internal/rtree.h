@@ -28,7 +28,7 @@
  */
 
 /* Number of high insignificant bits. */
-#define RTREE_NHIB ((1U << (LG_SIZEOF_SIZE_T+3)) - LG_VADDR)
+#define RTREE_NHIB ((1U << (LG_SIZEOF_PTRADDR_T+3)) - LG_VADDR)
 /* Number of low insigificant bits. */
 #define RTREE_NLIB LG_PAGE
 /* Number of significant bits. */
@@ -165,7 +165,7 @@ rtree_leaf_elm_t *rtree_leaf_elm_lookup_hard(tsdn_t *tsdn, rtree_t *rtree,
 
 JEMALLOC_ALWAYS_INLINE unsigned
 rtree_leaf_maskbits(void) {
-	unsigned ptrbits = ZU(1) << (LG_SIZEOF_SIZE_T+3);
+	unsigned ptrbits = ZU(1) << (LG_SIZEOF_PTRADDR_T+3);
 	unsigned cumbits = (rtree_levels[RTREE_HEIGHT-1].cumbits -
 	    rtree_levels[RTREE_HEIGHT-1].bits);
 	return ptrbits - cumbits;
@@ -185,7 +185,7 @@ rtree_cache_direct_map(uintptr_t key) {
 
 JEMALLOC_ALWAYS_INLINE uintptr_t
 rtree_subkey(uintptr_t key, unsigned level) {
-	unsigned ptrbits = ZU(1) << (LG_SIZEOF_SIZE_T+3);
+	unsigned ptrbits = ZU(1) << (LG_SIZEOF_PTRADDR_T+3);
 	unsigned cumbits = rtree_levels[level].cumbits;
 	unsigned shiftbits = ptrbits - cumbits;
 	unsigned maskbits = rtree_levels[level].bits;

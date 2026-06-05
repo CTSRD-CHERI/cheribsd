@@ -119,7 +119,7 @@ fls_u(unsigned x) {
 }
 #elif defined(_MSC_VER)
 
-#if LG_SIZEOF_SIZE_T == 3
+#if LG_SIZEOF_PTRADDR_T == 3
 #define DO_BSR64(bit, x) _BitScanReverse64(&bit, x)
 #else
 /*
@@ -298,11 +298,11 @@ cfs_lu(unsigned long* bitmap) {
 
 static inline unsigned
 ffs_zu(size_t x) {
-#if LG_SIZEOF_SIZE_T == LG_SIZEOF_INT
+#if LG_SIZEOF_PTRADDR_T == LG_SIZEOF_INT
 	return ffs_u(x);
-#elif LG_SIZEOF_SIZE_T == LG_SIZEOF_LONG
+#elif LG_SIZEOF_PTRADDR_T == LG_SIZEOF_LONG
 	return ffs_lu(x);
-#elif LG_SIZEOF_SIZE_T == LG_SIZEOF_LONG_LONG
+#elif LG_SIZEOF_PTRADDR_T == LG_SIZEOF_LONG_LONG
 	return ffs_llu(x);
 #else
 #error No implementation for size_t ffs()
@@ -311,11 +311,11 @@ ffs_zu(size_t x) {
 
 static inline unsigned
 fls_zu(size_t x) {
-#if LG_SIZEOF_SIZE_T == LG_SIZEOF_INT
+#if LG_SIZEOF_PTRADDR_T == LG_SIZEOF_INT
 	return fls_u(x);
-#elif LG_SIZEOF_SIZE_T == LG_SIZEOF_LONG
+#elif LG_SIZEOF_PTRADDR_T == LG_SIZEOF_LONG
 	return fls_lu(x);
-#elif LG_SIZEOF_SIZE_T == LG_SIZEOF_LONG_LONG
+#elif LG_SIZEOF_PTRADDR_T == LG_SIZEOF_LONG_LONG
 	return fls_llu(x);
 #else
 #error No implementation for size_t fls()
@@ -393,7 +393,7 @@ pow2_ceil_u32(uint32_t x) {
 /* Compute the smallest power of 2 that is >= x. */
 static inline size_t
 pow2_ceil_zu(size_t x) {
-#if (LG_SIZEOF_SIZE_T == 3)
+#if (LG_SIZEOF_PTRADDR_T == 3)
 	return pow2_ceil_u64(x);
 #else
 	return pow2_ceil_u32(x);
@@ -403,7 +403,7 @@ pow2_ceil_zu(size_t x) {
 static inline unsigned
 lg_floor(size_t x) {
 	util_assume(x != 0);
-#if (LG_SIZEOF_SIZE_T == 3)
+#if (LG_SIZEOF_PTRADDR_T == 3)
 	return fls_u64(x);
 #else
 	return fls_u32(x);
@@ -423,7 +423,7 @@ lg_ceil(size_t x) {
 #define LG_FLOOR_16(x) (x < (1ULL << 8) ? LG_FLOOR_8(x) : 8 + LG_FLOOR_8(x >> 8))
 #define LG_FLOOR_32(x) (x < (1ULL << 16) ? LG_FLOOR_16(x) : 16 + LG_FLOOR_16(x >> 16))
 #define LG_FLOOR_64(x) (x < (1ULL << 32) ? LG_FLOOR_32(x) : 32 + LG_FLOOR_32(x >> 32))
-#if LG_SIZEOF_SIZE_T == 2
+#if LG_SIZEOF_PTRADDR_T == 2
 #  define LG_FLOOR(x) LG_FLOOR_32((x))
 #else
 #  define LG_FLOOR(x) LG_FLOOR_64((x))
