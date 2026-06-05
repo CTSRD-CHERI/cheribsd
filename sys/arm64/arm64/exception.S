@@ -452,8 +452,7 @@ ENTRY(handle_el0_serror)
 	save_registers 0
 	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
-1:
-	bl	do_serror
+1:	bl	do_serror
 	b	1b
 	KMSAN_LEAVE
 END(handle_el0_serror)
@@ -462,8 +461,7 @@ ENTRY(handle_empty_exception)
 	save_registers 0
 	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
-1:
-	bl	unhandled_exception
+1:	bl	unhandled_exception
 	b	1b
 	KMSAN_LEAVE
 END(handle_empty_exception)
