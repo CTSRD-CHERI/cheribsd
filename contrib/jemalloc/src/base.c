@@ -283,7 +283,7 @@ base_block_alloc(tsdn_t *tsdn, base_t *base, ehooks_t *ehooks, unsigned ind,
 
 	if (metadata_thp_madvise()) {
 		void *addr = (void *)block;
-		assert(__builtin_is_aligned(addr, HUGEPAGE) &&
+		assert(((uintptr_t)addr & HUGEPAGE_MASK) == 0 &&
 		    (block_size & HUGEPAGE_MASK) == 0);
 		if (opt_metadata_thp == metadata_thp_always) {
 			pages_huge(addr, block_size);

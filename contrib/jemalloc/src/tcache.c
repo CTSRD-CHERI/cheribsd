@@ -712,14 +712,14 @@ tsd_tcache_data_init(tsd_t *tsd) {
 
 	assert(cache_bin_still_zero_initialized(&tcache->bins[0]));
 	size_t alignment = tcache_bin_alloc_alignment;
-	size_t size = ROUND_SIZE(sz_sa2u(tcache_bin_alloc_size, alignment));
+	size_t size = JEMALLOC_ROUND_SIZE(sz_sa2u(tcache_bin_alloc_size, alignment));
 
 	void *mem = ipallocztm(tsd_tsdn(tsd), size, alignment, true, NULL,
 	    true, arena_get(TSDN_NULL, 0, true));
 	if (mem == NULL) {
 		return true;
 	} else {
-		mem = BOUND_PTR(mem, size);
+		mem = JEMALLOC_BOUND_PTR(mem, size);
 	}
 
 	tcache_init(tsd, tcache_slow, tcache, mem);
@@ -763,14 +763,14 @@ tcache_create_explicit(tsd_t *tsd) {
 	    + sizeof(tcache_slow_t);
 	/* Naturally align the pointer stacks. */
 	size = PTR_CEILING(size);
-	size = ROUND_SIZE(sz_sa2u(size, tcache_bin_alloc_alignment));
+	size = JEMALLOC_ROUND_SIZE(sz_sa2u(size, tcache_bin_alloc_alignment));
 
 	void *mem = ipallocztm(tsd_tsdn(tsd), size, tcache_bin_alloc_alignment,
 	    true, NULL, true, arena_get(TSDN_NULL, 0, true));
 	if (mem == NULL) {
 		return NULL;
 	} else {
-		mem = BOUND_PTR(mem, size);
+		mem = JEMALLOC_BOUND_PTR(mem, size);
 	}
 	tcache_t *tcache = (void *)((uintptr_t)mem + tcache_bin_alloc_size);
 	tcache_slow_t *tcache_slow =

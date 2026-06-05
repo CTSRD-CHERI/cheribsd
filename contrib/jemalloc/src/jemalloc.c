@@ -358,9 +358,9 @@ bootstrap_malloc(size_t size) {
 	if (unlikely(size == 0)) {
 		size = 1;
 	}
-	size = ROUND_SIZE(size);
+	size = JEMALLOC_ROUND_SIZE(size);
 
-	return BOUND_PTR(a0ialloc(size, false, false), size);
+	return JEMALLOC_BOUND_PTR(a0ialloc(size, false, false), size);
 }
 
 void *
@@ -372,9 +372,9 @@ bootstrap_calloc(size_t num, size_t size) {
 		assert(num == 0 || size == 0);
 		num_size = 1;
 	}
-	num_size = ROUND_SIZE(num_size);
+	num_size = JEMALLOC_ROUND_SIZE(num_size);
 
-	return BOUND_PTR(a0ialloc(num_size, true, false), num_size);
+	return JEMALLOC_BOUND_PTR(a0ialloc(num_size, true, false), num_size);
 }
 
 void
@@ -2472,7 +2472,7 @@ compute_size_with_overflow(bool may_overflow, dynamic_opts_t *dopts,
 	/* A size_t with its high-half bits all set to 1. */
 	static const size_t high_bits = SIZE_T_MAX << (sizeof(size_t) * 8 / 2);
 
-	*size = ROUND_SIZE(dopts->item_size * dopts->num_items);
+	*size = JEMALLOC_ROUND_SIZE(dopts->item_size * dopts->num_items);
 
 	if (unlikely(*size == 0)) {
 		return (dopts->num_items != 0 && dopts->item_size != 0);
@@ -2726,7 +2726,7 @@ imalloc(static_opts_t *sopts, dynamic_opts_t *dopts) {
 		ret = imalloc_body(sopts, dopts, tsd);
 	}
 	if (ret == 0) {
-		*dopts->result = BOUND_PTR(*dopts->result, dopts->usize);
+		*dopts->result = JEMALLOC_BOUND_PTR(*dopts->result, dopts->usize);
 	}
 	return ret;
 }
@@ -2768,7 +2768,7 @@ malloc_default(size_t size) {
 	LOG("core.malloc.exit", "result: %p", ret);
 
 	if (ret != NULL) {
-		ret = BOUND_PTR(ret, sz_s2u(size));
+		ret = JEMALLOC_BOUND_PTR(ret, sz_s2u(size));
 	}
 	return ret;
 }
@@ -3542,7 +3542,7 @@ do_rallocx(void *ptr, size_t size, int flags, bool is_realloc) {
 	assert(malloc_initialized() || IS_INITIALIZER);
 	tsd = tsd_fetch();
 	check_entry_exit_locking(tsd_tsdn(tsd));
-	size = ROUND_SIZE(size);
+	size = JEMALLOC_ROUND_SIZE(size);
 
 	bool zero = zero_get(MALLOCX_ZERO_GET(flags), /* slow */ true);
 
@@ -3595,7 +3595,7 @@ do_rallocx(void *ptr, size_t size, int flags, bool is_realloc) {
 		junk_alloc_callback(excess_start, excess_len);
 	}
 
-	return BOUND_PTR(p, sz_s2u(size));
+	return JEMALLOC_BOUND_PTR(p, sz_s2u(size));
 label_oom:
 	if (is_realloc) {
 		set_errno(ENOMEM);
@@ -4396,7 +4396,7 @@ int
 je_allocm(void **ptr, size_t *rsize, size_t size, int flags) {
 	assert(ptr != NULL);
 
-	size = ROUND_SIZE(size);
+	size = JEMALLOC_ROUND_SIZE(size);
 	void *p = je_mallocx(size, flags);
 	if (p == NULL) {
 		return (ALLOCM_ERR_OOM);
@@ -4418,7 +4418,7 @@ je_rallocm(void **ptr, size_t *rsize, size_t size, size_t extra, int flags) {
 	int ret;
 	bool no_move = flags & ALLOCM_NO_MOVE;
 
-	size += ROUND_SIZE(size + extra) - (size + extra);
+	size += JEMALLOC_ROUND_SIZE(size + extra) - (size + extra);
 
 	if (no_move) {
 		size_t usize = je_xallocx(*ptr, size, extra, flags);

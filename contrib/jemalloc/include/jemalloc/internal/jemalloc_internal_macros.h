@@ -108,13 +108,11 @@
  */
 JEMALLOC_DIAGNOSTIC_DISABLE_SPURIOUS
 
-#ifndef __CHERI_PURE_CAPABILITY__
-#define	BOUND_PTR(ptr, size)	(ptr)
-#define	ROUND_SIZE(size)		(size)
-#else
+#ifdef __CHERI__
 #include <cheri/cheric.h>
+#include <cheriintrin.h>
 
-#define	BOUND_PTR(ptr, size) ({						\
+#  define JEMALLOC_BOUND_PTR(ptr, size) ({				\
 	typeof(ptr) _ptr = (ptr);					\
 	size_t _size = (size);						\
 	(_ptr == NULL ? NULL :						\
@@ -124,11 +122,13 @@ JEMALLOC_DIAGNOSTIC_DISABLE_SPURIOUS
 })
 
 /*
- * XXX-BD: In theory this poses an overflow risk.  Its overflow
- * handling is probably needed in each individual function, returning
- * an appropriate error value.
+ * If the size rounds up to requiring the omnipotent capability then
+ * size will be 0.
  */
-#define	ROUND_SIZE(size)	CHERI_REPRESENTABLE_LENGTH(size)
+#  define JEMALLOC_ROUND_SIZE(size) cheri_representable_length(size)
+#else
+#  define JEMALLOC_BOUND_PTR(ptr, size) (ptr)
+#  define JEMALLOC_ROUND_SIZE(size) (size)
 #endif
 
 #endif /* JEMALLOC_INTERNAL_MACROS_H */

@@ -389,7 +389,7 @@ malloc_initialized(void) {
 JEMALLOC_ALWAYS_INLINE void *
 imalloc_fastpath(size_t size, void *(fallback_alloc)(size_t)) {
 	LOG("core.malloc.entry", "size: %zu", size);
-	size = ROUND_SIZE(size);
+	size = JEMALLOC_ROUND_SIZE(size);
 	if (tsd_get_allocates() && unlikely(!malloc_initialized())) {
 		return fallback_alloc(size);
 	}
@@ -459,12 +459,12 @@ imalloc_fastpath(size_t size, void *(fallback_alloc)(size_t)) {
 	ret = cache_bin_alloc_easy(bin, &tcache_success);
 	if (tcache_success) {
 		fastpath_success_finish(tsd, allocated_after, bin, ret);
-		return BOUND_PTR(ret, usize);
+		return JEMALLOC_BOUND_PTR(ret, usize);
 	}
 	ret = cache_bin_alloc(bin, &tcache_success);
 	if (tcache_success) {
 		fastpath_success_finish(tsd, allocated_after, bin, ret);
-		return BOUND_PTR(ret, usize);
+		return JEMALLOC_BOUND_PTR(ret, usize);
 	}
 
 	return fallback_alloc(size);

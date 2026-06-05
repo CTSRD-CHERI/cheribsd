@@ -273,14 +273,14 @@ ckh_grow(tsd_t *tsd, ckh_t *ckh) {
 		size_t usize;
 
 		lg_curcells++;
-		usize = ROUND_SIZE(sz_sa2u(sizeof(ckhc_t) << lg_curcells,
+		usize = JEMALLOC_ROUND_SIZE(sz_sa2u(sizeof(ckhc_t) << lg_curcells,
 		    CACHELINE));
 		if (unlikely(usize == 0
 		    || usize > SC_LARGE_MAXCLASS)) {
 			ret = true;
 			goto label_return;
 		}
-		tab = (ckhc_t *)BOUND_PTR(ipallocztm(tsd_tsdn(tsd), usize,
+		tab = (ckhc_t *)JEMALLOC_BOUND_PTR(ipallocztm(tsd_tsdn(tsd), usize,
 		    CACHELINE, true, NULL, true, arena_ichoose(tsd, NULL)),
 		    usize);
 		if (tab == NULL) {
@@ -321,11 +321,12 @@ ckh_shrink(tsd_t *tsd, ckh_t *ckh) {
 	 */
 	lg_prevbuckets = ckh->lg_curbuckets;
 	lg_curcells = ckh->lg_curbuckets + LG_CKH_BUCKET_CELLS - 1;
-	usize = ROUND_SIZE(sz_sa2u(sizeof(ckhc_t) << lg_curcells, CACHELINE));
+	usize = JEMALLOC_ROUND_SIZE(sz_sa2u(sizeof(ckhc_t) << lg_curcells,
+	    CACHELINE));
 	if (unlikely(usize == 0 || usize > SC_LARGE_MAXCLASS)) {
 		return;
 	}
-	tab = (ckhc_t *)BOUND_PTR(ipallocztm(tsd_tsdn(tsd), usize, CACHELINE,
+	tab = (ckhc_t *)JEMALLOC_BOUND_PTR(ipallocztm(tsd_tsdn(tsd), usize, CACHELINE,
 	    true, NULL, true, arena_ichoose(tsd, NULL)), usize);
 	if (tab == NULL) {
 		/*
@@ -397,12 +398,13 @@ ckh_new(tsd_t *tsd, ckh_t *ckh, size_t minitems, ckh_hash_t *ckh_hash,
 	ckh->hash = ckh_hash;
 	ckh->keycomp = keycomp;
 
-	usize = ROUND_SIZE(sz_sa2u(sizeof(ckhc_t) << lg_mincells, CACHELINE));
+	usize = JEMALLOC_ROUND_SIZE(sz_sa2u(sizeof(ckhc_t) << lg_mincells,
+	    CACHELINE));
 	if (unlikely(usize == 0 || usize > SC_LARGE_MAXCLASS)) {
 		ret = true;
 		goto label_return;
 	}
-	ckh->tab = (ckhc_t *)BOUND_PTR(ipallocztm(tsd_tsdn(tsd), usize,
+	ckh->tab = (ckhc_t *)JEMALLOC_BOUND_PTR(ipallocztm(tsd_tsdn(tsd), usize,
 	    CACHELINE, true, NULL, true, arena_ichoose(tsd, NULL)), usize);
 	if (ckh->tab == NULL) {
 		ret = true;
