@@ -31,7 +31,7 @@ get_underlying_allocation(tsdn_t *tsdn, void *ptr) {
 	ubptr = ptr;
 #else
 	/*
-	 * These checks catch attacks from an adversary that can manipulate the 
+	 * These checks catch attacks from an adversary that can manipulate the
 	 * offset and the bounds of a ptr passed to free() or realloc().
 	 * Reject zero-length capabilities: region arithmetic can misclassify an
 	 * end-of-region pointer as the start of the next region.
