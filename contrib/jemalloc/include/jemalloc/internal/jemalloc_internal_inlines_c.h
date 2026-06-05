@@ -404,7 +404,7 @@ imalloc_fastpath(size_t size, void *(fallback_alloc)(size_t)) {
 	 * Note that when uninitialized, only the fast-path variants of the sz /
 	 * tsd facilities may be called.
 	 */
-	size = ROUND_SIZE(size);
+	size = JEMALLOC_ROUND_SIZE(size);
 	szind_t ind;
 	/*
 	 * The thread_allocated counter in tsd serves as a general purpose
@@ -458,12 +458,12 @@ imalloc_fastpath(size_t size, void *(fallback_alloc)(size_t)) {
 	ret = cache_bin_alloc_easy(bin, &tcache_success);
 	if (tcache_success) {
 		fastpath_success_finish(tsd, allocated_after, bin, ret);
-		return BOUND_PTR(ret, sz_index2size(ind));
+		return JEMALLOC_BOUND_PTR(ret, sz_index2size(ind));
 	}
 	ret = cache_bin_alloc(bin, &tcache_success);
 	if (tcache_success) {
 		fastpath_success_finish(tsd, allocated_after, bin, ret);
-		return BOUND_PTR(ret, sz_index2size(ind));
+		return JEMALLOC_BOUND_PTR(ret, sz_index2size(ind));
 	}
 
 	return fallback_alloc(size);
