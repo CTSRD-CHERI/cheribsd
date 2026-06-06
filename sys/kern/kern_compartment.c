@@ -602,7 +602,9 @@ out:
 	func = cheri_kern_bounds_set(func, size);
 	func = (intcap_t)cheri_kern_address_set(func,
 	    (intptr_t)&trampoline->ct_code);
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	func = cheri_capmode(func);
+#endif
 	func = cheri_sealentry(func);
 	return ((void *)func);
 }

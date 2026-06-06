@@ -74,29 +74,64 @@ compartment_entries_length:
 
 	/*
 	 * The trampoline uses r16-17 as scratch registers, as in PLT code.
+	 *
+	 * For the purecap benchmark ABI, we also use r19-20 to save the
+	 * caller's stack pointer and link register, so we don't have to deal
+	 * with the complexity of pushing/popping them from an appropriate
+	 * stack when we only have the one stack.
 	 */
+
+	/* Save callee-saved registers we'll be using */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	stp	c19, c20, [csp, #-(CAP_WIDTH * 2)]!
+#endif
 
 	/*
 	 * Store the caller's current Restricted stack pointer at the bottom of
 	 * its own Restricted stack.
+	 *
+	 * For the purecap benchmark ABI we're always in Executive so use that
+	 * stack pointer, which means we will update the bottom of even the
+	 * Executive's stack.
 	 */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	c16, csp
+#else
 	mrs	c16, rcsp_el0
+#endif
 	gclim	x17, c16
 	scvalue	c17, c16, x17
 	str	c16, [c17, #-CAP_WIDTH]
 	mov	x17, xzr
 
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	/*
+	 * Save the caller's stack pointer and the link register in saved
+	 * registers rather than the same stack we just stored.
+	 */
+	mov	c19, c16
+	mov	c20, c30
+#else
 	/*
 	 * Push the caller's Restricted stack pointer and the link register onto
 	 * the trusted stack.
 	 */
 	stp	c16, c30, [csp, #-(CAP_WIDTH * 2)]!
+#endif
 
 .ifc \type,executive
 	/*
 	 * Don't modify the Restricted stack pointer if we're branching into
-	 * Executive.
+	 * Executive, except in the purecap benchmark ABI, since we can't
+	 * exploit csp being banked. In the purecap benchmark ABI we repurpose
+	 * rcsp_el0 to point to the reserved stack slot on the Executive stack
+	 * so we can always find it, without needing curthread->td_kstack.
 	 */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mrs	c16, rcsp_el0
+	ldr	c16, [c16]
+	mov	csp, c16
+#endif
 .else
 	/*
 	 * Push function arguments.
@@ -115,7 +150,11 @@ compartment_entries_length:
 	ldr	x0, \type\()_entry_id
 	ldr	w1, \type\()_entry_type
 	ldr	c16, \type\()_entry_stackptr_func
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	blr	x16
+#else
 	blr	c16
+#endif
 
 	/*
 	 * TODO: Clear all registers that could have been set by the stack
@@ -139,7 +178,11 @@ compartment_entries_length:
 	ldp	c0, c1, [csp], #(CAP_WIDTH * 2)
 
 	/* Switch to the callee's stack. */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	csp, c16
+#else
 	msr	rcsp_el0, c16
+#endif
 .endif
 
 	/*
@@ -150,31 +193,53 @@ compartment_entries_length:
 	 * Call the target function.
 	 */
 	ldr	c16, \type\()_entry_func
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	blr	x16
+#else
 .ifc \type,executive
 	blr	c16
 .else
 	blrr	c16
 .endif
+#endif
 
 	/*
 	 * Store the callee's current Restricted stack pointer at the bottom of
 	 * its own Restricted stack in case it changed in a nested call.
+	 *
+	 * As above, for the purecap benchmark ABI, always use the Executive
+	 * stack pointer, which includes the Executive's stack.
 	 */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	c16, csp
+#else
 	mrs	c16, rcsp_el0
+#endif
 	gclim	x17, c16
 	scvalue	c17, c16, x17
 	str	c16, [c17, #-CAP_WIDTH]
 
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
 	 * Pop the caller's Restricted stack pointer and link register from the
 	 * trusted stack.
 	 */
 	ldp	c16, c30, [csp], #(CAP_WIDTH * 2)
+#endif
 
 	/*
-	 * Restore the caller's current Restricted stack pointer.
+	 * Restore the caller's current Restricted stack pointer, or normal
+	 * stack pointer for the purecap benchmark ABI. Also restore the link
+	 * register for the purecap benchmark ABI from the saved register, and
+	 * restore the callee-saved registers themselves.
 	 */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	csp, c19
+	mov	c30, c20
+	ldp	c19, c20, [csp], #(CAP_WIDTH * 2)
+#else
 	msr	rcsp_el0, c16
+#endif
 
 	/*
 	 * Clear temporary registers.
@@ -185,7 +250,11 @@ compartment_entries_length:
 	/*
 	 * Return to the caller, possibly in Restricted.
 	 */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	RETURN
+#else
 	retr	c30
+#endif
 	.p2align 4
 .endmacro
 
