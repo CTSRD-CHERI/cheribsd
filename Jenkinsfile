@@ -308,7 +308,9 @@ selectedArchitectures.each { arch ->
             // TODO: Add a --cheribsd/build-foo-kernels for kernel-c18n
             def kernels = [
                     'GENERIC-MORELLO-PURECAP-COMPARTMENTS-ARC',
+                    'GENERIC-MORELLO-PURECAP-BENCHMARK-COMPARTMENTS-ARC',
                     'GENERIC-MORELLO-PURECAP-COMPARTMENTS-ARC-NODEBUG',
+                    'GENERIC-MORELLO-PURECAP-BENCHMARK-COMPARTMENTS-ARC-NODEBUG',
                     'GENERIC-MORELLO-PURECAP-COMPARTMENTS',
                     'GENERIC-MORELLO-PURECAP-BENCHMARK-COMPARTMENTS',
                     'GENERIC-MORELLO-PURECAP-COMPARTMENTS-NODEBUG',
