@@ -95,7 +95,12 @@
 	 * XXX-AM: It could be another bootparam if needed
 	 */
 #if __has_feature(capabilities)
+#if defined(CHERI_COMPARTMENTALIZE_KERNEL) && \
+    defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+	sub	c\dregn, c\dregn, #(PCB_SIZE + CAP_WIDTH)
+#else
 	sub	c\dregn, c\dregn, #PCB_SIZE
+#endif
 #else
 	sub	x\dregn, x\dregn, #PCB_SIZE
 #endif
@@ -556,8 +561,12 @@ mp_virtdone:
 	LDR_LABEL(PTR(4), PTR(4), bootstack)
 	mov	PTRN(sp), PTR(4)
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	msr	rcsp_el0, PTR(4)
+#else
 	LDR_LABEL(c4, c4, resbootstack)
 	msr	rcsp_el0, c4
+#endif
 #endif
 
 #if defined(PERTHREAD_SSP)

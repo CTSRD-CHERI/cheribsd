@@ -34,6 +34,13 @@
 #include "assym.inc"
 #include <sys/intr.h>
 
+#if defined(CHERI_COMPARTMENTALIZE_KERNEL) && \
+    defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+#define	PTR_SAVED_TF_EL1	PTRN(28)
+#else
+#define	PTR_SAVED_TF_EL1	PTRN(sp)
+#endif
+
 	.text
 
 /*
@@ -103,9 +110,15 @@
 .endif
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	mrs	CAP(0), rcsp_el0
+#endif
 
 .if \el == 1
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	CAP(0), csp
+#endif
+
 	/*
 	 * Update the stack pointer of an interrupted compartment.
 	 *
@@ -118,6 +131,10 @@
 	str	CAP(0), [CAP(1), #-CAP_WIDTH]
 .endif
 
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mrs	CAP(0), rcsp_el0
+#endif
+
 	/*
 	 * Stash the compartment's stack pointer.
 	 */
@@ -126,6 +143,27 @@
 	stp	CAP(0), CAP(1), [PTRN(sp), #(TF_RCSP)]
 	str	CAP(2), [PTRN(sp), #(TF_RCTPIDR)]
 
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+.if \el == 1
+	/*
+	 * Switch to the Executive compartment's stack and save the trapframe
+	 * pointer in c28.
+	 */
+	ldr	CAP(0), [CAP(0)]
+	mov	CAP(28), csp
+	mov	csp, CAP(0)
+.else
+	/*
+	 * Point rcsp_el0 back at the reserved slot on the Executive
+	 * compartment's stack, since it's lost whilst in EL0.
+	 */
+	gclim	x1, csp
+	scvalue	CAP(0), csp, x1
+	sub	CAP(0), CAP(0), #(CAP_WIDTH)
+	scbnds	CAP(0), CAP(0), #(CAP_WIDTH)
+	msr	rcsp_el0, CAP(0)
+.endif
+#else
 	/*
 	 * Set the caller's stack pointer to a void stack.
 	 */
@@ -133,6 +171,7 @@
 	add	CAP(0), CAP(0), #(TD_VOIDSTACK)
 	scbnds	CAP(0), CAP(0), #(CAP_WIDTH)
 	msr	rcsp_el0, CAP(0)
+#endif
 #endif
 
 .if \el == 0
@@ -176,6 +215,22 @@
 .endm
 
 .macro	restore_registers el
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+.if \el == 1
+	/*
+	 * Perform a domain transition back to the compartment we came from in
+	 * save_registers.
+	 */
+	mov	CAP(0), csp
+	gclim	x1, CAP(0)
+	scvalue	CAP(1), CAP(0), x1
+	str	CAP(0), [CAP(1), #-CAP_WIDTH]
+	mov	csp, CAP(28)
+.endif
+#endif
+#endif
+
 	/*
 	 * Mask all exceptions, x18 may change in the interrupt exception
 	 * handler.
@@ -263,7 +318,12 @@
 	ldp	CAP(28), CAP(29), [PTRN(sp), #(TF_X + 28 * CAP_WIDTH)]
 #if !__has_feature(capabilities) || defined(__CHERI_PURE_CAPABILITY__)
 .else
+#if defined(CHERI_COMPARTMENTALIZE_KERNEL) && \
+    defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+	ldp	CAP(28), CAP(29), [PTRN(sp), #(TF_X + 28 * CAP_WIDTH)]
+#else
 	ldr	         CAP(29), [PTRN(sp), #(TF_X + 29 * CAP_WIDTH)]
+#endif
 .endif
 #endif
 .if \el == 0
@@ -329,7 +389,7 @@ ENTRY(handle_el1t_sync)
 	save_registers 1
 	KMSAN_ENTER
 	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
-	mov	PTR(1), PTRN(sp)
+	mov	PTR(1), PTR_SAVED_TF_EL1
 	bl	do_el1t_sync
 	KMSAN_LEAVE
 	restore_registers 1
@@ -339,7 +399,7 @@ END(handle_el1t_sync)
 ENTRY(handle_el1t_irq)
 	save_registers 1
 	KMSAN_ENTER
-	mov	PTR(0), PTRN(sp)
+	mov	PTR(0), PTR_SAVED_TF_EL1
 	mov	x1, #INTR_ROOT_IRQ
 	bl	intr_irq_handler
 	KMSAN_LEAVE
@@ -350,7 +410,7 @@ END(handle_el1t_irq)
 ENTRY(handle_el1t_fiq)
 	save_registers 1
 	KMSAN_ENTER
-	mov	PTR(0), PTRN(sp)
+	mov	PTR(0), PTR_SAVED_TF_EL1
 	mov	x1, #INTR_ROOT_FIQ
 	bl	intr_irq_handler
 	KMSAN_LEAVE
@@ -361,7 +421,7 @@ END(handle_el1t_fiq)
 ENTRY(handle_el1t_serror)
 	save_registers 1
 	KMSAN_ENTER
-	mov	PTR(0), PTRN(sp)
+	mov	PTR(0), PTR_SAVED_TF_EL1
 1:	bl	do_serror
 	b	1b
 	KMSAN_LEAVE
@@ -371,7 +431,7 @@ ENTRY(handle_el1h_sync)
 	save_registers 1
 	KMSAN_ENTER
 	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
-	mov	PTR(1), PTRN(sp)
+	mov	PTR(1), PTR_SAVED_TF_EL1
 	bl	do_el1h_sync
 	KMSAN_LEAVE
 	restore_registers 1
@@ -381,7 +441,7 @@ END(handle_el1h_sync)
 ENTRY(handle_el1h_irq)
 	save_registers 1
 	KMSAN_ENTER
-	mov	PTR(0), PTRN(sp)
+	mov	PTR(0), PTR_SAVED_TF_EL1
 	mov	x1, #INTR_ROOT_IRQ
 	bl	intr_irq_handler
 	KMSAN_LEAVE
@@ -392,7 +452,7 @@ END(handle_el1h_irq)
 ENTRY(handle_el1h_fiq)
 	save_registers 1
 	KMSAN_ENTER
-	mov	PTR(0), PTRN(sp)
+	mov	PTR(0), PTR_SAVED_TF_EL1
 	mov	x1, #INTR_ROOT_FIQ
 	bl	intr_irq_handler
 	KMSAN_LEAVE
@@ -403,7 +463,7 @@ END(handle_el1h_fiq)
 ENTRY(handle_el1h_serror)
 	save_registers 1
 	KMSAN_ENTER
-	mov	PTR(0), PTRN(sp)
+	mov	PTR(0), PTR_SAVED_TF_EL1
 1:	bl	do_serror
 	b	1b
 	KMSAN_LEAVE

@@ -124,7 +124,8 @@ uint64_t ap_cpuid;
 /* Stacks for AP initialization, discarded once idle threads are started. */
 void *bootstack;
 static void *bootstacks[MAXCPU];
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#if defined(CHERI_COMPARTMENTALIZE_KERNEL) && \
+    !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 void *resbootstack;
 static void *resbootstacks[MAXCPU];
 #endif
@@ -248,7 +249,8 @@ init_secondary(uint64_t cpu)
 	KASSERT(idlethread != NULL, ("no idle thread"));
 	PCPU_REF_SET(pcpup, curthread, idlethread);
 
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#if defined(CHERI_COMPARTMENTALIZE_KERNEL) && \
+    !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	/* Set the caller stack to the void stack. */
 	WRITE_SPECIALREG_CAP(rcsp_el0, idlethread->td_voidstack);
 #endif
@@ -313,7 +315,8 @@ smp_after_idle_runnable(void *arg __unused)
 	for (cpu = 1; cpu < mp_ncpus; cpu++) {
 		if (bootstacks[cpu] != NULL)
 			kmem_free(bootstacks[cpu], MP_BOOTSTACK_SIZE);
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#if defined(CHERI_COMPARTMENTALIZE_KERNEL) && \
+    !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 		if (resbootstacks[cpu] != NULL)
 			kmem_free(resbootstacks[cpu], MP_BOOTSTACK_SIZE);
 #endif
@@ -505,7 +508,8 @@ start_cpu(u_int cpuid, uint64_t target_cpu, int domain, vm_paddr_t release_addr)
 
 	bootstacks[cpuid] = kmem_malloc_domainset(DOMAINSET_PREF(domain),
 	    MP_BOOTSTACK_SIZE, M_WAITOK | M_ZERO);
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#if defined(CHERI_COMPARTMENTALIZE_KERNEL) && \
+    !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	resbootstacks[cpuid] = kmem_malloc_domainset(DOMAINSET_PREF(domain),
 	    MP_BOOTSTACK_SIZE, M_WAITOK | M_ZERO);
 #endif
@@ -513,7 +517,12 @@ start_cpu(u_int cpuid, uint64_t target_cpu, int domain, vm_paddr_t release_addr)
 	naps = atomic_load_int(&aps_started);
 	bootstack = (char *)bootstacks[cpuid] + MP_BOOTSTACK_SIZE;
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	bootstack = (char **)bootstack - 1;
+	*(char **)bootstack = bootstack;
+#else
 	resbootstack = (char *)resbootstacks[cpuid] + MP_BOOTSTACK_SIZE;
+#endif
 #endif
 
 	printf("Starting CPU %u (%lx)\n", cpuid, target_cpu);
@@ -542,12 +551,14 @@ start_cpu(u_int cpuid, uint64_t target_cpu, int domain, vm_paddr_t release_addr)
 		pcpu_destroy(pcpup);
 		dpcpu[cpuid - 1] = NULL;
 		kmem_free(bootstacks[cpuid], MP_BOOTSTACK_SIZE);
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#if defined(CHERI_COMPARTMENTALIZE_KERNEL) && \
+    !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 		kmem_free(resbootstacks[cpuid], MP_BOOTSTACK_SIZE);
 #endif
 		kmem_free(pcpup, size);
 		bootstacks[cpuid] = NULL;
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#if defined(CHERI_COMPARTMENTALIZE_KERNEL) && \
+    !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 		resbootstacks[cpuid] = NULL;
 #endif
 		mp_ncpus--;
