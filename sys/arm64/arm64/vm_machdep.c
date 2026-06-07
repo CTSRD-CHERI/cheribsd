@@ -77,6 +77,7 @@ cpu_fork(struct thread *td1, struct proc *p2,
 {
 	struct pcb *pcb2;
 	struct trapframe *tf;
+	vm_pointer_t kstackend2;
 
 	if ((flags & RFPROC) == 0)
 		return;
@@ -106,8 +107,17 @@ cpu_fork(struct thread *td1, struct proc *p2,
 #endif
 	}
 
-	pcb2 = (struct pcb *)(td2->td_kstack +
-	    td2->td_kstack_pages * PAGE_SIZE) - 1;
+	kstackend2 = td2->td_kstack + td2->td_kstack_pages * PAGE_SIZE;
+#if defined(CHERI_COMPARTMENTALIZE_KERNEL) && \
+    defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+	/*
+	 * Even Executive stacks have space reserved for the current stack
+	 * pointer.
+	 */
+	kstackend2 = (vm_pointer_t)((vm_pointer_t *)kstackend2 - 1);
+	*(vm_pointer_t *)kstackend2 = kstackend2;
+#endif
+	pcb2 = (struct pcb *)kstackend2 - 1;
 
 	td2->td_pcb = pcb2;
 	bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
@@ -146,12 +156,21 @@ cpu_fork(struct thread *td1, struct proc *p2,
 #endif
 	td2->td_pcb->pcb_sp = (uintptr_t)td2->td_frame;
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	/*
+	 * Reserve rcsp_el0 to get back to the executive stack. See the
+	 * compartment trampoline executive variant.
+	 */
+	td2->td_pcb->pcb_rcsp_el0 = cheri_bounds_set(kstackend2,
+	    sizeof(vm_pointer_t));
+#else
 	/*
 	 * Use the void stack as the caller's stack to satisfy the requirements
 	 * of a compartment trampoline that is branched into by
 	 * fork_trampoline() when calling fork_exit().
 	 */
 	td2->td_pcb->pcb_rcsp_el0 = td2->td_voidstack;
+#endif
 #endif
 
 	vfp_new_thread(td2, td1, true);
@@ -228,7 +247,13 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	td->td_pcb->pcb_sp = (uintptr_t)td->td_frame;
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	/* See cpu_fork(). */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	td->td_pcb->pcb_rcsp_el0 = cheri_bounds_set(td->td_kstack +
+	    td->td_kstack_pages * PAGE_SIZE - sizeof(vm_pointer_t),
+	    sizeof(vm_pointer_t));
+#else
 	td->td_pcb->pcb_rcsp_el0 = td->td_voidstack;
+#endif
 #endif
 
 	/* Update VFP state for the new thread */
@@ -331,11 +356,23 @@ cpu_thread_exit(struct thread *td)
 void
 cpu_thread_alloc(struct thread *td)
 {
+	vm_pointer_t kstackend;
 
-	td->td_pcb = (struct pcb *)(td->td_kstack +
-	    td->td_kstack_pages * PAGE_SIZE) - 1;
+	kstackend = td->td_kstack + td->td_kstack_pages * PAGE_SIZE;
+#if defined(CHERI_COMPARTMENTALIZE_KERNEL) && \
+    defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+	/* See cpu_fork(). */
+	kstackend = (vm_pointer_t)((vm_pointer_t *)kstackend - 1);
+	*(vm_pointer_t *)kstackend = kstackend;
+#endif
+	td->td_pcb = (struct pcb *)kstackend - 1;
 	td->td_frame = (struct trapframe *)STACKALIGN(
 	    (struct trapframe *)td->td_pcb - 1);
+#if defined(CHERI_COMPARTMENTALIZE_KERNEL) && \
+    defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+	td->td_pcb->pcb_rcsp_el0 = cheri_bounds_set(kstackend,
+	    sizeof(vm_pointer_t));
+#endif
 #ifdef PAC
 	ptrauth_thread_alloc(td);
 #endif

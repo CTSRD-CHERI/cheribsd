@@ -475,6 +475,7 @@ init_proc0(vm_pointer_t kstack)
 #endif
 {
 	struct pcpu *pcpup;
+	vm_pointer_t kstackend;
 
 	pcpup = pcpu_find(0);
 	MPASS(pcpup != NULL);
@@ -486,8 +487,17 @@ init_proc0(vm_pointer_t kstack)
 #if defined(PERTHREAD_SSP)
 	thread0.td_md.md_canary = boot_canary;
 #endif
-	thread0.td_pcb = (struct pcb *)(thread0.td_kstack +
-	    thread0.td_kstack_pages * PAGE_SIZE) - 1;
+	kstackend = thread0.td_kstack + thread0.td_kstack_pages * PAGE_SIZE;
+#if defined(CHERI_COMPARTMENTALIZE_KERNEL) && \
+    defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+	/*
+	 * Even Executive stacks have space reserved for the current stack
+	 * pointer.
+	 */
+	kstackend = (vm_pointer_t)((vm_pointer_t *)kstackend - 1);
+	*(vm_pointer_t *)kstackend = kstackend;
+#endif
+	thread0.td_pcb = (struct pcb *)kstackend - 1;
 	thread0.td_pcb->pcb_flags = 0;
 	thread0.td_pcb->pcb_fpflags = 0;
 	thread0.td_pcb->pcb_fpusaved = &thread0.td_pcb->pcb_fpustate;
@@ -495,7 +505,12 @@ init_proc0(vm_pointer_t kstack)
 	thread0.td_frame = &proc0_tf;
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	thread0.td_voidstack = (vm_pointer_t)&thread0.td_voidstack;
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	thread0.td_pcb->pcb_rcsp_el0 = cheri_bounds_set(kstackend,
+	    sizeof(vm_pointer_t));
+#else
 	thread0.td_pcb->pcb_rcsp_el0 = thread0.td_voidstack;
+#endif
 	WRITE_SPECIALREG_CAP(rcsp_el0, thread0.td_pcb->pcb_rcsp_el0);
 	init_compartments0(compartments0_stacks);
 #endif

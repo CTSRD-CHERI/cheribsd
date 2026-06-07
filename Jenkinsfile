@@ -302,13 +302,26 @@ selectedArchitectures.each { arch ->
             cheribuildArgs.add('--cheribsd/build-benchmark-abi-kernels')
         }
         if (arch == "morello-purecap") {
-            // Build GENERIC-MORELLO-PURECAP-COMPARTMENTS* kernels in addition
-            // to other kernels that we build for dev, and make
+            // Build GENERIC-MORELLO-PURECAP(-BENCHMARK)-COMPARTMENTS* kernels
+            // in addition to other kernels that we build for dev, and make
             // GENERIC-MORELLO-PURECAP-COMPARTMENTS-ARC the default kernel.
             // TODO: Add a --cheribsd/build-foo-kernels for kernel-c18n
-            def kernels = 'GENERIC-MORELLO-PURECAP-COMPARTMENTS-ARC GENERIC-MORELLO-PURECAP-COMPARTMENTS-ARC-NODEBUG GENERIC-MORELLO-PURECAP-COMPARTMENTS GENERIC-MORELLO-PURECAP-COMPARTMENTS-NODEBUG GENERIC-MORELLO GENERIC-MORELLO-PURECAP GENERIC-MORELLO-PURECAP-BENCHMARK GENERIC-MORELLO-NODEBUG GENERIC-MORELLO-PURECAP-NODEBUG GENERIC-MORELLO-PURECAP-BENCHMARK-NODEBUG'
-            cheribuildArgs.add("--cheribsd-${arch}/kernel-config=${kernels}")
-            cheribuildArgs.add("--cheribsd-release-${arch}/kernel-config=${kernels}")
+            def kernels = [
+                    'GENERIC-MORELLO-PURECAP-COMPARTMENTS-ARC',
+                    'GENERIC-MORELLO-PURECAP-COMPARTMENTS-ARC-NODEBUG',
+                    'GENERIC-MORELLO-PURECAP-COMPARTMENTS',
+                    'GENERIC-MORELLO-PURECAP-BENCHMARK-COMPARTMENTS',
+                    'GENERIC-MORELLO-PURECAP-COMPARTMENTS-NODEBUG',
+                    'GENERIC-MORELLO-PURECAP-BENCHMARK-COMPARTMENTS-NODEBUG',
+                    'GENERIC-MORELLO',
+                    'GENERIC-MORELLO-PURECAP',
+                    'GENERIC-MORELLO-PURECAP-BENCHMARK',
+                    'GENERIC-MORELLO-NODEBUG',
+                    'GENERIC-MORELLO-PURECAP-NODEBUG',
+                    'GENERIC-MORELLO-PURECAP-BENCHMARK-NODEBUG',
+            ]
+            cheribuildArgs.add("--cheribsd-${arch}/kernel-config=${kernels.join(' ')}")
+            cheribuildArgs.add("--cheribsd-release-${arch}/kernel-config=${kernels.join(' ')}")
         }
     }
     archArgs[arch] = [
