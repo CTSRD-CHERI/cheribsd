@@ -29,17 +29,6 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20180629,
- *   "target_type": "lib",
- *   "changes": [
- *     "support"
- *   ]
- * }
- * CHERI CHANGES END
- */
 
 #include "namespace.h"
 #include <sys/types.h>
@@ -54,7 +43,6 @@
 
 #include "thr_private.h"
 
-#ifndef __CHERI_PURE_CAPABILITY__
 FB10_COMPAT(_sem_init_compat, sem_init);
 FB10_COMPAT(_sem_destroy_compat, sem_destroy);
 FB10_COMPAT(_sem_getvalue_compat, sem_getvalue);
@@ -125,4 +113,3 @@ _sem_post_compat(sem_t *sem)
 {
 	return _libc_sem_post_compat(sem);
 }
-#endif /* !__CHERI_PURE_CAPABILITY__ */

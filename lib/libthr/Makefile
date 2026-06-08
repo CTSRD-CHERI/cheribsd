@@ -14,11 +14,6 @@ MK_SSP=	no
 # one cannot turn it back on.
 FORTIFY_SOURCE=	0
 
-.if !defined(LIBTHR_SRCTOP)
-LIBTHR_SRCTOP:=	${.PARSEDIR}
-.endif
-.PATH: ${LIBTHR_SRCTOP}
-
 .if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
 SHARED_CFLAGS+=-DCHERI_LIB_C18N
 .endif
@@ -31,9 +26,9 @@ NO_WCAST_ALIGN.gcc=1    # for gcc 4.2
 CFLAGS+=-DPTHREAD_KERNEL
 CFLAGS+=-I${SRCTOP}/lib/libc/include
 CFLAGS+=-I${SRCTOP}/lib/libc/${MACHINE_CPUARCH}
-CFLAGS+=-I${LIBTHR_SRCTOP}/thread
-CFLAGS+=-I${LIBTHR_SRCTOP}/arch/${MACHINE_CPUARCH}/include
-CFLAGS+=-I${LIBTHR_SRCTOP}/sys
+CFLAGS+=-I${.CURDIR}/thread
+CFLAGS+=-I${.CURDIR}/arch/${MACHINE_CPUARCH}/include
+CFLAGS+=-I${.CURDIR}/sys
 CFLAGS+=-I${SRCTOP}/libexec/rtld-elf
 CFLAGS+=-I${SRCTOP}/libexec/rtld-elf/${MACHINE_CPUARCH}
 CFLAGS+=-I${SRCTOP}/lib/libthread_db
@@ -66,7 +61,7 @@ LDFLAGS+=-Wl,-zinitfirst
 LDFLAGS+=-Wl,--auxiliary,libsys.so.7
 
 VERSION_DEF=${SRCTOP}/lib/libc/Versions.def
-SYMBOL_MAPS=${LIBTHR_SRCTOP}/pthread.map
+SYMBOL_MAPS=${.CURDIR}/pthread.map
 
 MAN=	libthr.3
 
@@ -77,18 +72,18 @@ CFLAGS+=-D_PTHREADS_INVARIANTS
 
 PRECIOUSLIB=
 
-.PATH: ${LIBTHR_SRCTOP}/arch/${MACHINE_CPUARCH}/${MACHINE_CPUARCH}
+.PATH: ${.CURDIR}/arch/${MACHINE_CPUARCH}/${MACHINE_CPUARCH}
 .if ${MACHINE_ABI:Mpurecap}
 .PATH: ${SRCTOP}/lib/libmalloc_simple
 .else
 .PATH: ${SRCTOP}/libexec/rtld-elf
 .endif
 
-.if exists(${LIBTHR_SRCTOP}/arch/${MACHINE_CPUARCH}/Makefile.inc)
-.include "${LIBTHR_SRCTOP}/arch/${MACHINE_CPUARCH}/Makefile.inc"
+.if exists(${.CURDIR}/arch/${MACHINE_CPUARCH}/Makefile.inc)
+.include "${.CURDIR}/arch/${MACHINE_CPUARCH}/Makefile.inc"
 .endif
-.include "${LIBTHR_SRCTOP}/sys/Makefile.inc"
-.include "${LIBTHR_SRCTOP}/thread/Makefile.inc"
+.include "${.CURDIR}/sys/Makefile.inc"
+.include "${.CURDIR}/thread/Makefile.inc"
 .if ${MACHINE_ABI:Mpurecap}
 SRCS+=	malloc.c heap.c
 CFLAGS.malloc.c+=	-DIN_LIBTHR
@@ -97,7 +92,7 @@ CFLAGS.heap.c+=	-DIN_LIBTHR
 SRCS+= rtld_malloc.c
 .endif
 
-LIBSYS_SRCTOP=	${LIBTHR_SRCTOP:H}/libsys
+LIBSYS_SRCTOP=	${.CURDIR:H}/libsys
 .if exists(${LIBSYS_SRCTOP}/${MACHINE_CPUARCH}/_umtx_op_err.S)
 .PATH: ${LIBSYS_SRCTOP}/${MACHINE_CPUARCH}
 .else
