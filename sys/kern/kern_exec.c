@@ -395,7 +395,7 @@ execve_nosetid(struct image_params *imgp)
  * In-kernel implementation of execve().  All arguments are assumed to be
  * userspace pointers from the passed thread.
  */
-static int
+static __noinline int
 do_execve(struct thread *td, struct image_args *args,
     void * __capability umac, struct vmspace *oldvmspace)
 {

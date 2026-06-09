@@ -1643,7 +1643,7 @@ tty_set_winsize(struct tty *tp, const struct winsize *wsz)
 	tty_signal_pgrp(tp, SIGWINCH);
 }
 
-static int
+static __noinline int
 tty_generic_ioctl(struct tty *tp, u_long cmd, void *data, int fflag,
     struct thread *td)
 {
