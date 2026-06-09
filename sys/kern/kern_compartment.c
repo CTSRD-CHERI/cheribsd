@@ -387,7 +387,7 @@ compartment_init_stack(struct compartment *compartment, vm_pointer_t stack)
 {
 
 	compartment->c_kstack = stack;
-	compartment->c_kstackptr = stack + kstack_pages * PAGE_SIZE;
+	compartment->c_kstackptr = stack + COMPARTMENT_STACK_PAGES * PAGE_SIZE;
 	cpu_compartment_alloc(compartment);
 }
 

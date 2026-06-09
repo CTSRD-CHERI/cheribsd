@@ -272,7 +272,7 @@ virtdone:
 	 * Prepare the in-kernel compartments' stacks for thread0.
 	 * Preserve a pointer to the stacks in x/c26 for bootparams.
 	 */
-	ldr	x7, =(PAGE_SIZE * KSTACK_PAGES * KERNEL_MAXC18NS)
+	ldr	x7, =(PAGE_SIZE * COMPARTMENT_STACK_PAGES * KERNEL_MAXC18NS)
 	buildptr 26, compartments0_stacks, x7
 #endif
 	/*
@@ -1443,7 +1443,7 @@ initstack_end:
 	 */
 	.type	compartments0_stacks,#object
 compartments0_stacks:
-	.space	(PAGE_SIZE * KSTACK_PAGES * KERNEL_MAXC18NS)
+	.space	(PAGE_SIZE * COMPARTMENT_STACK_PAGES * KERNEL_MAXC18NS)
 compartments0_stacks_end:
 	.size	compartments0_stacks, compartments0_stacks_end - compartments0_stacks
 #endif

@@ -458,8 +458,8 @@ init_compartments0(vm_pointer_t compartments0_stacks)
 	TAILQ_INIT(&thread0.td_compartments);
 	for (ii = 0; ii < KERNEL_MAXC18NS; ii++) {
 		compartment = &compartments0[ii];
-		stack = compartments0_stacks + ii * (kstack_pages * PAGE_SIZE);
-		stack = cheri_setbounds(stack, kstack_pages * PAGE_SIZE);
+		stack = compartments0_stacks + ii * (COMPARTMENT_STACK_PAGES * PAGE_SIZE);
+		stack = cheri_setbounds(stack, COMPARTMENT_STACK_PAGES * PAGE_SIZE);
 		compartment_init_stack(compartment, stack);
 	}
 	link_elf_linkup_compartments(linker_kernel_file, compartments0,
