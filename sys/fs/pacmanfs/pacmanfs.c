@@ -134,7 +134,7 @@ static int push_free_block(struct super_block *sb, block_number_t block)
  * The buffer head will be allocated by this function and it is on you to @brelse() it!
  * On error, returns NULL. In that case, the buffer head will not have been allocated.
  */
-static struct pacmanfs_inode_disk *
+static __noinline struct pacmanfs_inode_disk *
 pacmanfs_get_inode_disk(struct super_block *sb, struct buffer_head **bh,
 			inode_number_t ino)
 {
