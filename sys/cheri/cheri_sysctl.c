@@ -76,7 +76,7 @@ SYSCTL_INT(_security_cheri, OID_AUTO, bound_legacy_capabilities,
  * Set the default state of library-based compartmentalisation (c18n) in
  * userspace.
  */
-bool security_cheri_lib_based_c18n_default = false;
+bool security_cheri_lib_based_c18n_default = true;
 SYSCTL_BOOL(_security_cheri, OID_AUTO, lib_based_c18n_default, CTLFLAG_RWTUN,
     &security_cheri_lib_based_c18n_default, 0,
     "Userspace library-based compartmentalisation default");
