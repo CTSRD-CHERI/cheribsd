@@ -91,7 +91,7 @@
 #  endif
 #endif
 
-local int inflateStateCheck(z_streamp strm) {
+local __noinline int inflateStateCheck(z_streamp strm) {
     struct inflate_state FAR *state;
     if (strm == Z_NULL ||
         strm->zalloc == (alloc_func)0 || strm->zfree == (free_func)0)

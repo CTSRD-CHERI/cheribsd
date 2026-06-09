@@ -526,7 +526,7 @@ int ZEXPORT deflateInit2_(z_streamp strm, int level, int method,
 /* =========================================================================
  * Check for a valid deflate stream state. Return 0 if ok, 1 if not.
  */
-local int deflateStateCheck(z_streamp strm) {
+local __noinline int deflateStateCheck(z_streamp strm) {
     deflate_state *s;
     if (strm == Z_NULL ||
         strm->zalloc == (alloc_func)0 || strm->zfree == (free_func)0)
