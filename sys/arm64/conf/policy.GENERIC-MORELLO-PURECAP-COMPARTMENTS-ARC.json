@@ -25,11 +25,6 @@
                 "_mtx_init"
             ]
         },
-        "compart_355": {
-            "symbols": [
-                "atomic_add_64"
-            ]
-        },
         "compart_529": {
             "symbols": [
                 "exit1"
@@ -73,11 +68,6 @@
         "compart_2212": {
             "symbols": [
                 "do_execve"
-            ]
-        },
-        "compart_2882": {
-            "symbols": [
-                "atomic_fetchadd_32"
             ]
         },
         "compart_2938": {
@@ -145,54 +135,9 @@
                 "vn_printf"
             ]
         },
-        "compart_6595": {
-            "symbols": [
-                "__builtin_memset"
-            ]
-        },
         "compart_6611": {
             "symbols": [
                 "sdt_probe"
-            ]
-        },
-        "compart_6619": {
-            "symbols": [
-                "__builtin_strlen"
-            ]
-        },
-        "compart_6621": {
-            "symbols": [
-                "__builtin_memcpy"
-            ]
-        },
-        "compart_6623": {
-            "symbols": [
-                "__builtin_constant_p"
-            ]
-        },
-        "compart_6624": {
-            "symbols": [
-                "__builtin_cheri_bounds_set"
-            ]
-        },
-        "compart_6628": {
-            "symbols": [
-                "__builtin_memmove"
-            ]
-        },
-        "compart_6862": {
-            "symbols": [
-                "__builtin_align_up"
-            ]
-        },
-        "compart_6888": {
-            "symbols": [
-                "__builtin_align_down"
-            ]
-        },
-        "compart_6923": {
-            "symbols": [
-                "__builtin_strcmp"
             ]
         },
         "compart_14326": {
@@ -6372,12 +6317,6 @@
             "symbols": [
                 "vref",
                 "__builtin_strcpy"
-            ]
-        },
-        "compart_16572": {
-            "symbols": [
-                "atomic_load_acq_32",
-                "atomic_store_rel_32"
             ]
         },
         "compart_16573": {
