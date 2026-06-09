@@ -652,7 +652,7 @@ vm_compartment_new(struct compartment *compartment)
 {
 	vm_pointer_t ks;
 
-	ks = vm_kstack_new(kstack_pages);
+	ks = vm_kstack_new(COMPARTMENT_STACK_PAGES);
 	if (ks == 0)
 		return (0);
 
@@ -668,7 +668,7 @@ vm_compartment_dispose(struct compartment *compartment)
 	ks = compartment->c_kstack;
 	compartment->c_kstack = 0;
 	compartment->c_kstackptr = 0;
-	vm_kstack_dispose(ks, kstack_pages);
+	vm_kstack_dispose(ks, COMPARTMENT_STACK_PAGES);
 }
 #endif
 
