@@ -235,13 +235,6 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 	base_vlimit = rtld_round_page(segs[nsegs]->p_vaddr +
 	    segs[nsegs]->p_memsz);
 	mapsize = base_vlimit - base_vaddr;
-#ifdef __CHERI_PURE_CAPABILITY__
-	/* round up the requested size so that the kernel can represent the mmap
-	 * result */
-	mapsize = CHERI_REPRESENTABLE_LENGTH(mapsize);
-	base_vlimit = base_vaddr + mapsize;
-	assert(round_page(base_vlimit) == base_vlimit);
-#endif
 	base_addr = (caddr_t)(uintptr_t)base_vaddr;
 	base_flags = __getosreldate() >= P_OSREL_MAP_GUARD ?
 	    MAP_GUARD : MAP_PRIVATE | MAP_ANON | MAP_NOCORE;
