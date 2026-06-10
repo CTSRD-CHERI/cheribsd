@@ -197757,6 +197757,52 @@
                 "name": "bootverbose",
                 "type": "symbol"
             }
+        },
+        {
+            "subject": {
+                "name": "compart_3629"
+            },
+            "permissions": "x",
+            "symbols": [
+		"memcmp",
+		"memcpy",
+		"devfs_ctty_unref"
+	    ]
+        },
+        {
+            "subject": {
+                "name": "compart_2212"
+            },
+            "permissions": "rw",
+            "symbols": [
+		"disallow_high_osrel",
+		"dtrace_fasttrap_exec",
+		"exec_args_gen",
+		"execsw",
+		"pmc_hook",
+		"vop_close_desc",
+		"vop_mmapped_desc",
+		"vop_unlock_desc",
+		"vop_unset_text_desc"
+	    ]
+        },
+        {
+            "subject": {
+                "name": "compart_2212"
+            },
+            "permissions": "x",
+            "symbols": [
+		"exec_release_args_kva",
+		"execsigs",
+		"memcpy",
+		"memmove",
+		"sigacts_alloc",
+		"sigacts_copy",
+		"sigacts_free",
+		"sigacts_shared",
+		"signotify",
+		"vm_page_unwire"
+	    ]
         }
     ]
 }

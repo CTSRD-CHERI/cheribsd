@@ -175,7 +175,7 @@ int ZEXPORT inflateReset2(z_streamp strm, int windowBits) {
     return inflateReset(strm);
 }
 
-int ZEXPORT inflateInit2_(z_streamp strm, int windowBits,
+int __noinline ZEXPORT inflateInit2_(z_streamp strm, int windowBits,
                           const char *version, int stream_size) {
     int ret;
     struct inflate_state FAR *state;
