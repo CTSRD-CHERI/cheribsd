@@ -580,8 +580,9 @@ ef_symbol_address(elf_file_t ef, const Elf_Sym *sym)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
- * Find a copy of the module's program headers by probing for a valid ELF
- * executable header at ef->mapbase that we can then follow.
+ * Find a copy of the module's program headers, either from module metadata or
+ * by probing for a valid ELF executable header at ef->mapbase that we can then
+ * follow.
  *
  * NB: RISC-V kernels do not map phdrs into memory.
  */
@@ -589,6 +590,16 @@ static const Elf_Phdr *
 preload_search_phdrs(elf_file_t ef, size_t *phnum)
 {
 	const Elf_Ehdr *hdr;
+	uint32_t *modinfo;
+
+	modinfo = (uint32_t *)preload_search_info(ef->modptr,
+	    MODINFO_METADATA | MODINFOMD_PHDR);
+	if (modinfo != NULL) {
+		/* Size of metadata; see preload_search_info */
+		*phnum = modinfo[-1] / sizeof(Elf_Phdr);
+		return ((const Elf_Phdr *)modinfo);
+	}
+
 	hdr = (const Elf_Ehdr *)ef->mapbase;
 	if (IS_ELF(*hdr) &&
 	    hdr->e_ident[EI_CLASS] == ELF_TARG_CLASS &&

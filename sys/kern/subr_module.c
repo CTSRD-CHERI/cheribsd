@@ -457,6 +457,9 @@ preload_modinfo_type(struct sbuf *sbp, int type)
 		sbuf_cat(sbp, "MODINFOMD_SPLASH");
 		break;
 #endif
+	case MODINFOMD_PHDR:
+		sbuf_cat(sbp, "MODINFOMD_PHDR");
+		break;
 #ifdef MODINFOMD_BOOT_HARTID
 	case MODINFOMD_BOOT_HARTID:
 		sbuf_cat(sbp, "MODINFOMD_BOOT_HARTID");
