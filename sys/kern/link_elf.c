@@ -584,7 +584,9 @@ ef_symbol_address(elf_file_t ef, const Elf_Sym *sym)
  * by probing for a valid ELF executable header at ef->mapbase that we can then
  * follow.
  *
- * NB: RISC-V kernels do not map phdrs into memory.
+ * NB: RISC-V kernels do not map phdrs into memory, nor do compartmentalised
+ * kernels on any CHERI architecture when the program headers require extra
+ * pages to be mapped.
  */
 static const Elf_Phdr *
 preload_search_phdrs(elf_file_t ef, size_t *phnum)
