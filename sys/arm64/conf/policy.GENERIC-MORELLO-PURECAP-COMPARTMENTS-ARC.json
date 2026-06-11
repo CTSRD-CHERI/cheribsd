@@ -8677,8 +8677,8 @@
             "subject": "compart_16346",
             "permissions": "rw",
             "symbols": [
-                "<0xffff0000010cdd00>",
-                "<0xffff0000010d04a0>",
+                ".L__const.msginit.methods",
+                ".L__const.shminit.methods",
                 "M_BUS",
                 "M_MSG",
                 "M_SHM",
@@ -11840,7 +11840,7 @@
                 "aio_complete",
                 "aio_process_rw",
                 "aio_process_sync",
-                "casueword32_resolver",
+                "casueword32",
                 "counted_warning",
                 "dev_relthread",
                 "devvn_refthread",
@@ -11869,7 +11869,7 @@
             "subject": "compart_16426",
             "permissions": "r",
             "symbols": [
-                "<0xffff000000981498>"
+                ".L__const.vntype_to_kinfo.vtypes_table"
             ]
         },
         {
@@ -12259,7 +12259,7 @@
                 "_assert_sbuf_integrity",
                 "_getenv_static",
                 "_thread_lock",
-                "casueword32_resolver",
+                "casueword32",
                 "casuword32",
                 "copyinstr",
                 "copyout",
@@ -14727,7 +14727,7 @@
                 "_epoch_exit_preempt",
                 "_thread_lock",
                 "ast_sched",
-                "casueword32_resolver",
+                "casueword32",
                 "copyin",
                 "copyinptr",
                 "copyout",
@@ -16864,7 +16864,7 @@
             "subject": "compart_16506",
             "permissions": "rw",
             "symbols": [
-                "<0xffff0000010cf250>",
+                ".L__const.seminit.methods",
                 "Giant",
                 "M_BUS_SC",
                 "M_EVENTHANDLER",
@@ -17769,7 +17769,7 @@
                 "_sleep",
                 "callout_init",
                 "callout_reset_sbt_on",
-                "casueword_resolver",
+                "casueword",
                 "db_command_unregister",
                 "free",
                 "ktrcapfail",
@@ -21732,7 +21732,7 @@
                 "audit_arg_svipc_id",
                 "audit_arg_svipc_perm",
                 "audit_syscall_exit",
-                "casueword32_resolver",
+                "casueword32",
                 "copyin",
                 "copyout",
                 "fget",
@@ -22861,7 +22861,7 @@
             "subject": "compart_16574",
             "permissions": "rw",
             "symbols": [
-                "<0xffff0000010dd780>",
+                ".L__const.unp_gc.heads",
                 "M_TEMP",
                 "__start_set_pcpu",
                 "balance_interval",
@@ -24255,7 +24255,7 @@
                 "__mtx_unlock_spin_flags",
                 "_thread_lock",
                 "bcd2bin",
-                "casueword32_resolver",
+                "casueword32",
                 "copyin",
                 "copyout",
                 "devfs_alloc_cdp_inode",
