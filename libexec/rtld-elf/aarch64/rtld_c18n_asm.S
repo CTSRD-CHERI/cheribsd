@@ -57,7 +57,9 @@ END(_rtld_unw_getcontext_epilogue)
  * mode). Otherwise, call _rtld_unw_setcontext_impl via a trampoline.
  */
 ENTRY(_rtld_unw_setcontext)
-	ldr	c16, _rtld_unw_setcontext_ptr
+	adrp	c16, :got:_rtld_unw_setcontext_ptr
+	ldr	c16, [c16, :got_lo12:_rtld_unw_setcontext_ptr]
+	ldr	c16, [c16]
 	cbnz	w16, 1f
 	/*
 	 * FIXME: llvm-libunwind specific ABI. This should be better specified.
