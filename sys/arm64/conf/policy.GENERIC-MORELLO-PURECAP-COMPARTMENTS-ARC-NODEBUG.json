@@ -30,11 +30,6 @@
                 "__mtx_unlock_sleep"
             ]
         },
-        "compart_254": {
-            "symbols": [
-                "__mtx_assert"
-            ]
-        },
         "compart_256": {
             "symbols": [
                 "_mtx_init"
@@ -43,11 +38,6 @@
         "compart_258": {
             "symbols": [
                 "_thread_lock"
-            ]
-        },
-        "compart_355": {
-            "symbols": [
-                "atomic_add_64"
             ]
         },
         "compart_602": {
@@ -85,11 +75,6 @@
                 "sleepq_release"
             ]
         },
-        "compart_2883": {
-            "symbols": [
-                "atomic_fetchadd_32"
-            ]
-        },
         "compart_3076": {
             "symbols": [
                 "printf"
@@ -105,19 +90,9 @@
                 "_fdrop"
             ]
         },
-        "compart_3708": {
-            "symbols": [
-                "_sx_assert"
-            ]
-        },
         "compart_3936": {
             "symbols": [
                 "wakeup"
-            ]
-        },
-        "compart_4591": {
-            "symbols": [
-                "witness_warn"
             ]
         },
         "compart_4808": {
@@ -140,59 +115,9 @@
                 "sysctl_handle_int"
             ]
         },
-        "compart_6600": {
-            "symbols": [
-                "__builtin_memset"
-            ]
-        },
-        "compart_6614": {
-            "symbols": [
-                "__builtin_cheri_bounds_set"
-            ]
-        },
         "compart_6629": {
             "symbols": [
                 "sdt_probe"
-            ]
-        },
-        "compart_6631": {
-            "symbols": [
-                "__builtin_memcpy"
-            ]
-        },
-        "compart_6638": {
-            "symbols": [
-                "atomic_store_rel_32"
-            ]
-        },
-        "compart_6642": {
-            "symbols": [
-                "atomic_load_acq_32"
-            ]
-        },
-        "compart_6666": {
-            "symbols": [
-                "__builtin_constant_p"
-            ]
-        },
-        "compart_6671": {
-            "symbols": [
-                "__builtin_strlen"
-            ]
-        },
-        "compart_6674": {
-            "symbols": [
-                "__builtin_strcpy"
-            ]
-        },
-        "compart_6675": {
-            "symbols": [
-                "__builtin_memmove"
-            ]
-        },
-        "compart_6937": {
-            "symbols": [
-                "__builtin_strcmp"
             ]
         },
         "compart_14393": {
@@ -3981,12 +3906,6 @@
                 "setfmode",
                 "vput_final",
                 "at2cnpflags"
-            ]
-        },
-        "compart_16633": {
-            "symbols": [
-                "__builtin_align_up",
-                "__builtin_align_down"
             ]
         },
         "compart_16634": {
