@@ -803,11 +803,10 @@ arm64_exec_protect(struct image_params *imgp, int flags __unused)
  * Handle boot-time kernel relocations, this is called by locore.
  */
 static void __nosanitizecoverage
-elf_reloc_self_perms(const Elf_Dyn *dynp, void *data_cap, const void *code_cap,
-    uint8_t permsmask)
+elf_reloc_self_perms(const Elf_Dyn *dynp, const Elf_Phdr *phdr, size_t phnum,
+    void *data_cap, const void *code_cap, uint8_t permsmask)
 {
-	const Elf_Ehdr *hdr;
-	const Elf_Phdr *phdr, *phlimit;
+	const Elf_Phdr *phlimit;
 	const Elf_Rela *rela = NULL, *rela_end;
 	Elf_Addr addr, *fragment, size;
 	uintptr_t cap;
@@ -816,17 +815,8 @@ elf_reloc_self_perms(const Elf_Dyn *dynp, void *data_cap, const void *code_cap,
 	uint8_t perms;
 
 	/* See if there is an ELF header is at KERNBASE. */
-	hdr = data_cap;
-	if (IS_ELF(*hdr) &&
-	    hdr->e_ident[EI_CLASS] == ELF_TARG_CLASS &&
-	    hdr->e_ident[EI_DATA] == ELF_TARG_DATA &&
-	    hdr->e_ident[EI_VERSION] == EV_CURRENT &&
-	    hdr->e_machine == ELF_TARG_MACH &&
-	    hdr->e_version == ELF_TARG_VER &&
-	    hdr->e_phentsize == sizeof(Elf_Phdr) &&
-	    ELF_IS_CHERI(hdr)) {
-		phdr = (const Elf_Phdr *)((const char *)hdr + hdr->e_phoff);
-		phlimit = phdr + hdr->e_phnum;
+	if (phdr != NULL) {
+		phlimit = phdr + phnum;
 		for (; phdr < phlimit; phdr++) {
 			if (phdr->p_type == PT_CHERI_PCC) {
 				use_code_bounds = true;
@@ -870,13 +860,15 @@ elf_reloc_self_perms(const Elf_Dyn *dynp, void *data_cap, const void *code_cap,
 }
 
 void __nosanitizecoverage
-elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
+elf_reloc_self(const Elf_Dyn *dynp, const Elf_Phdr *phdr, size_t phnum,
+    void *data_cap, const void *code_cap)
 {
 
-	elf_reloc_self_perms(dynp, data_cap, code_cap, MORELLO_FRAG_RODATA |
-	    MORELLO_FRAG_RWDATA);
+	elf_reloc_self_perms(dynp, phdr, phnum, data_cap, code_cap,
+	    MORELLO_FRAG_RODATA | MORELLO_FRAG_RWDATA);
 	elf_init_data();
-	elf_reloc_self_perms(dynp, data_cap, code_cap, MORELLO_FRAG_EXECUTABLE);
+	elf_reloc_self_perms(dynp, phdr, phnum, data_cap, code_cap,
+	    MORELLO_FRAG_EXECUTABLE);
 }
 
 #endif

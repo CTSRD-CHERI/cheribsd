@@ -262,7 +262,8 @@ __ElfType(Auxinfo);
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
-void elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap);
+void elf_reloc_self(const Elf_Dyn *dynp, const Elf_Phdr *phdr, size_t phnum,
+    void *data_cap, const void *code_cap);
 #endif
 
 #define	ELF_STATIC_RELOC_LABEL(var, label)				\

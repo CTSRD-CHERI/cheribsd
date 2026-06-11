@@ -355,20 +355,24 @@ virtdone:
 	ldr	x3, =_end
 #endif
 	scvalue	c4, c2, x4
+	ldr	c5, [PTR(19), #BP_MODULEP]
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	adrp	c5, elf_kernel_compartments
-	add	c5, c5, :lo12:elf_kernel_compartments
+	adrp	c6, elf_kernel_compartments
+	add	c6, c6, :lo12:elf_kernel_compartments
 
-	adrp	c6, compartment_lastid
-	add	c6, c6, :lo12:compartment_lastid
+	adrp	c7, compartment_lastid
+	add	c7, c7, :lo12:compartment_lastid
 
-	adrp	c7, elf_kernel_pccs
-	add	c7, c7, :lo12:elf_kernel_pccs
+	adrp	c8, elf_kernel_pccs
+	add	c8, c8, :lo12:elf_kernel_pccs
 
-	scvalue	c5, c2, x5
 	scvalue	c6, c2, x6
 	scvalue	c7, c2, x7
+	scvalue	c8, c2, x8
+	str	c8, [PTRN(sp), #-(CAP_WIDTH)]!
+	scbnds	c9, PTRN(sp), #CAP_WIDTH
+	clrperm	c9, c9, w
 #endif
 
 	/*
@@ -381,6 +385,10 @@ virtdone:
 #endif
 
 	bl	elf_init
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	add	PTRN(sp), PTRN(sp), #CAP_WIDTH
+#endif
 
 #if __has_feature(capabilities)
 	/* Initialize capabilities. */

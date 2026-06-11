@@ -117,10 +117,11 @@ init_linker_file_cap_relocs(const void *start_relocs, const void *stop_relocs,
 }
 
 #ifdef __riscv
-void	init_cap_relocs(void *data_cap, void *code_cap);
+void	init_cap_relocs(const void *phdr, size_t phnum, void *data_cap,
+	    void *code_cap);
 
 void
-init_cap_relocs(void *data_cap, void *code_cap)
+init_cap_relocs(const void *phdr, size_t phnum, void *data_cap, void *code_cap)
 {
 	void *start_relocs, *stop_relocs;
 	cap_relocs_cb *cb;

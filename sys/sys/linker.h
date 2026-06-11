@@ -319,6 +319,8 @@ extern void *		preload_fetch_addr(caddr_t _mod);
 extern size_t		preload_fetch_size(caddr_t _mod);
 extern caddr_t		preload_search_by_name(const char *_name);
 extern caddr_t		preload_search_by_type(const char *_type);
+extern caddr_t		preload_search_by_type_early(caddr_t _mdp,
+			    const char *_type);
 extern caddr_t		preload_search_next_name(caddr_t _base);
 extern caddr_t		preload_search_info(caddr_t _mod, int _inf);
 extern void		preload_initkmdp(bool _fatal);
@@ -347,7 +349,7 @@ typedef int elf_lookup_fn(linker_file_t, Elf_Size, int, uintptr_t *);
 
 /* Support functions */
 void	elf_init(elf_file_t ef, Elf_Dyn *dynp, void *relocbase,
-	    ptraddr_t baseend, elf_plt_t plts
+	    ptraddr_t baseend, elf_plt_t plts, caddr_t mdp
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	    , elf_compartment_t compartments, u_long *lastidp, elf_pcc_t pccs
 #endif

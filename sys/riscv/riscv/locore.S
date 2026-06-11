@@ -415,6 +415,7 @@ va:
 	 * must be both executable and writable.
 	 */
 	cmove	ca2, cs0
+	cmove	ca5, cs3
 
 	cllc	cra, _C_LABEL(elf_init)
 	cjalr	cra
@@ -467,6 +468,7 @@ va:
 	mv	a2, zero
 	la	a3, _C_LABEL(_end)
 	la	a4, _C_LABEL(elf_kernel_plts)
+	mv	a5, s3
 	call	_C_LABEL(elf_init)
 
 #if __has_feature(capabilities)

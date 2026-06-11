@@ -173,7 +173,12 @@ extern bool	security_cheri_check_perm_syscall;
 typedef void (cap_relocs_cb)(void *arg, bool function, bool constant,
     ptraddr_t object, void **src);
 
-void	init_cap_relocs(void *data_cap, void *code_cap);
+/*
+ * NB: Not Elf_Phdr; requires sys/elf.h, and that breaks
+ * sys/dev/sge/if_sgereg.h which defines its own EI_DATA that clashes.
+ */
+void	init_cap_relocs(const void *phdr, size_t phnum, void *data_cap,
+	    void *code_cap);
 int	init_linker_file_cap_relocs(const void *start_relocs,
 	    const void *stop_relocs, void *data_cap, ptraddr_t base_addr,
 	    bool can_set_code_bounds, cap_relocs_cb *cb, void *cb_arg);
