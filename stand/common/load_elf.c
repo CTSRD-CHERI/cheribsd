@@ -724,7 +724,7 @@ __elfN(loadimage)(struct preloaded_file *fp, elf_file_t ef, uint64_t off)
 	}
 	lastaddr = roundup(lastaddr, sizeof(long));
 
-	file_addmetadata(fp, MODINFOMD_PHDR, ef->phdrslen, phdr)
+	file_addmetadata(fp, MODINFOMD_PHDR, ef->phdrslen, phdr);
 
 	/*
 	 * Get the section headers.  We need this for finding the .ctors
