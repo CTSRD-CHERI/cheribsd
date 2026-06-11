@@ -36,10 +36,6 @@
 #include "bootstrap.h"
 #include "modinfo.h"
 
-#ifdef EFI
-#include "loader_efi.h"
-#endif
-
 #define COPYOUT(s,d,l)	archsw.arch_copyout((vm_offset_t)(s), d, l)
 
 #if defined(__i386__) && __ELF_WORD_SIZE == 64
@@ -662,35 +658,8 @@ __elfN(loadimage)(struct preloaded_file *fp, elf_file_t ef, uint64_t off)
 	if (ef->kernel)
 		__elfN(relocation_offset) = off;
 
-#ifdef EFI
-	if (ehdr->e_phoff + ef->phdrslen > PAGE_SIZE) {
-		/*
-		 * In case program headers reside on multiple pages, the static
-		 * linker with a linker script for the kernel will not emit a
-		 * PT_LOAD header for the program headers but it will leave
-		 * enough virtual address space for them and shift .text, which
-		 * is reflected in the address of the kernel's entry point.
-		 * Given that this case only applies to the compartmentalized
-		 * kernel that is only supported on arm64 at the moment, we can
-		 * copyin the ELF headers and the program headers ahead of
-		 * processing program headers as well as we can assume the entry
-		 * point address aligned to 2M gives us the correct base VA of
-		 * the kernel. This of course also assumes that the ELF header
-		 * and program headers don't take more than 2M.
-		 */
-		if (ehdr->e_phoff + ef->phdrslen > M(2)) {
-			printf("\nelf" __XSTRING(__ELF_WORD_SIZE)
-			   "_loadimage: program headers exceed 2M");
-			goto out;
-		}
-		firstaddr = rounddown2(ehdr->e_entry, M(2));
-		archsw.arch_copyin(ef->firstpage, firstaddr, ef->firstlen);
-		archsw.arch_copyin(ef->phdrs, firstaddr + ehdr->e_phoff,
-		    ef->phdrslen);
-	}
-#endif
-
 	phdr = (Elf_Phdr *)ef->phdrs;
+
 	for (i = 0; i < ehdr->e_phnum; i++) {
 		if (elf_program_header_convert(ehdr, phdr))
 			continue;
