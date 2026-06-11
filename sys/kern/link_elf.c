@@ -580,23 +580,29 @@ ef_symbol_address(elf_file_t ef, const Elf_Sym *sym)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
- * Check for a valid ELF executable header at ef->mapbase.
+ * Find a copy of the module's program headers by probing for a valid ELF
+ * executable header at ef->mapbase that we can then follow.
  *
  * NB: RISC-V kernels do not map phdrs into memory.
  */
-static bool
-have_phdrs(elf_file_t ef)
+static const Elf_Phdr *
+preload_search_phdrs(elf_file_t ef, size_t *phnum)
 {
 	const Elf_Ehdr *hdr;
 	hdr = (const Elf_Ehdr *)ef->mapbase;
-	return (IS_ELF(*hdr) &&
+	if (IS_ELF(*hdr) &&
 	    hdr->e_ident[EI_CLASS] == ELF_TARG_CLASS &&
 	    hdr->e_ident[EI_DATA] == ELF_TARG_DATA &&
 	    hdr->e_ident[EI_VERSION] == EV_CURRENT &&
 	    hdr->e_machine == ELF_TARG_MACH &&
 	    hdr->e_version == ELF_TARG_VER &&
 	    hdr->e_phentsize == sizeof(Elf_Phdr) &&
-	    ELF_IS_CHERI(hdr));
+	    ELF_IS_CHERI(hdr)) {
+		*phnum = hdr->e_phnum;
+		return ((const Elf_Phdr *)((const char *)hdr + hdr->e_phoff));
+	}
+
+	return (NULL);
 }
 
 static bool
@@ -661,15 +667,14 @@ ef_create_pcc_caps(elf_file_t ef, const Elf_Phdr *phstart,
 static bool
 preload_init_pcc_caps(elf_file_t ef)
 {
-	const Elf_Ehdr *hdr;
 	const Elf_Phdr *phdr;
+	size_t phnum;
 
-	if (!have_phdrs(ef))
+	phdr = preload_search_phdrs(ef, &phnum);
+	if (phdr == NULL)
 		return (true);
 
-	hdr = (const Elf_Ehdr *)ef->mapbase;
-	phdr = (const Elf_Phdr *)((const char *)hdr + hdr->e_phoff);
-	return (ef_create_pcc_caps(ef, phdr, phdr + hdr->e_phnum));
+	return (ef_create_pcc_caps(ef, phdr, phdr + phnum));
 }
 #endif
 
@@ -3294,15 +3299,14 @@ elf_lookup_ifunc(linker_file_t lf, Elf_Size symidx, int deps __unused,
 static void
 preload_check_for_pcc_caps(elf_file_t ef)
 {
-	const Elf_Ehdr *hdr;
 	const Elf_Phdr *phdr, *phlimit;
+	size_t phnum;
 
-	if (!have_phdrs(ef))
+	phdr = preload_search_phdrs(ef, &phnum);
+	if (phdr == NULL)
 		return;
 
-	hdr = (const Elf_Ehdr *)ef->mapbase;
-	phdr = (const Elf_Phdr *)((const char *)hdr + hdr->e_phoff);
-	phlimit = phdr + hdr->e_phnum;
+	phlimit = phdr + phnum;
 	for (; phdr < phlimit; phdr++) {
 		if (phdr->p_type == PT_CHERI_PCC) {
 			ef->lf.flags |= LINKER_FILE_PCC_BOUNDS;
