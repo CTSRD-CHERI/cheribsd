@@ -29,6 +29,7 @@
 			"smccc_arm64.o",
 			"subr_devmap.o",
 			"subr_kobj.o",
+			"subr_module.o",
 			"subr_pcpu.o",
 			"swtch.o",
 			"vgic.o",

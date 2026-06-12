@@ -4824,7 +4824,6 @@
                 "uipc_connectat",
                 "malloc_exec",
                 "ttyinq_unputchar",
-                "preload_search_info",
                 "preload_fetch_addr",
                 "soaccept",
                 "elf64_prepare_notes",
@@ -24616,6 +24615,16 @@
             "permissions": "rw",
             "object": {
                 "name": "preload_kerntype",
+                "type": "symbol"
+            }
+        },
+        {
+            "subject": {
+                "name": "compart_16546"
+            },
+            "permissions": "x",
+            "object": {
+                "name": "preload_search_info",
                 "type": "symbol"
             }
         },
