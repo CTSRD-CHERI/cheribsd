@@ -1470,7 +1470,6 @@
 				"subr_lock.o",
 				"subr_log.o",
 				"subr_memdesc.o",
-				"subr_module.o",
 				"subr_msgbuf.o",
 				"subr_param.o",
 				"subr_pctrie.o",
