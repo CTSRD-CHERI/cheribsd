@@ -586,6 +586,7 @@ preload_modinfo_value(struct sbuf *sbp, uint32_t *bptr, int type, int len)
 #ifdef MODINFOMD_EFI_MAP
 	case MODINFO_METADATA | MODINFOMD_EFI_MAP:
 #endif
+	case MODINFO_METADATA | MODINFOMD_PHDR:
 		/* Don't print data buffers. */
 		sbuf_cat(sbp, "buffer contents omitted");
 		break;
