@@ -206,8 +206,8 @@ preload_search_info(caddr_t mod, int inf)
 	 * data.
 	 */
 	if (hdr[0] == inf)
-	    return (cheri_kern_bounds_set(curp + (sizeof(uint32_t) * 2),
-	        hdr[1]));
+	    return (cheri_kern_bounds_set(curp, hdr[1] + sizeof(uint32_t) * 2)
+		+ sizeof(uint32_t) * 2);
 
 	/* skip to next field */
 	next = sizeof(uint32_t) * 2 + hdr[1];
