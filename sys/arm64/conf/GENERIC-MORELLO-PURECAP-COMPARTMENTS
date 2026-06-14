@@ -10,6 +10,9 @@ nodevice	zlib
 # Enable compartmentalization by default
 options 	CHERI_COMPARTMENTALIZE_KERNEL
 
+# Collect statistics on kernel compartments
+options 	CHERI_COMPARTMENT_STATS
+
 # Use PCPU/DPCPU accessor functions
 options 	PCPU_FUNCS
 

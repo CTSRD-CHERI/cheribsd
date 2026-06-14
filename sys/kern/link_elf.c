@@ -882,7 +882,9 @@ link_elf_init(void* arg)
 	elf_file_t ef;
 	const char *modname;
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#ifdef CHERI_COMPARTMENT_STATS
 	struct compartment *compartment;
+#endif
 	elf_compartment_t ec;
 	unsigned int compartmentii;
 #endif
@@ -898,17 +900,23 @@ link_elf_init(void* arg)
 	ec = &elf_kernel_file.defcompartment;
 	ec->filename = elf_kernel_filename;
 	ec->name = elf_kernel_defname;
+
+#ifdef CHERI_COMPARTMENT_STATS
 	compartment_metadata_create(ec->id, ec->name,
 	    cheri_setaddress((uintcap_t)ec->pcc, (ptraddr_t)ec->start),
 	    ec);
+#endif
 	for (compartmentii = 0; compartmentii < elf_kernel_file.ncompartments;
 	    compartmentii++) {
 		ec = &elf_kernel_file.compartments[compartmentii];
 		ec->filename = elf_kernel_filename;
+#ifdef CHERI_COMPARTMENT_STATS
 		compartment_metadata_create(ec->id, ec->name,
 		    cheri_setaddress((uintcap_t)ec->pcc, (ptraddr_t)ec->start),
 		    ec);
+#endif
 	}
+#ifdef CHERI_COMPARTMENT_STATS
 	for (compartmentii = 0; compartmentii <= thread0.td_compartments_maxid;
 	    compartmentii++) {
 		compartment = thread0.td_compartments[compartmentii];
@@ -917,6 +925,7 @@ link_elf_init(void* arg)
 		compartment_metadata_insert(compartment);
 	}
 #endif
+#endif /* CHERI_COMPARTMENTALIZE_KERNEL */
 
 	modname = NULL;
 	modptr = preload_search_by_type("elf" __XSTRING(__ELF_WORD_SIZE) " kernel");

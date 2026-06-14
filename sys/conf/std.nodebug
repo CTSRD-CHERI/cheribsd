@@ -31,3 +31,6 @@ nooptions	CAM_DEBUG_FLAGS
 # CHERI revocation profiling
 # This introduces significant performance overhead
 nooptions 	CHERI_CAPREVOKE_STATS
+
+# CHERI kernel compartmentalization statistics
+nooptions 	CHERI_COMPARTMENT_STATS
