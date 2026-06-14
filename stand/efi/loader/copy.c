@@ -478,6 +478,13 @@ efi_copyin(const void *src, vm_offset_t dest, const size_t len)
 
 	if (!stage_offset_set) {
 		stage_offset = (vm_offset_t)staging - dest;
+#if EFI_STAGING_2M_ALIGN
+		/*
+		 * Keep stage_offset aligned so the physical address (returned
+		 * by efi_translate) and dest are congruent mod 2M
+		 */
+		stage_offset += dest & (M(2) - 1);
+#endif
 		stage_offset_set = true;
 	}
 
@@ -509,6 +516,10 @@ efi_readin(readin_handle_t fd, vm_offset_t dest, const size_t len)
 
 	if (!stage_offset_set) {
 		stage_offset = (vm_offset_t)staging - dest;
+#if EFI_STAGING_2M_ALIGN
+		/* See efi_copyin */
+		stage_offset += dest & (M(2) - 1);
+#endif
 		stage_offset_set = true;
 	}
 
