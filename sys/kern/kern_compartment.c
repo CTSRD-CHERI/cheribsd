@@ -72,6 +72,7 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_COMPARTMENT, "compartment", "kernel compartment");
 
+#ifdef CHERI_COMPARTMENT_STATS
 SYSCTL_NODE(_security, OID_AUTO, compartment, CTLFLAG_RD, 0,
     "Compartment subsystem");
 SYSCTL_NODE(_security_compartment, OID_AUTO, counters, CTLFLAG_RD, 0,
@@ -96,6 +97,7 @@ struct compartment_metadata {
 	elf_compartment_t  cm_elf_compartment;
 	TAILQ_HEAD(, compartment) cm_compartments;
 };
+#endif
 
 struct compartment_trampoline {
 	u_long		ct_compartment_id;
@@ -111,13 +113,15 @@ extern int early_boot;
 #endif
 
 u_long compartment_lastid = COMPARTMENT_KERNEL_ID;
-static u_long compartment_maxnid;
 static uma_zone_t compartment_zone;
+#ifdef CHERI_COMPARTMENT_STATS
+static u_long compartment_maxnid;
 static struct compartment_metadata **compartment_metadata;
 static struct sx __exclusive_cache_line compartment_metadatalock;
 static struct mtx compartment_metadataspinlock;
 MTX_SYSINIT(compartment_metadataspinlock, &compartment_metadataspinlock,
     "compartment_metadataspinlock", MTX_SPIN);
+#endif
 
 static int
 compartment_trampoline_compare(struct compartment_trampoline *a,
@@ -252,6 +256,7 @@ SYSINIT(compartment_cpu_cache_init_bsp, SI_SUB_KLD, SI_ORDER_FIRST,
 SYSINIT(compartment_cpu_cache_init_aps, SI_SUB_CPU, SI_ORDER_ANY,
     compartment_cpu_cache_init_aps, NULL);
 
+#ifdef CHERI_COMPARTMENT_STATS
 void
 compartment_metadata_create(u_long id, const char *name, uintcap_t base,
     elf_compartment_t elf_compartment)
@@ -356,6 +361,7 @@ compartment_metadata_init(void *arg __unused)
 
 SYSINIT(compartment_metadata_init, SI_SUB_KLD, SI_ORDER_FIRST,
     compartment_metadata_init, NULL);
+#endif
 
 u_long
 compartment_id_create(const char *name, uintcap_t base,
@@ -363,8 +369,10 @@ compartment_id_create(const char *name, uintcap_t base,
 {
 
 	atomic_add_long(&compartment_lastid, 1);
+#ifdef CHERI_COMPARTMENT_STATS
 	compartment_metadata_create(compartment_lastid, name, base,
 	    elf_compartment);
+#endif
 	return (compartment_lastid);
 }
 
@@ -439,7 +447,9 @@ compartment_alloc_from_cache(struct thread *td)
 struct compartment *
 compartment_create(struct thread *td, u_long id, bool usecache)
 {
+#ifdef CHERI_COMPARTMENT_STATS
 	struct compartment_metadata *metadata;
+#endif
 	struct compartment *compartment;
 
 	if (usecache)
@@ -451,6 +461,7 @@ compartment_create(struct thread *td, u_long id, bool usecache)
 	}
 	compartment_linkup(compartment, id, td);
 
+#ifdef CHERI_COMPARTMENT_STATS
 	/* NB: compartment_maxnid can be unlocked as it never decreases. */
 	KASSERT(id < compartment_maxnid,
 	    ("%s: id %lu exceeds the maximum value %lu", __func__, id,
@@ -463,6 +474,7 @@ compartment_create(struct thread *td, u_long id, bool usecache)
 	mtx_lock_spin(&metadata->cm_lock);
 	TAILQ_INSERT_TAIL(&metadata->cm_compartments, compartment, c_mnext);
 	mtx_unlock_spin(&metadata->cm_lock);
+#endif
 
 	return (compartment);
 }
@@ -470,6 +482,7 @@ compartment_create(struct thread *td, u_long id, bool usecache)
 void
 compartment_destroy(struct compartment *compartment)
 {
+#ifdef CHERI_COMPARTMENT_STATS
 	struct compartment_metadata *metadata;
 
 	if (compartment->c_id > 0) {
@@ -481,6 +494,7 @@ compartment_destroy(struct compartment *compartment)
 		TAILQ_REMOVE(&metadata->cm_compartments, compartment, c_mnext);
 		mtx_unlock_spin(&metadata->cm_lock);
 	}
+#endif
 
 	if (compartment->c_thread != NULL) {
 		compartment->c_thread->td_compartments[compartment->c_id] = NULL;
@@ -497,11 +511,13 @@ compartment_entry_stackptr(u_long id, int type)
 
 	EXECUTIVE_ASSERT();
 
+#ifdef CHERI_COMPARTMENT_STATS
 	/*
 	 * TODO: Make compartment_trampoline_counters actual atomic counters.
 	 */
 	if (compartment_trampoline_counters[type] < ULONG_MAX)
 		compartment_trampoline_counters[type]++;
+#endif
 
 	compartment = curthread->td_compartments[id];
 	if (compartment == NULL)
@@ -671,6 +687,7 @@ executive_get_function(uintptr_t func)
 	return ((void *)trampoline->ct_compartment_func);
 }
 
+#ifdef CHERI_COMPARTMENT_STATS
 #ifdef DDB
 DB_COMMAND_FLAGS(c18nstat, db_c18nstat, DB_CMD_MEMSAFE)
 {
@@ -753,5 +770,5 @@ DB_SHOW_COMMAND(compartment, db_show_compartment)
 		elf_ddb_show_compartment_symbols(metadata->cm_elf_compartment);
 	}
 }
-
 #endif /* DDB */
+#endif /* CHERI_COMPARTMENT_STATS */
