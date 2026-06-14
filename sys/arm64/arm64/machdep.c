@@ -449,13 +449,15 @@ makectx(struct trapframe *tf, struct pcb *pcb)
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 static void
-init_compartments0(vm_pointer_t compartments0_stacks)
+init_compartments0(vm_pointer_t compartments0_stacks,
+    vm_pointer_t compartments0_array)
 {
 	struct compartment *compartment;
 	vm_pointer_t stack;
 	unsigned int ii;
 
-	TAILQ_INIT(&thread0.td_compartments);
+	thread0.td_compartments = (void *)compartments0_array;
+	thread0.td_compartments_maxid = KERNEL_MAXC18NS;
 	for (ii = 0; ii < KERNEL_MAXC18NS; ii++) {
 		compartment = &compartments0[ii];
 		stack = compartments0_stacks + ii * (COMPARTMENT_STACK_PAGES * PAGE_SIZE);
@@ -469,7 +471,8 @@ init_compartments0(vm_pointer_t compartments0_stacks)
 
 static void
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-init_proc0(vm_pointer_t kstack, vm_pointer_t compartments0_stacks)
+init_proc0(vm_pointer_t kstack, vm_pointer_t compartments0_stacks,
+    vm_pointer_t compartments0_array)
 #else
 init_proc0(vm_pointer_t kstack)
 #endif
@@ -512,7 +515,7 @@ init_proc0(vm_pointer_t kstack)
 	thread0.td_pcb->pcb_rcsp_el0 = thread0.td_voidstack;
 #endif
 	WRITE_SPECIALREG_CAP(rcsp_el0, thread0.td_pcb->pcb_rcsp_el0);
-	init_compartments0(compartments0_stacks);
+	init_compartments0(compartments0_stacks, compartments0_array);
 #endif
 #ifdef PAC
 	ptrauth_thread0(&thread0);
@@ -880,7 +883,8 @@ initarm(struct arm64_bootparams *abp)
 	PCPU_SET(midr, get_midr());
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	init_proc0(abp->kern_stack, abp->compartments0_stacks);
+	init_proc0(abp->kern_stack, abp->compartments0_stacks,
+	    abp->compartments0_array);
 
 	/*
 	 * Everything until here was only using TCB.

@@ -58,6 +58,7 @@ kstack_contains(struct thread *td, vm_offset_t va, size_t len)
 {
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	struct compartment *compartment;
+	u_long ii;
 #endif
 
 	if (va >= td->td_kstack && va + len >= va &&
@@ -66,7 +67,10 @@ kstack_contains(struct thread *td, vm_offset_t va, size_t len)
 		return (true);
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	TAILQ_FOREACH(compartment, &td->td_compartments, c_next) {
+	for (ii = 0; ii <= td->td_compartments_maxid; ii++) {
+		compartment = td->td_compartments[ii];
+		if (compartment == NULL)
+			continue;
 		/*
 		 * A compartment stack does not contain a pcb object.
 		 */

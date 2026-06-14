@@ -378,8 +378,15 @@ compartment_linkup(struct compartment *compartment, u_long id,
 	compartment->c_id = id;
 	compartment->c_thread = td;
 
-	TAILQ_INSERT_HEAD(&compartment->c_thread->td_compartments, compartment,
-	    c_next);
+	if (compartment->c_id > td->td_compartments_maxid) {
+		td->td_compartments_maxid = compartment_lastid;
+		td->td_compartments = realloc(td->td_compartments,
+		    (td->td_compartments_maxid + 1) *
+		    sizeof(*td->td_compartments), M_COMPARTMENT, M_NOWAIT |
+		    M_USE_RESERVE | M_ZERO);
+	}
+	td->td_compartments[compartment->c_id] = compartment;
+
 }
 
 void
@@ -476,26 +483,11 @@ compartment_destroy(struct compartment *compartment)
 	}
 
 	if (compartment->c_thread != NULL) {
-		TAILQ_REMOVE(&compartment->c_thread->td_compartments,
-		    compartment, c_next);
+		compartment->c_thread->td_compartments[compartment->c_id] = NULL;
 	}
 
 	vm_compartment_dispose(compartment);
 	uma_zfree(compartment_zone, compartment);
-}
-
-static struct compartment *
-compartment_find(u_long id)
-{
-	struct compartment *compartment;
-
-	EXECUTIVE_ASSERT();
-
-	TAILQ_FOREACH(compartment, &curthread->td_compartments, c_next) {
-		if (compartment->c_id == id)
-			break;
-	}
-	return (compartment);
 }
 
 static vm_pointer_t __used
@@ -511,7 +503,7 @@ compartment_entry_stackptr(u_long id, int type)
 	if (compartment_trampoline_counters[type] < ULONG_MAX)
 		compartment_trampoline_counters[type]++;
 
-	compartment = compartment_find(id);
+	compartment = curthread->td_compartments[id];
 	if (compartment == NULL)
 		compartment = compartment_create(curthread, id, true);
 	return (compartment->c_kstackptr);

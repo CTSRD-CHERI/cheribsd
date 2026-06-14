@@ -799,7 +799,8 @@ thread_alloc(int pages)
 	bzero(&td->td_sa.args, sizeof(td->td_sa.args));
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	td->td_voidstack = (vm_pointer_t)&td->td_voidstack;
-	TAILQ_INIT(&td->td_compartments);
+	td->td_compartments = NULL;
+	td->td_compartments_maxid = 0;
 	if (!thread_alloc_compartments(td)) {
 		return (NULL);
 	}
@@ -842,7 +843,7 @@ int
 thread_alloc_compartments(struct thread *td)
 {
 
-	KASSERT(TAILQ_EMPTY(&td->td_compartments),
+	KASSERT(td->td_compartments_maxid == 0,
 	    ("thread_alloc_compartments called on a thread with existing compartments"));
 
 	return (link_elf_create_compartments(linker_kernel_file, td));
@@ -851,12 +852,16 @@ thread_alloc_compartments(struct thread *td)
 void
 thread_free_compartments(struct thread *td)
 {
-	struct compartment *compartment, *tmpcompartment;
+	u_long ii;
 
-	TAILQ_FOREACH_SAFE(compartment, &td->td_compartments, c_next,
-	    tmpcompartment) {
-		compartment_destroy(compartment);
+	for (ii = 0; ii <= td->td_compartments_maxid; ii++) {
+		if (td->td_compartments[ii] == NULL)
+			continue;
+		compartment_destroy(td->td_compartments[ii]);
 	}
+	free(td->td_compartments, M_COMPARTMENT);
+	td->td_compartments = NULL;
+	td->td_compartments_maxid = 0;
 }
 #endif
 

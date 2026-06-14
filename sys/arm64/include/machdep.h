@@ -35,6 +35,7 @@ struct arm64_bootparams {
 	vm_paddr_t	kern_ttbr0;
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	vm_pointer_t	compartments0_stacks;
+	vm_pointer_t	compartments0_array;
 #endif
 	int		boot_el;	/* EL the kernel booted from */
 	int		pad;
