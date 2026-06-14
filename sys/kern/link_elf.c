@@ -909,7 +909,11 @@ link_elf_init(void* arg)
 		    cheri_setaddress((uintcap_t)ec->pcc, (ptraddr_t)ec->start),
 		    ec);
 	}
-	TAILQ_FOREACH(compartment, &thread0.td_compartments, c_next) {
+	for (compartmentii = 0; compartmentii <= thread0.td_compartments_maxid;
+	    compartmentii++) {
+		compartment = thread0.td_compartments[compartmentii];
+		if (compartment == NULL)
+			continue;
 		compartment_metadata_insert(compartment);
 	}
 #endif

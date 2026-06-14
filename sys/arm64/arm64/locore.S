@@ -274,6 +274,8 @@ virtdone:
 	 */
 	ldr	x7, =(PAGE_SIZE * KSTACK_PAGES * KERNEL_MAXC18NS)
 	buildptr 26, compartments0_stacks, x7
+	ldr	x7, =(CHERICAP_SIZE * KERNEL_MAXC18NS)
+	buildptr 28, compartments0_array, x7
 #endif
 	/*
 	 * Set up the stack.
@@ -313,6 +315,7 @@ virtdone:
 	str	PTR(25), [PTR(0), #BP_KERN_STACK]
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	str	PTR(26), [PTR(0), #BP_COMPARTMENTS0_STACKS]
+	str	PTR(28), [PTR(0), #BP_COMPARTMENTS0_ARRAY]
 #endif
 	str	x27, [PTR(0), #BP_KERN_TTBR0]
 	str	x23, [PTR(0), #BP_BOOT_EL]
@@ -1446,6 +1449,14 @@ compartments0_stacks:
 	.space	(PAGE_SIZE * KSTACK_PAGES * KERNEL_MAXC18NS)
 compartments0_stacks_end:
 	.size	compartments0_stacks, compartments0_stacks_end - compartments0_stacks
+	/*
+	 * Array of in-kernel compartments thread0 can access.
+	 */
+	.type	compartments0_array,#object
+compartments0_array:
+	.space	(CHERICAP_SIZE * KERNEL_MAXC18NS)
+compartments0_array_end:
+	.size	compartments0_array, compartments0_array_end - compartments0_array
 #endif
 
 	.section .init_pagetable, "aw", %nobits

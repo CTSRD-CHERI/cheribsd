@@ -397,7 +397,8 @@ struct thread {
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	bool		td_incachefill;
 	vm_pointer_t	td_voidstack;	/* (k) First stack for a c18n call. */
-	TAILQ_HEAD(, compartment) td_compartments;	/* (k) Thread compartments. */
+	struct compartment **td_compartments;	/* (k) Thread compartments. */
+	u_long		td_compartments_maxid;
 #endif
 #ifdef EPOCH_TRACE
 	SLIST_HEAD(, epoch_tracker) td_epochs;
