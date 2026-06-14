@@ -69,6 +69,8 @@ STAILQ_HEAD(compartment_list, compartment);
 
 extern struct compartment compartments0[KERNEL_MAXC18NS];
 
+extern u_long compartment_lastid;
+
 void compartment_metadata_create(u_long id, const char *name, uintcap_t base,
     elf_compartment_t elf_compartment);
 void compartment_metadata_insert(struct compartment *compartment);
