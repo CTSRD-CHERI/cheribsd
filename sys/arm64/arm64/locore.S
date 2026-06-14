@@ -326,61 +326,24 @@ virtdone:
 	/*
 	 * Initialize kernel's ELF file.
 	 *
-	 * Statically relocate dependencies of dynamic relocation routines and
-	 * pass them as arguments to the relocation routines. The dependencies
-	 * must be reachable from DDC and PCC at this stage.
-	 *
 	 * In a purecap kernel, also relocate the kernel itself to construct
 	 * valid capabilities.
 	 */
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	ldr	x0, =~CHERI_PERMS_KERNEL_DATA
-	mrs	c2, ddc
-	clrperm	c2, c2, x0
-#endif
-
-	adrp	PTR(0), elf_kernel_file
-	add	PTR(0), PTR(0), :lo12:elf_kernel_file
-
-	adrp	PTR(1), _DYNAMIC
-	add	PTR(1), PTR(1), :lo12:_DYNAMIC
-
-	adrp	PTR(4), elf_kernel_plts
-	add	PTR(4), PTR(4), :lo12:elf_kernel_plts
-
-#ifdef __CHERI_PURE_CAPABILITY__
-	scvalue c0, c2, x0
-	scvalue	c1, c2, x1
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	gclim	x3, c2
-#else
-	ldr	x3, =_end
-#endif
-	scvalue	c4, c2, x4
-
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	adrp	c5, elf_kernel_compartments
-	add	c5, c5, :lo12:elf_kernel_compartments
-
-	adrp	c6, compartment_lastid
-	add	c6, c6, :lo12:compartment_lastid
-
-	adrp	c7, elf_kernel_pccs
-	add	c7, c7, :lo12:elf_kernel_pccs
-
-	scvalue	c5, c2, x5
-	scvalue	c6, c2, x6
-	scvalue	c7, c2, x7
-#endif
-
 	/*
 	 * Pass DDC without restrictions. We use it as a relocation base that
 	 * must be both executable and writable (for ifunc resolvers).
 	 */
-	mrs	c2, ddc
+	mrs	c0, ddc
 #else
-	mov	x2, 0
+	mov	x0, 0
+#endif
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	gclim	x1, c0
+#else
+	ldr	x1, =_end
 #endif
 
 	bl	elf_init

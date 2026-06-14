@@ -86,6 +86,10 @@
 #include <ddb/db_ctf.h>
 #endif
 
+#if !__has_feature(capabilities) && !defined(CHERI_RODATA_PTR)
+#define	CHERI_RODATA_PTR(x)	(&(*x))
+#endif
+
 /*
  * Maximum number of program headers not related to extra compartments.
  */
@@ -735,22 +739,38 @@ SYSCTL_ULONG(_kern, OID_AUTO, relbase_address, CTLFLAG_RD,
 	&kern_relbase, 0, "Kernel relocated base address");
 
 void
-elf_init(elf_file_t ef, Elf_Dyn *dynp, void *relocbase, ptraddr_t baseend,
-    elf_plt_t plts
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-    , elf_compartment_t compartments, u_long *lastidp, elf_pcc_t pccs
-#endif
-    )
+elf_init(void *relocbase, ptraddr_t baseend)
 {
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	linker_file_t lf;
 	const Elf_Ehdr *hdr;
 	const Elf_Phdr *phlimit, *phdr, *phtable;
+	elf_compartment_t compartments;
+	u_long *lastidp;
+	elf_pcc_t pccs;
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
 	void *code_cap, *data_cap;
 #endif
+	elf_file_t ef;
+	Elf_Dyn *dynp;
+	elf_plt_t plts;
 	int error;
+
+#define	RELOCBASE_DATA_PTR(p) \
+	(__typeof__((0, p)))cheri_kern_address_set(cheri_kern_perms_and( \
+	    relocbase, CHERI_PERMS_KERNEL_DATA), \
+	    (ptraddr_t)CHERI_RODATA_PTR(p))
+	ef = RELOCBASE_DATA_PTR(__unbounded_addressof(elf_kernel_file));
+	dynp = (Elf_Dyn *)RELOCBASE_DATA_PTR(__unbounded_addressof(_DYNAMIC));
+	plts = RELOCBASE_DATA_PTR(__builtin_no_change_bounds(elf_kernel_plts));
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	compartments = RELOCBASE_DATA_PTR(__builtin_no_change_bounds(
+	    elf_kernel_compartments));
+	lastidp = RELOCBASE_DATA_PTR(__unbounded_addressof(compartment_lastid));
+	pccs = RELOCBASE_DATA_PTR(__builtin_no_change_bounds(elf_kernel_pccs));
+#endif
+#undef	RELOCBASE_DATA_PTR
 
 	/*
 	 * Initialize an ELF file object for the kernel.
