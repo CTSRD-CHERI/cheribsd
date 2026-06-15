@@ -478,15 +478,25 @@ ef_symbol_address(elf_file_t ef, const Elf_Sym *sym)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
- * Find a copy of the module's program headers by probing for a valid ELF
- * executable header at ef->mapbase that we can then follow.
+ * Find a copy of the module's program headers, either from module metadata or
+ * by probing for a valid ELF executable header at ef->mapbase that we can then
+ * follow.
  *
  * NB: RISC-V kernels do not map phdrs into memory.
  */
 static const Elf_Phdr *
-preload_search_phdrs(elf_file_t ef, size_t *phnum)
+preload_search_phdrs(elf_file_t ef, size_t *phnum, caddr_t modptr)
 {
 	const Elf_Ehdr *hdr;
+	uint32_t *modinfo;
+
+	modinfo = (uint32_t *)preload_search_info(modptr,
+	    MODINFO_METADATA | MODINFOMD_PHDR);
+	if (modinfo != NULL) {
+		/* Size of metadata; see preload_search_info */
+		*phnum = modinfo[-1] / sizeof(Elf_Phdr);
+		return ((const Elf_Phdr *)modinfo);
+	}
 
 	hdr = (const Elf_Ehdr *)ef->mapbase;
 	if (IS_ELF(*hdr) &&
@@ -560,12 +570,12 @@ ef_create_pcc_caps(elf_file_t ef, const Elf_Phdr *phstart,
 }
 
 static bool
-preload_init_pcc_caps(elf_file_t ef)
+preload_init_pcc_caps(elf_file_t ef, caddr_t modptr)
 {
 	const Elf_Phdr *phdr;
 	size_t phnum;
 
-	phdr = preload_search_phdrs(ef, &phnum);
+	phdr = preload_search_phdrs(ef, &phnum, modptr);
 	if (phdr == NULL)
 		return (true);
 
@@ -672,7 +682,7 @@ link_elf_init(void* arg)
 	ef->address = cheri_address_set(kernel_root_cap, 0);
 	ef->mapbase = cheri_bounds_set(ef->address + KERNBASE,
 	    (ptraddr_t)_end - KERNBASE);
-	if (!preload_init_pcc_caps(ef))
+	if (!preload_init_pcc_caps(ef, preload_kmdp))
 		panic("%s: Can't create PCC caps for kernel", __func__);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
@@ -1184,7 +1194,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	ef->address = cheri_perms_and(ef->address, CHERI_PERMS_KERNEL_CODE |
 	    CHERI_PERMS_KERNEL_DATA);
 	ef->mapbase = ef->address;
-	if (!preload_init_pcc_caps(ef)) {
+	if (!preload_init_pcc_caps(ef, modptr)) {
 		error = ENOEXEC;
 		goto out;
 	}
