@@ -514,11 +514,7 @@ ef_create_pcc_caps(elf_file_t ef, const Elf_Phdr *phstart,
 		}
 	}
 
-	if (ef->npcc_caps == 0)
-		return (true);
-
 	valid = true;
-	ef->lf.flags |= LINKER_FILE_PCC_BOUNDS;
 	i = 0;
 	ef->pcc_caps = mallocarray(ef->npcc_caps, sizeof(*ef->pcc_caps),
 	    M_LINKER, M_WAITOK | M_ZERO);
@@ -2337,9 +2333,7 @@ link_elf_reloc_local(linker_file_t lf)
 		data_cap = cheri_perms_and(ef->mapbase, CHERI_PERMS_KERNEL_DATA);
 		if (init_linker_file_cap_relocs(ef->caprelocs,
 		    (char *)ef->caprelocs + ef->caprelocssize, data_cap,
-		    (ptraddr_t)ef->address,
-		    (lf->flags & LINKER_FILE_PCC_BOUNDS) != 0,
-		    resolve_cap_reloc, ef) != 0)
+		    (ptraddr_t)ef->address, true, resolve_cap_reloc, ef) != 0)
 			return (ENOEXEC);
 	}
 #endif
@@ -2432,31 +2426,6 @@ elf_lookup_ifunc(linker_file_t lf, Elf_Size symidx, int deps __unused,
 	return (ENOENT);
 }
 
-#ifdef __CHERI_PURE_CAPABILITY__
-/*
- * Set LINKER_FILE_PCC_BOUNDS but don't allocate pcc_caps[].
- */
-static void
-preload_check_for_pcc_caps(elf_file_t ef)
-{
-	const Elf_Ehdr *hdr;
-	const Elf_Phdr *phdr, *phlimit;
-
-	if (!have_phdrs(ef))
-		return;
-
-	hdr = (const Elf_Ehdr *)ef->mapbase;
-	phdr = (const Elf_Phdr *)((const char *)hdr + hdr->e_phoff);
-	phlimit = phdr + hdr->e_phnum;
-	for (; phdr < phlimit; phdr++) {
-		if (phdr->p_type == PT_CHERI_PCC) {
-			ef->lf.flags |= LINKER_FILE_PCC_BOUNDS;
-			return;
-		}
-	}
-}
-#endif
-
 void
 link_elf_ireloc(void)
 {
@@ -2484,7 +2453,6 @@ link_elf_ireloc(void)
 	ef->address = cheri_address_set(kernel_root_cap, 0);
 	ef->mapbase = cheri_bounds_set(ef->address + KERNBASE,
 	    (ptraddr_t)_end - KERNBASE);
-	preload_check_for_pcc_caps(ef);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
 	parse_dynamic(ef);

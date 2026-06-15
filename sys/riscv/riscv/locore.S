@@ -398,7 +398,7 @@ va:
 	cincoffset ca1, ca0, t1
 	candperm ca2, cs0, t0
 	mv	a3, zero
-	mv	a4, zero		/* TODO: true for PT_CHERI_PCC */
+	li	a4, 1
 	cllc	ca5, _C_LABEL(kernel_cap_relocs_cb)
 	csetflags ca6, ca5, zero
 	ccall	_C_LABEL(init_linker_file_cap_relocs)
