@@ -42,9 +42,13 @@
 static inline vm_pointer_t
 sf_buf_kva(struct sf_buf *sf)
 {
+	vm_pointer_t va;
 
-	return (cheri_kern_bounds_set(
-	    PHYS_TO_DMAP(VM_PAGE_TO_PHYS((vm_page_t)sf)), PAGE_SIZE));
+	va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS((vm_page_t)sf));
+	va = cheri_kern_bounds_set_exact(va, PAGE_SIZE);
+	va = cheri_kern_perms_clear(va, CHERI_PERM_CAP);
+
+	return (va);
 }
 
 static inline vm_page_t
