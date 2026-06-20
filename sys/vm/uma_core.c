@@ -4160,7 +4160,7 @@ slab_alloc_item(uma_keg_t keg, uma_slab_t slab)
 	if ((keg->uk_flags & UMA_ZONE_PCPU) == 0)
 		item = cheri_bounds_set_exact(item, keg->uk_size);
 #endif
-	item = cheri_kern_andperm(item, ~CHERI_PERM_SW_KMEM);
+	item = cheri_kern_perms_and(item, ~CHERI_PERM_SW_KMEM);
 
 	return (item);
 }
