@@ -237,16 +237,8 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 	if (npagesizes > 1 &&  rtld_round_page(segs[0]->p_filesz) >=
 	    pagesizes[1])
 		base_flags |= MAP_ALIGNED_SUPER;
-	if (base_vaddr != 0) {
-#ifdef __CHERI_PURE_CAPABILITY__
-		_rtld_error(
-		    "%s: Cannot map object at fixed address 0x%lx in CheriABI",
-		    path, base_vaddr);
-		goto error;
-#else
+	if (base_vaddr != 0)
 		base_flags |= MAP_FIXED | MAP_EXCL;
-#endif
-	}
 
 	mapbase = mmap(base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL),
 	    base_flags, -1, 0);
