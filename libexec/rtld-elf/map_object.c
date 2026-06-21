@@ -248,15 +248,9 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 		goto error;
 	}
 	if (base_addr != NULL && mapbase != base_addr) {
-#ifdef __CHERI_PURE_CAPABILITY__
 		_rtld_error(
-		    "%s: mmap returned wrong address: wanted %#p, got %#p",
+		    "%s: mmap returned wrong address: wanted " PTR_FMT ", got " PTR_FMT,
 		    path, base_addr, mapbase);
-#else
-		_rtld_error(
-		    "%s: mmap returned wrong address: wanted %p, got %p",
-		    path, base_addr, mapbase);
-#endif
 		goto error1;
 	}
 	(void)msetname(mapbase, mapsize, "rtld:base_object");
