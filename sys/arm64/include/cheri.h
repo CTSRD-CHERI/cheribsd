@@ -43,17 +43,6 @@
     (void * __capability)READ_SPECIALREG_CAP(rddc_el0))
 #define	__USER_PCC	((void * __capability)curthread->td_frame->tf_elr)
 
-/*
- * Special marker NOPs for the Morello FVP to start / stop region of interest
- * in trace.
- */
-#define	CHERI_START_TRACE	do {					\
-	__asm__ __volatile__("hlt 0xbeef");				\
-} while(0)
-#define	CHERI_STOP_TRACE	do {					\
-	__asm__ __volatile__("hlt 0xbeef");				\
-} while(0)
-
 struct thread;
 
 /* Used to set DDC_EL0 in psci call functions. */
@@ -70,5 +59,37 @@ int		cheri_esr_to_sicode(uint64_t esr);
 const char	*cheri_fsc_string(uint8_t fsc);
 void		cheri_assert_no_store_local(void *cap);
 #endif
+
+/*
+ * Special marker NOPs for the Morello QEMU to start / stop region of interest
+ * in trace.
+ */
+#define	CHERI_START_TRACE	do {					\
+	__asm__ __volatile__("hlt 0xc001");				\
+} while(0)
+
+#define	CHERI_STOP_TRACE	do {					\
+	__asm__ __volatile__("hlt 0xc002");				\
+} while(0)
+
+#define	CHERI_START_USER_TRACE	do {					\
+	__asm__ __volatile__("hlt 0xc006");				\
+} while(0)
+
+#define	CHERI_STOP_USER_TRACE	do {					\
+	__asm__ __volatile__("hlt 0xc007");				\
+} while(0)
+
+#define	QEMU_SET_TRACE_BUFFERED_MODE	do {				\
+	__asm__ __volatile__("hlt 0xc003");				\
+} while(0)
+
+#define	QEMU_CLEAR_TRACE_BUFFERED_MODE	do {				\
+	__asm__ __volatile__("hlt 0xc004");				\
+} while(0)
+
+#define	QEMU_FLUSH_TRACE_BUFFER	do {					\
+	__asm__ __volatile__("hlt 0xc005");				\
+} while(0)
 
 #endif /* _MACHINE_CHERI_H_ */
