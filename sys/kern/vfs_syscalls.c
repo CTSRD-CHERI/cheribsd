@@ -2021,16 +2021,17 @@ sys_unlink(struct thread *td, struct unlink_args *uap)
 
 int
 kern_funlinkat_ex(struct thread *td, int dfd, const char * __capability path,
-    int fd, int flag, enum uio_seg pathseg, ino_t oldinum)
+    int fd, int flags, enum uio_seg pathseg, ino_t oldinum)
 {
 
-	if ((flag & ~(AT_REMOVEDIR | AT_RESOLVE_BENEATH)) != 0)
+	if ((flags & ~(AT_REMOVEDIR | AT_RESOLVE_BENEATH)) != 0)
 		return (EINVAL);
 
-	if ((flag & AT_REMOVEDIR) != 0)
-		return (kern_frmdirat(td, dfd, path, fd, UIO_USERSPACE, 0));
+	if ((flags & AT_REMOVEDIR) != 0)
+		return (kern_frmdirat(td, dfd, path, fd, pathseg,
+		    flags & ~AT_REMOVEDIR));
 
-	return (kern_funlinkat(td, dfd, path, fd, UIO_USERSPACE, 0, 0));
+	return (kern_funlinkat(td, dfd, path, fd, pathseg, flags, 0));
 }
 
 #ifndef _SYS_SYSPROTO_H_
