@@ -218,7 +218,7 @@ syscallret(struct thread *td)
 {
 	struct proc *p;
 	struct syscall_args *sa;
-	ksiginfo_t ksi;
+	ksiginfo_t ksi __attribute__((uninitialized));
 	int traced;
 
 	KASSERT(td->td_errno != ERELOOKUP,
