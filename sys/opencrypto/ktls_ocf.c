@@ -498,12 +498,13 @@ ktls_ocf_tls_cbc_decrypt(struct ktls_session *tls,
 	iov = malloc(iovcnt * sizeof(*iov), M_KTLS_OCF, M_WAITOK);
 	IOVEC_INIT(&iov[0], &ad, sizeof(ad));
 	skip = sizeof(*hdr) + AES_BLOCK_LEN;
-	for (i = 1, n = m; n != NULL; i++, n = n->m_next) {
+	for (i = 1, n = m; n != NULL; n = n->m_next) {
 		if (n->m_len < skip) {
 			skip -= n->m_len;
 			continue;
 		}
 		IOVEC_INIT(&iov[i], mtod(n, char *) + skip, n->m_len - skip);
+		i++;
 		skip = 0;
 	}
 	uio.uio_iov = iov;
