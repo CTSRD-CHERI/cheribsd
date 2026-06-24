@@ -161,6 +161,23 @@ fbt_excluded(const char *name)
 		return (1);
 #endif
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	/*
+	 * The compartmentalization trampoline and its callees cannot be
+	 * instrumented as the probe handling code can be compartmentalized.
+	 * To simplify the assumptions, exclude the entire compartment API.
+	 * This list should be kept in sync with the trampoline code in
+	 * compartment.S and the functions it calls indirectly in
+	 * kern_compartment.c.
+	 */
+	if (strncmp(name, "compartment_", sizeof("compartment_") - 1) == 0 ||
+	    strcmp(name, "spinlock_enter") == 0 ||
+	    strcmp(name, "spinlock_exit") == 0 ||
+	    strncmp(name, "__pcpu_ptr_", sizeof("__pcpu_ptr_") - 1) == 0 ||
+	    strncmp(name, "__dpcpu_ptr_", sizeof("__dpcpu_ptr_") - 1) == 0)
+		return (1);
+#endif
+
 	return (0);
 }
 
