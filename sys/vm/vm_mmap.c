@@ -705,9 +705,12 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		/*
 		 * Mapping blank space is trivial.
 		 */
+		if ((flags & MAP_SHARED) == 0) {
+			prot = VM_PROT_ADD_CAP(prot);
+			max_prot = VM_PROT_ADD_CAP(max_prot);
+		}
 		error = vm_mmap_object(&vms->vm_map, &addr, max_addr, size,
-		    VM_PROT_ADD_CAP(prot), VM_PROT_ADD_CAP(max_prot), flags,
-		    NULL, pos, FALSE, td);
+		    prot, max_prot, flags, NULL, pos, FALSE, td);
 	} else {
 		/*
 		 * Mapping file, get fp for validation and don't let the
