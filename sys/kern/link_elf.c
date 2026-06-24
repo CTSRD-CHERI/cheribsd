@@ -519,16 +519,34 @@ ef_address(elf_file_t ef, ptraddr_t offset)
  * its permissions and bounds.
  */
 static caddr_t
-make_capability(const Elf_Sym *sym, caddr_t val)
+make_capability(elf_file_t ef, const Elf_Sym *sym, caddr_t val)
 {
 	switch (ELF_ST_TYPE(sym->st_info)) {
 	case STT_FUNC:
 	case STT_GNU_IFUNC:
-		val = cheri_perms_and(val, CHERI_PERMS_KERNEL_CODE);
+		val = cheri_perms_and(val,
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+		    CHERI_PERMS_KERNEL_EXECUTIVE_CODE
+#else
+		    CHERI_PERMS_KERNEL_CODE
+#endif
+		    );
 #ifdef CHERI_FLAGS_CAP_MODE
 		val = cheri_flags_set(val, CHERI_FLAGS_CAP_MODE);
 #endif
 		val = cheri_sentry_create(val);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+		if (ef == (elf_file_t)linker_kernel_file) {
+			/*
+			 * Call a kernel-specific variant because
+			 * linker_kernel_file might not exist yet.
+			 */
+			val = (caddr_t)
+			    compartment_entry_for_kernel((uintptr_t)val);
+		} else {
+			val = (caddr_t)compartment_entry((uintptr_t)val);
+		}
+#endif
 		break;
 	default:
 		val = cheri_bounds_set(val, sym->st_size);
@@ -578,7 +596,7 @@ ef_symbol_address(elf_file_t ef, const Elf_Sym *sym)
 	}
 
 	val = cheri_address_set(base, (ptraddr_t)ef->address + sym->st_value);
-	return (make_capability(sym, val));
+	return (make_capability(ef, sym, val));
 #else
 	return (ef_address(ef, sym->st_value));
 #endif
@@ -2969,14 +2987,14 @@ elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, uintptr_t *res)
 	if (elf_set_find(&set_pcpu_list, addr, &start, &base)) {
 		addr = (ptraddr_t)addr - (ptraddr_t)start + base;
 #ifdef __CHERI_PURE_CAPABILITY__
-		addr = make_capability(sym, addr);
+		addr = make_capability(ef, sym, addr);
 #endif
 	}
 #ifdef VIMAGE
 	else if (elf_set_find(&set_vnet_list, addr, &start, &base)) {
 		addr = (ptraddr_t)addr - (ptraddr_t)start + base;
 #ifdef __CHERI_PURE_CAPABILITY__
-		addr = make_capability(sym, addr);
+		addr = make_capability(ef, sym, addr);
 #endif
 	}
 #endif

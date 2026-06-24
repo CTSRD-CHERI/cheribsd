@@ -425,8 +425,8 @@ build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 		if (iskernel) {
 			/*
-			 * We call a kernel-specific variant because
-			 * linker_kernel_file does not exist yet.
+			 * Call a kernel-specific variant because
+			 * linker_kernel_file might not exist yet.
 			 */
 			cap = (uintptr_t)compartment_entry_for_kernel(
 			    (uintptr_t)cap);
@@ -620,28 +620,12 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			__asm__("" : "+r" (addend));
 			addr += addend;
 		}
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-		if ((cheri_getperm(addr) & CHERI_PERM_EXECUTE) != 0) {
-			if (lf == linker_kernel_file) {
-				addr = (uintptr_t)
-				    compartment_entry_for_kernel(addr);
-			} else {
-				addr = (uintptr_t)compartment_entry(addr);
-			}
-		}
-#endif
 		*(uintptr_t *)where = addr;
 		break;
 	case R_MORELLO_JUMP_SLOT:
 		error = lookup(lf, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-		if (lf == linker_kernel_file)
-			addr = (uintptr_t)compartment_entry_for_kernel(addr);
-		else
-			addr = (uintptr_t)compartment_entry(addr);
-#endif
 		*(uintptr_t *)where = addr;
 		break;
 	case R_MORELLO_IRELATIVE:
