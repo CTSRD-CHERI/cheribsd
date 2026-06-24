@@ -93,7 +93,7 @@ void compartment_destroy(struct compartment *compartment);
 void compartment_trampoline_destroy(uintptr_t func);
 void *compartment_entry_for_kernel(uintptr_t func);
 void *compartment_entry(uintptr_t func);
-void *executive_get_function(uintptr_t func);
+void *compartment_target(uintptr_t func);
 
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_COMPARTMENT);
