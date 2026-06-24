@@ -134,9 +134,7 @@ compartment_trampoline_compare(struct compartment_trampoline *a,
 	    (ptraddr_t)b->ct_compartment_func);
 }
 
-RB_HEAD(compartment_tree, compartment_trampoline) compartment_trampolines =
-    RB_INITIALIZER(&compartment_trampolines);
-RB_GENERATE_STATIC(compartment_tree, compartment_trampoline, ct_node,
+RB_GENERATE_STATIC(compartment_trampoline_tree, compartment_trampoline, ct_node,
     compartment_trampoline_compare);
 
 static struct mtx compartment_trampolines_lock;
@@ -363,6 +361,19 @@ SYSINIT(compartment_metadata_init, SI_SUB_KLD, SI_ORDER_FIRST,
     compartment_metadata_init, NULL);
 #endif
 
+void
+compartment_trampoline_tree_remove_all(struct compartment_trampoline_tree *tree)
+{
+	struct compartment_trampoline *tmptrampoline, *trampoline;
+
+	RB_FOREACH_SAFE(trampoline, compartment_trampoline_tree, tree,
+	    tmptrampoline) {
+		RB_REMOVE(compartment_trampoline_tree, tree, trampoline);
+		free(trampoline, M_COMPARTMENT);
+	}
+	KASSERT(RB_EMPTY(tree), ("%s: tree is not empty.", __func__));
+}
+
 u_long
 compartment_id_create(const char *name, uintcap_t base,
     elf_compartment_t elf_compartment)
@@ -531,6 +542,7 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 {
 	struct compartment_trampoline *trampoline, *oldtrampoline;
 	struct compartment_trampoline tmptrampoline;
+	struct compartment_trampoline_tree *tree;
 	uintcap_t dstfunc;
 	u_long dstid;
 
@@ -539,18 +551,16 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	    ("%s: linker file cannot be NULL", __func__));
 
 	elf_compartment_entry(lf, func, &dstid, &dstfunc);
+	tree = elf_compartment_trampoline_tree(lf);
 
 	tmptrampoline.ct_compartment_func = dstfunc;
-	oldtrampoline = RB_FIND(compartment_tree, &compartment_trampolines,
+	oldtrampoline = RB_FIND(compartment_trampoline_tree, tree,
 	    &tmptrampoline);
 	if (oldtrampoline != NULL) {
 		trampoline = oldtrampoline;
 		goto out;
 	}
 
-	/*
-	 * TODO: Free the trampoline.
-	 */
 	if (!early_boot) {
 		trampoline = malloc_exec(size, M_COMPARTMENT, M_NOWAIT |
 		    M_USE_RESERVE | M_ZERO);
@@ -579,18 +589,13 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	if (!early_boot) {
 		cpu_dcache_wb_range(trampoline, (vm_size_t)size);
 		cpu_icache_sync_range(trampoline, (vm_size_t)size);
-
-		mtx_lock(&compartment_trampolines_lock);
 	}
 
-	oldtrampoline = RB_INSERT(compartment_tree, &compartment_trampolines,
+	oldtrampoline = RB_INSERT(compartment_trampoline_tree, tree,
 	    trampoline);
 	KASSERT(oldtrampoline == NULL,
 	    ("Trampoline for 0x%#lp already exists",
 	    (void *)trampoline->ct_compartment_func));
-
-	if (!early_boot)
-		mtx_unlock(&compartment_trampolines_lock);
 
 out:
 	/*

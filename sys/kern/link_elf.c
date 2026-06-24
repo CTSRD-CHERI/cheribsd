@@ -211,6 +211,7 @@ struct elf_file {
 	struct elf_compartment defcompartment;
 	unsigned int	ncompartments;
 	struct elf_compartment *compartments;
+	struct compartment_trampoline_tree compartment_trampolines;
 #endif
 };
 
@@ -877,6 +878,7 @@ elf_init(void *relocbase, ptraddr_t baseend, caddr_t mdp __unused)
 #endif
 		    );
 	}
+	RB_INIT(&ef->compartment_trampolines);
 #endif
 	if (error != 0) {
 		panic("%s: Can't initialize the kernel ELF file", __func__);
@@ -2346,6 +2348,15 @@ elf_compartment_entry(linker_file_t lf, uintcap_t ptr, u_long *idp,
 	cap = cheri_sealentry(cap);
 	*ptrp = (uintptr_t)cap;
 }
+
+struct compartment_trampoline_tree *
+elf_compartment_trampoline_tree(linker_file_t lf)
+{
+	elf_file_t ef;
+
+	ef = (elf_file_t)lf;
+	return (&ef->compartment_trampolines);
+}
 #endif
 
 Elf_Addr
@@ -2408,6 +2419,7 @@ link_elf_unload_file(linker_file_t file)
 	elf_cpu_unload_file(file);
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	compartment_trampoline_tree_remove_all(&ef->compartment_trampolines);
 	free(ef->compartments, M_LINKER);
 	free(ef->pccs, M_LINKER);
 #endif

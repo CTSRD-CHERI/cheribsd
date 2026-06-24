@@ -66,6 +66,7 @@ struct compartment {
 };
 
 STAILQ_HEAD(compartment_list, compartment);
+RB_HEAD(compartment_trampoline_tree, compartment_trampoline);
 
 extern struct compartment compartments0[KERNEL_MAXC18NS];
 
@@ -74,6 +75,9 @@ extern u_long compartment_lastid;
 void compartment_metadata_create(u_long id, const char *name, uintcap_t base,
     elf_compartment_t elf_compartment);
 void compartment_metadata_insert(struct compartment *compartment);
+
+void compartment_trampoline_tree_remove_all(
+    struct compartment_trampoline_tree *tree);
 
 void compartment_cpu_cache_fill(u_int cpuid);
 
