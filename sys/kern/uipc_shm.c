@@ -328,6 +328,7 @@ static void
 shm_largepage_phys_ctor(vm_object_t object, vm_prot_t prot,
     vm_ooffset_t foff, struct ucred *cred)
 {
+	object->flags |= OBJ_PG_DTOR;
 }
 
 static void
@@ -335,16 +336,32 @@ shm_largepage_phys_dtor(vm_object_t object)
 {
 	int psind;
 
+	VM_OBJECT_WLOCK(object);
 	psind = object->un_pager.phys.data_val;
 	if (psind != 0) {
+		struct pctrie_iter pages;
+		vm_page_t m;
+		bool removed __diagused;
+
+		vm_page_iter_init(&pages, object);
+restart:
+		VM_RADIX_FOREACH(m, &pages) {
+			if (!vm_page_busy_acquire(m, VM_ALLOC_WAITFAIL)) {
+				pctrie_iter_reset(&pages);
+				goto restart;
+			}
+			removed = vm_page_iter_remove(&pages, m);
+			KASSERT(!removed, ("%s: page %p not wired", __func__, m));
+			vm_page_unwire(m, PQ_NONE);
+		}
 		atomic_subtract_long(&count_largepages[psind],
 		    object->size / (pagesizes[psind] / PAGE_SIZE));
-		vm_wire_sub(object->size);
 	} else {
 		KASSERT(object->size == 0,
 		    ("largepage phys obj %p not initialized bit size %#jx > 0",
 		    object, (uintmax_t)object->size));
 	}
+	VM_OBJECT_WUNLOCK(object);
 }
 
 static const struct phys_pager_ops shm_largepage_phys_ops = {
@@ -823,7 +840,7 @@ shm_dotruncate_largepage(struct shmfd *shmfd, off_t length, void *rl_cookie)
 	if ((shmfd->shm_seals & F_SEAL_GROW) != 0)
 		return (EPERM);
 
-	aflags = VM_ALLOC_NORMAL | VM_ALLOC_ZERO;
+	aflags = VM_ALLOC_NORMAL | VM_ALLOC_ZERO | VM_ALLOC_WIRED;
 	if (shmfd->shm_lp_alloc_policy == SHM_LARGEPAGE_ALLOC_NOWAIT)
 		aflags |= VM_ALLOC_WAITFAIL;
 	try = 0;
@@ -871,7 +888,6 @@ shm_dotruncate_largepage(struct shmfd *shmfd, off_t length, void *rl_cookie)
 		object->size += OFF_TO_IDX(pagesizes[psind]);
 		shmfd->shm_size += pagesizes[psind];
 		atomic_add_long(&count_largepages[psind], 1);
-		vm_wire_add(atop(pagesizes[psind]));
 	}
 	return (0);
 }
