@@ -32,6 +32,7 @@
 #include <sys/param.h>
 
 #include <sys/dtrace.h>
+#include <sys/compartment.h>
 
 #include "fbt.h"
 
@@ -120,7 +121,12 @@ fbt_unseal_symval(linker_symval_t *sym)
 	extern void * __capability sentry_unsealcap;
 	uintcap_t val;
 
-	val = cheri_unseal((uintcap_t)sym->value, sentry_unsealcap);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	val = (uintcap_t)compartment_target((uintptr_t)sym->value);
+#else
+	val = (uintcap_t)sym->value;
+#endif
+	val = cheri_unseal(val, sentry_unsealcap);
 	val = cheri_perms_and(val, CHERI_PERM_LOAD);
 	return (val);
 }
@@ -149,8 +155,10 @@ fbt_provide_module_function(linker_file_t lf, int symindx,
 	 * Instrumenting certain exception handling functions can lead to FBT
 	 * recursion, so exclude from instrumentation.
 	 */
-	 if (strcmp(name, "handle_el1h_sync") == 0 ||
-	    strcmp(name, "do_el1h_sync") == 0)
+	if (strcmp(name, "handle_el1h_sync") == 0 ||
+	    strcmp(name, "do_el1h_sync") == 0 ||
+	    strcmp(name, "handle_el1t_sync") == 0 ||
+	    strcmp(name, "do_el1t_sync") == 0)
 		return (0);
 
 #ifdef __CHERI_PURE_CAPABILITY__

@@ -30,6 +30,8 @@
 #include <machine/asm.h>
 #include <machine/armreg.h>
 #include <machine/cherireg.h>
+#include <machine/param.h>
+#include <machine/vmparam.h>
 
 #include "assym.inc"
 #include <sys/intr.h>
@@ -110,15 +112,26 @@
 .endif
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	mrs	CAP(0), rcsp_el0
-#endif
 
 .if \el == 1
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mov	CAP(0), csp
+	mov	CAP(1), csp
+#else
+	/*
+	 * Skip the stack pointer updating if rcsp_el0 is not set to a
+	 * kernel-space address because we took an exception from EL1 to EL1
+	 * whilst handling an exception from EL0 and EL1.
+	 */
+	ldr	x1, =VM_MIN_KERNEL_ADDRESS
+	gcbase	x2, CAP(0)
+	cmp	x2, x1
+	b.lo	1f
+	/*
+	 * Allocate space for the instruction emulation in DTrace.
+	 */
+	sub	CAP(1), CAP(0), #(TF_SIZE - TF_X + 128)
 #endif
-
 	/*
 	 * Update the stack pointer of an interrupted compartment.
 	 *
@@ -126,17 +139,15 @@
 	 * interrupted. We must update the stack pointer here to make sure that
 	 * it uses a valid stack pointer.
 	 */
-	gclim	x1, CAP(0)
-	scvalue	CAP(1), CAP(0), x1
-	str	CAP(0), [CAP(1), #-CAP_WIDTH]
+	gclim	x2, CAP(1)
+	scvalue	CAP(2), CAP(1), x2
+	str	CAP(1), [CAP(2), #-CAP_WIDTH]
+1:
 .endif
 
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mrs	CAP(0), rcsp_el0
-#endif
-
 	/*
-	 * Stash the compartment's stack pointer.
+	 * Stash the compartment's restricted registers' contents, including
+	 * the unmodified restricted stack pointer.
 	 */
 	mrs	CAP(1), rddc_el0
 	mrs	CAP(2), rctpidr_el0
@@ -277,6 +288,21 @@
 #if __has_feature(capabilities)
 	msr	ddc_el0, c9
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+.if \el == 1
+	/*
+	 * Skip the stack pointer updating if not needed (see save_registers).
+	 * Otherwise, restore the value before any modifications.
+	 */
+	ldr	x10, =VM_MIN_KERNEL_ADDRESS
+	gcbase	x11, c14
+	cmp	x11, x10
+	b.lo	1f
+	gclim	x11, c14
+	scvalue	c11, c14, x11
+	str	c14, [c11, #-CAP_WIDTH]
+1:
+.endif
+
 	msr	rcsp_el0, c14
 	msr	rddc_el0, c15
 	msr	rctpidr_el0, c16
