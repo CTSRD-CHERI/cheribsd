@@ -161,6 +161,21 @@ fbt_excluded(const char *name)
 		return (1);
 #endif
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	/*
+	 * The compartment ABI and its callees cannot be instrumented. They can
+	 * be called by a probe if the probe's callees are in different
+	 * compartments.
+	 *
+	 * XXXKW: This list is incomplete and currently there is no way to
+	 * reliably complete it. The trampolines use mutex(9) that pulls many
+	 * dependencies that we must get rid off. Before then, profiling fbt:::
+	 * will not work.
+	 */
+	if (strncmp(name, "compartment_", sizeof("compartment_") - 1) == 0)
+		return (1);
+#endif
+
 	return (0);
 }
 
