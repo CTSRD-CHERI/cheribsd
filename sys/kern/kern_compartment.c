@@ -673,7 +673,7 @@ compartment_entry(uintptr_t func)
 }
 
 void *
-executive_get_function(uintptr_t func)
+compartment_target(uintptr_t func)
 {
 	struct compartment_trampoline *trampoline;
 
@@ -686,8 +686,6 @@ executive_get_function(uintptr_t func)
 	    func & ~0x1);
 	trampoline = __containerof((char (*)[])trampoline,
 	    struct compartment_trampoline, ct_code);
-	KASSERT(trampoline->ct_type == TRAMPOLINE_TYPE_EXECUTIVE_ENTRY,
-	    ("Invalid trampoline type"));
 
 	return ((void *)trampoline->ct_compartment_func);
 }
