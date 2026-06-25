@@ -80,6 +80,12 @@
 	li		\tmp, CHERI_PERMS_KERNEL_DATA
 	candperm	CAP(\rd), CAP(\rs), \tmp
 .endmacro
+
+.macro set_code_perm rd rs tmp
+	/* xcheri */
+	li		\tmp, CHERI_PERMS_KERNEL_CODE
+	candperm	CAP(\rd), CAP(\rs), \tmp
+.endmacro
 #endif
 
 /*
@@ -384,6 +390,7 @@ va:
 	mv	a3, zero
 	LLA_PTR	a4, _C_LABEL(kernel_cap_relocs_cb)
 	set_cap_mode    a5 a4 0
+	call	_C_LABEL(init_linker_file_cap_relocs)
 
 	/* Initialize capabilities. */
 	MV_PTR	a0, s0
@@ -396,6 +403,11 @@ va:
 	sd	s4, RISCV_BOOTPARAMS_DTBP_PHYS(sp)
 	S_PTR	s3, RISCV_BOOTPARAMS_MODULEP(sp)
 
+	/* Enforce exec permissions on PCC */
+	LLA_PTR	t1, 1f
+	set_code_perm	t1 t1 t0
+	jr	t1
+1:
 	/* Discard omnipotent cs0. */
 	MV_PTR	s0, zero
 
@@ -589,6 +601,7 @@ mpva:
 	ybndsrw	t1, t1, t2
 	LLA_PTR	t0, 1f
 	yaddrw	t1, t1, t0
+	set_code_perm	t1 t1 t0
 	jr	t1
 1:
 #endif
