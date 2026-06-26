@@ -318,6 +318,8 @@ extern void *		preload_fetch_addr(caddr_t _mod);
 extern size_t		preload_fetch_size(caddr_t _mod);
 extern caddr_t		preload_search_by_name(const char *_name);
 extern caddr_t		preload_search_by_type(const char *_type);
+extern caddr_t		preload_search_by_type_early(caddr_t _mdp,
+			    const char *_type);
 extern caddr_t		preload_search_next_name(caddr_t _base);
 extern caddr_t		preload_search_info(caddr_t _mod, int _inf);
 extern void		preload_initkmdp(bool _fatal);
