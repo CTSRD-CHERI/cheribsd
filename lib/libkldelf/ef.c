@@ -43,7 +43,6 @@
 
 #include "kldelf.h"
 
-#define	MAXSEGS 16
 struct ef_file {
 	char		*ef_name;
 	struct elf_file *ef_efile;
@@ -59,7 +58,8 @@ struct ef_file {
 	long		ef_strsz;
 	GElf_Sym	*ef_symtab;
 	int		ef_nsegs;
-	GElf_Phdr	*ef_segs[MAXSEGS];
+	int		ef_maxsegs;
+	GElf_Phdr	**ef_segs;
 	int		ef_verbose;
 	GElf_Rel	*ef_rel;		/* relocation table */
 	long		ef_relsz;		/* number of entries */
@@ -652,8 +652,19 @@ ef_open(struct elf_file *efile, int verbose)
 			ef_print_phdr(phdr);
 		switch (phdr->p_type) {
 		case PT_LOAD:
-			if (nsegs < MAXSEGS)
-				ef->ef_segs[nsegs] = phdr;
+			if (nsegs == ef->ef_maxsegs) {
+				if (ef->ef_maxsegs == 0)
+					ef->ef_maxsegs = 16;
+				else
+					ef->ef_maxsegs *= 2;
+				ef->ef_segs = realloc(ef->ef_segs,
+				    ef->ef_maxsegs * sizeof(*ef->ef_segs));
+				if (ef->ef_segs == NULL) {
+					error = errno;
+					goto out;
+				}
+			}
+			ef->ef_segs[nsegs] = phdr;
 			nsegs++;
 			break;
 		case PT_PHDR:
@@ -671,10 +682,6 @@ ef_open(struct elf_file *efile, int verbose)
 		goto out;
 	}
 
-	if (nsegs > MAXSEGS) {
-		warnx("%s: too many segments", ef->ef_name);
-		goto out;
-	}
 	ef->ef_nsegs = nsegs;
 
 	error = ef_parse_dynamic(ef, phdyn);
@@ -690,6 +697,7 @@ ef_close(elf_file_t ef)
 	free(ef->ef_capreloc);
 	free(ef->ef_rela);
 	free(ef->ef_rel);
+	free(ef->ef_segs);
 	free(ef->ef_strtab);
 	free(ef->ef_symtab);
 	free(ef->ef_hashtab);
