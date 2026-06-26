@@ -1,0 +1,4 @@
+include	"GENERIC-MORELLO-MFS-ROOT"
+include	"std.nodebug"
+
+ident	GENERIC-MORELLO-MFS-ROOT-NODEBUG
