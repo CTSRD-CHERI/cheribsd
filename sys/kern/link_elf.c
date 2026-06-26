@@ -267,14 +267,15 @@ static void	link_elf_propagate_vnets(linker_file_t);
 static unsigned long elf_plt_count(elf_file_t ef);
 static void	elf_plt_create(elf_file_t ef);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-static bool	link_elf_init_compartments(linker_file_t lf, Elf_Phdr *phtable,
-		    Elf_Phdr *phlimit, u_long *lastidp);
-static bool	link_elf_load_compartments(linker_file_t lf, Elf_Phdr *phtable,
-		    Elf_Phdr *phlimit);
-static bool	link_elf_init_pccs(linker_file_t lf, Elf_Phdr *phtable, Elf_Phdr
-		    *phlimit);
-static bool	link_elf_load_pccs(linker_file_t lf, Elf_Phdr *phtable, Elf_Phdr
-		    *phlimit);
+static bool	link_elf_init_compartments(linker_file_t lf,
+		    const Elf_Phdr *phtable, const Elf_Phdr *phlimit,
+		    u_long *lastidp);
+static bool	link_elf_load_compartments(linker_file_t lf,
+		    const Elf_Phdr *phtable, const Elf_Phdr *phlimit);
+static bool	link_elf_init_pccs(linker_file_t lf, const Elf_Phdr *phtable,
+		    const Elf_Phdr *phlimit);
+static bool	link_elf_load_pccs(linker_file_t lf, const Elf_Phdr *phtable,
+		    const Elf_Phdr *phlimit);
 static void	elf_compartment_init(elf_compartment_t ec, elf_file_t ef,
 		    u_long id, const char *filename, const char *c18nname,
 		    caddr_t address, size_t size, elf_pcc_t pcc, elf_plt_t plt);
@@ -743,8 +744,8 @@ elf_init(elf_file_t ef, Elf_Dyn *dynp, void *relocbase, ptraddr_t baseend,
 {
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	linker_file_t lf;
-	Elf_Ehdr *hdr;
-	Elf_Phdr *phlimit, *phdr, *phtable;
+	const Elf_Ehdr *hdr;
+	const Elf_Phdr *phlimit, *phdr, *phtable;
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
 	void *code_cap, *data_cap;
@@ -783,8 +784,8 @@ elf_init(elf_file_t ef, Elf_Dyn *dynp, void *relocbase, ptraddr_t baseend,
 	if (error == 0)
 		error = parse_dynamic(ef);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	hdr = (Elf_Ehdr *)cheri_setaddress(ef->address, KERNBASE);
-	phtable = (Elf_Phdr *)cheri_setaddress(ef->address, KERNBASE +
+	hdr = (const Elf_Ehdr *)cheri_setaddress(ef->address, KERNBASE);
+	phtable = (const Elf_Phdr *)cheri_setaddress(ef->address, KERNBASE +
 	    hdr->e_phoff);
 	phlimit = phtable + hdr->e_phnum;
 	ef->ncompartments = 0;
@@ -1432,8 +1433,8 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	Elf_Addr *ctors_addrp;
 	Elf_Size *ctors_sizep;
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	Elf_Ehdr *hdr;
-	Elf_Phdr *phdr, *phlimit, *phtable;
+	const Elf_Ehdr *hdr;
+	const Elf_Phdr *phdr, *phlimit, *phtable;
 #endif
 	caddr_t modptr, baseptr, sizeptr, dynptr;
 	char *type;
@@ -1504,8 +1505,8 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	elf_plt_create(ef);
 	error = parse_dynamic(ef);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	hdr = (Elf_Ehdr *)ef->address;
-	phtable = (Elf_Phdr *)(ef->address + hdr->e_phoff);
+	hdr = (const Elf_Ehdr *)ef->address;
+	phtable = (const Elf_Phdr *)(ef->address + hdr->e_phoff);
 	phlimit = phtable + hdr->e_phnum;
 	ef->ncompartments = 0;
 	ef->npccs = 0;
@@ -1623,10 +1624,10 @@ link_elf_find_compartment_plt(linker_file_t lf, ptraddr_t base, size_t length)
 }
 
 static bool
-link_elf_init_compartments(linker_file_t lf, Elf_Phdr *phtable,
-    Elf_Phdr *phlimit, u_long *lastidp)
+link_elf_init_compartments(linker_file_t lf, const Elf_Phdr *phtable,
+    const Elf_Phdr *phlimit, u_long *lastidp)
 {
-	Elf_Phdr *phdr;
+	const Elf_Phdr *phdr;
 	elf_file_t ef;
 	unsigned int compartmentii;
 	elf_pcc_t pcc;
@@ -1670,8 +1671,8 @@ link_elf_init_compartments(linker_file_t lf, Elf_Phdr *phtable,
 }
 
 static bool
-link_elf_load_compartments(linker_file_t lf, Elf_Phdr *phtable,
-    Elf_Phdr *phlimit)
+link_elf_load_compartments(linker_file_t lf, const Elf_Phdr *phtable,
+    const Elf_Phdr *phlimit)
 {
 	elf_file_t ef;
 
@@ -1725,9 +1726,10 @@ link_elf_create_compartments(linker_file_t lf, struct thread *td)
 }
 
 static bool
-link_elf_init_pccs(linker_file_t lf, Elf_Phdr *phtable, Elf_Phdr *phlimit)
+link_elf_init_pccs(linker_file_t lf, const Elf_Phdr *phtable,
+    const Elf_Phdr *phlimit)
 {
-	Elf_Phdr *phdr;
+	const Elf_Phdr *phdr;
 	elf_file_t ef;
 	unsigned int pccii;
 
@@ -1749,7 +1751,8 @@ link_elf_init_pccs(linker_file_t lf, Elf_Phdr *phtable, Elf_Phdr *phlimit)
 }
 
 static bool
-link_elf_load_pccs(linker_file_t lf, Elf_Phdr *phtable, Elf_Phdr *phlimit)
+link_elf_load_pccs(linker_file_t lf, const Elf_Phdr *phtable,
+    const Elf_Phdr *phlimit)
 {
 	elf_file_t ef;
 
