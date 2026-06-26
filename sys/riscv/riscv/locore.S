@@ -401,6 +401,7 @@ va:
 	 */
 	cmove	ca0, cs0
 
+	cmove	ca2, cs3
 	cllc	cra, _C_LABEL(elf_init)
 	cjalr	cra
 
@@ -449,6 +450,7 @@ va:
 	 */
 	mv	a0, zero
 	la	a1, _C_LABEL(_end)
+	mv	a2, s3
 	call	_C_LABEL(elf_init)
 
 #if __has_feature(capabilities)

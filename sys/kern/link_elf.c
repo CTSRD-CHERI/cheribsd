@@ -739,7 +739,7 @@ SYSCTL_ULONG(_kern, OID_AUTO, relbase_address, CTLFLAG_RD,
 	&kern_relbase, 0, "Kernel relocated base address");
 
 void
-elf_init(void *relocbase, ptraddr_t baseend)
+elf_init(void *relocbase, ptraddr_t baseend, caddr_t mdp __unused)
 {
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	linker_file_t lf;
