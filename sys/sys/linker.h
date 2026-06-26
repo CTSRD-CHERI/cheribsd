@@ -345,7 +345,7 @@ extern int kld_debug;
 typedef int elf_lookup_fn(linker_file_t, Elf_Size, int, uintptr_t *);
 
 /* Support functions */
-void	elf_init(void *relocbase, ptraddr_t baseend);
+void	elf_init(void *relocbase, ptraddr_t baseend, caddr_t mdp);
 void	elf_init_data(void);
 bool	elf_is_ifunc_reloc(Elf_Size r_info);
 int	elf_reloc(linker_file_t _lf, char *base, const void *_rel, int _type,

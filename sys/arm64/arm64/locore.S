@@ -299,19 +299,19 @@ virtdone:
 #endif
 
 	/* Prepare a value for arm64_bootparams.modulep. */
-	mov	x19, x0
+	mov	x20, x0
 #ifdef __CHERI_PURE_CAPABILITY__
 	/*
 	 * Convert modulep into a capability
 	 * XXX-AM: can we set bounds on this?
 	 */
-	cvtd	c19, x0
+	cvtd	c20, x0
 #endif
 
 	sub	PTRN(sp), PTRN(sp), #BOOTPARAMS_SIZE
 	mov	PTR(0), PTRN(sp)
 
-	str	PTR(19), [PTR(0), #BP_MODULEP]
+	str	PTR(20), [PTR(0), #BP_MODULEP]
 	str	PTR(25), [PTR(0), #BP_KERN_STACK]
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	str	PTR(26), [PTR(0), #BP_COMPARTMENTS0_STACKS]
@@ -345,6 +345,8 @@ virtdone:
 #else
 	ldr	x1, =_end
 #endif
+
+	mov	PTR(2), PTR(20)
 
 	bl	elf_init
 
