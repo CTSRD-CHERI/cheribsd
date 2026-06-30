@@ -39,7 +39,7 @@ struct hwc_methods {
 };
 
 struct hwc_backend {
-	const char * __capability name;
+	const char * __kerncap name;
 	const char *fullname;
 	struct hwc_methods *methods;
 };
