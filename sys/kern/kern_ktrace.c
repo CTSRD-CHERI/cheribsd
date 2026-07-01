@@ -67,10 +67,6 @@
 
 #include <machine/stdarg.h>
 
-#ifdef CPU_CHERI
-#include <machine/pcb.h>
-#endif
-
 #include <security/mac/mac_framework.h>
 
 /*
