@@ -255,8 +255,8 @@ preload_search_info(caddr_t mod, int inf)
 	 * data.
 	 */
 	if (hdr[0] == inf)
-	    return (cheri_kern_bounds_set(curp + (sizeof(uint32_t) * 2),
-	        hdr[1]));
+	    return (cheri_kern_bounds_set(curp, hdr[1] + sizeof(uint32_t) * 2)
+		+ sizeof(uint32_t) * 2);
 
 	/* skip to next field */
 	next = sizeof(uint32_t) * 2 + hdr[1];
@@ -506,6 +506,9 @@ preload_modinfo_type(struct sbuf *sbp, int type)
 		sbuf_cat(sbp, "MODINFOMD_SPLASH");
 		break;
 #endif
+	case MODINFOMD_PHDR:
+		sbuf_cat(sbp, "MODINFOMD_PHDR");
+		break;
 #ifdef MODINFOMD_BOOT_HARTID
 	case MODINFOMD_BOOT_HARTID:
 		sbuf_cat(sbp, "MODINFOMD_BOOT_HARTID");
@@ -583,6 +586,7 @@ preload_modinfo_value(struct sbuf *sbp, uint32_t *bptr, int type, int len)
 #ifdef MODINFOMD_EFI_MAP
 	case MODINFO_METADATA | MODINFOMD_EFI_MAP:
 #endif
+	case MODINFO_METADATA | MODINFOMD_PHDR:
 		/* Don't print data buffers. */
 		sbuf_cat(sbp, "buffer contents omitted");
 		break;

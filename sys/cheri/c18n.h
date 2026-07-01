@@ -98,15 +98,17 @@ struct cheri_c18n_info {
 
 /*
  * The interface provided by the kernel via sysctl for compartmentalization
- * monitoring tools such as procstat.
+ * monitoring tools such as procstat and vmstat.
  */
 #define	CHERI_C18N_COMPART_MAXNAME	(PATH_MAX + NAME_MAX + 2)
 
+/*
+ * The last fields of kinfo_cheri_{,k}c18n_compart structures may be truncated.
+ * The *_structsize fields contains the actual aligned size of the current
+ * object.
+ */
+
 struct kinfo_cheri_c18n_compart {
-	/*
-	 * The last field of this struct may be truncated. This field contains
-	 * the actual aligned size of the current object.
-	 */
 	size_t		kccc_structsize;
 	size_t		kccc_id;
 	uint8_t		kccc_dlopened_explicitly : 1;

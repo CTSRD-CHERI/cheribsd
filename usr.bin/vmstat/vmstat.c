@@ -1579,17 +1579,6 @@ display_object(struct kinfo_vmobject *kvo)
 }
 
 static void
-display_compartment(struct kinfo_cheri_kc18n_compart *kckc)
-{
-
-	xo_open_instance("compartment");
-	xo_emit("{:id/%5ju} ", (uintmax_t)kckc->kckc_id);
-	xo_emit("{:flags/%s} ", kckc->kckc_executive ? "E" : "-");
-	xo_emit("{:name/%-s}\n", kckc->kckc_name);
-	xo_close_instance("compartment");
-}
-
-static void
 doobjstat(void)
 {
 	struct kinfo_vmobject *kvo;
@@ -1610,17 +1599,27 @@ doobjstat(void)
 }
 
 static void
+display_compartment(struct kinfo_cheri_kc18n_compart *kckc)
+{
+	xo_open_instance("compartment");
+	xo_emit("{:id/%5ju} ", (uintmax_t)kckc->kckc_id);
+	xo_emit("{:flags/%5s} ", kckc->kckc_executive ? "E" : "-");
+	xo_emit("{:name/%-s}\n", kckc->kckc_name);
+	xo_close_instance("compartment");
+}
+
+static void
 docompartments(void)
 {
 	struct kinfo_cheri_kc18n_compart *kckc;
 	int cnt, i;
 
-	kckc = kinfo_getcheri_kc18n_compart(&cnt);
+	kckc = kinfo_getcompartments(&cnt);
 	if (kckc == NULL) {
 		xo_warn("Failed to fetch kernel compartments list");
 		return;
 	}
-	xo_emit("{T:ID/%s} {T:FLAGS/%s} {T:NAME/%s}\n");
+	xo_emit("{T:ID/%5s} {T:FLAGS/%5s} {T:NAME/%s}\n");
 	xo_open_list("compartment");
 	for (i = 0; i < cnt; i++)
 		display_compartment(&kckc[i]);

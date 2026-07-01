@@ -58,7 +58,15 @@ struct dbreg {
 	int dummy;
 };
 
-#if __has_feature(capabilities)
+#if !__has_feature(capabilities)
+struct __chericap {
+	__uint64_t	addr;
+	__uint64_t	meta;
+} __aligned(16);
+
+#define	__uintcap_t	struct __chericap
+#endif
+
 struct capreg {
 	__uintcap_t cra;		/* return address */
 	__uintcap_t csp;		/* stack pointer */
@@ -72,6 +80,11 @@ struct capreg {
 	__uint64_t tagmask;
 	__uint64_t pad;
 };
+
+#if !__has_feature(capabilities)
+#undef	__uintcap_t
 #endif
+
+#define	__HAVE_CAPREG
 
 #endif /* !_MACHINE_REG_H_ */

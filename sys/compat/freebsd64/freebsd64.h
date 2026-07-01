@@ -173,6 +173,26 @@ struct kinfo_sigtramp64 {
 	uint64_t ksigtramp_spare[4];
 };
 
+#if defined(_WANT_KEVENT64) || (defined(_KERNEL) && __has_feature(capabilities))
+struct kinfo_knote64 {
+	int		knt_kq_fd;
+	struct kevent64	knt_event;
+	int		knt_status;
+	int		knt_extdata;
+	uint64_t	knt_spare0[4];
+	union {
+		struct {
+			int		knt_vnode_type;
+			uint64_t	knt_vnode_fsid;
+			uint64_t	knt_vnode_fileid;
+			char		knt_vnode_fullpath[PATH_MAX];
+		} knt_vnode;
+		struct {
+			ino_t		knt_pipe_ino;
+		} knt_pipe;
+	};
+};
+#endif
 
 struct kld_file_stat64 {
     int		version;	/* set to sizeof(struct kld_file_stat64) */
