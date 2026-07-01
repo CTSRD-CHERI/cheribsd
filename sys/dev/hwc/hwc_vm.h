@@ -31,11 +31,12 @@
 
 struct hwc_vm {
 	vm_object_t			obj;
-	struct cdev			*cdev;
 	struct hwc_context		*ctx;
+	int				fd;
+	struct file			*fp;
 };
 
-int hwc_vm_alloc(size_t bufsize, int kva_req, char *path, struct hwc_vm **vm0);
+int hwc_vm_alloc(size_t bufsize, int kva_req, struct hwc_vm **vm0);
 void hwc_vm_free(struct hwc_vm *vm);
 
 #endif /* !_DEV_HWC_HWC_VM_H_ */

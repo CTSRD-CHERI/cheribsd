@@ -51,7 +51,6 @@ struct hwc_context {
 	cpuset_t cpu_map;
 	int fd;
 	int attach;
-	int ident;
 	char *config_file;
 	char *output_file;
 	int mode;

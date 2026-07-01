@@ -36,7 +36,10 @@
 #define _SYS_HWC_H_
 
 #define	HWC_MAGIC		0x42
-#define	HWC_IOC_ALLOC		_IOW(HWC_MAGIC, 0x00, struct hwc_alloc)
+#define	HWC_IOC_ALLOC		_IOWR(HWC_MAGIC, 0x00, struct hwc_alloc)
+#ifdef COMPAT_FREEBSD64
+#define	HWC_IOC_ALLOC64		_IOWR(HWC_MAGIC, 0x00, struct hwc_alloc64)
+#endif
 #define	HWC_IOC_CONFIGURE	_IOW(HWC_MAGIC, 0x01, struct hwc_configure)
 #define	HWC_IOC_START		_IOW(HWC_MAGIC, 0x02, struct hwc_start)
 #define	HWC_IOC_STOP		_IOW(HWC_MAGIC, 0x03, struct hwc_stop)
@@ -48,36 +51,34 @@
 #ifdef COMPAT_FREEBSD64
 struct hwc_alloc64 {
 	int		mode;
-	pid_t		pid;		/* thread mode */
+	pid_t		pid;	/* thread mode */
 	uint64_t	backend_name;
-	size_t		backend_name_len;
-	uint64_t	ident;
-} __aligned(16);
+	int		fd;	/* return fd */
+};
 #endif
 
 struct hwc_alloc {
 	int		mode;
-	pid_t		pid;		/* thread mode */
+	pid_t		pid;	/* thread mode */
 	const char	* __kerncap backend_name;
-	size_t		backend_name_len;
-	int		* __capability ident;
-} __aligned(16);
+	int		fd;	/* return fd */
+};
 
 struct hwc_configure {
 	int		event_id;
 	int		counter_id;
 	int		flags;
-} __aligned(16);
+};
 
 struct hwc_start {
 	int		counter_mask;
 	int		flags;
 	int		data;
-} __aligned(16);
+};
 
 struct hwc_stop {
 	int		counter_mask;
 	int		flags;
-} __aligned(16);
+};
 
 #endif /* !_SYS_HWC_H_ */
