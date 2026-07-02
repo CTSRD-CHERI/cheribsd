@@ -1908,7 +1908,6 @@ pmap_init_multiple_tlbi(void *dummy __unused)
 		 * ARM Cortex-X3 erratum 4193786
 		 * ARM Cortex-X4 erratum 4118414
 		 * ARM Cortex-X925 erratum 4193781
-		 * ARM Morello (based on Neoverse-N1)
 		 * ARM Neoverse-N1 erratum 4193800
 		 * ARM Neoverse-N2 erratum 4193789
 		 * ARM Neoverse-V1 erratum 4193790
@@ -1934,7 +1933,6 @@ pmap_init_multiple_tlbi(void *dummy __unused)
 			case CPU_PART_CORTEX_X3:
 			case CPU_PART_CORTEX_X4:
 			case CPU_PART_CORTEX_X925:
-			case CPU_PART_MORELLO:
 			case CPU_PART_NEOVERSE_N1:
 			case CPU_PART_NEOVERSE_N2:
 			case CPU_PART_NEOVERSE_V1:
@@ -1944,6 +1942,15 @@ pmap_init_multiple_tlbi(void *dummy __unused)
 				pmap_multiple_tlbi = true;
 				return;
 			}
+		}
+
+		/*
+		 * ARM Morello (based on Neoverse-N1)
+		 */
+		if (CPU_IMPL(midr) == CPU_IMPL_RESEARCH &&
+		    CPU_PART(midr) == CPU_PART_MORELLO) {
+			pmap_multiple_tlbi = true;
+			return;
 		}
 	}
 }
