@@ -180,7 +180,18 @@ out:
 
 #define	EFI_STAGING_2M_ALIGN	1
 
-#if defined(__amd64__) || defined(__i386__)
+/*
+ * XXX: Add slop for Morello to ensure staging has space to copyin metadata.
+ * bi_load does not call md_copymodules until after bi_load_efi_data, which
+ * calls ExitBootServices, and we can't move that currently (nor even do a
+ * dummy copyin to grow staging if needed) since bi_load_efi_data itself adds
+ * metadata, dependent on the memory map that can change when trying to call
+ * ExitBootServices. This needs unpicking upstream, so for now work around this
+ * slop that should be enough for all sensible use cases. For example, booting
+ * a 237-compartment ARC kernel with a ZFS rootfs has been seen to pass about
+ * 230 KiB of metadata.
+ */
+#if defined(__amd64__) || defined(__i386__) || defined(__aarch64__)
 #define	EFI_STAGING_SLOP	M(8)
 #else
 #define	EFI_STAGING_SLOP	0
