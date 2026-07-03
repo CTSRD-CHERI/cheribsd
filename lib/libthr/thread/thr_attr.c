@@ -100,7 +100,7 @@
  *   "changes": [
  *     "unsupported"
  *   ],
- *   "change_comment": "Disallow retrieving thread stacks"
+ *   "change_comment": "Disallow non-zero sized stack guards"
  * }
  * CHERI CHANGES END
  */
@@ -294,16 +294,6 @@ _pthread_attr_getstack(const pthread_attr_t * __restrict attr,
 		return (EINVAL);
 
 	*stackaddr = (*attr)->stackaddr_attr;
-#ifdef __CHERI_PURE_CAPABILITY__
-	/*
-	 * Return an invalid capability to the thread's stack as we don't
-	 * want other threads being able to write to arbitrary stacks.
-	 *
-	 * XXX-AR: maybe we should allow this and simply treat
-	 * pthread_attr_getstack() as an unsafe API.
-	 */
-	*stackaddr = cheri_tag_clear(*stackaddr);
-#endif
 	*stacksize = (*attr)->stacksize_attr;
 	return (0);
 }
@@ -319,16 +309,6 @@ _thr_attr_getstackaddr(const pthread_attr_t *attr, void **stackaddr)
 		return (EINVAL);
 
 	*stackaddr = (*attr)->stackaddr_attr;
-#ifdef __CHERI_PURE_CAPABILITY__
-	/*
-	 * Return an invalid capability to the thread's stack as we don't
-	 * want other threads being able to write to arbitrary stacks.
-	 *
-	 * XXX-AR: maybe we should allow this and simply treat
-	 * pthread_attr_getstackaddr() as an unsafe API
-	 */
-	*stackaddr = cheri_tag_clear(*stackaddr);
-#endif
 	return (0);
 }
 
@@ -402,7 +382,7 @@ __weak_reference(_thr_attr_setguardsize, pthread_attr_setguardsize);
 __weak_reference(_thr_attr_setguardsize, _pthread_attr_setguardsize);
 
 int
-_thr_attr_setguardsize(pthread_attr_t *attr, size_t guardsize __unused)
+_thr_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)
 {
 
 	if (attr == NULL || *attr == NULL)
