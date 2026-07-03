@@ -155,7 +155,7 @@ dtrace_getstackdepth(int aframes)
 		return depth - aframes;
 }
 
-ulong_t
+uintptr_t
 dtrace_getreg(struct trapframe *frame, uint_t reg)
 {
 	printf("IMPLEMENT ME: %s\n", __func__);
