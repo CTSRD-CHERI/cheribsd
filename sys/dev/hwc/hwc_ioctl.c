@@ -37,7 +37,6 @@
 #include <sys/malloc.h>
 #include <sys/mman.h>
 #include <sys/mutex.h>
-#include <sys/refcount.h>
 #include <sys/rwlock.h>
 #include <sys/smp.h>
 #include <sys/hwc.h>
@@ -171,7 +170,6 @@ hwc_ioctl_alloc_mode_thread(struct thread *td, struct hwc_owner *ho,
 	/* Ensure it is not being traced already. */
 	ctx1 = hwc_contexthash_lookup(p);
 	if (ctx1) {
-		refcount_release(&ctx1->refcnt);
 		PROC_UNLOCK(p);
 		hwc_ctx_free(ctx);
 		return (EEXIST);

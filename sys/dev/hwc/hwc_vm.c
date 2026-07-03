@@ -35,7 +35,6 @@
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/mman.h>
-#include <sys/refcount.h>
 #include <sys/rwlock.h>
 #include <sys/hwc.h>
 #include <sys/smp.h>

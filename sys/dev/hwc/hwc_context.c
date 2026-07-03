@@ -36,7 +36,6 @@
 #include <sys/malloc.h>
 #include <sys/mman.h>
 #include <sys/mutex.h>
-#include <sys/refcount.h>
 #include <sys/rwlock.h>
 #include <sys/hwc.h>
 
@@ -64,7 +63,6 @@ hwc_ctx_alloc(struct hwc_context **ctx0)
 
 	mtx_init(&ctx->mtx, "ctx", NULL, MTX_SPIN);
 	mtx_init(&ctx->rec_mtx, "ctx_rec", NULL, MTX_DEF);
-	refcount_init(&ctx->refcnt, 0);
 
 	*ctx0 = ctx;
 
@@ -83,7 +81,6 @@ void
 hwc_ctx_put(struct hwc_context *ctx)
 {
 
-	refcount_release(&ctx->refcnt);
 }
 
 void

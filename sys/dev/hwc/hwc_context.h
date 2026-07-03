@@ -53,7 +53,6 @@ struct hwc_context {
 	struct mtx			mtx;
 	struct mtx			rec_mtx;
 	enum hwc_ctx_state		state;
-	int				refcnt;
 
 	struct hwc_vm			*vm;
 };
