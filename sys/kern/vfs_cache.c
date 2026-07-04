@@ -4471,7 +4471,7 @@ cache_fpl_terminated(struct cache_fpl *fpl)
 	(NC_NOMAKEENTRY | NC_KEEPPOSENTRY | LOCKLEAF | LOCKPARENT | WANTPARENT | \
 	 FAILIFEXISTS | FOLLOW | EMPTYPATH | LOCKSHARED | ISRESTARTED | WILLBEDIR | \
 	 ISOPEN | NOMACCHECK | AUDITVNODE1 | AUDITVNODE2 | NOCAPCHECK | OPENREAD | \
-	 OPENWRITE | WANTIOCTLCAPS | NAMEILOOKUP)
+	 OPENWRITE | WANTIOCTLCAPS)
 
 #define CACHE_FPL_INTERNAL_CN_FLAGS \
 	(ISDOTDOT | MAKEENTRY | ISLASTCN)
@@ -5290,19 +5290,30 @@ static int __noinline
 cache_fplookup_dotdot(struct cache_fpl *fpl)
 {
 	struct nameidata *ndp;
+	struct componentname *cnp;
 	struct namecache *ncp;
 	struct vnode *dvp;
+	struct prison *pr;
 	u_char nc_flag;
 
 	ndp = fpl->ndp;
+	cnp = fpl->cnp;
 	dvp = fpl->dvp;
 
-	MPASS(cache_fpl_isdotdot(fpl->cnp));
+	MPASS(cache_fpl_isdotdot(cnp));
 
 	/*
 	 * XXX this is racy the same way regular lookup is
 	 */
-	if (vfs_lookup_isroot(ndp, dvp)) {
+	for (pr = cnp->cn_cred->cr_prison; pr != NULL;
+	    pr = pr->pr_parent)
+		if (dvp == pr->pr_root)
+			break;
+
+	if (dvp == ndp->ni_rootdir ||
+	    dvp == ndp->ni_topdir ||
+	    dvp == rootvnode ||
+	    pr != NULL) {
 		fpl->tvp = dvp;
 		fpl->tvp_seqc = vn_seqc_read_any(dvp);
 		if (seqc_in_modify(fpl->tvp_seqc)) {
