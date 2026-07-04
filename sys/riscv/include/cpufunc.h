@@ -44,7 +44,7 @@ breakpoint(void)
 
 #ifdef _KERNEL
 
-#include <sys/_null.h>
+#include <sys/stddef.h>
 
 #include <machine/riscvreg.h>
 
