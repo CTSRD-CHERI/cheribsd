@@ -55,6 +55,7 @@
 #include "opt_stack.h"          /* for OPT_STACK */
 
 static bool elf32_arm_abi_supported(const struct image_params *,
+    const Elf32_Ehdr *, const Elf32_Phdr *,
     const int32_t *, const uint32_t *);
 
 u_long elf_hwcap;
