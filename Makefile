@@ -646,6 +646,10 @@ universe-toolchain: .PHONY universe_prologue
 	    echo "Missing host linker at ${HOST_OBJTOP}/tmp/usr/bin/ld?" >&2; \
 	    false; \
 	fi
+	@if [ ! -e "${HOST_OBJTOP}/tmp/legacy/bin/config" ]; then \
+	    echo "Missing config(8) at ${HOST_OBJTOP}/tmp/legacy/bin/config?" >&2; \
+	    false; \
+	fi
 	@echo "--------------------------------------------------------------"
 	@echo "> Toolchain bootstrap completed on `LC_ALL=C date`"
 	@echo "--------------------------------------------------------------"
@@ -706,13 +710,12 @@ MAKE_PARAMS_${target_arch}+= \
 universe_${target}_done: universe_${target}_worlds .PHONY
 .for target_arch in ${TARGET_ARCHES_${target}}
 universe_${target}_worlds: universe_${target}_${target_arch} .PHONY
-.if (defined(_need_clang_${target}_${target_arch}) && \
-    ${_need_clang_${target}_${target_arch}} == "yes") || \
-    (defined(_need_lld_${target}_${target_arch}) && \
-    ${_need_lld_${target}_${target_arch}} == "yes")
+# We always need universe-toolchain in order for universe_kernconfs to have an
+# up-to-date config(8) to determine the MACHINE_ARCH for a given kernel config
+# (and can't use a buildworld / kernel-toolchains config since we need to know
+# the MACHINE_ARCH before we can find its OBJTOP), regardless of Clang/LLD.
 universe_${target}_${target_arch}: universe-toolchain
 universe_${target}_prologue: universe-toolchain
-.endif
 universe_${target}_${target_arch}: universe_${target}_prologue .MAKE .PHONY
 	@echo ">> ${target}.${target_arch} ${UNIVERSE_TARGET} started on `LC_ALL=C date`"
 	@(cd ${.CURDIR} && env __MAKE_CONF=/dev/null \
