@@ -638,6 +638,7 @@ universe-toolchain: .PHONY universe_prologue
 	    (echo "${.TARGET} failed," \
 	    "check _.${.TARGET} for details" | \
 	    ${MAKEFAIL}; false)
+.if 0 # CheriBSD disables CLANG_BOOTSTRAP and LLD_BOOTSTRAP
 	@if [ ! -e "${HOST_OBJTOP}/tmp/usr/bin/cc" ]; then \
 	    echo "Missing host compiler at ${HOST_OBJTOP}/tmp/usr/bin/cc?" >&2; \
 	    false; \
@@ -646,6 +647,7 @@ universe-toolchain: .PHONY universe_prologue
 	    echo "Missing host linker at ${HOST_OBJTOP}/tmp/usr/bin/ld?" >&2; \
 	    false; \
 	fi
+.endif
 	@if [ ! -e "${HOST_OBJTOP}/tmp/legacy/bin/config" ]; then \
 	    echo "Missing config(8) at ${HOST_OBJTOP}/tmp/legacy/bin/config?" >&2; \
 	    false; \
