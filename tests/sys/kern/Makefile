@@ -7,6 +7,7 @@ TESTSRC=	${SRCTOP}/contrib/netbsd-tests/kernel
 
 TESTSDIR=	${TESTSBASE}/sys/kern
 
+ATF_TESTS_C+=	aslr
 ATF_TESTS_C+=	basic_signal
 .if ${MACHINE_ARCH} != "i386" && ${MACHINE_ARCH} != "powerpc" && \
 	${MACHINE_ARCH} != "powerpcspe"
@@ -27,9 +28,11 @@ ATF_TESTS_C+=	ktrace_test
 ATF_TESTS_C+=	listener_wakeup
 ATF_TESTS_C+=	module_test
 ATF_TESTS_C+=	prace
+ATF_TESTS_C+=	procdesc
 ATF_TESTS_C+=	ptrace_test
 TEST_METADATA.ptrace_test+=		timeout="15"
 ATF_TESTS_C+=	reaper
+ATF_TESTS_C+=	resolve_beneath_test
 ATF_TESTS_C+=	sched_affinity
 ATF_TESTS_C+=	shutdown_dgram
 ATF_TESTS_C+=	sigaltstack
@@ -78,6 +81,7 @@ PROGS+=		coredump_phnum_helper
 PROGS+=		pdeathsig_helper
 PROGS+=		sendfile_helper
 
+LIBADD.aslr+=				util
 CFLAGS.sys_getrandom+=			-I${SRCTOP}/sys/contrib/zstd/lib
 LIBADD.sys_getrandom+=			zstd
 LIBADD.sys_getrandom+=			c
@@ -89,6 +93,7 @@ CFLAGS.ktls_test+=			-DOPENSSL_API_COMPAT=0x10100000L
 LIBADD.ktls_test+=			crypto util
 LIBADD.listener_wakeup+=		pthread
 LIBADD.shutdown_dgram+=			pthread
+LIBADD.procdesc+=			pthread
 LIBADD.socket_msg_waitall+=		pthread
 LIBADD.socket_splice+=			pthread
 LIBADD.sendfile_helper+=		pthread

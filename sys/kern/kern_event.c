@@ -50,6 +50,7 @@
 #include <sys/filedesc.h>
 #include <sys/filio.h>
 #include <sys/fcntl.h>
+#include <sys/imgact.h>
 #include <sys/kthread.h>
 #include <sys/selinfo.h>
 #include <sys/queue.h>
@@ -3055,11 +3056,18 @@ sysctl_kern_proc_kqueue(SYSCTL_HANDLER_ARGS)
 	if ((u_int)arg2 > 2 || (u_int)arg2 == 0)
 		return (EINVAL);
 
-	error = pget((pid_t)name[0], PGET_HOLD | PGET_CANDEBUG, &p);
+	td = curthread;
+
+	error = pget((pid_t)name[0], PGET_NOTWEXIT, &p);
 	if (error != 0)
 		return (error);
 
-	td = curthread;
+	_PHOLD(p);
+	execve_block_wait(td, p);
+	error = p_candebug(td, p);
+	if (error != 0)
+		goto out1;
+	PROC_UNLOCK(p);
 
 	s = sbuf_new_for_sysctl(&sm, NULL, 0, req);
 	if (s == NULL) {
@@ -3082,7 +3090,11 @@ sysctl_kern_proc_kqueue(SYSCTL_HANDLER_ARGS)
 	sbuf_delete(s);
 
 out:
-	PRELE(p);
+	PROC_LOCK(p);
+out1:
+	execve_unblock(td, p);
+	_PRELE(p);
+	PROC_UNLOCK(p);
 	return (error);
 }
 

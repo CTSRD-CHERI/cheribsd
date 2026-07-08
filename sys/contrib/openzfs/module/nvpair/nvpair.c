@@ -3246,7 +3246,8 @@ nvs_xdr_nvl_fini(nvstream_t *nvs)
  * xdrproc_t-compatible callbacks for xdr_array()
  */
 
-#if (defined(__FreeBSD_version) && __FreeBSD_version >= 1600010) || \
+#if (defined(__CheriBSD_version) && __CheriBSD_version > 20250301) || \
+    (defined(__FreeBSD_version) && __FreeBSD_version >= 1600010) || \
     defined(_KERNEL) && defined(__linux__) /* Linux kernel */
 
 #define	NVS_BUILD_XDRPROC_T(type)		\
@@ -3256,7 +3257,7 @@ nvs_xdr_nvp_##type(XDR *xdrs, void *ptr)	\
 	return (xdr_##type(xdrs, ptr));		\
 }
 
-#elif !defined(_KERNEL) && defined(XDR_CONTROL) /* tirpc */
+#elif !defined(_KERNEL) && defined(XDR_CONTROL) /* tirpc, FreeBSD < 16 */
 
 #define	NVS_BUILD_XDRPROC_T(type)		\
 static bool_t					\
@@ -3272,7 +3273,7 @@ nvs_xdr_nvp_##type(XDR *xdrs, ...)		\
 	return (xdr_##type(xdrs, ptr));		\
 }
 
-#else /* FreeBSD, sunrpc */
+#else /* FreeBSD kernel < 16, sunrpc */
 
 #define	NVS_BUILD_XDRPROC_T(type)		\
 static bool_t					\

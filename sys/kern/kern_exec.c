@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include "opt_capsicum.h"
 #include "opt_hwpmc_hooks.h"
 #include "opt_ktrace.h"
@@ -46,6 +45,7 @@
 #include <sys/imgact.h>
 #include <sys/imgact_elf.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mman.h>
@@ -392,6 +392,77 @@ execve_nosetid(struct image_params *imgp)
 }
 
 /*
+ * Returns true if the execblock was obtained, in this case the
+ * process lock is kept.  Returns false if the execblock was not
+ * obtained, but the function slept and the lock was dropped.
+ */
+bool
+execve_block(struct thread *td, struct proc *p)
+{
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	MPASS(td == curthread);
+	MPASS(p != td->td_proc || (p->p_flag & P_INEXEC) == 0);
+
+	if (p != td->td_proc && (p->p_flag & P_INEXEC) != 0) {
+		p->p_flag |= P_INEXEC_WAIT;
+		msleep(&p->p_execblock, &p->p_mtx, PDROP, "inexec", 0);
+		return (false);
+	}
+	MPASS(p->p_execblock < UINT_MAX);
+	p->p_execblock++;
+	return (true);
+}
+
+/*
+ * Might drop the process lock internally, callers must re-check the
+ * invariants afterward.
+ */
+void
+execve_block_wait(struct thread *td, struct proc *p)
+{
+	bool first;
+
+	PROC_ASSERT_HELD(p);
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	for (first = true;; first = false) {
+		if (!first)
+			PROC_LOCK(p);
+		if (execve_block(td, p))
+			return;
+	}
+}
+
+void
+execve_unblock(struct thread *td, struct proc *p)
+{
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	MPASS(td == curthread);
+
+	MPASS(p->p_execblock > 0);
+	p->p_execblock--;
+	if (p->p_execblock == 0 && (p->p_flag & P_INEXEC_WAIT) != 0) {
+		p->p_flag &= ~P_INEXEC_WAIT;
+		wakeup(&p->p_execblock);
+	}
+}
+
+void
+execve_block_pass(struct thread *td)
+{
+	struct proc *p;
+
+	MPASS(td == curthread);
+	p = td->td_proc;
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	
+	while (p->p_execblock != 0) {
+		p->p_flag |= P_INEXEC_WAIT;
+		msleep(&p->p_execblock, &p->p_mtx, 0, "exeblk", 0);
+	}
+}
+
+/*
  * In-kernel implementation of execve().  All arguments are assumed to be
  * userspace pointers from the passed thread.
  */
@@ -448,6 +519,7 @@ do_execve(struct thread *td, struct image_args *args,
 	PROC_LOCK(p);
 	KASSERT((p->p_flag & P_INEXEC) == 0,
 	    ("%s(): process already has P_INEXEC flag", __func__));
+	execve_block_pass(td);
 	p->p_flag |= P_INEXEC;
 	PROC_UNLOCK(p);
 
@@ -923,7 +995,10 @@ interpret:
 	 * as we're now a bona fide freshly-execed process.
 	 */
 	KNOTE_LOCKED(p->p_klist, NOTE_EXEC);
-	p->p_flag &= ~P_INEXEC;
+	MPASS(p->p_execblock == 0);
+	if ((p->p_flag & P_INEXEC_WAIT) != 0)
+		wakeup(&p->p_execblock);
+	p->p_flag &= ~(P_INEXEC | P_INEXEC_WAIT);
 
 	/* clear "fork but no exec" flag, as we _are_ execing */
 	p->p_acflag &= ~AFORK;
@@ -1005,7 +1080,9 @@ exec_fail_dealloc:
 exec_fail:
 		/* we're done here, clear P_INEXEC */
 		PROC_LOCK(p);
-		p->p_flag &= ~P_INEXEC;
+		if ((p->p_flag & P_INEXEC_WAIT) != 0)
+			wakeup(&p->p_execblock);
+		p->p_flag &= ~(P_INEXEC | P_INEXEC_WAIT);
 		PROC_UNLOCK(p);
 
 		SDT_PROBE1(proc, , , exec__failure, error);
@@ -1818,7 +1895,7 @@ exec_args_adjust_args(struct image_args *args, size_t consume, ssize_t extend)
 	if (args->stringspace < offset)
 		return (E2BIG);
 	memmove(args->begin_argv + extend, args->begin_argv + consume,
-	    args->endp - args->begin_argv + consume);
+	    args->endp - (args->begin_argv + consume));
 	if (args->envc > 0)
 		args->begin_envv += offset;
 	args->endp += offset;

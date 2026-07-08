@@ -173,7 +173,7 @@ zfs_uio_release_stable_pages(zfs_uio_t *uio)
  * written to and must be given write access.
  */
 static int
-zfs_uio_hold_pages(unsigned long start, size_t len, int nr_pages,
+zfs_uio_hold_pages(void *start, size_t len, int nr_pages,
     zfs_uio_rw_t rw, vm_page_t *pages)
 {
 	vm_map_t map;
@@ -184,8 +184,13 @@ zfs_uio_hold_pages(unsigned long start, size_t len, int nr_pages,
 	ASSERT3S(len, >, 0);
 
 	prot = rw == UIO_READ ? (VM_PROT_READ | VM_PROT_WRITE) : VM_PROT_READ;
+#ifdef __CheriBSD_version
 	count = vm_fault_quick_hold_pages(map, start, len, prot, pages,
 	    nr_pages);
+#else
+	count = vm_fault_quick_hold_pages(map, (uintptr_t)start, len, prot, pages,
+	    nr_pages);
+#endif
 
 	return (count);
 }
@@ -208,7 +213,7 @@ zfs_uio_free_dio_pages(zfs_uio_t *uio, zfs_uio_rw_t rw)
 }
 
 static int
-zfs_uio_get_user_pages(unsigned long start, int nr_pages,
+zfs_uio_get_user_pages(void *start, int nr_pages,
     size_t len, zfs_uio_rw_t rw, vm_page_t *pages)
 {
 	int count;
@@ -229,12 +234,12 @@ zfs_uio_get_user_pages(unsigned long start, int nr_pages,
 static int
 zfs_uio_iov_step(struct iovec v, zfs_uio_t *uio, int *numpages)
 {
-	unsigned long addr = (unsigned long)(v.iov_base);
+	void *addr = (v.iov_base);
 	size_t len = v.iov_len;
 	int n = DIV_ROUND_UP(len, PAGE_SIZE);
 
 	int res = zfs_uio_get_user_pages(
-	    P2ALIGN_TYPED(addr, PAGE_SIZE, unsigned long), n, len,
+	    rounddown2(addr, PAGE_SIZE), n, len,
 	    zfs_uio_rw(uio), &uio->uio_dio.pages[uio->uio_dio.npages]);
 
 	if (res != n)
