@@ -2912,7 +2912,6 @@
                 "elf64c_load_sections",
                 "bdata2bio",
                 "uipc_connectat",
-                "preload_search_info",
                 "preload_fetch_addr",
                 "elf64c_modevent",
                 "soaccept",

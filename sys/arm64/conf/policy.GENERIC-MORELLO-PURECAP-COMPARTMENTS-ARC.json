@@ -4759,7 +4759,6 @@
                 "uipc_connectat",
                 "malloc_exec",
                 "ttyinq_unputchar",
-                "preload_search_info",
                 "preload_fetch_addr",
                 "soaccept",
                 "elf64_prepare_notes",
