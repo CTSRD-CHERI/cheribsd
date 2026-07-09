@@ -1689,9 +1689,9 @@ tramp_get_header(const void *data)
 	return (NULL);
 }
 
-ptraddr_t dl_c18n_get_trampoline_target(const void *);
+uintptr_t dl_c18n_get_trampoline_target(const void *);
 
-ptraddr_t
+uintptr_t
 dl_c18n_get_trampoline_target(const void *addr)
 {
 	struct tramp_header *header;
@@ -1703,7 +1703,8 @@ dl_c18n_get_trampoline_target(const void *addr)
 	if (header == NULL)
 		return (0);
 
-	return ((ptraddr_t)header->target);
+	return ((uintptr_t)cheri_tag_clear(
+	    atomic_load_explicit(&header->target, memory_order_relaxed)));
 }
 
 /*
@@ -2317,7 +2318,8 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	 * in one.
 	 */
 	callee = compart_id_for_address(header->defobj,
-	    (ptraddr_t)header->target);
+	    (ptraddr_t)atomic_load_explicit(&header->target,
+		memory_order_relaxed));
 	callee_idx = cid_to_index(callee);
 
 	/*

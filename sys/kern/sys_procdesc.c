@@ -119,7 +119,7 @@ static const struct fileops procdesc_ops = {
  * died.
  */
 int
-procdesc_find(struct thread *td, int fd, cap_rights_t *rightsp,
+procdesc_find(struct thread *td, int fd, const cap_rights_t *rightsp,
     struct proc **p)
 {
 	struct procdesc *pd;
@@ -166,7 +166,8 @@ procdesc_pid(struct file *fp_procdesc)
  * Retrieve the PID associated with a process descriptor.
  */
 int
-kern_pdgetpid(struct thread *td, int fd, cap_rights_t *rightsp, pid_t *pidp)
+kern_pdgetpid(struct thread *td, int fd, const cap_rights_t *rightsp,
+    pid_t *pidp)
 {
 	struct file *fp;
 	int error;
@@ -277,6 +278,7 @@ procdesc_free(struct procdesc *pd)
 		KASSERT((pd->pd_flags & PDF_CLOSED),
 		    ("procdesc_free: !PDF_CLOSED"));
 
+		seldrain(&pd->pd_selinfo);
 		knlist_destroy(&pd->pd_selinfo.si_note);
 		PROCDESC_LOCK_DESTROY(pd);
 		free(pd, M_PROCDESC);
@@ -319,10 +321,7 @@ procdesc_exit(struct proc *p)
 		procdesc_free(pd);
 		return (1);
 	}
-	if (pd->pd_flags & PDF_SELECTED) {
-		pd->pd_flags &= ~PDF_SELECTED;
-		selwakeup(&pd->pd_selinfo);
-	}
+	selwakeup(&pd->pd_selinfo);
 	KNOTE_LOCKED(&pd->pd_selinfo.si_note, NOTE_EXIT);
 	PROCDESC_UNLOCK(pd);
 	return (0);
@@ -437,10 +436,8 @@ procdesc_poll(struct file *fp, int events, struct ucred *active_cred,
 	PROCDESC_LOCK(pd);
 	if (pd->pd_flags & PDF_EXITED)
 		revents |= POLLHUP;
-	if (revents == 0) {
+	else
 		selrecord(td, &pd->pd_selinfo);
-		pd->pd_flags |= PDF_SELECTED;
-	}
 	PROCDESC_UNLOCK(pd);
 	return (revents);
 }

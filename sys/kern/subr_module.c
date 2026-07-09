@@ -128,6 +128,55 @@ preload_search_by_type(const char *type)
     return(NULL);
 }
 
+static int
+strcmp_early(const char *s1, const char *s2)
+{
+	while (*s1 == *s2++)
+		if (*s1++ == '\0')
+			return (0);
+	return (*(const unsigned char *)s1 - *(const unsigned char *)(s2 - 1));
+}
+
+/*
+ * Same as preload_search_by_type but takes an explicit module pointer for
+ * early relocation processing / linker use prior to setting preload_metadata.
+ *
+ * NB: Must not access any globals, nor call any functions that might go via a
+ * PLT (e.g. strcmp if compartmentalised or an IFUNC).
+ */
+caddr_t
+preload_search_by_type_early(caddr_t mdp, const char *type)
+{
+    caddr_t	curp, lname;
+    uint32_t	*hdr;
+    int		next;
+
+    if (mdp != NULL) {
+	curp = mdp;
+	lname = NULL;
+	for (;;) {
+	    hdr = (uint32_t *)curp;
+	    if (hdr[0] == 0 && hdr[1] == 0)
+		break;
+
+	    /* remember the start of each record */
+	    if (hdr[0] == MODINFO_NAME)
+		lname = curp;
+
+	    /* Search for a MODINFO_TYPE field */
+	    if ((hdr[0] == MODINFO_TYPE) &&
+		!strcmp_early(type, curp + sizeof(uint32_t) * 2))
+		return(lname);
+
+	    /* skip to next field */
+	    next = sizeof(uint32_t) * 2 + hdr[1];
+	    next = roundup(next, sizeof(u_long));
+	    curp += next;
+	}
+    }
+    return(NULL);
+}
+
 /*
  * Walk through the preloaded module list
  */
@@ -206,8 +255,8 @@ preload_search_info(caddr_t mod, int inf)
 	 * data.
 	 */
 	if (hdr[0] == inf)
-	    return (cheri_kern_bounds_set(curp + (sizeof(uint32_t) * 2),
-	        hdr[1]));
+	    return (cheri_kern_bounds_set(curp, hdr[1] + sizeof(uint32_t) * 2)
+		+ sizeof(uint32_t) * 2);
 
 	/* skip to next field */
 	next = sizeof(uint32_t) * 2 + hdr[1];
@@ -457,6 +506,9 @@ preload_modinfo_type(struct sbuf *sbp, int type)
 		sbuf_cat(sbp, "MODINFOMD_SPLASH");
 		break;
 #endif
+	case MODINFOMD_PHDR:
+		sbuf_cat(sbp, "MODINFOMD_PHDR");
+		break;
 #ifdef MODINFOMD_BOOT_HARTID
 	case MODINFOMD_BOOT_HARTID:
 		sbuf_cat(sbp, "MODINFOMD_BOOT_HARTID");
@@ -534,6 +586,7 @@ preload_modinfo_value(struct sbuf *sbp, uint32_t *bptr, int type, int len)
 #ifdef MODINFOMD_EFI_MAP
 	case MODINFO_METADATA | MODINFOMD_EFI_MAP:
 #endif
+	case MODINFO_METADATA | MODINFOMD_PHDR:
 		/* Don't print data buffers. */
 		sbuf_cat(sbp, "buffer contents omitted");
 		break;

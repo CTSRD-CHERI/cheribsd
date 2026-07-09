@@ -688,8 +688,11 @@ dt_node_type_assign(dt_node_t *dnp, ctf_file_t *fp, ctf_id_t type,
 
 	if (kind == CTF_K_INTEGER && ctf_type_encoding(fp, base, &e) == 0) {
 		size_t size = e.cte_bits / NBBY;
+		int model = ctf_getmodel(fp);
 
-		if (size > 8 || (e.cte_bits % NBBY) != 0 || (size & (size - 1)))
+		if ((model == CTF_MODEL_P128 && size > 16) ||
+		    (model != CTF_MODEL_P128 && size > 8) ||
+		    (e.cte_bits % NBBY) != 0 || (size & (size - 1)))
 			dnp->dn_flags |= DT_NF_BITFIELD;
 
 		if (e.cte_format & CTF_INT_SIGNED)

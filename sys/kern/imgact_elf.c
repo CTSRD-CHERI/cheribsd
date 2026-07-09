@@ -1488,6 +1488,34 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		error = ENOEXEC;
 		goto ret;
 	}
+
+	/*
+	 * Avoid a possible deadlock if the current address space is destroyed
+	 * and that address space maps the locked vnode.  In the common case,
+	 * the locked vnode's v_usecount is decremented but remains greater
+	 * than zero.  Consequently, the vnode lock is not needed by vrele().
+	 * However, in cases where the vnode lock is external, such as nullfs,
+	 * v_usecount may become zero.
+	 *
+	 * The VV_TEXT flag prevents modifications to the executable while
+	 * the vnode is unlocked.
+	 */
+	VOP_UNLOCK(imgp->vp);
+
+	/*
+	 * Decide whether to enable randomization of user mappings.  First,
+	 * reset user preferences for the setid binaries.  Then, account for the
+	 * support of randomization by the ABI, by user preferences, and make
+	 * special treatment for PIE binaries.
+	 */
+	if (imgp->credential_setid) {
+		PROC_LOCK(imgp->proc);
+		imgp->proc->p_flag2 &= ~(P2_ASLR_ENABLE | P2_ASLR_DISABLE |
+		    P2_WXORX_DISABLE | P2_WXORX_ENABLE_EXEC |
+		    P2_CHERI_REVOKE_MASK);
+		PROC_UNLOCK(imgp->proc);
+	}
+
 	sv = brand_info->sysvec;
 #ifdef __ELF_CHERI
 	/*
@@ -1504,6 +1532,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		if ((brand_info->flags & BI_CAN_EXEC_DYN) == 0) {
 			uprintf("Cannot execute shared object\n");
 			error = ENOEXEC;
+			(void)vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 			goto ret;
 		}
 		/*
@@ -1521,34 +1550,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			else
 				imgp->et_dyn_addr = __elfN(pie_base);
 		}
-	}
-
-	/*
-	 * Avoid a possible deadlock if the current address space is destroyed
-	 * and that address space maps the locked vnode.  In the common case,
-	 * the locked vnode's v_usecount is decremented but remains greater
-	 * than zero.  Consequently, the vnode lock is not needed by vrele().
-	 * However, in cases where the vnode lock is external, such as nullfs,
-	 * v_usecount may become zero.
-	 *
-	 * The VV_TEXT flag prevents modifications to the executable while
-	 * the vnode is unlocked.
-	 */
-	VOP_UNLOCK(imgp->vp);
-
-	/*
-	 * Decide whether to enable randomization of user mappings.
-	 * First, reset user preferences for the setid binaries.
-	 * Then, account for the support of the randomization by the
-	 * ABI, by user preferences, and make special treatment for
-	 * PIE binaries.
-	 */
-	if (imgp->credential_setid) {
-		PROC_LOCK(imgp->proc);
-		imgp->proc->p_flag2 &= ~(P2_ASLR_ENABLE | P2_ASLR_DISABLE |
-		    P2_WXORX_DISABLE | P2_WXORX_ENABLE_EXEC |
-		    P2_CHERI_REVOKE_MASK);
-		PROC_UNLOCK(imgp->proc);
 	}
 	if ((sv->sv_flags & SV_ASLR) == 0 ||
 	    (imgp->proc->p_flag2 & P2_ASLR_DISABLE) != 0 ||
@@ -3332,13 +3333,12 @@ __elfN(note_procstat_kqueues)(void *arg, struct sbuf *sb, size_t *sizep)
 	size_t size, sect_sz, i;
 	ssize_t start_len, sect_len;
 	int structsize;
-	bool compat32;
 
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
-	compat32 = true;
 	structsize = sizeof(struct kinfo_knote32);
+#elif defined(COMPAT_FREEBSD64) && __ELF_WORD_SIZE == 64 && !defined(__ELF_CHERI)
+	structsize = sizeof(struct kinfo_knote64);
 #else
-	compat32 = false;
 	structsize = sizeof(struct kinfo_knote);
 #endif
 	p = arg;
@@ -3347,7 +3347,7 @@ __elfN(note_procstat_kqueues)(void *arg, struct sbuf *sb, size_t *sizep)
 		sb = sbuf_new(NULL, NULL, 128, SBUF_FIXEDLEN);
 		sbuf_set_drain(sb, sbuf_count_drain, &size);
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
-		kern_proc_kqueues_out(p, sb, -1, compat32);
+		kern_proc_kqueues_out(p, sb, -1, p->p_sysent->sv_flags);
 		sbuf_finish(sb);
 		sbuf_delete(sb);
 		*sizep = size;
@@ -3356,7 +3356,7 @@ __elfN(note_procstat_kqueues)(void *arg, struct sbuf *sb, size_t *sizep)
 
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
 		kern_proc_kqueues_out(p, sb, *sizep - sizeof(structsize),
-		    compat32);
+		    p->p_sysent->sv_flags);
 
 		sect_len = sbuf_end_section(sb, start_len, 0, 0);
 		if (sect_len < 0)

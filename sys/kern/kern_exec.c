@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include "opt_capsicum.h"
 #include "opt_hwpmc_hooks.h"
 #include "opt_ktrace.h"
@@ -46,6 +45,7 @@
 #include <sys/imgact.h>
 #include <sys/imgact_elf.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mman.h>
@@ -392,6 +392,77 @@ execve_nosetid(struct image_params *imgp)
 }
 
 /*
+ * Returns true if the execblock was obtained, in this case the
+ * process lock is kept.  Returns false if the execblock was not
+ * obtained, but the function slept and the lock was dropped.
+ */
+bool
+execve_block(struct thread *td, struct proc *p)
+{
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	MPASS(td == curthread);
+	MPASS(p != td->td_proc || (p->p_flag & P_INEXEC) == 0);
+
+	if (p != td->td_proc && (p->p_flag & P_INEXEC) != 0) {
+		p->p_flag |= P_INEXEC_WAIT;
+		msleep(&p->p_execblock, &p->p_mtx, PDROP, "inexec", 0);
+		return (false);
+	}
+	MPASS(p->p_execblock < UINT_MAX);
+	p->p_execblock++;
+	return (true);
+}
+
+/*
+ * Might drop the process lock internally, callers must re-check the
+ * invariants afterward.
+ */
+void
+execve_block_wait(struct thread *td, struct proc *p)
+{
+	bool first;
+
+	PROC_ASSERT_HELD(p);
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	for (first = true;; first = false) {
+		if (!first)
+			PROC_LOCK(p);
+		if (execve_block(td, p))
+			return;
+	}
+}
+
+void
+execve_unblock(struct thread *td, struct proc *p)
+{
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	MPASS(td == curthread);
+
+	MPASS(p->p_execblock > 0);
+	p->p_execblock--;
+	if (p->p_execblock == 0 && (p->p_flag & P_INEXEC_WAIT) != 0) {
+		p->p_flag &= ~P_INEXEC_WAIT;
+		wakeup(&p->p_execblock);
+	}
+}
+
+void
+execve_block_pass(struct thread *td)
+{
+	struct proc *p;
+
+	MPASS(td == curthread);
+	p = td->td_proc;
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	
+	while (p->p_execblock != 0) {
+		p->p_flag |= P_INEXEC_WAIT;
+		msleep(&p->p_execblock, &p->p_mtx, 0, "exeblk", 0);
+	}
+}
+
+/*
  * In-kernel implementation of execve().  All arguments are assumed to be
  * userspace pointers from the passed thread.
  */
@@ -448,6 +519,7 @@ do_execve(struct thread *td, struct image_args *args,
 	PROC_LOCK(p);
 	KASSERT((p->p_flag & P_INEXEC) == 0,
 	    ("%s(): process already has P_INEXEC flag", __func__));
+	execve_block_pass(td);
 	p->p_flag |= P_INEXEC;
 	PROC_UNLOCK(p);
 
@@ -923,7 +995,10 @@ interpret:
 	 * as we're now a bona fide freshly-execed process.
 	 */
 	KNOTE_LOCKED(p->p_klist, NOTE_EXEC);
-	p->p_flag &= ~P_INEXEC;
+	MPASS(p->p_execblock == 0);
+	if ((p->p_flag & P_INEXEC_WAIT) != 0)
+		wakeup(&p->p_execblock);
+	p->p_flag &= ~(P_INEXEC | P_INEXEC_WAIT);
 
 	/* clear "fork but no exec" flag, as we _are_ execing */
 	p->p_acflag &= ~AFORK;
@@ -1005,7 +1080,9 @@ exec_fail_dealloc:
 exec_fail:
 		/* we're done here, clear P_INEXEC */
 		PROC_LOCK(p);
-		p->p_flag &= ~P_INEXEC;
+		if ((p->p_flag & P_INEXEC_WAIT) != 0)
+			wakeup(&p->p_execblock);
+		p->p_flag &= ~(P_INEXEC | P_INEXEC_WAIT);
 		PROC_UNLOCK(p);
 
 		SDT_PROBE1(proc, , , exec__failure, error);
@@ -1753,6 +1830,10 @@ exec_args_add_str(struct image_args *args, const char * __capability str,
 {
 	int error;
 	size_t length;
+#if __has_feature(capabilities)
+	size_t rounded_length;
+	size_t base_pad;
+#endif
 
 	KASSERT(args->endp != NULL, ("endp not initialized"));
 	KASSERT(args->begin_argv != NULL, ("begin_argp not initialized"));
@@ -1765,7 +1846,16 @@ exec_args_add_str(struct image_args *args, const char * __capability str,
 		    &length);
 	if (error != 0)
 		return (error == ENAMETOOLONG ? E2BIG : error);
+#if __has_feature(capabilities)
+	rounded_length = CHERI_REPRESENTABLE_LENGTH(length);
+	base_pad = CHERI_REPRESENTABLE_ALIGN_UP(args->endp, rounded_length) -
+	    args->endp;
+	if (rounded_length + base_pad > args->stringspace)
+		return (E2BIG);
+	args->stringspace -= base_pad + rounded_length;
+#else
 	args->stringspace -= length;
+#endif
 	args->endp += length;
 	(*countp)++;
 
@@ -1805,7 +1895,7 @@ exec_args_adjust_args(struct image_args *args, size_t consume, ssize_t extend)
 	if (args->stringspace < offset)
 		return (E2BIG);
 	memmove(args->begin_argv + extend, args->begin_argv + consume,
-	    args->endp - args->begin_argv + consume);
+	    args->endp - (args->begin_argv + consume));
 	if (args->envc > 0)
 		args->begin_envv += offset;
 	args->endp += offset;
@@ -1828,9 +1918,6 @@ exec_args_get_begin_envv(struct image_args *args)
  * Copy strings out to the new process address space, constructing new arg
  * and env vector tables. Return a pointer to the base so that it can be used
  * as the initial stack pointer.
- *
- * XXX: We may want a wrapper of cheri_bounds_set() that warns about
- * capabilities that are overly broad.
  */
 int
 exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
@@ -1843,9 +1930,15 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	struct proc *p;
 	struct sysentvec *sysent;
 	size_t execpath_len, len;
+	size_t strings_len;
 	int error, szsigcode;
 	char canary[sizeof(long) * 8];
 	bool strings_on_stack;
+#if __has_feature(capabilities)
+	size_t rounded_len;
+	size_t argv_space, envv_space;
+	uintcap_t vecstr_cap;
+#endif
 
 	p = imgp->proc;
 	sysent = p->p_sysent;
@@ -1929,11 +2022,16 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 
 	/*
 	 * Allocate room for the argument and environment strings.
+	 * On CHERI, ensure that the entire stringspace sub-allocation is
+	 * representable.
 	 */
-	destp -= ARG_MAX - imgp->args->stringspace;
+	strings_len = ARG_MAX - imgp->args->stringspace;
+	destp -= strings_len;
 	destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
-	ustringp = cheri_bounds_set(destp, ARG_MAX - imgp->args->stringspace);
+	strings_len = CHERI_REPRESENTABLE_LENGTH(strings_len);
+	destp = CHERI_REPRESENTABLE_ALIGN_DOWN(destp, strings_len);
+	ustringp = cheri_bounds_set_exact(destp, strings_len);
 #else
 	ustringp = destp;
 #endif
@@ -1965,7 +2063,18 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Allocate room for the argv[] and env vectors including the
 	 * terminating NULL pointers.
 	 */
+#if __has_feature(capabilities)
+	argv_space = (imgp->args->argc + 1) * sizeof(*vectp);
+	envv_space = (imgp->args->envc + 1) * sizeof(*vectp);
+	envv_space = CHERI_REPRESENTABLE_LENGTH(envv_space);
+	vectp -= imgp->args->envc + 1;
+	vectp = CHERI_REPRESENTABLE_ALIGN_DOWN(vectp, envv_space);
+	argv_space = CHERI_REPRESENTABLE_LENGTH(argv_space);
+	vectp -= imgp->args->argc + 1;
+	vectp = CHERI_REPRESENTABLE_ALIGN_DOWN(vectp, argv_space);
+#else
 	vectp -= imgp->args->argc + 1 + imgp->args->envc + 1;
+#endif
 
 	if (!strings_on_stack) {
 		*stack_base = (uintcap_t)imgp->stack;
@@ -1982,17 +2091,23 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 
 	/*
 	 * Copy out strings - arguments and environment.
+	 *
+	 * For CHERI, strings are copied out individually when populating the
+	 * string vectors to account for padding. For non-CHERI, the buffer is
+	 * packed and copied out as one buffer.
 	 */
+#if !__has_feature(capabilities)
 	error = copyout(stringp, (void * __capability)ustringp,
 	    ARG_MAX - imgp->args->stringspace);
 	if (error != 0)
 		return (error);
+#endif
 
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
 #if __has_feature(capabilities)
-	imgp->argv = cheri_bounds_set(vectp, (argc + 1) * sizeof(*vectp));
+	imgp->argv = cheri_bounds_set_exact(vectp, argv_space);
 #else
 	imgp->argv = vectp;
 #endif
@@ -2006,14 +2121,21 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; argc > 0; --argc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, cheri_bounds_set(ustringp, len)) != 0)
+		rounded_len = CHERI_REPRESENTABLE_LENGTH(len);
+		ustringp = CHERI_REPRESENTABLE_ALIGN_UP(ustringp, rounded_len);
+		error = copyout(stringp, (void * __capability)ustringp, len);
+		if (error != 0)
+			return (error);
+		vecstr_cap = cheri_bounds_set_exact(ustringp, rounded_len);
+		if (sucap(vectp++, vecstr_cap) != 0)
 			return (EFAULT);
+		ustringp += rounded_len;
 #else
 		if (suptr(vectp++, ustringp) != 0)
 			return (EFAULT);
+		ustringp += len;
 #endif
 		stringp += len;
-		ustringp += len;
 	}
 
 	/* a null vector table pointer separates the argp's from the envp's */
@@ -2021,7 +2143,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		return (EFAULT);
 
 #if __has_feature(capabilities)
-	imgp->envv = cheri_bounds_set(vectp, (envc + 1) * sizeof(*vectp));
+	vectp = CHERI_REPRESENTABLE_ALIGN_UP(vectp, argv_space);
+	imgp->envv = cheri_bounds_set_exact(vectp, envv_space);
 #else
 	imgp->envv = vectp;
 #endif
@@ -2035,14 +2158,22 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; envc > 0; --envc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, cheri_bounds_set(ustringp, len)) != 0)
+		rounded_len = CHERI_REPRESENTABLE_LENGTH(len);
+		ustringp = CHERI_REPRESENTABLE_ALIGN_UP(ustringp, rounded_len);
+		error = copyout(stringp, (void * __capability)ustringp,
+		    rounded_len);
+		if (error != 0)
+			return (error);
+		vecstr_cap = cheri_bounds_set_exact(ustringp, rounded_len);
+		if (sucap(vectp++, vecstr_cap) != 0)
 			return (EFAULT);
+		ustringp += rounded_len;
 #else
 		if (suptr(vectp++, ustringp) != 0)
 			return (EFAULT);
+		ustringp += len;
 #endif
 		stringp += len;
-		ustringp += len;
 	}
 
 	/* end of vector table is a null pointer */
@@ -2052,7 +2183,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	if (imgp->auxargs) {
 		vectp++;
 #if __has_feature(capabilities)
-		imgp->auxv = cheri_bounds_set(vectp,
+		imgp->auxv = cheri_bounds_set_exact(vectp,
 		    AT_COUNT * sizeof(Elf_Auxinfo));
 #else
 		imgp->auxv = vectp;

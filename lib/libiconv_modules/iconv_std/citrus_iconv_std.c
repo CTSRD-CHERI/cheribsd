@@ -29,6 +29,7 @@
  */
 
 #include <sys/cdefs.h>
+#include <sys/param.h>
 #include <sys/endian.h>
 #include <sys/queue.h>
 
@@ -36,6 +37,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -423,17 +425,21 @@ _citrus_iconv_std_iconv_init_context(struct _citrus_iconv *cv)
 	const struct _citrus_iconv_std_shared *is = cv->cv_shared->ci_closure;
 	struct _citrus_iconv_std_context *sc;
 	char *ptr;
-	size_t sz, szpsdst, szpssrc;
+	size_t sz, szctx, szpsdst, szpssrc;
 
-	szpssrc = _stdenc_get_state_size(is->is_src_encoding);
-	szpsdst = _stdenc_get_state_size(is->is_dst_encoding);
+	szpssrc = roundup2(_stdenc_get_state_size(is->is_src_encoding),
+	    _Alignof(max_align_t));
+	szpsdst = roundup2(_stdenc_get_state_size(is->is_dst_encoding),
+	    _Alignof(max_align_t));
+	szctx = roundup2(sizeof(struct _citrus_iconv_std_context),
+	    _Alignof(max_align_t));
 
-	sz = (szpssrc + szpsdst)*2 + sizeof(struct _citrus_iconv_std_context);
+	sz = szctx + 2 * (szpssrc + szpsdst);
 	sc = malloc(sz);
 	if (sc == NULL)
 		return (errno);
 
-	ptr = (char *)&sc[1];
+	ptr = (char *)sc + szctx;
 	if (szpssrc > 0)
 		init_encoding(&sc->sc_src_encoding, is->is_src_encoding,
 		    ptr, ptr+szpssrc);

@@ -363,6 +363,17 @@ cheri_ptr_equal_exact(void *x, void *y)
 #endif
 }
 
+/*
+ * Snapshot of the startup state upon entry to main().
+ * This is used by tests that need to verify properties that may
+ * be tampered with by the cheribsdtest runtime environment.
+ */
+struct cheribsdtest_entrystate {
+	int es_argc;
+	char **es_argv;
+};
+
+extern struct cheribsdtest_entrystate entrystate;
 
 /* For libc_memcpy and libc_memset tests and the unaligned copy tests: */
 extern void *cheribsdtest_memcpy(void *dst, const void *src, size_t n);
@@ -375,6 +386,8 @@ extern ptraddr_t find_address_space_gap(size_t len, size_t align);
  * function.
  */
 extern pid_t cheribsdtest_spawn_child(enum spawn_child_mode mode);
+extern pid_t cheribsdtest_spawn_child_args(enum spawn_child_mode mode,
+    char **argv, char **envv);
 
 const char *skip_need_cheri_revoke(const struct cheri_test *ctp);
 const char *skip_need_default_cheri_revoke(const struct cheri_test *ctp);

@@ -242,13 +242,13 @@ cheri_can_access(const void * __capability cap, ptraddr_t perms,
 #endif /* !__has_feature(capabilities) */
 
 /* Provide macros to make it easier to work with the raw CRAM/CRRL results: */
-#define	CHERI_REPRESENTABLE_ALIGNMENT(len) \
+#define	CHERI_REPRESENTABLE_ALIGNMENT(len)		\
 	(~CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) + 1)
-#define	CHERI_REPRESENTABLE_ALIGN_DOWN(base, len) \
-	((base) & CHERI_REPRESENTABLE_ALIGNMENT_MASK(len))
+#define	CHERI_REPRESENTABLE_ALIGN_DOWN(base, len)		\
+	__align_down((base), CHERI_REPRESENTABLE_ALIGNMENT(len))
 
 #if __has_feature(capabilities)
-#define	CHERI_REPRESENTABLE_ALIGN_UP(base, len) \
+#define	CHERI_REPRESENTABLE_ALIGN_UP(base, len)			\
 	__align_up((base), CHERI_REPRESENTABLE_ALIGNMENT(len))
 #else
 #define	CHERI_REPRESENTABLE_ALIGN_UP(base, len) (base)

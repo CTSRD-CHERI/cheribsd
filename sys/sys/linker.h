@@ -90,9 +90,6 @@ struct linker_file {
     int			flags;
 #define LINKER_FILE_LINKED	0x1	/* file has been fully linked */
 #define LINKER_FILE_MODULES	0x2	/* file has >0 modules at preload */
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	LINKER_FILE_PCC_BOUNDS	0x4	/* use PCC bounds from relative relocations */
-#endif
     TAILQ_ENTRY(linker_file) link;	/* list of all loaded files */
     char*		filename;	/* file which was loaded */
     char*		pathname;	/* file name with full path */
@@ -288,6 +285,7 @@ void linker_kldload_unbusy(int flags);
 #define MODINFOMD_KEYBUF	0x000d		/* Crypto key intake buffer */
 #define MODINFOMD_FONT		0x000e		/* Console font */
 #define MODINFOMD_SPLASH	0x000f		/* Console splash screen */
+#define MODINFOMD_PHDR		0x0c01		/* program headers */
 #define MODINFOMD_NOCOPY	0x8000		/* don't copy this metadata to the kernel */
 
 #define MODINFOMD_DEPLIST	(0x4001 | MODINFOMD_NOCOPY)	/* depends on */
@@ -318,6 +316,8 @@ extern void *		preload_fetch_addr(caddr_t _mod);
 extern size_t		preload_fetch_size(caddr_t _mod);
 extern caddr_t		preload_search_by_name(const char *_name);
 extern caddr_t		preload_search_by_type(const char *_type);
+extern caddr_t		preload_search_by_type_early(caddr_t _mdp,
+			    const char *_type);
 extern caddr_t		preload_search_next_name(caddr_t _base);
 extern caddr_t		preload_search_info(caddr_t _mod, int _inf);
 extern void		preload_initkmdp(bool _fatal);
@@ -345,12 +345,7 @@ extern int kld_debug;
 typedef int elf_lookup_fn(linker_file_t, Elf_Size, int, uintptr_t *);
 
 /* Support functions */
-void	elf_init(elf_file_t ef, Elf_Dyn *dynp, void *relocbase,
-	    ptraddr_t baseend, elf_plt_t plts
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	    , elf_compartment_t compartments, u_long *lastidp, elf_pcc_t pccs
-#endif
-	);
+void	elf_init(void *relocbase, ptraddr_t baseend, caddr_t mdp);
 void	elf_init_data(void);
 bool	elf_is_ifunc_reloc(Elf_Size r_info);
 int	elf_reloc(linker_file_t _lf, char *base, const void *_rel, int _type,

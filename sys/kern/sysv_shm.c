@@ -420,7 +420,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 	struct proc *p = td->td_proc;
 	struct shmid_kernel *shmseg;
 	struct shmmap_state *shmmap_s;
-	vm_pointer_t attach_va = 0, max_va;
+	vm_pointer_t attach_va = 0;
 	vm_prot_t prot;
 	vm_size_t size;
 	int cow, error, find_space, i, rv;
@@ -473,9 +473,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		attach_va = (__cheri_addr vm_offset_t)shmaddr;
 		if ((shmflg & SHM_RND) != 0)
 			attach_va = rounddown2(attach_va, SHMLBA);
-		else if (((__cheri_addr vm_offset_t)shmaddr & (SHMLBA-1)) == 0)
-			attach_va = (__cheri_addr vm_offset_t)shmaddr;
-		else
+		else if (!__is_aligned(attach_va, SHMLBA))
 			return (EINVAL);
 #if __has_feature(capabilities)
 		/*
@@ -509,9 +507,6 @@ kern_shmat_locked(struct thread *td, int shmid,
 			/* As with mmap, untagged implies exclusive. */
 			if ((shmflg & SHM_REMAP) != 0)
 				return (EINVAL);
-			shmaddr = (void * __capability)cheri_address_set(
-			    vm_map_rootcap(&td->td_proc->p_vmspace->vm_map),
-			    attach_va);
 		}
 #endif
 		if ((shmflg & SHM_REMAP) != 0)
@@ -537,21 +532,13 @@ kern_shmat_locked(struct thread *td, int shmid,
 			    CHERI_REPRESENTABLE_ALIGNMENT(size) < (1UL << 12) ?
 			    VMFS_OPTIMAL_SPACE :
 			    VMFS_ALIGNED_SPACE(CHERI_ALIGN_SHIFT(size));
-			shmaddr = (void * __capability)cheri_address_set(
-			    vm_map_rootcap(&td->td_proc->p_vmspace->vm_map),
-			    attach_va);
 		} else
 #endif
 			find_space = VMFS_OPTIMAL_SPACE;
 	}
-#if __has_feature(capabilities)
-	max_va = cheri_top_get(shmaddr);
-#else
-	max_va = 0;
-#endif
 	vm_object_reference(shmseg->object);
 	rv = vm_map_find_name(&p->p_vmspace->vm_map, shmseg->object, 0,
-	    &attach_va, size, max_va, find_space, prot, prot, cow,
+	    &attach_va, size, 0, find_space, prot, prot, cow,
 	    "sys:sysv_shm");
 	if (rv != KERN_SUCCESS) {
 		vm_object_deallocate(shmseg->object);
@@ -571,23 +558,25 @@ kern_shmat_locked(struct thread *td, int shmid,
 	shmseg->u.shm_nattch++;
 #if __has_feature(capabilities)
 	if (SV_CURPROC_FLAG(SV_CHERI)) {
-		/*
-		 * XXX-AM: The purecap kernel reservations should have taken care of this
-		 * and just return attach_va, as the capability will be derived from the
-		 * root map capability.
-		 */
-		shmaddr = cheri_bounds_set_exact(cheri_address_set(shmaddr,
-		     attach_va), size);
-		/* Remove inappropriate permissions. */
-		shmaddr = cheri_perms_and(shmaddr, ~(CHERI_PERM_EXECUTE |
-#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
-		    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
-#elif defined(HAS_CHERI_PERM_CAP)
-		    CHERI_PERM_CAP |
+		uintcap_t retaddr;
+		int perm;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+		retaddr = attach_va;
+#else
+		retaddr = cheri_address_set(
+		    vm_map_rootcap(&td->td_proc->p_vmspace->vm_map), attach_va);
+		retaddr = cheri_bounds_set_exact(retaddr, size);
 #endif
-		    ((shmflg & SHM_RDONLY) != 0 ? CHERI_PERM_STORE : 0)));
-		td->td_retval[0] = (uintcap_t)__DECONST_CAP(void * __capability,
-		    shmaddr);
+
+		/* Set appropriate permissions. */
+		if ((shmflg & SHM_RDONLY) != 0)
+			perm = CHERI_PERMS_USERSPACE_RODATA;
+		else
+			perm = CHERI_PERMS_USERSPACE_DATA;
+		perm |= CHERI_PERM_SW_VMEM;
+		retaddr = cheri_perms_and(retaddr, perm);
+		td->td_retval[0] = retaddr;
 	} else
 #endif
 		td->td_retval[0] = attach_va;

@@ -50,6 +50,7 @@
 #include <sys/filedesc.h>
 #include <sys/filio.h>
 #include <sys/fcntl.h>
+#include <sys/imgact.h>
 #include <sys/kthread.h>
 #include <sys/selinfo.h>
 #include <sys/queue.h>
@@ -75,6 +76,10 @@
 #include <sys/ktrace.h>
 #endif
 #include <machine/atomic.h>
+#ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64.h>
+#include <compat/freebsd64/freebsd64_util.h>
+#endif
 #ifdef COMPAT_FREEBSD32
 #include <compat/freebsd32/freebsd32.h>
 #include <compat/freebsd32/freebsd32_util.h>
@@ -2891,9 +2896,12 @@ knote_status_export(int kn_status)
 
 static int
 kern_proc_kqueue_report_one(struct sbuf *s, struct proc *p,
-    int kq_fd, struct kqueue *kq, struct knote *kn, bool compat32 __unused)
+    int kq_fd, struct kqueue *kq, struct knote *kn, u_int sv_flags __unused)
 {
 	struct kinfo_knote kin;
+#ifdef COMPAT_FREEBSD64
+	struct kinfo_knote64 kin64;
+#endif
 #ifdef COMPAT_FREEBSD32
 	struct kinfo_knote32 kin32;
 #endif
@@ -2910,8 +2918,14 @@ kern_proc_kqueue_report_one(struct sbuf *s, struct proc *p,
 	KQ_UNLOCK_FLUX(kq);
 	if (kn->kn_fop->f_userdump != NULL)
 		(void)kn->kn_fop->f_userdump(p, kn, &kin);
+#ifdef COMPAT_FREEBSD64
+	if ((sv_flags & (SV_LP64 | SV_CHERI)) == SV_LP64) {
+		freebsd64_kinfo_knote_to_64(&kin, &kin64);
+		error = sbuf_bcat(s, &kin64, sizeof(kin64));
+	} else
+#endif
 #ifdef COMPAT_FREEBSD32
-	if (compat32) {
+	if ((sv_flags & SV_ILP32) != 0) {
 		freebsd32_kinfo_knote_to_32(&kin, &kin32);
 		error = sbuf_bcat(s, &kin32, sizeof(kin32));
 	} else
@@ -2924,7 +2938,7 @@ kern_proc_kqueue_report_one(struct sbuf *s, struct proc *p,
 
 static int
 kern_proc_kqueue_report(struct sbuf *s, struct proc *p, int kq_fd,
-    struct kqueue *kq, bool compat32)
+    struct kqueue *kq, u_int sv_flags)
 {
 	struct knote *kn;
 	int error, i;
@@ -2934,7 +2948,7 @@ kern_proc_kqueue_report(struct sbuf *s, struct proc *p, int kq_fd,
 	for (i = 0; i < kq->kq_knlistsize; i++) {
 		SLIST_FOREACH(kn, &kq->kq_knlist[i], kn_link) {
 			error = kern_proc_kqueue_report_one(s, p, kq_fd,
-			    kq, kn, compat32);
+			    kq, kn, sv_flags);
 			if (error != 0)
 				goto out;
 		}
@@ -2944,7 +2958,7 @@ kern_proc_kqueue_report(struct sbuf *s, struct proc *p, int kq_fd,
 	for (i = 0; i <= kq->kq_knhashmask; i++) {
 		SLIST_FOREACH(kn, &kq->kq_knhash[i], kn_link) {
 			error = kern_proc_kqueue_report_one(s, p, kq_fd,
-			    kq, kn, compat32);
+			    kq, kn, sv_flags);
 			if (error != 0)
 				goto out;
 		}
@@ -2956,7 +2970,7 @@ out:
 
 struct kern_proc_kqueues_out1_cb_args {
 	struct sbuf *s;
-	bool compat32;
+	u_int sv_flags;
 };
 
 static int
@@ -2969,23 +2983,23 @@ kern_proc_kqueues_out1_cb(struct proc *p, int fd, struct file *fp, void *arg)
 		return (0);
 	a = arg;
 	kq = fp->f_data;
-	return (kern_proc_kqueue_report(a->s, p, fd, kq, a->compat32));
+	return (kern_proc_kqueue_report(a->s, p, fd, kq, a->sv_flags));
 }
 
 static int
 kern_proc_kqueues_out1(struct thread *td, struct proc *p, struct sbuf *s,
-    bool compat32)
+    u_int sv_flags)
 {
 	struct kern_proc_kqueues_out1_cb_args a;
 
 	a.s = s;
-	a.compat32 = compat32;
+	a.sv_flags = sv_flags;
 	return (fget_remote_foreach(td, p, kern_proc_kqueues_out1_cb, &a));
 }
 
 int
 kern_proc_kqueues_out(struct proc *p, struct sbuf *sb, size_t maxlen,
-    bool compat32)
+    u_int sv_flags)
 {
 	struct sbuf *s, sm;
 	size_t sb_len;
@@ -2997,7 +3011,7 @@ kern_proc_kqueues_out(struct proc *p, struct sbuf *sb, size_t maxlen,
 		sb_len = maxlen;
 	s = sbuf_new(&sm, NULL, sb_len, maxlen == -1 ? SBUF_AUTOEXTEND :
 	    SBUF_FIXEDLEN);
-	error = kern_proc_kqueues_out1(curthread, p, s, compat32);
+	error = kern_proc_kqueues_out1(curthread, p, s, sv_flags);
 	sbuf_finish(s);
 	if (error == 0) {
 		sbuf_bcat(sb, sbuf_data(s), MIN(sbuf_len(s), maxlen == -1 ?
@@ -3009,7 +3023,7 @@ kern_proc_kqueues_out(struct proc *p, struct sbuf *sb, size_t maxlen,
 
 static int
 sysctl_kern_proc_kqueue_one(struct thread *td, struct sbuf *s, struct proc *p,
-    int kq_fd, bool compat32)
+    int kq_fd, u_int sv_flags)
 {
 	struct file *fp;
 	struct kqueue *kq;
@@ -3022,7 +3036,7 @@ sysctl_kern_proc_kqueue_one(struct thread *td, struct sbuf *s, struct proc *p,
 		} else {
 			kq = fp->f_data;
 			error = kern_proc_kqueue_report(s, p, kq_fd, kq,
-			    compat32);
+			    sv_flags);
 		}
 		fdrop(fp, td);
 	}
@@ -3035,23 +3049,25 @@ sysctl_kern_proc_kqueue(SYSCTL_HANDLER_ARGS)
 	struct thread *td;
 	struct proc *p;
 	struct sbuf *s, sm;
+	u_int sv_flags;
 	int error, error1, *name;
-	bool compat32;
 
 	name = (int *)arg1;
 	if ((u_int)arg2 > 2 || (u_int)arg2 == 0)
 		return (EINVAL);
 
-	error = pget((pid_t)name[0], PGET_HOLD | PGET_CANDEBUG, &p);
+	td = curthread;
+
+	error = pget((pid_t)name[0], PGET_NOTWEXIT, &p);
 	if (error != 0)
 		return (error);
 
-	td = curthread;
-#ifdef FREEBSD_COMPAT32
-	compat32 = SV_CURPROC_FLAG(SV_ILP32);
-#else
-	compat32 = false;
-#endif
+	_PHOLD(p);
+	execve_block_wait(td, p);
+	error = p_candebug(td, p);
+	if (error != 0)
+		goto out1;
+	PROC_UNLOCK(p);
 
 	s = sbuf_new_for_sysctl(&sm, NULL, 0, req);
 	if (s == NULL) {
@@ -3060,11 +3076,12 @@ sysctl_kern_proc_kqueue(SYSCTL_HANDLER_ARGS)
 	}
 	sbuf_clear_flags(s, SBUF_INCLUDENUL);
 
+	sv_flags = curproc->p_sysent->sv_flags;
 	if ((u_int)arg2 == 1) {
-		error = kern_proc_kqueues_out1(td, p, s, compat32);
+		error = kern_proc_kqueues_out1(td, p, s, sv_flags);
 	} else {
 		error = sysctl_kern_proc_kqueue_one(td, s, p,
-		    name[1] /* kq_fd */, compat32);
+		    name[1] /* kq_fd */, sv_flags);
 	}
 
 	error1 = sbuf_finish(s);
@@ -3073,7 +3090,11 @@ sysctl_kern_proc_kqueue(SYSCTL_HANDLER_ARGS)
 	sbuf_delete(s);
 
 out:
-	PRELE(p);
+	PROC_LOCK(p);
+out1:
+	execve_unblock(td, p);
+	_PRELE(p);
+	PROC_UNLOCK(p);
 	return (error);
 }
 

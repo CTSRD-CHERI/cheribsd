@@ -130,8 +130,7 @@ init_cap_relocs(void *data_cap, void *code_cap)
 	stop_relocs = CHERI_RODATA_PTR(__stop___cap_relocs);
 	cb = CHERI_RODATA_PTR(kernel_cap_relocs_cb);
 	cb_arg = __builtin_cheri_flags_set(cb, 0);
-	/* TODO: true for PT_CHERI_PCC */
 	(void)init_linker_file_cap_relocs(start_relocs, stop_relocs, data_cap, 0,
-	    false, cb, cb_arg);
+	    true, cb, cb_arg);
 }
 #endif

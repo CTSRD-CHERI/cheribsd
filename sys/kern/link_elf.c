@@ -86,6 +86,10 @@
 #include <ddb/db_ctf.h>
 #endif
 
+#if !__has_feature(capabilities) && !defined(CHERI_RODATA_PTR)
+#define	CHERI_RODATA_PTR(x)	(&(*x))
+#endif
+
 /*
  * Maximum number of program headers not related to extra compartments.
  */
@@ -267,14 +271,15 @@ static void	link_elf_propagate_vnets(linker_file_t);
 static unsigned long elf_plt_count(elf_file_t ef);
 static void	elf_plt_create(elf_file_t ef);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-static bool	link_elf_init_compartments(linker_file_t lf, Elf_Phdr *phtable,
-		    Elf_Phdr *phlimit, u_long *lastidp);
-static bool	link_elf_load_compartments(linker_file_t lf, Elf_Phdr *phtable,
-		    Elf_Phdr *phlimit);
-static bool	link_elf_init_pccs(linker_file_t lf, Elf_Phdr *phtable, Elf_Phdr
-		    *phlimit);
-static bool	link_elf_load_pccs(linker_file_t lf, Elf_Phdr *phtable, Elf_Phdr
-		    *phlimit);
+static bool	link_elf_init_compartments(linker_file_t lf,
+		    const Elf_Phdr *phtable, const Elf_Phdr *phlimit,
+		    u_long *lastidp);
+static bool	link_elf_load_compartments(linker_file_t lf,
+		    const Elf_Phdr *phtable, const Elf_Phdr *phlimit);
+static bool	link_elf_init_pccs(linker_file_t lf, const Elf_Phdr *phtable,
+		    const Elf_Phdr *phlimit);
+static bool	link_elf_load_pccs(linker_file_t lf, const Elf_Phdr *phtable,
+		    const Elf_Phdr *phlimit);
 static void	elf_compartment_init(elf_compartment_t ec, elf_file_t ef,
 		    u_long id, const char *filename, const char *c18nname,
 		    caddr_t address, size_t size, elf_pcc_t pcc, elf_plt_t plt);
@@ -580,23 +585,40 @@ ef_symbol_address(elf_file_t ef, const Elf_Sym *sym)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
- * Check for a valid ELF executable header at ef->mapbase.
+ * Find a copy of the module's program headers, either from module metadata or
+ * by probing for a valid ELF executable header at ef->mapbase that we can then
+ * follow.
  *
  * NB: RISC-V kernels do not map phdrs into memory.
  */
-static bool
-have_phdrs(elf_file_t ef)
+static const Elf_Phdr *
+preload_search_phdrs(elf_file_t ef, size_t *phnum, caddr_t modptr)
 {
 	const Elf_Ehdr *hdr;
+	uint32_t *modinfo;
+
+	modinfo = (uint32_t *)preload_search_info(modptr,
+	    MODINFO_METADATA | MODINFOMD_PHDR);
+	if (modinfo != NULL) {
+		/* Size of metadata; see preload_search_info */
+		*phnum = modinfo[-1] / sizeof(Elf_Phdr);
+		return ((const Elf_Phdr *)modinfo);
+	}
+
 	hdr = (const Elf_Ehdr *)ef->mapbase;
-	return (IS_ELF(*hdr) &&
+	if (IS_ELF(*hdr) &&
 	    hdr->e_ident[EI_CLASS] == ELF_TARG_CLASS &&
 	    hdr->e_ident[EI_DATA] == ELF_TARG_DATA &&
 	    hdr->e_ident[EI_VERSION] == EV_CURRENT &&
 	    hdr->e_machine == ELF_TARG_MACH &&
 	    hdr->e_version == ELF_TARG_VER &&
 	    hdr->e_phentsize == sizeof(Elf_Phdr) &&
-	    ELF_IS_CHERI(hdr));
+	    ELF_IS_CHERI(hdr)) {
+		*phnum = hdr->e_phnum;
+		return ((const Elf_Phdr *)((const char *)hdr + hdr->e_phoff));
+	}
+
+	return (NULL);
 }
 
 static bool
@@ -616,11 +638,7 @@ ef_create_pcc_caps(elf_file_t ef, const Elf_Phdr *phstart,
 		}
 	}
 
-	if (ef->npcc_caps == 0)
-		return (true);
-
 	valid = true;
-	ef->lf.flags |= LINKER_FILE_PCC_BOUNDS;
 	i = 0;
 	ef->pcc_caps = mallocarray(ef->npcc_caps, sizeof(*ef->pcc_caps),
 	    M_LINKER, M_WAITOK | M_ZERO);
@@ -659,17 +677,16 @@ ef_create_pcc_caps(elf_file_t ef, const Elf_Phdr *phstart,
 }
 
 static bool
-preload_init_pcc_caps(elf_file_t ef)
+preload_init_pcc_caps(elf_file_t ef, caddr_t modptr)
 {
-	const Elf_Ehdr *hdr;
 	const Elf_Phdr *phdr;
+	size_t phnum;
 
-	if (!have_phdrs(ef))
+	phdr = preload_search_phdrs(ef, &phnum, modptr);
+	if (phdr == NULL)
 		return (true);
 
-	hdr = (const Elf_Ehdr *)ef->mapbase;
-	phdr = (const Elf_Phdr *)((const char *)hdr + hdr->e_phoff);
-	return (ef_create_pcc_caps(ef, phdr, phdr + hdr->e_phnum));
+	return (ef_create_pcc_caps(ef, phdr, phdr + phnum));
 }
 #endif
 
@@ -734,22 +751,39 @@ SYSCTL_ULONG(_kern, OID_AUTO, relbase_address, CTLFLAG_RD,
 	&kern_relbase, 0, "Kernel relocated base address");
 
 void
-elf_init(elf_file_t ef, Elf_Dyn *dynp, void *relocbase, ptraddr_t baseend,
-    elf_plt_t plts
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-    , elf_compartment_t compartments, u_long *lastidp, elf_pcc_t pccs
-#endif
-    )
+elf_init(void *relocbase, ptraddr_t baseend, caddr_t mdp __unused)
 {
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	caddr_t modptr;
 	linker_file_t lf;
-	Elf_Ehdr *hdr;
-	Elf_Phdr *phlimit, *phdr, *phtable;
+	const Elf_Phdr *phlimit, *phdr, *phtable;
+	size_t phnum;
+	elf_compartment_t compartments;
+	u_long *lastidp;
+	elf_pcc_t pccs;
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
 	void *code_cap, *data_cap;
 #endif
+	elf_file_t ef;
+	Elf_Dyn *dynp;
+	elf_plt_t plts;
 	int error;
+
+#define	RELOCBASE_DATA_PTR(p) \
+	(__typeof__((0, p)))cheri_kern_address_set(cheri_kern_perms_and( \
+	    relocbase, CHERI_PERMS_KERNEL_DATA), \
+	    (ptraddr_t)CHERI_RODATA_PTR(p))
+	ef = RELOCBASE_DATA_PTR(__unbounded_addressof(elf_kernel_file));
+	dynp = (Elf_Dyn *)RELOCBASE_DATA_PTR(__unbounded_addressof(_DYNAMIC));
+	plts = RELOCBASE_DATA_PTR(__builtin_no_change_bounds(elf_kernel_plts));
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	compartments = RELOCBASE_DATA_PTR(__builtin_no_change_bounds(
+	    elf_kernel_compartments));
+	lastidp = RELOCBASE_DATA_PTR(__unbounded_addressof(compartment_lastid));
+	pccs = RELOCBASE_DATA_PTR(__builtin_no_change_bounds(elf_kernel_pccs));
+#endif
+#undef	RELOCBASE_DATA_PTR
 
 	/*
 	 * Initialize an ELF file object for the kernel.
@@ -783,10 +817,18 @@ elf_init(elf_file_t ef, Elf_Dyn *dynp, void *relocbase, ptraddr_t baseend,
 	if (error == 0)
 		error = parse_dynamic(ef);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	hdr = (Elf_Ehdr *)cheri_setaddress(ef->address, KERNBASE);
-	phtable = (Elf_Phdr *)cheri_setaddress(ef->address, KERNBASE +
-	    hdr->e_phoff);
-	phlimit = phtable + hdr->e_phnum;
+	modptr = preload_search_by_type_early(mdp,
+	    CHERI_RODATA_PTR(__builtin_no_change_bounds(
+	    "elf" __XSTRING(__ELF_WORD_SIZE) " kernel")));
+	if (modptr == NULL)
+		modptr = preload_search_by_type_early(mdp,
+		    CHERI_RODATA_PTR(__builtin_no_change_bounds("elf kernel")));
+	phtable = preload_search_phdrs(ef, &phnum, modptr);
+	if (phtable == NULL) {
+		phlimit = NULL;
+		error = ENOEXEC;
+	} else
+		phlimit = phtable + phnum;
 	ef->ncompartments = 0;
 	ef->npccs = 0;
 	lf = &ef->lf;
@@ -937,7 +979,7 @@ link_elf_init(void* arg)
 	linker_file_set_filename(linker_kernel_file, modname);
 	ef = (elf_file_t) linker_kernel_file;
 #ifdef __CHERI_PURE_CAPABILITY__
-	if (!preload_init_pcc_caps(ef))
+	if (!preload_init_pcc_caps(ef, preload_kmdp))
 		panic("%s: Can't create PCC caps for kernel", __func__);
 #endif
 
@@ -1432,8 +1474,8 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	Elf_Addr *ctors_addrp;
 	Elf_Size *ctors_sizep;
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	Elf_Ehdr *hdr;
-	Elf_Phdr *phdr, *phlimit, *phtable;
+	const Elf_Phdr *phdr, *phlimit, *phtable;
+	size_t phnum;
 #endif
 	caddr_t modptr, baseptr, sizeptr, dynptr;
 	char *type;
@@ -1471,7 +1513,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	ef->address = cheri_perms_and(ef->address, CHERI_PERMS_KERNEL_CODE |
 	    CHERI_PERMS_KERNEL_DATA);
 	ef->mapbase = ef->address;
-	if (!preload_init_pcc_caps(ef)) {
+	if (!preload_init_pcc_caps(ef, modptr)) {
 		error = ENOEXEC;
 		goto out;
 	}
@@ -1504,9 +1546,12 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	elf_plt_create(ef);
 	error = parse_dynamic(ef);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	hdr = (Elf_Ehdr *)ef->address;
-	phtable = (Elf_Phdr *)(ef->address + hdr->e_phoff);
-	phlimit = phtable + hdr->e_phnum;
+	phtable = preload_search_phdrs(ef, &phnum, modptr);
+	if (phtable == NULL) {
+		phlimit = NULL;
+		error = ENOEXEC;
+	} else
+		phlimit = phtable + phnum;
 	ef->ncompartments = 0;
 	ef->npccs = 0;
 	for (phdr = phtable; phdr < phlimit; phdr++) {
@@ -1623,10 +1668,10 @@ link_elf_find_compartment_plt(linker_file_t lf, ptraddr_t base, size_t length)
 }
 
 static bool
-link_elf_init_compartments(linker_file_t lf, Elf_Phdr *phtable,
-    Elf_Phdr *phlimit, u_long *lastidp)
+link_elf_init_compartments(linker_file_t lf, const Elf_Phdr *phtable,
+    const Elf_Phdr *phlimit, u_long *lastidp)
 {
-	Elf_Phdr *phdr;
+	const Elf_Phdr *phdr;
 	elf_file_t ef;
 	unsigned int compartmentii;
 	elf_pcc_t pcc;
@@ -1670,8 +1715,8 @@ link_elf_init_compartments(linker_file_t lf, Elf_Phdr *phtable,
 }
 
 static bool
-link_elf_load_compartments(linker_file_t lf, Elf_Phdr *phtable,
-    Elf_Phdr *phlimit)
+link_elf_load_compartments(linker_file_t lf, const Elf_Phdr *phtable,
+    const Elf_Phdr *phlimit)
 {
 	elf_file_t ef;
 
@@ -1725,9 +1770,10 @@ link_elf_create_compartments(linker_file_t lf, struct thread *td)
 }
 
 static bool
-link_elf_init_pccs(linker_file_t lf, Elf_Phdr *phtable, Elf_Phdr *phlimit)
+link_elf_init_pccs(linker_file_t lf, const Elf_Phdr *phtable,
+    const Elf_Phdr *phlimit)
 {
-	Elf_Phdr *phdr;
+	const Elf_Phdr *phdr;
 	elf_file_t ef;
 	unsigned int pccii;
 
@@ -1749,7 +1795,8 @@ link_elf_init_pccs(linker_file_t lf, Elf_Phdr *phtable, Elf_Phdr *phlimit)
 }
 
 static bool
-link_elf_load_pccs(linker_file_t lf, Elf_Phdr *phtable, Elf_Phdr *phlimit)
+link_elf_load_pccs(linker_file_t lf, const Elf_Phdr *phtable,
+    const Elf_Phdr *phlimit)
 {
 	elf_file_t ef;
 
@@ -3205,9 +3252,7 @@ link_elf_reloc_local(linker_file_t lf)
 		data_cap = cheri_perms_and(ef->mapbase, CHERI_PERMS_KERNEL_DATA);
 		if (init_linker_file_cap_relocs(ef->caprelocs,
 		    (char *)ef->caprelocs + ef->caprelocssize, data_cap,
-		    (ptraddr_t)ef->address,
-		    (lf->flags & LINKER_FILE_PCC_BOUNDS) != 0,
-		    resolve_cap_reloc, ef) != 0)
+		    (ptraddr_t)ef->address, true, resolve_cap_reloc, ef) != 0)
 			return (ENOEXEC);
 	}
 #endif
@@ -3299,31 +3344,6 @@ elf_lookup_ifunc(linker_file_t lf, Elf_Size symidx, int deps __unused,
 	}
 	return (ENOENT);
 }
-
-#ifdef __CHERI_PURE_CAPABILITY__
-/*
- * Set LINKER_FILE_PCC_BOUNDS but don't allocate pcc_caps[].
- */
-static void
-preload_check_for_pcc_caps(elf_file_t ef)
-{
-	const Elf_Ehdr *hdr;
-	const Elf_Phdr *phdr, *phlimit;
-
-	if (!have_phdrs(ef))
-		return;
-
-	hdr = (const Elf_Ehdr *)ef->mapbase;
-	phdr = (const Elf_Phdr *)((const char *)hdr + hdr->e_phoff);
-	phlimit = phdr + hdr->e_phnum;
-	for (; phdr < phlimit; phdr++) {
-		if (phdr->p_type == PT_CHERI_PCC) {
-			ef->lf.flags |= LINKER_FILE_PCC_BOUNDS;
-			return;
-		}
-	}
-}
-#endif
 
 void
 link_elf_ireloc(void)

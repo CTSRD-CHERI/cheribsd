@@ -107,14 +107,14 @@ struct kinfo_vmentry *
 	kinfo_getvmmap(pid_t _pid, int *_cntp);
 struct kinfo_vmobject *
 	kinfo_getvmobject(int *_cntp);
-struct kinfo_cheri_kc18n_compart *
-	kinfo_getcheri_kc18n_compart(int *cntp);
 struct kinfo_vmobject *
 	kinfo_getswapvmobject(int *_cntp);
 struct kinfo_proc *
 	kinfo_getallproc(int *_cntp);
 struct kinfo_proc *
 	kinfo_getproc(pid_t _pid);
+struct kinfo_cheri_kc18n_compart *
+	kinfo_getcompartments(int *cntp);
 int	kld_isloaded(const char *_name);
 int	kld_load(const char *_name);
 int	login_tty(int _fd);

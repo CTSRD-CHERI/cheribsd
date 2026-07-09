@@ -1,0 +1,49 @@
+@Library('ctsrd-jenkins-scripts') _
+
+import org.jenkinsci.plugins.pipeline.modeldefinition.Utils
+
+// Set job properties:
+def jobProperties = [
+        [$class: 'GithubProjectProperty', displayName: '', projectUrlStr: 'https://github.com/CTSRD-CHERI/cheribsd/'],
+        copyArtifactPermission('*'),
+        rateLimitBuilds(throttle: [count: 2, durationName: 'week', userBoost: true]),
+]
+if (!env.CHANGE_ID) {
+    // For branches other than the main and releng branches, only keep the last two artifacts to save disk space
+    if (env.BRANCH_NAME != 'main' && !env.BRANCH_NAME.startsWith('releng/')) {
+        jobProperties.add(buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '2')))
+    }
+}
+// Set the default job properties (work around properties() not being additive but replacing)
+setDefaultJobProperties(jobProperties)
+
+def archiveLogs(params) {
+    stage("Archive logs") {
+        dir("logs") {
+            archiveArtifacts artifacts: "_.*", allowEmptyArchive: false,
+                             fingerprint: true, onlyIfSuccessful: false
+        }
+    }
+}
+
+cheribuildProject(target: 'cheribsd-tinderbox',
+                  architecture: 'nocpu',
+                  // nocpu is mostly an internal detail, though does get exposed in cheribuild's
+                  // Configuring/Building/Installing messages
+                  skipArchiving: true, skipTarball: true,
+                  sdkCompilerOnly: true,
+                  // We only need clang not the CheriBSD sysroot since we are building that.
+                  customGitCheckoutDir: 'cheribsd',
+                  // Delete stale compiler/logs
+                  beforeBuild: { params ->
+                      dir('cherisdk') { deleteDir() }
+                      sh label: 'Deleting outputs from previous builds',
+                         script: 'rm -rfv logs'
+                  },
+                  finallyAfterBuild: { params ->
+                      archiveLogs(params)
+                  },
+                  extraArgs: [
+                      '--cheribsd-tinderbox/universe-logdir=logs',
+                  ],
+                  gitHubStatusContext: "tinderbox")

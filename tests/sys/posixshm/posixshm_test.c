@@ -33,6 +33,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/sysctl.h>
@@ -48,6 +49,8 @@
 #include <unistd.h>
 
 #include <atf-c.h>
+
+#include "posixshm.h"
 
 #define	TEST_PATH_LEN	256
 static char test_path[TEST_PATH_LEN];
@@ -1239,20 +1242,6 @@ shm_open_large(int psind, int policy, size_t sz)
 	return (fd);
 }
 
-static int
-pagesizes(size_t ps[MAXPAGESIZES])
-{
-	int pscnt;
-
-	pscnt = getpagesizes(ps, MAXPAGESIZES);
-	ATF_REQUIRE_MSG(pscnt != -1, "getpagesizes failed; errno=%d", errno);
-	ATF_REQUIRE_MSG(ps[0] != 0, "psind 0 is %zu", ps[0]);
-	ATF_REQUIRE_MSG(pscnt <= MAXPAGESIZES, "invalid pscnt %d", pscnt);
-	if (pscnt == 1)
-		atf_tc_skip("no large page support");
-	return (pscnt);
-}
-
 ATF_TC_WITHOUT_HEAD(largepage_basic);
 ATF_TC_BODY(largepage_basic, tc)
 {
@@ -1261,7 +1250,7 @@ ATF_TC_BODY(largepage_basic, tc)
 	size_t ps[MAXPAGESIZES];
 	int error, fd, pscnt;
 
-	pscnt = pagesizes(ps);
+	pscnt = pagesizes(ps, true);
 	zeroes = calloc(1, ps[0]);
 	ATF_REQUIRE(zeroes != NULL);
 	for (int i = 1; i < pscnt; i++) {
@@ -1317,7 +1306,7 @@ ATF_TC_BODY(largepage_config, tc)
 	size_t ps[MAXPAGESIZES + 1]; /* silence warnings if MAXPAGESIZES == 1 */
 	int error, fd;
 
-	(void)pagesizes(ps);
+	(void)pagesizes(ps, true);
 
 	fd = shm_open(SHM_ANON, O_CREAT | O_RDWR, 0);
 	ATF_REQUIRE_MSG(fd >= 0, "shm_open failed; error=%d", errno);
@@ -1372,6 +1361,27 @@ ATF_TC_BODY(largepage_config, tc)
 	ATF_REQUIRE(close(fd) == 0);
 }
 
+ATF_TC_WITHOUT_HEAD(largepage_fspacectl);
+ATF_TC_BODY(largepage_fspacectl, tc)
+{
+	struct spacectl_range range;
+	size_t ps[MAXPAGESIZES];
+	int fd, pscnt;
+
+	pscnt = pagesizes(ps, true);
+
+	for (int i = 1; i < pscnt; i++) {
+		fd = shm_open_large(i, SHM_LARGEPAGE_ALLOC_DEFAULT, ps[i]);
+
+		range.r_offset = 0;
+		range.r_len = ps[i];
+		ATF_REQUIRE_ERRNO(ENOTSUP,
+		    fspacectl(fd, SPACECTL_DEALLOC, &range, 0, &range) == -1);
+
+		ATF_REQUIRE(close(fd) == 0);
+	}
+}
+
 ATF_TC_WITHOUT_HEAD(largepage_mmap);
 ATF_TC_BODY(largepage_mmap, tc)
 {
@@ -1379,7 +1389,7 @@ ATF_TC_BODY(largepage_mmap, tc)
 	size_t ps[MAXPAGESIZES];
 	int fd, pscnt;
 
-	pscnt = pagesizes(ps);
+	pscnt = pagesizes(ps, true);
 	for (int i = 1; i < pscnt; i++) {
 		fd = shm_open_large(i, SHM_LARGEPAGE_ALLOC_DEFAULT, ps[i]);
 
@@ -1475,7 +1485,7 @@ ATF_TC_BODY(largepage_munmap, tc)
 	size_t ps[MAXPAGESIZES], ps1;
 	int fd, pscnt;
 
-	pscnt = pagesizes(ps);
+	pscnt = pagesizes(ps, true);
 	for (int i = 1; i < pscnt; i++) {
 		fd = shm_open_large(i, SHM_LARGEPAGE_ALLOC_DEFAULT, ps[i]);
 		ps1 = ps[i - 1];
@@ -1526,7 +1536,7 @@ ATF_TC_BODY(largepage_madvise, tc)
 	size_t ps[MAXPAGESIZES];
 	int fd, pscnt;
 
-	pscnt = pagesizes(ps);
+	pscnt = pagesizes(ps, true);
 	for (int i = 1; i < pscnt; i++) {
 		fd = shm_open_large(i, SHM_LARGEPAGE_ALLOC_DEFAULT, ps[i]);
 		addr = mmap(NULL, ps[i], PROT_READ | PROT_WRITE, MAP_SHARED, fd,
@@ -1595,7 +1605,7 @@ ATF_TC_BODY(largepage_mlock, tc)
 	    "sysctlbyname(vm.stats.vm.v_user_wire_count) failed; error=%d",
 	    errno);
 
-	pscnt = pagesizes(ps);
+	pscnt = pagesizes(ps, true);
 	for (int i = 1; i < pscnt; i++) {
 		if (ps[i] / ps[0] > max_wired - wired) {
 			/* Cannot wire past the limit. */
@@ -1638,7 +1648,7 @@ ATF_TC_BODY(largepage_msync, tc)
 	size_t ps[MAXPAGESIZES];
 	int fd, pscnt;
 
-	pscnt = pagesizes(ps);
+	pscnt = pagesizes(ps, true);
 	for (int i = 1; i < pscnt; i++) {
 		fd = shm_open_large(i, SHM_LARGEPAGE_ALLOC_DEFAULT, ps[i]);
 		addr = mmap(NULL, ps[i], PROT_READ | PROT_WRITE, MAP_SHARED, fd,
@@ -1697,7 +1707,7 @@ ATF_TC_BODY(largepage_mprotect, tc)
 	size_t ps[MAXPAGESIZES];
 	int fd, pscnt;
 
-	pscnt = pagesizes(ps);
+	pscnt = pagesizes(ps, true);
 	for (int i = 1; i < pscnt; i++) {
 		/*
 		 * Reserve a contiguous region in the address space to avoid
@@ -1775,7 +1785,7 @@ ATF_TC_BODY(largepage_minherit, tc)
 	pid_t child;
 	int fd, pscnt, status;
 
-	pscnt = pagesizes(ps);
+	pscnt = pagesizes(ps, true);
 	for (int i = 1; i < pscnt; i++) {
 		fd = shm_open_large(i, SHM_LARGEPAGE_ALLOC_DEFAULT, ps[i]);
 		addr = mmap(NULL, ps[i], PROT_READ | PROT_WRITE, MAP_SHARED, fd,
@@ -1863,7 +1873,7 @@ ATF_TC_BODY(largepage_pipe, tc)
 	int fd, pfd[2], pscnt, status;
 	pid_t child;
 
-	pscnt = pagesizes(ps);
+	pscnt = pagesizes(ps, true);
 
 	for (int i = 1; i < pscnt; i++) {
 		fd = shm_open_large(i, SHM_LARGEPAGE_ALLOC_DEFAULT, ps[i]);
@@ -1916,7 +1926,7 @@ ATF_TC_BODY(largepage_reopen, tc)
 	size_t ps[MAXPAGESIZES];
 	int fd, psind;
 
-	(void)pagesizes(ps);
+	(void)pagesizes(ps, true);
 	psind = 1;
 
 	gen_test_path();
@@ -1946,6 +1956,130 @@ ATF_TC_BODY(largepage_reopen, tc)
 	    "mincore failed; error=%d", errno);
 	ATF_REQUIRE_MSG((vec[0] & MINCORE_SUPER) == MINCORE_PSIND(psind),
 	    "page not mapped into a %zu-byte superpage", ps[psind]);
+
+	ATF_REQUIRE_MSG(shm_unlink(test_path) == 0,
+	    "shm_unlink failed; errno=%d", errno);
+	ATF_REQUIRE_MSG(close(fd) == 0,
+	    "close failed; errno=%d", errno);
+}
+
+static unsigned char
+largepage_sendfile_expected(size_t off)
+{
+
+	return ((unsigned char)(off * 131 + (off >> 8)));
+}
+
+ATF_TC_WITHOUT_HEAD(largepage_sendfile);
+ATF_TC_BODY(largepage_sendfile, tc)
+{
+	static const int flags[] = { 0, SF_NOCACHE };
+	char *addr;
+	off_t sbytes;
+	size_t ps[MAXPAGESIZES];
+	int error, fd, pscnt, sd[2], status;
+	pid_t child;
+
+	pscnt = pagesizes(ps, true);
+
+	for (int i = 1; i < pscnt; i++) {
+		for (int fi = 0; fi < (int)nitems(flags); fi++) {
+			fd = shm_open_large(i, SHM_LARGEPAGE_ALLOC_DEFAULT,
+			    ps[i]);
+			addr = mmap(NULL, ps[i], PROT_READ | PROT_WRITE,
+			    MAP_SHARED, fd, 0);
+			ATF_REQUIRE_MSG(addr != MAP_FAILED,
+			    "mmap(%zu bytes) failed; error=%d", ps[i], errno);
+
+			/* Fill with a verifiable pattern. */
+			for (size_t j = 0; j < ps[i]; j++)
+				addr[j] = largepage_sendfile_expected(j);
+
+			ATF_REQUIRE(socketpair(PF_LOCAL, SOCK_STREAM, 0,
+			    sd) == 0);
+
+			child = fork();
+			ATF_REQUIRE_MSG(child != -1,
+			    "fork() failed; error=%d", errno);
+			if (child == 0) {
+				char buf[BUFSIZ];
+				ssize_t len;
+				size_t off, resid;
+
+				(void)close(sd[0]);
+				off = 0;
+				for (resid = ps[i]; resid > 0; resid -= len) {
+					len = read(sd[1], buf, sizeof(buf));
+					if (len <= 0)
+						_exit(1);
+					for (ssize_t k = 0; k < len; k++) {
+						if ((unsigned char)buf[k] !=
+						    largepage_sendfile_expected(
+						    off + k))
+							_exit(2);
+					}
+					off += len;
+				}
+				_exit(0);
+			}
+			ATF_REQUIRE(close(sd[1]) == 0);
+
+			sbytes = 0;
+			error = sendfile(fd, sd[0], 0, ps[i], NULL, &sbytes,
+			    flags[fi]);
+			ATF_REQUIRE_MSG(error == 0,
+			    "sendfile() failed; error=%d flags=%#x",
+			    errno, flags[fi]);
+			ATF_REQUIRE_MSG(sbytes == (off_t)ps[i],
+			    "sendfile() short; sbytes=%jd expected=%zu flags=%#x",
+			    (intmax_t)sbytes, ps[i], flags[fi]);
+
+			ATF_REQUIRE(close(sd[0]) == 0);
+
+			ATF_REQUIRE_MSG(waitpid(child, &status, 0) == child,
+			    "waitpid() failed; error=%d", errno);
+			ATF_REQUIRE_MSG(WIFEXITED(status),
+			    "child killed by signal %d", WTERMSIG(status));
+			ATF_REQUIRE_MSG(WEXITSTATUS(status) == 0,
+			    "child exited with status %d (flags=%#x)",
+			    WEXITSTATUS(status), flags[fi]);
+
+			ATF_REQUIRE(munmap(addr, ps[i]) == 0);
+			ATF_REQUIRE(close(fd) == 0);
+		}
+	}
+}
+
+ATF_TC_WITHOUT_HEAD(largepage_truncate);
+ATF_TC_BODY(largepage_truncate, tc)
+{
+	size_t ps[MAXPAGESIZES];
+	int fd, psind;
+
+	(void)pagesizes(ps, true);
+	psind = 1;
+
+	gen_test_path();
+	fd = shm_create_largepage(test_path, O_CREAT | O_RDWR, psind,
+	    SHM_LARGEPAGE_ALLOC_DEFAULT, 0600);
+	if (fd < 0 && errno == ENOTTY)
+		atf_tc_skip("no large page support");
+	ATF_REQUIRE_MSG(fd >= 0, "shm_create_largepage failed; error=%d", errno);
+
+	ATF_REQUIRE_MSG(ftruncate(fd, ps[psind]) == 0,
+	    "ftruncate failed; error=%d", errno);
+
+	ATF_REQUIRE_MSG(close(fd) == 0, "close failed; error=%d", errno);
+
+	fd = shm_open(test_path, O_RDWR | O_TRUNC, 0);
+	ATF_REQUIRE_MSG(fd == -1, "shm_open(O_TRUNC) should have failed");
+	ATF_REQUIRE_ERRNO(ENOTSUP, fd == -1);
+
+	fd = shm_open(test_path, O_RDWR, 0);
+	ATF_REQUIRE_MSG(fd >= 0, "shm_open failed; error=%d", errno);
+
+	ATF_REQUIRE_MSG(ftruncate(fd, ps[psind]) == 0,
+	    "ftruncate to same size failed; error=%d", errno);
 
 	ATF_REQUIRE_MSG(shm_unlink(test_path) == 0,
 	    "shm_unlink failed; errno=%d", errno);
@@ -1991,6 +2125,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, mmap_prot);
 	ATF_TP_ADD_TC(tp, largepage_basic);
 	ATF_TP_ADD_TC(tp, largepage_config);
+	ATF_TP_ADD_TC(tp, largepage_fspacectl);
 	ATF_TP_ADD_TC(tp, largepage_mmap);
 	ATF_TP_ADD_TC(tp, largepage_munmap);
 	ATF_TP_ADD_TC(tp, largepage_madvise);
@@ -2000,6 +2135,8 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, largepage_minherit);
 	ATF_TP_ADD_TC(tp, largepage_pipe);
 	ATF_TP_ADD_TC(tp, largepage_reopen);
+	ATF_TP_ADD_TC(tp, largepage_sendfile);
+	ATF_TP_ADD_TC(tp, largepage_truncate);
 
 	return (atf_no_error());
 }

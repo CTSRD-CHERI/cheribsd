@@ -417,7 +417,7 @@ build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
 	if (perms == MORELLO_FRAG_RWDATA ||
 	    perms == MORELLO_FRAG_RODATA) {
 		cap = cheri_perms_clear(cap, CHERI_PERM_SEAL |
-		    CHERI_PERM_EXECUTE);
+		    CHERI_PERM_EXECUTE | CHERI_PERM_EXECUTIVE);
 	}
 	cap += offset;
 	if (perms == MORELLO_FRAG_EXECUTABLE) {
@@ -473,13 +473,12 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 	const Elf_Rel *rel;
 	const Elf_Rela *rela;
 	int error;
-#if __has_feature(capabilities)
-	bool use_code_bounds = false;
+#ifdef __CHERI_PURE_CAPABILITY__
+	const bool use_code_bounds = true;
+#elif __has_feature(capabilities)
+	const bool use_code_bounds = false;
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
-	use_code_bounds = (lf->flags & LINKER_FILE_PCC_BOUNDS) != 0;
-#endif
 	switch (type) {
 	case ELF_RELOC_REL:
 		rel = (const Elf_Rel *)data;
@@ -806,34 +805,11 @@ static void __nosanitizecoverage
 elf_reloc_self_perms(const Elf_Dyn *dynp, void *data_cap, const void *code_cap,
     uint8_t permsmask)
 {
-	const Elf_Ehdr *hdr;
-	const Elf_Phdr *phdr, *phlimit;
 	const Elf_Rela *rela = NULL, *rela_end;
 	Elf_Addr addr, *fragment, size;
 	uintptr_t cap;
 	size_t rela_size = 0;
-	bool use_code_bounds = false;
 	uint8_t perms;
-
-	/* See if there is an ELF header is at KERNBASE. */
-	hdr = data_cap;
-	if (IS_ELF(*hdr) &&
-	    hdr->e_ident[EI_CLASS] == ELF_TARG_CLASS &&
-	    hdr->e_ident[EI_DATA] == ELF_TARG_DATA &&
-	    hdr->e_ident[EI_VERSION] == EV_CURRENT &&
-	    hdr->e_machine == ELF_TARG_MACH &&
-	    hdr->e_version == ELF_TARG_VER &&
-	    hdr->e_phentsize == sizeof(Elf_Phdr) &&
-	    ELF_IS_CHERI(hdr)) {
-		phdr = (const Elf_Phdr *)((const char *)hdr + hdr->e_phoff);
-		phlimit = phdr + hdr->e_phnum;
-		for (; phdr < phlimit; phdr++) {
-			if (phdr->p_type == PT_CHERI_PCC) {
-				use_code_bounds = true;
-				break;
-			}
-		}
-	}
 
 	for (; dynp->d_tag != DT_NULL; dynp++) {
 		switch (dynp->d_tag) {
@@ -862,7 +838,7 @@ elf_reloc_self_perms(const Elf_Dyn *dynp, void *data_cap, const void *code_cap,
 				continue;
 
 			cap = build_reloc_cap(addr, size, perms, rela->r_addend,
-			    data_cap, code_cap, use_code_bounds, true);
+			    data_cap, code_cap, true, true);
 			*((uintptr_t *)fragment) = cap;
 			break;
 		}
