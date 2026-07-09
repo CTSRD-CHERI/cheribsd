@@ -175,6 +175,4 @@ void	kdtrace_thread_dtor(struct thread *td);
 uint64_t	dtrace_gethrtime(void);
 uint64_t	dtrace_gethrestime(void);
 
-extern int dtrace_enabled;
-
 #endif /* _SYS_DTRACE_BSD_H */
