@@ -45,13 +45,12 @@ msg_auto_ufs="Auto (UFS)"
 msg_auto_ufs_desc="Guided UFS Disk Setup"
 msg_auto_ufs_help="Menu options help choose which disk to setup using UFS and standard partitions"
 msg_auto_zfs="Auto (ZFS)"
+msg_auto_zfs_desc="Guided Root-on-ZFS"
 case `uname -p` in
 aarch64*c*|riscv*c*)
-	msg_auto_zfs_desc="EXPERIMENTAL Guided Root-on-ZFS"
-	msg_auto_zfs_help="ZFS is Alpha quality. See the release notes for caveats."
+	msg_auto_zfs_help="Some advanced ZFS features are experimental and not well-tested on CHERI. See the release notes for caveats."
 	;;
 *)
-	msg_auto_zfs_desc="Guided Root-on-ZFS"
 	msg_auto_zfs_help="To use ZFS with less than 8GB RAM, see https://wiki.freebsd.org/ZFSTuningGuide"
 	;;
 esac
@@ -292,25 +291,14 @@ if f_interactive; then
 	esac
 fi
 
-case `uname -p` in
-aarch64*c*|riscv*c*)
-	# Allow ZFS on CHERI, but make UFS first
-	PMODES="
-		'$msg_auto_ufs' '$msg_auto_ufs_desc' '$msg_auto_ufs_help'
-		'$msg_auto_zfs' '$msg_auto_zfs_desc' '$msg_auto_zfs_help'
-		'$msg_manual' '$msg_manual_desc' '$msg_manual_help'
-		'$msg_shell' '$msg_shell_desc' '$msg_shell_help'
-	" # END-QUOTE
-	;;
-*)
-	PMODES="
-		'$msg_auto_ufs' '$msg_auto_ufs_desc' '$msg_auto_ufs_help'
-		'$msg_manual' '$msg_manual_desc' '$msg_manual_help'
-		'$msg_shell' '$msg_shell_desc' '$msg_shell_help'
-	" # END-QUOTE
+PMODES="
+	'$msg_auto_ufs' '$msg_auto_ufs_desc' '$msg_auto_ufs_help'
+	'$msg_manual' '$msg_manual_desc' '$msg_manual_help'
+	'$msg_shell' '$msg_shell_desc' '$msg_shell_help'
+" # END-QUOTE
 
-	CURARCH=$( uname -m )
-	case $CURARCH in
+CURARCH=$( uname -m )
+case $CURARCH in
 	amd64|arm64|i386|riscv)	# Booting ZFS Supported
 		PMODES="
 			'$msg_auto_zfs' '$msg_auto_zfs_desc' '$msg_auto_zfs_help'
@@ -319,8 +307,6 @@ aarch64*c*|riscv*c*)
 		;;
 	*)			# Booting ZFS Unsupported
 		;;
-	esac
-	;;
 esac
 
 exec 5>&1
