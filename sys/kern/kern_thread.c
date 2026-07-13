@@ -118,7 +118,7 @@ _Static_assert(offsetof(struct proc, p_filemon) == 0x270,
     "struct proc KBI p_filemon");
 _Static_assert(offsetof(struct proc, p_comm) == 0x288,
     "struct proc KBI p_comm");
-_Static_assert(offsetof(struct proc, p_emuldata) == 0x31c,
+_Static_assert(offsetof(struct proc, p_emuldata) == 0x320,
     "struct proc KBI p_emuldata");
 #endif
 
