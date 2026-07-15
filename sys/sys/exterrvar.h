@@ -26,6 +26,8 @@
 
 #ifdef _KERNEL
 
+struct thread;
+
 #ifndef EXTERR_CATEGORY
 #error "Specify error category before including sys/exterrvar.h"
 #endif
