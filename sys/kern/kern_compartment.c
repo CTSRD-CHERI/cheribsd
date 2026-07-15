@@ -112,7 +112,7 @@ struct compartment_trampoline {
 extern int early_boot;
 #endif
 
-u_long compartment_lastid = COMPARTMENT_KERNEL_ID;
+u_long compartment_lastid = COMPARTMENT_FIRST_ID;
 static uma_zone_t compartment_zone;
 #ifdef CHERI_COMPARTMENT_STATS
 static u_long compartment_maxnid;
@@ -400,11 +400,11 @@ compartment_linkup(struct compartment *compartment, u_long id,
 	if (compartment->c_id > td->td_compartments_maxid) {
 		td->td_compartments_maxid = compartment_lastid;
 		td->td_compartments = realloc(td->td_compartments,
-		    (td->td_compartments_maxid + 1) *
+		    (TD_CIDNDX(td->td_compartments_maxid) + 1) *
 		    sizeof(*td->td_compartments), M_COMPARTMENT, M_NOWAIT |
 		    M_USE_RESERVE | M_ZERO);
 	}
-	td->td_compartments[compartment->c_id] = compartment;
+	td->td_compartments[TD_CIDNDX(compartment->c_id)] = compartment;
 
 }
 
@@ -508,7 +508,8 @@ compartment_destroy(struct compartment *compartment)
 #endif
 
 	if (compartment->c_thread != NULL) {
-		compartment->c_thread->td_compartments[compartment->c_id] = NULL;
+		compartment->c_thread->td_compartments[TD_CIDNDX(compartment->c_id)] =
+		    NULL;
 	}
 
 	vm_compartment_dispose(compartment);
@@ -530,7 +531,10 @@ compartment_entry_stackptr(u_long id, int type)
 		compartment_trampoline_counters[type]++;
 #endif
 
-	compartment = curthread->td_compartments[id];
+	if (id <= curthread->td_compartments_maxid)
+		compartment = curthread->td_compartments[TD_CIDNDX(id)];
+	else
+		compartment = NULL;
 	if (compartment == NULL)
 		compartment = compartment_create(curthread, id, true);
 	return (compartment->c_kstackptr);
@@ -714,13 +718,13 @@ DB_COMMAND_FLAGS(c18nstat, db_c18nstat, DB_CMD_MEMSAFE)
 	    ADDRESS_WIDTH - 7, ' ', "CID", "CNAME", "PID", "TID", "COMM",
 	    "TDNAME");
 	if (verbose) {
-		ii = COMPARTMENT_KERNEL_ID;
+		ii = COMPARTMENT_FIRST_ID;
 	} else {
 		db_printf("*%*c %6lu %-20s %5s %6s %-20s %-20s\n",
-		    ADDRESS_WIDTH - 1, ' ', (u_long)COMPARTMENT_KERNEL_ID,
-		    compartment_metadata[COMPARTMENT_KERNEL_ID]->cm_name,
+		    ADDRESS_WIDTH - 1, ' ', (u_long)COMPARTMENT_FIRST_ID,
+		    compartment_metadata[COMPARTMENT_FIRST_ID]->cm_name,
 		    "*", "*", "*", "*");
-		ii = COMPARTMENT_KERNEL_ID + 1;
+		ii = COMPARTMENT_FIRST_ID + 1;
 	}
 #undef	ADDRESS_WIDTH
 	for (; ii <= compartment_lastid; ii++) {
