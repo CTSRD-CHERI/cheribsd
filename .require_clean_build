@@ -18,3 +18,5 @@
 20240315  # Switch to final ABI for passing memory arguments on Morello
 # https://github.com/CTSRD-CHERI/cheribsd/commit/58148940eb25f74991336171b68ddffe85c342a7
 20260417  # bsd.opts.mk: Switch to new TGOT-based TLS ABI by default for CHERI
+# https://github.com/CTSRD-CHERI/cheribsd/commit/2093d496abfa96be9137dba86f859e6216aee017
+20260710  # Bump __CheriBSD_version to 20260710
