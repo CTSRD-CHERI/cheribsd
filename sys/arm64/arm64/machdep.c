@@ -457,10 +457,13 @@ init_compartments0(vm_pointer_t compartments0_stacks,
 	unsigned int ii;
 
 	thread0.td_compartments = (void *)compartments0_array;
-	thread0.td_compartments_maxid = KERNEL_MAXC18NS - 1;
-	for (ii = 0; ii < KERNEL_MAXC18NS; ii++) {
-		compartment = &compartments0[ii];
-		stack = compartments0_stacks + ii * (kstack_pages * PAGE_SIZE);
+	thread0.td_compartments_maxid = COMPARTMENT_FIRST_ID +
+	    KERNEL_MAXC18NS - 1;
+	for (ii = COMPARTMENT_FIRST_ID; ii <= thread0.td_compartments_maxid;
+	    ii++) {
+		compartment = &compartments0[TD_CIDNDX(ii)];
+		stack = compartments0_stacks + TD_CIDNDX(ii) *
+		    (kstack_pages * PAGE_SIZE);
 		stack = cheri_setbounds(stack, kstack_pages * PAGE_SIZE);
 		compartment_init_stack(compartment, stack);
 	}
