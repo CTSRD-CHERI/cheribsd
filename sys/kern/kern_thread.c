@@ -854,10 +854,10 @@ thread_free_compartments(struct thread *td)
 {
 	u_long ii;
 
-	for (ii = 0; ii <= td->td_compartments_maxid; ii++) {
-		if (td->td_compartments[ii] == NULL)
+	for (ii = COMPARTMENT_FIRST_ID; ii <= td->td_compartments_maxid; ii++) {
+		if (td->td_compartments[TD_CIDNDX(ii)] == NULL)
 			continue;
-		compartment_destroy(td->td_compartments[ii]);
+		compartment_destroy(td->td_compartments[TD_CIDNDX(ii)]);
 	}
 	free(td->td_compartments, M_COMPARTMENT);
 	td->td_compartments = NULL;

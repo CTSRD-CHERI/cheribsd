@@ -43,9 +43,11 @@
 #include <machine/compartment.h>
 
 /*
- * A compartment identifier for the kernel itself.
+ * A compartment identifier for the default compartment in the kernel binary.
  */
-#define	COMPARTMENT_KERNEL_ID			1
+#define	COMPARTMENT_FIRST_ID			1
+
+#define	TD_CIDNDX(id)				(id - COMPARTMENT_FIRST_ID)
 
 #define	TRAMPOLINE_TYPE_COMPARTMENT_ENTRY	0
 #define	TRAMPOLINE_TYPE_EXECUTIVE_ENTRY	1
