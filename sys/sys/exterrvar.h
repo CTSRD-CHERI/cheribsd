@@ -58,7 +58,7 @@
 
 #define	_SET_ERROR2(eerror, mmsg, pp1, pp2)				\
 	exterr_set(eerror, EXTERR_CATEGORY, SET_ERROR_MSG(mmsg),	\
-	    (uintptr_t)(pp1), (uintptr_t)(pp2), __LINE__)
+	    (uint64ptr_t)(pp1), (uint64ptr_t)(pp2), __LINE__)
 #define	_SET_ERROR0(eerror, mmsg)	_SET_ERROR2(eerror, mmsg, 0, 0)
 #define	_SET_ERROR1(eerror, mmsg, pp1)	_SET_ERROR2(eerror, mmsg, pp1, 0)
 
@@ -70,8 +70,8 @@
 
 void exterr_clear(struct kexterr *ke);
 int exterr_set_from(const struct kexterr *ke);
-int exterr_set(int eerror, int category, const char *mmsg, uintptr_t pp1,
-    uintptr_t pp2, int line);
+int exterr_set(int eerror, int category, const char *mmsg, uint64ptr_t pp1,
+    uint64ptr_t pp2, int line);
 int exterr_to_ue(struct thread *td, struct uexterror *ue);
 void ktrexterr(struct thread *td);
 
