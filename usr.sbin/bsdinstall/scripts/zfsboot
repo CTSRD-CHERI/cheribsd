@@ -124,7 +124,7 @@ f_include $BSDCFG_SHARE/variable.subr
 # How much swap to put on each block device in the boot zpool
 # NOTE: Value passed to gpart(8); which supports SI unit suffixes.
 #
-: ${ZFSBOOT_SWAP_SIZE:=2g}
+: ${ZFSBOOT_SWAP_SIZE:=4g}
 
 #
 # Should we use geli(8) to encrypt the swap?
