@@ -101,11 +101,13 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 static inline void
 fix_obj_mapping_cap_permissions(Obj_Entry *obj, const char *path __unused)
 {
-	obj->text_rodata_cap = (const char*)cheri_perms_clear(obj->text_rodata_cap, FUNC_PTR_REMOVE_PERMS);
-	obj->relocbase = (char*)cheri_perms_clear(obj->relocbase, DATA_PTR_REMOVE_PERMS);
-	obj->mapbase = (char*)cheri_perms_clear(obj->mapbase, DATA_PTR_REMOVE_PERMS);
-	/* Purecap code also needs the capmode flag */
-	obj->text_rodata_cap = cheri_flags_set(obj->text_rodata_cap, CHERI_FLAGS_CAP_MODE);
+	obj->text_rodata_cap = cheri_perms_clear(obj->text_rodata_cap,
+	    FUNC_PTR_REMOVE_PERMS);
+	obj->text_rodata_cap = cheri_flags_set(obj->text_rodata_cap,
+	    CHERI_FLAGS_CAP_MODE);
+	obj->relocbase = cheri_perms_clear(obj->relocbase,
+	    DATA_PTR_REMOVE_PERMS);
+	obj->mapbase = cheri_perms_clear(obj->mapbase, DATA_PTR_REMOVE_PERMS);
 }
 #endif
 
