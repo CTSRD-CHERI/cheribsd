@@ -1722,9 +1722,8 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 			if (dynp->d_un.d_ptr == 0)
 				break;
 #endif
-			obj->plts[jmprel].rel =
-			    (const Elf_Rel *)(obj->relocbase +
-			    dynp->d_un.d_ptr);
+			obj->plts[jmprel].rel = (const Elf_Rel *)
+			    (obj->relocbase + dynp->d_un.d_ptr);
 			jmprel++;
 			break;
 
@@ -1927,8 +1926,8 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 			if (dynp->d_un.d_ptr == 0)
 				break;
 #endif
-			obj->plts[pltgot].pltgot =
-			    (uintptr_t *)(obj->relocbase + dynp->d_un.d_ptr);
+			obj->plts[pltgot].pltgot = (uintptr_t *)
+			    (obj->relocbase + dynp->d_un.d_ptr);
 			pltgot++;
 			break;
 
@@ -5487,8 +5486,8 @@ get_program_var_addr(const char *name, RtldLockState *lockstate)
 		return ((const void **)rtld_resolve_ifunc(req.defobj_out,
 		    req.sym_out));
 	else
-		return (const void **)make_data_pointer(req.sym_out,
-		    req.defobj_out);
+		return ((const void **)make_data_pointer(req.sym_out,
+		    req.defobj_out));
 }
 
 /*
