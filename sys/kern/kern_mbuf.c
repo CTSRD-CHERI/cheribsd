@@ -316,6 +316,15 @@ SYSCTL_PROC(_kern_ipc, OID_AUTO, nmbufs,
     &nmbufs, 0, sysctl_nmbufs, "IU",
     "Maximum number of mbufs allowed");
 
+SYSCTL_ULONG(_kern_ipc, OID_AUTO, mlen, CTLFLAG_RD,
+    SYSCTL_NULL_ULONG_PTR, MLEN, "System MLEN size");
+
+SYSCTL_ULONG(_kern_ipc, OID_AUTO, mhlen, CTLFLAG_RD,
+    SYSCTL_NULL_ULONG_PTR, MHLEN, "System MHLEN size");
+
+SYSCTL_ULONG(_kern_ipc, OID_AUTO, msize, CTLFLAG_RD,
+    SYSCTL_NULL_ULONG_PTR, MSIZE, "System MSIZE size");
+
 /*
  * Zones from which we allocate.
  */
