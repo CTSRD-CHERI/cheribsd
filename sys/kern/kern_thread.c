@@ -846,6 +846,23 @@ thread_alloc_compartments(struct thread *td)
 	KASSERT(td->td_compartments_maxid == 0,
 	    ("thread_alloc_compartments called on a thread with existing compartments"));
 
+	/*
+	 * XXXKW: Overallocate the array to allow linking compartments of
+	 * modules that could be dynamically loaded during a thread's lifetime
+	 * and which are called by the thread due to:
+	 * - an IPI (e.g., dtraceall.ko and its dependencies create 11
+	 *   compartments, including dtrace.ko that issues an IPI on SYSINIT())
+	 * This is a temporary workaround. There are most likely other cases
+	 * that are not considered yet (e.g., operations on a file stored in
+	 * a file system that is handled by a dynamically loaded module).
+	 * The correct implementation should not involve a data structure that
+	 * requires expanding while a thread is in a critical section (e.g., on
+	 * IPI).
+	 */
+	td->td_compartments_maxid = compartment_lastid + 16;
+	td->td_compartments = realloc(td->td_compartments,
+	    (TD_CIDNDX(td->td_compartments_maxid) + 1) *
+	    sizeof(*td->td_compartments), M_COMPARTMENT, M_NOWAIT | M_ZERO);
 	return (link_elf_create_compartments(linker_kernel_file, td));
 }
 
