@@ -3165,15 +3165,8 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	obj_rtld.path = xstrdup(ld_path_rtld);
 
 	parse_rtld_phdr(&obj_rtld);
-#ifndef __CHERI_PURE_CAPABILITY__
-	/*
-	 * We would need VMMAP permissions on AT_BASE to call mprotect(). Since
-	 * this only marks one page as read-only and we have CHERI to enforce
-	 * access, don't bother calling mprotect for RTLD.
-	 */
 	if (obj_enforce_relro(&obj_rtld) == -1)
 		rtld_die();
-#endif
 
 	r_debug.r_version = R_DEBUG_VERSION;
 	r_debug.r_brk = make_rtld_local_function_pointer(r_debug_state);
@@ -7685,6 +7678,18 @@ _rtld_is_dlopened(void *arg)
 	return (res);
 }
 
+static inline bool
+can_mprotect(caddr_t page)
+{
+#ifdef __CHERI__
+	if ((cheri_perms_get(page) & CHERI_PERM_SW_VMEM) == 0)
+		return (false);
+#else
+	(void)page;
+#endif
+	return (true);
+}
+
 static int
 obj_remap_relro(Obj_Entry *obj, int prot)
 {
@@ -7698,6 +7703,19 @@ obj_remap_relro(Obj_Entry *obj, int prot)
 		relro_page = obj->relocbase + rtld_trunc_page(ph->p_vaddr);
 		relro_size = rtld_round_page(ph->p_vaddr + ph->p_memsz) -
 		    rtld_trunc_page(ph->p_vaddr);
+		if (!can_mprotect(relro_page)) {
+			/*
+			 * On CHERI systems, we're unable to mprotect relro
+			 * in the main binary because AT_BASE lacks the
+			 * necessary permissions.  Rather than adding them,
+			 * we rely on the rest of rtld to hand out
+			 * capabilities with appropriate permissions and
+			 * leave the page RWX.
+			 */
+			dbg("Can't mprotect relro at " PTR_FMT "\n",
+			    relro_page);
+			return(0);
+		}
 		if (mprotect(relro_page, relro_size, prot) == -1) {
 			_rtld_error(
 			    "%s: Cannot set relro protection to %#x: %s",
