@@ -2439,8 +2439,8 @@ kern_exterrctl(struct thread *td, u_int op, u_int flags,
 }
 
 int
-exterr_set(int eerror, int category, const char *mmsg, uintptr64_t pp1,
-    uintptr64_t pp2, int line)
+exterr_set(int eerror, int category, const char *mmsg, uint64ptr_t pp1,
+    uint64ptr_t pp2, int line)
 {
 	struct thread *td;
 
