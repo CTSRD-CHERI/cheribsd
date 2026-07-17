@@ -393,17 +393,12 @@ compartment_linkup(struct compartment *compartment, u_long id,
 {
 
 	EXECUTIVE_ASSERT();
+	KASSERT(id <= td->td_compartments_maxid,
+	    ("%s: id %lu exceeds the maximum value %lu", __func__, id,
+	     td->td_compartments_maxid));
 
 	compartment->c_id = id;
 	compartment->c_thread = td;
-
-	if (compartment->c_id > td->td_compartments_maxid) {
-		td->td_compartments_maxid = compartment_lastid;
-		td->td_compartments = realloc(td->td_compartments,
-		    (TD_CIDNDX(td->td_compartments_maxid) + 1) *
-		    sizeof(*td->td_compartments), M_COMPARTMENT, M_NOWAIT |
-		    M_USE_RESERVE | M_ZERO);
-	}
 	td->td_compartments[TD_CIDNDX(compartment->c_id)] = compartment;
 
 }
