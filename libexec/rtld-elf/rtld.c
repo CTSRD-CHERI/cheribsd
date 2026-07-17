@@ -796,11 +796,19 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 					argv[i] = argv[i + rtld_argc];
 				*argcp -= rtld_argc;
 
+#ifdef __CHERI__
 				/*
-				 * auxv/envp is not on the stack in CHERI so we
-				 * don't need this.
+				 * CHERI: auxv and envp aren't on the stack so
+				 * we don't need to relocate them.
+				 *
+				 * Do zero the entries beyond the end and
+				 * make an attempt to adjust bounds.
 				 */
-#ifndef __CHERI_PURE_CAPABILITY__
+				for (i = main_argc + 1; i <= argc; i++)
+					argv[i] = NULL;
+				argv = cheri_bounds_set(argv,
+				    (main_argc + 1) * sizeof(*argv));
+#else
 				environ = env = envp = argv + main_argc + 1;
 				dbg("move env from %p to %p", envp + rtld_argc,
 				    envp);
