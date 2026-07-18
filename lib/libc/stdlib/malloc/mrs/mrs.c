@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 2019 Brett F. Gutstein
- * Copyright (c) 2025 Capabilities Limited
+ * Copyright (c) 2025-2026 Capabilities Limited
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
@@ -55,6 +55,7 @@
 #include <cheriintrin.h>
 #include <dlfcn.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <malloc_np.h>
 #include <pthread.h>
@@ -156,6 +157,9 @@ extern void snmalloc_flush_message_queue(void);
 	"_RUNTIME_QUARANTINE_STATS_DISABLE"
 #define	MALLOC_QUARANTINE_STATS_ENABLE_ENV \
 	"_RUNTIME_QUARANTINE_STATS_ENABLE"
+
+#define	MALLOC_QUARANTINE_STATS_FILE_ENV \
+	"_RUNTIME_QUARANTINE_STATS_FILE"
 
 /*
  * Different allocators give their strong symbols different names.  Hide
@@ -334,6 +338,8 @@ static bool mrs_initialized = false;
 
 static unsigned int quarantine_denominator = QUARANTINE_DENOMINATOR;
 static unsigned int quarantine_numerator = QUARANTINE_NUMERATOR;
+
+static const char *mrs_statfile_name = NULL;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 static struct cheri_mrs_stats *cmsp;
@@ -1341,6 +1347,58 @@ spawn_background(void)
 #endif /* OFFLOAD_QUARANTINE */
 
 static void
+mrs_statfile_dump(void)
+{
+	char buf[PATH_MAX];
+	int fd;
+
+	if (cmsp == NULL || mrs_statfile_name == NULL)
+		return;
+	(void)snprintf(buf, sizeof(buf), "%s.%d", mrs_statfile_name,
+	    getpid());
+	fd = open(buf, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+	if (fd < 0)
+		return;
+
+	/*
+	 * Data presentation modeled on proctat(1)'s mrs mode.
+	 */
+	(void)snprintf(buf, sizeof(buf), "PID: %d\n"
+	    "COMM: %s\n"
+	    "FLAGS: %c%c%c%c%c\n"
+	    "%%TQR: %u\n"
+	    "%%MQR: %zu\n"
+	    "CHEAP: %zu\n"
+	    "BHEAP: %zu\n"
+	    "CQUAR: %zu\n"
+	    "BQUAR: %zu\n"
+	    "ASIZE: %zu\n"
+	    "MAXASIZE: %zu\n"
+	    "MINRVK: %u\n"
+	    "UEPOCH: %zu\n",
+	    getpid(), getprogname(),
+	    (cmsp->cms_mrs_flags & CHERI_MRS_FLAGS_ASYNCREVOKE) ? 'a' : '-',
+	    (cmsp->cms_mrs_flags & CHERI_MRS_FLAGS_BOUNDPTRS) ? 'b' : '-',
+	    (cmsp->cms_mrs_flags & CHERI_MRS_FLAGS_EVERYFREE) ? 'e' : '-',
+	    (cmsp->cms_mrs_flags & CHERI_MRS_FLAGS_ABORTONFAIL) ? 'f' : '-',
+	    (cmsp->cms_mrs_flags & CHERI_MRS_FLAGS_QUARANTINING) ? 'q' : '-',
+            (100 * cmsp->cms_mrs_quarantine_numerator) /
+            cmsp->cms_mrs_quarantine_denominator,
+            (100 * cmsp->cms_mrs_bytes_inquarantine) /
+            (cmsp->cms_mrs_bytes_inquarantine + cmsp->cms_mrs_bytes_inheap),
+            cmsp->cms_mrs_count_inheap,
+            cmsp->cms_mrs_bytes_inheap,
+            cmsp->cms_mrs_count_inquarantine,
+            cmsp->cms_mrs_bytes_inquarantine,
+	    cmsp->cms_mrs_allocated_size,
+	    cmsp->cms_mrs_max_allocated_size,
+	    cmsp->cms_mrs_revocation_minimum,
+	    cmsp->cms_mrs_epoch);
+	(void)write(fd, buf, strlen(buf));
+	(void)close(fd);
+}
+
+static void
 mrs_init_impl_locked(void)
 {
 	initialize_lock(app_quarantine_lock);
@@ -1496,8 +1554,8 @@ mrs_init_impl_locked(void)
 	 * events.
 	 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	if (getenv(MALLOC_QUARANTINE_STATS_DISABLE_ENV) == NULL &&
-	    getenv(MALLOC_QUARANTINE_STATS_ENABLE_ENV) != NULL) {
+	if (secure_getenv(MALLOC_QUARANTINE_STATS_DISABLE_ENV) == NULL &&
+	    secure_getenv(MALLOC_QUARANTINE_STATS_ENABLE_ENV) != NULL) {
 		if (_elf_aux_info(AT_CHERI_MRS, &cmsp, sizeof(cmsp)) < 0)
 			mrs_puts("error getting AT_CHERI_MRS\n");
 		cmsp->cms_mrs_arenas = APP_QUARANTINE_ARENAS;
@@ -1514,6 +1572,11 @@ mrs_init_impl_locked(void)
 			cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_ABORTONFAIL;
 		if (bound_pointers)
 			cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_BOUNDPTRS;
+
+	}
+	if ((mrs_statfile_name =
+	    secure_getenv(MALLOC_QUARANTINE_STATS_FILE_ENV)) != NULL) {
+		atexit(mrs_statfile_dump);
 	}
 #endif
 
