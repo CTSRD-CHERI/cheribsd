@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2025 Capabilities Limited
+ * Copyright (c) 2025-2026 Capabilities Limited
  *
  * This software was developed by SRI International, the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
@@ -56,10 +56,11 @@ procstat_mrs(struct procstat *procstat, struct kinfo_proc *kipp)
 		else
 			xo_emit(
 			    "{T:/%5s %-19s %5s %4s %4s %7s %9s %7s %9s "
-			    "%9s %9s %9s %6s %6s}\n",
+			    "%9s %9s %9s %6s %6s %10u.%09u}\n",
 			    "PID", "COMM", "FLAGS", "%TQR", "%MQR",
 			    "CHEAP", "BHEAP", "CQUAR", "BQUAR",
-			    "ASIZE", "MAXASIZE", "MINRVK", "UEPOCH", "KEPOCH");
+			    "ASIZE", "MAXASIZE", "MINRVK", "UEPOCH", "KEPOCH",
+			    "START");
 	}
 
 	xo_emit("{k:process_id/%5d/%d}", kipp->ki_pid);
@@ -80,6 +81,7 @@ procstat_mrs(struct procstat *procstat, struct kinfo_proc *kipp)
 			xo_emit(" {:mrs_revocation_minimum/%9s/%s}", "-");
 			xo_emit(" {:mrs_epoch/%6s/%s}", "-");
 			xo_emit(" {:kernel_epoch/%6s/%s}", "-");
+			xo_emit(" {:mrs_ts_start/%20s}", "-");
 		}
 		xo_emit("\n");
 		return;
@@ -117,6 +119,9 @@ procstat_mrs(struct procstat *procstat, struct kinfo_proc *kipp)
 		kernel_epoch = get_revoker_epoch(procstat, kipp);
 		xo_emit(" {:kernel_epoch/%6s/%s}",
 		    kernel_epoch != NULL ? kernel_epoch : "-");
+		xo_emit(" {:mrs_s_start/%10u.%09u}",
+		    cms.cms_mrs_ts_start.tv_sec,
+		    cms.cms_mrs_ts_start.tv_nsec);
 	}
 	xo_emit("\n");
 }
