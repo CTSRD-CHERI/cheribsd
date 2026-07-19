@@ -1349,6 +1349,7 @@ spawn_background(void)
 static void
 mrs_statfile_dump(void)
 {
+	struct timespec ts_end;
 	char buf[PATH_MAX];
 	int fd;
 
@@ -1363,8 +1364,12 @@ mrs_statfile_dump(void)
 	/*
 	 * Data presentation modeled on proctat(1)'s mrs mode.
 	 */
-	(void)snprintf(buf, sizeof(buf), "PID: %d\n"
+	(void)clock_gettime(CLOCK_REALTIME, &ts_end);
+	(void)snprintf(buf, sizeof(buf),
+	    "PID: %d\n"
 	    "COMM: %s\n"
+	    "TS_START: %zu.%09zu\n"
+	    "TS_END: %zu.%09zu\n"
 	    "FLAGS: %c%c%c%c%c\n"
 	    "%%TQR: %u\n"
 	    "%%MQR: %zu\n"
@@ -1377,6 +1382,10 @@ mrs_statfile_dump(void)
 	    "MINRVK: %u\n"
 	    "UEPOCH: %zu\n",
 	    getpid(), getprogname(),
+	    cmsp->cms_mrs_ts_start.tv_sec,
+	    cmsp->cms_mrs_ts_start.tv_nsec,
+	    ts_end.tv_sec,
+	    ts_end.tv_nsec,
 	    (cmsp->cms_mrs_flags & CHERI_MRS_FLAGS_ASYNCREVOKE) ? 'a' : '-',
 	    (cmsp->cms_mrs_flags & CHERI_MRS_FLAGS_BOUNDPTRS) ? 'b' : '-',
 	    (cmsp->cms_mrs_flags & CHERI_MRS_FLAGS_EVERYFREE) ? 'e' : '-',
@@ -1572,7 +1581,7 @@ mrs_init_impl_locked(void)
 			cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_ABORTONFAIL;
 		if (bound_pointers)
 			cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_BOUNDPTRS;
-
+		clock_gettime(CLOCK_REALTIME, &cmsp->cms_mrs_ts_start);
 	}
 	if ((mrs_statfile_name =
 	    secure_getenv(MALLOC_QUARANTINE_STATS_FILE_ENV)) != NULL) {
