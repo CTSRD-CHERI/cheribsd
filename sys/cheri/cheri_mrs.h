@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2025 Capabilities Limited
+ * Copyright (c) 2025-2026 Capabilities Limited
  *
  * This software was developed by SRI International, the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
@@ -32,6 +32,8 @@
 
 #ifndef __SYS_CHERI_MRS_H__
 #define	__SYS_CHERI_MRS_H__
+
+#include <sys/_timespec.h>
 
 #define CHERI_MRS_STATS_VERSION		1
 #define CHERI_MRS_STATS_MAX_SIZE	256
@@ -86,8 +88,11 @@ struct cheri_mrs_stats {
 	/* 64-bit mrs parameters. */
 	_Atomic(uint64_t)	cms_mrs_epoch;
 
+	/* Timestamps associated with these stats. */
+	struct timespec	cms_mrs_ts_start;	/* Earliest moment. */
+
 	/* Padding to a sensible size for future non-disruptive growth. */
-	size_t		_cms_pad1[6];
+	size_t		_cms_pad1[4];
 };
 
 #ifndef _KERNEL
