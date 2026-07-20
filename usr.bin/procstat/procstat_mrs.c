@@ -50,13 +50,13 @@ procstat_mrs(struct procstat *procstat, struct kinfo_proc *kipp)
 	if ((procstat_opts & PS_OPT_NOHEADER) == 0) {
 		if ((procstat_opts & PS_OPT_VERBOSE) == 0)
 			xo_emit(
-			    "{T:/%5s %-19s %5s %4s %4s %7s %9s %7s %9s}\n",
+			    "{T:/%5s %-19s %5s %4s %4s %8s %9s %8s %9s}\n",
 			    "PID", "COMM", "FLAGS", "%TQR", "%MQR",
 			    "CHEAP", "BHEAP", "CQUAR", "BQUAR");
 		else
 			xo_emit(
-			    "{T:/%5s %-19s %5s %4s %4s %7s %9s %7s %9s "
-			    "%9s %9s %9s %6s %6s %10u.%09u}\n",
+			    "{T:/%5s %-19s %5s %4s %4s %8s %9s %8s %9s "
+			    "%9s %9s %9s %6s %6s %20s}\n",
 			    "PID", "COMM", "FLAGS", "%TQR", "%MQR",
 			    "CHEAP", "BHEAP", "CQUAR", "BQUAR",
 			    "ASIZE", "MAXASIZE", "MINRVK", "UEPOCH", "KEPOCH",
@@ -67,13 +67,14 @@ procstat_mrs(struct procstat *procstat, struct kinfo_proc *kipp)
 	xo_emit(" {:command/%-19s/%s}", kipp->ki_comm);
 
 	if (procstat_getmrs(procstat, kipp, &cms) != 0 ||
-	    cms.cms_version != CHERI_MRS_STATS_VERSION) {
+	    cms.cms_version != CHERI_MRS_STATS_VERSION ||
+	    !(cms.cms_mrs_flags & CHERI_MFS_FLAGS_INITIALIZED)) {
 		xo_emit(" {:mrs_flags/%5s/%s}", "-----");
 		xo_emit(" {:mrs_max_ratio/%4s/%s}", "-");
 		xo_emit(" {:mrs_ratio/%4s/%s}", "-");
-		xo_emit(" {:mrs_count_inheap/%7s/%s}", "-");
+		xo_emit(" {:mrs_count_inheap/%8s/%s}", "-");
 		xo_emit(" {:mrs_bytes_inheap/%9s/%s}", "-");
-		xo_emit(" {:mrs_count_inquarantine/%7s/%s}", "-");
+		xo_emit(" {:mrs_count_inquarantine/%8s/%s}", "-");
 		xo_emit(" {:mrs_bytes_inquarantine/%9s/%s}", "-");
 		if ((procstat_opts & PS_OPT_VERBOSE) != 0) {
 			xo_emit(" {:mrs_allocated_size/%9s/%s}", "-");
@@ -99,11 +100,11 @@ procstat_mrs(struct procstat *procstat, struct kinfo_proc *kipp)
 	    (100 * cms.cms_mrs_bytes_inquarantine) /
 	    (cms.cms_mrs_bytes_inquarantine +
 	    cms.cms_mrs_bytes_inheap));
-	xo_emit(" {:mrs_count_inheap/%7zu/%zu",
+	xo_emit(" {:mrs_count_inheap/%8zu/%zu}",
 	    cms.cms_mrs_count_inheap);
 	xo_emit(" {:mrs_bytes_inheap/%9zu/%zu}",
 	    cms.cms_mrs_bytes_inheap);
-	xo_emit(" {:mrs_count_inquarantine/%7zu/%zu}",
+	xo_emit(" {:mrs_count_inquarantine/%8zu/%zu}",
 	    cms.cms_mrs_count_inquarantine);
 	xo_emit(" {:mrs_bytes_inquarantine/%9zu/%zu}",
 	    cms.cms_mrs_bytes_inquarantine);
