@@ -68,7 +68,7 @@ procstat_mrs(struct procstat *procstat, struct kinfo_proc *kipp)
 
 	if (procstat_getmrs(procstat, kipp, &cms) != 0 ||
 	    cms.cms_version != CHERI_MRS_STATS_VERSION ||
-	    !(cms.cms_mrs_flags & CHERI_MFS_FLAGS_INITIALIZED)) {
+	    !(cms.cms_mrs_flags & CHERI_MRS_FLAGS_INITIALIZED)) {
 		xo_emit(" {:mrs_flags/%5s/%s}", "-----");
 		xo_emit(" {:mrs_max_ratio/%4s/%s}", "-");
 		xo_emit(" {:mrs_ratio/%4s/%s}", "-");
