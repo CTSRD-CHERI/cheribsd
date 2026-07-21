@@ -38,7 +38,7 @@
 #define CHERI_MRS_STATS_VERSION		1
 #define CHERI_MRS_STATS_MAX_SIZE	256
 
-#define	CHERI_MFS_FLAGS_INITIALIZED	0x00000001	/* Structure live. */
+#define	CHERI_MRS_FLAGS_INITIALIZED	0x00000001	/* Structure live. */
 #define	CHERI_MRS_FLAGS_QUARANTINING	0x00000002	/* Quarantining. */
 #define	CHERI_MRS_FLAGS_EVERYFREE	0x00000004	/* Revoke every free. */
 #define	CHERI_MRS_FLAGS_ASYNCREVOKE	0x00000008	/* Async revocation. */
