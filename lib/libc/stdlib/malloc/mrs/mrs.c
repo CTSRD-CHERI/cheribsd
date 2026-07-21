@@ -1609,7 +1609,7 @@ mrs_init_impl_locked(void)
 		if (bound_pointers)
 			cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_BOUNDPTRS;
 		clock_gettime(CLOCK_REALTIME, &cmsp->cms_mrs_ts_start);
-		cmsp->cms_mrs_flags |= CHERI_MFS_FLAGS_INITIALIZED;
+		cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_INITIALIZED;
 	}
 	if ((mrs_statfile_name =
 	    secure_getenv(MALLOC_QUARANTINE_STATS_FILE_ENV)) != NULL) {
