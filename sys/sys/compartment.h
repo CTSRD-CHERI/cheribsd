@@ -43,9 +43,11 @@
 #include <machine/compartment.h>
 
 /*
- * A compartment identifier for the kernel itself.
+ * A compartment identifier for the default compartment in the kernel binary.
  */
-#define	COMPARTMENT_KERNEL_ID			1
+#define	COMPARTMENT_FIRST_ID			1
+
+#define	TD_CIDNDX(id)				(id - COMPARTMENT_FIRST_ID)
 
 #define	TRAMPOLINE_TYPE_COMPARTMENT_ENTRY	0
 #define	TRAMPOLINE_TYPE_EXECUTIVE_ENTRY	1
@@ -66,6 +68,7 @@ struct compartment {
 };
 
 STAILQ_HEAD(compartment_list, compartment);
+RB_HEAD(compartment_trampoline_tree, compartment_trampoline);
 
 extern struct compartment compartments0[KERNEL_MAXC18NS];
 
@@ -74,6 +77,9 @@ extern u_long compartment_lastid;
 void compartment_metadata_create(u_long id, const char *name, uintcap_t base,
     elf_compartment_t elf_compartment);
 void compartment_metadata_insert(struct compartment *compartment);
+
+void compartment_trampoline_tree_remove_all(
+    struct compartment_trampoline_tree *tree);
 
 void compartment_cpu_cache_fill(u_int cpuid);
 
@@ -89,7 +95,7 @@ void compartment_destroy(struct compartment *compartment);
 void compartment_trampoline_destroy(uintptr_t func);
 void *compartment_entry_for_kernel(uintptr_t func);
 void *compartment_entry(uintptr_t func);
-void *executive_get_function(uintptr_t func);
+void *compartment_target(uintptr_t func);
 
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_COMPARTMENT);

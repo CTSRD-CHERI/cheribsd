@@ -324,17 +324,30 @@ dtrace_store64(uint64_t *addr, struct trapframe *frame, u_int reg)
 static int
 dtrace_invop_start(struct trapframe *frame)
 {
+#ifdef __CHERI_PURE_CAPABILITY__
+	uintcap_t *cspp;
+#endif
 	int data, invop, tmp;
 
 	invop = dtrace_invop(frame->tf_elr, frame, frame->tf_x[0]);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	if ((cheri_getperm(frame->tf_elr) & CHERI_PERM_EXECUTIVE) != 0)
+		cspp = &frame->tf_sp;
+	else
+		cspp = &frame->tf_rcsp;
+#else
+	cspp = &frame->tf_sp;
+#endif
+#endif
 	tmp = (invop & LDP_STP_MASK);
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (tmp == STP_C_PREIND) {
 		uintcap_t *csp;
 		int arg1, arg2, offs;
 
-		csp = (uintcap_t *)frame->tf_sp;
+		csp = (uintcap_t *)*cspp;
 		arg1 = (invop >> ARG1_SHIFT) & ARG1_MASK;
 		arg2 = (invop >> ARG2_SHIFT) & ARG2_MASK;
 		offs = (invop >> OFFSET_SHIFT) & OFFSET_MASK;
@@ -346,7 +359,7 @@ dtrace_invop_start(struct trapframe *frame)
 		dtrace_storecap(csp + 1, frame, arg2);
 
 		/* Update the stack pointer and program counter to continue */
-		frame->tf_sp = (uintcap_t)csp;
+		*cspp = (uintcap_t)csp;
 		frame->tf_elr += INSN_SIZE;
 		return (0);
 	}
@@ -392,7 +405,7 @@ dtrace_invop_start(struct trapframe *frame)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	if ((invop & SUBC_MASK) == SUBC_INSTR) {
-		frame->tf_sp -= (invop >> SUB_IMM_SHIFT) & SUB_IMM_MASK;
+		*cspp -= (invop >> SUB_IMM_SHIFT) & SUB_IMM_MASK;
 		frame->tf_elr += INSN_SIZE;
 		return (0);
 	}

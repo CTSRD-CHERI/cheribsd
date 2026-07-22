@@ -112,7 +112,7 @@ struct compartment_trampoline {
 extern int early_boot;
 #endif
 
-u_long compartment_lastid = COMPARTMENT_KERNEL_ID;
+u_long compartment_lastid = COMPARTMENT_FIRST_ID;
 static uma_zone_t compartment_zone;
 #ifdef CHERI_COMPARTMENT_STATS
 static u_long compartment_maxnid;
@@ -134,9 +134,7 @@ compartment_trampoline_compare(struct compartment_trampoline *a,
 	    (ptraddr_t)b->ct_compartment_func);
 }
 
-RB_HEAD(compartment_tree, compartment_trampoline) compartment_trampolines =
-    RB_INITIALIZER(&compartment_trampolines);
-RB_GENERATE_STATIC(compartment_tree, compartment_trampoline, ct_node,
+RB_GENERATE_STATIC(compartment_trampoline_tree, compartment_trampoline, ct_node,
     compartment_trampoline_compare);
 
 static struct mtx compartment_trampolines_lock;
@@ -363,6 +361,19 @@ SYSINIT(compartment_metadata_init, SI_SUB_KLD, SI_ORDER_FIRST,
     compartment_metadata_init, NULL);
 #endif
 
+void
+compartment_trampoline_tree_remove_all(struct compartment_trampoline_tree *tree)
+{
+	struct compartment_trampoline *tmptrampoline, *trampoline;
+
+	RB_FOREACH_SAFE(trampoline, compartment_trampoline_tree, tree,
+	    tmptrampoline) {
+		RB_REMOVE(compartment_trampoline_tree, tree, trampoline);
+		free(trampoline, M_COMPARTMENT);
+	}
+	KASSERT(RB_EMPTY(tree), ("%s: tree is not empty.", __func__));
+}
+
 u_long
 compartment_id_create(const char *name, uintcap_t base,
     elf_compartment_t elf_compartment)
@@ -382,18 +393,13 @@ compartment_linkup(struct compartment *compartment, u_long id,
 {
 
 	EXECUTIVE_ASSERT();
+	KASSERT(id <= td->td_compartments_maxid,
+	    ("%s: id %lu exceeds the maximum value %lu", __func__, id,
+	     td->td_compartments_maxid));
 
 	compartment->c_id = id;
 	compartment->c_thread = td;
-
-	if (compartment->c_id > td->td_compartments_maxid) {
-		td->td_compartments_maxid = compartment_lastid;
-		td->td_compartments = realloc(td->td_compartments,
-		    (td->td_compartments_maxid + 1) *
-		    sizeof(*td->td_compartments), M_COMPARTMENT, M_NOWAIT |
-		    M_USE_RESERVE | M_ZERO);
-	}
-	td->td_compartments[compartment->c_id] = compartment;
+	td->td_compartments[TD_CIDNDX(compartment->c_id)] = compartment;
 
 }
 
@@ -497,7 +503,8 @@ compartment_destroy(struct compartment *compartment)
 #endif
 
 	if (compartment->c_thread != NULL) {
-		compartment->c_thread->td_compartments[compartment->c_id] = NULL;
+		compartment->c_thread->td_compartments[TD_CIDNDX(compartment->c_id)] =
+		    NULL;
 	}
 
 	vm_compartment_dispose(compartment);
@@ -519,7 +526,10 @@ compartment_entry_stackptr(u_long id, int type)
 		compartment_trampoline_counters[type]++;
 #endif
 
-	compartment = curthread->td_compartments[id];
+	if (id <= curthread->td_compartments_maxid)
+		compartment = curthread->td_compartments[TD_CIDNDX(id)];
+	else
+		compartment = NULL;
 	if (compartment == NULL)
 		compartment = compartment_create(curthread, id, true);
 	return (compartment->c_kstackptr);
@@ -531,6 +541,7 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 {
 	struct compartment_trampoline *trampoline, *oldtrampoline;
 	struct compartment_trampoline tmptrampoline;
+	struct compartment_trampoline_tree *tree;
 	uintcap_t dstfunc;
 	u_long dstid;
 
@@ -539,18 +550,16 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	    ("%s: linker file cannot be NULL", __func__));
 
 	elf_compartment_entry(lf, func, &dstid, &dstfunc);
+	tree = elf_compartment_trampoline_tree(lf);
 
 	tmptrampoline.ct_compartment_func = dstfunc;
-	oldtrampoline = RB_FIND(compartment_tree, &compartment_trampolines,
+	oldtrampoline = RB_FIND(compartment_trampoline_tree, tree,
 	    &tmptrampoline);
 	if (oldtrampoline != NULL) {
 		trampoline = oldtrampoline;
 		goto out;
 	}
 
-	/*
-	 * TODO: Free the trampoline.
-	 */
 	if (!early_boot) {
 		trampoline = malloc_exec(size, M_COMPARTMENT, M_NOWAIT |
 		    M_USE_RESERVE | M_ZERO);
@@ -579,18 +588,13 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	if (!early_boot) {
 		cpu_dcache_wb_range(trampoline, (vm_size_t)size);
 		cpu_icache_sync_range(trampoline, (vm_size_t)size);
-
-		mtx_lock(&compartment_trampolines_lock);
 	}
 
-	oldtrampoline = RB_INSERT(compartment_tree, &compartment_trampolines,
+	oldtrampoline = RB_INSERT(compartment_trampoline_tree, tree,
 	    trampoline);
 	KASSERT(oldtrampoline == NULL,
 	    ("Trampoline for 0x%#lp already exists",
 	    (void *)trampoline->ct_compartment_func));
-
-	if (!early_boot)
-		mtx_unlock(&compartment_trampolines_lock);
 
 out:
 	/*
@@ -668,7 +672,7 @@ compartment_entry(uintptr_t func)
 }
 
 void *
-executive_get_function(uintptr_t func)
+compartment_target(uintptr_t func)
 {
 	struct compartment_trampoline *trampoline;
 
@@ -681,8 +685,6 @@ executive_get_function(uintptr_t func)
 	    func & ~0x1);
 	trampoline = __containerof((char (*)[])trampoline,
 	    struct compartment_trampoline, ct_code);
-	KASSERT(trampoline->ct_type == TRAMPOLINE_TYPE_EXECUTIVE_ENTRY,
-	    ("Invalid trampoline type"));
 
 	return ((void *)trampoline->ct_compartment_func);
 }
@@ -711,13 +713,13 @@ DB_COMMAND_FLAGS(c18nstat, db_c18nstat, DB_CMD_MEMSAFE)
 	    ADDRESS_WIDTH - 7, ' ', "CID", "CNAME", "PID", "TID", "COMM",
 	    "TDNAME");
 	if (verbose) {
-		ii = COMPARTMENT_KERNEL_ID;
+		ii = COMPARTMENT_FIRST_ID;
 	} else {
 		db_printf("*%*c %6lu %-20s %5s %6s %-20s %-20s\n",
-		    ADDRESS_WIDTH - 1, ' ', (u_long)COMPARTMENT_KERNEL_ID,
-		    compartment_metadata[COMPARTMENT_KERNEL_ID]->cm_name,
+		    ADDRESS_WIDTH - 1, ' ', (u_long)COMPARTMENT_FIRST_ID,
+		    compartment_metadata[COMPARTMENT_FIRST_ID]->cm_name,
 		    "*", "*", "*", "*");
-		ii = COMPARTMENT_KERNEL_ID + 1;
+		ii = COMPARTMENT_FIRST_ID + 1;
 	}
 #undef	ADDRESS_WIDTH
 	for (; ii <= compartment_lastid; ii++) {

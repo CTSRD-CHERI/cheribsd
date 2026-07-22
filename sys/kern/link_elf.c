@@ -211,6 +211,7 @@ struct elf_file {
 	struct elf_compartment defcompartment;
 	unsigned int	ncompartments;
 	struct elf_compartment *compartments;
+	struct compartment_trampoline_tree compartment_trampolines;
 #endif
 };
 
@@ -518,16 +519,34 @@ ef_address(elf_file_t ef, ptraddr_t offset)
  * its permissions and bounds.
  */
 static caddr_t
-make_capability(const Elf_Sym *sym, caddr_t val)
+make_capability(elf_file_t ef, const Elf_Sym *sym, caddr_t val)
 {
 	switch (ELF_ST_TYPE(sym->st_info)) {
 	case STT_FUNC:
 	case STT_GNU_IFUNC:
-		val = cheri_perms_and(val, CHERI_PERMS_KERNEL_CODE);
+		val = cheri_perms_and(val,
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+		    CHERI_PERMS_KERNEL_EXECUTIVE_CODE
+#else
+		    CHERI_PERMS_KERNEL_CODE
+#endif
+		    );
 #ifdef CHERI_FLAGS_CAP_MODE
 		val = cheri_flags_set(val, CHERI_FLAGS_CAP_MODE);
 #endif
 		val = cheri_sentry_create(val);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+		if (ef == (elf_file_t)linker_kernel_file) {
+			/*
+			 * Call a kernel-specific variant because
+			 * linker_kernel_file might not exist yet.
+			 */
+			val = (caddr_t)
+			    compartment_entry_for_kernel((uintptr_t)val);
+		} else {
+			val = (caddr_t)compartment_entry((uintptr_t)val);
+		}
+#endif
 		break;
 	default:
 		val = cheri_bounds_set(val, sym->st_size);
@@ -577,7 +596,7 @@ ef_symbol_address(elf_file_t ef, const Elf_Sym *sym)
 	}
 
 	val = cheri_address_set(base, (ptraddr_t)ef->address + sym->st_value);
-	return (make_capability(sym, val));
+	return (make_capability(ef, sym, val));
 #else
 	return (ef_address(ef, sym->st_value));
 #endif
@@ -868,7 +887,7 @@ elf_init(void *relocbase, ptraddr_t baseend, caddr_t mdp __unused)
 		}
 	}
 	if (error == 0) {
-		error = elf_compartment_init_default(ef, COMPARTMENT_KERNEL_ID,
+		error = elf_compartment_init_default(ef, COMPARTMENT_FIRST_ID,
 		    NULL, ef->address,
 #ifdef RELOCATABLE_KERNEL
 		    -(intptr_t)ef->address
@@ -877,6 +896,7 @@ elf_init(void *relocbase, ptraddr_t baseend, caddr_t mdp __unused)
 #endif
 		    );
 	}
+	RB_INIT(&ef->compartment_trampolines);
 #endif
 	if (error != 0) {
 		panic("%s: Can't initialize the kernel ELF file", __func__);
@@ -928,7 +948,7 @@ link_elf_init(void* arg)
 	struct compartment *compartment;
 #endif
 	elf_compartment_t ec;
-	unsigned int compartmentii;
+	unsigned int ii;
 #endif
 
 	linker_file_register(linker_kernel_file, &link_elf_class);
@@ -948,9 +968,8 @@ link_elf_init(void* arg)
 	    cheri_setaddress((uintcap_t)ec->pcc, (ptraddr_t)ec->start),
 	    ec);
 #endif
-	for (compartmentii = 0; compartmentii < elf_kernel_file.ncompartments;
-	    compartmentii++) {
-		ec = &elf_kernel_file.compartments[compartmentii];
+	for (ii = 0; ii < elf_kernel_file.ncompartments; ii++) {
+		ec = &elf_kernel_file.compartments[ii];
 		ec->filename = elf_kernel_filename;
 #ifdef CHERI_COMPARTMENT_STATS
 		compartment_metadata_create(ec->id, ec->name,
@@ -959,9 +978,9 @@ link_elf_init(void* arg)
 #endif
 	}
 #ifdef CHERI_COMPARTMENT_STATS
-	for (compartmentii = 0; compartmentii <= thread0.td_compartments_maxid;
-	    compartmentii++) {
-		compartment = thread0.td_compartments[compartmentii];
+	for (ii = COMPARTMENT_FIRST_ID; ii <= thread0.td_compartments_maxid;
+	    ii++) {
+		compartment = thread0.td_compartments[TD_CIDNDX(ii)];
 		if (compartment == NULL)
 			continue;
 		compartment_metadata_insert(compartment);
@@ -1735,7 +1754,7 @@ link_elf_linkup_compartments(linker_file_t lf, struct compartment *compartments,
 	unsigned int compartmentii;
 
 	ef = (elf_file_t)lf;
-	if (ef->ncompartments > ncompartments + 1) {
+	if (ef->ncompartments + 1 /* default */ > ncompartments) {
 		panic("%s: too many compartments defined in the file",
 		    __func__);
 	}
@@ -2346,6 +2365,15 @@ elf_compartment_entry(linker_file_t lf, uintcap_t ptr, u_long *idp,
 	cap = cheri_sealentry(cap);
 	*ptrp = (uintptr_t)cap;
 }
+
+struct compartment_trampoline_tree *
+elf_compartment_trampoline_tree(linker_file_t lf)
+{
+	elf_file_t ef;
+
+	ef = (elf_file_t)lf;
+	return (&ef->compartment_trampolines);
+}
 #endif
 
 Elf_Addr
@@ -2408,6 +2436,7 @@ link_elf_unload_file(linker_file_t file)
 	elf_cpu_unload_file(file);
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	compartment_trampoline_tree_remove_all(&ef->compartment_trampolines);
 	free(ef->compartments, M_LINKER);
 	free(ef->pccs, M_LINKER);
 #endif
@@ -2957,14 +2986,14 @@ elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, uintptr_t *res)
 	if (elf_set_find(&set_pcpu_list, addr, &start, &base)) {
 		addr = (ptraddr_t)addr - (ptraddr_t)start + base;
 #ifdef __CHERI_PURE_CAPABILITY__
-		addr = make_capability(sym, addr);
+		addr = make_capability(ef, sym, addr);
 #endif
 	}
 #ifdef VIMAGE
 	else if (elf_set_find(&set_vnet_list, addr, &start, &base)) {
 		addr = (ptraddr_t)addr - (ptraddr_t)start + base;
 #ifdef __CHERI_PURE_CAPABILITY__
-		addr = make_capability(sym, addr);
+		addr = make_capability(ef, sym, addr);
 #endif
 	}
 #endif
