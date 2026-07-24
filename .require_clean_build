@@ -20,3 +20,5 @@
 20260417  # bsd.opts.mk: Switch to new TGOT-based TLS ABI by default for CHERI
 # https://github.com/CTSRD-CHERI/cheribsd/commit/2093d496abfa96be9137dba86f859e6216aee017
 20260710  # Bump __CheriBSD_version to 20260710
+# https://github.com/CTSRD-CHERI/cheribsd/commit/a03781ba7d4f5d9534ae017c01a35faf6d57903c
+20260801  # bsd.opts.mk: Adopt "full" TGOT-based TLS ABI for Morello
