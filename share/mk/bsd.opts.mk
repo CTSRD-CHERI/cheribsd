@@ -113,11 +113,7 @@ __SINGLE_OPTIONS = \
    INIT_ALL
 
 __CHERI_TGOT_TLS_OPTIONS=	native no compat yes
-.if ${MACHINE_CPUARCH} == "aarch64"
-__CHERI_TGOT_TLS_DEFAULT=	compat
-.else
 __CHERI_TGOT_TLS_DEFAULT=	yes
-.endif
 
 __INIT_ALL_OPTIONS=	none pattern zero
 __INIT_ALL_DEFAULT=	none
