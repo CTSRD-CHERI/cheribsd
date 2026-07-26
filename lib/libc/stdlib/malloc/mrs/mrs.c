@@ -1043,6 +1043,20 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 			clear_region(iter->slab[i].ptr,
 			    cheri_length_get(iter->slab[i].ptr));
 #endif /* CLEAR_ON_RETURN */
+#ifdef MRS_STATS
+#ifdef __CHERI_PURE_CAPABILITY__
+			if (cmsp != NULL) {
+				atomic_fetch_add(
+				    &cmsp->cms_mrs_count_returned, 1);
+				atomic_fetch_add(
+				    &cmsp->cms_mrs_bytes_returned, len);
+				atomic_fetch_sub(
+				    &cmsp->cms_mrs_count_inquarantine, 1);
+				atomic_fetch_sub(
+				    &cmsp->cms_mrs_bytes_inquarantine, len);
+			}
+#endif
+#endif
 
 			/*
 			 * We have a VMEM-bearing cap from
@@ -1066,20 +1080,6 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 
 	size_t utrace_allocated_size = 0;
 	if (prev != NULL) {
-#ifdef MRS_STATS
-#ifdef __CHERI_PURE_CAPABILITY__
-		if (cmsp != NULL) {
-			atomic_fetch_add(&cmsp->cms_mrs_count_returned, 1);
-			atomic_fetch_add(&cmsp->cms_mrs_bytes_returned,
-			    quarantine->size);
-
-			atomic_fetch_sub(&cmsp->cms_mrs_count_inquarantine, 1);
-			atomic_fetch_sub(&cmsp->cms_mrs_bytes_inquarantine,
-			    quarantine->size);
-		}
-#endif
-#endif
-
 		/* Free the quarantined descriptors. */
 		prev->next = free_descriptor_slabs;
 		while (!atomic_compare_exchange_weak(&free_descriptor_slabs,
