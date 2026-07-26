@@ -348,10 +348,7 @@ static unsigned int quarantine_numerator = QUARANTINE_NUMERATOR;
 
 #ifdef MRS_STATS
 static const char *mrs_statfile_name = NULL;
-
-#ifdef __CHERI_PURE_CAPABILITY__
 static struct cheri_mrs_stats *cmsp;
-#endif
 #endif
 
 static spinlock_t mrs_init_lock = _SPINLOCK_INITIALIZER;
@@ -876,10 +873,8 @@ app_quarantine_revoke_async(void)
 
 	(void)cheri_revoke(CHERI_REVOKE_ASYNC, epoch, NULL);
 #ifdef MRS_STATS
-#ifdef __CHERI_PURE_CAPABILITY__
 	if (cmsp != NULL)
 		atomic_store(&cmsp->cms_mrs_epoch, epoch);
-#endif
 #endif
 
 	/*
@@ -1054,7 +1049,6 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 			    cheri_length_get(iter->slab[i].ptr));
 #endif /* CLEAR_ON_RETURN */
 #ifdef MRS_STATS
-#ifdef __CHERI_PURE_CAPABILITY__
 			if (cmsp != NULL) {
 				atomic_fetch_add(
 				    &cmsp->cms_mrs_count_returned, 1);
@@ -1065,7 +1059,6 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 				atomic_fetch_sub(
 				    &cmsp->cms_mrs_bytes_inquarantine, len);
 			}
-#endif
 #endif
 
 			/*
@@ -1102,11 +1095,9 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 		quarantine->size = 0;
 
 #ifdef MRS_STATS
-#ifdef __CHERI_PURE_CAPABILITY__
 		if (cmsp != NULL)
 			atomic_store(&cmsp->cms_mrs_allocated_size,
 			    allocated_size);
-#endif
 #endif
 	}
 	mrs_debug_printf("quarantine_flush: flushed, allocated_size %zu quarantine->size %zu\n",
@@ -1138,10 +1129,8 @@ quarantine_revoke(struct mrs_quarantine *quarantine)
 		(void)cheri_revoke(CHERI_REVOKE_TAKE_STATS, epoch, &crsi);
 		cyc_fini = cheri_revoke_get_cyc();
 #ifdef MRS_STATS
-#ifdef __CHERI_PURE_CAPABILITY__
 		if (cmsp != NULL)
 			atomic_store(&cmsp->cms_mrs_epoch, epoch);
-#endif
 #endif
 		print_cheri_revoke_stats("load-barrier", &crsi,
 		    cyc_fini - cyc_init);
@@ -1160,10 +1149,8 @@ quarantine_revoke(struct mrs_quarantine *quarantine)
 		    CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS,
 		    start_epoch, NULL);
 #ifdef MRS_STATS
-#ifdef __CHERI_PURE_CAPABILITY__
 		if (cmsp != NULL)
 			atomic_store(&cmsp->cms_mrs_epoch, start_epoch);
-#endif
 #endif
 # endif /* !PRINT_CAPREVOKE */
 	}
@@ -1589,7 +1576,6 @@ mrs_init_impl_locked(void)
 	 * events.
 	 */
 #ifdef MRS_STATS
-#ifdef __CHERI_PURE_CAPABILITY__
 	if (secure_getenv(MALLOC_QUARANTINE_STATS_DISABLE_ENV) == NULL &&
 	    secure_getenv(MALLOC_QUARANTINE_STATS_ENABLE_ENV) != NULL) {
 		if (_elf_aux_info(AT_CHERI_MRS, &cmsp, sizeof(cmsp)) < 0)
@@ -1615,7 +1601,6 @@ mrs_init_impl_locked(void)
 	    secure_getenv(MALLOC_QUARANTINE_STATS_FILE_ENV)) != NULL) {
 		atexit(mrs_statfile_dump);
 	}
-#endif
 #endif
 
 nosys:
@@ -1719,7 +1704,6 @@ mrs_malloc(size_t size)
 	    size, allocated_region);*/
 
 #ifdef MRS_STATS
-#ifdef __CHERI_PURE_CAPABILITY__
 	if (cmsp != NULL) {
 		atomic_fetch_add(&cmsp->cms_mrs_count_allocated, 1);
 		atomic_fetch_add(&cmsp->cms_mrs_bytes_allocated,
@@ -1728,7 +1712,6 @@ mrs_malloc(size_t size)
 		atomic_fetch_add(&cmsp->cms_mrs_bytes_inheap,
 		    cheri_length_get(allocated_region));
 	}
-#endif
 #endif
 	MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, allocated_region);
 	return (allocated_region);
@@ -1833,7 +1816,6 @@ mrs_calloc(size_t number, size_t size)
 	/*mrs_debug_printf("mrs_calloc: exit called %d size 0x%zx address %p\n", number, size, allocated_region);*/
 
 #ifdef MRS_STATS
-#ifdef __CHERI_PURE_CAPABILITY__
 	if (cmsp != NULL) {
 		atomic_fetch_add(&cmsp->cms_mrs_count_allocated, 1);
 		atomic_fetch_add(&cmsp->cms_mrs_bytes_allocated,
@@ -1842,7 +1824,6 @@ mrs_calloc(size_t number, size_t size)
 		atomic_fetch_add(&cmsp->cms_mrs_bytes_inheap,
 		    cheri_length_get(allocated_region));
 	}
-#endif
 #endif
 	MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number, allocated_region);
 	return (allocated_region);
@@ -1887,7 +1868,6 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 	increment_allocated_size(*ptr);
 
 #ifdef MRS_STATS
-#ifdef __CHERI_PURE_CAPABILITY__
 	if (cmsp != NULL) {
 		atomic_fetch_add(&cmsp->cms_mrs_count_allocated, 1);
 		atomic_fetch_add(&cmsp->cms_mrs_bytes_allocated,
@@ -1896,7 +1876,6 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 		atomic_fetch_add(&cmsp->cms_mrs_bytes_inheap,
 		    cheri_length_get(*ptr));
 	}
-#endif
 #endif
 	MRS_UTRACE(UTRACE_MRS_POSIX_MEMALIGN, NULL, size, alignment, *ptr);
 	return (ret);
@@ -1938,7 +1917,6 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	increment_allocated_size(allocated_region);
 
 #ifdef MRS_STATS
-#ifdef __CHERI_PURE_CAPABILITY__
 	if (cmsp != NULL) {
 		atomic_fetch_add(&cmsp->cms_mrs_count_allocated, 1);
 		atomic_fetch_add(&cmsp->cms_mrs_bytes_allocated,
@@ -1947,7 +1925,6 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 		atomic_fetch_add(&cmsp->cms_mrs_bytes_inheap,
 		    cheri_length_get(allocated_region));
 	}
-#endif
 #endif
 	MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 	    allocated_region);
@@ -2052,7 +2029,6 @@ mrs_free(void *ptr)
 #endif
 
 #ifdef MRS_STATS
-#ifdef __CHERI_PURE_CAPABILITY__
 	if (cmsp != NULL) {
 		atomic_fetch_add(&cmsp->cms_mrs_count_freed, 1);
 		atomic_fetch_add(&cmsp->cms_mrs_bytes_freed,
@@ -2065,7 +2041,6 @@ mrs_free(void *ptr)
 		atomic_fetch_add(&cmsp->cms_mrs_bytes_inquarantine,
 		    cheri_length_get(ins));
 	}
-#endif
 #endif
 
 	mrs_lock(&app_quarantine_lock);
