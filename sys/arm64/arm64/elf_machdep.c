@@ -431,15 +431,14 @@ build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
 #ifdef __CHERI_PURE_CAPABILITY__
 static uintcap_t __nosanitizecoverage
 build_cap_from_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr offset,
-    void * __capability data_cap, const void * __capability code_cap,
-    bool use_code_bounds)
+    void * __capability data_cap, const void * __capability code_cap)
 {
 	Elf_Addr addr, size;
 	uint8_t perms;
 
 	decode_fragment(fragment, relocbase, &addr, &size, &perms);
 	return (build_reloc_cap(addr, size, perms, offset, data_cap, code_cap,
-	    use_code_bounds));
+	    true));
 }
 #endif
 #endif
@@ -617,7 +616,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 	case R_MORELLO_IRELATIVE:
 		addr = build_cap_from_fragment(where, (Elf_Addr)relocbase,
-		    rela->r_addend, relocbase, relocbase, use_code_bounds);
+		    rela->r_addend, relocbase, relocbase);
 		addr = ((uintptr_t (*)(void))addr)();
 		*(uintptr_t *)where = addr;
 		break;
@@ -784,7 +783,7 @@ elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
 			fragment = (Elf_Addr *)cheri_address_set(data_cap,
 			    rela->r_offset);
 			cap = build_cap_from_fragment(fragment, 0,
-			    rela->r_addend, data_cap, code_cap, true);
+			    rela->r_addend, data_cap, code_cap);
 			*((uintptr_t *)fragment) = cap;
 			break;
 		}
