@@ -63,13 +63,12 @@ void _start(void *, void (*)(void), struct Struct_Obj_Entry *) __dead2 __exporte
 Elf_Auxinfo *__auxargs;
 
 /*
- * The entry function, C part. This performs the bulk of program initialisation
+ * The entry function, C part. This performs the bulk of program initialization
  * before handing off to main().
  *
- * Note: If we want to support tight function bounds, it is important that
- * function calls and global variable accesses are only be made after
+ * Note: It is important that global variable accesses are only made after
  * crt_init_globals() has completed (as this initializes the capabilities to
- * globals and functions in the captable, which is used for all function calls).
+ * globals in the GOT).
  * This restriction only applies to statically linked binaries since the dynamic
  * linker takes care of initialization otherwise.
  */
@@ -98,9 +97,6 @@ _start(void *auxv,
 
 	/*
 	 * Digest the auxiliary vector for local use.
-	 *
-	 * Note: this file must be compiled with -fno-jump-tables to avoid use
-	 * of the captable before crt_init_globals() has been called.
 	 */
 	for (Elf_Auxinfo *auxp = auxv; auxp->a_type != AT_NULL; auxp++) {
 		if (auxp->a_type == AT_ARGV) {
@@ -118,7 +114,7 @@ _start(void *auxv,
 		}
 	}
 
-	/* For -pie executables rtld will initialize the __cap_relocs */
+	/* For -pie executables, rtld will process relocations. */
 #ifndef PIC
 	/*
 	 * crt_init_globals must be called before accessing any globals.
@@ -130,7 +126,7 @@ _start(void *auxv,
 		crt_init_globals(at_phdr, at_phnum, &data_cap, &code_cap,
 		    NULL);
 #endif
-	/* We can access global variables/make function calls now. */
+	/* We can access global variables now. */
 
 	__auxargs = auxv; /* Store the global auxargs pointer */
 
