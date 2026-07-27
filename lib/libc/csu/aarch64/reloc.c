@@ -27,37 +27,9 @@
 
 #include <sys/cdefs.h>
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#include <stdbool.h>
-
-static bool use_code_bounds;
-#endif
-
 static void
 ifunc_init(const Elf_Auxinfo *aux __unused)
 {
-#ifdef __CHERI_PURE_CAPABILITY__
-	const Elf_Phdr *phdr;
-	long phnum;
-
-	/* Digest the auxiliary vector. */
-	for (; aux->a_type != AT_NULL; aux++) {
-		switch (aux->a_type) {
-		case AT_PHDR:
-			phdr = aux->a_un.a_ptr;
-			break;
-		case AT_PHNUM:
-			phnum = aux->a_un.a_val;
-			break;
-		}
-	}
-	for (const Elf_Phdr *ph = phdr; ph < phdr + phnum; ph++) {
-		if (ph->p_type == PT_CHERI_PCC) {
-			use_code_bounds = true;
-			break;
-		}
-	}
-#endif
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -73,7 +45,7 @@ ifunc_init(const Elf_Auxinfo *aux __unused)
 static uintcap_t
 init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
     const void * __capability text_rodata_cap, Elf_Addr base_addr,
-    Elf_Size addend, bool use_code_bounds)
+    Elf_Size addend)
 {
 	uintcap_t cap;
 	Elf_Addr address, len;
@@ -86,8 +58,7 @@ init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
 	    (uintcap_t)text_rodata_cap : (uintcap_t)data_cap;
 	cap = cheri_address_set(cap, base_addr + address);
-	if (perms != MORELLO_FRAG_EXECUTABLE || use_code_bounds)
-		cap = cheri_bounds_set(cap, len);
+	cap = cheri_bounds_set(cap, len);
 	cap = cheri_perms_clear(cap, CHERI_PERM_SW_VMEM);
 
 	if (perms == MORELLO_FRAG_EXECUTABLE || perms == MORELLO_FRAG_RODATA) {
@@ -124,7 +95,7 @@ crt1_handle_rela(const Elf_Rela *r, void *data_cap, const void *code_cap)
 		    (r->r_offset - (ptraddr_t)data_cap));
 		fragment = (Elf_Addr *)where;
 		ptr = init_cap_from_fragment(fragment, data_cap,
-		    code_cap, 0, r->r_addend, use_code_bounds);
+		    code_cap, 0, r->r_addend);
 		target = ((ifunc_resolver_t)ptr)(0, 0, 0, 0, 0, 0, 0, 0);
 		*where = target;
 		break;
@@ -143,7 +114,7 @@ crt1_handle_tgot_rela(const Elf_Rela *r, void *tgot, Elf_Addr init, void *tls)
 		    (r->r_offset - init));
 		fragment = (Elf_Addr *)where;
 		*where = init_cap_from_fragment(fragment, tls,
-		    NULL, (ptraddr_t)tls, 0, true);
+		    NULL, (ptraddr_t)tls, 0);
 		break;
 	}
 }
