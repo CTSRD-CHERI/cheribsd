@@ -118,8 +118,7 @@ _start(void *auxv,
 	 * not span the readonly segment or text segment.
 	 */
 	if (!has_dynamic_linker)
-		crt_init_globals(at_phdr, at_phnum, &data_cap, &code_cap,
-		    NULL);
+		crt_init_globals(at_phdr, at_phnum, &data_cap, &code_cap);
 #endif
 	/* We can access global variables now. */
 
