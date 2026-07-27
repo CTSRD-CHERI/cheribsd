@@ -1613,20 +1613,14 @@ create_pcc_caps(Obj_Entry *obj, const char *name)
 
 /*
  * Returns a code pointer to the instruction at the relative offset
- * into the mapped object.  If the object includes PCC bounds via
- * PT_CHERI_PCC headers, the pointer uses the bounds from the relevant
- * header.  Otherwise the pointer uses bounds for the entire object.
+ * into the mapped object.  The pointer uses the bounds from the
+ * relevant PT_CHERI_PCC segment.
  */
 const char *
 pcc_cap(const Obj_Entry *obj, Elf_Off offset)
 {
 	Elf_Addr addr;
 	const char *pcc_cap;
-
-	if (obj->npcc_caps == 0) {
-		pcc_cap = obj->text_rodata_cap + offset;
-		return (cheri_perms_clear(pcc_cap, CAP_RELOC_REMOVE_PERMS));
-	}
 
 	addr = (Elf_Addr)(uintptr_t)obj->relocbase + offset;
 	for (unsigned long i = 0; i < obj->npcc_caps; i++) {

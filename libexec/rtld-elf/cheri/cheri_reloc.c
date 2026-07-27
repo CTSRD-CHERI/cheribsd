@@ -49,7 +49,6 @@ process___cap_relocs(Obj_Entry *obj)
 	struct capreloc *end_relocs =
 	    (struct capreloc *)(obj->cap_relocs + obj->cap_relocs_size);
 	char * __capability data_base = get_datasegment_cap(obj);
-	bool tight_pcc_bounds;
 
 	if (obj->cap_relocs_processed) {
 		dbg("__cap_relocs for %s have already been processed!",
@@ -60,12 +59,6 @@ process___cap_relocs(Obj_Entry *obj)
 
 	dbg("Processing %lu __cap_relocs for %s (data base = %#lp)\n",
 	    end_relocs - start_relocs, obj->path, data_base);
-
-#ifdef __CHERI_PURE_CAPABILITY__
-	tight_pcc_bounds = can_use_tight_pcc_bounds(obj);
-#else
-	tight_pcc_bounds = false;
-#endif
 
 	for (const struct capreloc *reloc = start_relocs; reloc < end_relocs;
 	     reloc++) {
@@ -97,11 +90,10 @@ process___cap_relocs(Obj_Entry *obj)
 			cap = (uintcap_t)pcc_cap(obj, reloc->object);
 			cap = cheri_perms_clear(cap, FUNC_PTR_REMOVE_PERMS);
 
-			/*
-			 * Do not set tight bounds for functions
-			 * (unless we are in the plt ABI).
-			 */
-			can_set_bounds = tight_pcc_bounds;
+#ifndef __CHERI_PURE_CAPABILITY__
+			/* Do not set tight bounds for functions in hybrid. */
+			can_set_bounds = false;
+#endif
 		} else if (reloc->permissions == constant_reloc_flag) {
 			 /* read-only data pointer */
 			cap = (uintcap_t)data_base + reloc->object;
@@ -139,7 +131,6 @@ process_ifunc___cap_relocs(Obj_Entry *obj)
 	struct capreloc *start_relocs = (struct capreloc *)obj->cap_relocs;
 	struct capreloc *end_relocs =
 	    (struct capreloc *)(obj->cap_relocs + obj->cap_relocs_size);
-	bool tight_pcc_bounds = can_use_tight_pcc_bounds(obj);
 
 	dbg("Processing %lu __cap_relocs for %s IFUNCs\n",
 	    end_relocs - start_relocs, obj->path);
@@ -157,7 +148,7 @@ process_ifunc___cap_relocs(Obj_Entry *obj)
 		cap = (uintcap_t)pcc_cap(obj, reloc->object);
 		cap = cheri_perms_clear(cap,
 		    FUNC_PTR_REMOVE_PERMS | CAP_RELOC_REMOVE_PERMS);
-		if (tight_pcc_bounds && reloc->size != 0)
+		if (reloc->size != 0)
 			cap = cheri_bounds_set(cap, reloc->size);
 		cap += reloc->offset;
 		cap = cheri_sentry_create(cap);
