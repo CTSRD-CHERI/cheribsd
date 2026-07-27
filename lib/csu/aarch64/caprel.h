@@ -37,7 +37,7 @@
 static __always_inline uintcap_t
 init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
     const void * __capability text_rodata_cap, Elf_Addr base_addr,
-    Elf_Size addend, bool use_code_bounds)
+    Elf_Size addend)
 {
 	uintcap_t cap;
 	Elf_Addr address, len;
@@ -50,7 +50,9 @@ init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
 	    (uintcap_t)text_rodata_cap : (uintcap_t)data_cap;
 	cap = cheri_address_set(cap, base_addr + address);
-	if (perms != MORELLO_FRAG_EXECUTABLE || use_code_bounds)
+#ifndef __CHERI_PURE_CAPABILITY__
+	if (perms != MORELLO_FRAG_EXECUTABLE)
+#endif
 		cap = cheri_bounds_set(cap, len);
 	cap = cheri_perms_clear(cap, CAP_RELOC_REMOVE_PERMS);
 
@@ -72,8 +74,7 @@ init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
 
 static __always_inline void
 elf_reloc(const Elf_Rela *rela, void * __capability data_cap,
-    const void * __capability code_cap, Elf_Addr relocbase,
-    bool use_code_bounds)
+    const void * __capability code_cap, Elf_Addr relocbase)
 {
 	Elf_Addr addr;
 	Elf_Addr *where;
@@ -95,7 +96,7 @@ elf_reloc(const Elf_Rela *rela, void * __capability data_cap,
 	where = (Elf_Addr *)addr;
 #endif
 	*(uintcap_t *)(void *)where = init_cap_from_fragment(where, data_cap,
-	    code_cap, relocbase, rela->r_addend, use_code_bounds);
+	    code_cap, relocbase, rela->r_addend);
 }
 
 #endif /* __CAPREL_H__ */
