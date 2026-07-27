@@ -83,7 +83,7 @@ __start(int argc, char **argv, char **env, void (*cleanup)(void))
 		}
 
 		if (phdr != NULL && phnum != 0) {
-			crt_init_globals(phdr, phnum, NULL, NULL, NULL);
+			crt_init_globals(phdr, phnum, NULL, NULL);
 		}
 	}
 #endif
