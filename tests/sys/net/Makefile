@@ -19,6 +19,7 @@ ATF_TESTS_SH+=	if_wg
 
 TESTS_SUBDIRS+=	bpf
 TESTS_SUBDIRS+=	if_ovpn
+TESTS_SUBDIRS+=	wg
 TESTS_SUBDIRS+=	routing
 
 .if !${MACHINE_ABI:Mpurecap}
