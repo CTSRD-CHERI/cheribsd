@@ -438,9 +438,6 @@ ef_pcc_cap(elf_file_t ef, ptraddr_t offset)
 	caddr_t pcc_cap;
 	Elf_Addr addr;
 
-	if (ef->npcc_caps == 0)
-		return (ef->mapbase);
-
 	addr = (Elf_Addr)ef->address + offset;
 	for (size_t i = 0; i < ef->npcc_caps; i++) {
 		pcc_cap = ef->pcc_caps[i];
@@ -521,14 +518,28 @@ ef_create_pcc_caps(elf_file_t ef, const Elf_Phdr *phstart,
 	const Elf_Phdr *phdr;
 	caddr_t pcc_cap;
 	size_t i, j;
-	bool valid;
+	bool has_text, valid;
 
+	has_text = false;
 	for (phdr = phstart; phdr < phlimit; phdr++) {
 		switch (phdr->p_type) {
+		case PT_LOAD:
+			if ((phdr->p_flags & PF_X) != 0)
+				has_text = true;
+			break;
 		case PT_CHERI_PCC:
 			ef->npcc_caps++;
 			break;
 		}
+	}
+
+	if (ef->npcc_caps == 0) {
+		if (has_text) {
+			printf("%s: Missing PT_CHERI_PCC segment\n",
+			    ef->lf.filename);
+			return (false);
+		}
+		return (true);
 	}
 
 	valid = true;
@@ -576,8 +587,14 @@ preload_init_pcc_caps(elf_file_t ef, caddr_t modptr)
 	size_t phnum;
 
 	phdr = preload_search_phdrs(ef, &phnum, modptr);
-	if (phdr == NULL)
+	if (phdr == NULL) {
+		/* Create a single PCC cap entry as a fallback. */
+		ef->npcc_caps = 1;
+		ef->pcc_caps = mallocarray(ef->npcc_caps, sizeof(*ef->pcc_caps),
+		    M_LINKER, M_WAITOK | M_ZERO);
+		ef->pcc_caps[0] = ef->mapbase;
 		return (true);
+	}
 
 	return (ef_create_pcc_caps(ef, phdr, phdr + phnum));
 }
@@ -2349,7 +2366,7 @@ link_elf_reloc_local(linker_file_t lf)
 		data_cap = cheri_perms_and(ef->mapbase, CHERI_PERMS_KERNEL_DATA);
 		if (init_linker_file_cap_relocs(ef->caprelocs,
 		    (char *)ef->caprelocs + ef->caprelocssize, data_cap,
-		    (ptraddr_t)ef->address, true, resolve_cap_reloc, ef) != 0)
+		    (ptraddr_t)ef->address, resolve_cap_reloc, ef) != 0)
 			return (ENOEXEC);
 	}
 #endif
