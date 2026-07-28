@@ -157,6 +157,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 }
 #endif /* __CHERI_PURE_CAPABILITY__ */
 
+#ifndef __CHERI_PURE_CAPABILITY__
 int
 do_copy_relocations(Obj_Entry *dstobj)
 {
@@ -214,6 +215,7 @@ do_copy_relocations(Obj_Entry *dstobj)
 
 	return (0);
 }
+#endif /* !__CHERI_PURE_CAPABILITY__ */
 
 /*
  * Process the PLT relocations.
@@ -508,6 +510,11 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			*where += (Elf_Addr)defobj->tlsindex;
 			break;
 		case R_RISCV_COPY:
+#ifdef __CHERI_PURE_CAPABILITY__
+			_rtld_error("%s: Unexpected R_RISCV_COPY "
+			    "relocation in pure-capability object", obj->path);
+			return (-1);
+#else
 			/*
 			 * These are deferred until all other relocations have
 			 * been done. All we do here is make sure that the
@@ -520,6 +527,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				return (-1);
 			}
 			break;
+#endif
 		case R_RISCV_TLS_DTPREL64:
 #ifndef TLS_TGOT
 			def = find_symdef(symnum, obj, &defobj, flags, cache,
