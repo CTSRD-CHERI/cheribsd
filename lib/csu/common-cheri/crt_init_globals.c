@@ -75,15 +75,8 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum __unused,
 	const struct capreloc *stop_relocs;
 #ifndef __CHERI_PURE_CAPABILITY__
 	const Elf_Phdr *phlimit = phdr + phnum;
-	Elf_Addr text_start = (Elf_Addr)-1l;
-	Elf_Addr text_end = 0;
-	Elf_Addr readonly_start = (Elf_Addr)-1l;
-	Elf_Addr readonly_end = 0;
-	Elf_Addr writable_start = (Elf_Addr)-1l;
-	Elf_Addr writable_end = 0;
-	bool have_rodata_segment = false;
-	bool have_text_segment = false;
-	bool have_data_segment = false;
+	Elf_Addr base_addr = (Elf_Addr)-1l;
+	Elf_Addr end_addr = 0;
 #endif
 	bool use_code_bounds = false;
 	void * __capability data_cap;
@@ -94,134 +87,36 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum __unused,
 	/*
 	 * The capabilities for `phdr` and the current PCC should be
 	 * constrained to the executable for purecap.  Trust
-	 * relocations to further narrow bounds as needed.
-	 *
+	 * relocations to further narrow code bounds as needed.
 	 */
 	use_code_bounds = true;
-	code_cap = cheri_pcc_get();
 	data_cap = __DECONST(void *, phdr);
+#else
+	/* Bound the data capability to the executable image */
+	for (const Elf_Phdr *ph = phdr; ph < phlimit; ph++) {
+		if (ph->p_type != PT_LOAD)
+			continue;
+
+		base_addr = MIN(base_addr, ph->p_vaddr);
+		end_addr = MAX(end_addr, ph->p_vaddr + ph->p_memsz);
+	}
+
+	data_cap = cheri_ddc_get();
+	data_cap = cheri_address_set(data_cap, base_addr);
+	data_cap = cheri_bounds_set(data_cap, end_addr - base_addr);
+#endif
+
+	code_cap = cheri_pcc_get();
 	data_cap = cheri_perms_clear(data_cap, CHERI_PERM_EXECUTE |
 	    CHERI_PERM_SW_VMEM);
 	rodata_cap = cheri_perms_clear(data_cap, CHERI_PERM_STORE |
 #ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	    CHERI_PERM_STORE_CAP |
 #endif
-	    CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_SW_VMEM);
+	    CHERI_PERM_STORE_LOCAL_CAP);
 
 #ifdef CHERI_INIT_RELA
 	crt_init_rela(code_cap, data_cap);
-#endif
-#else
-	/* Attempt to bound the data capability to only the writable segment */
-	for (const Elf_Phdr *ph = phdr; ph < phlimit; ph++) {
-		if (ph->p_type != PT_LOAD && ph->p_type != PT_GNU_RELRO) {
-			/* Static binaries should not have a PT_DYNAMIC phdr */
-			if (ph->p_type == PT_DYNAMIC) {
-				__builtin_trap();
-				break;
-			}
-			continue;
-		}
-		/*
-		 * We found a PT_LOAD or PT_GNU_RELRO phdr. PT_GNU_RELRO will
-		 * be a subset of a matching PT_LOAD but we need to add the
-		 * range from PT_GNU_RELRO to the constant capability since
-		 * __cap_relocs could have some constants pointing to the relro
-		 * section. The phdr for the matching PT_LOAD has PF_R|PF_W so
-		 * it would not be added to the readonly if we didn't also
-		 * parse PT_GNU_RELRO.
-		 */
-		Elf_Addr seg_start = ph->p_vaddr;
-		Elf_Addr seg_end = seg_start + ph->p_memsz;
-		if ((ph->p_flags & PF_X)) {
-			/* text segment */
-			have_text_segment = true;
-			text_start = MIN(text_start, seg_start);
-			text_end = MAX(text_end, seg_end);
-		} else if ((ph->p_flags & PF_W)) {
-			/* data segment */
-			have_data_segment = true;
-			writable_start = MIN(writable_start, seg_start);
-			writable_end = MAX(writable_end, seg_end);
-		} else {
-			have_rodata_segment = true;
-			/* read-only segment (not always present) */
-			readonly_start = MIN(readonly_start, seg_start);
-			readonly_end = MAX(readonly_end, seg_end);
-		}
-	}
-
-	if (!have_text_segment) {
-		/* No text segment??? Must be an error somewhere else. */
-		__builtin_trap();
-	}
-	if (!have_rodata_segment) {
-		/*
-		 * Note: If we don't have a separate rodata segment we also
-		 * need to include the text segment in the rodata cap. This is
-		 * required since all constants will be part of the read/exec
-		 * segment instead of a separate read-only one.
-		 */
-		readonly_start = text_start;
-		readonly_end = text_end;
-	}
-	if (!have_data_segment) {
-		/*
-		 * There cannot be any capabilities to initialize if there
-		 * is no data segment. Set all to NULL to catch errors.
-		 *
-		 * Note: RELRO segment will be part of a R/W PT_LOAD.
-		 */
-		code_cap = NULL;
-		data_cap = NULL;
-		rodata_cap = NULL;
-	} else {
-		/* Check that ranges are well-formed */
-		if (writable_end < writable_start ||
-		    readonly_end < readonly_start ||
-		    text_end < text_start)
-			__builtin_trap();
-
-		/* Abort if text and writeable overlap: */
-		if (MAX(writable_start, text_start) <
-		    MIN(writable_end, text_end)) {
-			/* TODO: should we allow a single RWX segment? */
-			__builtin_trap();
-		}
-
-		data_cap = cheri_ddc_get();
-		data_cap = cheri_perms_clear(data_cap,
-		   CHERI_PERM_EXECUTE | CHERI_PERM_SW_VMEM);
-
-		code_cap = cheri_pcc_get();
-		rodata_cap = cheri_perms_clear(data_cap,
-		    CHERI_PERM_STORE |
-#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
-		    CHERI_PERM_STORE_CAP |
-#endif
-		    CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_SW_VMEM);
-
-		data_cap = cheri_address_set(data_cap, writable_start);
-		rodata_cap = cheri_address_set(rodata_cap, readonly_start);
-
-		/* TODO: should we use exact setbounds? */
-		data_cap =
-		    cheri_bounds_set(data_cap, writable_end - writable_start);
-		rodata_cap =
-		    cheri_bounds_set(rodata_cap, readonly_end - readonly_start);
-
-		if (!cheri_tag_get(data_cap))
-			__builtin_trap();
-		if (!cheri_tag_get(rodata_cap))
-			__builtin_trap();
-		if (!cheri_tag_get(code_cap))
-			__builtin_trap();
-	}
-
-#ifdef CHERI_INIT_RELA
-	crt_init_rela(code_cap, cheri_perms_clear(cheri_ddc_get(),
-	    CHERI_PERM_EXECUTE | CHERI_PERM_SW_VMEM));
-#endif
 #endif
 
 	start_relocs = CHERI_RODATA_PTR(__start___cap_relocs);
