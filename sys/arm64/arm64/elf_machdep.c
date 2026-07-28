@@ -616,18 +616,8 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		*(uintptr_t *)where = addr;
 		break;
 	case R_MORELLO_IRELATIVE:
-		/* XXX: See libexec/rtld-elf/aarch64/reloc.c. */
-		if ((where[0] == 0 && where[1] == 0) ||
-		    (Elf_Ssize)where[0] == rela->r_addend) {
-			addr = (uintptr_t)(relocbase + rela->r_addend);
-			addr = cheri_perms_clear(addr, CHERI_PERM_SEAL |
-			    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
-			    CHERI_PERM_STORE_LOCAL_CAP);
-			addr = cheri_sentry_create(addr);
-		} else
-			addr = build_cap_from_fragment(where,
-			    (Elf_Addr)relocbase, rela->r_addend,
-			    relocbase, relocbase, use_code_bounds);
+		addr = build_cap_from_fragment(where, (Elf_Addr)relocbase,
+		    rela->r_addend, relocbase, relocbase, use_code_bounds);
 		addr = ((uintptr_t (*)(void))addr)();
 		*(uintptr_t *)where = addr;
 		break;

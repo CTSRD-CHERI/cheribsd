@@ -697,33 +697,9 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 	where = (uintptr_t *)(obj->relocbase + rela->r_offset);
 #ifdef __CHERI_PURE_CAPABILITY__
 	fragment = (Elf_Addr *)where;
-	/*
-	 * XXX: Morello LLVM commit 94e1dbac broke R_MORELLO_IRELATIVE ABI.
-	 * This horrible hack exists to support both old and new ABIs.
-	 *
-	 * Old ABI:
-	 *   - Treat as R_AARCH64_IRELATIVE (addend is symbol value)
-	 *   - Fragment contents either all zero (for ET_DYN) or base set to
-	 *     the addend and length set to the symbol size (which we don't
-	 *     have to hand).
-	 *
-	 * New ABI:
-	 *   - Same representation as R_MORELLO_RELATIVE
-	 *
-	 * Thus, probe for something that looks like the old ABI and hope
-	 * that's reliable enough until the commit is old enough that we can
-	 * assume the new ABI and ditch this.
-	 *
-	 * See also: lib/csu/aarch64c/reloc.c and sys/arm64/arm64/elf_machdep.c
-	 */
-	if ((fragment[0] == 0 && fragment[1] == 0) ||
-	    (Elf_Ssize)fragment[0] == rela->r_addend)
-		ptr = (uintptr_t)pcc_cap(obj, rela->r_addend);
-	else
-		ptr = init_cap_from_fragment(fragment, obj->relocbase,
-		    pcc_cap(obj, fragment[0]),
-		    (Elf_Addr)(uintptr_t)obj->relocbase,
-		    rela->r_addend, use_code_bounds);
+	ptr = init_cap_from_fragment(fragment, obj->relocbase,
+	    pcc_cap(obj, fragment[0]), (Elf_Addr)(uintptr_t)obj->relocbase,
+	    rela->r_addend, use_code_bounds);
 #else
 	ptr = (uintptr_t)(obj->relocbase + rela->r_addend);
 #endif

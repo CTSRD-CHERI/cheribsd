@@ -123,16 +123,8 @@ crt1_handle_rela(const Elf_Rela *r, void *data_cap, const void *code_cap)
 		where = (uintptr_t *)((uintptr_t)data_cap +
 		    (r->r_offset - (ptraddr_t)data_cap));
 		fragment = (Elf_Addr *)where;
-		/*
-		 * XXX: See libexec/rtld-elf/aarch64/reloc.c. Unlike there we
-		 * can ignore the ET_DYN case.
-		 */
-		if ((Elf_Ssize)fragment[0] == r->r_addend)
-			ptr = (uintptr_t)code_cap +
-			    (r->r_addend - (ptraddr_t)code_cap);
-		else
-			ptr = init_cap_from_fragment(fragment, data_cap,
-			    code_cap, 0, r->r_addend, use_code_bounds);
+		ptr = init_cap_from_fragment(fragment, data_cap,
+		    code_cap, 0, r->r_addend, use_code_bounds);
 		target = ((ifunc_resolver_t)ptr)(0, 0, 0, 0, 0, 0, 0, 0);
 		*where = target;
 		break;
