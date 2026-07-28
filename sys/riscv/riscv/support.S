@@ -44,8 +44,7 @@
  * The .cap loads are only allowed on xcheri.
  */
 .macro load_res width xreg preg
-#ifdef __CHERI_HYBRID__
-	/* Note: xcheri */
+#if defined(__riscv_xcheri) && defined(__CHERI_HYBRID__)
 	lr.\width\().cap	\xreg, 0(CAP(\preg))
 #else
 	lr.\width	\xreg, 0(\preg)
@@ -53,8 +52,7 @@
 .endmacro
 
 .macro store_cond width xreg1 xreg2 preg
-#ifdef __CHERI_HYBRID__
-	/* Note: xcheri */
+#if defined(__riscv_xcheri) && defined(__CHERI_HYBRID__)
 	move		\xreg1, \xreg2
 	sc.\width\().cap	\xreg1, 0(CAP(\preg))
 #else
@@ -63,8 +61,7 @@
 .endmacro
 
 .macro load_op width xreg preg
-#ifdef __CHERI_HYBRID__
-	/* Note: xcheri */
+#if defined(__riscv_xcheri) && defined(__CHERI_HYBRID__)
 	l\width\().cap	\xreg, 0(CAP(\preg))
 #else
 	l\width	\xreg, 0(\preg)
@@ -72,8 +69,7 @@
 .endmacro
 
 .macro store_op width xreg preg
-#ifdef __CHERI_HYBRID__
-	/* Note: xcheri */
+#if defined(__riscv_xcheri) && defined(__CHERI_HYBRID__)
 	s\width\().cap	\xreg, 0(CAP(\preg))
 #else
 	s\width	\xreg, 0(\preg)
@@ -82,8 +78,7 @@
 
 #if __has_feature(capabilities)
 .macro load_ptr xreg preg
-#ifdef __CHERI_HYBRID__
-	/* Note: xcheri */
+#if defined(__riscv_xcheri) && defined(__CHERI_HYBRID__)
 	lc.cap	CAP(\xreg), 0(CAP(\preg))
 #else
 	ly	\xreg, 0(\preg)
@@ -91,7 +86,7 @@
 .endmacro
 
 .macro store_ptr xreg preg
-#ifdef __CHERI_HYBRID__
+#if defined(__riscv_xcheri) && defined(__CHERI_HYBRID__)
 	/* Note: xcheri */
 	sc.cap	CAP(\xreg), 0(CAP(\preg))
 #else
@@ -104,7 +99,7 @@
  * One of the fu* or su* functions failed, return -1.
  */
 ENTRY(fsu_fault)
-	MODESW_INT
+	YMODE_EXIT
 	SET_FAULT_HANDLER(zero, a1)	/* Reset the handler function */
 	EXIT_USER_ACCESS(a1)
 fsu_fault_nopcb:
@@ -122,7 +117,7 @@ ENTRY(casueword32)
 	LA_PTR	a6, fsu_fault	/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a4)	/* And set it */
 	ENTER_USER_ACCESS(a4)
-	MODESW_CAP
+	YMODE_ENTER
 
 	load_res	w a4 a0		/* Load-exclusive the data */
 	bne	a4, a1, 1f		/* If not equal then exit */
@@ -131,7 +126,7 @@ ENTRY(casueword32)
 
 1:	li	a5, 1			/* Normalize failure result */
 2:
-	MODESW_INT
+	YMODE_EXIT
 	EXIT_USER_ACCESS(a6)
 	SET_FAULT_HANDLER(zero, a6)	/* Reset the fault handler */
 	sw	a4, 0(a2)		/* Store the read data */
@@ -148,7 +143,7 @@ ENTRY(casueword)
 	LA_PTR	a6, fsu_fault	/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a4)	/* And set it */
 	ENTER_USER_ACCESS(a4)
-	MODESW_CAP
+	YMODE_ENTER
 
 	load_res	d a4 a0		/* Load-exclusive the data */
 	bne	a4, a1, 1f		/* If not equal then exit */
@@ -156,7 +151,7 @@ ENTRY(casueword)
 	beqz	a5, 2f			/* Success */
 1:	li	a5, 1			/* Normalize failure result */
 2:
-	MODESW_INT
+	YMODE_EXIT
 	EXIT_USER_ACCESS(a6)
 	SET_FAULT_HANDLER(zero, a6)	/* Reset the fault handler */
 	sd	a4, 0(a2)		/* Store the read data */
@@ -173,9 +168,9 @@ ENTRY(fubyte)
 	LA_PTR	a6, fsu_fault	/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a1)	/* And set it */
 	ENTER_USER_ACCESS(a1)
-	MODESW_CAP
+	YMODE_ENTER
 	load_op	bu a0 a0		/* Try loading the data */
-	MODESW_INT
+	YMODE_EXIT
 	EXIT_USER_ACCESS(a1)
 	SET_FAULT_HANDLER(zero, a1)	/* Reset the fault handler */
 	ret				/* Return */
@@ -190,9 +185,9 @@ ENTRY(fuword16)
 	LA_PTR	a6, fsu_fault	/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a1)	/* And set it */
 	ENTER_USER_ACCESS(a1)
-	MODESW_CAP
+	YMODE_ENTER
 	load_op	hu a0 a0		/* Try loading the data */
-	MODESW_INT
+	YMODE_EXIT
 	EXIT_USER_ACCESS(a1)
 	SET_FAULT_HANDLER(zero, a1)	/* Reset the fault handler */
 	ret				/* Return */
@@ -207,9 +202,9 @@ ENTRY(fueword32)
 	LA_PTR	a6, fsu_fault	/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
-	MODESW_CAP
+	YMODE_ENTER
 	load_op	w a0 a0			/* Try loading the data */
-	MODESW_INT
+	YMODE_EXIT
 	EXIT_USER_ACCESS(a2)
 	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
 	sw	a0, 0(a1)		/* Save the data in kernel space */
@@ -228,9 +223,9 @@ EENTRY(fueword64)
 	LA_PTR	a6, fsu_fault	/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
-	MODESW_CAP
+	YMODE_ENTER
 	load_op	d a0 a0			/* Try loading the data */
-	MODESW_INT
+	YMODE_EXIT
 	EXIT_USER_ACCESS(a2)
 	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
 	sd	a0, 0(a1)		/* Save the data in kernel space */
@@ -249,9 +244,9 @@ ENTRY(fuecap)
 	LA_PTR	a6, fsu_fault	/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
-	MODESW_CAP
+	YMODE_ENTER
 	load_ptr	a0 a0		/* Try loading the data */
-	MODESW_INT
+	YMODE_EXIT
 	EXIT_USER_ACCESS(a2)
 	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
 	store_ptr	a0 a1		/* Save the data in kernel space */
@@ -269,9 +264,9 @@ ENTRY(subyte)
 	LA_PTR	a6, fsu_fault	/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
-	MODESW_CAP
+	YMODE_ENTER
 	store_op	b a1 a0		/* Try storing the data */
-	MODESW_INT
+	YMODE_EXIT
 	EXIT_USER_ACCESS(a2)
 	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
@@ -287,9 +282,9 @@ ENTRY(suword16)
 	LA_PTR	a6, fsu_fault	/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
-	MODESW_CAP
+	YMODE_ENTER
 	store_op	h a1 a0		/* Try storing the data */
-	MODESW_INT
+	YMODE_EXIT
 	EXIT_USER_ACCESS(a2)
 	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
@@ -305,9 +300,9 @@ ENTRY(suword32)
 	LA_PTR	a6, fsu_fault	/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
-	MODESW_CAP
+	YMODE_ENTER
 	store_op	w a1 a0		/* Try storing the data */
-	MODESW_INT
+	YMODE_EXIT
 	EXIT_USER_ACCESS(a2)
 	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
@@ -324,9 +319,9 @@ EENTRY(suword64)
 	LA_PTR	a6, fsu_fault	/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
-	MODESW_CAP
+	YMODE_ENTER
 	store_op	d a1 a0		/* Try storing the data */
-	MODESW_INT
+	YMODE_EXIT
 	EXIT_USER_ACCESS(a2)
 	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
@@ -344,9 +339,9 @@ ENTRY(sucap)
 	LA_PTR	a6, fsu_fault	/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
-	MODESW_CAP
+	YMODE_ENTER
 	store_ptr	a1 a0		/* Try storing the data */
-	MODESW_INT
+	YMODE_EXIT
 	EXIT_USER_ACCESS(a2)
 	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */

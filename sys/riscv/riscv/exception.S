@@ -40,7 +40,7 @@
 
 .macro save_registers mode
 .option push
-#ifndef __CHERI__
+#ifdef __CHERI_HYBRID__
 .option capmode
 	/*
 	 * If coming from userspace, load_registers 0 leaves 'csp' as a
@@ -122,9 +122,7 @@
 #if __has_feature(capabilities)
 	GET_DDC(t0)
 	S_CAP	t0, (TF_DDC)(sp)
-#endif
 
-#if __has_feature(capabilities)
 .if \mode == 0
 	/* Load our DDC */
 #ifdef __CHERI__
@@ -135,12 +133,11 @@
 	SET_DDC(t0)
 .endif
 
-#ifndef __CHERI__
+#ifdef __CHERI_HYBRID__
 	MODESW_INT(t1)
 #endif
 #endif /* __has_feature(capabilities) */
 .option pop
-#endif
 
 	csrr	t0, sstatus
 	sd	t0, (TF_SSTATUS)(sp)
@@ -191,7 +188,7 @@
 
 .option push
 #if __has_feature(capabilities)
-#ifndef __CHERI__
+#ifdef __CHERI_HYBRID__
 	/* Switch to capmode PCC. */
 	MODESW_CAP(t0, t1)
 .option capmode
@@ -212,7 +209,7 @@
 	GET_DDC(t0)
 	S_CAP	t0, (TF_SIZE + KF_DDC)(sp)
 .endif
-#endif /* !defined(__CHERI__) */
+#endif /* __CHERI_HYBRID__ */
 
 	/*
 	 * Switch to user DDC.  After this point, all stack accesses

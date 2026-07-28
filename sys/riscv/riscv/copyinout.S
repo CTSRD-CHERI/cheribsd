@@ -45,8 +45,7 @@
  * The .cap loads are only allowed on xcheri.
  */
 .macro load_byte xreg preg
-#ifdef __CHERI_HYBRID__
-	/* Note: xcheri */
+#if defined(__riscv_xcheri) && defined(__CHERI_HYBRID__)
 	lb.cap	\xreg, 0(CAP(\preg))
 #else
 	lb	\xreg, 0(\preg)
@@ -54,8 +53,7 @@
 .endmacro
 
 .macro store_byte xreg preg
-#ifdef __CHERI_HYBRID__
-	/* Note: xcheri */
+#if defined(__riscv_xcheri) && defined(__CHERI_HYBRID__)
 	sb.cap	\xreg, 0(CAP(\preg))
 #else
 	sb	\xreg, 0(\preg)
@@ -63,8 +61,7 @@
 .endmacro
 
 .macro load_word xreg preg
-#ifdef __CHERI_HYBRID__
-	/* Note: xcheri */
+#if defined(__riscv_xcheri) && defined(__CHERI_HYBRID__)
 	ld.cap	\xreg, 0(CAP(\preg))
 #else
 	ld	\xreg, 0(\preg)
@@ -72,8 +69,7 @@
 .endmacro
 
 .macro store_word xreg preg
-#ifdef __CHERI_HYBRID__
-	/* Note: xcheri */
+#if defined(__riscv_xcheri) && defined(__CHERI_HYBRID__)
 	sd.cap	\xreg, 0(CAP(\preg))
 #else
 	sd	\xreg, 0(\preg)
@@ -81,8 +77,7 @@
 .endmacro
 
 .macro load_ptr xreg preg
-#ifdef __CHERI_HYBRID__
-	/* Note: xcheri */
+#if defined(__riscv_xcheri) && defined(__CHERI_HYBRID__)
 	lc.cap	CAP(\xreg), 0(CAP(\preg))
 #else
 	ly	\xreg, 0(\preg)
@@ -90,8 +85,7 @@
 .endmacro
 
 .macro store_ptr xreg preg
-#ifdef __CHERI_HYBRID__
-	/* Note: xcheri */
+#if defined(__riscv_xcheri) && defined(__CHERI_HYBRID__)
 	sc.cap	CAP(\xreg), 0(CAP(\preg))
 #else
 	sy	\xreg, 0(\preg)
@@ -102,6 +96,7 @@
  * Fault handler for the copy{in,out} functions below.
  */
 ENTRY(copyio_fault)
+	YMODE_EXIT
 	SET_FAULT_HANDLER(zero, a1) /* Clear the handler */
 	EXIT_USER_ACCESS(a1)
 copyio_fault_nopcb:
@@ -120,7 +115,7 @@ END(copyio_fault)
 	LA_PTR	a6, copyio_fault	/* Get the handler address */
 	SET_FAULT_HANDLER(a6, a7)	/* Set the handler */
 	ENTER_USER_ACCESS(a7)
-	MODESW_CAP
+	YMODE_ENTER
 
 	li	t2, XLEN_BYTES
 	blt	a2, t2, 4f		/* Byte-copy if len < XLEN_BYTES */
@@ -166,7 +161,8 @@ END(copyio_fault)
 	addi	a2, a2, -1		/* len-- */
 	bnez	a2, 4b
 
-5:	MODESW_INT
+5:
+	YMODE_EXIT
 	EXIT_USER_ACCESS(a7)
 	SET_FAULT_HANDLER(zero, a7)	/* Clear the handler */
 	.endm
@@ -232,7 +228,7 @@ ENTRY(copyinstr)
 	LA_PTR	a6, copyio_fault /* Get the handler address */
 	SET_FAULT_HANDLER(a6, a7) /* Set the handler */
 	ENTER_USER_ACCESS(a7)
-	MODESW_CAP
+	YMODE_ENTER
 
 #ifdef __CHERI_HYBRID__
 	GET_DDC(a4)
@@ -251,7 +247,8 @@ ENTRY(copyinstr)
 	addi	a5, a5, 1	/* count++ */
 	bnez	a2, 1b
 
-2:	MODESW_INT
+2:
+	YMODE_EXIT
 	EXIT_USER_ACCESS(a7)
 	SET_FAULT_HANDLER(zero, a7) /* Clear the handler */
 
@@ -278,7 +275,7 @@ END(copyinstr)
 	LA_PTR	a6, copyio_fault	/* Get the handler address */
 	SET_FAULT_HANDLER(a6, a7)	/* Set the handler */
 	ENTER_USER_ACCESS(a7)
-	MODESW_CAP
+	YMODE_ENTER
 
 	li	t2, CLEN_BYTES
 	blt	a2, t2, 4f		/* Byte-copy if len < CLEN_BYTES */
@@ -324,7 +321,8 @@ END(copyinstr)
 	addi	a2, a2, -1		/* len-- */
 	bnez	a2, 4b
 
-5:	MODESW_INT
+5:
+	YMODE_EXIT
 	EXIT_USER_ACCESS(a7)
 	SET_FAULT_HANDLER(zero, a7) /* Clear the handler */
 	.endm

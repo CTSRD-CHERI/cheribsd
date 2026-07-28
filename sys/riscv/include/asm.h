@@ -78,6 +78,7 @@
  * Abstract CSR manipulation that requires different
  * instructions across RV64, xcheri and RV64Y.
  */
+#ifdef __riscv_xcheri
 #define	GET_DDC(rd)				\
 	cspecialr	CAP(rd), ddc
 
@@ -86,8 +87,24 @@
 
 #define	GET_PCC(rd)				\
 	cspecialr	CAP(rd), pcc
+#else /* !__riscv_xcheri */
+/*
+ * RVY hybrid is required for DDC
+ * Note: these macros require capability mode
+ * to use CLEN registers.
+ */
+#define	GET_DDC(rd)				\
+	csrr		rd, ddc
 
-#if __has_feature(capabilities)
+#define	SET_DDC(rs)				\
+	csrw		ddc, rs
+
+#define	GET_PCC(rd)				\
+	auipc		rd, 0
+#endif /* !__riscv_xcheri */
+
+
+#if __has_feature(capabilities) && defined(__riscv_xcheri)
 #define	CSRR_CAP(rd, csrn)			\
 	cspecialr	CAP(rd), csrn ## c
 
@@ -115,7 +132,11 @@
 #define	INT_WIDTH	8
 
 #if __has_feature(capabilities)
+#ifdef __riscv_xcheri
 #define	CAP(x)		c ## x
+#else
+#define	CAP(x)		x
+#endif
 #define	CAP_WIDTH	16
 
 #define	L_CAP		ly
@@ -123,7 +144,11 @@
 #define	MV_CAP		ymv
 #define	ADD_CAP		yadd
 #define	ADDI_CAP	yaddi
-/* Note: xcheri */
+#ifdef __riscv_xcheri
+/*
+ * The MODESW macros are only relevant in the hybrid kernel.
+ * In the pure-capability kernel, the MODESW macros become no-ops.
+ */
 #define	MODESW_CAP(tmp, tmp1)					\
 	lla		tmp1, 99f;				\
 	cspecialr	CAP(tmp), pcc;				\
@@ -132,13 +157,49 @@
 	csetflags	CAP(tmp), CAP(tmp), tmp1;		\
 	jr.cap		CAP(tmp);				\
 	99:
-/* Note: xcheri */
 #define	MODESW_INT(tmp)						\
 	llc		CAP(tmp), 99f;				\
 	csetflags	CAP(tmp), CAP(tmp), zero;		\
 	jr.cap		CAP(tmp);				\
 	99:
+#define	YMODE_ENTER
+#define	YMODE_EXIT
+#elif defined(__riscv_zcheripurecap)
+#define	MODESW_CAP(tmp, tmp1)	modesw.cap
+#define	MODESW_INT(tmp)		modesw.int
+#ifdef __CHERI_HYBRID__
+#define	YMODE_ENTER				\
+	modesw.cap;				\
+	.option capmode
+#define	YMODE_EXIT				\
+	modesw.int;				\
+	.option nocapmode
 #else
+#define	YMODE_ENTER
+#define	YMODE_EXIT
+#endif
+#elif defined(__riscv_y)
+#define	MODESW_CAP(tmp, tmp1)	ymodeswy
+#define	MODESW_INT(tmp)		ymodeswi
+#ifdef __CHERI_HYBRID__
+/*
+ * RVY uses additional mode switches because it has a more
+ * constrained set of features available in hybrid mode.
+ * These differ from the MODESW macros because they become
+ * no-ops in a purecap kernel.
+ */
+#define	YMODE_ENTER				\
+	ymodeswy;				\
+	.option capmode
+#define	YMODE_EXIT				\
+	ymodeswi;				\
+	.option nocapmode
+#else
+#define	YMODE_ENTER
+#define	YMODE_EXIT
+#endif
+#endif /* __riscv_y */
+#else /* !__has_feature(capabilities) */
 #define	CAP(x)		x
 #define	CAP_WIDTH	INT_WIDTH
 
@@ -148,8 +209,10 @@
 #define	ADD_CAP		add
 #define	ADDI_CAP	addi
 #define	MODESW_CAP(tmp, tmp1)
-#define	MODESW_INT(tmp, tmp1)
-#endif
+#define	MODESW_INT(tmp)
+#define	YMODE_ENTER
+#define	YMODE_EXIT
+#endif  /* !__has_feature(capabilities) */
 
 #ifdef __CHERI__
 #define	PTR_WIDTH	CAP_WIDTH
@@ -161,7 +224,7 @@
 #define	S_PTR		sy
 #define	LLA_PTR		lly
 #define	LA_PTR		lgy
-#else
+#else /* !__CHERI__ */
 #define	PTR_WIDTH	INT_WIDTH
 
 #define	MV_PTR		mv
@@ -171,7 +234,7 @@
 #define	S_PTR		sd
 #define	LLA_PTR		lla
 #define	LA_PTR		la
-#endif
+#endif /* !__CHERI__ */
 
 #endif /* _MACHINE_ASM_H_ */
 // CHERI CHANGES START
