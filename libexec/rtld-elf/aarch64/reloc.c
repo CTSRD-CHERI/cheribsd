@@ -530,31 +530,13 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 			}
 			if (lazy) {
 #ifdef __CHERI_PURE_CAPABILITY__
-				/*
-				 * Old ABI:
-				 *   - Treat as R_AARCH64_JUMP_SLOT
-				 *
-				 * New ABI:
-				 *   - Same representation as
-				 *     R_MORELLO_RELATIVE
-				 *
-				 * Determine which this is based on
-				 * whether there's non-zero metadata
-				 * next to the address. Remove once
-				 * the new ABI is old enough that we
-				 * can assume it is in use.
-				 */
 				pcc = pcc_cap(obj, fragment[0]);
 				pcc = cheri_perms_clear(pcc,
 				    FUNC_PTR_REMOVE_PERMS);
-				if (fragment[1] == 0)
-					*where = cheri_sentry_create(
-					    (uintptr_t)pcc);
-				else
-					*where = init_cap_from_fragment(
-					    fragment, obj->relocbase, pcc,
-					    (Elf_Addr)(uintptr_t)obj->relocbase,
-					    rela->r_addend, use_code_bounds);
+				*where = init_cap_from_fragment(fragment,
+				    obj->relocbase, pcc,
+				    (Elf_Addr)(uintptr_t)obj->relocbase,
+				    rela->r_addend, use_code_bounds);
 #else
 				*where += (Elf_Addr)obj->relocbase;
 #endif
