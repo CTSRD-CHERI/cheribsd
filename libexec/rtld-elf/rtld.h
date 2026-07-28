@@ -694,7 +694,9 @@ bool check_elf_headers(const Elf_Ehdr *hdr, const char *path);
 /*
  * MD function declarations.
  */
+#ifndef __CHERI_PURE_CAPABILITY__
 int do_copy_relocations(Obj_Entry *);
+#endif
 int reloc_non_plt(Obj_Entry *, Obj_Entry *, int flags,
     struct Struct_RtldLockState *);
 int reloc_plt(Plt_Entry *, int flags, struct Struct_RtldLockState *);
