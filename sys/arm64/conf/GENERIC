@@ -44,3 +44,5 @@ include		"std.qcom"
 include		"std.rockchip"
 include		"std.virt"
 include		"std.xilinx"
+
+options         CHERI_USE_STABLE_MEMCPY

@@ -184,12 +184,12 @@ ENTRY(copyinstr)
 	RETURN
 END(copyinstr)
 
-#if !__has_feature(capabilities)
+#ifdef CHERI_USE_STABLE_MEMCPY
 /*
  * Local helper
  *
- * x0 - src pointer
- * x1 - dst pointer
+ * x0/c0 - src pointer
+ * x1/c1 - dst pointer
  * x2 - size
  * lr - the return address, so jump here instead of calling
  *
@@ -206,9 +206,10 @@ END(copyinstr)
 	.type	copycommon,@function
 
 copycommon:
-	adr	x6, copyio_fault /* Get the handler address */
-	SET_FAULT_HANDLER(x6, x7) /* Set the handler */
-	ENTER_USER_ACCESS(w6, x7)
+	adr	PTR(6), copyio_fault /* Get the handler address */
+	SET_FAULT_HANDLER(PTR(6), PTR(7)) /* Set the handler */
+	ENTER_USER_ACCESS(w6, PTR(7))
+	ENTER_C64
 
 	/* Check alignment */
 	orr	x3, x0, x1
@@ -217,8 +218,8 @@ copycommon:
 
 	/* Unaligned is byte by byte copy */
 byte_by_byte:
-	ldrb	w3, [x0], #0x01
-	strb	w3, [x1], #0x01
+	ldrb	w3, [CAP(0)], #0x01
+	strb	w3, [CAP(1)], #0x01
 	subs	x2, x2, #0x01
 	b.ne	byte_by_byte
 	b	ending
@@ -232,14 +233,14 @@ aligned:
 	/* Block copy */
 	lsr	x15, x2, #0x06
 by_blocks:
-	ldp	x3, x4, [x0], #0x10
-	ldp	x5, x6, [x0], #0x10
-	ldp	x7, x8, [x0], #0x10
-	ldp	x9, x10, [x0], #0x10
-	stp	x3, x4, [x1], #0x10
-	stp	x5, x6, [x1], #0x10
-	stp	x7, x8, [x1], #0x10
-	stp	x9, x10, [x1], #0x10
+	ldp	x3, x4, [CAP(0)], #0x10
+	ldp	x5, x6, [CAP(0)], #0x10
+	ldp	x7, x8, [CAP(0)], #0x10
+	ldp	x9, x10, [CAP(0)], #0x10
+	stp	x3, x4, [CAP(1)], #0x10
+	stp	x5, x6, [CAP(1)], #0x10
+	stp	x7, x8, [CAP(1)], #0x10
+	stp	x9, x10, [CAP(1)], #0x10
 
 	subs	x15, x15, #0x01
 	b.ne	by_blocks
@@ -250,40 +251,41 @@ by_dwords_start:
 	lsr	x15, x2, #0x04
 	cbz	x15, lead_out
 by_dwords:
-	ldp	x3, x4, [x0], #0x10
-	stp	x3, x4, [x1], #0x10
+	ldp	x3, x4, [CAP(0)], #0x10
+	stp	x3, x4, [CAP(1)], #0x10
 	subs	x15, x15, #0x01
 	b.ne  	by_dwords
 
 	/* Less than 16 bytes to copy */
 lead_out:
 	tbz	x2, #0x03, last_word
-	ldr	x3, [x0], #0x08
-	str	x3, [x1], #0x08
+	ldr	x3, [CAP(0)], #0x08
+	str	x3, [CAP(1)], #0x08
 
 last_word:
 	tbz	x2, #0x02, last_hword
-	ldr	w3, [x0], #0x04
-	str	w3, [x1], #0x04
+	ldr	w3, [CAP(0)], #0x04
+	str	w3, [CAP(1)], #0x04
 
 last_hword:
 	tbz	x2, #0x01, last_byte
-	ldrh	w3, [x0], #0x02
-	strh	w3, [x1], #0x02
+	ldrh	w3, [CAP(0)], #0x02
+	strh	w3, [CAP(1)], #0x02
 
 last_byte:
 	tbz	x2, #0x00, ending
-	ldrb	w3, [x0]
-	strb	w3, [x1]
+	ldrb	w3, [CAP(0)]
+	strb	w3, [CAP(1)]
 
 ending:
-	EXIT_USER_ACCESS_CHECK(w6, x7)
-	SET_FAULT_HANDLER(xzr, x7) /* Clear the handler */
+	EXIT_C64
+	EXIT_USER_ACCESS_CHECK(w6, PTR(7))
+	SET_FAULT_HANDLER(xzr, PTR(7)) /* Clear the handler */
 
 	mov	x0, xzr		/* return 0 */
 	RETURN
 	.size	copycommon, . - copycommon
-#endif /* !__has_feature(capabilities) */
+#endif /* CHERI_USE_STABLE_MEMCPY */
 
 #if __has_feature(capabilities)
 /*
@@ -425,6 +427,7 @@ copycap_done:
 	RETURN
 	.size	copycapcommon, . - copycapcommon
 
+#ifndef CHERI_USE_STABLE_MEMCPY
 	.text
 	.align	4
 	.local	copycommon
@@ -466,6 +469,7 @@ copy_done:
 	mov	x0, xzr			/* Return 0 */
 	RETURN
 	.size	copycommon, . - copycommon
+#endif /* !CHERI_USE_STABLE_MEMCPY */
 #endif
 
 GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

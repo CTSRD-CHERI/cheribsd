@@ -51,6 +51,11 @@ FEATURE(cheri_kernel_capflow,
 #endif
 #endif /* __CHERI_PURE_CAPABILITY__ */
 
+#ifdef CHERI_USE_STABLE_MEMCPY
+FEATURE(cheri_kernel_stable_memcpy,
+    "Consistent memcpy implementation enabled");
+#endif
+
 SYSCTL_NODE(_security, OID_AUTO, cheri, CTLFLAG_RD, 0,
     "CHERI settings and statistics");
 
