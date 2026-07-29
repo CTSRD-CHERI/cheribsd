@@ -220,16 +220,12 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 #else
 		data_cap = cheri_ddc_get();
 #endif
-		data_cap = cheri_perms_clear(data_cap,
-		   CHERI_PERM_EXECUTE | CHERI_PERM_SW_VMEM);
+		data_cap = cheri_perms_and(data_cap,
+		    CHERI_CAP_USER_DATA_PERMS);
 
 		code_cap = cheri_pcc_get();
-		rodata_cap = cheri_perms_clear(data_cap,
-		    CHERI_PERM_STORE |
-#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
-		    CHERI_PERM_STORE_CAP |
-#endif
-		    CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_SW_VMEM);
+		rodata_cap = cheri_perms_and(data_cap,
+		    CHERI_CAP_USER_RODATA_PERMS);
 
 		data_cap = cheri_address_set(data_cap, writable_start);
 		rodata_cap = cheri_address_set(rodata_cap, readonly_start);

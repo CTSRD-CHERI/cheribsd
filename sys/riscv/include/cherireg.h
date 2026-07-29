@@ -209,7 +209,7 @@
 	(CHERI_PERMS_USERSPACE | CHERI_PERM_EXECUTE | CHERI_PERM_SYSCALL)
 
 #define	CHERI_PERMS_USERSPACE_RODATA					\
-	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD)
+	(CHERI_PERMS_USERSPACE)
 
 /*
  * Corresponding permission masks for kernel code and data; these are
