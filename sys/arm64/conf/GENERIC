@@ -46,3 +46,4 @@ include		"std.virt"
 include		"std.xilinx"
 
 options         CHERI_USE_STABLE_MEMCPY
+options         CPU_QEMU_MORELLO

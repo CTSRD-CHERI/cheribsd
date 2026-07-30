@@ -187,7 +187,7 @@ SUBDIR+=	minimal_count_stats
 .endif
 
 # Tracing currently only implemented for some CHERI-QEMU architectures
-.if ${MACHINE_CPUARCH} == "riscv"
+.if ${MACHINE_CPUARCH} == "riscv" || ${MACHINE_CPUARCH} == "aarch64"
 SUBDIR+=	qtrace
 .endif
 

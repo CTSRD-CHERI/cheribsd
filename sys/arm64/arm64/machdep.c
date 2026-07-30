@@ -196,6 +196,12 @@ SYSINIT(ssp_warn, SI_SUB_COPYRIGHT, SI_ORDER_ANY, print_ssp_warning, NULL);
 SYSINIT(ssp_warn2, SI_SUB_LAST, SI_ORDER_ANY, print_ssp_warning, NULL);
 #endif
 
+#ifdef CPU_QEMU_MORELLO
+u_int	qemu_trace_perthread;
+SYSCTL_UINT(_hw, OID_AUTO, qemu_trace_perthread, CTLFLAG_RW,
+    &qemu_trace_perthread, 0, "Per-thread Qemu ISA-level tracing configured");
+#endif
+
 static bool
 pan_check(const struct cpu_feat *feat __unused, u_int midr __unused)
 {

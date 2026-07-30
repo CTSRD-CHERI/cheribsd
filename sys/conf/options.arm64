@@ -28,6 +28,8 @@ CHERI_CAPREVOKE_STATS		opt_global.h
 # Purecap kernel weirdness tunables
 CHERI_USE_STABLE_MEMCPY         opt_global.h
 
+CPU_QEMU_MORELLO                opt_global.h
+
 # EFI Runtime services support
 EFIRT				opt_efirt.h
 

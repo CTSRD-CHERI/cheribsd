@@ -40,12 +40,21 @@ struct ptrauth_key {
 	uint64_t pa_key_hi;
 };
 
+/* md_flags */
+#ifdef CPU_QEMU_MORELLO
+#define	MDTD_QTRACE		0x0001		/* QEMU-CHERI ISA-level tracing */
+#define	MDTD_QTRACE_USERMODE	0x0002		/* QEMU-CHERI user-only tracing */
+#endif
+
 struct mdthread {
 	int	md_spinlock_count;	/* (k) */
 	register_t md_saved_daif;	/* (k) */
 	uintptr_t md_canary;
 #ifdef CHERI_BOUNDED_KSTACK
 	void	*md_kstack;		/* (k) */
+#endif
+#ifdef CPU_QEMU_MORELLO
+	int	md_flags;
 #endif
 
 	/*
