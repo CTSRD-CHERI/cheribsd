@@ -416,7 +416,7 @@ va:
 	ADD_PTR	a1, a0, t1
 	set_data_perm	a2 s0 t0
 	mv	a3, zero
-	li	a4, 1
+	li	a4, 0
 	LLA_PTR	a5, _C_LABEL(kernel_cap_relocs_cb)
 	set_cap_mode    a6 a5 0
 	call	_C_LABEL(init_linker_file_cap_relocs)
