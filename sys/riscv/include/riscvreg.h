@@ -232,6 +232,8 @@
 
 #if defined(__riscv_y)
 #define	SENVCFG_Y	(0x01 << 9)
+#elif defined(__riscv_zcheripurecap)
+#define	SENVCFG_Y	(0x01 << 28)
 #endif
 #endif /* __has_feature(capabilities) */
 
