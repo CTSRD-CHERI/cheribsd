@@ -529,8 +529,6 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 			if (lazy) {
 #ifdef __CHERI_PURE_CAPABILITY__
 				pcc = pcc_cap(obj, fragment[0]);
-				pcc = cheri_perms_clear(pcc,
-				    FUNC_PTR_REMOVE_PERMS);
 				*where = init_cap_from_fragment(fragment,
 				    obj->relocbase, pcc,
 				    (Elf_Addr)(uintptr_t)obj->relocbase,
