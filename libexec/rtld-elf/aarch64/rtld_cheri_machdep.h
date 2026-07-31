@@ -57,16 +57,13 @@
  */
 static inline dlfunc_t __capability
 make_code_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
-    bool tight_bounds, size_t addend)
+    size_t addend)
 {
 	const void * __capability ret;
 
 	ret = pcc_cap(defobj, def->st_value);
 	/* Remove store and seal permissions */
 	ret = cheri_perms_clear(ret, FUNC_PTR_REMOVE_PERMS);
-	if (tight_bounds) {
-		ret = cheri_bounds_set(ret, def->st_size);
-	}
 	/*
 	 * Note: The addend is required for C++ exceptions since capabilities
 	 * for catch blocks point to the middle of a function.
@@ -84,8 +81,7 @@ static inline dlfunc_t __capability
 make_function_cap_with_addend(const Elf_Sym *def,
     const struct Struct_Obj_Entry *defobj, size_t addend)
 {
-	/* TODO: ABIs with tight bounds */
-	return make_code_cap(def, defobj, /*tight_bounds=*/false, addend);
+	return make_code_cap(def, defobj, addend);
 }
 
 static inline dlfunc_t __capability
