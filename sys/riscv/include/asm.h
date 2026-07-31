@@ -104,7 +104,8 @@
 #endif /* !__riscv_xcheri */
 
 
-#if __has_feature(capabilities) && defined(__riscv_xcheri)
+#if __has_feature(capabilities)
+#ifdef __riscv_xcheri
 #define	CSRR_CAP(rd, csrn)			\
 	cspecialr	CAP(rd), csrn ## c
 
@@ -113,6 +114,16 @@
 
 #define	CSRRW_CAP(rd, csrn, rs)				\
 	cspecialrw	CAP(rd), csrn ## c, CAP(rs)
+#else
+#define	CSRR_CAP(rd, csrn)			\
+	csrr		rd, csrn ## c
+
+#define	CSRW_CAP(csrn, rs)			\
+	csrw		csrn ## c, rs
+
+#define	CSRRW_CAP(rd, csrn, rs)			\
+	csrrw		rd, csrn ## c, rs
+#endif
 #else
 #define	CSRR_CAP(rd, csrn)			\
 	csrr		rd, csrn
@@ -132,11 +143,7 @@
 #define	INT_WIDTH	8
 
 #if __has_feature(capabilities)
-#ifdef __riscv_xcheri
 #define	CAP(x)		c ## x
-#else
-#define	CAP(x)		x
-#endif
 #define	CAP_WIDTH	16
 
 #define	L_CAP		ly

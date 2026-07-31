@@ -70,21 +70,45 @@
 #if __has_feature(capabilities)
 /* Set cap mode flag on $rd if mode == 1 */
 .macro set_cap_mode rd rs mode
-	/* xcheri */
+#ifdef __riscv_xcheri
 	li		\rd, \mode
 	csetflags	CAP(\rd), CAP(\rs), \rd
+#else
+.if \mode == 1
+	li		\rd, 0
+.else
+	li		\rd, 0
+.endif
+	ymodew		\rd, \rs, \rd
+#endif
 .endmacro
 
 .macro set_data_perm rd rs tmp
-	/* xcheri */
+#if defined(__riscv_zcheripurecap) && !defined(CHERI_RISCV_STD_093)
+	li		\tmp, ~CHERI_PERMS_KERNEL_DATA
+	ypermc		\rd, \rs, \tmp
+#else
 	li		\tmp, CHERI_PERMS_KERNEL_DATA
+#ifdef __riscv_xcheri
 	candperm	CAP(\rd), CAP(\rs), \tmp
+#else
+	acperm		CAP(\rd), CAP(\rs), \tmp
+#endif
+#endif
 .endmacro
 
 .macro set_code_perm rd rs tmp
-	/* xcheri */
+#if defined(__riscv_zcheripurecap) && !defined(CHERI_RISCV_STD_093)
+	li		\tmp, ~CHERI_PERMS_KERNEL_CODE
+	ypermc		\rd, \rs, \tmp
+#else
 	li		\tmp, CHERI_PERMS_KERNEL_CODE
+#ifdef __riscv_xcheri
 	candperm	CAP(\rd), CAP(\rs), \tmp
+#else
+	acperm		CAP(\rd), CAP(\rs), \tmp
+#endif
+#endif
 .endmacro
 #endif
 
