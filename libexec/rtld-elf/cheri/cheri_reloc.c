@@ -145,7 +145,7 @@ process_ifunc___cap_relocs(Obj_Entry *obj)
 		    (function_reloc_flag | indirect_reloc_flag))
 			continue;
 
-		cap = (uintcap_t)pcc_cap(obj, reloc->object);
+		cap = (uintcap_t)get_codesegment_cap(obj) + reloc->object;
 		cap = cheri_perms_clear(cap,
 		    FUNC_PTR_REMOVE_PERMS | CAP_RELOC_REMOVE_PERMS);
 		if (reloc->size != 0)

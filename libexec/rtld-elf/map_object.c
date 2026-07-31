@@ -430,7 +430,8 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 #endif
 	if (hdr->e_entry != 0) {
 #ifdef __CHERI_PURE_CAPABILITY__
-		obj->entry = (const void *)pcc_cap(obj, hdr->e_entry);
+		obj->entry = (const void *)(get_codesegment_cap(obj) +
+		    hdr->e_entry);
 #else
 		obj->entry = (const void *)(obj->relocbase + hdr->e_entry);
 #endif

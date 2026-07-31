@@ -469,9 +469,6 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
 	const Elf_Sym *def, *sym;
-#ifdef __CHERI_PURE_CAPABILITY__
-	const char *pcc;
-#endif
 	bool lazy;
 
 	relalim = (const Elf_Rela *)((const char *)plt->rela + plt->relasize);
@@ -507,9 +504,8 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 			}
 			if (lazy) {
 #ifdef __CHERI_PURE_CAPABILITY__
-				pcc = pcc_cap(obj, fragment[0]);
 				*where = init_cap_from_fragment(fragment,
-				    obj->relocbase, pcc,
+				    obj->relocbase, get_codesegment_cap(obj),
 				    (Elf_Addr)(uintptr_t)obj->relocbase,
 				    rela->r_addend);
 #else
@@ -656,7 +652,7 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 #ifdef __CHERI_PURE_CAPABILITY__
 	fragment = (Elf_Addr *)where;
 	ptr = init_cap_from_fragment(fragment, obj->relocbase,
-	    pcc_cap(obj, fragment[0]), (Elf_Addr)(uintptr_t)obj->relocbase,
+	    get_codesegment_cap(obj), (Elf_Addr)(uintptr_t)obj->relocbase,
 	    rela->r_addend);
 #else
 	ptr = (uintptr_t)(obj->relocbase + rela->r_addend);
@@ -935,14 +931,14 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		case R_MORELLO_RELATIVE:
 			*(uintcap_t *)(void *)where =
 			    init_cap_from_fragment(where, data_cap,
-				pcc_cap(obj, where[0]),
+				get_codesegment_cap(obj),
 				(Elf_Addr)(uintptr_t)obj->relocbase,
 				rela->r_addend);
 			break;
 		case R_MORELLO_FUNC_RELATIVE:
 			*(uintcap_t *)(void *)where =
 			    init_cap_from_fragment(where, data_cap,
-				pcc_cap(obj, where[0]),
+				get_codesegment_cap(obj),
 				(Elf_Addr)(uintptr_t)obj->relocbase,
 				rela->r_addend);
 #ifdef CHERI_LIB_C18N
