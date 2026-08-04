@@ -1860,7 +1860,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 			 * uses AT_BASE which must be RWX as noted below.
 			 */
 			exec_base = prog_cap(imgp, CHERI_CAP_USER_DATA_PERMS |
-			    CHERI_CAP_USER_CODE_PERMS);
+			    CHERI_CAP_USER_CODE_PERMS | CHERI_PERM_SW_VMEM);
 		}
 	} else {
 		/*
@@ -1873,7 +1873,8 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		 * can be relaxed to RW (similar to AT_PHDR).
 		 */
 		exec_base = interp_cap(imgp, args,
-		    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
+		    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS |
+		    CHERI_PERM_SW_VMEM);
 	}
 	AUXARGS_ENTRY_PTR(pos, AT_BASE, cheri_address_set(exec_base,
 	    args->base));
