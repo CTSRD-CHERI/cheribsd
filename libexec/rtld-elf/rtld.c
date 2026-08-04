@@ -3141,7 +3141,9 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	objtmp.text_rodata_cap = objtmp.relocbase;
+	/* Derive text_rodata_cap from the current PCC rather than AT_BASE. */
+	objtmp.text_rodata_cap = cheri_address_copy(cheri_pcc_get(),
+	    objtmp.relocbase);
 	fix_obj_mapping_cap_permissions(&objtmp, "RTLD");
 	if (!create_pcc_caps(&objtmp, "RTLD"))
 		rtld_die();
