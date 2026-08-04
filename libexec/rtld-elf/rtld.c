@@ -3107,6 +3107,19 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	const Elf_Dyn *dyn_soname;
 	const Elf_Dyn *dyn_runpath;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * In the direct-exec case, derive mapbase from AT_PHDR rather
+	 * than AT_BASE.
+	 */
+	if (aux_info[AT_PHDR] != NULL &&
+	    (ptraddr_t)mapbase + CHERI_RODATA_PTR(&__ehdr_start)->e_phoff ==
+	    (ptraddr_t)aux_info[AT_PHDR]->a_un.a_ptr) {
+		mapbase = cheri_address_copy(aux_info[AT_PHDR]->a_un.a_ptr,
+		    mapbase);
+	}
+#endif
+
 	/*
 	 * Conjure up an Obj_Entry structure for the dynamic linker.
 	 *

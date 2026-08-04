@@ -104,6 +104,7 @@ void
 _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 {
 	caddr_t relocbase = NULL;
+	Elf_Phdr *phdr = NULL;
 	const struct capreloc *caprelocs = NULL, *caprelocslim;
 	Elf_Addr caprelocssz = 0;
 	void *pcc;
@@ -113,8 +114,16 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 		case AT_BASE:
 			relocbase = aux->a_un.a_ptr;
 			break;
+		case AT_PHDR:
+			phdr = aux->a_un.a_ptr;
+			break;
 		}
 	}
+
+	/* Derive from AT_PHDR instead of AT_BASE in the direct-exec case. */
+	if ((ptraddr_t)relocbase + CHERI_RODATA_PTR(&__ehdr_start)->e_phoff ==
+	    (ptraddr_t)phdr)
+		relocbase = cheri_address_copy(phdr, relocbase);
 
 	for (; dynp->d_tag != DT_NULL; dynp++) {
 		switch (dynp->d_tag) {
