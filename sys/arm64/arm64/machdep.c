@@ -133,6 +133,11 @@ _Static_assert(offsetof(struct pcb, pcb_fpustate) == 192,
     "pcb_fpustate changed offset");
 #endif
 
+#ifdef CHERI_USE_STABLE_MEMCPY
+FEATURE(cheri_kernel_stable_memcpy,
+    "Consistent memcpy implementation enabled");
+#endif
+
 enum arm64_bus arm64_bus_method = ARM64_BUS_NONE;
 
 /*
