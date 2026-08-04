@@ -48,8 +48,7 @@ struct arm64_guard_page_args {
 
 #define	ARM64_GET_SVE_VL	0x200
 /* Reserved ARM64_SET_SVE_VL	0x201 */
-#define	ARM64_GET_USER_PMU_EN	0x101
-#define	ARM64_SET_USER_PMU_EN	0x102
+
 /*
  * Query, enable, and disable QEMU ISA-level tracing on threads. To use this
  * feature, the sysctl hw.qemu_trace_perthread must be enabled.

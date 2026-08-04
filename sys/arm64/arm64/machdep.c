@@ -191,6 +191,24 @@ void (*pagezero)(void *p) = pagezero_simple;
 
 int (*apei_nmi)(void);
 
+static int
+sysctl_pmu_user_access(SYSCTL_HANDLER_ARGS)
+{
+	int error;
+	uint64_t value = READ_SPECIALREG(pmuserenr_el0);
+
+	error = sysctl_handle_64(oidp, &value, 0, req);
+	if (error || req->newptr == NULL)
+		return (error);
+
+	WRITE_SPECIALREG(pmuserenr_el0, value);
+	return (0);
+}
+SYSCTL_PROC(_machdep, OID_AUTO, pmu_user_access, CTLTYPE_U64 | CTLFLAG_RW,
+
+    NULL, 0, sysctl_pmu_user_access, "QU",
+    "Enable PMU register access from user space");
+
 #if defined(PERTHREAD_SSP_WARNING)
 static void
 print_ssp_warning(void *data __unused)
