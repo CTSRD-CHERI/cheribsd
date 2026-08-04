@@ -1847,21 +1847,11 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, entry);
 
 	if (imgp->interp_end == 0) {
-		if (args->hdr_etype != ET_DYN) {
-			/*
-			 * Static PDEs don't use AT_BASE as a
-			 * capability root so it can be null-derived.
-			 */
-			exec_base = NULL;
-		} else {
-			/*
-			 * Static PIEs generally use AT_ENTRY/AT_PHDR for
-			 * relocations.  However, the direct-exec rtld case
-			 * uses AT_BASE which must be RW as noted below.
-			 */
-			exec_base = prog_cap(imgp, CHERI_CAP_USER_DATA_PERMS |
-			    CHERI_PERM_SW_VMEM);
-		}
+		/*
+		 * Static binaries don't use AT_BASE as a
+		 * capability root so it can be null-derived.
+		 */
+		exec_base = NULL;
 	} else {
 		/*
 		 * AT_BASE is used by rtld to process its own
