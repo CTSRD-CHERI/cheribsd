@@ -1849,27 +1849,28 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	if (imgp->interp_end == 0) {
 		if (args->hdr_etype != ET_DYN) {
 			/*
-			 * For statically linked (but not static-PIE, i.e.
-			 * currently only RTLD direct exec), AT_BASE should be
-			 * untagged args->base (zero) rather than a massively
-			 * out-of-bounds capability with address zero that may
-			 * or may not be tagged.
+			 * Static PDEs don't use AT_BASE as a
+			 * capability root so it can be null-derived.
 			 */
-			exec_base = (void *__capability)(uintcap_t)args->base;
+			exec_base = NULL;
 		} else {
 			/*
-			 * For static-PIE we need AT_BASE for relocations and
-			 * therefore needs to be RWX.
-			 * TODO: should probably use AT_ENTRY/AT_PHDR instead.
+			 * Static PIEs generally use AT_ENTRY/AT_PHDR for
+			 * relocations.  However, the direct-exec rtld case
+			 * uses AT_BASE which must be RWX as noted below.
 			 */
 			exec_base = prog_cap(imgp, CHERI_CAP_USER_DATA_PERMS |
 			    CHERI_CAP_USER_CODE_PERMS);
 		}
 	} else {
 		/*
-		 * XXX: AT_BASE is both writable and executable to permit
-		 * textrel fixups.
-		 * TODO: should probably use AT_ENTRY/AT_PHDR instead.
+		 * XXX: AT_BASE is both writable and executable because rtld
+		 * uses it as a single root to derive capabilities for rtld
+		 * itself.
+		 *
+		 * TODO: rtld should be fixed to derive code capabilities
+		 * from the initial PCC (similar to AT_ENTRY) and then this
+		 * can be relaxed to RW (similar to AT_PHDR).
 		 */
 		exec_base = interp_cap(imgp, args,
 		    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
