@@ -498,11 +498,18 @@ kern_shmat_locked(struct thread *td, int shmid,
 			if ((shmflg & SHM_RDONLY) == 0)
 				reqperm |= CHERI_PERM_STORE;
 
-			/* XXX: require that a reservation exists. */
 			/* Handle any rounding above */
 			shmaddr = cheri_address_set(shmaddr, attach_va);
 			if (!cheri_can_access(shmaddr, reqperm, size))
 				return (EPROT);
+
+			/*
+			 * vm_map_find() will verify that this is
+			 * covered by an existing reservation.
+			 */
+#ifdef __CHERI_PURE_CAPABILITY__
+			attach_va = (vm_pointer_t)shmaddr;
+#endif
 		} else {
 			/* As with mmap, untagged implies exclusive. */
 			if ((shmflg & SHM_REMAP) != 0)

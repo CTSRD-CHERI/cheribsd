@@ -2580,8 +2580,9 @@ vm_map_find_name_locked(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 {
 	vm_offset_t alignment, curr_min_addr, min_addr, vaddr;
 	int gap, pidx, rv, try;
-	bool cluster, en_aslr, update_anon;
+	bool cluster, en_aslr, existing_reservation, update_anon;
 	vm_pointer_t reservation;
+	vm_offset_t reservation_id;
 	const vm_size_t unpadded_length = length;
 
 	KASSERT((cow & MAP_STACK_AREA) == 0 || object == NULL,
@@ -2611,6 +2612,7 @@ vm_map_find_name_locked(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	}
 #endif
 
+	existing_reservation = false;
 	en_aslr = (map->flags & MAP_ASLR) != 0;
 	update_anon = cluster = clustering_anon_allowed(*addr, cow) &&
 	    (map->flags & MAP_IS_SUB_MAP) == 0 && max_addr == 0 &&
@@ -2729,16 +2731,27 @@ again:
 	} else if ((cow & MAP_REMAP) != 0) {
 		if (!vm_map_range_valid(map, vaddr, vaddr + length))
 			return (KERN_INVALID_ADDRESS);
+		if ((map->flags & MAP_RESERVATIONS) != 0) {
+			rv = vm_map_reservation_get(map, vaddr, length,
+			    &reservation_id);
+			if (rv != KERN_SUCCESS)
+				return (rv);
+			reservation = *addr;
+			existing_reservation = true;
+		}
 		rv = vm_map_delete(map, vaddr, vaddr + length, true);
 		if (rv != KERN_SUCCESS)
 			return (rv);
 	}
 
-	reservation = vaddr;
-	rv = vm_map_reservation_create_locked(map, &reservation,
-	    length, max);
-	if (rv != KERN_SUCCESS)
-		return (rv);
+	if (!existing_reservation) {
+		reservation = vaddr;
+		rv = vm_map_reservation_create_locked(map, &reservation,
+		    length, max);
+		if (rv != KERN_SUCCESS)
+			return (rv);
+		reservation_id = reservation;
+	}
 
 	/*
 	 * The guard mapping must have PROT_NONE maxprot but the capability we
@@ -2754,10 +2767,11 @@ again:
 	} else {
 		rv = vm_map_insert_name(map, object, offset, reservation,
 		    reservation + unpadded_length, prot, max, cow,
-		    reservation, name);
+		    reservation_id, name);
 	}
 	if (rv != KERN_SUCCESS) {
-		vm_map_reservation_delete_locked(map, reservation);
+		if (!existing_reservation)
+			vm_map_reservation_delete_locked(map, reservation);
 		return (rv);
 	}
 
