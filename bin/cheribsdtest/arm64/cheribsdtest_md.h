@@ -50,7 +50,6 @@
 
 #ifndef __CHERI_PURE_CAPABILITY__
 /* The Morello compiler currently sets bounds on globals. */
-#define	XFAIL_HYBRID_BOUNDS_GLOBALS	NULL
 #define	XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC	NULL
 #define	XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN	NULL
 #endif
