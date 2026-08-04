@@ -1857,23 +1857,19 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 			/*
 			 * Static PIEs generally use AT_ENTRY/AT_PHDR for
 			 * relocations.  However, the direct-exec rtld case
-			 * uses AT_BASE which must be RWX as noted below.
+			 * uses AT_BASE which must be RW as noted below.
 			 */
 			exec_base = prog_cap(imgp, CHERI_CAP_USER_DATA_PERMS |
-			    CHERI_CAP_USER_CODE_PERMS | CHERI_PERM_SW_VMEM);
+			    CHERI_PERM_SW_VMEM);
 		}
 	} else {
 		/*
-		 * XXX: AT_BASE is both writable and executable because rtld
-		 * uses it as a single root to derive capabilities for rtld
-		 * itself.
-		 *
-		 * TODO: rtld should be fixed to derive code capabilities
-		 * from the initial PCC (similar to AT_ENTRY) and then this
-		 * can be relaxed to RW (similar to AT_PHDR).
+		 * AT_BASE is used by rtld to process its own
+		 * relocations and to derive data capabilities similar
+		 * to AT_PHDR.  rtld uses the initial PCC to derive
+		 * code capabilities similar to AT_ENTRY.
 		 */
-		exec_base = interp_cap(imgp, args,
-		    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS |
+		exec_base = interp_cap(imgp, args, CHERI_CAP_USER_DATA_PERMS |
 		    CHERI_PERM_SW_VMEM);
 	}
 	AUXARGS_ENTRY_PTR(pos, AT_BASE, cheri_address_set(exec_base,
