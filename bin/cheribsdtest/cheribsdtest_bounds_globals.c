@@ -104,24 +104,24 @@ test_bounds_impl(void *__capability allocation, void *__capability global_ptr, s
 	/* Global offset. */
 	if (allocation_offset != 0)
 		cheribsdtest_failure_errx(
-		    "global: non-zero offset (%ju)", allocation_offset);
+		    "local pointer: non-zero offset (%ju)", allocation_offset);
 
 	/* Global length. */
 	if (allocation_len != rounded_size)
 		cheribsdtest_failure_errx(
-		    "global: incorrect length (expected %ju, "
+		    "local pointer: incorrect length (expected %ju, "
 		    "rounded from %ju, got %ju)",
 		    rounded_size, size, allocation_len);
 
 	/* Pointer offset. */
 	if (pointer_offset != 0)
 		cheribsdtest_failure_errx(
-		    "pointer: non-zero offset (%ju)", pointer_offset);
+		    "global pointer: non-zero offset (%ju)", pointer_offset);
 
 	/* Pointer length. */
 	if (pointer_len != rounded_size)
 		cheribsdtest_failure_errx(
-		    "pointer: incorrect length (expected %ju, "
+		    "global pointer: incorrect length (expected %ju, "
 		    "rounded from %ju, got %ju)",
 		    rounded_size, size, pointer_len);
 	cheribsdtest_success();
