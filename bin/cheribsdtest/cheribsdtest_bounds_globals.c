@@ -90,6 +90,37 @@
  * DDC (-O0) or a bounded capablity from the GOT (-O1 or higher).
  */
 
+#ifndef __CHERI_PURE_CAPABILITY__
+/*
+ * Ensure that hybrid capabilities have the same address as a
+ * non-capability pointer and sufficiently large (but not necessarily
+ * exact) bounds.
+ */
+#define	TEST_HYBRID_CAP(test, desc)					\
+	CHERIBSDTEST(hybrid_cap_##test,					\
+	"Check hybrid capability to " desc)				\
+	{								\
+		void *__capability cap =				\
+		    (__cheri_tocap void * __capability)&(test);		\
+		test_hybrid_cap_impl(cap, &(test), sizeof(test));	\
+	}
+
+static void
+test_hybrid_cap_impl(void *__capability cap, void *ptr, size_t size)
+{
+	/* Capability address should match integer pointer. */
+	CHERIBSDTEST_CHECK_EQ_LONG(cheri_address_get(cap), (uintptr_t)ptr);
+
+	CHERIBSDTEST_VERIFY(cheri_is_address_inbounds(cap, (uintptr_t)ptr));
+	CHERIBSDTEST_VERIFY(cheri_is_address_inbounds(cap, (uintptr_t)ptr +
+	    size - 1));
+
+	cheribsdtest_success();
+}
+#else
+#define	TEST_HYBRID_CAP(test, desc)
+#endif
+
 #if defined(__CHERI_PURE_CAPABILITY__) || defined(HAS_HYBRID_BOUNDS_GLOBALS)
 /*
  * Template for a test function, which assumes there is a global (test) and
@@ -97,10 +128,9 @@
  * taking a pointer to the global, and using the existing pointer, return
  * offsets and sizes as desired.
  */
-#define TEST_BOUNDS(test, desc, ...)						\
-	CHERIBSDTEST(bounds_##test,				\
-	"Check bounds on " desc,					\
-	__VA_ARGS__)							\
+#define	TEST_CAP_BOUNDS(test, desc)					\
+	CHERIBSDTEST(bounds_##test,					\
+	"Check bounds on " desc)					\
 	{                                                               \
 		void *__capability allocation =                         \
 		    (__cheri_tocap void *__capability) & test;          \
@@ -146,6 +176,13 @@ test_bounds_impl(void *__capability allocation, void *__capability global_ptr, s
 		    rounded_size, size, pointer_len);
 	cheribsdtest_success();
 }
+#else
+#define	TEST_CAP_BOUNDS(test, desc)
+#endif
+
+#define	TEST_BOUNDS(test, desc)						\
+	TEST_CAP_BOUNDS(test, desc);					\
+	TEST_HYBRID_CAP(test, desc)
 
 /*
  * Basic integer types.
@@ -493,6 +530,26 @@ TEST_BOUNDS(extern_global_uint32, "extern global uint32_t (C size)");
 TEST_BOUNDS(extern_global_array7, "extern global uint8_t[7] (C size)");
 TEST_BOUNDS(extern_global_array16, "extern global uint8_t[16] (C size)");
 TEST_BOUNDS(extern_global_array65536, "extern global uint8_t[16] (C size)");
+
+#ifndef __CHERI_PURE_CAPABILITY__
+/*
+ * Ensure that hybrid capabilities have the same address as a
+ * non-capability pointer and sufficiently large (but not necessarily
+ * exact) bounds.
+ */
+#define	TEST_DYNAMIC_HYBRID_CAP(test, type)				\
+	CHERIBSDTEST(hybrid_cap_##test,					\
+	"Check hybrid capability to extern global " #type " (dynamic size)") \
+	{								\
+		void *__capability cap =				\
+		    (__cheri_tocap void * __capability)&(test);		\
+		test_hybrid_cap_impl(cap, &(test), sizeof(type));	\
+	}
+#else
+#define	TEST_DYNAMIC_HYBRID_CAP(test, type)
+#endif
+
+#if defined(__CHERI_PURE_CAPABILITY__) || defined(HAS_HYBRID_BOUNDS_GLOBALS)
 /*
  * Template for a test function, which assumes there is a global (test) and
  * corresponding statically initialised pointer (testp).  Check that both
@@ -501,15 +558,21 @@ TEST_BOUNDS(extern_global_array65536, "extern global uint8_t[16] (C size)");
  * from which to generate a size, whereas above we assume the C type of the
  * variable is a correct source of size information.
  */
-#define	TEST_DYNAMIC_BOUNDS(test, type, ...)				\
-	CHERIBSDTEST(bounds_##test,				\
-	"Check bounds on extern global " #type " (dynamic size)",	\
-	__VA_ARGS__)							\
+#define	TEST_DYNAMIC_CAP_BOUNDS(test, type)				\
+	CHERIBSDTEST(bounds_##test,					\
+	"Check bounds on extern global " #type " (dynamic size)")	\
 	{								\
 		void * __capability allocation =			\
 		    (__cheri_tocap void * __capability)&test;		\
 		test_bounds_impl(allocation, test##p, sizeof(type));	\
 	}
+#else
+#define	TEST_DYNAMIC_CAP_BOUNDS(test, type)
+#endif
+
+#define	TEST_DYNAMIC_BOUNDS(test, desc)					\
+	TEST_DYNAMIC_CAP_BOUNDS(test, desc);				\
+	TEST_DYNAMIC_HYBRID_CAP(test, desc)
 
 /*
  * Checks to ensure we are using linker-provided size information, and not C
@@ -520,4 +583,3 @@ TEST_DYNAMIC_BOUNDS(extern_global_uint64, uint64_t);
 TEST_DYNAMIC_BOUNDS(extern_global_array1, uint8_t[1]);
 TEST_DYNAMIC_BOUNDS(extern_global_array65537, uint8_t[65537]);
 TEST_DYNAMIC_BOUNDS(extern_global_array256, uint8_t[256]);
-#endif
