@@ -67,9 +67,30 @@
  * globals should have the correct dynamic sizes in their underlying
  * capabilities.
  *
- * XXXRW: For now, no expectations about non-CheriABI code.
+ * XXXRW: For now, no expectations about non-CheriABI code.  Morello
+ * LLVM enforces similar semantics to CheriABI in hybrid (but with
+ * some fragile quirks), but other LLVM implementations do not provide
+ * identical semantics to CheriABI.
+ *
+ * For an example of a fragile quirk, compare these two functions:
+ *
+ * static int x;
+ *
+ * int * __capability foo() {
+ *     return (__cheri_tocap int * __capability)&x;
+ * }
+ *
+ * int * __capability bar() {
+ *     int *p = &x;
+ *     return (__cheri_tocap int * __capability)p;
+ * }
+ *
+ * In Morello LLVM, foo() always returns a bounded capability from the
+ * GOT, but bar() returns either an unbounded capability derived from
+ * DDC (-O0) or a bounded capablity from the GOT (-O1 or higher).
  */
 
+#if defined(__CHERI_PURE_CAPABILITY__) || defined(HAS_HYBRID_BOUNDS_GLOBALS)
 /*
  * Template for a test function, which assumes there is a global (test) and
  * corresponding statically initialised pointer (testp).  Check that both
@@ -79,7 +100,6 @@
 #define TEST_BOUNDS(test, desc, ...)						\
 	CHERIBSDTEST(bounds_##test,				\
 	"Check bounds on " desc,					\
-	.ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC,		\
 	__VA_ARGS__)							\
 	{                                                               \
 		void *__capability allocation =                         \
@@ -484,7 +504,6 @@ TEST_BOUNDS(extern_global_array65536, "extern global uint8_t[16] (C size)");
 #define	TEST_DYNAMIC_BOUNDS(test, type, ...)				\
 	CHERIBSDTEST(bounds_##test,				\
 	"Check bounds on extern global " #type " (dynamic size)",	\
-	.ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN,		\
 	__VA_ARGS__)							\
 	{								\
 		void * __capability allocation =			\
@@ -501,3 +520,4 @@ TEST_DYNAMIC_BOUNDS(extern_global_uint64, uint64_t);
 TEST_DYNAMIC_BOUNDS(extern_global_array1, uint8_t[1]);
 TEST_DYNAMIC_BOUNDS(extern_global_array65537, uint8_t[65537]);
 TEST_DYNAMIC_BOUNDS(extern_global_array256, uint8_t[256]);
+#endif
