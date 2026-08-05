@@ -106,24 +106,6 @@ extern struct cheribsdtest_child_state *ccsp;
 #define	SI_CODE_STORELOCAL	PROT_CHERI_STORELOCAL
 #endif
 
-#ifndef	XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN	NULL
-#else
-#define	XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN \
-    "Bounds not supported for extern globals in hybrid ABI"
-#endif
-#endif
-
-#ifndef	XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC	NULL
-#else
-#define	XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC \
-    "Bounds not supported for static globals in hybrid ABI"
-#endif
-#endif
-
 #ifndef XFAIL_VARARG_BOUNDS
 #define	XFAIL_VARARG_BOUNDS	NULL
 #endif

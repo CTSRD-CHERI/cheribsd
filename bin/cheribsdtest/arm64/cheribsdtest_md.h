@@ -49,9 +49,8 @@
 #define	SI_CODE_STORELOCAL	PROT_CHERI_PERM
 
 #ifndef __CHERI_PURE_CAPABILITY__
-/* The Morello compiler currently sets bounds on globals. */
-#define	XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC	NULL
-#define	XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN	NULL
+/* The Morello compiler currently sets bounds on globals in hybrid. */
+#define	HAS_HYBRID_BOUNDS_GLOBALS
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
