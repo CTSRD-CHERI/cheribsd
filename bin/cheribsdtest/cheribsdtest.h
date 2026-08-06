@@ -145,18 +145,18 @@ struct cheri_test {
 	const char	*ct_flaky_reason;
 };
 
-#define	_CHERIBSDTEST_DECLARE(func, desc, ...)				\
+#define	_CHERIBSDTEST_DECLARE(func, desc, line, ...)			\
 	static void func(void);						\
-	static struct cheri_test __CONCAT(__cheri_test, __LINE__) = {	\
+	static struct cheri_test __CONCAT(__cheri_test, line) = {	\
 		.ct_name = #func,					\
 		.ct_desc = (desc),					\
 		.ct_func = func,					\
 		__VA_ARGS__						\
 	};								\
-	DATA_SET(cheri_tests_set, __CONCAT(__cheri_test, __LINE__))
+	DATA_SET(cheri_tests_set, __CONCAT(__cheri_test, line))
 
 #define	CHERIBSDTEST(func, desc, ...)					\
-	_CHERIBSDTEST_DECLARE(func, (desc), __VA_ARGS__);		\
+	_CHERIBSDTEST_DECLARE(func, (desc), __COUNTER__, __VA_ARGS__);	\
 	static void func(void)
 
 /* Enum for different modes of spawning a child process */
