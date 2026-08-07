@@ -137,7 +137,7 @@ static void
 max_hdr_grow(void)
 {
 
-	max_hdr = max_linkhdr + max_protohdr;
+	max_hdr = roundup2(max_linkhdr + max_protohdr, sizeof(long));
 	MPASS(max_hdr <= MHLEN);
 }
 
