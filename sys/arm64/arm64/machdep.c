@@ -58,6 +58,7 @@
 #include <sys/rwlock.h>
 #include <sys/sched.h>
 #include <sys/signalvar.h>
+#include <sys/smp.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
@@ -191,6 +192,13 @@ void (*pagezero)(void *p) = pagezero_simple;
 
 int (*apei_nmi)(void);
 
+static void
+pmu_user_access_update(void *argp)
+{
+	uint64_t value = *(uint64_t *)argp;
+	WRITE_SPECIALREG(pmuserenr_el0, value);
+}
+
 static int
 sysctl_pmu_user_access(SYSCTL_HANDLER_ARGS)
 {
@@ -201,7 +209,9 @@ sysctl_pmu_user_access(SYSCTL_HANDLER_ARGS)
 	if (error || req->newptr == NULL)
 		return (error);
 
-	WRITE_SPECIALREG(pmuserenr_el0, value);
+	printf("PMU user access: %lx -> %lx\n", READ_SPECIALREG(pmuserenr_el0), value);
+	smp_rendezvous(NULL, pmu_user_access_update, NULL, &value);
+
 	return (0);
 }
 SYSCTL_PROC(_machdep, OID_AUTO, pmu_user_access, CTLTYPE_U64 | CTLFLAG_RW,
