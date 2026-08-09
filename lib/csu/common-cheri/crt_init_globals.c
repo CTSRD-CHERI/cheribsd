@@ -172,7 +172,15 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 		data_cap = cheri_perms_and(data_cap,
 		    CHERI_CAP_USER_DATA_PERMS);
 		rodata_cap = cheri_perms_and(data_cap,
-		    CHERI_CAP_USER_RODATA_PERMS);
+		    CHERI_CAP_USER_RODATA_PERMS |
+#if defined(HAS_CHERI_PERM_LOAD_STORE_CAP)
+		    CHERI_PERM_LOAD_CAP
+#elif defined(HAS_CHERI_PERM_CAP)
+		    CHERI_PERM_CAP
+#else
+#error "Missing LOAD_CAP permission"
+#endif
+		    );
 		goto handle_relocs;
 	}
 #endif
