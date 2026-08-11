@@ -185,7 +185,7 @@ ENTRY(copyout)
 #ifdef __CHERI_HYBRID__
 	GET_DDC(a3)
 	ADD_CAP		a3, a3, a0
-	ybndsw		a0, a3, a2
+	ybndsrw		a0, a3, a2
 #endif
 
 	copycommon
@@ -209,7 +209,7 @@ ENTRY(copyin)
 #ifdef __CHERI_HYBRID__
 	GET_DDC(a3)
 	ADD_CAP		a3, a3, a1
-	ybndsw		a1, a3, a2
+	ybndsrw		a1, a3, a2
 #endif
 
 	copycommon
@@ -237,7 +237,7 @@ ENTRY(copyinstr)
 #ifdef __CHERI_HYBRID__
 	GET_DDC(a4)
 	ADD_CAP		a4, a4, a1
-	ybndsw		a1, a4, a2
+	ybndsrw		a1, a4, a2
 #endif
 
 	li	a7, VM_MAXUSER_ADDRESS
@@ -340,10 +340,10 @@ ENTRY(copyoutptr)
 	li	a4, VM_MAXUSER_ADDRESS
 	bgeu	a3, a4, copyio_fault_nopcb
 
-#ifndef __CHERI__
+#ifdef __CHERI_HYBRID__
 	GET_DDC(a3)
 	ADD_CAP		a3, a3, a0
-	ybndsw		a0, a3, a2
+	ybndsrw		a0, a3, a2
 #endif
 
 	copycapcommon
@@ -364,10 +364,10 @@ ENTRY(copyinptr)
 	li	a4, VM_MAXUSER_ADDRESS
 	bgeu	a3, a4, copyio_fault_nopcb
 
-#ifndef __CHERI__
+#ifdef __CHERI_HYBRID__
 	GET_DDC(a3)
 	ADD_CAP		a3, a3, a1
-	ybndsw		a1, a3, a2
+	ybndsrw		a1, a3, a2
 #endif
 
 	copycapcommon
