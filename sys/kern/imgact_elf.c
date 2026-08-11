@@ -1789,7 +1789,7 @@ timekeep_cap(struct image_params *imgp)
 	    ("timekeep_len needs rounding"));
 
 	tmpcap = (void * __capability)cheri_bounds_set_exact(
-	    cheri_perms_and(timekeep_base, CHERI_PERMS_USERSPACE_RODATA),
+	    cheri_perms_and(timekeep_base, CHERI_PERMS_USERSPACE_RODATA_NOCAP),
 	    timekeep_len);
 
 	return (tmpcap);

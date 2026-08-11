@@ -195,6 +195,9 @@
 #endif /* !defined(__riscv_xcheri) */
 
 #define	CHERI_PERMS_USERSPACE_RODATA					\
+	(CHERI_PERMS_USERSPACE)
+
+#define	CHERI_PERMS_USERSPACE_RODATA_NOCAP				\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD)
 
 #ifdef __riscv_xcheri
