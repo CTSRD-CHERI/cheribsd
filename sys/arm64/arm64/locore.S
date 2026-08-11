@@ -753,7 +753,7 @@ LENTRY(create_pagetables)
 	sub	x7, x27, x6
 	cvtd	c6, x6
 	scbnds	c6, c6, x7
-	ldr	x7, =~CHERI_PERMS_KERNEL_PAGETABLE
+	ldr	x7, =~CHERI_PERMS_KERNEL_DATA_NOCAP
 	clrperm	c6, c6, x7
 	scvalue	c27, c6, x27
 #endif
