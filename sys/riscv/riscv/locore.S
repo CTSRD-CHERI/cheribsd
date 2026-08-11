@@ -56,7 +56,7 @@
  * instructions and registers across RV64, xcheri and RV64Y.
  */
 .macro set_stvec newvec
-#if __has_feature(capabilities)
+#ifdef __CHERI__
 	/* xcheri */
 	cspecialw	stcc, CAP(\newvec)
 #else
@@ -97,7 +97,12 @@
 	yaddrw		t1, t1, t0
 	set_cap_mode	t0, t1, 1
 #endif
-	set_stvec	t0
+#if __has_feature(capabilities)
+	/* xcheri */
+	cspecialw	stcc, CAP(t0)
+#else
+	csrw		stvec, t0
+#endif
 .endmacro
 
 	.globl	kernbase
