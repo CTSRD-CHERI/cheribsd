@@ -195,7 +195,11 @@ RISCV_MARCH=	rv64imafdch
 .if ${MACHINE_CPU:Mxcheri}
 RISCV_MARCH:=	${RISCV_MARCH}xcheri
 .elif ${MACHINE_CPU:Mrvy}
+.if defined(CHERI_RISCV_STD_093)
 RISCV_MARCH:=	${RISCV_MARCH}zcherihybrid_zcherilevels
+.else
+RISCV_MARCH:=	${RISCV_MARCH:S/i/y/}zyhybrid_zylevels1b
+.endif
 .endif
 
 RISCV_ABI=	lp64
