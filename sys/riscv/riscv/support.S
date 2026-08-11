@@ -77,7 +77,7 @@
 .endmacro
 
 #if __has_feature(capabilities)
-.macro load_ptr xreg preg
+.macro load_cap xreg preg
 #if defined(__riscv_xcheri) && defined(__CHERI_HYBRID__)
 	lc.cap	CAP(\xreg), 0(CAP(\preg))
 #else
@@ -85,10 +85,17 @@
 #endif
 .endmacro
 
-.macro store_ptr xreg preg
+.macro store_cap xreg preg
 #if defined(__riscv_xcheri) && defined(__CHERI_HYBRID__)
-	/* Note: xcheri */
 	sc.cap	CAP(\xreg), 0(CAP(\preg))
+#else
+	sy	\xreg, 0(\preg)
+#endif
+.endmacro
+
+.macro store_cap_via_ptr xreg preg
+#if defined(__riscv_xcheri) && defined(__CHERI_HYBRID__)
+	sc.ddc	CAP(\xreg), 0(\preg)
 #else
 	sy	\xreg, 0(\preg)
 #endif
@@ -245,11 +252,11 @@ ENTRY(fuecap)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
 	YMODE_ENTER
-	load_ptr	a0 a0		/* Try loading the data */
+	load_cap	a0 a0		/* Try loading the data */
 	YMODE_EXIT
 	EXIT_USER_ACCESS(a2)
 	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
-	store_ptr	a0 a1		/* Save the data in kernel space */
+	store_cap_via_ptr	a0 a1	/* Save the data in kernel space */
 	li	a0, 0			/* Success */
 	ret				/* Return */
 END(fuecap)
@@ -340,7 +347,7 @@ ENTRY(sucap)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
 	YMODE_ENTER
-	store_ptr	a1 a0		/* Try storing the data */
+	store_cap	a1 a0		/* Try storing the data */
 	YMODE_EXIT
 	EXIT_USER_ACCESS(a2)
 	SET_FAULT_HANDLER(zero, a2)	/* Reset the fault handler */
