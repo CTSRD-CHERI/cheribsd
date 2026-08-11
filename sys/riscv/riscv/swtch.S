@@ -504,7 +504,7 @@ ENTRY(fork_trampoline)
 	L_CAP	tp, (TF_TP)(sp)
 
 	/* Save kernel stack so we can use it doing a user trap */
-	ADDI_PTR	sp, sp, TF_SIZE
+	ADDI_CAP	sp, sp, TF_SIZE
 	CSRW_CAP(sscratch, sp)
 
 	/* Load user stack */
