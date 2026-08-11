@@ -183,9 +183,6 @@
 #define	CHERI_PERMS_KERNEL_CIDCAP					\
 	(CHERI_PERM_COMPARTMENT_ID)
 
-#define	CHERI_PERMS_KERNEL_PAGETABLE					\
-	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_STORE)
-
 /*
  * Permission mask that encodes the permission bits associated to
  * the RWX memory access control.
