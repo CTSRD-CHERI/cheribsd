@@ -56,7 +56,7 @@ struct Struct_Obj_Entry;
 
 /* Return the address of the .dynamic section in the dynamic linker. */
 #ifdef __CHERI_PURE_CAPABILITY__
-#define rtld_dynamic(obj) (&_DYNAMIC)
+#define	rtld_dynamic(obj) (&_DYNAMIC)
 #else
 #define	rtld_dynamic(obj)						\
 ({									\
