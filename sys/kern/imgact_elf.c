@@ -2023,6 +2023,8 @@ typedef void (*segment_callback)(vm_map_entry_t, void *);
 struct phdr_closure {
 	Elf_Phdr *phdr;		/* Program header to fill in */
 	Elf_Off offset;		/* Offset of segment in core file */
+	int numsegs;		/* Maximum number of segments */
+	int nextseg;		/* Next segment to fill in */
 };
 
 struct note_info {
@@ -2151,10 +2153,15 @@ __elfN(coredump)(struct thread *td, struct vnode *vp, off_t limit, int flags)
         }
 
 	/*
-	 * Allocate memory for building the header, fill it up,
-	 * and write it out following the notes.
+	 * Allocate memory for building the header, fill it up, and write it out
+	 * following the notes.
+	 *
+	 * Note that a process sharing our vmspace might be concurrently
+	 * mutating the map, in which case we could populate fewer than
+	 * seginfo.count headers.  Zero the buffer to ensure that unpopulated
+	 * headers are still initialized.
 	 */
-	hdr = malloc(hdrsize, M_TEMP, M_WAITOK);
+	hdr = malloc(hdrsize, M_TEMP, M_WAITOK | M_ZERO);
 	error = __elfN(corehdr)(&params, seginfo.count, hdr, hdrsize, &notelst,
 	    notesz, flags);
 
@@ -2226,6 +2233,11 @@ cb_put_phdr(vm_map_entry_t entry, void *closure)
 	struct phdr_closure *phc = (struct phdr_closure *)closure;
 	Elf_Phdr *phdr = phc->phdr;
 
+	if (phc->nextseg >= phc->numsegs) {
+		/* Only write as many headers as we have space for. */
+		return;
+	}
+
 	phc->offset = round_page(phc->offset);
 
 	phdr->p_type = PT_LOAD;
@@ -2238,6 +2250,8 @@ cb_put_phdr(vm_map_entry_t entry, void *closure)
 
 	phc->offset += phdr->p_filesz;
 	phc->phdr++;
+
+	phc->nextseg++;
 }
 
 #if __has_feature(capabilities)
@@ -2540,6 +2554,8 @@ __elfN(puthdr)(struct thread *td, void *hdr, size_t hdrsize, int numsegs,
 	/* All the writable segments from the program. */
 	phc.phdr = phdr;
 	phc.offset = round_page(hdrsize + notesz);
+	phc.numsegs = numsegs;
+	phc.nextseg = 0;
 	each_dumpable_segment(td, cb_put_phdr, &phc, flags);
 #if __has_feature(capabilities)
 	each_dumpable_segment(td, cb_put_memtag_phdr, &phc, flags);
