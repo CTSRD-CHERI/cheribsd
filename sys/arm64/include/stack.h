@@ -55,5 +55,4 @@ kstack_contains(struct thread *td, vm_offset_t va, size_t len)
 	    sizeof(struct pcb));
 }
 #endif	/* _SYS_PROC_H_ */
-
 #endif /* !_MACHINE_STACK_H_ */

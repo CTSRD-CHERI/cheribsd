@@ -44,6 +44,8 @@ sf_buf_kva(struct sf_buf *sf)
 	m = (vm_page_t)sf;
 	va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 	va = cheri_kern_bounds_set_exact(va, PAGE_SIZE);
+	va = cheri_kern_perms_clear(va, CHERI_PERM_CAP);
+
 	return (va);
 }
 

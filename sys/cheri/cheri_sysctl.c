@@ -45,6 +45,10 @@ FEATURE(cheri_subobject_bounds_kernel,
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 FEATURE(morello_purecap_benchmark_abi_kernel, "Morello benchmark ABI kernel");
 #endif
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+FEATURE(cheri_kernel_capflow,
+    "CHERI Local kernel capabilities flow enforcement");
+#endif
 #endif /* __CHERI_PURE_CAPABILITY__ */
 
 SYSCTL_NODE(_security, OID_AUTO, cheri, CTLFLAG_RD, 0,

@@ -477,6 +477,11 @@ do_trap_supervisor(struct trapframe *frame)
 
 	KASSERT((csr_read(sstatus) & (SSTATUS_SUM)) == 0,
 	    ("Came from S mode with SUM enabled"));
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	KASSERT(cheri_is_kernel_lvl(frame), ("kernel frame: !KernelLevel"));
+	KASSERT(cheri_has_store_kernel_lvl(frame),
+	    ("kernel frame: StoreKernelLevel forbidden"));
+#endif
 
 	exception = frame->tf_scause & SCAUSE_CODE;
 	if ((frame->tf_scause & SCAUSE_INTR) != 0) {
@@ -583,6 +588,29 @@ do_trap_user(struct trapframe *frame)
 
 	td = curthread;
 	pcb = td->td_pcb;
+
+#ifdef CHERI_BOUNDED_KSTACK
+	KASSERT(cheri_length_get(frame) == TF_SIZE,
+	    ("Invalid trapframe bounds: %#p", frame));
+	KASSERT(cheri_base_get(td->td_frame) >= cheri_top_get(cheri_stack_get()),
+	    ("Invalid kernel stack bounds: %#p overlaps frame %#p",
+		cheri_stack_get(), td->td_frame));
+	KASSERT(cheri_base_get(cheri_stack_get()) == td->td_kstack,
+	    ("Invalid kernel stack base: %#p expect td_kstack %#p",
+		cheri_stack_get(), (void *)td->td_kstack));
+	KASSERT(cheri_top_get(cheri_stack_get()) <= (ptraddr_t)td->td_frame,
+	    ("Invalid kernel stack length: %#p overlaps frame %#p",
+		cheri_stack_get(), td->td_frame));
+	KASSERT(cheri_length_get(pcb) == sizeof(struct pcb),
+	    ("Invalid PCB bounds %#p", pcb));
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	KASSERT(cheri_is_kernel_lvl(frame), ("kernel frame: !KernelLevel"));
+	KASSERT(!cheri_has_store_kernel_lvl(frame),
+	    ("kernel frame: StoreKernelLevel allowed"));
+	KASSERT(!cheri_has_store_kernel_lvl(td->td_frame),
+	    ("td_frame: StoreKernelLevel allowed"));
+#endif
+#endif
 
 	KASSERT(td->td_frame == frame,
 	    ("%s: td_frame %p != frame %p", __func__, td->td_frame, frame));

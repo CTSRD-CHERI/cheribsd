@@ -101,6 +101,9 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_perms_and(ctemp, CHERI_PERMS_KERNEL_DATA);
 	devmap_init_capability(ctemp);
 
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	kroot = cheri_perms_clear(kroot, CHERI_PERM_GLOBAL);
+#endif
 	kernel_root_cap = cheri_perms_and(kroot,
 	    ~(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL));
 
@@ -142,16 +145,22 @@ vm_prot2perms(int base, vm_prot_t prot)
 			perms |= CHERI_PERM_LOAD_CAP | CHERI_PERM_MUTABLE_LOAD;
 		if (prot & VM_PROT_WRITE)
 			perms |= CHERI_PERM_STORE;
-		if (VM_PROT_HAS_WRITE_CAP(prot))
-			perms |= CHERI_PERM_STORE_CAP |
-			    CHERI_PERM_STORE_LOCAL_CAP;
+		if (VM_PROT_HAS_WRITE_CAP(prot)) {
+			perms |= CHERI_PERM_STORE_CAP;
+#ifndef CHERI_RESTRICT_KERNCAP_FLOW
+			perms |= CHERI_PERM_STORE_LOCAL_CAP;
+#endif
+		}
 	} else {
 		if (prot & (VM_PROT_READ | VM_PROT_COPY))
 			perms |= CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |
 			    CHERI_PERM_MUTABLE_LOAD;
-		if (prot & VM_PROT_WRITE)
-			perms |= CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
-			    CHERI_PERM_STORE_LOCAL_CAP;
+		if (prot & VM_PROT_WRITE) {
+			perms |= CHERI_PERM_STORE | CHERI_PERM_STORE_CAP;
+#ifndef CHERI_RESTRICT_KERNCAP_FLOW
+			perms |= CHERI_PERM_STORE_LOCAL_CAP;
+#endif
+		}
 	}
 	if (prot & VM_PROT_EXECUTE)
 		perms |= CHERI_PERM_EXECUTE | CHERI_PERM_EXECUTIVE |
@@ -159,3 +168,11 @@ vm_prot2perms(int base, vm_prot_t prot)
 
 	return ((base & ~CHERI_PERMS_RWX_MASK) | perms);
 }
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_RESTRICT_KERNCAP_FLOW) && defined(INVARIANTS)
+void
+cheri_assert_no_store_local(void *cap)
+{
+	panic("Unexpected capability with StoreLocal %#p\n", cap);
+}
+#endif

@@ -33,6 +33,7 @@
 #include <machine/asm.h>
 #include <machine/param.h>
 #include <machine/vmparam.h>
+#include <machine/cherireg.h>
 
 #include "assym.inc"
 
@@ -47,6 +48,23 @@
 	ldr	x7, =VM_MAXUSER_ADDRESS
 	cmp	x6, x7
 	b.hi	\bad_access_func
+.endm
+
+/*
+ * Verify that we are not copying via a capability that allows leaking
+ * kernel pointers.
+ * Trashes x7, x8.
+ */
+.macro assert_no_store_local creg
+#if defined(CHERI_RESTRICT_KERNCAP_FLOW) && defined(INVARIANTS)
+	ldr	x8, =CHERI_PERM_STORE_LOCAL_CAP
+	gcperm	x7, \creg
+	and	x7, x7, x8
+	cbz	x7, 1f
+	mov	c0, \creg
+	bl	cheri_assert_no_store_local
+1:
+#endif
 .endm
 
 /*
@@ -79,6 +97,7 @@ ENTRY(copyout)
 	cvtd	c0, x0			/* Store through a capability */
 	scbnds	c0, c0, x2		/* Set the bounds */
 #endif
+	assert_no_store_local	c1
 	b	copycommon
 
 1:	mov	x0, xzr		/* return 0 */
@@ -100,6 +119,7 @@ ENTRY(copyin)
 	scbnds	c1, c1, x2		/* Set the bounds */
 #endif
 
+	assert_no_store_local	c0
 	b	copycommon
 
 1:	mov	x0, xzr		/* return 0 */
@@ -118,6 +138,7 @@ ENTRY(copyinstr)
 	mov	w4, #1		/* If zero return faulure */
 	cbz	x2, 3f		/* If len == 0 then skip loop */
 
+	assert_no_store_local	c0
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 	cvtd	c1, x1			/* Store through a capability */
 	scbnds	c1, c1, x2		/* Set the bounds */
@@ -280,6 +301,7 @@ ENTRY(copyinptr)
 	cvtd	c1, x1			/* Store through a capability */
 	scbnds	c1, c1, x2		/* Set the bounds */
 #endif
+	assert_no_store_local c0
 
 	/* Check the length is greater than 1 capability */
 	cmp	x2, #16
@@ -312,6 +334,7 @@ ENTRY(copyoutptr)
 	cvtd	c0, x0			/* Store through a capability */
 	scbnds	c0, c0, x2		/* Set the bounds */
 #endif
+	assert_no_store_local c1
 
 	/* Check the length is greater than 1 capability */
 	cmp	x2, #16

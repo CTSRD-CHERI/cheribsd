@@ -217,6 +217,12 @@ cheri_can_access(const void * __capability cap, ptraddr_t perms,
 #define	cheri_kern_address_set(x, y)	cheri_address_set(x, y)
 #define	cheri_kern_address_get(x)	cheri_address_get(x)
 #define	cheri_kern_perms_and(x, y)	cheri_perms_and(x, y)
+#define	cheri_kern_perms_clear(x, y)	cheri_perms_clear(x, y)
+
+#define	cheri_is_kernel_lvl(x)						\
+	((cheri_perms_get(x) & CHERI_PERM_GLOBAL) == 0)
+#define	cheri_has_store_kernel_lvl(x)					\
+	((cheri_perms_get(x) & CHERI_PERM_STORE_LOCAL_CAP) != 0)
 #else
 #define	cheri_kern_tag_get(x)		1
 #define	cheri_kern_bounds_set(x, y)	(x)
@@ -224,6 +230,7 @@ cheri_can_access(const void * __capability cap, ptraddr_t perms,
 #define	cheri_kern_address_set(x, y)	((__typeof__(x))(y))
 #define	cheri_kern_address_get(x)	((uintptr_t)(x))
 #define	cheri_kern_perms_and(x, y)	(x)
+#define	cheri_kern_perms_clear(x, y)	(x)
 #endif	/* __CHERI_PURE_CAPABILITY__ */
 #endif	/* _KERNEL */
 

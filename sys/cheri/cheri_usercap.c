@@ -63,6 +63,9 @@ SYSCTL_ULONG(_security_cheri_stats, OID_AUTO, untagged_ptrace_caps, CTLFLAG_RD,
 void
 userspace_root_cap_init(void * __capability cap)
 {
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	cap = cheri_perms_clear(cap, CHERI_PERM_STORE_LOCAL_CAP);
+#endif
 	userspace_root_cap = cap;
 }
 

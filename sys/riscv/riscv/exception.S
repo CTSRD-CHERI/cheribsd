@@ -37,7 +37,15 @@
 
 #include <machine/trap.h>
 #include <machine/riscvreg.h>
+#include <machine/cherireg.h>
 
+/*
+ * Save the registers to the kernel stack and enter the kernel context.
+ *
+ * When CHERI_BOUNDED_KSTACK is enabled, and saving userspace registers:
+ * 1. Return a bounded capability to td_frame in cs0.
+ * 2. Install a bounded kernel stack in csp.
+ */
 .macro save_registers mode
 #if __has_feature(capabilities)
 .option push
@@ -224,6 +232,16 @@
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* CHERI-RISC-V purecap doesn't currently use cgp. */
 	cmove	cgp, cnull
+#ifdef CHERI_BOUNDED_KSTACK
+	/* Prepare frame pointer in cs0 */
+	cmove	cs0, csp
+	li	t0, TF_SIZE
+	csetboundsexact	cs0, cs0, t0
+
+	/* Install bounded kstack */
+	clc	ct0, (PC_CURTHREAD)(ctp)
+	clc	csp, (TD_MDKSTACK)(ct0)
+#endif
 #else
 .option push
 .option norelax
@@ -234,7 +252,24 @@
 .endif
 .endm
 
+/*
+ * Restore registers from the kernel stack and enter the user context.
+ *
+ * When CHERI_BOUNDED_KSTACK is enabled, and returning to userspace:
+ * 1. Recover the unbounded kstack pointer in csp, to be preserved in sscratch.
+ * 2. Ensure that the returned csp pointer points at the beginning of the
+ * td_frame structure.
+ */
 .macro load_registers mode
+#ifdef CHERI_BOUNDED_KSTACK
+.if \mode == 0
+	/* Recover the full kstack bounds to access trapframe and kernframe. */
+	clc	ct0, (PC_CURTHREAD)(ctp)
+	clc	ct1, (TD_KSTACK)(ct0)
+	clc	ct0, (TD_FRAME)(ct0)
+	csetaddr	csp, ct1, t0
+.endif
+#endif
 #ifdef __CHERI_PURE_CAPABILITY__
 	cld	t0, (TF_SSTATUS)(csp)
 #else
@@ -300,7 +335,6 @@
 	/* We go to userspace. Load user csp */
 	clc	ct0, (TF_SP)(csp)
 	cspecialw sscratchc, ct0
-
 	/* Store our pcpu */
 	csc	ctp, (TF_SIZE + KF_TP)(csp)
 	clc	ctp, (TF_TP)(csp)
@@ -418,7 +452,17 @@
 
 	/* Handle the ast */
 #ifdef __CHERI_PURE_CAPABILITY__
+
+#ifdef CHERI_BOUNDED_KSTACK
+	/* See save_registers */
+	cmove	ca0, cs0
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	li	t1, ~CHERI_PERM_STORE_LOCAL_CAP
+	candperm	ca0, ca0, t1
+#endif
+#else
 	cmove	ca0, csp
+#endif
 	ccall	_C_LABEL(ast)
 #else
 	mv	a0, sp
@@ -453,6 +497,10 @@ ENTRY(cpu_exception_handler_supervisor)
 	save_registers 1
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	ca0, csp
+#ifdef CHERI_BOUNDED_KSTACK
+	li	t1, TF_SIZE
+	csetboundsexact	ca0, ca0, t1
+#endif
 	ccall	_C_LABEL(do_trap_supervisor)
 #else
 	mv	a0, sp
@@ -465,7 +513,15 @@ END(cpu_exception_handler_supervisor)
 ENTRY(cpu_exception_handler_user)
 	save_registers 0
 #ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CHERI_BOUNDED_KSTACK
+	cmove	ca0, cs0
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	li	t1, ~CHERI_PERM_STORE_LOCAL_CAP
+	candperm	ca0, ca0, t1
+#endif
+#else
 	cmove	ca0, csp
+#endif
 	ccall	_C_LABEL(do_trap_user)
 #else
 	mv	a0, sp

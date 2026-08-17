@@ -82,12 +82,14 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_perms_and(ctemp, CHERI_PERMS_KERNEL_DATA);
 	devmap_init_capability(ctemp);
 
-#ifdef HAS_CHERI_PERM_SEAL
-	kernel_root_cap = cheri_perms_and(kroot,
-	    ~(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL));
-#else
-	kernel_root_cap = kroot;
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	kroot = cheri_perms_clear(kroot, CHERI_PERM_GLOBAL);
 #endif
+#ifdef HAS_CHERI_PERM_SEAL
+	kroot = cheri_perms_and(kroot,
+	    ~(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL));
+#endif
+	kernel_root_cap = kroot;
 #endif
 }
 
@@ -114,15 +116,20 @@ int
 vm_prot2perms(int base, vm_prot_t prot)
 {
 	int perms = 0;
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	const int perm_kernel_level = 0;
+#else
+	const int perm_kernel_level = CHERI_PERM_STORE_LOCAL_CAP;
+#endif
 #ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	const int perm_load_cap = CHERI_PERM_LOAD_CAP;
 	const int perm_store_cap = CHERI_PERM_STORE_CAP |
-	    CHERI_PERM_STORE_LOCAL_CAP;
+	    perm_kernel_level;
 #else
 	const int perm_load_cap = CHERI_PERM_CAP |
 	    CHERI_PERM_LOAD_MUTABLE;
 	const int perm_store_cap = CHERI_PERM_CAP |
-	    CHERI_PERM_STORE_LOCAL_CAP;
+	    perm_kernel_level;
 #endif
 
 	if (prot & (VM_PROT_CAP | VM_PROT_NO_IMPLY_CAP)) {
@@ -146,6 +153,14 @@ vm_prot2perms(int base, vm_prot_t prot)
 
 	return ((base & ~CHERI_PERMS_RWX_MASK) | perms);
 }
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_RESTRICT_KERNCAP_FLOW) && defined(INVARIANTS)
+void
+cheri_assert_no_store_local(void *cap)
+{
+	panic("Unexpected capability with StoreLocal %#p\n", cap);
+}
+#endif
 // CHERI CHANGES START
 // {
 //   "updated": 20230509,

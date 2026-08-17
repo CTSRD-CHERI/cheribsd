@@ -666,6 +666,11 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 	esr = frame->tf_esr;
 	exception = ESR_ELx_EXCEPTION(esr);
 
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	KASSERT(cheri_is_kernel_lvl(frame), ("kernel frame: !KernelLevel"));
+	KASSERT(cheri_has_store_kernel_lvl(frame),
+	    ("kernel frame: StoreKernelLevel forbidden"));
+#endif
 #ifdef KDTRACE_HOOKS
 	if (dtrace_trap_func != NULL && (*dtrace_trap_func)(frame, exception))
 		return;
@@ -779,6 +784,30 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 	KASSERT((uintptr_t)get_pcpu() >= VM_MIN_KERNEL_ADDRESS,
 	    ("Invalid pcpu address from userland: %p (tpidr 0x%lx)",
 	     get_pcpu(), READ_SPECIALREG(tpidr_el1)));
+#ifdef CHERI_BOUNDED_KSTACK
+	KASSERT(cheri_base_get(td->td_pcb) >= cheri_top_get(cheri_stack_get()),
+	    ("Invalid kernel stack bounds: %#p overlaps pcb %#p",
+		cheri_stack_get(), td->td_pcb));
+	KASSERT(cheri_length_get(td->td_pcb) == sizeof(struct pcb),
+	    ("Unbounded PCB pointer %#p", td->td_pcb));
+	KASSERT(td->td_frame == frame, ("Invalid td_frame %#p != %#p",
+	    td->td_frame, frame));
+	KASSERT(cheri_length_get(frame) == sizeof(struct trapframe),
+	    ("Invalid trapframe bounds: %#p", frame));
+	KASSERT(cheri_base_get(cheri_stack_get()) == td->td_kstack,
+	    ("Invalid kernel stack base: %#p expect td_kstack %#p",
+		cheri_stack_get(), (void *)td->td_kstack));
+	KASSERT(cheri_top_get(cheri_stack_get()) <= (ptraddr_t)td->td_frame,
+	    ("Invalid kernel stack length: %#p overlaps frame %#p",
+		cheri_stack_get(), td->td_frame));
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+	KASSERT(cheri_is_kernel_lvl(frame), ("kernel frame: !KernelLevel"));
+	KASSERT(!cheri_has_store_kernel_lvl(frame),
+	    ("kernel frame: StoreKernelLevel allowed"));
+	KASSERT(!cheri_has_store_kernel_lvl(td->td_frame),
+	    ("td_frame: StoreKernelLevel allowed"));
+#endif
+#endif
 
 	kasan_mark(frame, sizeof(*frame), sizeof(*frame), 0);
 	kmsan_mark(frame, sizeof(*frame), KMSAN_STATE_INITED);
