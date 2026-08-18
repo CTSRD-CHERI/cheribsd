@@ -141,7 +141,7 @@
 .macro cheri_cpu_init
 #if __has_feature(capabilities) && defined(__riscv_zcheripurecap)
 	/* Enable CHERI for U-mode */
-	li	t0, SENVCFG_CRE
+	li	t0, SENVCFG_Y
 	csrs	senvcfg, t0
 #endif
 .endmacro

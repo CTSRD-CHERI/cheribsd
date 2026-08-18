@@ -229,9 +229,9 @@
 #define	TVAL_CAP_TYPE_MASK	(0x0f << TVAL_CAP_TYPE_SHIFT)
 #define	TVAL_CAP_TYPE(tval)						\
 	(((tval) & TVAL_CAP_TYPE_MASK) >> TVAL_CAP_TYPE_SHIFT)
-#define	SENVCFG_CRE	(0x01 << 28)
-#elif defined(__riscv_zcheripurecap)
-#define	SENVCFG_CRE	(0x01 << 9)
+#define	SENVCFG_Y	(0x01 << 28)
+#elif defined(__riscv_y)
+#define	SENVCFG_Y	(0x01 << 9)
 #endif
 #define	TVAL_CAP_CAUSE(tval)						\
 	(((tval) & TVAL_CAP_CAUSE_MASK) >> TVAL_CAP_CAUSE_SHIFT)
