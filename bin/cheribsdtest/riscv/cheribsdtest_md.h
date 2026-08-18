@@ -38,13 +38,19 @@
 
 #include <machine/riscvreg.h>
 
+#ifndef __riscv_y
 #define	TRAPNO_CHERI		(SCAUSE_CHERI)
-#ifdef __riscv_xcheri
-#define	TRAPNO_STORE_CAP_PF	(SCAUSE_STORE_AMO_CAP_PAGE_FAULT)
-#else
-#define	TRAPNO_STORE_CAP_PF	(SCAUSE_STORE_PAGE_FAULT)
-#endif
 #define	TRAPNO_LOAD_STORE	(SCAUSE_CHERI)
+#else
+/* XXX-AM: This pacifices the compiler but it is incorrect. */
+#define	TRAPNO_CHERI		(SCAUSE_CHERI_LOAD_ACCESS_FAULT)
+#define	TRAPNO_LOAD_STORE	(SCAUSE_CHERI_LOAD_ACCESS_FAULT)
+#endif
+#ifdef __riscv_zcheripurecap
+#define	TRAPNO_STORE_CAP_PF	(SCAUSE_STORE_PAGE_FAULT)
+#else
+#define	TRAPNO_STORE_CAP_PF	(SCAUSE_CHERI_STORE_AMO_PAGE_FAULT)
+#endif
 #define	TRAPNO_LOAD_PF		(SCAUSE_LOAD_PAGE_FAULT)
 #define	TRAPNO_STORE_PF		(SCAUSE_STORE_PAGE_FAULT)
 #define	TRAPNO_EXEC_PF		(SCAUSE_INST_PAGE_FAULT)

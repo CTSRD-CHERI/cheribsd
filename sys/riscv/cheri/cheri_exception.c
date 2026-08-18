@@ -189,7 +189,7 @@ cheri_stval_to_sicode(register_t stval)
 		return (0);
 	}
 }
-#else /* !defined(__riscv_xcheri) */
+#elif defined(__riscv_zcheripurecap)
 static const char *cheri_fault_type_descr[] = {
 	[CHERI_EXCTYPE_FETCH_FAULT] = "pcc fault",
 	[CHERI_EXCTYPE_DATA_FAULT] = " access fault",
@@ -247,4 +247,4 @@ cheri_stval_to_sicode(register_t stval)
 		return (0);
 	}
 }
-#endif /* !defined(__riscv_xcheri) */
+#endif /* defined(__riscv_zcheripurecap) */

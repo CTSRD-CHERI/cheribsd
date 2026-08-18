@@ -56,12 +56,18 @@
 #define	SCAUSE_LOAD_GUEST_PAGE_FAULT	21
 #define	SCAUSE_VIRTUAL_INSTRUCTION	22
 #define	SCAUSE_STORE_GUEST_PAGE_FAULT	23
-#if __has_feature(capabilities)
-#ifdef __riscv_xcheri
-#define	SCAUSE_LOAD_CAP_PAGE_FAULT	26
-#define	SCAUSE_STORE_AMO_CAP_PAGE_FAULT	27
-#endif
+#if defined(__riscv_xcheri)
+#define	SCAUSE_CHERI_LOAD_PAGE_FAULT	26
+#define	SCAUSE_CHERI_STORE_AMO_PAGE_FAULT	27
 #define	SCAUSE_CHERI			28
+#elif defined(__riscv_zcheripurecap)
+#define	SCAUSE_CHERI			28
+#elif defined(__riscv_y)
+#define	SCAUSE_CHERI_INST_ACCESS_FAULT	32
+#define	SCAUSE_CHERI_LOAD_ACCESS_FAULT	33
+#define	SCAUSE_CHERI_STORE_AMO_ACCESS_FAULT	34
+#define	SCAUSE_CHERI_LOAD_PAGE_FAULT	35
+#define	SCAUSE_CHERI_STORE_AMO_PAGE_FAULT	36
 #endif
 
 #define	SSTATUS_UIE			(1 << 0)
@@ -216,36 +222,20 @@
 #define	TVAL_CAP_IDX_MASK	(0x3f << TVAL_CAP_IDX_SHIFT)
 #define	TVAL_CAP_IDX(tval)						\
 	(((tval) & TVAL_CAP_IDX_MASK) >> TVAL_CAP_IDX_SHIFT)
-
-#define	cheri_is_length_violation(frame)				\
-	(TVAL_CAP_CAUSE((frame)->tf_stval) == CHERI_EXCCODE_LENGTH)
-#define	cheri_is_pcc_violation(frame)					\
-	(TVAL_CAP_IDX((frame)->tf_stval) == 32 /* PCC */)
-#define	cheri_is_ddc_violation(frame)					\
-	(TVAL_CAP_IDX((frame)->tf_stval) == 33 /* DDC */)
-#else /* !defined(__riscv_xcheri) */
+#elif defined(__riscv_zcheripurecap)
 #define	TVAL_CAP_CAUSE_SHIFT	0
 #define	TVAL_CAP_CAUSE_MASK	(0x0f << TVAL_CAP_CAUSE_SHIFT)
 #define	TVAL_CAP_TYPE_SHIFT	16
 #define	TVAL_CAP_TYPE_MASK	(0x0f << TVAL_CAP_TYPE_SHIFT)
 #define	TVAL_CAP_TYPE(tval)						\
 	(((tval) & TVAL_CAP_TYPE_MASK) >> TVAL_CAP_TYPE_SHIFT)
-
-#define	cheri_is_length_violation(frame)				\
-	(TVAL_CAP_CAUSE((frame)->tf_stval2) == CHERI_EXCCODE_BOUNDS)
-#define	cheri_is_pcc_violation(frame)					\
-	(TVAL_CAP_TYPE((frame)->tf_stval2) == CHERI_EXCTYPE_FETCH_FAULT || \
-	TVAL_CAP_TYPE((frame)->tf_stval2) == CHERI_EXCTYPE_BRANCH_FAULT)
-#define	cheri_is_ddc_violation(frame)					\
-	(TVAL_CAP_TYPE((frame)->tf_stval2) == CHERI_EXCTYPE_DATA_FAULT && \
-	(cheri_getflags((frame)->tf_sepc) & CHERI_FLAGS_CAP_MODE_MASK) == \
-	    CHERI_FLAGS_INT_MODE)
-#endif /* !defined(__riscv_xcheri) */
+#define	SENVCFG_CRE	(0x01 << 28)
+#elif defined(__riscv_zcheripurecap)
+#define	SENVCFG_CRE	(0x01 << 9)
+#endif
 #define	TVAL_CAP_CAUSE(tval)						\
 	(((tval) & TVAL_CAP_CAUSE_MASK) >> TVAL_CAP_CAUSE_SHIFT)
-
-#define	SENVCFG_CRE	(0x01 << 28)
-#endif
+#endif /* __has_feature(capabilities) */
 
 #define	XLEN		__riscv_xlen
 #define	XLEN_BYTES	(XLEN / 8)
