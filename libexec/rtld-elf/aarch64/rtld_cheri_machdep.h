@@ -100,7 +100,7 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 #define set_bounds_if_nonnull(cap, size)	\
 	do { if (cap) { cap = cheri_bounds_set(cap, size); } } while(0)
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 static inline void
 fix_obj_mapping_cap_permissions(Obj_Entry *obj, const char *path __unused)
 {

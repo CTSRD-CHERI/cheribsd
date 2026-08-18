@@ -108,7 +108,7 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 	Elf_Addr bss_vaddr;
 	Elf_Addr bss_vlimit;
 	caddr_t bss_addr;
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 	Elf_Word stack_flags;
 #endif
 	caddr_t note_start;
@@ -135,7 +135,7 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 	note_map = NULL;
 	note_map_len = 0;
 	segs = alloca(sizeof(segs[0]) * hdr->e_phnum);
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 	stack_flags = PF_X | PF_R | PF_W;
 #endif
 	text_end = 0;
@@ -178,7 +178,7 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 			break;
 
 		case PT_GNU_STACK:
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 			if ((phdr->p_flags & PF_X) != 0) {
 				_rtld_error("%s: PF_X in PT_GNU_STACK", path);
 				goto error;
@@ -339,7 +339,7 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 	obj->vaddrbase = base_vaddr;
 
 	obj->relocbase = mapbase - base_vaddr;
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	if (obj->vaddrbase != 0) {
 		rtld_fdprintf(STDERR_FILENO,
 		    "%s: nonzero vaddrbase %zd may be broken for CheriABI",
@@ -394,7 +394,7 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 		goto error;
 #endif
 	}
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	if (!create_pcc_caps(obj, path)) {
 		obj_free(obj);
 		goto error1;
@@ -403,7 +403,7 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 	obj->stack_flags = stack_flags;
 #endif
 	if (hdr->e_entry != 0) {
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 		obj->entry = (const void *)(get_codesegment_cap(obj) +
 		    hdr->e_entry);
 #else
@@ -487,7 +487,7 @@ get_elf_header(int fd, const char *path, const struct stat *sbp,
 	if (!check_elf_headers(hdr, path))
 		goto error;
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	if (!ELF_IS_CHERI(hdr))
 #else
 	if (ELF_IS_CHERI(hdr))
@@ -577,7 +577,7 @@ obj_free(Obj_Entry *obj)
 		free(obj->priv);
 	if (obj->path)
 		free(obj->path);
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 #ifdef CHERI_LIB_C18N
 	if (obj->comparts)
 		free(obj->comparts);

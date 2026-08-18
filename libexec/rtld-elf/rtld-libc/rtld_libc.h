@@ -87,7 +87,7 @@ int __getosreldate(void);
 
 // For CHERI with optional syscall args do not using the varargs calling
 // convention. Work around this by using macros with default arguments:
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 int	__sys_fcntl(int, int, intptr_t);
 int	__sys_open(const char *, int, int);
 int	__sys_openat(int, const char *, int, int);

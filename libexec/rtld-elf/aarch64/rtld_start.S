@@ -52,7 +52,7 @@
  */
 
 ENTRY(.rtld_start)
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	.cfi_undefined	c30
 	mov	c19, c0				/* Put aux in a callee-saved register */
 
@@ -84,7 +84,7 @@ ENTRY(.rtld_start)
 #else
 	br	c8				/* Jump to the entry point */
 #endif
-#else /* defined(__CHERI_PURE_CAPABILITY__) */
+#else /* defined(__CHERI__) */
 	.cfi_undefined	x30
 	mov	x19, x0		/* Put ps_strings in a callee-saved register */
 
@@ -100,7 +100,7 @@ ENTRY(.rtld_start)
 
 	mov	x0, x19		/* Restore ps_strings */
 	br	x8		/* Jump to the entry point */
-#endif /* defined(__CHERI_PURE_CAPABILITY__) */
+#endif /* defined(__CHERI__) */
 END(.rtld_start)
 
 /*
@@ -144,7 +144,7 @@ ENTRY(_rtld_bind_start)
 	ldr	PTR(2), [PTR(17), #0]	/* Get the address of the entry */
 	sub	x1, x2, x16		/* Find its offset from &GOT[2] */
 	sub	x1, x1, #PTR_WIDTH	/* Turn into an offset from &GOT[3] */
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	lsr	x3, x1, #1		/* x3 = offset / 2 */
 #else
 	lsl	x3, x1, #1		/* x3 = 2 * offset */
@@ -210,15 +210,15 @@ END(_rtld_bind_start)
  * Resolver function for TLS symbols resolved at load time
  */
 ENTRY(_rtld_tlsdesc_static)
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	ldp	x0, x1, [c0, #16]
 	add	c0, c2, x0
 	scbnds	c0, c0, x1
 	RETURN
-#else /* defined(__CHERI_PURE_CAPABILITY__) */
+#else /* defined(__CHERI__) */
 	ldr	x0, [x0, #8]
 	ret
-#endif /* defined(__CHERI_PURE_CAPABILITY__) */
+#endif /* defined(__CHERI__) */
 END(_rtld_tlsdesc_static)
 
 /*
@@ -235,10 +235,10 @@ END(_rtld_tlsdesc_static)
  * Resolver function for weak and undefined TLS symbols
  */
 ENTRY(_rtld_tlsdesc_undef)
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	ldr	x0, [c0, #16]
 	RETURN
-#else /* defined(__CHERI_PURE_CAPABILITY__) */
+#else /* defined(__CHERI__) */
 	str	x1, [sp, #-16]!
 	.cfi_adjust_cfa_offset	16
 
@@ -249,7 +249,7 @@ ENTRY(_rtld_tlsdesc_undef)
 	ldr	x1, [sp], #16
 	.cfi_adjust_cfa_offset 	-16
 	ret
-#endif /* defined(__CHERI_PURE_CAPABILITY__) */
+#endif /* defined(__CHERI__) */
 END(_rtld_tlsdesc_undef)
 
 /*
@@ -266,7 +266,7 @@ END(_rtld_tlsdesc_undef)
  * Resolver function for TLS symbols from dlopen()
  */
 ENTRY(_rtld_tlsdesc_dynamic)
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	stp	c3, c4, [csp, #-32]!
 	.cfi_adjust_cfa_offset	2 * 16
 	.cfi_rel_offset		c3, 0
@@ -381,7 +381,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	ldp	 c3,  c4, [csp], #32
 	.cfi_adjust_cfa_offset 	-2 * 16
 	RETURN
-#else /* defined(__CHERI_PURE_CAPABILITY__) */
+#else /* defined(__CHERI__) */
 	/* Save registers used in fast path */
 	stp	x1,  x2, [sp, #(-2 * 16)]!
 	stp	x3,  x4, [sp, #(1 * 16)]
@@ -478,7 +478,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	ldp	 x1,  x2, [sp], #(2 * 16)
 	.cfi_adjust_cfa_offset	-2 * 16
 	ret
-#endif /* defined(__CHERI_PURE_CAPABILITY__) */
+#endif /* defined(__CHERI__) */
 END(_rtld_tlsdesc_dynamic)
 #endif /* !defined(__CHERI_TGOT_TLS__) || defined(__ARM_MORELLO_TGOT_TLS_COMPAT) */
 

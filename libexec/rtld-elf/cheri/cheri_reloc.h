@@ -66,7 +66,7 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 	 * otherwise.
 	 */
 	if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 		_rtld_error("%s: unsupported IFUNC capability in hybrid: %s",
 		    obj->path, symname(obj, r_symndx));
 		return (-1);
@@ -136,7 +136,7 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 			.sig = sigtab_get(obj, r_symndx)
 		});
 #endif
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 		if (addend != 0) {
 			_rtld_error("%s: unsupported IFUNC addend: %s+%jd",

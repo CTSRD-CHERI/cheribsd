@@ -48,12 +48,12 @@ struct Struct_Obj_Entry;
 
 #define	MD_OBJ_ENTRY
 
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 uint64_t set_gp(struct Struct_Obj_Entry *obj);
 #endif
 
 /* Return the address of the .dynamic section in the dynamic linker. */
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 #define rtld_dynamic(obj) (&_DYNAMIC)
 #else
 #define rtld_dynamic(obj)                                               \
@@ -74,7 +74,7 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
     const struct Struct_Obj_Entry *defobj, const struct Struct_Obj_Entry *obj,
     const Elf_Rel *rel);
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 
 #define make_function_pointer(def, defobj) \
 	make_function_cap(def, defobj)
@@ -85,7 +85,7 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
 #define call_init_pointer(obj, target)					\
 	(((InitArrFunc)(target))(main_argc, main_argv, environ))
 
-#else /* __CHERI_PURE_CAPABILITY__ */
+#else /* __CHERI__ */
 
 #define make_function_pointer(def, defobj) \
 	((defobj)->relocbase + (def)->st_value)
@@ -106,7 +106,7 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
 	__asm __volatile("mv    gp, %0" :: "r"(old1));			\
 })
 
-#endif /* __CHERI_PURE_CAPABILITY__ */
+#endif /* __CHERI__ */
 
 extern unsigned long elf_hwcap;
 #define	call_ifunc_resolver(ptr) \
