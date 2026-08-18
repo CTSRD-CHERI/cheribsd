@@ -40,7 +40,7 @@
 #include "rtld.h"
 #include "rtld_printf.h"
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 #include "cheri_reloc.h"
 #endif
 
@@ -51,7 +51,7 @@
 #define	RELOC_ALIGNED_P(x) \
 	(((uintptr_t)(x) & (sizeof(void *) - 1)) == 0)
 
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 uint64_t
 set_gp(Obj_Entry *obj)
 {
@@ -86,7 +86,7 @@ init_pltgot(Plt_Entry *plt)
 	}
 }
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 /*
  * Plain RISC-V can rely on PC-relative addressing early in rtld startup.
  * However, pure capability code requires capabilities from the captable for
@@ -133,9 +133,9 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 	    /*data_cap=*/relocbase, /*code_cap=*/pcc, /*rodata_cap=*/pcc,
 	    /*tight_code_bounds=*/true, (Elf_Addr)relocbase);
 }
-#endif /* __CHERI_PURE_CAPABILITY__ */
+#endif /* __CHERI__ */
 
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 int
 do_copy_relocations(Obj_Entry *dstobj)
 {
@@ -193,7 +193,7 @@ do_copy_relocations(Obj_Entry *dstobj)
 
 	return (0);
 }
-#endif /* !__CHERI_PURE_CAPABILITY__ */
+#endif /* !__CHERI__ */
 
 /*
  * Process the PLT relocations.
@@ -214,7 +214,7 @@ reloc_plt(Plt_Entry *plt, int flags __unused, RtldLockState *lockstate __unused)
 
 		switch (ELF_R_TYPE(rela->r_info)) {
 		case R_RISCV_JUMP_SLOT:
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 			/* Relocated by __cap_relocs for CHERI */
 			(void)where;
 #else
@@ -412,7 +412,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	Elf_Addr *where, symval;
 	unsigned long symnum;
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	/*
 	 * The __cap_relocs for the dynamic loader have already been done, and
 	 * there should be no normal ELF relocations.
@@ -488,7 +488,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			*where += (Elf_Addr)defobj->tlsindex;
 			break;
 		case R_RISCV_COPY:
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 			_rtld_error("%s: Unexpected R_RISCV_COPY "
 			    "relocation in pure-capability object", obj->path);
 			return (-1);
@@ -561,7 +561,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		case R_RISCV_IRELATIVE:
 			obj->irelative_nonplt = true;
 			break;
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 		case R_RISCV_CHERI_CAPABILITY:
 			if (process_r_cheri_capability(obj, symnum, lockstate,
 			    flags, where, rela->r_addend) != 0)
@@ -586,7 +586,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			_rtld_error("%s: TGOT not supported", obj->path);
 			return (-1);
 #endif
-#endif /* __CHERI_PURE_CAPABILITY__ */
+#endif /* __CHERI__ */
 		default:
 			rtld_printf("%s: Unhandled relocation %lu\n",
 			    obj->path, ELF_R_TYPE(rela->r_info));

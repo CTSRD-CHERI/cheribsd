@@ -55,7 +55,7 @@ struct Struct_Obj_Entry;
     bool variant_pcs : 1;	/* Object has a variant pcs function */
 
 /* Return the address of the .dynamic section in the dynamic linker. */
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 #define	rtld_dynamic(obj) (&_DYNAMIC)
 #else
 #define	rtld_dynamic(obj)						\
@@ -74,17 +74,17 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
     const struct Struct_Obj_Entry *defobj, const struct Struct_Obj_Entry *obj,
     const Elf_Rel *rel);
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 
 #define make_function_pointer(def, defobj) \
 	make_function_cap(def, defobj)
 
-#else /* __CHERI_PURE_CAPABILITY__ */
+#else /* __CHERI__ */
 
 #define	make_function_pointer(def, defobj) \
 	((defobj)->relocbase + (def)->st_value)
 
-#endif /* __CHERI_PURE_CAPABILITY__ */
+#endif /* __CHERI__ */
 
 #define	call_initfini_pointer(obj, target) \
 	(((InitFunc)(target))())

@@ -169,7 +169,7 @@ static int load_needed_objects(Obj_Entry *, int);
 static int load_preload_objects(const char *, bool);
 static int load_kpreload(const void *addr);
 static Obj_Entry *load_object(const char *, int fd, const Obj_Entry *, int);
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 static void map_stacks_exec(RtldLockState *);
 #endif
 static int obj_disable_relro(Obj_Entry *);
@@ -325,7 +325,7 @@ int rtld_set_var(const char *name, const char *val) __exported;
 
 /* Only here to fix -Wmissing-prototypes warnings */
 int __getosreldate(void);
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 func_ptr_type _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc,
     Obj_Entry **objp);
 #else
@@ -338,7 +338,7 @@ static int osreldate;
 size_t *pagesizes;
 size_t page_size;
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 static int stack_prot = PROT_READ | PROT_WRITE;
 #else
 static int stack_prot = PROT_READ | PROT_WRITE | PROT_EXEC;
@@ -597,14 +597,14 @@ rtld_trunc_page(uintptr_t x)
  * The return value is the main program's entry point.
  */
 func_ptr_type
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
 #else
 _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #endif
 {
 	Elf_Auxinfo *aux_info[AT_COUNT], *auxp;
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 	Elf_Auxinfo *aux, *auxpf, auxtmp;
 #endif
 	Objlist_Entry *entry;
@@ -623,7 +623,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	const char *static_tgot_extra;
 #endif
 	struct ld_env_var_desc *lvd;
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 	char **envp;
 #endif
 	dlfunc_t imgentry;
@@ -641,7 +641,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	 * init_rtld has returned.  It is OK to reference file-scope statics
 	 * and string constants, and to call static and global functions.
 	 */
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 	/* Find the auxiliary vector on the stack. */
 	argcp = sp;
 	argc = *sp++;
@@ -664,7 +664,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 			old_auxv_format = 0;
 #endif
 	}
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	/* CHERI reads these values from auxv instead */
 	argcp = &aux_info[AT_ARGC]->a_un.a_val;
 	argc = *argcp;
@@ -976,7 +976,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		close(fd);
 		if (obj_main == NULL)
 			rtld_die();
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 		max_stack_flags = obj_main->stack_flags;
 #endif
 	} else { /* Main program already loaded. */
@@ -1170,7 +1170,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		SYMLOOK_EARLY, NULL) == -1)
 		rtld_die();
 
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 	/* Copy relocations are not supported in the purecap ABI */
 	dbg("doing copy relocations");
 	if (do_copy_relocations(obj_main) == -1)
@@ -1204,7 +1204,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
 	r_debug_state(NULL, &obj_main->linkmap); /* say hello to gdb! */
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	/* old crt does not exist for CheriABI */
 	obj_main->crt_no_init = true;
 #else
@@ -1220,7 +1220,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		obj_main->preinit_array = obj_main->init_array =
 		    obj_main->fini_array = NULL;
 	}
-#endif /* #ifndef __CHERI_PURE_CAPABILITY__ */
+#endif /* #ifndef __CHERI__ */
 
 	if (direct_exec) {
 		/* Set osrel for direct-execed binary */
@@ -1350,7 +1350,7 @@ relock:
 		}
 		target = (uintptr_t)rtld_resolve_ifunc(defobj, def);
 	} else {
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 		target = (uintptr_t)make_function_pointer(def, defobj);
 #ifdef CHERI_LIB_C18N
 		target = (uintptr_t)tramp_intern(plt, plt->compart_id,
@@ -1564,7 +1564,7 @@ rtld_die(void)
 	_exit(1);
 }
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 bool
 create_pcc_caps(Obj_Entry *obj, const char *name)
 {
@@ -1965,7 +1965,7 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 			break;
 
 		case DT_INIT:
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 			_rtld_error("%s: _init not supported for CheriABI",
 			    obj->path);
 			return (false);
@@ -1996,7 +1996,7 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 			break;
 
 		case DT_FINI:
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 			_rtld_error("%s: _fini not supported for CheriABI",
 			    obj->path);
 			return (false);
@@ -2197,7 +2197,7 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 #endif
 		object_add_name(obj, obj->strtab + dyn_soname->d_un.d_val);
 	}
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	// Set tight bounds on the individual members now (for the ones that
 	// we iterate over) instead of inheriting the relocbase bounds to avoid
 	// any overflows at runtime.
@@ -2261,7 +2261,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 			continue;
 
 		obj->phnum = ph->p_memsz / sizeof(*ph);
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 		obj->phdr = cheri_bounds_set(phdr, ph->p_memsz);
 #else
 		obj->phdr = phdr;
@@ -2270,7 +2270,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 		break;
 	}
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	/*
 	 * Position dependent binaries can cause relocbase to be
 	 * unrepresentable. Furthermore, they cannot be used with co-processes.
@@ -2341,7 +2341,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 #endif
 
 		case PT_GNU_STACK:
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 			if ((ph->p_flags & PF_X) != 0) {
 				_rtld_error("%s: PF_X in PT_GNU_STACK", path);
 				obj_free(obj);
@@ -2365,7 +2365,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 		return (NULL);
 	}
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	if (cheri_bytes_remaining(obj->relocbase) >
 	    CHERI_REPRESENTABLE_LENGTH(obj->mapsize)) {
 		rtld_fatal("Kernel failed to bound relocbase(%#p) to %#zx "
@@ -3066,7 +3066,7 @@ parse_rtld_phdr(Obj_Entry *obj)
 	bool first_seg;
 
 	first_seg = true;
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 	obj->stack_flags = PF_X | PF_R | PF_W;
 #endif
 	for (ph = obj->phdr; ph < obj->phdr + obj->phnum; ph++) {
@@ -3081,7 +3081,7 @@ parse_rtld_phdr(Obj_Entry *obj)
 			    obj->vaddrbase);
 			break;
 		case PT_GNU_STACK:
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 			if ((ph->p_flags & PF_X) != 0)
 				rtld_fatal("%s: PF_X in PT_GNU_STACK",
 				    obj->path);
@@ -3141,7 +3141,7 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	objtmp.cap_relocs_processed = true;
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	objtmp.text_rodata_cap = objtmp.relocbase;
 	fix_obj_mapping_cap_permissions(&objtmp, "RTLD");
 	if (!create_pcc_caps(&objtmp, "RTLD"))
@@ -3640,7 +3640,7 @@ do_load_object(int fd, const char *name, char *path, struct stat *sbp,
 	obj_count++;
 	obj_loads++;
 	linkmap_add(obj); /* for GDB & dlinfo() */
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 	max_stack_flags |= obj->stack_flags;
 #endif
 
@@ -3684,7 +3684,7 @@ load_kpreload(const void *addr)
 			break;
 		case PT_GNU_STACK:
 			/* Absense of PT_GNU_STACK implies stack_flags == 0. */
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 			if ((phdr->p_flags & PF_X) != 0) {
 				_rtld_error("%s: PF_X in PT_GNU_STACK", kname);
 				obj_free(obj);
@@ -3733,7 +3733,7 @@ load_kpreload(const void *addr)
 	obj_count++;
 	obj_loads++;
 	linkmap_add(obj); /* for GDB & dlinfo() */
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 	max_stack_flags |= obj->stack_flags;
 #endif
 
@@ -4715,7 +4715,7 @@ dlopen_object(const char *name, int fd, Obj_Entry *refobj, int lo_flags,
 	GDB_STATE(RT_CONSISTENT, obj ? &obj->linkmap : NULL);
 
 	if ((lo_flags & RTLD_LO_EARLY) == 0) {
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 		map_stacks_exec(lockstate);
 #endif
 		if (obj != NULL) {
@@ -4917,13 +4917,13 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 			 * CHERI-RISC-V's traditional TLS ABI does not set
 			 * bounds; mirror in dlsym
 			 */
-#if (!defined(__riscv) || defined(TLS_TGOT)) && defined(__CHERI_PURE_CAPABILITY__)
+#if (!defined(__riscv) || defined(TLS_TGOT)) && defined(__CHERI__)
 			sym = cheri_bounds_set(sym, def->st_size);
 #endif
 		} else
 			sym = make_data_pointer(def, defobj);
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(DEBUG)
+#if defined(__CHERI__) && defined(DEBUG)
 		// FIXME: this warning breaks some tests that expect clean
 		// FIXME: stdout/stderr
 		// FIXME: See https://github.com/CTSRD-CHERI/cheribsd/issues/257
@@ -5014,7 +5014,7 @@ dladdr(const void *addr, Dl_info *info)
 	}
 	info->dli_fname = obj->path;
 	info->dli_fbase = obj->mapbase;
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	/* Clear all permissions from dli_fbase to avoid direct access */
 	info->dli_fbase = cheri_perms_and(info->dli_fbase, 0);
 #endif
@@ -5041,7 +5041,7 @@ dladdr(const void *addr, Dl_info *info)
 		 * then reject it.
 		 */
 		symbol_addr = obj->relocbase + def->st_value;
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 		/* Clear all permissions from the symbol_addr */
 		symbol_addr = cheri_perms_and(symbol_addr, 0);
 #endif
@@ -5110,7 +5110,7 @@ dlinfo(void *handle, int request, void *p)
 static void
 rtld_fill_dl_phdr_info(const Obj_Entry *obj, struct dl_phdr_info *phdr_info)
 {
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 #ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 	phdr_info->dlpi_addr = (uintptr_t)cheri_perms_and(obj->relocbase,
 	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP);
@@ -6501,7 +6501,7 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign,
 				addr = (char *)tcb +
 				    (dtv->dtv_slots[i].dtvs_tgot -
 				    (char *)oldtcb);
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 				addr = cheri_bounds_set(addr, cheri_length_get(
 				    dtv->dtv_slots[i].dtvs_tgot));
 #endif
@@ -6522,7 +6522,7 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign,
 			tgot_init_offset = obj->tgotpoffset &
 			    (obj->tgotalign - 1);
 			addr = (char *)tcb + obj->tgotoffset;
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 			addr = cheri_bounds_set(addr, obj->tgotsize);
 #endif
 			if (tgot_init_offset > 0)
@@ -6699,7 +6699,7 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign,
 				addr = (char *)tcb +
 				    (dtv->dtv_slots[i].dtvs_tls -
 				    (char *)oldtcb);
-#if defined(TLS_TGOT) && defined(__CHERI_PURE_CAPABILITY__)
+#if defined(TLS_TGOT) && defined(__CHERI__)
 				addr = cheri_bounds_set(addr, cheri_length_get(
 				    dtv->dtv_slots[i].dtvs_tls));
 #endif
@@ -6714,7 +6714,7 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign,
 				addr = (char *)tcb +
 				    (dtv->dtv_slots[i].dtvs_tgot -
 				    (char *)oldtcb);
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 				addr = cheri_bounds_set(addr, cheri_length_get(
 				    dtv->dtv_slots[i].dtvs_tgot));
 #endif
@@ -6735,7 +6735,7 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign,
 				continue;
 			tls_init_offset = obj->tlspoffset & (obj->tlsalign - 1);
 			addr = (char *)tcb + obj->tlsoffset;
-#if defined(TLS_TGOT) && defined(__CHERI_PURE_CAPABILITY__)
+#if defined(TLS_TGOT) && defined(__CHERI__)
 			addr = cheri_bounds_set(addr, obj->tlssize);
 #endif
 			if (tls_init_offset > 0)
@@ -6761,7 +6761,7 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign,
 			tgot_init_offset = obj->tgotpoffset &
 			    (obj->tgotalign - 1);
 			addr = (char *)tcb - obj->tgotoffset;
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 			addr = cheri_bounds_set(addr, obj->tgotsize);
 #endif
 			if (tgot_init_offset > 0)
@@ -7001,7 +7001,7 @@ allocate_module_tls(struct tcb *tcb __unused, int index)
 #else
 		p = (char *)tcb - obj->tlsoffset;
 #endif
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(TLS_TGOT)
+#if defined(__CHERI__) && defined(TLS_TGOT)
 		p = cheri_bounds_set(p, obj->tlssize);
 #endif
 		return (p);
@@ -7042,7 +7042,7 @@ allocate_module_tgot(struct tcb *tcb, int index, RtldLockState *lockstate)
 #else
 		p = (char *)tcb - obj->tgotoffset;
 #endif
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 		p = cheri_bounds_set(p, obj->tgotsize);
 #endif
 		return (p);
@@ -7747,7 +7747,7 @@ obj_enforce_relro(Obj_Entry *obj)
 	return (obj_remap_relro(obj, PROT_READ));
 }
 
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 static void
 map_stacks_exec(RtldLockState *lockstate)
 {
@@ -7819,7 +7819,7 @@ distribute_static_tgot(Objlist *list, RtldLockState *lockstate)
 #else
 			tgot = (char *)tcb - obj->tgotoffset;
 #endif
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 			tgot = cheri_bounds_set(tgot, obj->tgotsize);
 #endif
 			if (tgot_init_offset > 0)

@@ -58,7 +58,7 @@ struct utrace_rtld {
 	char name[MAXPATHLEN];
 };
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 #define	UTRACE_COMPARTMENT_ENTER	1
 #define	UTRACE_COMPARTMENT_LEAVE	2
 

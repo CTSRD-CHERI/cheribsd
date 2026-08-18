@@ -34,7 +34,7 @@
 
 #include <machine/asm.h>
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 #include <machine/riscvreg.h>
 #endif
 
@@ -43,7 +43,7 @@
 #define	LOAD_INT	PTR(ld)
 #define	STORE_INT	PTR(sd)
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 #define	LOAD_PTR	LOAD_CAP
 #define	STORE_PTR	STORE_CAP
 #define	ADD_PTR		cincoffset
@@ -100,7 +100,7 @@
 
 ENTRY(.rtld_start)
 	.cfi_undefined PTR(ra)	/* Do not attempt to unwind any further. */
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	cmove	cs0, ca0				/* Put aux in a callee-saved register */
 	cmove	cs1, csp				/* And the stack pointer */
 
@@ -127,7 +127,7 @@ ENTRY(.rtld_start)
 	cmove	ca0, cs0				/* Restore aux */
 	cmove	csp, cs1				/* Restore the stack pointer */
 	cjr	ct0					/* Jump to the entry point */
-#else /* defined(__CHERI_PURE_CAPABILITY__) */
+#else /* defined(__CHERI__) */
 	mv	s0, a0		/* Put ps_strings in a callee-saved register */
 	mv	s1, sp		/* And the stack pointer */
 
@@ -143,7 +143,7 @@ ENTRY(.rtld_start)
 	mv	a0, s0		/* Restore ps_strings */
 	mv	sp, s1		/* Restore the stack pointer */
 	jr	t0		/* Jump to the entry point */
-#endif /* defined(__CHERI_PURE_CAPABILITY__) */
+#endif /* defined(__CHERI__) */
 END(.rtld_start)
 
 /*
@@ -183,7 +183,7 @@ ENTRY(_rtld_bind_start)
 #endif
 
 	/* Reloc offset is 3x or 1.5x of the .got.plt offset */
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	srli	a1, t1, 1	/* Divide items by 2 */
 #else
 	slli	a1, t1, 1	/* Mult items by 2 */
@@ -194,7 +194,7 @@ ENTRY(_rtld_bind_start)
 	MV_PTR	PTR(a0), PTR(t0)
 
 	/* Call into rtld */
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	cjal	_rtld_bind
 #else
 	jal	_rtld_bind

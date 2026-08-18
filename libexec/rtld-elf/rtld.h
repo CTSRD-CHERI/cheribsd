@@ -246,7 +246,7 @@ typedef struct Struct_Obj_Entry {
     caddr_t mapbase;		/* Base address of mapped region */
     size_t mapsize;		/* Size of mapped region in bytes */
     Elf_Addr vaddrbase;		/* Base address in shared object file */
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
     /*
      * For CHERI we need a capability for the executable + rodata segments so
      * that we can derive code capabilities from it.
@@ -263,7 +263,7 @@ typedef struct Struct_Obj_Entry {
     const Elf_Phdr *phdr;	/* Program header if it is mapped, else NULL */
     size_t phnum;		/* Number of program headers */
     const char *interp;		/* Pathname of the interpreter, if any */
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
     Elf_Word stack_flags;
 #endif
 
@@ -588,7 +588,7 @@ extern Elf_Sym sym_zero;	/* For resolving undefined weak refs. */
 extern bool ld_bind_not;
 extern bool ld_fast_sigblock;
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 bool create_pcc_caps(Obj_Entry *, const char *);
 const char *pcc_cap(const Obj_Entry *, Elf_Off);
 #endif
@@ -597,7 +597,7 @@ void dump_obj_relocations(Obj_Entry *);
 void dump_Elf_Rel(Obj_Entry *, const Elf_Rel *, u_long);
 void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 #define get_codesegment_cap(obj)					\
 	(cheri_clearperm((obj)->text_rodata_cap, CAP_RELOC_REMOVE_PERMS))
 #define get_datasegment_cap(obj)				\
@@ -643,7 +643,7 @@ __END_DECLS
 #define make_rtld_local_function_pointer(target_func)	(&target_func)
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 #define make_data_pointer(def, defobj)	make_data_cap(def, defobj)
 #else
 #define make_data_pointer(def, defobj)	(defobj->relocbase + def->st_value)
@@ -698,7 +698,7 @@ bool check_elf_headers(const Elf_Ehdr *hdr, const char *path);
 /*
  * MD function declarations.
  */
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI__
 int do_copy_relocations(Obj_Entry *);
 #endif
 int reloc_non_plt(Obj_Entry *, Obj_Entry *, int flags,

@@ -127,7 +127,7 @@ process___cap_relocs(Obj_Entry *obj)
 int
 process_ifunc___cap_relocs(Obj_Entry *obj)
 {
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	struct capreloc *start_relocs = (struct capreloc *)obj->cap_relocs;
 	struct capreloc *end_relocs =
 	    (struct capreloc *)(obj->cap_relocs + obj->cap_relocs_size);
