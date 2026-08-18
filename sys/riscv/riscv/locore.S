@@ -51,6 +51,60 @@
 #include <machine/riscvreg.h>
 #include <machine/sbi.h>
 
+/*
+ * These macros abstract away CSR manipulation that requires different
+ * instructions and registers across RV64, xcheri and RV64Y.
+ */
+.macro set_stvec newvec
+#ifdef __CHERI__
+	/* xcheri */
+	cspecialw	stcc, CAP(\newvec)
+#else
+	csrw		stvec, \newvec
+#endif
+.endmacro
+
+#if __has_feature(capabilities)
+/* Set cap mode flag on $rd if mode == 1 */
+.macro set_cap_mode rd rs mode
+	/* xcheri */
+	li		\rd, \mode
+	csetflags	CAP(\rd), CAP(\rs), \rd
+.endmacro
+
+.macro set_data_perm rd rs tmp
+	/* xcheri */
+	li		\tmp, CHERI_PERMS_KERNEL_DATA
+	candperm	CAP(\rd), CAP(\rs), \tmp
+.endmacro
+
+.macro set_code_perm rd rs tmp
+	/* xcheri */
+	li		\tmp, CHERI_PERMS_KERNEL_CODE
+	candperm	CAP(\rd), CAP(\rs), \tmp
+.endmacro
+#endif
+
+/*
+ * Set the CPU exception vector register.
+ * Ensure that the installed exception handler is in cap-mode.
+ * Trashes t0, t1.
+ */
+.macro set_exception_handler
+	LLA_PTR	t0, cpu_exception_handler
+#ifdef __CHERI_HYBRID__
+	GET_PCC(t1)
+	yaddrw		t1, t1, t0
+	set_cap_mode	t0, t1, 1
+#endif
+#if __has_feature(capabilities)
+	/* xcheri */
+	cspecialw	stcc, CAP(t0)
+#else
+	csrw		stvec, t0
+#endif
+.endmacro
+
 	.globl	kernbase
 	.set	kernbase, KERNBASE
 
@@ -67,8 +121,8 @@
 	.globl _alt_start
 _alt_start:
 	/* Set the global pointer */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cmove	cgp, cnull
+#ifdef __CHERI__
+	MV_PTR	gp, zero
 #else
 .option push
 .option norelax
@@ -76,7 +130,7 @@ _alt_start:
 .option pop
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 .option push
 .option nocapmode
 
@@ -85,25 +139,15 @@ _alt_start:
 	 * our ELF header requests capmode.  The instructions below
 	 * should work in both modes.
 	 */
-	lla	t0, 1f
-	cspecialr ct1, pcc
-	csetaddr ct1, ct1, t0
-	li	t0, 1
-	csetflags ct1, ct1, t0
-	jr.cap	ct1
-1:
+	MODESW_CAP(t0, t1)
 .option pop
 #endif
 
 	/* Pick a hart to run the boot process. */
 	li	t1, 1
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	ct0, hart_lottery
-	camoadd.w t0, t1, 0(ct0)
-#else
-	lla	t0, hart_lottery
-	amoadd.w t0, t1, 0(t0)
-#endif
+	LLA_PTR	t0, hart_lottery
+	/* Note: xcheri */
+	amoadd.w	t0, t1, 0(t0)
 
 	/*
 	 * We must jump to mpentry in the non-BSP case because the offset is
@@ -113,13 +157,8 @@ _alt_start:
 	j	mpentry
 1:
 	/* Store the boot hart */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	ct0, boot_hart
-	csw	a0, 0(ct0)
-#else
-	lla	t0, boot_hart
+	LLA_PTR	t0, boot_hart
 	sw	a0, 0(t0)
-#endif
 
 	/*
 	 * Stash the DTB pointer in the callee-saved register s4, and zero s3
@@ -140,8 +179,8 @@ _alt_start:
 	.globl _start
 _start:
 	/* Set the global pointer */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cmove	cgp, cnull
+#ifdef __CHERI__
+	MV_PTR	gp, zero
 #else
 .option push
 .option norelax
@@ -154,11 +193,7 @@ _start:
 	 * indicate that we have no DTB pointer. It is already included in the
 	 * loader(8) metadata.
 	 */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cmove	cs3, ca0
-#else	
-	mv	s3, a0
-#endif
+	MV_CAP	s3, a0
 	mv	s4, zero
 
 	/*
@@ -185,25 +220,13 @@ _start:
 	 */
 pagetables:
 	/* Get the kernel's load address (kernstart) in s9 */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cjal	get_physmem
-#else
 	jal	get_physmem
-#endif
 
 	/* Get PTE attribute bits in s8 */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cjal	get_pte_fixup_bits
-#else
 	jal	get_pte_fixup_bits
-#endif
 
 	/* Construct 1GB Identity Map (1:1 PA->VA) */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	cs1, bootstrap_pt_l1
-#else
-	lla	s1, bootstrap_pt_l1
-#endif
+	LLA_PTR	s1, bootstrap_pt_l1
 
 	srli	s2, s9, L1_SHIFT	/* kernstart >> L1_SHIFT */
 	andi	a5, s2, Ln_ADDR_MASK	/* & Ln_ADDR_MASK */
@@ -215,24 +238,14 @@ pagetables:
 	/* Store L1 PTE entry to position */
 	li	a6, PTE_SIZE
 	mulw	a5, a5, a6		/* calculate L1 slot */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cincoffset ct0, cs1, a5
-	csd	t6, (ct0)		/* Store new PTE */
-#else
-	add	t0, s1, a5
+	ADD_PTR	t0, s1, a5
 	sd	t6, (t0)		/* Store new PTE */
-#endif
 
 	/* Construct the virtual address space at KERNBASE */
 
 	/* Add L1 entry for kernel */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	cs1, bootstrap_pt_l1
-	cllc	cs2, bootstrap_pt_l2	/* Link to next level PN */
-#else
-	lla	s1, bootstrap_pt_l1
-	lla	s2, bootstrap_pt_l2	/* Link to next level PN */
-#endif
+	LLA_PTR	s1, bootstrap_pt_l1
+	LLA_PTR	s2, bootstrap_pt_l2	/* Link to next level PN */
 	srli	s2, s2, PAGE_SHIFT
 
 	li	a5, KERNBASE
@@ -245,20 +258,11 @@ pagetables:
 	/* Store L1 PTE entry to position */
 	li	a6, PTE_SIZE
 	mulw	a5, a5, a6
-#ifdef __CHERI_PURE_CAPABILITY__
-	cincoffset ct0, cs1, a5
-	csd	t6, (ct0)
-#else
-	add	t0, s1, a5
+	ADD_PTR	t0, s1, a5
 	sd	t6, (t0)
-#endif
 
 	/* Level 2 superpages (512 x 2MiB) */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	cs1, bootstrap_pt_l2
-#else
-	lla	s1, bootstrap_pt_l2
-#endif
+	LLA_PTR	s1, bootstrap_pt_l2
 	srli	t4, s9, L2_SHIFT	/* Div physmem base by 2 MiB */
 	li	t2, Ln_ENTRIES		/* Build 512 entries */
 	add	t3, t4, t2
@@ -267,13 +271,8 @@ pagetables:
 1:
 	slli	t2, t4, PTE_PPN1_S	/* << PTE_PPN1_S */
 	or	t5, t0, t2
-#ifdef __CHERI_PURE_CAPABILITY__
-	csd	t5, (cs1)		/* Store PTE entry to position */
-	cincoffset cs1, cs1, PTE_SIZE
-#else
 	sd	t5, (s1)		/* Store PTE entry to position */
-	addi	s1, s1, PTE_SIZE
-#endif
+	ADDI_PTR	s1, s1, PTE_SIZE
 
 	addi	t4, t4, 1
 	bltu	t4, t3, 1b
@@ -287,22 +286,12 @@ pagetables:
 	 */
 	li	t1, KERNBASE
 	sub	t1, t1, s9
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	ct0, va
-	cincoffset ct0, ct0, t1
-	cspecialw stcc, ct0
-#else
-	lla	t0, va
-	add	t0, t0, t1
-	csrw	stvec, t0
-#endif
+	LLA_PTR	t0, va
+	ADD_PTR	t0, t0, t1
+	set_stvec	t0
 
 	/* Set page tables base register */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	cs2, bootstrap_pt_l1
-#else
-	lla	s2, bootstrap_pt_l1
-#endif
+	LLA_PTR	s2, bootstrap_pt_l1
 	srli	s2, s2, PAGE_SHIFT
 	li	t0, SATP_MODE_SV39
 	or	s2, s2, t0
@@ -312,7 +301,7 @@ pagetables:
 	.align 2
 va:
 	/* Set the global pointer again, this time with the virtual address. */
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	/* CHERI-RISC-V purecap doesn't currently use cgp. */
 #else
 .option push
@@ -321,110 +310,100 @@ va:
 .option pop
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	/* Create a reduced PCC. */
 	li	t0, KERNBASE
-	cllc	ct1, _C_LABEL(_end)
+	LLA_PTR	t1, _C_LABEL(_end)
 	sub	t2, t1, t0
-	csetaddr ct1, ct1, t0
-	csetbounds ct1, ct1, t2
-	cllc	ct0, 1f
-	csetaddr ct1, ct1, t0
-	cjr	ct1
+	yaddrw	t1, t1, t0
+	/* Note! allow imprecise bounds */
+	ybndsrw	t1, t1, t2
+	LLA_PTR	t0, 1f
+	yaddrw	t1, t1, t0
+	jr	t1
 1:
 #endif
 
 	/* Set the trap vector to the real handler. */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	ct0, cpu_exception_handler
-	cspecialw stcc, ct0
-#else
-	la	t0, cpu_exception_handler
-#if __has_feature(capabilities)
-	cspecialr ct1, pcc
-	csetaddr ct1, ct1, t0
-	li	t0, 1
-	csetflags ct1, ct1, t0
-	cspecialw stcc, ct1
-#else
-	csrw	stvec, t0
-#endif
-#endif
+	set_exception_handler
 
 	/* Ensure sscratch is zero */
+	MV_CAP	t0, zero
+	CSRW_CAP(sscratch, t0)
 #if __has_feature(capabilities)
-	cmove	ct0, cnull
-	cspecialw sscratchc, ct0
-	/* Ensure stdc is null and thus not used */
-	cspecialw stdc, ct0
-#else
-	li	t0, 0
-	csrw	sscratch, t0
+	/* xcheri: Ensure stdc is null and thus not used */
+	cspecialw	stdc, CAP(t0)
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	/* Initialize stack pointer */
-	cllc	cs2, initstack
-	cllc	ct0, initstack_end
+	LLA_PTR	s2, initstack
+	LLA_PTR	t0, initstack_end
 	sub	t0, t0, s2
-	csetbounds cs2, cs2, t0
-	li	t1, CHERI_PERMS_KERNEL_DATA
-	candperm cs2, cs2, t1
-	cincoffset csp, cs2, t0
+	/* Note! Allow imprecise bounds, should be fixed */
+	ybndsrw	s2, s2, t0
+	set_data_perm	s2 s2 t1
+	ADD_PTR	sp, s2, t0
 
 	/* Allocate space for thread0 PCB and riscv_bootparams */
-	cincoffset csp, csp, -(PCB_SIZE + RISCV_BOOTPARAMS_SIZE) & ~STACKALIGNBYTES
+	ADDI_PTR	sp, sp, -(PCB_SIZE + RISCV_BOOTPARAMS_SIZE) & ~STACKALIGNBYTES
 
 	/* Clear BSS */
-	cllc	cs0, _C_LABEL(__bss_start)
-	cllc	cs1, _C_LABEL(_end)
+	LLA_PTR	s0, _C_LABEL(__bss_start)
+	LLA_PTR	s1, _C_LABEL(_end)
 1:
-	csd	zero, 0(cs0)
-	cincoffset cs0, cs0, 8
+	sd	zero, 0(s0)
+	ADDI_PTR	s0, s0, 8
 	bltu	s0, s1, 1b
 
 	/* Save omnipotent DDC and clear kernel's DDC. */
-	cspecialr cs0, ddc
-	cmove	ct0, cnull
-	cspecialw ddc, ct0
+	GET_DDC(s0)
+	MV_PTR	t0, zero
+	SET_DDC(t0)
 
 	/* Initialize cap relocs. */
-	li	t0, CHERI_PERMS_KERNEL_DATA
-	cllc	ca0, _C_LABEL(__start___cap_relocs)
-	candperm ca0, ca0, t0
-	cllc	ca1, _C_LABEL(__stop___cap_relocs)
+	LLA_PTR	a0, _C_LABEL(__start___cap_relocs)
+	set_data_perm	a0 a0 t0
+	LLA_PTR	a1, _C_LABEL(__stop___cap_relocs)
 	sub	t1, a1, a0
-	csetbounds ca0, ca0, t1
-	cincoffset ca1, ca0, t1
-	candperm ca2, cs0, t0
+	/* Note! Allow imprecise bounds */
+	ybndsrw	a0, a0, t1
+	ADD_PTR	a1, a0, t1
+	set_data_perm	a2 s0 t0
 	mv	a3, zero
 	li	a4, 1
-	cllc	ca5, _C_LABEL(kernel_cap_relocs_cb)
-	csetflags ca6, ca5, zero
-	ccall	_C_LABEL(init_linker_file_cap_relocs)
+	LLA_PTR	a5, _C_LABEL(kernel_cap_relocs_cb)
+	set_cap_mode    a6 a5 0
+	call	_C_LABEL(init_linker_file_cap_relocs)
 
 	/* Initialize capabilities. */
-	cmove	ca0, cs0
-	ccall	_C_LABEL(cheri_init_capabilities)
+	MV_PTR	a0, s0
+	call	_C_LABEL(cheri_init_capabilities)
 
 	/* Fill riscv_bootparams */
-	csd	s9, RISCV_BOOTPARAMS_KERN_PHYS(csp)
+	sd	s9, RISCV_BOOTPARAMS_KERN_PHYS(sp)
 
-	csc	cs2, RISCV_BOOTPARAMS_KERN_STACK(csp)
-	csd	s4, RISCV_BOOTPARAMS_DTBP_PHYS(csp)
-	csc	cs3, RISCV_BOOTPARAMS_MODULEP(csp)
+	S_PTR	s2, RISCV_BOOTPARAMS_KERN_STACK(sp)
+	sd	s4, RISCV_BOOTPARAMS_DTBP_PHYS(sp)
+	S_PTR	s3, RISCV_BOOTPARAMS_MODULEP(sp)
 
+	/* Enforce exec permissions on PCC */
+	LLA_PTR	t1, 1f
+	set_code_perm	t1 t1 t0
+	jr	t1
+1:
 	/* Discard omnipotent cs0. */
-	cmove	cs0, cnull
+	MV_PTR	s0, zero
 
 	/* Clear other capabilities no longer needed. */
-	cmove	cs1, cnull
-	cmove	cs2, cnull
-	cmove	cs3, cnull
+	MV_PTR	s1, zero
+	MV_PTR	s2, zero
+	MV_PTR	s3, zero
 
-	csetbounds ca0, csp, RISCV_BOOTPARAMS_SIZE
-	ccall	_C_LABEL(initriscv)
-	ccall	_C_LABEL(mi_startup)
+	li	t0, RISCV_BOOTPARAMS_SIZE
+	ybndsw	a0, sp, t0	/* Assume representable bootparams size */
+	call	_C_LABEL(initriscv)
+	call	_C_LABEL(mi_startup)
 #else
 	/* Initialize stack pointer */
 	la	sp, initstack_end
@@ -445,7 +424,7 @@ va:
 
 #if __has_feature(capabilities)
 	/* Initialize capabilities. */
-	cspecialr ca0, ddc
+	GET_DDC(a0)
 	call	_C_LABEL(cheri_init_capabilities)
 #endif
 
@@ -471,17 +450,12 @@ va:
  * Get the physical address the kernel is loaded to. Returned in s9.
  */
 get_physmem:
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	ct0, virt_map	/* physical address of virt_map */
-	cld	t1, 0(ct0)	/* virtual address of virt_map */
-#else
-	lla	t0, virt_map	/* physical address of virt_map */
+	LLA_PTR	t0, virt_map	/* physical address of virt_map */
 	ld	t1, 0(t0)	/* virtual address of virt_map */
-#endif
 	sub	t1, t1, t0	/* calculate phys->virt delta */
 	li	t2, KERNBASE
 	sub	s9, t2, t1	/* s9 = physmem base */
-	RETURN
+	ret
 
 /*
  * T-HEAD CPUs implement an alternate scheme for PTE attributes that is
@@ -503,7 +477,7 @@ get_pte_fixup_bits:
 	bnez	t0, 1f		/* branch if a1 != t0 */
 	li	s8, PTE_THEAD_MA_NONE
 1:
-	RETURN
+	ret
 
 	.align  4
 initstack:
@@ -543,6 +517,12 @@ END(mpentry)
  * Called by a core when it is being brought online.
  */
 ENTRY(mpentry)
+#ifdef __CHERI__
+.option push
+.option nocapmode
+	MODESW_CAP(t0, t1)
+.option pop
+#endif
 	/*
 	 * Calculate the offset to __riscv_boot_ap
 	 * for the current core, cpuid is in a0.
@@ -550,31 +530,9 @@ ENTRY(mpentry)
 	li	t1, 4
 	mulw	t1, t1, a0
 	/* Get the pointer */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	ct0, __riscv_boot_ap
-	cincoffset ct0, ct0, t1
 
-1:
-	/* Wait the kernel to be ready */
-	clw	t1, 0(ct0)
-	beqz	t1, 1b
-
-	/* Setup stack pointer */
-	cllc	ct0, bootstack
-	clc	csp, 0(ct0)
-
-	/* Get the kernel's load address */
-	cjal	get_physmem
-
-	/* Setup supervisor trap vector */
-	cllc	ct0, mpva
-	li	t1, KERNBASE
-	sub	t1, t1, s9
-	cincoffset ct0, ct0, t1
-	cspecialw stcc, ct0
-#else
-	lla	t0, __riscv_boot_ap
-	add	t0, t0, t1
+	LLA_PTR	t0, __riscv_boot_ap
+	ADD_PTR	t0, t0, t1
 
 1:
 	/* Wait the kernel to be ready */
@@ -582,41 +540,32 @@ ENTRY(mpentry)
 	beqz	t1, 1b
 
 	/* Setup stack pointer */
-	lla	t0, bootstack
-	ld	sp, 0(t0)
+	LLA_PTR	t0, bootstack
+	L_PTR	sp, 0(t0)
 
 	/* Get the kernel's load address */
-	jal	get_physmem
+	LLA_PTR	ra, get_physmem
+	jalr	ra
 
-	/*
-	 * Set the supervisor trap vector temporarily. Enabling virtual memory
-	 * may generate a page fault. We simply wish to continue onwards, so
-	 * have the trap deliver us to 'mpva'.
-	 */
-	lla	t0, mpva
-	sub	t0, t0, s9
+	/* Setup supervisor trap vector */
+	LLA_PTR	t0, mpva
 	li	t1, KERNBASE
-	add	t0, t0, t1
-	csrw	stvec, t0
-#endif
+	sub	t1, t1, s9
+	ADD_PTR	t0, t0, t1
+	set_stvec	t0
 
 	/* Set page tables base register */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	ct2, kernel_pmap_store
-	cld	s2, PM_SATP(ct2)
-#else
-	lla	t2, kernel_pmap_store
+	LLA_PTR	t2, kernel_pmap_store
 	ld	s2, PM_SATP(t2)
-#endif
 	sfence.vma
 	csrw	satp, s2
 
 	.align 2
 mpva:
 	/* Set the global pointer again, this time with the virtual address. */
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	/* CHERI-RISC-V purecap doesn't currently use cgp. */
-	cmove	cgp, cnull
+	MV_PTR	gp, zero
 #else
 .option push
 .option norelax
@@ -624,52 +573,33 @@ mpva:
 .option pop
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 	/* Create a reduced PCC. */
 	li	t0, KERNBASE
-	cllc	ct1, _C_LABEL(_end)
+	LLA_PTR	t1, _C_LABEL(_end)
 	sub	t2, t1, t0
-	csetaddr ct1, ct1, t0
-	csetbounds ct1, ct1, t2
-	cllc	ct0, 1f
-	csetaddr ct1, ct1, t0
-	cjr	ct1
+	yaddrw	t1, t1, t0
+	/* Note! allow imprecise bounds */
+	ybndsrw	t1, t1, t2
+	LLA_PTR	t0, 1f
+	yaddrw	t1, t1, t0
+	set_code_perm	t1 t1 t0
+	jr	t1
 1:
 #endif
 
 	/* Set the trap vector to the real handler. */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	ct0, cpu_exception_handler
-	cspecialw stcc, ct0
-#else
-	la	t0, cpu_exception_handler
-#if __has_feature(capabilities)
-	cspecialr ct1, pcc
-	csetaddr ct1, ct1, t0
-	li	t0, 1
-	csetflags ct1, ct1, t0
-	cspecialw stcc, ct1
-#else
-	csrw	stvec, t0
-#endif
-#endif
+	set_exception_handler
 
 	/* Ensure sscratch is zero */
+	MV_CAP	t0, zero
+	CSRW_CAP(sscratch, t0)
 #if __has_feature(capabilities)
-	cmove	ct0, cnull
-	cspecialw sscratchc, ct0
-	/* Ensure stdc is null and thus not used */
-	cspecialw stdc, ct0
-#else
-	li	t0, 0
-	csrw	sscratch, t0
+	/* xcheri: Ensure stdc is null and thus not used */
+	cspecialw	stdc, ct0
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
-	ccall	init_secondary
-#else
 	call	init_secondary
-#endif
 END(mpentry)
 #endif
 
