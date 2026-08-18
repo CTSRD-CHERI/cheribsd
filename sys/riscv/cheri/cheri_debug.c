@@ -64,8 +64,8 @@ DB_SHOW_COMMAND(scr, ddb_dump_scr)
 	uint64_t senvcfg;
 
 	senvcfg = csr_read(senvcfg);
-	db_printf("senvcfg: %s\n",
-	    senvcfg & SENVCFG_CRE ? "enabled" : "disabled");
+	db_printf("senvcfg Y: %s\n",
+	    senvcfg & SENVCFG_Y ? "enabled" : "disabled");
 #endif
 
 	db_printf("ddc: %#.16lp\n",  scr_read(ddc));
