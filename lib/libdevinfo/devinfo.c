@@ -482,25 +482,6 @@ devinfo_foreach_device_child(struct devinfo_dev *parent,
 }
 
 /*
- * Iterate over the interrupt children of a device, calling (fn) on each.
- * If (fn) returns nonzero, abort the scan and return.
- */
-int
-devinfo_foreach_device_intr_child(struct devinfo_dev *parent, 
-    int (* fn)(struct devinfo_dev *child, void *arg), 
-    void *arg)
-{
-	struct devinfo_i_dev	*dd;
-	int				error;
-
-	TAILQ_FOREACH(dd, &devinfo_dev, dd_link)
-	    if (dd->dd_dev.dd_intr_parent == parent->dd_handle)
-		    if ((error = fn(&dd->dd_dev, arg)) != 0)
-			    return(error);
-	return(0);
-}
-
-/*
  * Iterate over all the resources owned by a device, calling (fn) on each.
  * If (fn) returns nonzero, abort the scan and return.
  */

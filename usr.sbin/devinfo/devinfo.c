@@ -45,7 +45,6 @@
 #include <libxo/xo.h>
 #include "devinfo.h"
 
-static bool	iflag;
 static bool	rflag;
 static bool	vflag;
 static int	open_tag_count;
@@ -197,10 +196,6 @@ print_device_rman_resources(struct devinfo_rman *rman, void *arg)
 	ia->indent = 0;
 	if (devinfo_foreach_rman_resource(rman,
 	    print_device_matching_resource, ia) != 0) {
-		/* XXX: Resources should have types... */
-		if (iflag && !rflag &&
-		    strncmp("Interrupt", rman->dm_desc, 9) != 0)
-			goto skip;
 
 		/* there are, print header */
 		safe_desc = xml_safe_string(rman->dm_desc);
@@ -216,7 +211,6 @@ print_device_rman_resources(struct devinfo_rman *rman, void *arg)
 		xo_close_list(safe_desc);
 		free(safe_desc);
 	}
-skip:
 	ia->indent = indent;
 	return(0);
 }
@@ -263,7 +257,7 @@ print_device_props(struct devinfo_dev *dev)
 }
 
 /*
- * Print information about a device and its children.
+ * Print information about a device.
  */
 static int
 print_device(struct devinfo_dev *dev, void *arg)
@@ -283,7 +277,7 @@ print_device(struct devinfo_dev *dev, void *arg)
 
 		print_device_props(dev);
 		xo_emit("\n");
-		if (iflag || rflag) {
+		if (rflag) {
 			ia.indent = indent + 4;
 			ia.arg = dev;
 			devinfo_foreach_rman(print_device_rman_resources,
@@ -291,12 +285,8 @@ print_device(struct devinfo_dev *dev, void *arg)
 		}
 	}
 
-	if (iflag)
-		ret = (devinfo_foreach_device_intr_child(dev, print_device,
-		    (void *)((char *)arg + 2)));
-	else
-		ret = (devinfo_foreach_device_child(dev, print_device,
-		    (void *)((char *)arg + 2)));
+	ret = (devinfo_foreach_device_child(dev, print_device,
+	    (void *)((char *)arg + 2)));
 
 	if (printit) {
 		xo_close_container(devname);
@@ -463,11 +453,8 @@ main(int argc, char *argv[])
 	}
 
 	uflag = false;
-	while ((c = getopt(argc, argv, "ip:ruv")) != -1) {
+	while ((c = getopt(argc, argv, "p:ruv")) != -1) {
 		switch(c) {
-		case 'i':
-			iflag = true;
-			break;
 		case 'p':
 			path = optarg;
 			break;
@@ -510,11 +497,7 @@ main(int argc, char *argv[])
 	} else {
 		/* print device hierarchy */
 		xo_open_container("device-information");
-		if (iflag)
-			devinfo_foreach_device_intr_child(root, print_device,
-			    NULL);
-		else
-			devinfo_foreach_device_child(root, print_device, NULL);
+		devinfo_foreach_device_child(root, print_device, (void *)0);
 		xo_close_container("device-information");
 	}
 
