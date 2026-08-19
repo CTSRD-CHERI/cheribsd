@@ -64,27 +64,7 @@ __start(int argc, char **argv, char **env, void (*cleanup)(void))
 	 * will initialise any for dynamic executables.
 	 */
 	if (&_DYNAMIC == NULL) {
-		const Elf_Auxinfo *auxp;
-		char **strp;
-		void *phdr = NULL;
-		long phnum = 0;
-
-		strp = env;
-		while (*strp++ != NULL)
-			;
-		auxp = (Elf_Auxinfo *)strp;
-
-		for (; auxp->a_type != AT_NULL; auxp++) {
-			if (auxp->a_type == AT_PHDR) {
-				phdr = auxp->a_un.a_ptr;
-			} else if (auxp->a_type == AT_PHNUM) {
-				phnum = auxp->a_un.a_val;
-			}
-		}
-
-		if (phdr != NULL && phnum != 0) {
-			crt_init_globals(phdr, phnum, NULL, NULL);
-		}
+		crt_init_globals();
 	}
 #endif
 

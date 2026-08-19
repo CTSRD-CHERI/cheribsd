@@ -86,7 +86,6 @@ _start(void *auxv,
 	const void *code_cap = NULL;
 #ifndef PIC
 	const Elf_Phdr *at_phdr = NULL;
-	long at_phnum = 0;
 #else
 	if (!has_dynamic_linker)
 		__builtin_trap(); /* RTLD missing? Wrong *crt1.o linked? */
@@ -108,22 +107,14 @@ _start(void *auxv,
 #ifndef PIC
 		} else if (auxp->a_type == AT_PHDR) {
 			at_phdr = auxp->a_un.a_ptr;
-		} else if (auxp->a_type == AT_PHNUM) {
-			at_phnum = auxp->a_un.a_val;
 #endif
 		}
 	}
 
 	/* For -pie executables, rtld will process relocations. */
 #ifndef PIC
-	/*
-	 * crt_init_globals must be called before accessing any globals.
-	 *
-	 * Note: We parse the phdrs to ensure that the global data cap does
-	 * not span the readonly segment or text segment.
-	 */
 	if (!has_dynamic_linker)
-		crt_init_globals(at_phdr, at_phnum, &data_cap, &code_cap);
+		crt_init_globals(at_phdr, &data_cap, &code_cap);
 #endif
 	/* We can access global variables now. */
 

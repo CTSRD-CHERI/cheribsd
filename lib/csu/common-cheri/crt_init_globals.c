@@ -67,9 +67,13 @@ crt_init_rela(const void * __capability code_cap, void * __capability data_cap)
 
 /* This is __always_inline since it is called before globals have been set up */
 static __always_inline void
-crt_init_globals(const Elf_Phdr *phdr __unused, long phnum __unused,
+#ifdef __CHERI_PURE_CAPABILITY__
+crt_init_globals(const Elf_Phdr *phdr,
     void * __capability *data_cap_out,
     const void * __capability *code_cap_out)
+#else
+crt_init_globals(void)
+#endif
 {
 	const struct capreloc *start_relocs;
 	const struct capreloc *stop_relocs;
@@ -108,8 +112,8 @@ crt_init_globals(const Elf_Phdr *phdr __unused, long phnum __unused,
 
 	cheri_init_globals_impl(start_relocs, stop_relocs, data_cap, code_cap,
 	    rodata_cap, use_code_bounds, 0);
-	if (data_cap_out)
-		*data_cap_out = data_cap;
-	if (code_cap_out)
-		*code_cap_out = code_cap;
+#ifdef __CHERI_PURE_CAPABILITY__
+	*data_cap_out = data_cap;
+	*code_cap_out = code_cap;
+#endif
 }

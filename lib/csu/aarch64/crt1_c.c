@@ -47,10 +47,10 @@ extern int _DYNAMIC;
 
 #include "crt_init_globals.c"
 
-void	__process_cap_relocs(char *env[]);
+void	__process_cap_relocs(void);
 
 void
-__process_cap_relocs(char *env[])
+__process_cap_relocs(void)
 {
 	/*
 	 * Initialize __cap_relocs for static executables.  Dynamic
@@ -58,27 +58,7 @@ __process_cap_relocs(char *env[])
 	 * would initialize them if they did.
 	 */
 	if (&_DYNAMIC == NULL) {
-		const Elf_Auxinfo *auxp;
-		char **strp;
-		void *phdr = NULL;
-		long phnum = 0;
-
-		strp = env;
-		while (*strp++ != NULL)
-			;
-		auxp = (Elf_Auxinfo *)strp;
-
-		for (; auxp->a_type != AT_NULL; auxp++) {
-			if (auxp->a_type == AT_PHDR) {
-				phdr = auxp->a_un.a_ptr;
-			} else if (auxp->a_type == AT_PHNUM) {
-				phnum = auxp->a_un.a_val;
-			}
-		}
-
-		if (phdr != NULL && phnum != 0) {
-			crt_init_globals(phdr, phnum, NULL, NULL);
-		}
+		crt_init_globals();
 	}
 }
 #endif
