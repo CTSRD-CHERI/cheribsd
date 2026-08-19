@@ -207,7 +207,7 @@ void
 _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 {
 	caddr_t relocbase = NULL;
-	const Elf_Phdr *phdr = NULL;
+	Elf_Phdr *phdr = NULL;
 	const Elf_Rela *rela = NULL, *relalim;
 	size_t phnum = 0;
 	unsigned long relasz;
@@ -233,6 +233,10 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 			break;
 		}
 	}
+
+	/* Derive from AT_PHDR instead of AT_BASE in the direct-exec case. */
+	if (cheri_is_address_inbounds(phdr, (uintptr_t)relocbase))
+		relocbase = cheri_address_copy(phdr, relocbase);
 
 	for (; phnum > 0; phdr++, phnum--) {
 		if (phdr->p_type == PT_CHERI_PCC) {

@@ -3113,6 +3113,19 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	const Elf_Dyn *dyn_soname;
 	const Elf_Dyn *dyn_runpath;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * In the direct-exec case, derive mapbase from AT_PHDR rather
+	 * than AT_BASE.
+	 */
+	if (aux_info[AT_PHDR] != NULL &&
+	    cheri_is_address_inbounds(aux_info[AT_PHDR]->a_un.a_ptr,
+	    (uintptr_t)mapbase)) {
+		mapbase = cheri_address_copy(aux_info[AT_PHDR]->a_un.a_ptr,
+		    mapbase);
+	}
+#endif
+
 	/*
 	 * Conjure up an Obj_Entry structure for the dynamic linker.
 	 *
@@ -3141,7 +3154,9 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	objtmp.text_rodata_cap = objtmp.relocbase;
+	/* Derive text_rodata_cap from the current PCC rather than AT_BASE. */
+	objtmp.text_rodata_cap = cheri_address_copy(cheri_pcc_get(),
+	    objtmp.relocbase);
 	fix_obj_mapping_cap_permissions(&objtmp, "RTLD");
 	if (!create_pcc_caps(&objtmp, "RTLD"))
 		rtld_die();
@@ -3172,15 +3187,8 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	obj_rtld.path = xstrdup(ld_path_rtld);
 
 	parse_rtld_phdr(&obj_rtld);
-#ifndef __CHERI_PURE_CAPABILITY__
-	/*
-	 * We would need VMMAP permissions on AT_BASE to call mprotect(). Since
-	 * this only marks one page as read-only and we have CHERI to enforce
-	 * access, don't bother calling mprotect for RTLD.
-	 */
 	if (obj_enforce_relro(&obj_rtld) == -1)
 		rtld_die();
-#endif
 
 	r_debug.r_version = R_DEBUG_VERSION;
 	r_debug.r_brk = make_rtld_local_function_pointer(r_debug_state);
