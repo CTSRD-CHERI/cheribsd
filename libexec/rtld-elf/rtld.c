@@ -3187,19 +3187,8 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	obj_rtld.path = xstrdup(ld_path_rtld);
 
 	parse_rtld_phdr(&obj_rtld);
-#ifdef __CHERI_PURE_CAPABILITY__
-	/*
-	 * Older CheriBSD kernels do not include VMMAP permissions on
-	 * AT_BASE which is needed to call mprotect().
-	 */
-	if ((cheri_perms_get(obj_rtld.relocbase) & CHERI_PERM_SW_VMEM) == 0)
-		goto skip_relro;
-#endif
 	if (obj_enforce_relro(&obj_rtld) == -1)
 		rtld_die();
-#ifdef __CHERI_PURE_CAPABILITY__
-skip_relro:
-#endif
 
 	r_debug.r_version = R_DEBUG_VERSION;
 	r_debug.r_brk = make_rtld_local_function_pointer(r_debug_state);
