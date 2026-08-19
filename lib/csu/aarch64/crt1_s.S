@@ -49,9 +49,8 @@ ENTRY(_start)
 	mov	x21, x2		/* save env */
 	mov	x22, x3		/* save cleanup */
 	/*
-	 * __process_cap_relocs(env)
+	 * __process_cap_relocs()
 	 */
-	mov	x0, x21
 	bl	__process_cap_relocs
 	mov	x0, x19		/* restore argc */
 	mov	x1, x20		/* restore argv */
