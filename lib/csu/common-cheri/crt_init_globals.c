@@ -67,18 +67,13 @@ crt_init_rela(const void * __capability code_cap, void * __capability data_cap)
 
 /* This is __always_inline since it is called before globals have been set up */
 static __always_inline void
-crt_init_globals(const Elf_Phdr *phdr, long phnum __unused,
+crt_init_globals(const Elf_Phdr *phdr __unused, long phnum __unused,
     void * __capability *data_cap_out,
     const void * __capability *code_cap_out)
 {
 	const struct capreloc *start_relocs;
 	const struct capreloc *stop_relocs;
-#ifndef __CHERI_PURE_CAPABILITY__
-	const Elf_Phdr *phlimit = phdr + phnum;
-	Elf_Addr base_addr = (Elf_Addr)-1l;
-	Elf_Addr end_addr = 0;
-#endif
-	bool use_code_bounds = false;
+	bool use_code_bounds;
 	void * __capability data_cap;
 	const void * __capability code_cap;
 	const void * __capability rodata_cap;
@@ -92,20 +87,9 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum __unused,
 	use_code_bounds = true;
 	data_cap = __DECONST(void *, phdr);
 #else
-	/* Bound the data capability to the executable image */
-	for (const Elf_Phdr *ph = phdr; ph < phlimit; ph++) {
-		if (ph->p_type != PT_LOAD)
-			continue;
-
-		base_addr = MIN(base_addr, ph->p_vaddr);
-		end_addr = MAX(end_addr, ph->p_vaddr + ph->p_memsz);
-	}
-
+	use_code_bounds = false;
 	data_cap = cheri_ddc_get();
-	data_cap = cheri_address_set(data_cap, base_addr);
-	data_cap = cheri_bounds_set(data_cap, end_addr - base_addr);
 #endif
-
 	code_cap = cheri_pcc_get();
 	data_cap = cheri_perms_clear(data_cap, CHERI_PERM_EXECUTE |
 	    CHERI_PERM_SW_VMEM);
