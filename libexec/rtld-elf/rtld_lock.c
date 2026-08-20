@@ -353,8 +353,6 @@ lockstate_wlocked(const RtldLockState *lockstate)
 	return (lockstate->lockstate == RTLD_LOCK_WLOCKED);
 }
 
-#define local_rtld_function_pointer(func) &func
-
 void
 dlerror_dflt_init(void)
 {
@@ -368,14 +366,14 @@ lockdflt_init(void)
 {
 	int i;
 
-	deflockinfo.rtli_version  = RTLI_VERSION;
-	deflockinfo.lock_create   = make_rtld_local_function_pointer(def_lock_create);
-	deflockinfo.lock_destroy  = make_rtld_local_function_pointer(def_lock_destroy);
-	deflockinfo.rlock_acquire = make_rtld_local_function_pointer(def_rlock_acquire);
-	deflockinfo.wlock_acquire = make_rtld_local_function_pointer(def_wlock_acquire);
-	deflockinfo.lock_release  = make_rtld_local_function_pointer(def_lock_release);
-	deflockinfo.thread_set_flag = make_rtld_local_function_pointer(def_thread_set_flag);
-	deflockinfo.thread_clr_flag = make_rtld_local_function_pointer(def_thread_clr_flag);
+	deflockinfo.rtli_version = RTLI_VERSION;
+	deflockinfo.lock_create = def_lock_create;
+	deflockinfo.lock_destroy = def_lock_destroy;
+	deflockinfo.rlock_acquire = def_rlock_acquire;
+	deflockinfo.wlock_acquire = def_wlock_acquire;
+	deflockinfo.lock_release  = def_lock_release;
+	deflockinfo.thread_set_flag = def_thread_set_flag;
+	deflockinfo.thread_clr_flag = def_thread_clr_flag;
 	deflockinfo.at_fork = NULL;
 	deflockinfo.dlerror_loc = def_dlerror_loc;
 	deflockinfo.dlerror_loc_sz = sizeof(def_dlerror_msg);
