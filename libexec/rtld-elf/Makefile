@@ -135,6 +135,9 @@ beforeinstall:
 .PATH: ${RTLD_ELF_DIR}/${RTLD_ARCH} ${SRCTOP}/lib/csu/common
 
 .if ${MACHINE_CPU:Mcheri} && ${USE_COMPAT:U} != "32"
+.if ${MACHINE_ABI:Mpurecap}
+SRCS+=		cheri_bounds.c
+.endif
 .PATH: ${RTLD_ELF_DIR}/cheri
 SRCS+=		cheri_reloc.c
 CFLAGS+=	-I${RTLD_ELF_DIR}/cheri
