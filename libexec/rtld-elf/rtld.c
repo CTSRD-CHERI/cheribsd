@@ -143,9 +143,7 @@ static bool donelist_check(DoneList *, const Obj_Entry *);
 static void dump_auxv(Elf_Auxinfo **aux_info);
 static void errmsg_restore(struct dlerror_save *);
 static struct dlerror_save *errmsg_save(void);
-static void *_fill_search_info(const char *, size_t, void *);
-/* Make this a macro to avoid updating all uses of fill_search_info */
-#define fill_search_info make_rtld_local_function_pointer(_fill_search_info)
+static void *fill_search_info(const char *, size_t, void *);
 
 static char *find_library(const char *, const Obj_Entry *, int *);
 static const char *gethints(bool);
@@ -3069,7 +3067,7 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 		rtld_die();
 
 	r_debug.r_version = R_DEBUG_VERSION;
-	r_debug.r_brk = make_rtld_local_function_pointer(r_debug_state);
+	r_debug.r_brk = r_debug_state;
 	r_debug.r_state = RT_CONSISTENT;
 	r_debug.r_ldbase = obj_rtld.relocbase;
 }
@@ -4278,8 +4276,7 @@ search_library_path(const char *name, const char *path, const char *refobj_path,
 	arg.buflen = PATH_MAX;
 	arg.fd = -1;
 
-	p = path_enumerate(path,
-	    make_rtld_local_function_pointer(try_library_path), refobj_path,
+	p = path_enumerate(path, try_library_path, refobj_path,
 	    &arg);
 	*fdp = arg.fd;
 
@@ -5094,7 +5091,7 @@ dl_iterate_phdr(__dl_iterate_hdr_callback callback, void *param)
 }
 
 static __used void *
-_fill_search_info(const char *dir, size_t dirlen, void *param)
+fill_search_info(const char *dir, size_t dirlen, void *param)
 {
 	struct fill_search_info_args *arg;
 

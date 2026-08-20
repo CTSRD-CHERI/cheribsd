@@ -640,9 +640,6 @@ __END_DECLS
 #define make_rtld_function_pointer(target_func)	(&target_func)
 #endif
 #endif
-#ifndef make_rtld_local_function_pointer
-#define make_rtld_local_function_pointer(target_func)	(&target_func)
-#endif
 
 #ifdef __CHERI__
 #define make_data_pointer(def, defobj)	make_data_cap(def, defobj)
