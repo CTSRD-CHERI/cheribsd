@@ -591,6 +591,7 @@ extern bool ld_fast_sigblock;
 #ifdef __CHERI__
 bool create_pcc_caps(Obj_Entry *, const char *);
 const char *pcc_cap(const Obj_Entry *, Elf_Off);
+void narrow_object_bounds(Obj_Entry *obj);
 #endif
 void dump_relocations(Obj_Entry *);
 void dump_obj_relocations(Obj_Entry *);
