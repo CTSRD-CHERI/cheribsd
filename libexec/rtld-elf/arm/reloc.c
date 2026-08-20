@@ -354,8 +354,7 @@ reloc_plt(Plt_Entry *plt, int flags __unused, RtldLockState *lockstate __unused)
 	const Elf_Rel *rellim;
 	const Elf_Rel *rel;
 		
-	rellim = (const Elf_Rel *)((const char *)plt->rel +
-	    plt->relsize);
+	rellim = (const Elf_Rel *)((const char *)plt->rel + plt->relsize);
 	for (rel = plt->rel;  rel < rellim;  rel++) {
 		Elf_Addr *where;
 
