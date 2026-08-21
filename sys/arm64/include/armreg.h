@@ -297,6 +297,7 @@
 
 /* CNTFRQ_EL0 */
 #define	CNTFRQ_EL0		MRS_REG(CNTFRQ_EL0)
+#define	CNTFRQ_EL0_ISS		ISS_MSR_REG(CNTFRQ_EL0)
 #define	CNTFRQ_EL0_op0		3
 #define	CNTFRQ_EL0_op1		3
 #define	CNTFRQ_EL0_CRn		14

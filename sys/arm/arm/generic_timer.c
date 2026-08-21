@@ -322,20 +322,22 @@ cntpct_handler(uint64_t esr, struct trapframe *frame)
 }
 
 #if __has_feature(capabilities)
-static int
-cntfrq_handler(vm_offset_t va, uint32_t insn, struct trapframe *frame,
-	       uint32_t esr)
+static bool
+cntfrq_handler(uint64_t esr, struct trapframe *frame)
 {
 	uint64_t val;
 	int reg;
 
-	if ((insn & MRS_MASK) != MRS_VALUE)
-		return (0);
+	if (ESR_ELx_EXCEPTION(esr) != EXCP_MSR)
+		return (false);
 
-	if (MRS_SPECIAL(insn) != MRS_SPECIAL(CNTFRQ_EL0))
-		return (0);
+	if ((esr & ISS_MSR_DIR) == 0)
+		return (false);
 
-	reg = MRS_REGISTER(insn);
+	if ((esr & ISS_MSR_REG_MASK) != CNTFRQ_EL0_ISS)
+		return (false);
+
+	reg = ISS_MSR_Rt(esr);
 	val = READ_SPECIALREG(cntfrq_el0);
 	if (reg < nitems(frame->tf_x)) {
 		frame->tf_x[reg] = val;
@@ -344,7 +346,7 @@ cntfrq_handler(vm_offset_t va, uint32_t insn, struct trapframe *frame,
 	}
 	frame->tf_elr += INSN_SIZE;
 
-	return (1);
+	return (true);
 }
 #endif
 #endif
@@ -370,7 +372,7 @@ tmr_setup_user_access(void *arg __unused)
 		 * making it inaccessible to user space.
 		 * We emulate access here to work around this issue.
 		 */
-		install_undef_handler(cntfrq_handler);
+		install_sys_handler(cntfrq_handler);
 #endif
 #endif
 	}
