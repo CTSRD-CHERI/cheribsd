@@ -478,6 +478,8 @@ _ELF_DEFINE_EF(EF_RISCV_RVE,	    0x00000008UL,			\
 	"RV32E embedded ABI")						\
 _ELF_DEFINE_EF(EF_RISCV_TSO,	    0x00000010UL,			\
 	"RVTSO memory consistency model")				\
+_ELF_DEFINE_EF(EF_RISCV_RVY,	    0x00000040UL,			\
+	"RVY pure-capability ABI")					\
 _ELF_DEFINE_EF(EF_RISCV_CHERIABI,   0x00010000UL,			\
 	"CheriABI")							\
 _ELF_DEFINE_EF(EF_RISCV_CAPMODE,    0x00020000UL,			\

@@ -85,7 +85,7 @@ elf_is_cheriabi(const GElf_Ehdr *hdr)
 	    (hdr->e_flags & EF_AARCH64_CHERI_PURECAP) != 0)
 		return (true);
 	if (hdr->e_machine == EM_RISCV &&
-	    (hdr->e_flags & EF_RISCV_CHERIABI) != 0)
+	    (hdr->e_flags & (EF_RISCV_RVY | EF_RISCV_CHERIABI)) != 0)
 		return (true);
 	return (false);
 }
