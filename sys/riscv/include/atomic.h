@@ -475,7 +475,7 @@ atomic_set_ptr(volatile uintptr_t *p, uintptr_t val)
 		: "+A" (*p), "=&r" (temp1)
 		: "r" ((ptraddr_t)val)
 		: "ct0", "memory");
-#else
+#elif defined(__riscv_zcheripurecap)
 	__asm __volatile(
 		"1:	lr.c	ct0, %0\n"
 		"	mv	%1, t0\n"
@@ -486,6 +486,17 @@ atomic_set_ptr(volatile uintptr_t *p, uintptr_t val)
 		: "+A" (*p), "=&r" (temp1)
 		: "r" ((ptraddr_t)val)
 		: "ct0", "memory");
+#else
+	__asm __volatile(
+		"1:	lr.y	t0, %0\n"
+		"	mv	%1, t0\n"
+		"	or	%1, %1, %2\n"
+		"	yaddrw	t0, t0, %1\n"
+		"	sc.y	%1, t0, %0\n"
+		"	bnez	%1, 1b\n"
+		: "+A" (*p), "=&r" (temp1)
+		: "r" ((ptraddr_t)val)
+		: "t0", "memory");
 #endif
 #endif
 }
@@ -510,7 +521,7 @@ atomic_clear_ptr(volatile uintptr_t *p, uintptr_t val)
 		: "+A" (*p), "=&r" (temp1)
 		: "r" (~(ptraddr_t)val)
 		: "ct0", "memory");
-#else
+#elif defined(__riscv_zcheripurecap)
 	__asm __volatile(
 		"1:	lr.c	ct0, %0\n"
 		"	mv	%1, t0\n"
@@ -521,6 +532,17 @@ atomic_clear_ptr(volatile uintptr_t *p, uintptr_t val)
 		: "+A" (*p), "=&r" (temp1)
 		: "r" (~(ptraddr_t)val)
 		: "ct0", "memory");
+#else
+	__asm __volatile(
+		"1:	lr.y	t0, %0\n"
+		"	mv	%1, t0\n"
+		"	and	%1, %1, %2\n"
+		"	yaddrw	t0, t0, %1\n"
+		"	sc.y	%1, t0, %0\n"
+		"	bnez	%1, 1b\n"
+		: "+A" (*p), "=&r" (temp1)
+		: "r" (~(ptraddr_t)val)
+		: "t0", "memory");
 #endif
 #endif
 }
@@ -563,7 +585,7 @@ atomic_testandclear_ptr(volatile uintptr_t *p, u_int val)
 		: "+A" (*p), "=&C" (old), "=&r" (temp1)
 		: "r" (~(ptraddr_t)mask)
 		: "ct0", "memory");
-#else
+#elif defined(__riscv_zcheripurecap)
 	__asm __volatile(
 		"1:	lr.c	ct0, %0\n"
 		"	mv	%2, t0\n"
@@ -575,6 +597,18 @@ atomic_testandclear_ptr(volatile uintptr_t *p, u_int val)
 		: "+A" (*p), "=&C" (old), "=&r" (temp1)
 		: "r" (~(ptraddr_t)mask)
 		: "ct0", "memory");
+#else
+	__asm __volatile(
+		"1:	lr.y	t0, %0\n"
+		"	mv	%2, t0\n"
+		"	and	%2, %2, %3\n"
+		"	yaddrw	%1, t0, %2\n"
+		"	sc.y	%2, %1, %0\n"
+		"	bnez	%2, 1b\n"
+		"	ymv	%1, t0\n"
+		: "+A" (*p), "=&C" (old), "=&r" (temp1)
+		: "r" (~(ptraddr_t)mask)
+		: "t0", "memory");
 #endif
 #endif
 
@@ -605,7 +639,7 @@ atomic_testandset_ptr(volatile uintptr_t *p, u_int val)
 		: "+A" (*p), "=&C" (old), "=&r" (temp1)
 		: "r" ((ptraddr_t)mask)
 		: "ct0", "memory");
-#else
+#elif defined(__riscv_zcheripurecap)
 	__asm __volatile(
 		"1:	lr.c	ct0, %0\n"
 		"	mv	%2, t0\n"
@@ -617,6 +651,18 @@ atomic_testandset_ptr(volatile uintptr_t *p, u_int val)
 		: "+A" (*p), "=&C" (old), "=&r" (temp1)
 		: "r" ((ptraddr_t)mask)
 		: "ct0", "memory");
+#else
+	__asm __volatile(
+		"1:	lr.y	t0, %0\n"
+		"	mv	%2, t0\n"
+		"	or	%2, %2, %3\n"
+		"	yaddrw	%1, t0, %2\n"
+		"	sc.y	%2, %1, %0\n"
+		"	bnez	%2, 1b\n"
+		"	ymv	%1, t0\n"
+		: "+A" (*p), "=&C" (old), "=&r" (temp1)
+		: "r" ((ptraddr_t)mask)
+		: "t0", "memory");
 #endif
 #endif
 

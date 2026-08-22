@@ -136,7 +136,27 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 		 * mapping of physical memory.
 		 */
 again:
-#if defined(__CHERI_PURE_CAPABILITY__) || !defined(__riscv_xcheri)
+#if defined(__riscv_y)
+		__asm__ __volatile__ (
+#if !defined(__CHERI_PURE_CAPABILITY__)
+			".option push\n\t"
+			".option capmode\n\t"
+			"ymodeswy\n\t"
+#endif
+			"lr.y %[cscratch], (%[cutp])\n\t"
+			"yeq %[ok], %[cscratch], %[cut]\n\t"
+			"beq x0, %[ok], 1f\n\t"
+			"sc.y %[sc_result], %[cutr], (%[cutp])\n\t"
+			"1:\n\t"
+#if !defined(__CHERI_PURE_CAPABILITY__)
+			".option pop\n\t"
+			"ymodeswi\n\t"
+#endif
+		  : [ok] "=&r" (ok), [cscratch] "=&C" (cscratch),
+		    [cutr] "+C" (cutr), [sc_result] "=r" (sc_result)
+		  : [cut] "C" (cut), [cutp] "C" (cutp)
+		  : "memory");
+#elif defined(__CHERI_PURE_CAPABILITY__) || !defined(__riscv_xcheri)
 		__asm__ __volatile__ (
 #if !defined(__CHERI_PURE_CAPABILITY__)
 			".option push\n\t"

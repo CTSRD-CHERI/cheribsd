@@ -156,6 +156,8 @@ db_trace_self(void)
 #ifdef __CHERI_PURE_CAPABILITY__
 #ifdef __riscv_xcheri
 	__asm __volatile("cmove %0, csp" : "=&C" (sp));
+#elif defined(__riscv_y)
+	__asm __volatile("ymv %0, sp" : "=&C" (sp));
 #else
 	__asm __volatile("cmv %0, csp" : "=&C" (sp));
 #endif

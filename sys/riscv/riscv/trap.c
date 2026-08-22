@@ -292,7 +292,7 @@ dump_regs(struct trapframe *frame)
 #endif
 	printf("sstatus: 0x%016lx\n", frame->tf_sstatus);
 	printf("stval  : 0x%016lx\n", frame->tf_stval);
-#ifdef __riscv_zcheripurecap
+#if defined(__riscv_zcheripurecap) || defined(__riscv_y)
         printf("stval2  : 0x%016lx\n", frame->tf_stval2);
 #endif
 }
@@ -645,7 +645,7 @@ do_trap_user(struct trapframe *frame)
 	}
 	intr_enable();
 
-#ifdef __riscv_zcheripurecap
+#if defined(__riscv_zcheripurecap) || defined(__riscv_y)
 	CTR5(KTR_TRAP, "%s: exception=%lu, sepc=%#lx, stval=%#lx stval2=%#lx",
             __func__, exception, (unsigned long)frame->tf_sepc, frame->tf_stval,
 	    frame->tf_stval2);

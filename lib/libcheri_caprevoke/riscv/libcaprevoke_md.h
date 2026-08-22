@@ -79,11 +79,11 @@ caprev_shadow_set_fw(uint64_t * __capability fw, void * __capability user_obj,
 		 */
 
 		/* Jump out if object detagged */
-		"gctag %[scratch], %[obj]\n\t"
+		"ytagr %[scratch], %[obj]\n\t"
 		"beqz %[scratch], 2f\n\t"
 
 		/* Jump out if zero perms */
-		"gcperm %[scratch], %[obj]\n\t"
+		"ypermr %[scratch], %[obj]\n\t"
 		"beqz %[scratch], 2f\n\t"
 
 #ifdef __CHERI_PURE_CAPABILITY__

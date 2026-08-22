@@ -126,7 +126,7 @@
 .if \mode == 0
 	/* Load our DDC */
 #ifdef __CHERI_PURE_CAPABILITY__
-	_CMV	CAP(t0), CAP(null)
+	_CMV	CAP(t0), CAP_NULL
 #else
 	_LC	CAP(t0), (TF_SIZE + KF_DDC)(CAP(sp))
 #endif
@@ -141,7 +141,7 @@
 	cjr	CAP(t1)
 1:
 #else
-	modesw.int
+	_MODESW_INT
 #endif
 #endif
 #endif /* __has_feature(capabilities) */
@@ -152,11 +152,7 @@
 	_SD	t0, (TF_STVAL)(PTR(sp))
 	csrr	t0, scause
 	_SD	t0, (TF_SCAUSE)(PTR(sp))
-#ifdef __riscv_zcheripurecap
-	csrr	t0, stval2
-	sd	t0, (TF_STVAL2)(PTR(sp))
-#endif
-#ifdef __riscv_zcheripurecap
+#if defined(__riscv_zcheripurecap) || defined(__riscv_y)
 	csrr	t0, stval2
 	sd	t0, (TF_STVAL2)(PTR(sp))
 #endif
@@ -169,7 +165,7 @@
 .if \mode == 0
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* CHERI-RISC-V purecap doesn't currently use cgp. */
-	_CMV	PTR(gp), PTR(null)
+	_CMV	PTR(gp), PTR_NULL
 #else
 .option push
 .option norelax
@@ -209,7 +205,7 @@
 	csetflags ct1, ct1, t0
 	jr.cap	ct1
 #else /* !defiend(__riscv_xcheri) */
-	modesw.cap
+	_MODESW_CAP
 #endif  /* !defiend(__riscv_xcheri) */
 .option capmode
 1:

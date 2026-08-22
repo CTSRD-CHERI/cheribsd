@@ -45,7 +45,7 @@
 ENTRY(copyio_fault)
 	MODESW_INT
 #ifdef __CHERI_PURE_CAPABILITY__
-	SET_FAULT_HANDLER(PTR(null), PTR(a1))
+	SET_FAULT_HANDLER(PTR_NULL, PTR(a1))
 #else
 	SET_FAULT_HANDLER(x0, a1) /* Clear the handler */
 #endif

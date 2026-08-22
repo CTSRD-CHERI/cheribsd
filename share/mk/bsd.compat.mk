@@ -186,7 +186,8 @@ LIB${_LIBCOMPAT}_RISCV_MARCH=	rv64imafdc
       ${LIB${_LIBCOMPAT}CPUTYPE} == "cheri"
 LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}xcheri
 .  elif ${LIB${_LIBCOMPAT}CPUTYPE} == "rvy"
-LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}zcherihybrid_zcherilevels
+#LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}zcherihybrid_zcherilevels
+LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH:S/i/y/}zyhybrid_zylevels1b
 .  else
 .    error "Invalid CHERI variant ${LIB${_LIBCOMPAT}CPUTYPE}"
 .  endif

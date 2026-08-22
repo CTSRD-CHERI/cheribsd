@@ -1220,7 +1220,7 @@ pmap_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 			use = false;
 		if (VM_PROT_HAS_WRITE_CAP(prot) && (l3 & PTE_CW) == 0)
 			use = false;
-#elif defined(__riscv_zcheripurecap)
+#elif defined(__riscv_zcheripurecap) || defined(__riscv_y)
 		if ((prot & VM_PROT_CAP) != 0 && (l3 & PTE_CW) == 0)
 			use = false;
 #endif
@@ -3379,7 +3379,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (va < VM_MAX_USER_ADDRESS)
 		new_l3 |= PTE_U;
 #if __has_feature(capabilities)
-#ifdef __riscv_zcheripurecap
+#if defined(__riscv_zcheripurecap) || defined(__riscv_y)
 	if (VM_PROT_HAS_READ_CAP(prot))
 		new_l3 |= PTE_CW;
 #endif

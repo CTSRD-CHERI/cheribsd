@@ -76,13 +76,13 @@
 	csetflags	CAP(t1), CAP(t1), t0
 	cspecialw	stcc, ct1
 #else
-	modesw.cap
+	_MODESW_CAP
 .option push
 .option capmode
 	auipc	CAP(t1), 0
 	scaddr	CAP(t1), CAP(t1), t0
 	csrw	stvecc, CAP(t1)
-	modesw.int
+	_MODESW_INT
 .option pop
 #endif
 #else
@@ -94,7 +94,7 @@
  * Initialize CHERI CPU state.
  */
 .macro cheri_cpu_init
-#if __has_feature(capabilities) && defined(__riscv_zcheripurecap)
+#if __has_feature(capabilities) && (defined(__riscv_zcheripurecap) || defined(__riscv_y))
 	/* Enable CHERI for U-mode */
 	li	t0, SENVCFG_CRE
 	csrs	senvcfg, t0
@@ -119,7 +119,7 @@
 _alt_start:
 	/* Set the global pointer */
 #ifdef __CHERI_PURE_CAPABILITY__
-	_CMV	PTR(gp), PTR(null)
+	_CMV	PTR(gp), PTR_NULL
 #else
 .option push
 .option norelax
@@ -136,8 +136,8 @@ _alt_start:
 	 * our ELF header requests capmode.  The instructions below
 	 * should work in both modes.
 	 */
-#ifdef __riscv_zcheripurecap
-	modesw.cap
+#if defined(__riscv_zcheripurecap) || defined(__riscv_y)
+	_MODESW_CAP
 #else
 	lla	t0, 1f
 	cspecialr ct1, pcc
@@ -187,7 +187,7 @@ _alt_start:
 _start:
 	/* Set the global pointer */
 #ifdef __CHERI_PURE_CAPABILITY__
-	_CMV	PTR(gp), PTR(null)
+	_CMV	PTR(gp), PTR_NULL
 #else
 .option push
 .option norelax
@@ -203,7 +203,7 @@ _start:
 	 * loader(8) metadata.
 	 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	cmv	cs3, ca0    
+	_CMV	CAP(s3), CAP(a0)    
 #else	
 	mv	s3, a0
 #endif
@@ -242,8 +242,8 @@ pagetables:
 
 	/* Get PTE attribute bits in s8 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	_LLC	cra, get_pte_fixup_bits
-	_JALR	cra
+	_LLC	CAP(ra), get_pte_fixup_bits
+	_JALR	CAP(ra)
 #else
 	jal	get_pte_fixup_bits
 #endif
@@ -370,8 +370,13 @@ va:
 	_LLC	PTR(t0), initstack_end
 	sub	t0, t0, s2
 	_SCBNDSR	PTR(s2), PTR(s2), t0
+#ifdef __riscv_y
+	li	t1, ~CHERI_PERMS_KERNEL_DATA
+	ypermc	PTR(s2), PTR(s2), t1
+#else
 	li	t1, CHERI_PERMS_KERNEL_DATA
 	_ACPERM	PTR(s2), PTR(s2), t1
+#endif
 	_CADD	PTR(sp), PTR(s2), t0
 
 	/* Allocate space for thread0 PCB and riscv_bootparams */
@@ -387,23 +392,37 @@ va:
 
 	/* Save omnipotent DDC and clear kernel's DDC. */
 	_CSRR	PTR(s0), ddc
-	_CMV	PTR(t0), cnull
+	_CMV	PTR(t0), CAP_NULL
 	_CSRW	ddc, PTR(t0)
 
 	/* Initialize cap relocs. */
+#ifdef __riscv_y
+	li	t0, ~CHERI_PERMS_KERNEL_DATA
+#else
 	li	t0, CHERI_PERMS_KERNEL_DATA
+#endif
 	_LLC	PTR(a0), _C_LABEL(__start___cap_relocs)
+#ifdef __riscv_y
+	ypermc	PTR(a0), PTR(a0), t0
+#else
 	_ACPERM	PTR(a0), PTR(a0), t0
+#endif
 	_LLC	PTR(a1), _C_LABEL(__stop___cap_relocs)
 	sub	t1, a1, a0
 	_SCBNDSR	PTR(a0), PTR(a0), t1
 	_CADD	PTR(a1), PTR(a0), t1
+#ifdef __riscv_y
+	ypermc	PTR(a2), PTR(s0), t0
+#else
 	_ACPERM	PTR(a2), PTR(s0), t0
+#endif
 	mv	a3, zero
 	mv	a4, zero		/* TODO: true for PT_CHERI_PCC */
 	_LLC	PTR(a5), _C_LABEL(kernel_cap_relocs_cb)
 #ifdef __riscv_xcheri
 	csetflags PTR(a6), PTR(a5), zero
+#elif defined(__riscv_y)
+	ymodew	PTR(a6), PTR(a5), zero
 #else
 	scmode	PTR(a6), PTR(a5), zero
 #endif
@@ -421,12 +440,12 @@ va:
 	S_PTR	PTR(s3), RISCV_BOOTPARAMS_MODULEP(PTR(sp))
 
 	/* Discard omnipotent cs0. */
-	_CMV	PTR(s0), cnull
+	_CMV	PTR(s0), CAP_NULL
 
 	/* Clear other capabilities no longer needed. */
-	_CMV	PTR(s1), cnull
-	_CMV	PTR(s2), cnull
-	_CMV	PTR(s3), cnull
+	_CMV	PTR(s1), CAP_NULL
+	_CMV	PTR(s2), CAP_NULL
+	_CMV	PTR(s3), CAP_NULL
 
 	li	t0, RISCV_BOOTPARAMS_SIZE
 	_SCBNDSR	PTR(a0), PTR(sp), t0
@@ -548,8 +567,8 @@ ENTRY(mpentry)
 #ifdef __CHERI_PURE_CAPABILITY__
 .option push
 .option nocapmode
-#ifdef __riscv_zcheripurecap
-	modesw.cap
+#if defined(__riscv_zcheripurecap) || defined(__riscv_y)
+	_MODESW_CAP
 #else
 	lla	t0, 1f
 	cspecialr	PTR(t1), pcc
@@ -606,7 +625,7 @@ mpva:
 	/* Set the global pointer again, this time with the virtual address. */
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* CHERI-RISC-V purecap doesn't currently use cgp. */
-	_CMV	PTR(gp), PTR(null)
+	_CMV	PTR(gp), PTR_NULL
 #else
 .option push
 .option norelax

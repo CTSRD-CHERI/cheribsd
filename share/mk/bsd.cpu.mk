@@ -400,7 +400,8 @@ RISCV_MARCH=	rv64imafdc
 .if ${MACHINE_CPU:Mxcheri}
 RISCV_MARCH:=	${RISCV_MARCH}xcheri
 .elif ${MACHINE_CPU:Mrvy}
-RISCV_MARCH:=	${RISCV_MARCH}zcherihybrid_zcherilevels
+#RISCV_MARCH:=	${RISCV_MARCH}zcherihybrid_zcherilevels
+RISCV_MARCH:=	${RISCV_MARCH:S/i/y/}zyhybrid_zylevels1b
 .endif
 
 .if ${MACHINE_ARCH:Mriscv*c*}

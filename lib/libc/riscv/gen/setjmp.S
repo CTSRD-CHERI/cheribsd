@@ -45,7 +45,7 @@ ENTRY(setjmp)
 	_CADDI PTR(a2), PTR(a0), (_JB_SIGMASK * 16)	/* oset */
 	li	a1, 0				/* set */
 	li	a0, 1				/* SIG_BLOCK */
-	ccall	_C_LABEL(sigprocmask)
+	call	_C_LABEL(sigprocmask)
 
 	_LC	PTR(a0), 0(PTR(sp))
 	_LC	PTR(ra), 16(PTR(sp))
@@ -59,17 +59,16 @@ ENTRY(setjmp)
 	_CADDI	PTR(a0), PTR(a0), (2 * 16)
 #ifdef CHERI_LIB_C18N
 	/* Store the trusted stack pointer */
-	caddi	csp, csp, -(2 * 16)
-	sc	ca0, (0 * 16)(csp)
-	sc	cra, (1 * 16)(csp)
-	cmv	ca0, cra
-	lgc	ct0, _C_LABEL(dl_c18n_get_trusted_stack)
-	jalr	ct0
-	lc	ca1, (0 * 16)(csp)
-	lc	cra, (1 * 16)(csp)
-	caddi	csp, csp, (2 * 16)
-	sc	ca0, 0(ca1)
-	caddi	ca0, ca1, 16
+	_CADDI	PTR(sp), PTR(sp), -(2 * 16)
+	_SC	PTR(a0), (0 * 16)(PTR(sp))
+	_SC	PTR(ra), (1 * 16)(PTR(sp))
+	_CMV	PTR(a0), PTR(ra)
+	call	PTR(t0), _C_LABEL(dl_c18n_get_trusted_stack)
+	_LC	PTR(a1), (0 * 16)(PTR(sp))
+	_LC	PTR(ra), (1 * 16)(PTR(sp))
+	_CADDI	PTR(sp), PTR(sp), (2 * 16)
+	_SC	PTR(a0), 0(PTR(a1))
+	_CADDI	PTR(a0), PTR(a1), 16
 #endif
 
 	/* Store the general purpose registers and ra */
@@ -186,15 +185,14 @@ ENTRY(longjmp)
 	 * Preserve the arguments in callee-saved registers instead of pushing
 	 * them onto the stack because stack unwinding will switch the stack.
 	 */
-	cmv	cs0, ca0
-	cmv	cs1, ca1
+	_CMV	PTR(s0), PTR(a0)
+	_CMV	PTR(s1), PTR(a1)
 	/* Pass the target untrusted stack pointer and trusted stack pointer */
-	lc	ca0, (1 * 16)(cs0)
-	lc	ca1, (2 * 16)(cs0)
-	lgc	ct0, _C_LABEL(dl_c18n_unwind_trusted_stack)
-	jalr	ct0
-	cmv	ca0, cs0
-	cmv	ca1, cs1
+	_LC	PTR(a0), (1 * 16)(PTR(s0))
+	_LC	PTR(a1), (2 * 16)(PTR(s0))
+	call	PTR(t0), _C_LABEL(dl_c18n_unwind_trusted_stack)
+	_CMV	PTR(a0), PTR(s0)
+	_CMV	PTR(a1), PTR(s1)
 #endif
 
 	_CADDI	PTR(sp), PTR(sp), -(3 * 16)
@@ -206,7 +204,7 @@ ENTRY(longjmp)
 	li	a2, 0				/* oset */
 	_CADDI	PTR(a1), PTR(a0), (_JB_SIGMASK * 16)	/* set */
 	li	a0, 3				/* SIG_BLOCK */
-	ccall	_C_LABEL(sigprocmask)
+	call	_C_LABEL(sigprocmask)
 
 	_LC	PTR(a1), (2 * 16)(PTR(sp))
 	_LC	PTR(ra), (1 * 16)(PTR(sp))
@@ -218,7 +216,7 @@ ENTRY(longjmp)
 	_CADDI	PTR(a0), PTR(a0), (2 * 16)
 #ifdef CHERI_LIB_C18N
 	/* Skip the trusted stack pointer */
-	caddi	ca0, ca0, 16
+	_CADDI	PTR(a0), PTR(a0), 16
 #endif
 
 	/* Restore the general purpose registers and ra */
@@ -264,8 +262,8 @@ ENTRY(longjmp)
 	RETURN
 
 botch:
-	ccall	_C_LABEL(longjmperror)
-	ccall	_C_LABEL(abort)
+	call	_C_LABEL(longjmperror)
+	call	_C_LABEL(abort)
 #else
 	/* Check the magic value */
 	ld	t0, 0(a0)

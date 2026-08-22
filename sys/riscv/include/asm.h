@@ -58,9 +58,9 @@
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	SET_FAULT_HANDLER(handler, tmp)					\
-	lc	tmp, PC_CURTHREAD(ctp);					\
-	lc	tmp, TD_PCB(tmp);		/* Load the pcb */	\
-	sc	handler, PCB_ONFAULT(tmp)	/* Set the handler */
+	_LC	tmp, PC_CURTHREAD(CAP(tp));				\
+	_LC	tmp, TD_PCB(tmp);		/* Load the pcb */	\
+	_SC	handler, PCB_ONFAULT(tmp)	/* Set the handler */
 #else
 #define	SET_FAULT_HANDLER(handler, tmp)					\
 	ld	tmp, PC_CURTHREAD(tp);					\
@@ -90,9 +90,17 @@
 #define	INT_WIDTH	8
 
 #if __has_feature(capabilities)
+#ifdef __riscv_y
+#define	CAP(x)	x
+#define	CAPN(n)	x ## n
+#define	CAP_CSR(x)	x
+#define	CAP_NULL	zero
+#else
 #define	CAP(x)	c ## x
 #define	CAPN(n)	c ## n
 #define	CAP_CSR(x)	x ## c
+#define	CAP_NULL	cnull
+#endif
 #define	CAP_WIDTH	16
 
 #ifdef __riscv_xcheri
@@ -100,6 +108,14 @@
 // Note: in xcheri mode switching must be handled separately
 #define	_MODESW_CAP
 #define	_MODESW_INT
+#elif defined(__riscv_y)
+#define	_CAP_INSTR(x)	x
+#define	_MODESW_CAP				\
+	ymodeswy;				\
+	.option capmode
+#define	_MODESW_INT				\
+	ymodeswi;				\
+	.option nocapmode
 #else /* defined(__riscv_zcheripurecap) */
 #define	_CAP_INSTR(x)	x
 #define	_MODESW_CAP				\
@@ -113,6 +129,7 @@
 #define	CAP(x)	x
 #define	CAPN(n)	x ## n
 #define	CAP_CSR(x)	x
+#define	CAP_NULL	zero
 #define	CAP_WIDTH	INT_WIDTH
 #define	_CAP_INSTR(x)	x
 #define	_MODESW_CAP
@@ -123,7 +140,7 @@
 #define	PTR(x)	CAP(x)
 #define	PTRN(n)	CAPN(n)
 #define	PTR_CSR(x)	CAP_CSR(x)
-#define	PTR_NULL	PTR(null)
+#define	PTR_NULL	CAP_NULL
 #define	PTR_WIDTH	CAP_WIDTH
 #define	_PTR_INSTR(x)	_CAP_INSTR(x)
 #define	MODESW_CAP
@@ -135,7 +152,7 @@
 #define	PTR(x)	x
 #define	PTRN(n)	x ## n
 #define	PTR_CSR(x)	x
-#define	PTR_NULL	x0
+#define	PTR_NULL	zero
 #define	PTR_WIDTH	INT_WIDTH
 #define	_PTR_INSTR(x)	x
 #define	MODESW_CAP	_MODESW_CAP
@@ -164,8 +181,13 @@
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	L_PTR	_LC
 #define	S_PTR	_SC
+#ifdef __riscv_y
+#define	_LC	_PTR_INSTR(ly)
+#define	_SC	_PTR_INSTR(sy)
+#else
 #define	_LC	_PTR_INSTR(lc)
 #define	_SC	_PTR_INSTR(sc)
+#endif
 #define	LB_CAP	_LB
 #define	LBU_CAP	_LBU
 #define	LHU_CAP	_LHU
@@ -220,8 +242,13 @@
 
 /* Relocation pseudo instructions */
 #ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __riscv_y
+#define	_LLC	_PTR_INSTR(lly)
+#define	_LGC	_PTR_INSTR(lgy)
+#else
 #define	_LLC	_PTR_INSTR(llc)
 #define	_LGC	_PTR_INSTR(lgc)
+#endif
 #else
 #define	_LLC	lla
 #define	_LGC	lga
@@ -249,6 +276,14 @@
 #define	_SCADDR		csetaddr
 #define	_ACPERM		candperm
 #define	_CBLD		cbuildcap
+#elif defined(__riscv_y)
+#define	CMV_CAP	ymv
+#define	CADD_CAP	yadd
+#define	CADDI_CAP	yaddi
+#define	_SCBNDS		ybndsw
+#define	_SCBNDSR	ybndsrw
+#define	_SCADDR		yaddrw
+#define	_CBLD		ybld
 #else /* defined(__riscv_zcheripurecap) */
 #define	CMV_CAP	cmv
 #define	CADD_CAP	cadd

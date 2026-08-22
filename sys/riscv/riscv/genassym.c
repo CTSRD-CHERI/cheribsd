@@ -107,7 +107,7 @@ ASSYM(TF_DDC, offsetof(struct trapframe, tf_ddc));
 ASSYM(TF_STVAL, offsetof(struct trapframe, tf_stval));
 ASSYM(TF_SCAUSE, offsetof(struct trapframe, tf_scause));
 ASSYM(TF_SSTATUS, offsetof(struct trapframe, tf_sstatus));
-#ifdef __riscv_zcheripurecap
+#if defined(__riscv_zcheripurecap) || defined(__riscv_y)
 ASSYM(TF_STVAL2, offsetof(struct trapframe, tf_stval2));
 #endif
 

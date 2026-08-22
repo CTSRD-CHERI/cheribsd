@@ -29,6 +29,7 @@
 #define RTLD_C18N_MACHDEP_H
 
 #include <sys/cdefs.h>
+#include <machine/asm.h>
 #include <machine/riscvreg.h>
 
 #define	TRUSTED_FRAME_SIZE		17
@@ -42,39 +43,43 @@
 
 #define	INST_ALIGN		2
 
-#define	UNTRUSTED_STACK		csp
+#define	UNTRUSTED_STACK		CAP(sp)
 #define	TRUSTED_STACK		0
 #define	STACK_TABLE		CLEN_BYTES
 #define	STACK_TABLE_N		5
-#define	STACK_TABLE_C		__CONCAT(ct, STACK_TABLE_N)
+#define	STACK_TABLE_C		__CONCAT(CAP(t), STACK_TABLE_N)
 #define	STACK_TABLE_RTLD	32
 
 #ifdef IN_ASM
 
 .macro	get_untrusted_stk	reg
-	cmv		\reg, UNTRUSTED_STACK
+	_CMV		\reg, UNTRUSTED_STACK
 .endmacro
 
 .macro	set_untrusted_stk	reg
-	cmv		UNTRUSTED_STACK, \reg
+	_CMV		UNTRUSTED_STACK, \reg
 .endmacro
 
 /* outi must be the integer variant of out */
 .macro	get_rtld_stk		out, outi, tmp
-	lgc		STACK_TABLE_C, sealer_tidc
-	lc		STACK_TABLE_C, 0(STACK_TABLE_C)
+	_LGC		STACK_TABLE_C, sealer_tidc
+	_LC		STACK_TABLE_C, 0(STACK_TABLE_C)
 	csrr		\out, utidc
 	unseal_tidc	\out, STACK_TABLE_C, \out, \outi, \tmp
-	lc		STACK_TABLE_C, STACK_TABLE(\out)
-	lc		\out, STACK_TABLE_RTLD(STACK_TABLE_C)
+	_LC		STACK_TABLE_C, STACK_TABLE(\out)
+	_LC		\out, STACK_TABLE_RTLD(STACK_TABLE_C)
 .endmacro
 
 /* tidci must be the integer variant of tidc */
 .macro	unseal_tidc		out, unsealer, tidc, tidci, tmp
+#ifdef __riscv_zcheripurecap
 	scss		\tmp, \unsealer, \tidc
+#else
+	yss		\tmp, \unsealer, \tidc
+#endif
 	neg		\tmp, \tmp
 	and		\tidci, \tidci, \tmp
-	scaddr		\out, \unsealer, \tidci
+	_SCADDR		\out, \unsealer, \tidci
 .endmacro
 
 #else
@@ -84,7 +89,11 @@ get_trusted_tp(void)
 {
 	void *ptr;
 
+#ifdef __riscv_zcheripurecap
 	asm volatile ("cmv	%0, ctp" : "=C" (ptr));
+#else
+	asm volatile ("ymv	%0, tp" : "=C" (ptr));
+#endif
 	return (ptr);
 }
 
