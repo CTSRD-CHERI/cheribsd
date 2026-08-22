@@ -236,9 +236,9 @@ ENTRY(cpu_throw)
 	L_PTR	s10, (PCB_S + 10 * PTR_WIDTH)(x13)
 	L_PTR	s11, (PCB_S + 11 * PTR_WIDTH)(x13)
 
-#if __has_feature(capabilities) && defined(__riscv_zcheripurecap)
+#if __has_feature(capabilities) && !defined(__riscv_xcheri)
 	L_CAP	t0, (PCB_TIDC)(x13)
-	CSRW_CAP(utid, t0)
+	csrw	utidc, t0
 #endif
 
 	/* Is FPE enabled for new thread? */
@@ -292,8 +292,8 @@ ENTRY(cpu_switch)
 	S_PTR	s10, (PCB_S + 10 * PTR_WIDTH)(x13)
 	S_PTR	s11, (PCB_S + 11 * PTR_WIDTH)(x13)
 
-#if __has_feature(capabilities) && defined(__riscv_zcheripurecap)
-	CSRR_CAP(t0, utid)
+#if __has_feature(capabilities) && !defined(__riscv_xcheri)
+	csrr	t0, utidc
 	S_CAP	t0, (PCB_TIDC)(x13)
 #endif
 
@@ -386,9 +386,9 @@ ENTRY(cpu_switch)
 	L_PTR	s10, (PCB_S + 10 * PTR_WIDTH)(x13)
 	L_PTR	s11, (PCB_S + 11 * PTR_WIDTH)(x13)
 
-#if __has_feature(capabilities) && defined(__riscv_zcheripurecap)
+#if __has_feature(capabilities) && !defined(__riscv_xcheri)
 	L_CAP	t0, (PCB_TIDC)(x13)
-	CSRW_CAP(utid, t0)
+	csrw	utidc, t0
 #endif
 
 	/* Is FPE enabled for new thread? */
@@ -537,8 +537,8 @@ ENTRY(savectx)
 	S_CAP	s10, (PCB_S + 10 * CAP_WIDTH)(a0)
 	S_CAP	s11, (PCB_S + 11 * CAP_WIDTH)(a0)
 
-#if __has_feature(capabilities) && defined(__riscv_zcheripurecap)
-	CSRR_CAP(t0, utid)
+#if __has_feature(capabilities) && !defined(__riscv_xcheri)
+	csrr	t0, utidc
 	S_CAP	t0, (PCB_TIDC)(a0)
 #endif
 

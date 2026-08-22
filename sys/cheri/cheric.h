@@ -141,14 +141,16 @@
 
 #endif /* __WANT_OLD_CHERI_MACROS */
 
-#if defined(__riscv_zcheripurecap)
+#ifdef __riscv
+#ifndef __riscv_xcheri
 /* CLoadTags not available, just use gettag(load) instead. */
 #define cheri_loadtags(m) \
 	cheri_gettag(     \
 	    *(uintcap_t * __capability)(__cheri_tocap void * __capability)(m))
-#elif defined(__riscv)
+#else
 #define	cheri_loadtags(m)						\
 	__builtin_cheri_cap_load_tags((__cheri_tocap void * __capability)(m))
+#endif
 #else
 #define	cheri_loadtags(m)	__builtin_cheri_cap_load_tags((m))
 #endif
