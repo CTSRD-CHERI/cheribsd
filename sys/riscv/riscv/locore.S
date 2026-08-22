@@ -56,14 +56,10 @@
  * instructions and registers across RV64, xcheri and RV64Y.
  */
 .macro set_stvec newvec
-#ifdef __CHERI__
-#ifdef __riscv_xcheri
+#if defined(__CHERI__) && defined(__riscv_xcheri)
 	cspecialw	stcc, CAP(\newvec)
 #else
-	csrw		stvecc, \newvec
-#endif
-#else
-	csrw		stvec, \newvec
+	CSRW_CAP(stvec, \newvec)
 #endif
 .endmacro
 
@@ -84,7 +80,7 @@
 .endmacro
 
 .macro set_data_perm rd rs tmp
-#if defined(__riscv_zcheripurecap) && !defined(CHERI_RISCV_STD_093)
+#if defined(__riscv_y)
 	li		\tmp, ~CHERI_PERMS_KERNEL_DATA
 	ypermc		\rd, \rs, \tmp
 #else
@@ -98,7 +94,7 @@
 .endmacro
 
 .macro set_code_perm rd rs tmp
-#if defined(__riscv_zcheripurecap) && !defined(CHERI_RISCV_STD_093)
+#if defined(__riscv_y)
 	li		\tmp, ~CHERI_PERMS_KERNEL_CODE
 	ypermc		\rd, \rs, \tmp
 #else
@@ -124,14 +120,10 @@
 	yaddrw		t1, t1, t0
 	set_cap_mode	t0, t1, 1
 #endif
-#if __has_feature(capabilities)
-#ifdef __riscv_xcheri
+#if __has_feature(capabilities) && defined(__riscv_xcheri)
 	cspecialw	stcc, CAP(t0)
 #else
-	csrw		stvecc, t0
-#endif
-#else
-	csrw		stvec, t0
+	CSRW_CAP(stvec, t0)
 #endif
 .endmacro
 
