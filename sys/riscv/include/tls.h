@@ -53,9 +53,9 @@
 static __inline void
 _tcb_set(struct tcb *tcb)
 {
-#ifdef __CHERI_PURE_CAPABILITY__
-#ifdef __riscv_xcheri
-	__asm __volatile("cincoffset ctp, %0, %1" :: "C" (tcb),
+#ifdef __CHERI__
+#ifdef __riscv_y
+	__asm __volatile("yaddi tp, %0, %1" :: "C" (tcb),
 	    "I" (TLS_TCB_SIZE));
 #else
 	__asm __volatile("caddi ctp, %0, %1" :: "C" (tcb),
@@ -71,9 +71,9 @@ _tcb_get(void)
 {
 	struct tcb *tcb;
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#ifdef __riscv_xcheri
-	__asm __volatile("cincoffset %0, ctp, %1" : "=C" (tcb) :
+#ifdef __CHERI__
+#ifdef __riscv_y
+	__asm __volatile("yaddi %0, tp, %1" : "=C" (tcb) :
 	    "I" (-TLS_TCB_SIZE));
 #else
 	__asm __volatile("caddi %0, ctp, %1" : "=C" (tcb) :
