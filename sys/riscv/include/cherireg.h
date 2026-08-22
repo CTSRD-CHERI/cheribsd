@@ -106,7 +106,7 @@
 #endif
 #endif /* !_KERNEL */
 
-#ifdef __riscv_zcheripurecap
+#if defined(__riscv_zcheripurecap) || defined(__riscv_y)
 /*
  * Re-define these because RVY cheriintrin.h uses different names.
  * XXX-AM: Ideally we unify on a single naming convention.
@@ -342,7 +342,7 @@
 #define	_CHERI_EXCCODE_RESERVED1d	0x1d
 #define	_CHERI_EXCCODE_RESERVED1e	0x1e
 #define	_CHERI_EXCCODE_RESERVED1f	0x1f
-#elif defined(__riscv_zcheripurecap) && defined(CHERI_RISCV_STD_093)
+#elif defined(__riscv_zcheripurecap)
 #define	CHERI_EXCTYPE_FETCH_FAULT	0x00
 #define	CHERI_EXCTYPE_DATA_FAULT	0x01
 #define	CHERI_EXCTYPE_BRANCH_FAULT	0x02
@@ -351,7 +351,7 @@
 #define	CHERI_EXCCODE_PERMS		0x02
 #define	CHERI_EXCCODE_ADDRESS		0x03
 #define	CHERI_EXCCODE_BOUNDS		0x04
-#endif /* defined(__riscv_zcheripurecap) && defined(CHERI_RISCV_STD_093) */
+#endif /* defined(__riscv_zcheripurecap) */
 
 /*
  * Derive an unbounded pointer before initial relocation.  For
