@@ -1,0 +1,6 @@
+#NO_UNIVERSE
+
+include "QEMU"
+include "std.RVY-093-PURECAP"
+
+ident RVY-093-PURECAP-QEMU
