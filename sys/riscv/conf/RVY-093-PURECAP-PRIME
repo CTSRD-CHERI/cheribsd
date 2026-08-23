@@ -2,11 +2,9 @@
 
 include "GENERIC"
 include "std.MFS-ROOT"
-include "std.RVY-PURECAP"
+include "std.RVY-093-PURECAP"
 
-ident RVY-PURECAP-PRIME
+ident RVY-093-PURECAP-PRIME
 
 options 	FDT
 options         HZ=100
-
-
