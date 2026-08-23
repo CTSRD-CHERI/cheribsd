@@ -1308,7 +1308,7 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_sparc6jumptoEv)
 
 .macro restore_fpr num, ctxreg
 #ifdef __CHERI_PURE_CAPABILITY__
-  fld    f\num, (RISCV_FOFFSET + RISCV_FSIZE * \num)(c\ctxreg)
+  fld    f\num, (RISCV_FOFFSET + RISCV_FSIZE * \num)(\ctxreg)
 #else
   FLOAD  f\num, (RISCV_FOFFSET + RISCV_FSIZE * \num)(\ctxreg)
 #endif
@@ -1316,7 +1316,7 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_sparc6jumptoEv)
 
 .macro restore_gpr num, ctxreg
 #ifdef __CHERI_PURE_CAPABILITY__
-  lc    c\num, (__SIZEOF_CHERI_CAPABILITY__ * \num)(c\ctxreg)
+  ly    x\num, (__SIZEOF_CHERI_CAPABILITY__ * \num)(\ctxreg)
 #else
   ILOAD x\num, (RISCV_ISIZE * \num)(\ctxreg)
 #endif
@@ -1333,13 +1333,13 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_riscv6jumptoEv)
 #ifdef _LIBUNWIND_HAS_CHERI_LIB_C18N
   // Preserve the argument in a callee-saved register instead of pushing it onto
   // the stack because stack unwinding will switch the stack.
-  cmv      cs1, ca0
+  ymv      s1, a0
   // Pass the target untrusted stack pointer
-  lc       ca0, (__SIZEOF_CHERI_CAPABILITY__ * 2)(cs1)
+  ly       a0, (__SIZEOF_CHERI_CAPABILITY__ * 2)(s1)
   // Pass the target trusted stack pointer
-  lc       ca1, (__SIZEOF_CHERI_CAPABILITY__ * 32)(cs1)
+  ly       a1, (__SIZEOF_CHERI_CAPABILITY__ * 32)(s1)
   call     dl_c18n_unwind_trusted_stack
-  cmv      ca0, cs1
+  ymv      a0, s1
 #endif
 
 # if defined(__riscv_flen)
@@ -1350,7 +1350,7 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_riscv6jumptoEv)
 
   // x0 is zero
 #ifdef __CHERI_PURE_CAPABILITY__
-  lc       c1, (__SIZEOF_CHERI_CAPABILITY__ * 0)(ca0) // restore pc into ra
+  ly       x1, (__SIZEOF_CHERI_CAPABILITY__ * 0)(a0) // restore pc into ra
 #else
   ILOAD    x1, (RISCV_ISIZE * 0)(a0) // restore pc into ra
 #endif
