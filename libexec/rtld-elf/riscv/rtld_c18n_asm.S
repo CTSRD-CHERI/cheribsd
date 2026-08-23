@@ -43,69 +43,69 @@ ENTRY(_rtld_sighandler)
 	/*
 	 * The function is executing on a sigaltstack. Switch to RTLD's stack.
 	 */
-	get_rtld_stk		ca3, a3, t0
+	get_rtld_stk		a3, a3, t0
 	/*
 	 * Allocate a sigframe on RTLD's stack.
 	 */
-	caddi			ca3, ca3, -SIG_FRAME_SIZE
-	set_untrusted_stk	ca3
+	ADDI_PTR		a3, a3, -SIG_FRAME_SIZE
+	set_untrusted_stk	a3
 	j			_rtld_sighandler_impl
 END(_rtld_sighandler)
 
 .macro save_arguments
-	caddi	csp, csp, -(10 * CLEN_BYTES + 8 * 8)
+	ADDI_PTR	sp, sp, -(10 * CLEN_BYTES + 8 * 8)
 
 	/* Save floating point arguments */
-	fsd	fa0, (0 * 8)(csp)
-	fsd	fa1, (1 * 8)(csp)
-	fsd	fa2, (2 * 8)(csp)
-	fsd	fa3, (3 * 8)(csp)
-	fsd	fa4, (4 * 8)(csp)
-	fsd	fa5, (5 * 8)(csp)
-	fsd	fa6, (6 * 8)(csp)
-	fsd	fa7, (7 * 8)(csp)
+	fsd	fa0, (0 * 8)(sp)
+	fsd	fa1, (1 * 8)(sp)
+	fsd	fa2, (2 * 8)(sp)
+	fsd	fa3, (3 * 8)(sp)
+	fsd	fa4, (4 * 8)(sp)
+	fsd	fa5, (5 * 8)(sp)
+	fsd	fa6, (6 * 8)(sp)
+	fsd	fa7, (7 * 8)(sp)
 
 	/* Save argument registers */
-	sc	ca0, (0 * CLEN_BYTES + 8 * 8)(csp)
-	sc	ca1, (1 * CLEN_BYTES + 8 * 8)(csp)
-	sc	ca2, (2 * CLEN_BYTES + 8 * 8)(csp)
-	sc	ca3, (3 * CLEN_BYTES + 8 * 8)(csp)
-	sc	ca4, (4 * CLEN_BYTES + 8 * 8)(csp)
-	sc	ca5, (5 * CLEN_BYTES + 8 * 8)(csp)
-	sc	ca6, (6 * CLEN_BYTES + 8 * 8)(csp)
-	sc	ca7, (7 * CLEN_BYTES + 8 * 8)(csp)
-	sc	ct6, (8 * CLEN_BYTES + 8 * 8)(csp)
+	S_PTR	a0, (0 * CLEN_BYTES + 8 * 8)(sp)
+	S_PTR	a1, (1 * CLEN_BYTES + 8 * 8)(sp)
+	S_PTR	a2, (2 * CLEN_BYTES + 8 * 8)(sp)
+	S_PTR	a3, (3 * CLEN_BYTES + 8 * 8)(sp)
+	S_PTR	a4, (4 * CLEN_BYTES + 8 * 8)(sp)
+	S_PTR	a5, (5 * CLEN_BYTES + 8 * 8)(sp)
+	S_PTR	a6, (6 * CLEN_BYTES + 8 * 8)(sp)
+	S_PTR	a7, (7 * CLEN_BYTES + 8 * 8)(sp)
+	S_PTR	t6, (8 * CLEN_BYTES + 8 * 8)(sp)
 
 	/* Save return address */
-	sc	cra, (9 * CLEN_BYTES + 8 * 8)(csp)
+	S_PTR	ra, (9 * CLEN_BYTES + 8 * 8)(sp)
 .endmacro
 
 .macro restore_arguments
 	/* Restore floating point arguments */
-	fsd	fa0, (0 * 8)(csp)
-	fsd	fa1, (1 * 8)(csp)
-	fsd	fa2, (2 * 8)(csp)
-	fsd	fa3, (3 * 8)(csp)
-	fsd	fa4, (4 * 8)(csp)
-	fsd	fa5, (5 * 8)(csp)
-	fsd	fa6, (6 * 8)(csp)
-	fsd	fa7, (7 * 8)(csp)
+	fsd	fa0, (0 * 8)(sp)
+	fsd	fa1, (1 * 8)(sp)
+	fsd	fa2, (2 * 8)(sp)
+	fsd	fa3, (3 * 8)(sp)
+	fsd	fa4, (4 * 8)(sp)
+	fsd	fa5, (5 * 8)(sp)
+	fsd	fa6, (6 * 8)(sp)
+	fsd	fa7, (7 * 8)(sp)
 
 	/* Restore argument registers */
-	lc	ca0, (0 * CLEN_BYTES + 8 * 8)(csp)
-	lc	ca1, (1 * CLEN_BYTES + 8 * 8)(csp)
-	lc	ca2, (2 * CLEN_BYTES + 8 * 8)(csp)
-	lc	ca3, (3 * CLEN_BYTES + 8 * 8)(csp)
-	lc	ca4, (4 * CLEN_BYTES + 8 * 8)(csp)
-	lc	ca5, (5 * CLEN_BYTES + 8 * 8)(csp)
-	lc	ca6, (6 * CLEN_BYTES + 8 * 8)(csp)
-	lc	ca7, (7 * CLEN_BYTES + 8 * 8)(csp)
-	lc	ct6, (8 * CLEN_BYTES + 8 * 8)(csp)
+	L_PTR	a0, (0 * CLEN_BYTES + 8 * 8)(sp)
+	L_PTR	a1, (1 * CLEN_BYTES + 8 * 8)(sp)
+	L_PTR	a2, (2 * CLEN_BYTES + 8 * 8)(sp)
+	L_PTR	a3, (3 * CLEN_BYTES + 8 * 8)(sp)
+	L_PTR	a4, (4 * CLEN_BYTES + 8 * 8)(sp)
+	L_PTR	a5, (5 * CLEN_BYTES + 8 * 8)(sp)
+	L_PTR	a6, (6 * CLEN_BYTES + 8 * 8)(sp)
+	L_PTR	a7, (7 * CLEN_BYTES + 8 * 8)(sp)
+	L_PTR	t6, (8 * CLEN_BYTES + 8 * 8)(sp)
 
 	/* Restore return address */
-	lc	cra, (9 * CLEN_BYTES + 8 * 8)(csp)
+	L_PTR	ra, (9 * CLEN_BYTES + 8 * 8)(sp)
 
-	caddi	csp, csp, (10 * CLEN_BYTES + 8 * 8)
+	ADDI_PTR	sp, sp, (10 * CLEN_BYTES + 8 * 8)
 .endmacro
 
 /*
@@ -117,7 +117,7 @@ ENTRY(create_untrusted_stk)
 	/*
 	 * NON-STANDARD CALLING CONVENTION
 	 *
-	 * cs7: Callee to be tail-called
+	 * s7: Callee to be tail-called
 	 * t3: Callee's compartment ID
 	 *
 	 * The function resolves the callee's stack, installs it, and tail-calls
@@ -131,23 +131,23 @@ ENTRY(create_untrusted_stk)
 	 * The execution stack is still the caller's stack. Switch to RTLD's
 	 * stack.
 	 */
-	get_rtld_stk		ct0, t0, t1
-	set_untrusted_stk	ct0
+	get_rtld_stk		t0, t0, t1
+	set_untrusted_stk	t0
 
 	save_arguments
 
 	move		a0, t3
 	jal		resolve_untrusted_stk_impl
-	cmv		ct0, ca0
+	MV_PTR		t0, a0
 
 	restore_arguments
 
-	set_untrusted_stk	ct0
+	set_untrusted_stk	t0
 
 	/*
 	 * Clear temporary registers, except:
-	 * ct0: Callee's stack
-	 * ct6: Memory arguments
+	 * t0: Callee's stack
+	 * t6: Memory arguments
 	 */
 	li		t1, 0
 	li		t2, 0
@@ -156,12 +156,12 @@ ENTRY(create_untrusted_stk)
 	li		t5, 0
 
 	/*
-	 * All callee-saved registers are safe except cs4 and cs5
+	 * All callee-saved registers are safe except s4 and s5
 	 */
 	li		s4, 0
 	li		s5, 0
 
-	jr		cs7
+	jr		s7
 END(create_untrusted_stk)
 
 /*
@@ -172,7 +172,7 @@ ENTRY(tramp_hook)
 	/*
 	 * NON-STANDARD CALLING CONVENTION
 	 *
-	 * ct0-ct1 hold the first two arguments of tramp_hook.
+	 * t0-t1 hold the first two arguments of tramp_hook.
 	 *
 	 * All argument registers, callee-saved registers, and arguments used
 	 * by the stack resolver must be preserved.
@@ -185,8 +185,8 @@ ENTRY(tramp_hook)
 	 */
 	move		s1, t3
 
-	cmv		ca0, ct0
-	cmv		ca1, ct1
+	MV_PTR		a0, t0
+	MV_PTR		a1, t1
 	jal		tramp_hook_impl
 
 	/*
@@ -221,27 +221,27 @@ END(tramp_hook)
 	.word	label - end_##tramp
 
 #define	TRUSTED_STACK_S		t4
-#define	TRUSTED_STACK_C		ct4
+#define	TRUSTED_STACK_C		t4
 #undef	CHERI_C18N_ZICOND
 
 TRAMP(tramp_push_frame)
-1:	auipc		ct0, 0
+1:	auipc		t0, 0
 .option push
 .option norvc
 	/*
 	 * Get the unsealer for the thread identifier buffer.
 	 */
-2:	lc		ct1, 0(ct0)		/* To be patched at runtime */
+2:	L_PTR		t1, 0(t0)		/* To be patched at runtime */
 .option pop
 	/*
 	 * Get and unseal the thread identifier buffer.
 	 */
-	csrr		ct2, utidc
-	unseal_tidc	ct1, ct1, ct2, t2, t3
+	csrr		t2, utidc
+	unseal_tidc	t1, t1, t2, t2, t3
 	/*
 	 * Get the trusted stack.
 	 */
-	lc		TRUSTED_STACK_C, TRUSTED_STACK(ct1)
+	L_PTR		TRUSTED_STACK_C, TRUSTED_STACK(t1)
 
 	/*
 	 * Load the caller's compartment ID from the previous trusted frame.
@@ -262,39 +262,39 @@ TRAMP(tramp_push_frame)
 	 */
 	bne		t2, t3, 10f
 	/*
-	 * Load the target capability and overwrite ct1.
+	 * Load the target capability and overwrite t1.
 	 */
 .option push
 .option norvc
-5:	lc		ct1, 0(ct0)		/* To be patched at runtime */
+5:	L_PTR		t1, 0(t0)		/* To be patched at runtime */
 .option pop
 	li		t0, 0
 	/*
 	 * Use ct4 as the link register to overwrite it with the slow path
 	 * entry point, which is harmless, without polluting the RAS.
 	 */
-	jalr		ct4, ct1
+	jalr		t4, t1
 
 	/*
 	 * Entry point of the slow path.
 	 */
-6:	cllc		ct0, 1b
+6:	LLA_PTR		t0, 1b
 .option push
 .option norvc
 	/*
 	 * Get the unsealer for the thread identifier buffer.
 	 */
-7:	lc		ct1, 0(ct0)		/* To be patched at runtime */
+7:	L_PTR		t1, 0(t0)		/* To be patched at runtime */
 .option pop
 	/*
 	 * Get and unseal the thread identifier buffer.
 	 */
-	csrr		ct2, utidc
-	unseal_tidc	ct1, ct1, ct2, t2, t3
+	csrr		t2, utidc
+	unseal_tidc	t1, t1, t2, t2, t3
 	/*
 	 * Get the trusted stack.
 	 */
-	lc		TRUSTED_STACK_C, TRUSTED_STACK(ct1)
+	L_PTR		TRUSTED_STACK_C, TRUSTED_STACK(t1)
 
 	/*
 	 * Load the caller's compartment ID from the previous trusted frame.
@@ -313,37 +313,37 @@ TRAMP(tramp_push_frame)
 	/*
 	 * Get the stack lookup table.
 	 */
-	lc		STACK_TABLE_C, STACK_TABLE(ct1)
+	L_PTR		STACK_TABLE_C, STACK_TABLE(t1)
 	/*
 	 * Load the caller's old stack top from the stack lookup table and save
 	 * it in the trusted frame.
 	 */
-	sc		cs11, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 10)(TRUSTED_STACK_C)
-	cadd		STACK_TABLE_C, STACK_TABLE_C, t2
-	lc		cs11, 0(STACK_TABLE_C)
+	S_PTR		s11, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 10)(TRUSTED_STACK_C)
+	ADD_PTR		STACK_TABLE_C, STACK_TABLE_C, t2
+	L_PTR		s11, 0(STACK_TABLE_C)
 	/*
 	 * Store the caller's current stack top in the stack lookup table. The
 	 * current stack top is rederived from the old stack top to inductively
 	 * guarantee that the stack has not been swapped.
 	 */
-	scaddr		csp, cs11, sp
-	sc		csp, 0(STACK_TABLE_C)
+	yaddrw		sp, s11, sp
+	S_PTR		sp, 0(STACK_TABLE_C)
 
 	/*
 	 * Save the caller's old stack top.
 	 */
-	sc		cs11, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + TRUSTED_FRAME_SP_OSP + CLEN_BYTES)(TRUSTED_STACK_C)
+	S_PTR		s11, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + TRUSTED_FRAME_SP_OSP + CLEN_BYTES)(TRUSTED_STACK_C)
 	/*
 	 * Get the length of the stack lookup table.
 	 */
-	gclen		s11, STACK_TABLE_C
+	ylenr		s11, STACK_TABLE_C
 	/*
 	 * Compare the compartment ID to the length of the stack lookup table.
 	 * If the stack lookup table index is out-of-bounds, set it to zero.
 	 */
-	sc		cs10, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 9)(TRUSTED_STACK_C)
+	S_PTR		s10, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 9)(TRUSTED_STACK_C)
 	sltu		s10, t3, s11
-	sc		cs9, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 8)(TRUSTED_STACK_C)
+	S_PTR		s9, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 8)(TRUSTED_STACK_C)
 #ifdef CHERI_C18N_ZICOND
 	//czero.eqz	s9, t3, s10
 	//.word		0x0f8d5c33
@@ -351,72 +351,72 @@ TRAMP(tramp_push_frame)
 	neg		s9, s10
 	and		s9, t3, s9
 #endif
-	sc		cs8, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 7)(TRUSTED_STACK_C)
+	S_PTR		s8, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 7)(TRUSTED_STACK_C)
 	sub		s8, s9, t2
 	/*
 	 * Load the callee's stack if the stack lookup table index is within
 	 * bounds. Otherwise the resolver will be loaded.
 	 */
-	cadd		STACK_TABLE_C, STACK_TABLE_C, s8
-	lc		ct5, 0(STACK_TABLE_C)
+	ADD_PTR		STACK_TABLE_C, STACK_TABLE_C, s8
+	L_PTR		t5, 0(STACK_TABLE_C)
 
 	/*
 	 * Load the target capability.
 	 */
-	sc		cs7, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 6)(TRUSTED_STACK_C)
+	S_PTR		s7, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 6)(TRUSTED_STACK_C)
 .option push
 .option norvc
-11:	lc		cs7, 0(ct0)		/* To be patched at runtime */
+11:	L_PTR		s7, 0(t0)		/* To be patched at runtime */
 .option pop
 	/*
 	 * Get the type of the loaded value. The resolver is loaded iff the
 	 * type is 1.
 	 */
-	sc		cs6, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 5)(TRUSTED_STACK_C)
-	gctype		s6, ct5
+	S_PTR		s6, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 5)(TRUSTED_STACK_C)
+	ytyper		s6, t5
 	/*
 	 * If the resolver is loaded, keep the stack unchanged. Otherwise,
 	 * install the callee's stack.
 	 */
-	sc		cs5, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 4)(TRUSTED_STACK_C)
-	cmv		cs5, ct5
+	S_PTR		s5, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 4)(TRUSTED_STACK_C)
+	MV_PTR		s5, t5
 	/*
 	 * If the resolver is loaded, set the branch target to it. Otherwise,
 	 * install the callee.
 	 */
-	sc		cs4, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 3)(TRUSTED_STACK_C)
-	cmv		cs4, cs7
+	S_PTR		s4, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 3)(TRUSTED_STACK_C)
+	MV_PTR		s4, s7
 	beqz		s6, 12f
-	cmv		cs5, csp
-	cmv		cs4, ct5
+	MV_PTR		s5, sp
+	MV_PTR		s4, t5
 12:
 
 	/*
 	 * Load the landing address from the previous trusted frame.
 	 */
-	sc		cs3, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 2)(TRUSTED_STACK_C)
+	S_PTR		s3, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 2)(TRUSTED_STACK_C)
 	ld		s3, TRUSTED_FRAME_LANDING(TRUSTED_STACK_C)
 	/*
 	 * Load the existing number of return value registers.
 	 */
-	sc		cs2, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 1)(TRUSTED_STACK_C)
+	S_PTR		s2, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 1)(TRUSTED_STACK_C)
 	lbu		s2, (TRUSTED_FRAME_CALLEE + 2)(TRUSTED_STACK_C)
 	/*
 	 * Get the tag of the return capability.
 	 */
-	sc		cs1, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 0)(TRUSTED_STACK_C)
-	gctag		s1, cra
+	S_PTR		s1, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 0)(TRUSTED_STACK_C)
+	ytagr		s1, ra
 	/*
 	 * Save the return address, the frame pointer, and the caller's current
 	 * stack top.
 	 */
-	sc		cs0, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 11)(TRUSTED_STACK_C)
-	sc		cra, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 12)(TRUSTED_STACK_C)
-	sc		csp, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + TRUSTED_FRAME_SP_OSP)(TRUSTED_STACK_C)
+	S_PTR		s0, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 11)(TRUSTED_STACK_C)
+	S_PTR		ra, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + CLEN_BYTES * 12)(TRUSTED_STACK_C)
+	S_PTR		sp, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + TRUSTED_FRAME_SP_OSP)(TRUSTED_STACK_C)
 	/*
 	 * Save the address of the previous trusted frame.
 	 */
-	sc		TRUSTED_STACK_C, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + TRUSTED_FRAME_PREV)(TRUSTED_STACK_C)
+	S_PTR		TRUSTED_STACK_C, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + TRUSTED_FRAME_PREV)(TRUSTED_STACK_C)
 	/*
 	 * Save the compartment ID of the caller.
 	 */
@@ -444,10 +444,10 @@ c18n_tramp_entry_slow_offset:
 TRAMP(tramp_count_entry)
 .option push
 .option norvc
-1:	lc		cs9, 0(ct0)		/* To be patched at runtime */
+1:	L_PTR		s9, 0(t0)		/* To be patched at runtime */
 .option pop
 	li		s8, 1
-	camoadd.d	x0, s8, (cs9)
+	amoadd.d	x0, s8, (s9)
 TRAMPEND(tramp_count_entry)
 
 PATCH_POINT(tramp_count_entry, counter, 1b)
@@ -474,8 +474,8 @@ TRAMP(tramp_push_frame_2)
 	neg		s1, s1
 	and		s2, s2, s1
 #endif
-	cadd		TRUSTED_STACK_C, TRUSTED_STACK_C, s6
-	sc		TRUSTED_STACK_C, TRUSTED_STACK(ct1)
+	ADD_PTR		TRUSTED_STACK_C, TRUSTED_STACK_C, s6
+	S_PTR		TRUSTED_STACK_C, TRUSTED_STACK(t1)
 
 	/*
 	 * Save the callee's compartment ID.
@@ -505,22 +505,22 @@ TRAMP(tramp_push_frame_2)
 	 * previous store instruction, the callee as identified by the topmost
 	 * trusted frame would be inconsistent with the untrusted stack.
 	 */
-	set_untrusted_stk	cs5
+	set_untrusted_stk	s5
 TRAMPEND(tramp_push_frame_2)
 
 PATCH_POINT(tramp_push_frame_2, n_rets, 6b)
 PATCH_POINT(tramp_push_frame_2, landing, 7b)
 
 TRAMP(tramp_call_hook)
-1:	auipc		ct1, 0
+1:	auipc		t1, 0
 .option push
 .option norvc
-2:	lc		ct2, 0(ct1)		/* To be patched at runtime */
+2:	L_PTR		t2, 0(t1)		/* To be patched at runtime */
 
 3:	li		t0, 0			/* To be patched at runtime */
-4:	caddi		ct1, ct1, 0		/* To be patched at runtime */
+4:	ADDI_PTR	t1, t1, 0		/* To be patched at runtime */
 .option pop
-	jalr		cra, ct2
+	jalr		ra, t2
 TRAMPEND(tramp_call_hook)
 
 PATCH_POINT(tramp_call_hook, pcc, 1b)
@@ -529,11 +529,11 @@ PATCH_POINT(tramp_call_hook, event, 3b)
 PATCH_POINT(tramp_call_hook, header, 4b)
 
 /*
- * Save the address of the current frame to cs0 so that unwinders can locate
+ * Save the address of the current frame to s0 so that unwinders can locate
  * it.
  */
 TRAMP(tramp_update_fp)
-	caddi		cs0, TRUSTED_STACK_C, TRUSTED_FRAME_SP_OSP
+	ADDI_PTR	s0, TRUSTED_STACK_C, TRUSTED_FRAME_SP_OSP
 TRAMPEND(tramp_update_fp)
 
 TRAMP(tramp_update_fp_untagged)
@@ -560,66 +560,66 @@ TRAMPEND(tramp_clear_args)
 
 TRAMP(tramp_invoke)
 	li		TRUSTED_STACK_S, 0
-	jalr		cra, cs4
+	jalr		ra, s4
 TRAMPEND(tramp_invoke)
 
 TRAMP(tramp_count_return)
-	camoadd.d	x0, s8, (cs9)
+	amoadd.d	x0, s8, (s9)
 TRAMPEND(tramp_count_return)
 
 TRAMP(tramp_pop_frame)
-1:	auipc		ct3, 0
+1:	auipc		t3, 0
 .option push
 .option norvc
 	/*
 	 * Get the unsealer for the thread identifier buffer.
 	 */
-2:	lc		ct3, 0(ct3)		/* To be patched at runtime */
+2:	L_PTR		t3, 0(t3)		/* To be patched at runtime */
 .option pop
 	/*
 	 * Get and unseal the thread identifier buffer.
 	 */
-	csrr		ct0, utidc
-	unseal_tidc	ct3, ct3, ct0, t0, t1
+	csrr		t0, utidc
+	unseal_tidc	t3, t3, t0, t0, t1
 
 	/*
 	 * Get the trusted stack.
 	 */
-	lc		TRUSTED_STACK_C, TRUSTED_STACK(ct3)
+	L_PTR		TRUSTED_STACK_C, TRUSTED_STACK(t3)
 	/*
 	 * Load the address of the previous trusted frame, the compartment ID
 	 * of the caller, and the number of return values registers.
 	 */
-	lc		ct6, TRUSTED_FRAME_PREV(TRUSTED_STACK_C)
+	L_PTR		t6, TRUSTED_FRAME_PREV(TRUSTED_STACK_C)
 	lhu		t2, TRUSTED_FRAME_CALLER(TRUSTED_STACK_C)
 	lbu		a7, (TRUSTED_FRAME_CALLEE + 2)(TRUSTED_STACK_C)
 	/*
 	 * Load the caller's current stack top and old stack top.
 	 */
-	lc		ca6, (TRUSTED_FRAME_SP_OSP)(TRUSTED_STACK_C)
-	lc		ca5, (TRUSTED_FRAME_SP_OSP + CLEN_BYTES)(TRUSTED_STACK_C)
+	L_PTR		a6, (TRUSTED_FRAME_SP_OSP)(TRUSTED_STACK_C)
+	L_PTR		a5, (TRUSTED_FRAME_SP_OSP + CLEN_BYTES)(TRUSTED_STACK_C)
 
 	/*
 	 * Get the stack lookup table.
 	 */
-	lc		STACK_TABLE_C, STACK_TABLE(ct3)
+	L_PTR		STACK_TABLE_C, STACK_TABLE(t3)
 
 	/*
 	 * Restore callee-saved registers.
 	 */
-	lc		cs1, (CLEN_BYTES * 0)(TRUSTED_STACK_C)
-	lc		cs2, (CLEN_BYTES * 1)(TRUSTED_STACK_C)
-	lc		cs3, (CLEN_BYTES * 2)(TRUSTED_STACK_C)
-	lc		cs4, (CLEN_BYTES * 3)(TRUSTED_STACK_C)
-	lc		cs5, (CLEN_BYTES * 4)(TRUSTED_STACK_C)
-	lc		cs6, (CLEN_BYTES * 5)(TRUSTED_STACK_C)
-	lc		cs7, (CLEN_BYTES * 6)(TRUSTED_STACK_C)
-	lc		cs8, (CLEN_BYTES * 7)(TRUSTED_STACK_C)
-	lc		cs9, (CLEN_BYTES * 8)(TRUSTED_STACK_C)
-	lc		cs10, (CLEN_BYTES * 9)(TRUSTED_STACK_C)
-	lc		cs11, (CLEN_BYTES * 10)(TRUSTED_STACK_C)
-	lc		cs0, (CLEN_BYTES * 11)(TRUSTED_STACK_C)
-	lc		cra, (CLEN_BYTES * 12)(TRUSTED_STACK_C)
+	L_PTR		s1, (CLEN_BYTES * 0)(TRUSTED_STACK_C)
+	L_PTR		s2, (CLEN_BYTES * 1)(TRUSTED_STACK_C)
+	L_PTR		s3, (CLEN_BYTES * 2)(TRUSTED_STACK_C)
+	L_PTR		s4, (CLEN_BYTES * 3)(TRUSTED_STACK_C)
+	L_PTR		s5, (CLEN_BYTES * 4)(TRUSTED_STACK_C)
+	L_PTR		s6, (CLEN_BYTES * 5)(TRUSTED_STACK_C)
+	L_PTR		s7, (CLEN_BYTES * 6)(TRUSTED_STACK_C)
+	L_PTR		s8, (CLEN_BYTES * 7)(TRUSTED_STACK_C)
+	L_PTR		s9, (CLEN_BYTES * 8)(TRUSTED_STACK_C)
+	L_PTR		s10, (CLEN_BYTES * 9)(TRUSTED_STACK_C)
+	L_PTR		s11, (CLEN_BYTES * 10)(TRUSTED_STACK_C)
+	L_PTR		s0, (CLEN_BYTES * 11)(TRUSTED_STACK_C)
+	L_PTR		ra, (CLEN_BYTES * 12)(TRUSTED_STACK_C)
 
 	/*
 	 * Install the caller's stack.
@@ -628,17 +628,17 @@ TRAMP(tramp_pop_frame)
 	 * the callee as identified by the topmost trusted frame would be
 	 * inconsistent with the untrusted stack.
 	 */
-	set_untrusted_stk	ca6
+	set_untrusted_stk	a6
 	/*
 	 * Bump the trusted stack pointer.
 	 */
-	sc		ct6, TRUSTED_STACK(ct3)
+	S_PTR		t6, TRUSTED_STACK(t3)
 
 	/*
 	 * Store the caller's old stack top in the stack lookup table.
 	 */
-	cadd		STACK_TABLE_C, STACK_TABLE_C, t2
-	sc		ca5, 0(STACK_TABLE_C)
+	ADD_PTR		STACK_TABLE_C, STACK_TABLE_C, t2
+	S_PTR		a5, 0(STACK_TABLE_C)
 
 	/*
 	 * Extract the number of return value registers. The number of return

@@ -42,39 +42,39 @@
 
 #define	INST_ALIGN		2
 
-#define	UNTRUSTED_STACK		csp
+#define	UNTRUSTED_STACK		sp
 #define	TRUSTED_STACK		0
 #define	STACK_TABLE		CLEN_BYTES
 #define	STACK_TABLE_N		5
-#define	STACK_TABLE_C		__CONCAT(ct, STACK_TABLE_N)
+#define	STACK_TABLE_C		__CONCAT(t, STACK_TABLE_N)
 #define	STACK_TABLE_RTLD	32
 
 #ifdef IN_ASM
 
 .macro	get_untrusted_stk	reg
-	cmv		\reg, UNTRUSTED_STACK
+	MV_PTR		\reg, UNTRUSTED_STACK
 .endmacro
 
 .macro	set_untrusted_stk	reg
-	cmv		UNTRUSTED_STACK, \reg
+	MV_PTR		UNTRUSTED_STACK, \reg
 .endmacro
 
 /* outi must be the integer variant of out */
 .macro	get_rtld_stk		out, outi, tmp
-	lgc		STACK_TABLE_C, sealer_tidc
-	lc		STACK_TABLE_C, 0(STACK_TABLE_C)
+	LA_PTR		STACK_TABLE_C, sealer_tidc
+	L_PTR		STACK_TABLE_C, 0(STACK_TABLE_C)
 	csrr		\out, utidc
 	unseal_tidc	\out, STACK_TABLE_C, \out, \outi, \tmp
-	lc		STACK_TABLE_C, STACK_TABLE(\out)
-	lc		\out, STACK_TABLE_RTLD(STACK_TABLE_C)
+	L_PTR		STACK_TABLE_C, STACK_TABLE(\out)
+	L_PTR		\out, STACK_TABLE_RTLD(STACK_TABLE_C)
 .endmacro
 
 /* tidci must be the integer variant of tidc */
 .macro	unseal_tidc		out, unsealer, tidc, tidci, tmp
-	scss		\tmp, \unsealer, \tidc
+	yss		\tmp, \unsealer, \tidc
 	neg		\tmp, \tmp
 	and		\tidci, \tidci, \tmp
-	scaddr		\out, \unsealer, \tidci
+	yaddrw		\out, \unsealer, \tidci
 .endmacro
 
 #else
@@ -84,7 +84,7 @@ get_trusted_tp(void)
 {
 	void *ptr;
 
-	asm volatile ("cmv	%0, ctp" : "=C" (ptr));
+	asm volatile ("ymv	%0, tp" : "=C" (ptr));
 	return (ptr);
 }
 
