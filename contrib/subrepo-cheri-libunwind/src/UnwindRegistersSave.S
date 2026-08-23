@@ -1237,7 +1237,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 
 .macro save_fpr num, ctxreg
 #ifdef __CHERI_PURE_CAPABILITY__
-  fsd    f\num, (RISCV_FOFFSET + RISCV_FSIZE * \num)(c\ctxreg)
+  fsd    f\num, (RISCV_FOFFSET + RISCV_FSIZE * \num)(\ctxreg)
 #else
   FSTORE f\num, (RISCV_FOFFSET + RISCV_FSIZE * \num)(\ctxreg)
 #endif
@@ -1245,7 +1245,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 
 .macro save_gpr num, ctxreg
 #ifdef __CHERI_PURE_CAPABILITY__
-  sc     c\num, (__SIZEOF_CHERI_CAPABILITY__ * \num)(c\ctxreg)
+  sy     x\num, (__SIZEOF_CHERI_CAPABILITY__ * \num)(\ctxreg)
 #else
   ISTORE x\num, (RISCV_ISIZE * \num)(\ctxreg)
 #endif
@@ -1259,7 +1259,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 #
 DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 #ifdef __CHERI_PURE_CAPABILITY__
-  sc        c1, (__SIZEOF_CHERI_CAPABILITY__ * 0)(ca0) // store ra as pc
+  sy        x1, (__SIZEOF_CHERI_CAPABILITY__ * 0)(a0) // store ra as pc
 #else
   ISTORE    x1, (RISCV_ISIZE * 0)(a0) // store ra as pc
 #endif
@@ -1275,15 +1275,15 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 
 #ifdef _LIBUNWIND_HAS_CHERI_LIB_C18N
   // Store the trusted stack pointer
-  caddi     csp, csp, -(__SIZEOF_CHERI_CAPABILITY__ * 2)
-  sc        ca0, 0(csp)
-  sc        cra, __SIZEOF_CHERI_CAPABILITY__(csp)
-  cmv       ca0, cra
+  yaddi     sp, sp, -(__SIZEOF_CHERI_CAPABILITY__ * 2)
+  sy        a0, 0(sp)
+  sy        ra, __SIZEOF_CHERI_CAPABILITY__(sp)
+  ymv       a0, ra
   call      dl_c18n_get_trusted_stack
-  lc        ca1, 0(csp)
-  lc        cra, __SIZEOF_CHERI_CAPABILITY__(csp)
-  caddi     csp, csp, (__SIZEOF_CHERI_CAPABILITY__ * 2)
-  sc        ca0, (__SIZEOF_CHERI_CAPABILITY__ * 32)(ca1)
+  ly        a1, 0(sp)
+  ly        ra, __SIZEOF_CHERI_CAPABILITY__(sp)
+  yaddi     sp, sp, (__SIZEOF_CHERI_CAPABILITY__ * 2)
+  sy        a0, (__SIZEOF_CHERI_CAPABILITY__ * 32)(a1)
 #endif
 
   li     a0, 0  // return UNW_ESUCCESS
