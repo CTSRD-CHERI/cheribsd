@@ -99,6 +99,23 @@ SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, last_ref_early_finish, CTLF
     &cheri_last_ref_early_finish,
     "Scans finished early because the target exited");
 
+#ifdef CHERI_CAPREVOKE_POISON
+COUNTER_U64_DEFINE_EARLY(cheri_poison_probe_clg_faults);
+SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, poison_probe_clg_faults,
+    CTLFLAG_RD, &cheri_poison_probe_clg_faults,
+    "Number of CLG faults during poison probe");
+
+COUNTER_U64_DEFINE_EARLY(cheri_poison_probe_faults);
+SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, poison_probe_faults,
+    CTLFLAG_RD, &cheri_poison_probe_faults,
+    "Number of non-CLG faults during poison probe");
+
+COUNTER_U64_DEFINE_EARLY(cheri_poison_probe_emulated);
+SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, poison_probe_emul,
+    CTLFLAG_RD, &cheri_poison_probe_emulated,
+    "Number of emulated poison probe operations");
+#endif
+
 /***************************** KERNEL THREADS ***************************/
 
 static MALLOC_DEFINE(M_REVOKE, "cheri_revoke", "cheri_revoke temporary data");

@@ -94,6 +94,12 @@ int (*dtrace_invop_jump_addr)(struct trapframe *);
 #ifdef CPU_QEMU_RISCV
 extern u_int qemu_trace_buffered;
 #endif
+#ifdef CHERI_CAPREVOKE_POISON
+#include <sys/counter.h>
+extern counter_u64_t cheri_poison_probe_clg_faults;
+extern counter_u64_t cheri_poison_probe_faults;
+extern counter_u64_t cheri_poison_probe_emulated;
+#endif
 
 /* Called from exception.S */
 void do_trap_supervisor(struct trapframe *);
@@ -386,6 +392,11 @@ page_fault_handler(struct trapframe *frame, int usermode)
 #ifdef CHERI_CAPREVOKE
 	if ((frame->tf_scause == SCAUSE_LOAD_CAP_PAGE_FAULT) &&
 	    (va < VM_MAX_USER_ADDRESS)) {
+#ifdef CHERI_CAPREVOKE_POISON
+		if (pcb->pcb_onfault == (vm_pointer_t)fsu_fault_poison)
+			counter_u64_add(cheri_poison_probe_clg_faults, 1);
+#endif
+
 		if (vm_cheri_revoke_fault_visit(p->p_vmspace, va) ==
 		    VM_CHERI_REVOKE_FAULT_RESOLVED)
 			goto done;
@@ -442,6 +453,7 @@ skip_pmap:
 		 */
 		KASSERT((ftype & (VM_PROT_READ_CAP | VM_PROT_WRITE_CAP)) == 0,
 		    ("Invalid poison probe fault type"));
+		counter_u64_add(cheri_poison_probe_faults, 1);
 #ifdef CHERI_POISON_PROBE_FAULTS
 		fault_flags |= VM_FAULT_POISON_PROBE;
 #else
@@ -527,6 +539,8 @@ poison_probe_handler(struct trapframe *frame)
 	/* Ensure that the probe is aligned */
 	KASSERT(is_aligned(frame->tf_stval, sizeof(uintcap_t)),
 	    ("Unaligned poison probe address %#lx", frame->tf_stval));
+
+	counter_u64_add(cheri_poison_probe_emulated, 1);
 
 	/*
 	 * Assume that if we got a CRG fault we have a PTE, it just
