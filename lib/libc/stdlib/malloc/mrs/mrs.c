@@ -97,7 +97,8 @@
  */
 
 #define POISON_ON_FREE 1
-#define CLEAR_ON_ALLOC_PVER_INIT 1
+// #define CLEAR_ON_ALLOC_PVER_INIT 1
+#define CLEAR_ON_ALLOC 1
 #define PTRAP_ENABLE 1
 #define	_CACHE_LINE_SIZE 64
 
