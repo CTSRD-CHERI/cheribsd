@@ -442,7 +442,23 @@ skip_pmap:
 		 */
 		KASSERT((ftype & (VM_PROT_READ_CAP | VM_PROT_WRITE_CAP)) == 0,
 		    ("Invalid poison probe fault type"));
+#ifdef CHERI_POISON_PROBE_FAULTS
 		fault_flags |= VM_FAULT_POISON_PROBE;
+#else
+		/*
+		 * Under the following assumptions we simplify poison probe
+		 * faults handling:
+		 * 1. poisoned memory is not swapped
+		 * 2. poisoned memory is always pre-faulted by the poisoning
+		 * 3. we don't need to do CoW for poison probes.
+		 *
+		 * Then, if the page was not there and it was not a CLG fault,
+		 * we can pretend it contains no poison.
+		 */
+		frame->tf_a[0] = (uintptr_t)NULL;
+		frame->tf_sepc = pcb->pcb_onfault;
+		return;
+#endif
 	}
 #endif
 
