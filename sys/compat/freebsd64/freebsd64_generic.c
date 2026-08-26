@@ -203,6 +203,12 @@ freebsd64_kcmp(struct thread *td, struct freebsd64_kcmp_args *uap)
 	return (kern_kcmp(td, uap->pid1, uap->pid2, uap->type,
 	    uap->idx1, uap->idx2));
 }
+
+int
+freebsd64_exterrctl(struct thread *td, struct freebsd64_exterrctl_args *uap)
+{
+	return (EOPNOTSUPP);
+}
 /*
  * CHERI CHANGES START
  * {
