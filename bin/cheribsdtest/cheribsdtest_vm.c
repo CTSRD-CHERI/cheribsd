@@ -193,7 +193,7 @@ mmap_check_bad_protections(int prot, int expected_errno)
 	mmap_check_bad_protections_fd(prot, -1, expected_errno);
 }
 
-CHERIBSDTEST(vm_mmap_diallowed_prot,
+CHERIBSDTEST(vm_mmap_disallowed_prot,
     "check that disallowed protection combinations are rejected")
 {
 	/* Max protections not a superset */
