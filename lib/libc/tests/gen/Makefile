@@ -8,10 +8,7 @@ ATF_TESTS_C+=		fmtmsg_test
 ATF_TESTS_C+=		fnmatch2_test
 ATF_TESTS_C+=		fpclassify2_test
 .if ${COMPILER_FEATURES:Mblocks}
-.if !${MACHINE_ABI:Mpurecap}
-# See https://github.com/CTSRD-CHERI/llvm-project/issues/671
 ATF_TESTS_C+=		fts_blocks_test
-.endif
 .endif
 ATF_TESTS_C+=		fts_options_test
 ATF_TESTS_C+=		ftw_test
@@ -19,10 +16,7 @@ ATF_TESTS_C+=		getentropy_test
 ATF_TESTS_C+=		getmntinfo_test
 ATF_TESTS_C+=		glob2_test
 .if ${COMPILER_FEATURES:Mblocks}
-.if !${MACHINE_ABI:Mpurecap}
-# See https://github.com/CTSRD-CHERI/llvm-project/issues/671
 ATF_TESTS_C+=		glob_blocks_test
-.endif
 .endif
 ATF_TESTS_C+=		makecontext_test
 ATF_TESTS_C+=		popen_test
