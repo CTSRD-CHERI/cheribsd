@@ -6212,13 +6212,10 @@ update_crg:
 	else
 		csr_clear(sccsr, SCCSR_UGCLG);
 #else
-	if (pmap->flags.uclg) {
+	if (pmap->flags.uclg)
 		csr_set(sstatus, SSTATUS_UYRG);
-		td->td_frame->tf_sstatus |= SSTATUS_UYRG;
-	} else {
+	else
 		csr_clear(sstatus, SSTATUS_UYRG);
-		td->td_frame->tf_sstatus &= ~SSTATUS_UYRG;
-	}
 #endif
 #endif
 

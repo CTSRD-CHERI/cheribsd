@@ -418,6 +418,23 @@ ENTRY(fork_trampoline)
 
 	/* Restore sstatus */
 	ld	t0, (TF_SSTATUS)(sp)
+#if defined(CHERI_CAPREVOKE) && !defined(__riscv_xcheri)
+	/*
+	 * Mask the RVY bits from tf_sstatus.
+	 * These are part of the per CPU state managed by context switch
+	 * and pmap.
+	 */
+#ifdef __riscv_zcheripurecap
+	li	t1, SSTATUS_UYRG
+#else
+	li	t1, (SSTATUS_YRGE | SSTATUS_SYRG | SSTATUS_UYRG)
+#endif
+	csrr	t2, sstatus
+	and	t2, t2, t1
+	xori	t1, t1, -1
+	and	t0, t0, t1
+	or	t0, t0, t2
+#endif
 	/* Ensure interrupts disabled */
 	li	t1, ~SSTATUS_SIE
 	and	t0, t0, t1
