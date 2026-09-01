@@ -47,7 +47,9 @@
 
 #define	CHERI_SEAL_VIOLATION_EXCEPTION	0
 
-#define	SI_CODE_STORELOCAL	PROT_CHERI_PERM
+#define	SI_CODE_CHERI_BOUNDS	PROT_CHERI_BOUNDS
+#define	SI_CODE_CHERI_TAG	PROT_CHERI_TAG
+#define	SI_CODE_CHERI_PERM	PROT_CHERI_PERM
 
 #ifndef __CHERI_PURE_CAPABILITY__
 /* The Morello compiler currently sets bounds on globals. */
