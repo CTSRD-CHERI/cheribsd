@@ -221,7 +221,7 @@ CHERIBSDTEST(bounds_subobject_struct_chararray2048_overflow,
     "Check that an overflow of a 2048-byte subobject array faults",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
-    .ct_si_code = PROT_CHERI_BOUNDS,
+    .ct_si_code = SI_CODE_CHERI_BOUNDS,
     .ct_si_trapno = TRAPNO_STORE)
 {
 
