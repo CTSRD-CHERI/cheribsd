@@ -68,6 +68,9 @@
 #define	HAS_CHERI_PERM_EXECUTIVE
 #define	HAS_CHERI_PERM_SEAL
 
+#define PERM_RESERVED0_MASK ((register_t)0)
+#define PERM_RESERVED1_MASK ((register_t)0)
+
 /*
  * Morello uses a different naming for the LOAD_MUTABLE permission.
  * Define an alias here to make it consistent with RISC-V.
