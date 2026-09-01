@@ -177,6 +177,12 @@ check_initreg_code(void * __capability c)
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheribsdtest_failure_errx("perms %jx (system_regs present)", v);
 
+	if ((v & PERM_RESERVED0_MASK) != 0)
+		cheribsdtest_failure_errx("perms %jx (reserved-0 bits set)", v);
+
+	if ((v & PERM_RESERVED1_MASK) != PERM_RESERVED1_MASK)
+		cheribsdtest_failure_errx("perms %jx (reserved-1 bits clear)", v);
+
 	expect = CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM;
 #ifdef CHERIBSD_C18N_TESTS
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -197,7 +203,7 @@ check_initreg_code(void * __capability c)
 #endif
 #endif
 #endif
-	if (v != expect)
+	if ((v & ~PERM_RESERVED1_MASK) != expect)
 		cheribsdtest_failure_errx("perms %jx (expected %jx)", v, expect);
 
 	cheribsdtest_success();
@@ -295,6 +301,12 @@ check_initreg_data_full_addrspace(void * __capability c)
 	if ((v & CHERI_PERMS_SWALL) != CHERI_PERMS_SWALL)
 		cheribsdtest_failure_errx("swperms %jx (expected swperms %x)",
 		    v & CHERI_PERMS_SWALL, CHERI_PERMS_SWALL);
+
+	if ((v & PERM_RESERVED0_MASK) != 0)
+		cheribsdtest_failure_errx("perms %jx (reserved-0 bits set)", v);
+
+	if ((v & PERM_RESERVED1_MASK) != PERM_RESERVED1_MASK)
+		cheribsdtest_failure_errx("perms %jx (reserved-1 bits clear)", v);
 
 	/* Sealed bit. */
 	v = cheri_is_sealed(c);
@@ -436,9 +448,15 @@ CHERIBSDTEST(initregs_stack,
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheribsdtest_failure_errx("perms %jx (system_regs present)", v);
 
-	if (v != CHERI_CAP_USER_DATA_PERMS)
-		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
-		    (uintmax_t)(CHERI_CAP_USER_DATA_PERMS));
+	if ((v & PERM_RESERVED0_MASK) != 0)
+		cheribsdtest_failure_errx("perms %jx (reserved-0 bits set)", v);
+
+	if ((v & PERM_RESERVED1_MASK) != PERM_RESERVED1_MASK)
+		cheribsdtest_failure_errx("perms %jx (reserved-1 bits clear)", v);
+
+	if ((v & ~PERM_RESERVED1_MASK) != CHERI_CAP_USER_DATA_PERMS)
+		cheribsdtest_failure_errx("perms %jx (expected %jx | %jx)", v,
+		    (uintmax_t)(CHERI_CAP_USER_DATA_PERMS), (uintmax_t)PERM_RESERVED1_MASK);
 
 	/* Sealed bit. */
 	v = cheri_is_sealed(c);
