@@ -78,11 +78,18 @@ bool has_hyp;
 bool __read_frequently has_sstc;
 bool __read_frequently has_sscofpmf;
 bool has_svpbmt;
+#ifdef __riscv_y
+bool has_svyrg;
+#endif
 
 /* Z-extensions support. */
 bool has_zicbom;
 bool has_zicboz;
 bool has_zicbop;
+#ifdef __riscv_y
+bool has_zyhybrid;
+bool has_zylevels1b;
+#endif
 
 struct cpu_desc {
 	const char	*cpu_mvendor_name;
@@ -95,10 +102,17 @@ struct cpu_desc {
 #define	 SV_SVPBMT	(1 << 2)
 #define	 SV_SVINVAL	(1 << 3)
 #define	 SV_SSCOFPMF	(1 << 4)
+#ifdef __riscv_y
+#define	 SV_SVYRG	(1 << 5)
+#endif
 	u_int		z_extensions;		/* Multi-letter extensions. */
 #define	 Z_ZICBOM	(1 << 0)
 #define	 Z_ZICBOZ	(1 << 1)
 #define	 Z_ZICBOP	(1 << 2)
+#ifdef __riscv_y
+#define	 Z_ZYHYBRID	(1 << 3)
+#define	 Z_ZYLEVELS1B	(1 << 4)
+#endif
 	int		cbom_block_size;
 	int		cboz_block_size;
 };
@@ -178,6 +192,9 @@ parse_ext_s(struct cpu_desc *desc, char *isa, int idx, int len)
 	CHECK_S_EXT("svpbmt",	SV_SVPBMT);
 	CHECK_S_EXT("svinval",	SV_SVINVAL);
 	CHECK_S_EXT("sscofpmf",	SV_SSCOFPMF);
+#ifdef __riscv_y
+	CHECK_S_EXT("svyrg", SV_SVYRG);
+#endif
 
 #undef CHECK_S_EXT
 
@@ -222,6 +239,10 @@ parse_ext_z(struct cpu_desc *desc __unused, char *isa, int idx, int len)
 	CHECK_Z_EXT("zicbom",	Z_ZICBOM);
 	CHECK_Z_EXT("zicboz",	Z_ZICBOZ);
 	CHECK_Z_EXT("zicbop",	Z_ZICBOP);
+#ifdef __riscv_y
+	CHECK_Z_EXT("zyhybrid", Z_ZYHYBRID);
+	CHECK_Z_EXT("zylevels1b", Z_ZYLEVELS1B);
+#endif
 
 #undef CHECK_Z_EXT
 	/*
@@ -283,6 +304,13 @@ parse_riscv_isa(struct cpu_desc *desc, char *isa, int len)
 			desc->isa_extensions |= HWCAP_ISA_BIT(isa[i]);
 			i++;
 			break;
+#ifdef __riscv_y
+		case 'y':
+			/* Note: set both Y and I, to distinguish between Y and E */
+			desc->isa_extensions |= HWCAP_ISA_Y | HWCAP_ISA_I;
+			i++;
+			break;
+#endif
 		case 'g':
 			desc->isa_extensions |= HWCAP_ISA_G;
 			i++;
@@ -466,11 +494,18 @@ update_global_capabilities(u_int cpu, struct cpu_desc *desc)
 	UPDATE_CAP(has_sstc, (desc->smode_extensions & SV_SSTC) != 0);
 	UPDATE_CAP(has_sscofpmf, (desc->smode_extensions & SV_SSCOFPMF) != 0);
 	UPDATE_CAP(has_svpbmt, (desc->smode_extensions & SV_SVPBMT) != 0);
+#ifdef __riscv_y
+	UPDATE_CAP(has_svyrg, (desc->z_extensions & SV_SVYRG) != 0);
+#endif
 
 	/* Z extension support. */
 	UPDATE_CAP(has_zicbom, (desc->z_extensions & Z_ZICBOM) != 0);
 	UPDATE_CAP(has_zicboz, (desc->z_extensions & Z_ZICBOZ) != 0);
 	UPDATE_CAP(has_zicbop, (desc->z_extensions & Z_ZICBOP) != 0);
+#ifdef __riscv_y
+	UPDATE_CAP(has_zyhybrid, (desc->z_extensions & Z_ZYHYBRID) != 0);
+	UPDATE_CAP(has_zylevels1b, (desc->z_extensions & Z_ZYLEVELS1B) != 0);
+#endif
 
 #undef UPDATE_CAP
 }
@@ -617,7 +652,24 @@ printcpuinfo(u_int cpu)
 		    "\02Svnapot"
 		    "\03Svpbmt"
 		    "\04Svinval"
-		    "\05Sscofpmf");
+		    "\05Sscofpmf"
+#ifdef __riscv_y
+		    "\06Svyrg"
+#endif
+		    );
+	}
+
+	if (SHOULD_PRINT(z_extensions)) {
+		printf("  U-mode Extensions: %#b\n", desc->z_extensions,
+		    "\020"
+		    "\01Zicbom"
+		    "\02Zicboz"
+		    "\03Zicbop"
+#ifdef __riscv_y
+		    "\04Zyhybrid"
+		    "\05Zylevels1b"
+#endif
+		    );
 	}
 
 #undef SHOULD_PRINT
