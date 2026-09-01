@@ -175,6 +175,20 @@
 	/* Ensure user interrupts will be enabled on eret */
 	li	t1, SSTATUS_SPIE
 	or	t0, t0, t1
+#if defined(CHERI_CAPREVOKE) && !defined(__riscv_xcheri)
+	/*
+	 * Mask the RVY bits from tf_sstatus.
+	 * These are part of the per CPU state managed by context switch
+	 * and pmap.
+	 */
+	li	t1, (SSTATUS_YRGE | SSTATUS_SYRG | SSTATUS_UYRG)
+	csrr	t2, sstatus
+	and	t2, t2, t1
+	/* Do not trust the RVY bits in tf_sstatus to be zero? */
+	xori	t1, t1, -1
+	and	t0, t0, t1
+	or	t0, t0, t2
+#endif
 .else
 	/*
 	 * Disable interrupts for supervisor mode exceptions.

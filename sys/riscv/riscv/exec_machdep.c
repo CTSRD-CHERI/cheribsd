@@ -358,14 +358,6 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 		tf->tf_sp = stack;
 		tf->tf_sepc = (uintcap_t)cheri_exec_pcc(td, imgp);
 		td->td_proc->p_md.md_sigcode = cheri_sigcode_capability(td);
-#if !defined(__riscv_xcheri) && defined(CHERI_CAPREVOKE)
-                /*
-                 * We need to preserve the current load-side revocation epoch.
-                 * The switcher will have updated the current sstatus register
-                 * to the correct value.
-                 */
-                tf->tf_sstatus |= csr_read(sstatus) & SSTATUS_UYRG;
-#endif
 	} else
 #endif
 	{
