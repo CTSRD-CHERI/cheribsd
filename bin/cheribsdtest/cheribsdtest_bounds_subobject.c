@@ -222,7 +222,7 @@ CHERIBSDTEST(bounds_subobject_struct_chararray2048_overflow,
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
     .ct_si_code = PROT_CHERI_BOUNDS,
-    .ct_si_trapno = TRAPNO_LOAD_STORE)
+    .ct_si_trapno = TRAPNO_STORE)
 {
 
 	subobject_ptr_outofbounds = &sc2048_sideeffect.chararray2048[2047];
