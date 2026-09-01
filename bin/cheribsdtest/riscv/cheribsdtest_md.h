@@ -55,6 +55,21 @@
 #define	TRAPNO_STORE_PF		(SCAUSE_STORE_PAGE_FAULT)
 #define	TRAPNO_EXEC_PF		(SCAUSE_INST_PAGE_FAULT)
 
+#if !defined(__riscv_y)
+#define	SI_CODE_CHERI_BOUNDS	PROT_CHERI_BOUNDS
+#define	SI_CODE_CHERI_TAG	PROT_CHERI_TAG
+#define	SI_CODE_CHERI_PERM	PROT_CHERI_PERM
+#else
+/*
+ * XXX-AM: RVY can't distinguish cheri exception types.
+ * These will all become a single si_code under SIGSEGV in the
+ * future.
+ */
+#define	SI_CODE_CHERI_BOUNDS	PROT_CHERI_BOUNDS
+#define	SI_CODE_CHERI_TAG	PROT_CHERI_BOUNDS
+#define	SI_CODE_CHERI_PERM	PROT_CHERI_BOUNDS
+#endif
+
 #define	CHERI_SEAL_VIOLATION_EXCEPTION	1
 
 #if defined(__CHERI_PURE_CAPABILITY__) && !defined(__riscv_zcheripurecap)
