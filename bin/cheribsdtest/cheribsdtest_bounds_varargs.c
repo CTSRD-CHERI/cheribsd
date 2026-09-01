@@ -76,7 +76,7 @@ CHERIBSDTEST(bounds_varargs_vaarg_overflow,
     "check that va_arg() triggers a fault on overrun",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
-    .ct_si_code = PROT_CHERI_BOUNDS,
+    .ct_si_code = SI_CODE_CHERI_BOUNDS,
     .ct_si_trapno = TRAPNO_LOAD,
     .ct_xfail_reason = XFAIL_VARARG_BOUNDS)
 {
@@ -99,7 +99,7 @@ CHERIBSDTEST(bounds_varargs_empty_pointer_null,
     "check that empty varargs gives a tag violation on load",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
-    .ct_si_code = PROT_CHERI_TAG,
+    .ct_si_code = SI_CODE_CHERI_TAG,
     .ct_si_trapno = TRAPNO_LOAD,
     .ct_xfail_reason = XFAIL_VARARG_BOUNDS)
 {
@@ -120,7 +120,7 @@ CHERIBSDTEST(bounds_varargs_printf_load,
     "check that load via printf varargs overflow faults",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
-    .ct_si_code = PROT_CHERI_BOUNDS,
+    .ct_si_code = SI_CODE_CHERI_BOUNDS,
     .ct_si_trapno = TRAPNO_LOAD,
     .ct_xfail_reason = XFAIL_VARARG_BOUNDS)
 {
@@ -142,7 +142,7 @@ CHERIBSDTEST(bounds_varargs_printf_store,
     "check that store via printf varargs overflow faults",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
-    .ct_si_code = PROT_CHERI_BOUNDS,
+    .ct_si_code = SI_CODE_CHERI_BOUNDS,
     .ct_si_trapno = TRAPNO_LOAD,
     .ct_xfail_reason = XFAIL_VARARG_BOUNDS)
 {
