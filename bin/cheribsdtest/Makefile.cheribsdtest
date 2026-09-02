@@ -95,6 +95,8 @@ SRCS+=		cheribsdtest_tls_threads.c
 .ifdef CHERIBSD_C18N_TESTS
 CFLAGS+=	-DCHERIBSD_C18N_TESTS
 ELF_FEATURES+=	+cheric18n
+.else
+ELF_FEATURES+=	+nocheric18n
 .endif
 
 .include <bsd.prog.mk>
