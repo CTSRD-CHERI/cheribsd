@@ -237,7 +237,7 @@ vm_wxcheck(struct proc *p, char *call)
 }
 
 static inline int
-vm_prot2vmprot(vm_prot_t *prot, const char *func, const char *protname)
+vm_prot2vmprot(vm_prot_t *prot, const char *protname)
 {
 #if __has_feature(capabilities)
 	vm_prot_t vm_prot;
@@ -246,10 +246,8 @@ vm_prot2vmprot(vm_prot_t *prot, const char *func, const char *protname)
 
 	if ((*prot & PROT_CAP) != 0 &&
 	    (*prot & (PROT_READ | PROT_WRITE)) == 0) {
-		SYSERRCAUSE(
-		    "%s: PROT_CAP in %s without PROT_READ or PROT_WRITE",
-		    func, protname);
-		return (ENOTSUP);
+		return (EXTERROR(ENOTSUP,
+		    "PROT_CAP without PROT_READ or PROT_WRITE"));
 	}
 
 	vm_prot = (*prot & ~_PROT_CAP);
@@ -308,8 +306,8 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	vm_offset_t hint;
 
 	if (flags & MAP_32BIT) {
-		SYSERRCAUSE("MAP_32BIT not supported in CheriABI");
-		return (EINVAL);
+		return (EXTERROR(EINVAL,
+		    "MAP_32BIT not supported in CheriABI"));
 	}
 
 	/*
@@ -341,8 +339,8 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		else if ((cheri_perms_get(uap->addr) & CHERI_PERM_SW_VMEM))
 			source_cap = uap->addr;
 		else {
-			SYSERRCAUSE("MAP_FIXED without CHERI_PERM_SW_VMEM");
-			return (EACCES);
+			return (EXTERROR(EACCES,
+			    "MAP_FIXED without CHERI_PERM_SW_VMEM"));
 		}
 	} else {
 		if (!cheri_is_null_derived(uap->addr))
@@ -371,11 +369,10 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	    (rounddown2(hint, PAGE_SIZE) < cheri_base_get(source_cap) ||
 	    roundup2(hint + uap->len, PAGE_SIZE) >
 	    cheri_address_get(source_cap) + cheri_length_get(source_cap))) {
-		SYSERRCAUSE("MAP_FIXED and too little space in "
+		return (EXTERROR(EPROT, "MAP_FIXED and too little space in "
 		    "capablity (0x%zx < 0x%zx)",
 		    cheri_bytes_remaining(source_cap),
-		    roundup2(uap->len, PAGE_SIZE));
-		return (EPROT);
+		    roundup2(uap->len, PAGE_SIZE)));
 	}
 
 	perms = cheri_perms_get(source_cap);
@@ -389,9 +386,8 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		reqperms &= ~CHERI_PERM_EXECUTIVE;
 #endif
 	if ((perms & reqperms) != reqperms) {
-		SYSERRCAUSE("capability has insufficient perms (0x%lx)"
-		    "for request (0x%lx)", perms, reqperms);
-		return (EPROT);
+		return (EXTERROR(EPROT, "capability has insufficient perms "
+		    "(0x%lx) for request (0x%lx)", perms, reqperms));
 	}
 
 	/*
@@ -457,9 +453,6 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	p = td->td_proc;
 
 	if ((mrp->mr_prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))) != 0) {
-		SYSERRCAUSE(
-		    "%s: invalid bits in prot %x", __func__,
-		    (mrp->mr_prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))));
 		return (EXTERROR(EINVAL, "unknown PROT bits"));
 	}
 	max_prot = PROT_MAX_EXTRACT(mrp->mr_prot);
@@ -482,8 +475,6 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		}
 #endif
 		if ((max_prot & prot) != prot) {
-			SYSERRCAUSE("%s: requested page permissions exceed "
-			    "requested maximum", __func__);
 			return (EXTERROR(ENOTSUP,
 			    "prot is not subset of max_prot"));
 		}
@@ -568,13 +559,13 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	    MAP_32BIT | MAP_ALIGNMENT_MASK)) != 0)) {
 		return (EXTERROR(EINVAL, "GUARD with wrong parameters"));
 	}
-	error = vm_prot2vmprot(&prot, "mmap", "prot");
+	error = vm_prot2vmprot(&prot, "prot");
 	if (error)
 		return (error);
-	error = vm_prot2vmprot(&max_prot, "mmap", "max prot");
+	error = vm_prot2vmprot(&max_prot, "max_prot");
 	if (error)
 		return (error);
-	error = vm_prot2vmprot(&cap_prot, "mmap", "cap_prot");
+	error = vm_prot2vmprot(&cap_prot, "cap_prot");
 	if (error)
 		return (error);
 	/*
@@ -722,8 +713,8 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 			cap_maxprot = VM_PROT_ADD_CAP(cap_maxprot);
 #endif
 		if ((cap_prot & cap_maxprot) != cap_prot) {
-			SYSERRCAUSE("%s: unable to map file with "
-			    "requested permissions", __func__);
+			EXTERROR(EINVAL, "unable to map file with "
+			    "requested permissions");
 			error = EINVAL;
 			goto done;
 		}
@@ -1062,10 +1053,10 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int userprot,
 			return (ENOTSUP);
 		flags |= VM_MAP_PROTECT_SET_MAXPROT;
 	}
-	error = vm_prot2vmprot(&prot, "mprotect", "prot");
+	error = vm_prot2vmprot(&prot, "prot");
 	if (error)
 		return (error);
-	error = vm_prot2vmprot(&max_prot, "mprotect", "max prot");
+	error = vm_prot2vmprot(&max_prot, "max_prot");
 	if (error)
 		return (error);
 
