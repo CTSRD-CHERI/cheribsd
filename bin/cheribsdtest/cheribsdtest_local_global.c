@@ -71,16 +71,16 @@ CHERIBSDTEST(store_local_allowed,
 	cheribsdtest_success();
 }
 
-#ifndef __riscv_zcherilevels
+#if defined(__riscv_zcherilevels) || defined(__riscv_zylevels1b)
+CHERIBSDTEST(store_local_disallowed,
+    "Checks tag is stripped when local capabilities are stored via non-store-local capabilities")
+#else
 CHERIBSDTEST(store_local_disallowed,
     "Checks local capabilities can not be stored via non-store-local capabilities",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
     .ct_si_code = SI_CODE_STORELOCAL,
     .ct_si_trapno = TRAPNO_STORE)
-#else
-CHERIBSDTEST(store_local_disallowed,
-    "Checks tag is stripped when local capabilities are stored via non-store-local capabilities")
 #endif
 {
 	char str[] = STR_VAL;
@@ -101,7 +101,7 @@ CHERIBSDTEST(store_local_disallowed,
 	/* This should fault */
 	*targetp = cap;
 
-#ifdef __riscv_zcherilevels
+#if defined(__riscv_zcherilevels) || defined(__riscv_zylevels1b)
         CHERIBSDTEST_VERIFY(cheri_tag_get(*targetp) == 0);
         cheribsdtest_success();
 #else
