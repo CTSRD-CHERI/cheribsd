@@ -212,6 +212,8 @@ int	kern_extattr_set_path(struct thread *td, const char * __capability path,
 int	kern_extattrctl(struct thread *td, const char * __capability path,
 	    int cmd, const char * __capability filename, int attrnamespace,
 	    const char * __capability uattrname);
+int	kern_exterrctl(struct thread *td, u_int op, u_int flags,
+	    void * __capability ptr);
 int	kern_fchmodat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg, mode_t mode, int flag);
 int	kern_fchownat(struct thread *td, int fd, const char * __capability path,
