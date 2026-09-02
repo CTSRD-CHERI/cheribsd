@@ -141,6 +141,7 @@ struct sysentvec ia32_freebsd_sysvec = {
 	.sv_set_fork_retval = x86_set_fork_retval,
 	.sv_regset_begin = SET_BEGIN(__elfN(regset)),
 	.sv_regset_end  = SET_LIMIT(__elfN(regset)),
+	.sv_exterr_copyout = exterr_copyout,
 };
 INIT_SYSENTVEC(elf_ia32_sysvec, &ia32_freebsd_sysvec);
 

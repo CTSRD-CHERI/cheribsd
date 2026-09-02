@@ -93,6 +93,7 @@ struct sysentvec elf64_freebsd_sysvec_la48 = {
 	.sv_set_fork_retval = x86_set_fork_retval,
 	.sv_regset_begin = SET_BEGIN(__elfN(regset)),
 	.sv_regset_end  = SET_LIMIT(__elfN(regset)),
+	.sv_exterr_copyout = exterr_copyout,
 };
 
 struct sysentvec elf64_freebsd_sysvec_la57 = {
@@ -135,6 +136,7 @@ struct sysentvec elf64_freebsd_sysvec_la57 = {
 	.sv_set_fork_retval=  x86_set_fork_retval,
 	.sv_regset_begin = SET_BEGIN(__elfN(regset)),
 	.sv_regset_end  = SET_LIMIT(__elfN(regset)),
+	.sv_exterr_copyout = exterr_copyout,
 };
 
 static void
