@@ -223,6 +223,19 @@ struct iovec64 {
 	size_t	iov_len;
 };
 
+struct uexterror64 {
+	__uint32_t ver;
+	__uint32_t error;
+	__uint32_t cat;
+	__uint32_t src_line;
+	__uint32_t flags;
+	__uint32_t rsrv0;
+	__uint64_t p1;
+	__uint64_t p2;
+	__uint64_t rsrv1[4];
+	char msg[128];
+};
+
 #endif /* !_COMPAT_FREEBSD64_FREEBSD64_H_ */
 /*
  * CHERI CHANGES START
