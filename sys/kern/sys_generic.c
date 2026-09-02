@@ -2368,6 +2368,8 @@ sys_exterrctl(struct thread *td, struct exterrctl_args *uap)
 		return (EINVAL);
 	switch (uap->op) {
 	case EXTERRCTL_ENABLE:
+		if (td->td_proc->p_sysent->sv_exterr_copyout == NULL)
+			return (EOPNOTSUPP);
 		if ((td->td_pflags2 & TDP2_UEXTERR) != 0 &&
 		    (uap->flags & EXTERRCTLF_FORCE) == 0)
 			return (EBUSY);

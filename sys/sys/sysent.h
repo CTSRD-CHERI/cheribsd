@@ -164,6 +164,7 @@ struct sysentvec {
 			    struct image_params *imgp);
 	void		(*sv_set_fork_retval)(struct thread *);
 					/* Only used on x86 */
+	void		(*sv_exterr_copyout)(struct thread *);
 	struct regset	**sv_regset_begin;
 	struct regset	**sv_regset_end;
 };
