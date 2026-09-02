@@ -493,7 +493,6 @@ main(int argc, char *argv[])
 			break;
 		case KTR_NAMEI:
 		case KTR_SYSCTL:
-		case KTR_SYSERRCAUSE:
 			ktrnamei(m, ktrlen);
 			break;
 		case KTR_GENIO:
@@ -689,7 +688,6 @@ static const char * const hdr_names[] = {
 	[KTR_ARGS] =		"ARGS",
 	[KTR_ENVS] =		"ENVS",
 	[KTR_EXTERR] =		"EERR",
-	[KTR_SYSERRCAUSE] =	"ERR ",
 };
 
 static void
