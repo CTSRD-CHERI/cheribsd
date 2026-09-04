@@ -87,6 +87,10 @@ WERROR?=	-Werror
 # default over to -fno-common, making this redundant.
 CFLAGS+=	-fno-common
 
+COMPILATION_DB_FILE?=${.OBJDIR}/compile_commands.json
+COMPILATION_DB_DIR?=${.OBJDIR}/cdb
+CFLAGS.clang+=	-gen-cdb-fragment-path ${COMPILATION_DB_DIR}
+
 # XXX LOCORE means "don't declare C stuff" not "for locore.s".
 ASM_CFLAGS= -x assembler-with-cpp -DLOCORE ${CFLAGS} ${ASM_CFLAGS.${.IMPSRC:T}}
 
