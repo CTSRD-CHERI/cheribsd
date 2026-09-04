@@ -173,6 +173,9 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 		    CHERI_CAP_USER_DATA_PERMS);
 		rodata_cap = cheri_perms_and(data_cap,
 		    CHERI_CAP_USER_RODATA_PERMS |
+#if defined(HAS_CHERI_PERM_LOAD_MUTABLE)
+		    CHERI_PERM_LOAD_MUTABLE |
+#endif
 #if defined(HAS_CHERI_PERM_LOAD_STORE_CAP)
 		    CHERI_PERM_LOAD_CAP
 #elif defined(HAS_CHERI_PERM_CAP)
