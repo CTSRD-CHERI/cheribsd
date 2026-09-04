@@ -1091,6 +1091,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	KERN_PROC_REVOKER_EPOCH	102	/* revoker epoch */
 #define	KERN_PROC_C18N_STATS	103	/* compartmentalisation statistics */
 #define	KERN_PROC_C18N_COMPARTS	104	/* compartment list */
+#define	KERN_PROC_CHERI_MRS_STATS	105	/* heap and mrs statistics */
 
 /*
  * KERN_IPC identifiers

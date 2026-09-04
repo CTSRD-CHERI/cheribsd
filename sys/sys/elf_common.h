@@ -1049,8 +1049,9 @@ typedef struct {
 #define	AT_USRSTACKBASE	35	/* Top of user stack */
 #define	AT_USRSTACKLIM	36	/* Grow limit of user stack */
 #define	AT_CHERI_C18N	37	/* Compartment info block */
+#define	AT_CHERI_MRS	38	/* Heap and mrs info block */
 
-#define	AT_COUNT	38	/* Count of defined aux entry types. */
+#define	AT_COUNT	39	/* Count of defined aux entry types. */
 
 /*
  * Relocation types.

@@ -114,6 +114,7 @@ static const struct procstat_cmd cmd_table[] = {
 	    PS_CMP_PLURAL },
 	{ "kstack", "kstack", "[-v]", &procstat_kstack, &cmdopt_verbose,
 	    PS_CMP_NORMAL },
+	{ "mrs", "mrs", "[-v]", &procstat_mrs, &cmdopt_verbose, PS_CMP_NORMAL },
 	{ "pargs", "args", NULL, &procstat_pargs, &cmdopt_none,
 	    PS_CMP_NORMAL },
 	{ "penv", "env", NULL, &procstat_penv, &cmdopt_none,
