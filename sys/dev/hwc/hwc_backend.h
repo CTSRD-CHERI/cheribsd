@@ -41,8 +41,8 @@ struct hwc_backend_ops {
 	    struct hwc_configure *hc);
 	void (*hwc_backend_enable)(struct hwc_context *, int cpu_id);
 	void (*hwc_backend_disable)(struct hwc_context *, int cpu_id);
-	int (*hwc_backend_read)(struct hwc_vm *, int *ident,
-	    vm_offset_t *offset, uint64_t *data);
+	int (*hwc_backend_read)(struct hwc_vm *, vm_offset_t *offset,
+	    uint64_t *data);
 	int (*hwc_backend_stop)(struct hwc_context *, struct hwc_stop *);
 	int (*hwc_backend_start)(struct hwc_context *, struct hwc_start *);
 	/* Debugging only. */

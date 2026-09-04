@@ -39,7 +39,6 @@ struct hwc_context {
 	LIST_ENTRY(hwc_context)		next_hwcs; /* Entry in ho->hwcs. */
 
 	int				mode;
-	int				ident;
 
 	int				kqueue_fd;
 	struct thread			*hwc_td;
@@ -54,7 +53,6 @@ struct hwc_context {
 	struct mtx			mtx;
 	struct mtx			rec_mtx;
 	enum hwc_ctx_state		state;
-	int				refcnt;
 
 	struct hwc_vm			*vm;
 };
