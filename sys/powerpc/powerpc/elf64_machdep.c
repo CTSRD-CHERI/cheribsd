@@ -100,6 +100,7 @@ struct sysentvec elf64_freebsd_sysvec_v1 = {
 	.sv_onexit	= exit_onexit,
 	.sv_regset_begin = SET_BEGIN(__elfN(regset)),
 	.sv_regset_end  = SET_LIMIT(__elfN(regset)),
+	.sv_exterr_copyout = exterr_copyout,
 };
 
 struct sysentvec elf64_freebsd_sysvec_v2 = {
@@ -141,6 +142,7 @@ struct sysentvec elf64_freebsd_sysvec_v2 = {
 	.sv_onexit	= exit_onexit,
 	.sv_regset_begin = SET_BEGIN(__elfN(regset)),
 	.sv_regset_end  = SET_LIMIT(__elfN(regset)),
+	.sv_exterr_copyout = exterr_copyout,
 };
 
 static bool ppc64_elfv1_header_match(const struct image_params *params,

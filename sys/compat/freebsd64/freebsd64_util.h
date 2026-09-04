@@ -113,6 +113,7 @@ struct kinfo_knote64;
 void	freebsd64_kinfo_knote_to_64(const struct kinfo_knote *kin,
 	    struct kinfo_knote64 *kin64);
 
+void	freebsd64_exterr_copyout(struct thread *td);
 int	freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags);
 int	freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp);
 

@@ -37,6 +37,8 @@
 #include "opt_ktrace.h"
 
 #include <sys/param.h>
+#define	EXTERR_CATEGORY	-1
+#include <sys/exterrvar.h>
 #include <sys/fcntl.h>
 #include <sys/ioccom.h>
 #include <sys/poll.h>
@@ -204,10 +206,60 @@ freebsd64_kcmp(struct thread *td, struct freebsd64_kcmp_args *uap)
 	    uap->idx1, uap->idx2));
 }
 
+static void
+ue_to_ue64(const struct uexterror *ue, struct uexterror64 *ue64)
+{
+	CP(*ue, *ue64, ver);
+	CP(*ue, *ue64, error);
+	CP(*ue, *ue64, cat);
+	CP(*ue, *ue64, src_line);
+	CP(*ue, *ue64, flags);
+	CP(*ue, *ue64, rsrv0);
+	PTROUT_CP(*ue, *ue64, p1);
+	PTROUT_CP(*ue, *ue64, p2);
+	for (u_int i = 0; i < nitems(ue->rsrv1); i++)
+		PTROUT_CP(*ue, *ue64, rsrv1[i]);
+	memcpy(ue64->msg, ue->msg, sizeof(ue->msg));
+}
+
+void
+freebsd64_exterr_copyout(struct thread *td)
+{
+	struct uexterror64 ue64;
+	struct uexterror ue;
+	ksiginfo_t ksi;
+	void * __capability uloc;
+	size_t sz;
+	int error;
+
+	MPASS((td->td_pflags2 & TDP2_UEXTERR) != 0);
+
+	uloc = (char * __capability)td->td_exterr_ptr +
+	    __offsetof(struct uexterror64, error);
+	error = exterr_to_ue(td, &ue);
+	if (error != 0) {
+		ue64.error = 0;
+		sz = sizeof(ue64.error);
+	} else {
+		ue_to_ue64(&ue, &ue64);
+		sz = sizeof(ue64) - __offsetof(struct uexterror64, error);
+	}
+	error = copyout(__unbounded_addressof(ue64.error), uloc, sz);
+	if (error != 0) {
+		td->td_pflags2 &= ~TDP2_UEXTERR;
+		ksiginfo_init_trap(&ksi);
+		ksi.ksi_signo = SIGSEGV;
+		ksi.ksi_code = SEGV_ACCERR;
+		ksi.ksi_addr = uloc;
+		trapsignal(td, &ksi);
+	}
+}
+
 int
 freebsd64_exterrctl(struct thread *td, struct freebsd64_exterrctl_args *uap)
 {
-	return (EOPNOTSUPP);
+	return (kern_exterrctl(td, uap->op, uap->flags, USER_PTR(uap->ptr,
+	    sizeof(struct uexterror64))));
 }
 /*
  * CHERI CHANGES START

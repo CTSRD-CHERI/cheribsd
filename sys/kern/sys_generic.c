@@ -2361,24 +2361,33 @@ exterr_copyout(struct thread *td)
 int
 sys_exterrctl(struct thread *td, struct exterrctl_args *uap)
 {
+	return (kern_exterrctl(td, uap->op, uap->flags, uap->ptr));
+}
+
+int
+kern_exterrctl(struct thread *td, u_int op, u_int flags,
+    void * __capability ptr)
+{
 	uint32_t ver;
 	int error;
 
-	if ((uap->flags & ~(EXTERRCTLF_FORCE)) != 0)
+	if ((flags & ~(EXTERRCTLF_FORCE)) != 0)
 		return (EINVAL);
-	switch (uap->op) {
+	switch (op) {
 	case EXTERRCTL_ENABLE:
+		if (td->td_proc->p_sysent->sv_exterr_copyout == NULL)
+			return (EOPNOTSUPP);
 		if ((td->td_pflags2 & TDP2_UEXTERR) != 0 &&
-		    (uap->flags & EXTERRCTLF_FORCE) == 0)
+		    (flags & EXTERRCTLF_FORCE) == 0)
 			return (EBUSY);
 		td->td_pflags2 &= ~TDP2_UEXTERR;
-		error = copyin(uap->ptr, &ver, sizeof(ver));
+		error = copyin(ptr, &ver, sizeof(ver));
 		if (error != 0)
 			return (error);
 		if (ver != UEXTERROR_VER)
 			return (EINVAL);
 		td->td_pflags2 |= TDP2_UEXTERR;
-		td->td_exterr_ptr = uap->ptr;
+		td->td_exterr_ptr = ptr;
 		return (0);
 	case EXTERRCTL_DISABLE:
 		if ((td->td_pflags2 & TDP2_UEXTERR) == 0)
@@ -2388,6 +2397,45 @@ sys_exterrctl(struct thread *td, struct exterrctl_args *uap)
 	default:
 		return (EINVAL);
 	}
+}
+
+int
+exterr_set(int eerror, int category, const char *mmsg, uintptr_t pp1,
+    uintptr_t pp2, int line)
+{
+	struct thread *td;
+
+	td = curthread;
+	if ((td->td_pflags2 & TDP2_UEXTERR) != 0) {
+		td->td_pflags2 |= TDP2_EXTERR;
+		td->td_kexterr.error = eerror;
+		td->td_kexterr.cat = category;
+		td->td_kexterr.msg = mmsg;
+		td->td_kexterr.p1 = pp1;
+		td->td_kexterr.p2 = pp2;
+		td->td_kexterr.src_line = line;
+		ktrexterr(td);
+	}
+	return (eerror);
+}
+
+int
+exterr_set_from(const struct kexterr *ke)
+{
+	struct thread *td;
+
+	td = curthread;
+	if ((td->td_pflags2 & TDP2_UEXTERR) != 0) {
+		td->td_pflags2 |= TDP2_EXTERR;
+		td->td_kexterr = *ke;
+	}
+	return (td->td_kexterr.error);
+}
+
+void
+exterr_clear(struct kexterr *ke)
+{
+	memset(ke, 0, sizeof(*ke));
 }
 // CHERI CHANGES START
 // {

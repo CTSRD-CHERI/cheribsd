@@ -527,7 +527,9 @@ ENTRY(cpu_switch)
 	beqz	t0, .Lout_qemu_tracing
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	clw	t0, TD_MDFLAGS(ca1)
+	li	t0, TD_MDFLAGS
+	cincoffset ct0, ca1, t0
+	clw	t0, (ct0)
 #else
 	lw	t0, TD_MDFLAGS(a1)
 #endif

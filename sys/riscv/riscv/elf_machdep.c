@@ -118,6 +118,7 @@ static struct sysentvec elf_freebsd_sysvec = {
 	.sv_onexit	= exit_onexit,
 	.sv_regset_begin = SET_BEGIN(__elfN(regset)),
 	.sv_regset_end  = SET_LIMIT(__elfN(regset)),
+	.sv_exterr_copyout = exterr_copyout,
 };
 INIT_SYSENTVEC(elf_sysvec, &elf_freebsd_sysvec);
 
