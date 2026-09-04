@@ -584,6 +584,22 @@ do_trap_user(struct trapframe *frame)
 	td = curthread;
 	pcb = td->td_pcb;
 
+#ifdef CHERI_BOUNDED_KSTACK
+	KASSERT(cheri_length_get(frame) == TF_SIZE,
+	    ("Invalid trapframe bounds: %#p", frame));
+	KASSERT(cheri_base_get(td->td_frame) >= cheri_top_get(cheri_stack_get()),
+	    ("Invalid kernel stack bounds: %#p overlaps frame %#p",
+		cheri_stack_get(), td->td_frame));
+	KASSERT(cheri_base_get(cheri_stack_get()) == td->td_kstack,
+	    ("Invalid kernel stack base: %#p expect td_kstack %#p",
+		cheri_stack_get(), (void *)td->td_kstack));
+	KASSERT(cheri_top_get(cheri_stack_get()) <= (ptraddr_t)td->td_frame,
+	    ("Invalid kernel stack length: %#p overlaps frame %#p",
+		cheri_stack_get(), td->td_frame));
+	KASSERT(cheri_length_get(pcb) == sizeof(struct pcb),
+	    ("Invalid PCB bounds %#p", pcb));
+#endif
+
 	KASSERT(td->td_frame == frame,
 	    ("%s: td_frame %p != frame %p", __func__, td->td_frame, frame));
 
