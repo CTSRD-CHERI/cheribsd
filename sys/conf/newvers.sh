@@ -201,7 +201,7 @@ else
 	t=$(date)
 fi
 i=$(${MAKE:-make} -V KERN_IDENT)
-compiler_v=$($(${MAKE:-make} -V CC) -v 2>&1 | grep -w 'version')
+compiler_v=$($(${MAKE:-make} -V CC) -v 2>&1 | grep -w 'version' | awk '{printf "%s\\n", $0}')
 
 for dir in /usr/bin /usr/local/bin; do
 	if [ -n "${svnversion}" ] ; then
