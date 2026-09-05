@@ -1361,6 +1361,7 @@ spawn_background(void)
 static void
 mrs_statfile_dump(void)
 {
+	struct cheri_revoke_syscall_info crsi = { 0 };
 	struct timespec ts_end;
 	char buf[PATH_MAX];
 	int fd;
@@ -1415,6 +1416,41 @@ mrs_statfile_dump(void)
 	    cmsp->cms_mrs_max_allocated_size,
 	    cmsp->cms_mrs_revocation_minimum,
 	    cmsp->cms_mrs_epoch);
+	(void)write(fd, buf, strlen(buf));
+
+	(void)cheri_revoke(CHERI_REVOKE_TAKE_STATS | CHERI_REVOKE_IGNORE_START,
+			   0, &crsi);
+	(void)snprintf(buf, sizeof(buf),
+	    "PGSCAN_CY: %zu\n"
+	    "FAULT_CY: %zu\n"
+	    "PGSCAN_RO: %zu\n"
+	    "PGSCAN_RW: %zu\n"
+	    "PGFAULT_RO: %zu\n"
+	    "PGFAULT_RW: %zu\n"
+	    "PGVISIT: %zu\n"
+	    "PGSKIP_FAST: %zu\n"
+	    "PGSKIP_NOFILL: %zu\n"
+	    "PGSKIP: %zu\n"
+	    "NCAPS: %zu\n"
+	    "NRVK: %zu\n"
+	    "NCLR: %zu\n"
+	    "LNSCAN: %zu\n"
+	    "PGCLEAN: %zu\n",
+	    crsi.stats.page_scan_cycles,
+	    crsi.stats.fault_cycles,
+	    (size_t)crsi.stats.pages_scan_ro,
+	    (size_t)crsi.stats.pages_scan_rw,
+	    (size_t)crsi.stats.pages_faulted_ro,
+	    (size_t)crsi.stats.pages_faulted_rw,
+	    (size_t)crsi.stats.fault_visits,
+	    (size_t)crsi.stats.pages_skip_fast,
+	    (size_t)crsi.stats.pages_skip_nofill,
+	    (size_t)crsi.stats.pages_skip,
+	    (size_t)crsi.stats.caps_found,
+	    (size_t)crsi.stats.caps_found_revoked,
+	    (size_t)crsi.stats.caps_cleared,
+	    (size_t)crsi.stats.lines_scan,
+	    (size_t)crsi.stats.pages_mark_clean);
 	(void)write(fd, buf, strlen(buf));
 	(void)close(fd);
 }
