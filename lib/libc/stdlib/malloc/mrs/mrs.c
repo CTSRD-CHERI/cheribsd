@@ -88,9 +88,7 @@
  *   If !OFFLOAD_QUARANTINE, this still prevents the application from
  *   using CPU 3.
  * DEBUG: Print debug statements.
- * PRINT_STATS: Print statistics on exit.
- * PRINT_CAPREVOKE: Print stats for each CHERI revocation.
- * PRINT_CAPREVOKE_MRS: Print details of MRS operation around revocations.
+ * MRS_STATS: Collect MRS and revocation statistics.
  * CLEAR_ON_ALLOC: Zero allocated regions as they are allocated (for
  *   non-calloc allocation functions).
  * CLEAR_ON_RETURN: Zero allocated regions as they come out of quarantine.
@@ -571,6 +569,21 @@ mrs_utrace_log(int event, void *p, size_t s, size_t n, void *r)
 		mrs_utrace_log(__VA_ARGS__);			\
 } while (0)
 
+#ifdef MRS_STATS
+static inline uint64_t
+cheri_revoke_get_cyc(void)
+{
+#if defined(__riscv)
+	return (__builtin_readcyclecounter());
+#elif defined(__aarch64__)
+	uint64_t _val;
+	__asm __volatile("mrs %0, cntvct_el0" : "=&r" (_val));
+	return (_val);
+#else
+	return (0);
+#endif
+}
+
 /* utilities */
 
 static struct mrs_descriptor_slab *
@@ -928,84 +941,6 @@ malloc_revoke_quarantine_force_flush_async(void)
 	quarantine_revoke(&tmp);
 }
 
-#if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS)
-static inline uint64_t
-cheri_revoke_get_cyc(void)
-{
-#if defined(__riscv)
-	return (__builtin_readcyclecounter());
-#elif defined(__aarch64__)
-	uint64_t _val;
-	__asm __volatile("mrs %0, cntvct_el0" : "=&r" (_val));
-	return (_val);
-#else
-	return (0);
-#endif
-}
-#endif
-
-#if defined(PRINT_CAPREVOKE)
-static inline void
-print_cheri_revoke_stats(char *what, struct cheri_revoke_syscall_info *crsi,
-    uint64_t cycles)
-{
-	mrs_printf("mrs caprevoke %s:"
-	    " efin=%" PRIu64
-
-	    " psro=%" PRIu32
-	    " psrw=%" PRIu32
-
-	    " pfro=%" PRIu32
-	    " pfrw=%" PRIu32
-
-	    " pclg=%" PRIu32
-
-	    " pskf=%" PRIu32
-	    " pskn=%" PRIu32
-	    " psks=%" PRIu32
-
-	    " cfnd=%" PRIu32
-	    " cfrv=%" PRIu32
-
-	    " cnuk=%" PRIu32
-
-	    " lscn=%" PRIu32
-	    " pmkc=%" PRIu32
-
-	    " pcyc=%" PRIu64
-	    " fcyc=%" PRIu64
-	    " tcyc=%" PRIu64
-	    "\n",
-
-	    what,
-	    crsi->epochs.dequeue,
-
-	    crsi->stats.pages_scan_ro,
-	    crsi->stats.pages_scan_rw,
-
-	    crsi->stats.pages_faulted_ro,
-	    crsi->stats.pages_faulted_rw,
-
-	    crsi->stats.fault_visits,
-
-	    crsi->stats.pages_skip_fast,
-	    crsi->stats.pages_skip_nofill,
-	    crsi->stats.pages_skip,
-
-	    crsi->stats.caps_found,
-	    crsi->stats.caps_found_revoked,
-
-	    crsi->stats.caps_cleared,
-
-	    crsi->stats.lines_scan,
-	    crsi->stats.pages_mark_clean,
-
-	    crsi->stats.page_scan_cycles,
-	    crsi->stats.fault_cycles,
-	    cycles);
-}
-#endif /* PRINT_CAPREVOKE */
-
 static void
 quarantine_flush(struct mrs_quarantine *quarantine)
 {
@@ -1121,38 +1056,30 @@ quarantine_revoke(struct mrs_quarantine *quarantine)
 
 	MRS_UTRACE(UTRACE_MRS_QUARANTINE_REVOKE, NULL, 0, 0, NULL);
 	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
-# ifdef PRINT_CAPREVOKE
+#ifdef MRS_STATS
 		struct cheri_revoke_syscall_info crsi = { 0 };
 		uint64_t cyc_init, cyc_fini;
 
-		cyc_init = cheri_revoke_get_cyc();
-		(void)cheri_revoke(CHERI_REVOKE_TAKE_STATS, epoch, &crsi);
-		cyc_fini = cheri_revoke_get_cyc();
-#ifdef MRS_STATS
-		if (cmsp != NULL)
-			atomic_store(&cmsp->cms_mrs_epoch, epoch);
-#endif
-		print_cheri_revoke_stats("load-barrier", &crsi,
-		    cyc_fini - cyc_init);
+		if (collect_revoke_stats) {
+			cyc_init = cheri_revoke_get_cyc();
+			(void)cheri_revoke(CHERI_REVOKE_TAKE_STATS, start_epoch,
+			    &crsi);
+			cyc_fini = cheri_revoke_get_cyc();
 
-		cyc_init = cheri_revoke_get_cyc();
-		(void)cheri_revoke(
-		    CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS, epoch,
-		    &crsi);
-		cyc_fini = cheri_revoke_get_cyc();
-		print_cheri_revoke_stats("load-final", &crsi,
-		    cyc_fini - cyc_init);
-
-# else /* PRINT_CAPREVOKE */
-		(void)cheri_revoke(CHERI_REVOKE_TAKE_STATS, start_epoch, NULL);
-		(void)cheri_revoke(
-		    CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS,
-		    start_epoch, NULL);
-#ifdef MRS_STATS
+			cyc_init = cheri_revoke_get_cyc();
+			(void)cheri_revoke(
+				CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS,
+				start_epoch, &crsi);
+			cyc_fini = cheri_revoke_get_cyc();
+		} else {
+			(void)cheri_revoke(CHERI_REVOKE_LAST_PASS,
+			    start_epoch, NULL);
+		}
 		if (cmsp != NULL)
 			atomic_store(&cmsp->cms_mrs_epoch, start_epoch);
+#else
+		(void)cheri_revoke(CHERI_REVOKE_LAST_PASS, start_epoch, NULL);
 #endif
-# endif /* !PRINT_CAPREVOKE */
 	}
 	MRS_UTRACE(UTRACE_MRS_QUARANTINE_REVOKE_DONE, NULL, 0, 0, NULL);
 	quarantine_flush(quarantine);
@@ -1173,10 +1100,8 @@ _internal_quarantine_flush(struct mrs_quarantine *quarantine)
 {
 #ifdef OFFLOAD_QUARANTINE
 
-#ifdef PRINT_CAPREVOKE_MRS
-	mrs_puts("malloc_revoke_quarantine_force_flush (offload): "
+	mrs_debug_printf("malloc_revoke_quarantine_force_flush (offload): "
 	    "waiting for offload_quarantine to drain\n");
-#endif
 
 	mrs_lock(&offload_quarantine_lock);
 	while (offload_quarantine.list != NULL) {
@@ -1187,22 +1112,19 @@ _internal_quarantine_flush(struct mrs_quarantine *quarantine)
 		}
 	}
 
-#ifdef PRINT_CAPREVOKE_MRS
-	mrs_puts("malloc_revoke_quarantine_force_flush (offload): offload_quarantine drained\n");
-	mrs_printf("malloc_revoke_quarantine_force_flush: cycle count after waiting on offload %" PRIu64 "\n",
+	mrs_debug_printf("malloc_revoke_quarantine_force_flush (offload): "
+	    "offload_quarantine drained\n");
+	mrs_debug_printf("malloc_revoke_quarantine_force_flush: "
+	    "cycle count after waiting on offload %" PRIu64 "\n",
 	    cheri_revoke_get_cyc());
-#endif /* PRINT_CAPREVOKE_MRS */
-
 #ifdef SNMALLOC_FLUSH
 	/* Consume pending messages now in our queue. */
 	snmalloc_flush_message_queue();
 #endif
 
-#ifdef PRINT_CAPREVOKE_MRS
-	mrs_printf("malloc_revoke_quarantine_force_flush: cycle count after waiting on offload %" PRIu64 "\n",
+	mrs_debug_printf("malloc_revoke_quarantine_force_flush: "
+	    "cycle count after waiting on offload %" PRIu64 "\n",
 	    cheri_revoke_get_cyc());
-#endif
-
 #ifdef SNMALLOC_PRINT_STATS
 	snmalloc_print_stats();
 #endif
@@ -1216,16 +1138,13 @@ _internal_quarantine_flush(struct mrs_quarantine *quarantine)
 	}
 
 #else /* OFFLOAD_QUARANTINE */
-
-#ifdef PRINT_CAPREVOKE_MRS
-	mrs_puts("malloc_revoke_quarantine_force_flush\n");
-#endif
+	mrs_debug_printf("malloc_revoke_quarantine_force_flush\n");
 	quarantine_revoke(quarantine);
 #ifdef SNMALLOC_FLUSH
 	/* Consume pending messages now in our queue. */
 	snmalloc_flush_message_queue();
 #endif
-#if defined(SNMALLOC_PRINT_STATS)
+#ifdef SNMALLOC_PRINT_STATS
 	snmalloc_print_stats();
 #endif
 
@@ -1641,10 +1560,6 @@ mrs_init_impl_locked(void)
 
 nosys:
 	mrs_initialized = true;
-
-#if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS) || defined(PRINT_STATS)
-	mrs_puts(VERSION_STRING);
-#endif
 }
 
 static void
@@ -1671,23 +1586,6 @@ mrs_constructor(void)
 {
 	mrs_init();
 }
-
-#ifdef PRINT_STATS
-__attribute__((destructor))
-static void
-fini(void)
-{
-#ifdef OFFLOAD_QUARANTINE
-	mrs_printf("fini: heap size %zu, max heap size %zu, offload quarantine size %zu, max offload quarantine size %zu\n",
-	    allocated_size, max_allocated_size, offload_quarantine.size,
-	    offload_quarantine.max_size);
-#else /* OFFLOAD_QUARANTINE */
-	mrs_printf("fini: heap size %zu, max heap size %zu, quarantine size %zu, max quarantine size %zu\n",
-	    allocated_size, max_allocated_size, app_quarantine->size,
-	    app_quarantine->max_size);
-#endif /* !OFFLOAD_QUARANTINE */
-}
-#endif /* PRINT_STATS */
 
 /* mrs functions */
 
@@ -2187,12 +2085,10 @@ mrs_sdallocx(void *ptr, size_t size, int flags)
 static void *
 mrs_offload_thread(void *arg)
 {
-#ifdef PRINT_CAPREVOKE_MRS
-	mrs_printf("offload thread spawned: %d\n", pthread_getthreadid_np());
-#endif
+	mrs_debug_printf("offload thread spawned: %d\n",
+	    pthread_getthreadid_np());
 
-#ifdef MRS_PINNED_CPUSET
-#ifdef __aarch64__
+#if defined(MRS_PINNED_CPUSET) && defined(__aarch64__)
 	cpuset_t mask = {0};
 	if (cpuset_getaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID,
 	    (id_t)-1, sizeof(mask), &mask) != 0) {
@@ -2209,7 +2105,6 @@ mrs_offload_thread(void *arg)
 		}
 	}
 #endif
-#endif
 
 	/*
 	 * Perform a spurious allocation here to force the allocator to wake
@@ -2222,18 +2117,16 @@ mrs_offload_thread(void *arg)
 	mrs_lock(&offload_quarantine_lock);
 	for (;;) {
 		while (offload_quarantine.list == NULL) {
-#ifdef PRINT_CAPREVOKE_MRS
-			mrs_puts("mrs_offload_thread: waiting for offload_quarantine to be ready\n");
-#endif /* PRINT_CAPREVOKE_MRS */
+			mrs_debug_printf("mrs_offload_thread: waiting for "
+			    "offload_quarantine to be ready\n");
 			if (pthread_cond_wait(&offload_quarantine_ready,
 			    &offload_quarantine_lock) != 0) {
 				mrs_puts("pthread error\n");
 				exit(7);
 			}
 		}
-#ifdef PRINT_CAPREVOKE_MRS
-		mrs_debug_printf("mrs_offload_thread: offload_quarantine ready\n");
-#endif /* PRINT_CAPREVOKE_MRS */
+		mrs_debug_printf("mrs_offload_thread: "
+		    "offload_quarantine ready\n");
 
 		/*
 		 * Re-calculate the quarantine's size using only valid
@@ -2258,15 +2151,14 @@ mrs_offload_thread(void *arg)
 			}
 		}
 
-		mrs_debug_printf("mrs_offload_thread: flushing validated quarantine size %zu\n", offload_quarantine.size);
+		mrs_debug_printf("mrs_offload_thread: flushing validated "
+		    "quarantine size %zu\n", offload_quarantine.size);
 
 		quarantine_revoke(&offload_quarantine);
 
-#ifdef PRINT_CAPREVOKE_MRS
-		mrs_printf("mrs_offload_thread: application quarantine's (unvalidated) size "
-		    "when offloaded quarantine flush complete: %zu\n",
+		mrs_debug_printf("mrs_offload_thread: application quarantine's "
+		    "(unvalidated) size when offloaded quarantine flush complete: %zu\n",
 		    app_quarantine->size);
-#endif /* PRINT_CAPREVOKE_MRS */
 
 		if (pthread_cond_signal(&offload_quarantine_empty) != 0) {
 			mrs_puts("pthread error\n");
