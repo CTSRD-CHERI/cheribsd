@@ -156,6 +156,9 @@ extern void snmalloc_flush_message_queue(void);
 #define	MALLOC_QUARANTINE_STATS_ENABLE_ENV \
 	"_RUNTIME_QUARANTINE_STATS_ENABLE"
 
+#define MALLOC_REVOKE_STATS_ENABLE_ENV \
+	"_RUNTIME_REVOKE_STATS_ENABLE"
+
 #define	MALLOC_QUARANTINE_STATS_FILE_ENV \
 	"_RUNTIME_QUARANTINE_STATS_FILE"
 
@@ -345,8 +348,42 @@ static unsigned int quarantine_denominator = QUARANTINE_DENOMINATOR;
 static unsigned int quarantine_numerator = QUARANTINE_NUMERATOR;
 
 #ifdef MRS_STATS
+/*
+ * Extended-range counters for kernel revocation stats.
+ */
+struct cheri_revoke_counters {
+	/* Cycles spent in the barrier phase (sync) */
+	_Atomic(uint64_t) barrier_cycles;
+	/* Cycles spent in the revocation phase (sync) */
+	_Atomic(uint64_t) revoke_cycles;
+	/*
+	 * Revocation stats, same as cheri_revoke_stats but wider type to
+	 *  avoid overflow.
+	 */
+	_Atomic(size_t) page_scan_cycles;
+	_Atomic(size_t) fault_cycles;
+	_Atomic(size_t) pages_scan_ro;
+	_Atomic(size_t) pages_scan_rw;
+	_Atomic(size_t) pages_faulted_ro;
+	_Atomic(size_t) pages_faulted_rw;
+	_Atomic(size_t) fault_visits;
+	_Atomic(size_t) pages_skip_fast;
+	_Atomic(size_t) pages_skip_nofill;
+	_Atomic(size_t) pages_skip;
+	_Atomic(size_t) caps_found;
+	_Atomic(size_t) caps_found_revoked;
+	_Atomic(size_t) caps_cleared;
+	_Atomic(size_t) lines_scan;
+	_Atomic(size_t) pages_mark_clean;
+};
+
+#define mrs_stats_inc(cntp, value)		\
+	atomic_fetch_add_explicit((cntp), (value), memory_order_relaxed)
+
 static const char *mrs_statfile_name = NULL;
 static struct cheri_mrs_stats *cmsp;
+static struct cheri_revoke_counters revoke_cntrs;
+static bool collect_revoke_stats = false;
 #endif
 
 static spinlock_t mrs_init_lock = _SPINLOCK_INITIALIZER;
@@ -583,6 +620,50 @@ cheri_revoke_get_cyc(void)
 	return (0);
 #endif
 }
+
+static void
+update_revoke_counters(struct cheri_revoke_counters *crcp,
+    struct cheri_revoke_stats *crsp)
+{
+	mrs_stats_inc(&crcp->page_scan_cycles, crsp->page_scan_cycles);
+	mrs_stats_inc(&crcp->fault_cycles, crsp->fault_cycles);
+	mrs_stats_inc(&crcp->pages_scan_ro, crsp->pages_scan_ro);
+	mrs_stats_inc(&crcp->pages_scan_rw, crsp->pages_scan_rw);
+	mrs_stats_inc(&crcp->pages_faulted_ro, crsp->pages_faulted_ro);
+	mrs_stats_inc(&crcp->pages_faulted_rw, crsp->pages_faulted_rw);
+	mrs_stats_inc(&crcp->fault_visits, crsp->fault_visits);
+	mrs_stats_inc(&crcp->pages_skip_fast, crsp->pages_skip_fast);
+	mrs_stats_inc(&crcp->pages_skip_nofill, crsp->pages_skip_nofill);
+	mrs_stats_inc(&crcp->pages_skip, crsp->pages_skip);
+	mrs_stats_inc(&crcp->caps_found, crsp->caps_found);
+	mrs_stats_inc(&crcp->caps_found_revoked, crsp->caps_found_revoked);
+	mrs_stats_inc(&crcp->caps_cleared, crsp->caps_cleared);
+	mrs_stats_inc(&crcp->lines_scan, crsp->lines_scan);
+	mrs_stats_inc(&crcp->pages_mark_clean, crsp->pages_mark_clean);
+}
+
+/*
+ * Update revoker statistics for the barrier phase.
+ * XXX-AM: This is only sensible with the sync revocation mode.
+ */
+static inline void
+update_barrier_stats(struct cheri_revoke_stats *crsp, uint64_t cycles)
+{
+	mrs_stats_inc(&revoke_cntrs.barrier_cycles, cycles);
+	update_revoke_counters(&revoke_cntrs, crsp);
+}
+
+/*
+ * Update revoker statistics for the revocation phase.
+ */
+static inline void
+update_revoke_stats(struct cheri_revoke_stats *crsp, uint64_t cycles)
+{
+	mrs_stats_inc(&revoke_cntrs.revoke_cycles, cycles);
+	update_revoke_counters(&revoke_cntrs, crsp);
+}
+
+#endif /* MRS_STATS */
 
 /* utilities */
 
@@ -865,6 +946,9 @@ app_quarantine_revoke_async(void)
 {
 	struct mrs_quarantine *curr, *next;
 	cheri_revoke_epoch_t epoch;
+#ifdef MRS_STATS
+	struct cheri_revoke_syscall_info crsi;
+#endif
 
 	/*
 	 * Add this arena to the list of pending revocations if it isn't already
@@ -884,10 +968,16 @@ app_quarantine_revoke_async(void)
 	epoch = TAILQ_FIRST(&app_quarantine_revoke_list)->epoch;
 	mrs_unlock(&app_quarantine_lock);
 
+#ifndef MRS_STATS
 	(void)cheri_revoke(CHERI_REVOKE_ASYNC, epoch, NULL);
-#ifdef MRS_STATS
-	if (cmsp != NULL)
+#else
+	(void)cheri_revoke(CHERI_REVOKE_ASYNC | CHERI_REVOKE_TAKE_STATS, epoch,
+	    &crsi);
+	if (cmsp != NULL) {
+		if (collect_revoke_stats)
+			update_revoke_stats(&crsi.stats, 0);
 		atomic_store(&cmsp->cms_mrs_epoch, epoch);
+	}
 #endif
 
 	/*
@@ -1065,12 +1155,14 @@ quarantine_revoke(struct mrs_quarantine *quarantine)
 			(void)cheri_revoke(CHERI_REVOKE_TAKE_STATS, start_epoch,
 			    &crsi);
 			cyc_fini = cheri_revoke_get_cyc();
+			update_barrier_stats(&crsi.stats, cyc_fini - cyc_init);
 
 			cyc_init = cheri_revoke_get_cyc();
 			(void)cheri_revoke(
 				CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS,
 				start_epoch, &crsi);
 			cyc_fini = cheri_revoke_get_cyc();
+			update_revoke_stats(&crsi.stats, cyc_fini - cyc_init);
 		} else {
 			(void)cheri_revoke(CHERI_REVOKE_LAST_PASS,
 			    start_epoch, NULL);
@@ -1280,7 +1372,6 @@ spawn_background(void)
 static void
 mrs_statfile_dump(void)
 {
-	struct cheri_revoke_syscall_info crsi = { 0 };
 	struct timespec ts_end;
 	char buf[PATH_MAX];
 	int fd;
@@ -1323,53 +1414,51 @@ mrs_statfile_dump(void)
 	    (cmsp->cms_mrs_flags & CHERI_MRS_FLAGS_EVERYFREE) ? 'e' : '-',
 	    (cmsp->cms_mrs_flags & CHERI_MRS_FLAGS_ABORTONFAIL) ? 'f' : '-',
 	    (cmsp->cms_mrs_flags & CHERI_MRS_FLAGS_QUARANTINING) ? 'q' : '-',
-            (100 * cmsp->cms_mrs_quarantine_numerator) /
-            cmsp->cms_mrs_quarantine_denominator,
-            (100 * cmsp->cms_mrs_bytes_inquarantine) /
-            (cmsp->cms_mrs_bytes_inquarantine + cmsp->cms_mrs_bytes_inheap),
-            cmsp->cms_mrs_count_inheap,
-            cmsp->cms_mrs_bytes_inheap,
-            cmsp->cms_mrs_count_inquarantine,
-            cmsp->cms_mrs_bytes_inquarantine,
+	    (100 * cmsp->cms_mrs_quarantine_numerator) /
+	    cmsp->cms_mrs_quarantine_denominator,
+	    (100 * cmsp->cms_mrs_bytes_inquarantine) /
+	    (cmsp->cms_mrs_bytes_inquarantine + cmsp->cms_mrs_bytes_inheap),
+	    cmsp->cms_mrs_count_inheap,
+	    cmsp->cms_mrs_bytes_inheap,
+	    cmsp->cms_mrs_count_inquarantine,
+	    cmsp->cms_mrs_bytes_inquarantine,
 	    cmsp->cms_mrs_allocated_size,
 	    cmsp->cms_mrs_max_allocated_size,
 	    cmsp->cms_mrs_revocation_minimum,
 	    cmsp->cms_mrs_epoch);
 	(void)write(fd, buf, strlen(buf));
 
-	(void)cheri_revoke(CHERI_REVOKE_TAKE_STATS | CHERI_REVOKE_IGNORE_START,
-			   0, &crsi);
 	(void)snprintf(buf, sizeof(buf),
-	    "PGSCAN_CY: %zu\n"
-	    "FAULT_CY: %zu\n"
-	    "PGSCAN_RO: %zu\n"
-	    "PGSCAN_RW: %zu\n"
-	    "PGFAULT_RO: %zu\n"
-	    "PGFAULT_RW: %zu\n"
-	    "PGVISIT: %zu\n"
-	    "PGSKIP_FAST: %zu\n"
-	    "PGSKIP_NOFILL: %zu\n"
-	    "PGSKIP: %zu\n"
-	    "NCAPS: %zu\n"
-	    "NRVK: %zu\n"
-	    "NCLR: %zu\n"
+	    "SCAN_RO: %zu\n"
+	    "SCAN_RW: %zu\n"
+	    "FAULT_RO: %zu\n"
+	    "FAULT_RW: %zu\n"
+	    "FAULT_VISIT: %zu\n"
+	    "SKIP_FAST: %zu\n"
+	    "SKIP_NOFILL: %zu\n"
+	    "SKIP: %zu\n"
+	    "CAP_FND: %zu\n"
+	    "CAP_FNDREV: %zu\n"
+	    "CAP_CLR: %zu\n"
 	    "LNSCAN: %zu\n"
-	    "PGCLEAN: %zu\n",
-	    crsi.stats.page_scan_cycles,
-	    crsi.stats.fault_cycles,
-	    (size_t)crsi.stats.pages_scan_ro,
-	    (size_t)crsi.stats.pages_scan_rw,
-	    (size_t)crsi.stats.pages_faulted_ro,
-	    (size_t)crsi.stats.pages_faulted_rw,
-	    (size_t)crsi.stats.fault_visits,
-	    (size_t)crsi.stats.pages_skip_fast,
-	    (size_t)crsi.stats.pages_skip_nofill,
-	    (size_t)crsi.stats.pages_skip,
-	    (size_t)crsi.stats.caps_found,
-	    (size_t)crsi.stats.caps_found_revoked,
-	    (size_t)crsi.stats.caps_cleared,
-	    (size_t)crsi.stats.lines_scan,
-	    (size_t)crsi.stats.pages_mark_clean);
+	    "MKCAPCLEAN: %zu\n"
+	    "SCAN_CYC: %" PRIu64 "\n"
+	    "FAULT_CYC: %" PRIu64 "\n",
+	    revoke_cntrs.pages_scan_ro,
+	    revoke_cntrs.pages_scan_rw,
+	    revoke_cntrs.pages_faulted_ro,
+	    revoke_cntrs.pages_faulted_rw,
+	    revoke_cntrs.fault_visits,
+	    revoke_cntrs.pages_skip_fast,
+	    revoke_cntrs.pages_skip_nofill,
+	    revoke_cntrs.pages_skip,
+	    revoke_cntrs.caps_found,
+	    revoke_cntrs.caps_found_revoked,
+	    revoke_cntrs.caps_cleared,
+	    revoke_cntrs.lines_scan,
+	    revoke_cntrs.pages_mark_clean,
+	    revoke_cntrs.page_scan_cycles,
+	    revoke_cntrs.fault_cycles);
 	(void)write(fd, buf, strlen(buf));
 	(void)close(fd);
 }
@@ -1551,6 +1640,9 @@ mrs_init_impl_locked(void)
 			cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_BOUNDPTRS;
 		clock_gettime(CLOCK_REALTIME, &cmsp->cms_mrs_ts_start);
 		cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_INITIALIZED;
+	}
+	if (secure_getenv(MALLOC_REVOKE_STATS_ENABLE_ENV) != NULL) {
+		collect_revoke_stats = true;
 	}
 	if ((mrs_statfile_name =
 	    secure_getenv(MALLOC_QUARANTINE_STATS_FILE_ENV)) != NULL) {
