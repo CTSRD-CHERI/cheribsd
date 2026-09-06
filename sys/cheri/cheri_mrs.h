@@ -85,6 +85,7 @@ struct cheri_mrs_stats {
 	/* 64-bit mrs global state. */
 	_Atomic(size_t)	cms_mrs_allocated_size;
 	_Atomic(size_t)	cms_mrs_max_allocated_size;
+	_Atomic(size_t)	cms_mrs_max_quarantine_size;
 
 	/* 64-bit mrs parameters. */
 	_Atomic(uint64_t)	cms_mrs_epoch;

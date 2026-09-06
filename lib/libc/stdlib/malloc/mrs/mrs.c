@@ -788,6 +788,24 @@ quarantine_insert(struct mrs_quarantine *quarantine, void *ptr)
 	quarantine->size += size;
 	if (quarantine->size > quarantine->max_size) {
 		quarantine->max_size = quarantine->size;
+#ifdef MRS_STATS
+		/*
+		 * XXX-AM: Does not strictly need an atomic, under
+		 * app_quarantine_lock.
+		 * Note that we have multiple quarantines laying around,
+		 * so being larger than the current max_size is not enough
+		 * to be the absolute max.
+		 * Furtheremore, this sometimes will be < mrs_bytes_inquarantine
+		 * because we have multiple quarantines, so the inquarantine
+		 * counter aggregates across the two, while the max is
+		 * per-quarantine. We may still have quarantined bytes in the
+		 * quarantine_revoke_list, these are not counted by this max.
+		 */
+		if (cmsp != NULL &&
+		    quarantine->max_size > cmsp->cms_mrs_max_quarantine_size)
+			atomic_store(&cmsp->cms_mrs_max_quarantine_size,
+			    quarantine->max_size);
+#endif
 	}
 }
 
@@ -1402,6 +1420,7 @@ mrs_statfile_dump(void)
 	    "BQUAR: %zu\n"
 	    "ASIZE: %zu\n"
 	    "MAXASIZE: %zu\n"
+	    "MAXQSIZE: %zu\n"
 	    "MINRVK: %u\n"
 	    "UEPOCH: %zu\n",
 	    getpid(), getprogname(),
@@ -1424,6 +1443,7 @@ mrs_statfile_dump(void)
 	    cmsp->cms_mrs_bytes_inquarantine,
 	    cmsp->cms_mrs_allocated_size,
 	    cmsp->cms_mrs_max_allocated_size,
+	    cmsp->cms_mrs_max_quarantine_size,
 	    cmsp->cms_mrs_revocation_minimum,
 	    cmsp->cms_mrs_epoch);
 	(void)write(fd, buf, strlen(buf));
