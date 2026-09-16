@@ -1851,7 +1851,13 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		 * Static binaries don't use AT_BASE as a
 		 * capability root so it can be null-derived.
 		 */
-		exec_base = NULL;
+		if (imgp->proc->p_osrel < P_OSREL_RTLD_PCC &&
+		    args->hdr_etype == ET_DYN) {
+			/* Support direct-exec of old CheriBSD rtld. */
+			exec_base = prog_cap(imgp, CHERI_CAP_USER_DATA_PERMS |
+			    CHERI_CAP_USER_CODE_PERMS | CHERI_PERM_SW_VMEM);
+		} else
+			exec_base = NULL;
 	} else {
 		/*
 		 * AT_BASE is used by rtld to process its own
@@ -1859,8 +1865,14 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		 * to AT_PHDR.  rtld uses the initial PCC to derive
 		 * code capabilities similar to AT_ENTRY.
 		 */
-		exec_base = interp_cap(imgp, args, CHERI_CAP_USER_DATA_PERMS |
-		    CHERI_PERM_SW_VMEM);
+		if (imgp->proc->p_osrel < P_OSREL_RTLD_PCC) {
+			/* Old CheriBSD rtld still needs RWX. */
+			exec_base = interp_cap(imgp, args,
+			    CHERI_CAP_USER_DATA_PERMS |
+			    CHERI_CAP_USER_CODE_PERMS | CHERI_PERM_SW_VMEM);
+		} else
+			exec_base = interp_cap(imgp, args,
+			    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM);
 	}
 	AUXARGS_ENTRY_PTR(pos, AT_BASE, cheri_address_set(exec_base,
 	    args->base));
