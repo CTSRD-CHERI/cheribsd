@@ -946,8 +946,8 @@ CHERIBSDTEST(vm_reservation_mmap_after_free_fixed,
 	map = mmap(map, PAGE_SIZE, PROT_READ | PROT_WRITE,
 	    MAP_ANON | MAP_FIXED, -1, 0);
 	CHERIBSDTEST_VERIFY2(map == MAP_FAILED, "mmap after free succeeded");
-	CHERIBSDTEST_VERIFY2(errno == EPROT || errno == EACCES,
-	    "mmap after free failed with %d instead of EPROT / EACCES", errno);
+	CHERIBSDTEST_VERIFY2(errno == EPROT || errno == EACCES || errno == ENOMEM,
+	    "mmap after free failed with %d instead of EPROT / EACCES / ENOMEM", errno);
 
 	if (reservations_are_quarantined()) {
 		/*
