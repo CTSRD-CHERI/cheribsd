@@ -1052,7 +1052,7 @@ fork1(struct thread *td, struct fork_req *fr)
 	}
 
 	if ((flags & RFMEM) == 0) {
-		vm2 = vmspace_fork(p1->p_vmspace, &mem_charged);
+		vm2 = vmspace_fork(p1, &mem_charged);
 		if (vm2 == NULL) {
 			error = ENOMEM;
 			goto fail2;

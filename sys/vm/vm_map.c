@@ -5570,14 +5570,16 @@ vmspace_map_entry_forked(const struct vmspace *vm1, struct vmspace *vm2,
  * The source map must not be locked.
  */
 struct vmspace *
-vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
+vmspace_fork(struct proc *p, vm_ooffset_t *fork_charge)
 {
-	struct vmspace *vm2;
+	struct vmspace *vm1, *vm2;
 	vm_map_t new_map, old_map;
 	vm_map_entry_t new_entry, old_entry;
 	vm_object_t object;
 	int error, locked __diagused;
 	vm_inherit_t inh;
+
+	vm1 = p->p_vmspace;
 
 	old_map = &vm1->vm_map;
 	/* Copy immutable fields of vm1 to vm2. */
@@ -6396,7 +6398,7 @@ vmspace_unshare(struct proc *p)
 	if (refcount_load(&oldvmspace->vm_refcnt) == 1)
 		return (0);
 	fork_charge = 0;
-	newvmspace = vmspace_fork(oldvmspace, &fork_charge);
+	newvmspace = vmspace_fork(p, &fork_charge);
 	if (newvmspace == NULL)
 		return (ENOMEM);
 	if (!swap_reserve_by_cred(fork_charge, p->p_ucred)) {
