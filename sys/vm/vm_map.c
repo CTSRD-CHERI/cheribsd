@@ -541,6 +541,15 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 	boolean_t found __diagused, grown_down;
 	int rv __diagused;
 
+	/*
+	 * If the entry is in quarantine, we must not abandon it.  Instead,
+	 * clear ownership, and leave it inplace.
+	 */
+	if (old_entry->inheritance == VM_INHERIT_QUARANTINE) {
+		old_entry->owner = NO_PID;
+		return;
+	}
+
 	next = vm_map_entry_succ(old_entry);
 	prev = vm_map_entry_pred(old_entry);
 	start = old_entry->start;
