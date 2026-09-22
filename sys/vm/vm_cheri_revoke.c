@@ -1260,6 +1260,7 @@ vm_map_install_cheri_revoke_shadow(struct vm_map *map, struct sysentvec *sv)
 	bool reserved_info = false;
 	vm_object_t vmo_shadow, vmo_info;
 	vm_pointer_t start;
+	vm_map_entry_t entry;
 
 	vm_offset_t start_addr = sv->sv_cheri_revoke_shadow_base;
 	vm_offset_t end_addr = start_addr + sv->sv_cheri_revoke_shadow_length;
@@ -1298,6 +1299,11 @@ vm_map_install_cheri_revoke_shadow(struct vm_map *map, struct sysentvec *sv)
 	if (error != KERN_SUCCESS)
 		goto out;
 
+	if (!vm_map_lookup_entry(map, start, &entry))
+		panic("can't find just-inserted entry");
+	/* The shadow map is shared by all processes so is un-owned. */
+	entry->owner = NO_PID;
+
 	/* Now do the same thing for the info page */
 	start_addr = start = sv->sv_cheri_revoke_info_page;
 	end_addr = sv->sv_cheri_revoke_info_page + PAGE_SIZE;
@@ -1319,6 +1325,11 @@ vm_map_install_cheri_revoke_shadow(struct vm_map *map, struct sysentvec *sv)
 
 	if (error != KERN_SUCCESS)
 		goto out;
+
+	if (!vm_map_lookup_entry(map, start, &entry))
+		panic("can't find just-inserted entry");
+	/* The info page is shared by all processes so is un-owned. */
+	entry->owner = NO_PID;
 
 	/*
 	 * XXX We should probably be tracking the shadow object in the map,
