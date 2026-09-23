@@ -659,8 +659,7 @@ vm_map_entry_t vm_map_try_merge_entries(vm_map_t map, vm_map_entry_t prev,
     vm_map_entry_t entry);
 void vm_map_startup (void);
 int vm_map_submap (vm_map_t, vm_pointer_t, vm_pointer_t, vm_map_t);
-int vm_map_sync(vm_map_t, vm_offset_t, vm_offset_t, boolean_t, boolean_t,
-    boolean_t);
+int vm_map_sync(vm_map_t, vm_offset_t, vm_offset_t, boolean_t, boolean_t);
 int vm_map_madvise (vm_map_t, vm_offset_t, vm_offset_t, int);
 int vm_map_msetname(vm_map_t, vm_offset_t, vm_offset_t, const char *);
 int vm_map_stack (vm_map_t, vm_pointer_t, vm_size_t, vm_prot_t, vm_prot_t, int);

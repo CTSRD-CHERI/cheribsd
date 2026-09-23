@@ -870,11 +870,7 @@ kern_msync(struct thread *td, uintptr_t addr0, size_t size, int flags)
 	if (addr + size < addr)
 		return (EINVAL);
 
-	if ((flags & ~(MS_ASYNC | MS_INVALIDATE | MS_PAGEOUT)) != 0)
-		return (EINVAL);
 	if ((flags & (MS_ASYNC|MS_INVALIDATE)) == (MS_ASYNC|MS_INVALIDATE))
-		return (EINVAL);
-	if ((flags & MS_PAGEOUT) != 0 && (flags & ~MS_PAGEOUT) != 0)
 		return (EINVAL);
 
 	map = &td->td_proc->p_vmspace->vm_map;
@@ -883,7 +879,7 @@ kern_msync(struct thread *td, uintptr_t addr0, size_t size, int flags)
 	 * Clean the pages and interpret the return value.
 	 */
 	rv = vm_map_sync(map, addr, addr + size, (flags & MS_ASYNC) == 0,
-	    (flags & MS_INVALIDATE) != 0, (flags & MS_PAGEOUT) != 0);
+	    (flags & MS_INVALIDATE) != 0);
 	switch (rv) {
 	case KERN_SUCCESS:
 		return (0);
