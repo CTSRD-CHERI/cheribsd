@@ -161,12 +161,13 @@ static void vm_map_wire_entry_failure(vm_map_t map, vm_map_entry_t entry,
 static void vm_map_reservation_init_entry(vm_map_entry_t entry);
 static vm_map_entry_t vm_map_reservation_insert(vm_map_t map, vm_offset_t addr,
     vm_size_t length, vm_prot_t max, vm_offset_t reservation);
-static int vm_map_reservation_abandon_locked(vm_map_t map,
-    vm_offset_t reservation);
 static int vm_map_clip_end(vm_map_t map, vm_map_entry_t entry,
     vm_offset_t end);
 static int vm_map_clip_start(vm_map_t map, vm_map_entry_t entry,
     vm_offset_t start);
+#ifdef CHERI_CAPREVOKE
+static void vm_map_entry_quarantine(vm_map_t map, vm_map_entry_t entry);
+#endif
 
 #define	CONTAINS_BITS(set, bits)	((~(set) & (bits)) == 0)
 
@@ -508,148 +509,9 @@ static int coexecve_cleanup_on_exit = 1;
 SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_on_exit, CTLFLAG_RWTUN,
     &coexecve_cleanup_on_exit, 0,
     "Clean up abandoned vm entries after colocated process exits");
-static int coexecve_cleanup_on_fork = 1;
-SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_on_fork, CTLFLAG_RWTUN,
-    &coexecve_cleanup_on_fork, 0,
-    "Clean up abandoned vm entries after colocated process forks");
-static long coexecve_cleanup_margin_up = 0x10000;
-SYSCTL_LONG(_debug, OID_AUTO, coexecve_cleanup_margin_up, CTLFLAG_RWTUN,
-    &coexecve_cleanup_margin_up, 0,
-    "Maximum hole size for segments growing up when cleaning up after colocated processes");
-static long coexecve_cleanup_margin_down = (MAXSSIZ * 2L);
-SYSCTL_LONG(_debug, OID_AUTO, coexecve_cleanup_margin_down, CTLFLAG_RWTUN,
-    &coexecve_cleanup_margin_down, 0,
-    "Maximum hole size for segments growing down when cleaning up after colocated processes");
-static int abandon_on_munmap = 1;
-SYSCTL_INT(_debug, OID_AUTO, abandon_on_munmap, CTLFLAG_RWTUN, &abandon_on_munmap, 0,
-    "Add abandoned vm entries on munmap(2)/shmdt(2)");
 static int kdb_on_overlap = 0;
 SYSCTL_INT(_debug, OID_AUTO, kdb_on_overlap, CTLFLAG_RWTUN, &kdb_on_overlap, 0,
     "Enter ddb(4) when vm_map_check_owner_proc() overlaps");
-
-static bool
-vm_map_entry_abandoned(vm_map_entry_t entry)
-{
-	if (entry->object.vm_object == NULL &&
-	    entry->protection == PROT_NONE && entry->owner == NO_PID)
-		return (true);
-
-	return (false);
-}
-
-static void
-vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
-{
-	vm_map_entry_t entry, prev, next;
-	vm_pointer_t start;
-	vm_offset_t end;
-	boolean_t found __diagused, grown_down;
-	int rv __diagused;
-
-	/*
-	 * If the entry is in quarantine, we must not abandon it.  Instead,
-	 * clear ownership, and leave it inplace.
-	 */
-	if (old_entry->inheritance == VM_INHERIT_QUARANTINE) {
-		old_entry->owner = NO_PID;
-		return;
-	}
-
-	next = vm_map_entry_succ(old_entry);
-	prev = vm_map_entry_pred(old_entry);
-	start = old_entry->start;
-	end = old_entry->end;
-	grown_down = old_entry->eflags & MAP_ENTRY_GROWS_DOWN;
-
-	/*
-	 * XXXJHB: These next two groups duplicate work in
-	 * vm_map_delete, but some places call this function outside
-	 * of vm_map_delete.
-	 */
-
-	/*
-	 * Unwire before removing addresses from the pmap; otherwise,
-	 * unwiring will put the entries back in the pmap.
-	 */
-	if (old_entry->wired_count != 0)
-		vm_map_entry_unwire(map, old_entry);
-
-	/*
-	 * Remove mappings for the pages, but only if the
-	 * mappings could exist.  For instance, it does not
-	 * make sense to call pmap_remove() for guard entries.
-	 */
-	if ((old_entry->eflags & MAP_ENTRY_IS_SUB_MAP) != 0 ||
-			old_entry->object.vm_object != NULL)
-		pmap_remove(map->pmap, start, end);
-
-	vm_map_entry_delete(map, old_entry);
-
-	/*
-	 * Try to cover the "holes" between abandoned entries, so that
-	 * vm_map_try_merge_entries() can coalesce them.  Use much larger
-	 * threshold for stacks.
-	 */
-	if (prev != &map->header && vm_map_entry_abandoned(prev) &&
-	    start > prev->end && start - prev->end <=
-	    ((grown_down != 0) ?
-	    coexecve_cleanup_margin_down : coexecve_cleanup_margin_up)) {
-		start = prev->end;
-	}
-
-	if (next != &map->header && vm_map_entry_abandoned(next) &&
-	    end < next->start && next->start - end <=
-	    (((next->eflags & MAP_ENTRY_GROWS_DOWN) != 0) ?
-	    coexecve_cleanup_margin_down : coexecve_cleanup_margin_up)) {
-		end = next->start;
-	}
-
-	if (map->flags & MAP_RESERVATIONS) {
-		/*
-		 * XXX: we can't use vm_map_reservation_create() because
-		 * we use a reservation of -1.
-		 */
-		(void)vm_map_reservation_insert(map, start, end - start,
-		    PROT_NONE, (vm_offset_t)-1);
-		start = vm_map_buildcap(map, start, end - start, VM_PROT_NONE);
-	}
-	rv = vm_map_insert(map, NULL, 0, start, end,
-	    VM_PROT_NONE, VM_PROT_NONE,
-	    MAP_NOFAULT | MAP_DISABLE_SYNCER | MAP_DISABLE_COREDUMP,
-	    (vm_offset_t)-1);
-	KASSERT(rv == KERN_SUCCESS,
-	    ("%s: vm_map_insert() failed with error %d\n", __func__, rv));
-
-	found = vm_map_lookup_entry(map, start, &entry);
-	KASSERT(found == TRUE,
-	    ("%s: vm_map_insert() returned false\n", __func__));
-
-	KASSERT(entry->protection == PROT_NONE,
-	    ("%s: protection %d\n", __func__, entry->protection));
-	KASSERT(entry->max_protection == VM_PROT_NO_IMPLY_CAP,
-	    ("%s: max_protection %d\n", __func__, entry->max_protection));
-	KASSERT(entry->inheritance == VM_INHERIT_DEFAULT,
-	    ("%s: inheritance %d\n", __func__, entry->inheritance));
-	KASSERT(entry->wired_count == 0,
-	    ("%s: wired_count %d\n", __func__, entry->wired_count));
-	KASSERT(entry->cred == NULL,
-	    ("%s: cred %p\n", __func__, entry->cred));
-
-	/*
-	 * Preserve this particular flag for the purpose of future coalescing
-	 * by another vm_map_entry_abandon() run.
-	 */
-	if (grown_down)
-		entry->eflags |= MAP_ENTRY_GROWS_DOWN;
-	entry->owner = NO_PID;
-	vm_map_log("abandon", entry);
-
-	/*
-	 * We need to call it again after setting the owner to NO_PID.
-	 */
-	vm_map_try_merge_entries(map, prev, entry);
-	vm_map_try_merge_entries(map, entry, next);
-}
 
 void
 vmspace_insert_proc(struct vmspace *vm, struct proc *p)
@@ -756,21 +618,62 @@ vmspace_exit(struct thread *td)
 	} else {
 		map = &vm->vm_map;
 		vm_map_lock(map);
-again:
+
 		VM_MAP_ENTRY_FOREACH(entry, map) {
-			if (entry->owner == p->p_pid) {
-				if (coexecve_cleanup_on_exit != 0) {
-					vm_map_entry_abandon(map, entry);
+			if (entry->owner != p->p_pid)
+				continue;
+
+			if (coexecve_cleanup_on_exit != 0) {
+				int rv;
+				boolean_t found;
+				vm_offset_t start = entry->start;
+
+				if ((entry->eflags & MAP_ENTRY_UNMAPPED) == 0) {
+					rv = vm_map_delete(map, start, entry->end,
+					    true);
+					if (rv != KERN_SUCCESS)
+						panic("failed to delete entry %d", rv);
 					/*
-					 * vm_map_entry_abandon() frees
-					 * the entry, and possibly also
-					 * the next one, due to coalescing.
+					 * vm_map_delete creates a new,
+					 * unmapped entry, owned by us.
 					 */
-					goto again;
-				} else {
-					entry->owner = NO_PID;
+					found = vm_map_lookup_entry(map, start, &entry);
+					if (!found)
+						panic("entry vanished");
+
+				}
+
+				/* Disown the entry so we can merge with neighbors */
+				entry->owner = NO_PID;
+
+				/*
+				 * max_protection is preserved by vm_map_delete so
+				 * so squash it to allow merging.
+				 */
+				entry->max_protection = 0;
+
+				KASSERT((entry->eflags & MAP_ENTRY_UNMAPPED) != 0,
+				    ("entry %p not unmapped", (void *)entry));
+
+				vm_map_try_merge_entries(map, vm_map_entry_pred(entry),
+				    entry);
+				entry = vm_map_try_merge_entries(map, entry,
+				    vm_map_entry_succ(entry));
+				if (vm_map_reservation_is_unmapped(map,
+				    entry->reservation) &&
+				    entry->inheritance != VM_INHERIT_QUARANTINE) {
+					vm_map_entry_quarantine(map, entry);
+
+					/*
+					 * vm_map_entry_quarantine may have
+					 * replaced entry so look it up again
+					 */
+					found = vm_map_lookup_entry(map, start, &entry);
+					if (!found)
+						panic("entry vanished");
 				}
 			}
+			entry->owner = NO_PID;
 		}
 		vm_map_unlock(map);
 	}
@@ -3166,18 +3069,6 @@ vm_map_try_merge_entries(vm_map_t map, vm_map_entry_t prev_entry,
 
 	VM_MAP_ASSERT_LOCKED(map);
 
-	/*
-	 * Try to merge abandoned stacks.
-	 */
-	if ((entry->eflags & MAP_ENTRY_GROWS_DOWN) &&
-	    vm_map_entry_abandoned(entry) &&
-	    vm_map_entry_abandoned(prev_entry) &&
-	    prev_entry->end == entry->start) {
-		vm_map_entry_unlink(map, prev_entry, UNLINK_MERGE_NEXT);
-		vm_map_merged_neighbor_dispose(map, prev_entry);
-		return (entry);
-	}
-
 	if ((entry->eflags & MAP_ENTRY_NOMERGE_MASK) == 0 &&
 	    vm_map_mergeable_neighbors(map, prev_entry, entry)) {
 		vm_map_entry_unlink(map, prev_entry, UNLINK_MERGE_NEXT);
@@ -5204,7 +5095,6 @@ vm_map_remove_locked(vm_map_t map, vm_offset_t start, vm_offset_t end)
 	int result;
 	vm_offset_t reservation = 0;
 	vm_map_entry_t entry;
-	bool abandon = false;
 
 	VM_MAP_ASSERT_LOCKED(map);
 
@@ -5215,16 +5105,6 @@ vm_map_remove_locked(vm_map_t map, vm_offset_t start, vm_offset_t end)
 			    __func__, result);
 			return (result);
 		}
-
-		/*
-		 * XXX: This is suboptimal; it makes it impossible for
-		 *	the application to reuse the address range it
-		 *	just munmapped.
-		 *
-		 * XXX-JHB: Maybe only do this for purecap?
-		 */
-		if (abandon_on_munmap)
-			abandon = true;
 	} else {
 		KASSERT(map == pipe_map || map == exec_map || map == kernel_map,
 		    ("%s: invalid map %p", __func__, map));
@@ -5271,9 +5151,6 @@ vm_map_remove_locked(vm_map_t map, vm_offset_t start, vm_offset_t end)
 			 * order to warn if we later start revoking?
 			 */
 #endif
-		if (abandon)
-			vm_map_reservation_abandon_locked(map, reservation);
-		else
 			vm_map_reservation_delete_locked(map, reservation);
 	}
 
@@ -5636,6 +5513,8 @@ vmspace_fork(struct proc *p, vm_ooffset_t *fork_charge)
 		    (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) != 0 &&
 		    inh != VM_INHERIT_NONE && inh != VM_INHERIT_QUARANTINE)
 			inh = VM_INHERIT_COPY;
+		if (old_entry->owner != p->p_pid && old_entry->owner != NO_PID)
+			inh = VM_INHERIT_QUARANTINE;
 
 		new_entry = NULL;
 		switch (inh) {
@@ -5812,21 +5691,6 @@ vmspace_fork(struct proc *p, vm_ooffset_t *fork_charge)
 
 			break;
 #endif
-		}
-
-		// XXX: OBJT_PHYS is to avoid touching the shared page.
-		// XXX: We should just skip (not duplicate) mappings that
-		// 	are not owned by us.  This, however, breaks certain
-		// 	things, for reasons yet unknown.
-		if (new_entry != NULL && old_entry->owner != curproc->p_pid &&
-		    old_entry->owner != NO_PID &&
-		    (old_entry->object.vm_object == NULL ||
-		    old_entry->object.vm_object->type != OBJT_PHYS)) {
-			if (coexecve_cleanup_on_fork != 0) {
-				vm_map_entry_abandon(new_map, new_entry);
-			} else {
-				new_entry->owner = NO_PID;
-			}
 		}
 	}
 #if defined(CHERI_CAPREVOKE)
@@ -6962,35 +6826,6 @@ vm_map_reservation_create(vm_map_t map, vm_pointer_t *addr, vm_size_t length,
 	if (result == KERN_SUCCESS)
 		*addr = start;
 	return (result);
-}
-
-int
-vm_map_reservation_abandon_locked(vm_map_t map, vm_offset_t reservation)
-{
-	vm_map_entry_t	entry, next_entry;
-
-	VM_MAP_ASSERT_LOCKED(map);
-
-	if ((map->flags & MAP_RESERVATIONS) == 0)
-		return (KERN_SUCCESS);
-
-	if (!vm_map_lookup_entry(map, reservation, &entry))
-		return (KERN_FAILURE);
-
-	KASSERT(entry->reservation == reservation,
-	    ("Reservation mismatch requested %lx found %lx",
-	    (u_long)reservation, (u_long)entry->reservation));
-
-	while (entry->reservation == reservation) {
-		next_entry = vm_map_entry_succ(entry);
-
-		/* XXX: This might free next_entry due to coalescing. */
-		vm_map_entry_abandon(map, entry);
-		entry = next_entry;
-	}
-	CTR2(KTR_VM, "%s: reservation %lx", __func__, reservation);
-
-	return (KERN_SUCCESS);
 }
 
 int
