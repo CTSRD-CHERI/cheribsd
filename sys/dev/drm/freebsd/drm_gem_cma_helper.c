@@ -67,12 +67,10 @@ drm_gem_cma_destruct(struct drm_gem_cma_object *bo)
 		m = bo->m[i];
 		if (m == NULL)
 			break;
-		vm_page_lock(m);
 		m->oflags |= VPO_UNMANAGED;
 		m->flags &= ~PG_FICTITIOUS;
 		vm_page_unwire_noq(m);
 		vm_page_free(m);
-		vm_page_unlock(m);
 	}
 }
 

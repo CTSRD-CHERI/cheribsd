@@ -94,10 +94,8 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 			if (m == NULL)
 				continue;
 
-			vm_page_lock(m);
 			vm_page_unwire_noq(m);
 			vm_page_free(m);
-			vm_page_unlock(m);
 		}
 
 		free(bo->pages, M_PANFROST);
