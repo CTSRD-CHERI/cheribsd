@@ -46,7 +46,6 @@
  */
 
 #include "opt_hwpmc_hooks.h"
-#include "opt_ktrace.h"
 #include "opt_vm.h"
 
 #define	EXTERR_CATEGORY	EXTERR_CAT_MMAP
@@ -67,7 +66,6 @@
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
 #include <sys/rwlock.h>
-#include <sys/signal.h>
 #include <sys/sysctl.h>
 #include <sys/vnode.h>
 #include <sys/fcntl.h>
@@ -79,8 +77,6 @@
 #include <sys/syscallsubr.h>
 #include <sys/sysent.h>
 #include <sys/syslog.h>
-#include <sys/uio.h>
-#include <sys/ktrace.h>		/* Requires sys/signal.h, sys/uio.h */
 #include <sys/vmmeter.h>
 #if defined(__amd64__) || defined(__i386__) /* for i386_read_exec */
 #include <machine/md_var.h>
