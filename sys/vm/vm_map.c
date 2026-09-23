@@ -6361,14 +6361,17 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 int
 vmspace_coexec(struct proc *p, struct proc *cop, vm_offset_t minuser, vm_offset_t maxuser)
 {
-	struct vmspace *newvmspace;
+	struct vmspace *newvmspace, *oldvmspace;
 
 	KASSERT((curthread->td_pflags & TDP_EXECVMSPC) == 0,
 	    ("vmspace_coexec recursed"));
 	newvmspace = vmspace_acquire_ref(cop);
 	PROC_VMSPACE_LOCK(p);
+	oldvmspace = p->p_vmspace;
 	p->p_vmspace = newvmspace;
 	PROC_VMSPACE_UNLOCK(p);
+	vmspace_remove_proc(oldvmspace, p);
+	vmspace_insert_proc(newvmspace, p);
 	if (p == curthread->td_proc)
 		pmap_activate(curthread);
 	curthread->td_pflags |= TDP_EXECVMSPC;
