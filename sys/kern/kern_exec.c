@@ -1457,6 +1457,7 @@ exec_map_stack(struct image_params *imgp)
 	int error, find_space, stack_off;
 	vm_prot_t stack_prot;
 	vm_object_t obj;
+	vm_map_entry_t sp_entry;
 
 	p = imgp->proc;
 	sv = p->p_sysent;
@@ -1690,6 +1691,9 @@ exec_map_stack(struct image_params *imgp)
 		vm_object_deallocate(obj);
 		return (vm_mmap_to_errno(error));
 	}
+	if (!vm_map_lookup_entry(map, sharedpage_addr, &sp_entry))
+		return (ENOMEM);	/* XXX: can't happen */
+	sp_entry->owner = NO_PID;
 out:
 	/*
 	 * vm_ssize and vm_maxsaddr are somewhat antiquated concepts, but they
