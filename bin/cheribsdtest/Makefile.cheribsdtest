@@ -60,10 +60,6 @@ LIBADD+=	cheri_caprevoke
 CFLAGS+=	-DCHERIBSDTEST_CHERI_REVOKE_TESTS
 .endif
 
-# This test is broken as written
-#SRCS+=	cheribsdtest_vm_swap.c
-#CFLAGS.cheribsdtest_vm_swap.c+=-Wno-cheri-capability-misuse
-
 .sinclude "${CHERIBSDTEST_DIR}/${MACHINE}/Makefile.cheribsdtest"
 
 # Enable sub-object bounds only in tests specifically designed for them.
