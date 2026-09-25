@@ -236,7 +236,7 @@ TRAMP(tramp_push_frame)
 	/*
 	 * Get and unseal the thread identifier buffer.
 	 */
-	csrr		t2, utidc
+	GET_UTIDC(t2)
 	unseal_tidc	t1, t1, t2, t2, t3
 	/*
 	 * Get the trusted stack.
@@ -289,7 +289,7 @@ TRAMP(tramp_push_frame)
 	/*
 	 * Get and unseal the thread identifier buffer.
 	 */
-	csrr		t2, utidc
+	GET_UTIDC(t2)
 	unseal_tidc	t1, t1, t2, t2, t3
 	/*
 	 * Get the trusted stack.
@@ -579,7 +579,7 @@ TRAMP(tramp_pop_frame)
 	/*
 	 * Get and unseal the thread identifier buffer.
 	 */
-	csrr		t0, utidc
+	GET_UTIDC(t0)
 	unseal_tidc	t3, t3, t0, t0, t1
 
 	/*

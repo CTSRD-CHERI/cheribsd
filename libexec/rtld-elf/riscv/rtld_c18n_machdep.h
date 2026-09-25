@@ -63,7 +63,7 @@
 .macro	get_rtld_stk		out, outi, tmp
 	LA_PTR		STACK_TABLE_C, sealer_tidc
 	L_PTR		STACK_TABLE_C, 0(STACK_TABLE_C)
-	csrr		\out, utidc
+	GET_UTIDC(\out)
 	unseal_tidc	\out, STACK_TABLE_C, \out, \outi, \tmp
 	L_PTR		STACK_TABLE_C, STACK_TABLE(\out)
 	L_PTR		\out, STACK_TABLE_RTLD(STACK_TABLE_C)
