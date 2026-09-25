@@ -31,6 +31,7 @@
 #ifndef	_SYS__SX_H_
 #define	_SYS__SX_H_
 
+#include <sys/cdefs.h>
 #include <sys/_types.h>
 #include <sys/_lock.h>
 

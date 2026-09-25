@@ -32,6 +32,7 @@
 #ifndef _SYS__IOVEC_H_
 #define	_SYS__IOVEC_H_
 
+#include <sys/cdefs.h>
 #include <sys/_types.h>
 
 #ifndef _SIZE_T_DECLARED
