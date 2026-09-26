@@ -1,0 +1,213 @@
+.\"
+.\" Copyright (c) 2025-2026 Capabilities Limited
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.\" This software was developed by SRI International, the University of
+.\" Cambridge Computer Laboratory (Department of Computer Science and
+.\" Technology), and Capabilities Limited under Defense Advanced Research
+.\" Projects Agency / Air Force Research Laboratory (DARPA/AFRL) Contract
+.\" No. FA8750-24-C-B047 ("DEC").
+.\"
+.Dd March 24, 2026
+.Dt TAGSCAN 4
+.Os
+.Sh NAME
+.Nm tagscan
+.Nd CHERI memory measurement and overhead estimation device
+.Sh DESCRIPTION
+.Nm
+is an optionally loaded kernel module that walks physical memory to measure
+and analyse capability overheads on CHERI-enabled systems.
+.Pp
+.Nm
+is concerned with measure use at two granularities:
+.Pp
+.Bl -tag -width indent
+.It Page
+At this granularity, the interet is in how many pages contain at least one
+capability, allowing estimates of underlying tag-storage overhead.
+.Nm
+estimates the percentage overhead, compared to baseline memory, utilized tag
+storage would consume for the tag-bearing pages.
+This is intended to presuppose hardware optimizations in which physical memory
+for tags can be committed only for those pages that require it.
+.It Capability-sized word
+At this granularity, the interest is in the memory overhead represented by
+the 8-byte increase in pointer sizes.
+This is intended to estimate the percentage increase in memory due to
+pointer-size growth based on the number of tagged values found.
+.El
+.Ss Page sets
+Measurements and estimages are generated with respect to
+.It named page sets ,
+collections of pages that have common ownership or properties.
+Physical pages may (and will) belong to more than one page set; for example,
+all physical pages are captured in the
+.Dv global
+page set, and each will also be captured by either the
+.Dv allocated
+or
+.Dv unallocated
+page sets.
+.Pp
+Available page sets include:
+.Bl -tag -width unallocated
+.It global
+All pages present in the system.
+.It allocated
+Pages marked as allocated by the physical-memory buddy allocator
+.It unallocated
+Pages marked as unallocated by the physical-memory buddy allocator
+.It object
+Pages marked as allocated by the physical-memory buddy allocator and
+associated with a specific virtual-memory object (such as a file or the
+kernel object).
+.It no_object
+Pages marked as allocated by the physical-memory buddy allocator but not
+associated with a specific virtual-memory object.
+.El
+.Pp
+Pages that are allocated by the physical-memory buddy allocator and are
+associated with a sepcific virtual-memory object will be further categorised
+by the type of object:
+.Bl -tag -width device_object
+.It phys_object
+Pages that are held only in physical memory.
+.It swap_object
+Pages that can be paged to on-disk swap.
+.It anon_object
+Pages associated with anonymous memory (e.g., as allocated with
+.Xr mmap 2
+using the
+.Dv MAP_ANON
+flag); this is a subset of pages in the
+.Dv swap_object
+category.
+.It vnode_object
+Pages that can be paged to and front a filesystem object.
+.It device_object
+Pages associated with a device driver.
+.It kernel_object
+Pages associated with the kernel's internal memory allocators; this is a
+subset of pages in the
+.Dv phys_object
+category.
+.It misc_object
+Pages associated with any other object type not captured above.
+.El
+.Ss Scanning
+Depending on system memory size, the time it takes to complete the scan may
+vary from less than a second to over ten seconds.
+The scan is run once when the module is first loaded, and then additional
+scans can be requested by writing to the
+.Va dev.tagscan.rescan
+sysctl node using the
+.Xr sysctl 8
+utility; e.g.:
+.Bd -literal -offset indent
+# sysctl dev.tagscan.rescan=1
+dev.tagscan.rescan: 0 -> 0
+.Ed
+.Ss Printing data and estimates
+Statistics are exported from the kernel in a simply text format, organized by
+page set, and can be retrieved by printing the
+.Va dev.tagscan.dump
+sysctl node using the
+.Xr sysctl 8
+utility; e.g., 
+.Bd -literal -offset indent
+# sysctl -n dev.tagscan.dump
+global:
+  pages_count_scanned: 16064392
+  pages_count_with_tags: 4075395
+  pages_percent_with_tags: 25.3
+  pages_tagstore_overhead_bytes: 130412640
+  pages_tagstore_overhead_percent: 0.1
+  words_count_scanned: 4112484352
+  words_count_with_tags: 428240103
+  words_percent_with_tags: 10.4
+  words_memory_overhead_bytes: 3425920824
+  words_memory_overhead_percent: 5.4
+  bytes_count_scanned: 65799749632
+  bytes_count_in_capabilities: 6851841648
+  percent_of_global_memory: 100.0
+allocated:
+  ...
+.Ed
+.Ss Interpreting tagscan measurements
+.Nm
+updates the following measurements as part of each memory scan:
+.Bl -tag -width indent
+.It pages_count_scanned
+The total number of physical pages found and scanned.
+.It pages_count_with_tags
+The total number of physical pages found to contain at least one valid
+capability.
+.It pages_percent_with_tags
+The percentage of physical pages scanned that contained at least one valid
+capability.
+.It words_count_scanned
+The number of capability-width words scanned.
+.It words_count_with_tags
+The number of capability-width words scanned that contained a valid
+capability.
+.It words_percent_with_tags
+The percentage of capability-width words scanned that contained a valid
+capability.
+.It bytes_count_scanned
+The number of bytes of memory scanned.
+.It bytes_count_in_capabilities
+The number of bytes of memory used to store capabilities.
+.It percent_of_global_memory
+The percentage of global memory that the current page set represents.
+.El
+.Ss Interpreting tagscan overhead estimates
+.Nm
+maintains a set of overhead estimates derived from its measurements, which
+are recalculated after scans complete.
+Estimates are just that: They attempt to give a reasonable indication of
+potential overhead, subject to certain documented limitations.
+.Pp
+The following estimates are maintained by
+.Nm :
+.Bl -tag -width indent
+.It pages_tagstore_overhead_bytes
+The estimated memory overhead in bytes for the space required to store tags
+for any pages that contain a least one valid capability.
+This estimate incorporates various assumptions including that no additional
+metadata (e.g., associated with a hierarchical tag table) is used, and that
+pages without any valid capabilities do not require tag storage.
+.It pages_tagstore_overhead_percent
+The estimated overhead as a percentage of total memory for the space required
+to store tags for any pages that contain at least one valid capability.
+Carries the same limitations as
+.Va pages_tagstore_overhead_bytes .
+.It words_memory_overhead_bytes
+The estimated memory overhead in bytes for the space increase caused in
+expanding pointer sizes from 8 bytes to 16 bytes.
+This estimate incorporates various assumptions including that all pointer
+fields contain valid capabilities; as
+.Dv NULL
+pointers do not have a tag set, this limitation must be considered carefully.
+.It words_memory_overhead_percent
+The estimated overhead as a percentage of total memroy for the space required
+to store the 8-byte metadata extensions associated with capabilities.
+Carries the same lmitations as
+.Va words_memory_overhead_bytes .
+.El
+.Sh SEE ALSO
+.Xr mmap 2 ,
+.Xr sysctl 8
+.Sh AUTHORS
+.Nm
+was developed by
+.An -nosplit
+.An Robert Watson Aq Mt rwatson@FreeBSD.org
+This manual page was written by SRI International, the University of
+Cambridge Computer Laboratory (Department of Computer Science and Technology),
+and Capabilities Limited under Defense Advanced Research Projects Agency / Air
+Force Research Laboratory (DARPA/AFRL) Contract No.
+.Pq FA8750-24-C-B047
+.Pq Do DEC Dc ,
+as part of the DARPA CPM research programme.
