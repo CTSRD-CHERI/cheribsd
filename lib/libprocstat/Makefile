@@ -44,6 +44,7 @@ MLINKS+=libprocstat.3 procstat_close.3 \
 		libprocstat.3 procstat_getfiles.3 \
 		libprocstat.3 procstat_getgroups.3 \
 		libprocstat.3 procstat_getkstack.3 \
+		libprocstat.3 procstat_getmrs.3 \
 		libprocstat.3 procstat_getosrel.3 \
 		libprocstat.3 procstat_getpathname.3 \
 		libprocstat.3 procstat_getprocs.3 \

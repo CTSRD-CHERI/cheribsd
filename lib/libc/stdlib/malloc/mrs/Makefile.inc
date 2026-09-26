@@ -15,4 +15,4 @@ MLINKS+= \
 
 CFLAGS.mrs.c+=-Wno-error=gnu-folding-constant
 
-CFLAGS.mrs.c+=	-DMRS_REAL_PREFIX=${MRS_REAL_PREFIX}
+CFLAGS.mrs.c+=	-DMRS_REAL_PREFIX=${MRS_REAL_PREFIX} -DMRS_STATS

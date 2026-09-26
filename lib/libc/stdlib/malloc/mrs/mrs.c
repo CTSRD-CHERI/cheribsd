@@ -1,10 +1,16 @@
 /*-
  * Copyright (c) 2019 Brett F. Gutstein
+ * Copyright (c) 2025-2026 Capabilities Limited
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
  * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
  * DARPA SSITH research programme.
+ *
+ * This software was developed by SRI International, the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology), and Capabilities Limited under Defense Advanced Research
+ * Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +35,7 @@
  */
 
 #include <sys/param.h>
+#include <sys/auxv.h>
 #include <sys/ktrace.h>
 #include <sys/mman.h>
 #include <sys/tree.h>
@@ -37,8 +44,10 @@
 #include <sys/queue.h>
 #include <sys/sysctl.h>
 
+#include <cheri/cheric.h>
 #include <cheri/revoke.h>
 #include <cheri/libcaprevoke.h>
+#include <cheri/cheri_mrs.h>
 
 #include <machine/vmparam.h>
 
@@ -46,6 +55,7 @@
 #include <cheriintrin.h>
 #include <dlfcn.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <malloc_np.h>
 #include <pthread.h>
@@ -142,6 +152,14 @@ extern void snmalloc_flush_message_queue(void);
 	"_RUNTIME_QUARANTINE_DENOMINATOR"
 #define	MALLOC_QUARANTINE_NUMERATOR_ENV \
 	"_RUNTIME_QUARANTINE_NUMERATOR"
+
+#define	MALLOC_QUARANTINE_STATS_DISABLE_ENV \
+	"_RUNTIME_QUARANTINE_STATS_DISABLE"
+#define	MALLOC_QUARANTINE_STATS_ENABLE_ENV \
+	"_RUNTIME_QUARANTINE_STATS_ENABLE"
+
+#define	MALLOC_QUARANTINE_STATS_FILE_ENV \
+	"_RUNTIME_QUARANTINE_STATS_FILE"
 
 /*
  * Different allocators give their strong symbols different names.  Hide
@@ -327,6 +345,11 @@ static bool mrs_initialized = false;
 
 static unsigned int quarantine_denominator = QUARANTINE_DENOMINATOR;
 static unsigned int quarantine_numerator = QUARANTINE_NUMERATOR;
+
+#ifdef MRS_STATS
+static const char *mrs_statfile_name = NULL;
+static struct cheri_mrs_stats *cmsp;
+#endif
 
 static spinlock_t mrs_init_lock = _SPINLOCK_INITIALIZER;
 #define	MRS_LOCK(x)	__extension__ ({	\
@@ -607,6 +630,13 @@ increment_allocated_size(void *allocated)
 	if (allocated_size > max_allocated_size) {
 		max_allocated_size = allocated_size;
 	}
+#ifdef MRS_STATS
+	if (cmsp != NULL) {
+		atomic_store(&cmsp->cms_mrs_allocated_size, allocated_size);
+		atomic_store(&cmsp->cms_mrs_max_allocated_size,
+		    max_allocated_size);
+	}
+#endif
 }
 
 static inline void
@@ -842,6 +872,10 @@ app_quarantine_revoke_async(void)
 	mrs_unlock(&app_quarantine_lock);
 
 	(void)cheri_revoke(CHERI_REVOKE_ASYNC, epoch, NULL);
+#ifdef MRS_STATS
+	if (cmsp != NULL)
+		atomic_store(&cmsp->cms_mrs_epoch, epoch);
+#endif
 
 	/*
 	 * Is it possible that some of the pending revocation work has finished?
@@ -1014,6 +1048,18 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 			clear_region(iter->slab[i].ptr,
 			    cheri_length_get(iter->slab[i].ptr));
 #endif /* CLEAR_ON_RETURN */
+#ifdef MRS_STATS
+			if (cmsp != NULL) {
+				atomic_fetch_add(
+				    &cmsp->cms_mrs_count_returned, 1);
+				atomic_fetch_add(
+				    &cmsp->cms_mrs_bytes_returned, len);
+				atomic_fetch_sub(
+				    &cmsp->cms_mrs_count_inquarantine, 1);
+				atomic_fetch_sub(
+				    &cmsp->cms_mrs_bytes_inquarantine, len);
+			}
+#endif
 
 			/*
 			 * We have a VMEM-bearing cap from
@@ -1047,6 +1093,12 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 		allocated_size -= quarantine->size;
 		utrace_allocated_size += quarantine->size;
 		quarantine->size = 0;
+
+#ifdef MRS_STATS
+		if (cmsp != NULL)
+			atomic_store(&cmsp->cms_mrs_allocated_size,
+			    allocated_size);
+#endif
 	}
 	mrs_debug_printf("quarantine_flush: flushed, allocated_size %zu quarantine->size %zu\n",
 	    allocated_size, quarantine->size);
@@ -1076,6 +1128,10 @@ quarantine_revoke(struct mrs_quarantine *quarantine)
 		cyc_init = cheri_revoke_get_cyc();
 		(void)cheri_revoke(CHERI_REVOKE_TAKE_STATS, epoch, &crsi);
 		cyc_fini = cheri_revoke_get_cyc();
+#ifdef MRS_STATS
+		if (cmsp != NULL)
+			atomic_store(&cmsp->cms_mrs_epoch, epoch);
+#endif
 		print_cheri_revoke_stats("load-barrier", &crsi,
 		    cyc_fini - cyc_init);
 
@@ -1092,6 +1148,10 @@ quarantine_revoke(struct mrs_quarantine *quarantine)
 		(void)cheri_revoke(
 		    CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS,
 		    start_epoch, NULL);
+#ifdef MRS_STATS
+		if (cmsp != NULL)
+			atomic_store(&cmsp->cms_mrs_epoch, start_epoch);
+#endif
 # endif /* !PRINT_CAPREVOKE */
 	}
 	MRS_UTRACE(UTRACE_MRS_QUARANTINE_REVOKE_DONE, NULL, 0, 0, NULL);
@@ -1297,6 +1357,69 @@ spawn_background(void)
 }
 #endif /* OFFLOAD_QUARANTINE */
 
+#ifdef MRS_STATS
+static void
+mrs_statfile_dump(void)
+{
+	struct timespec ts_end;
+	char buf[PATH_MAX];
+	int fd;
+
+	if (cmsp == NULL || mrs_statfile_name == NULL)
+		return;
+	(void)snprintf(buf, sizeof(buf), "%s.%d", mrs_statfile_name,
+	    getpid());
+	fd = open(buf, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+	if (fd < 0)
+		return;
+
+	/*
+	 * Data presentation modeled on proctat(1)'s mrs mode.
+	 */
+	(void)clock_gettime(CLOCK_REALTIME, &ts_end);
+	(void)snprintf(buf, sizeof(buf),
+	    "PID: %d\n"
+	    "COMM: %s\n"
+	    "TS_START: %zu.%09zu\n"
+	    "TS_END: %zu.%09zu\n"
+	    "FLAGS: %c%c%c%c%c\n"
+	    "%%TQR: %u\n"
+	    "%%MQR: %zu\n"
+	    "CHEAP: %zu\n"
+	    "BHEAP: %zu\n"
+	    "CQUAR: %zu\n"
+	    "BQUAR: %zu\n"
+	    "ASIZE: %zu\n"
+	    "MAXASIZE: %zu\n"
+	    "MINRVK: %u\n"
+	    "UEPOCH: %zu\n",
+	    getpid(), getprogname(),
+	    cmsp->cms_mrs_ts_start.tv_sec,
+	    cmsp->cms_mrs_ts_start.tv_nsec,
+	    ts_end.tv_sec,
+	    ts_end.tv_nsec,
+	    (cmsp->cms_mrs_flags & CHERI_MRS_FLAGS_ASYNCREVOKE) ? 'a' : '-',
+	    (cmsp->cms_mrs_flags & CHERI_MRS_FLAGS_BOUNDPTRS) ? 'b' : '-',
+	    (cmsp->cms_mrs_flags & CHERI_MRS_FLAGS_EVERYFREE) ? 'e' : '-',
+	    (cmsp->cms_mrs_flags & CHERI_MRS_FLAGS_ABORTONFAIL) ? 'f' : '-',
+	    (cmsp->cms_mrs_flags & CHERI_MRS_FLAGS_QUARANTINING) ? 'q' : '-',
+            (100 * cmsp->cms_mrs_quarantine_numerator) /
+            cmsp->cms_mrs_quarantine_denominator,
+            (100 * cmsp->cms_mrs_bytes_inquarantine) /
+            (cmsp->cms_mrs_bytes_inquarantine + cmsp->cms_mrs_bytes_inheap),
+            cmsp->cms_mrs_count_inheap,
+            cmsp->cms_mrs_bytes_inheap,
+            cmsp->cms_mrs_count_inquarantine,
+            cmsp->cms_mrs_bytes_inquarantine,
+	    cmsp->cms_mrs_allocated_size,
+	    cmsp->cms_mrs_max_allocated_size,
+	    cmsp->cms_mrs_revocation_minimum,
+	    cmsp->cms_mrs_epoch);
+	(void)write(fd, buf, strlen(buf));
+	(void)close(fd);
+}
+#endif
+
 static void
 mrs_init_impl_locked(void)
 {
@@ -1448,6 +1571,38 @@ mrs_init_impl_locked(void)
 	}
 	app_quarantine = &app_quarantine_store[0];
 
+	/*
+	 * Initial export of stats, to be updated on various allocation/etc.
+	 * events.
+	 */
+#ifdef MRS_STATS
+	if (secure_getenv(MALLOC_QUARANTINE_STATS_DISABLE_ENV) == NULL &&
+	    secure_getenv(MALLOC_QUARANTINE_STATS_ENABLE_ENV) != NULL) {
+		if (_elf_aux_info(AT_CHERI_MRS, &cmsp, sizeof(cmsp)) < 0)
+			mrs_puts("error getting AT_CHERI_MRS\n");
+		cmsp->cms_mrs_arenas = APP_QUARANTINE_ARENAS;
+		cmsp->cms_mrs_quarantine_numerator = quarantine_numerator;
+		cmsp->cms_mrs_quarantine_denominator = quarantine_denominator;
+		cmsp->cms_mrs_revocation_minimum = MIN_REVOKE_HEAP_SIZE;
+		if (quarantining)
+			cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_QUARANTINING;
+		if (revoke_every_free)
+			cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_EVERYFREE;
+		if (revoke_async)
+			cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_ASYNCREVOKE;
+		if (abort_on_validation_failure)
+			cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_ABORTONFAIL;
+		if (bound_pointers)
+			cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_BOUNDPTRS;
+		clock_gettime(CLOCK_REALTIME, &cmsp->cms_mrs_ts_start);
+		cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_INITIALIZED;
+	}
+	if ((mrs_statfile_name =
+	    secure_getenv(MALLOC_QUARANTINE_STATS_FILE_ENV)) != NULL) {
+		atexit(mrs_statfile_dump);
+	}
+#endif
+
 nosys:
 	mrs_initialized = true;
 
@@ -1548,6 +1703,16 @@ mrs_malloc(size_t size)
 	/*mrs_debug_printf("mrs_malloc: called size 0x%zx, allocation %#p\n",
 	    size, allocated_region);*/
 
+#ifdef MRS_STATS
+	if (cmsp != NULL) {
+		atomic_fetch_add(&cmsp->cms_mrs_count_allocated, 1);
+		atomic_fetch_add(&cmsp->cms_mrs_bytes_allocated,
+		    cheri_length_get(allocated_region));
+		atomic_fetch_add(&cmsp->cms_mrs_count_inheap, 1);
+		atomic_fetch_add(&cmsp->cms_mrs_bytes_inheap,
+		    cheri_length_get(allocated_region));
+	}
+#endif
 	MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, allocated_region);
 	return (allocated_region);
 }
@@ -1650,6 +1815,16 @@ mrs_calloc(size_t number, size_t size)
 	 */
 	/*mrs_debug_printf("mrs_calloc: exit called %d size 0x%zx address %p\n", number, size, allocated_region);*/
 
+#ifdef MRS_STATS
+	if (cmsp != NULL) {
+		atomic_fetch_add(&cmsp->cms_mrs_count_allocated, 1);
+		atomic_fetch_add(&cmsp->cms_mrs_bytes_allocated,
+		    cheri_length_get(allocated_region));
+		atomic_fetch_add(&cmsp->cms_mrs_count_inheap, 1);
+		atomic_fetch_add(&cmsp->cms_mrs_bytes_inheap,
+		    cheri_length_get(allocated_region));
+	}
+#endif
 	MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number, allocated_region);
 	return (allocated_region);
 }
@@ -1692,6 +1867,16 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 
 	increment_allocated_size(*ptr);
 
+#ifdef MRS_STATS
+	if (cmsp != NULL) {
+		atomic_fetch_add(&cmsp->cms_mrs_count_allocated, 1);
+		atomic_fetch_add(&cmsp->cms_mrs_bytes_allocated,
+		    cheri_length_get(*ptr));
+		atomic_fetch_add(&cmsp->cms_mrs_count_inheap, 1);
+		atomic_fetch_add(&cmsp->cms_mrs_bytes_inheap,
+		    cheri_length_get(*ptr));
+	}
+#endif
 	MRS_UTRACE(UTRACE_MRS_POSIX_MEMALIGN, NULL, size, alignment, *ptr);
 	return (ret);
 }
@@ -1731,6 +1916,16 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 
 	increment_allocated_size(allocated_region);
 
+#ifdef MRS_STATS
+	if (cmsp != NULL) {
+		atomic_fetch_add(&cmsp->cms_mrs_count_allocated, 1);
+		atomic_fetch_add(&cmsp->cms_mrs_bytes_allocated,
+		    cheri_length_get(allocated_region));
+		atomic_fetch_add(&cmsp->cms_mrs_count_inheap, 1);
+		atomic_fetch_add(&cmsp->cms_mrs_bytes_inheap,
+		    cheri_length_get(allocated_region));
+	}
+#endif
 	MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 	    allocated_region);
 	return (allocated_region);
@@ -1837,6 +2032,21 @@ mrs_free(void *ptr)
 
 #ifdef CLEAR_ON_FREE
 	bzero(cheri_offset_set(ptr, 0), cheri_length_get(ptr));
+#endif
+
+#ifdef MRS_STATS
+	if (cmsp != NULL) {
+		atomic_fetch_add(&cmsp->cms_mrs_count_freed, 1);
+		atomic_fetch_add(&cmsp->cms_mrs_bytes_freed,
+		    cheri_length_get(ins));
+
+		atomic_fetch_sub(&cmsp->cms_mrs_count_inheap, 1);
+		atomic_fetch_sub(&cmsp->cms_mrs_bytes_inheap,
+		    cheri_length_get(ins));
+		atomic_fetch_add(&cmsp->cms_mrs_count_inquarantine, 1);
+		atomic_fetch_add(&cmsp->cms_mrs_bytes_inquarantine,
+		    cheri_length_get(ins));
+	}
 #endif
 
 	mrs_lock(&app_quarantine_lock);
