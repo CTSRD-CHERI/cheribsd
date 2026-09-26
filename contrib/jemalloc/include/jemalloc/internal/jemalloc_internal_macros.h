@@ -4,7 +4,11 @@
 #ifdef JEMALLOC_DEBUG
 #  define JEMALLOC_ALWAYS_INLINE static inline
 #else
-#  define JEMALLOC_ALWAYS_INLINE JEMALLOC_ATTR(always_inline) static inline
+#  ifdef _MSC_VER
+#    define JEMALLOC_ALWAYS_INLINE static __forceinline
+#  else
+#    define JEMALLOC_ALWAYS_INLINE JEMALLOC_ATTR(always_inline) static inline
+#  endif
 #endif
 #ifdef _MSC_VER
 #  define inline _inline
@@ -39,13 +43,6 @@
 
 #define JEMALLOC_VA_ARGS_HEAD(head, ...) head
 #define JEMALLOC_VA_ARGS_TAIL(head, ...) __VA_ARGS__
-
-#if (defined(__GNUC__) || defined(__GNUG__)) && !defined(__clang__) \
-  && defined(JEMALLOC_HAVE_ATTR) && (__GNUC__ >= 7)
-#define JEMALLOC_FALLTHROUGH JEMALLOC_ATTR(fallthrough);
-#else
-#define JEMALLOC_FALLTHROUGH /* falls through */
-#endif
 
 /* Diagnostic suppression macros */
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -111,13 +108,11 @@
  */
 JEMALLOC_DIAGNOSTIC_DISABLE_SPURIOUS
 
-#ifndef __CHERI_PURE_CAPABILITY__
-#define	BOUND_PTR(ptr, size)	(ptr)
-#define	ROUND_SIZE(size)		(size)
-#else
+#ifdef __CHERI__
 #include <cheri/cheric.h>
+#include <cheriintrin.h>
 
-#define	BOUND_PTR(ptr, size) ({						\
+#  define JEMALLOC_BOUND_PTR(ptr, size) ({				\
 	typeof(ptr) _ptr = (ptr);					\
 	size_t _size = (size);						\
 	(_ptr == NULL ? NULL :						\
@@ -127,11 +122,13 @@ JEMALLOC_DIAGNOSTIC_DISABLE_SPURIOUS
 })
 
 /*
- * XXX-BD: In theory this poses an overflow risk.  Its overflow
- * handling is probably needed in each individual function, returning
- * an appropriate error value.
+ * If the size rounds up to requiring the omnipotent capability then
+ * size will be 0.
  */
-#define	ROUND_SIZE(size)	CHERI_REPRESENTABLE_LENGTH(size)
+#  define JEMALLOC_ROUND_SIZE(size) cheri_representable_length(size)
+#else
+#  define JEMALLOC_BOUND_PTR(ptr, size) (ptr)
+#  define JEMALLOC_ROUND_SIZE(size) (size)
 #endif
 
 #endif /* JEMALLOC_INTERNAL_MACROS_H */
