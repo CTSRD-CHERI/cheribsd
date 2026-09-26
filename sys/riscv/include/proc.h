@@ -35,6 +35,9 @@ struct mdthread {
 	int	md_spinlock_count;	/* (k) */
 	register_t md_saved_sstatus_ie;	/* (k) */
 	int	md_flags;		/* (k) */
+#ifdef CHERI_BOUNDED_KSTACK
+	void	*md_kstack;		/* (k) */
+#endif
 };
 
 /* md_flags */

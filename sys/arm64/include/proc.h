@@ -44,6 +44,9 @@ struct mdthread {
 	int	md_spinlock_count;	/* (k) */
 	register_t md_saved_daif;	/* (k) */
 	uintptr_t md_canary;
+#ifdef CHERI_BOUNDED_KSTACK
+	void	*md_kstack;		/* (k) */
+#endif
 
 	/*
 	 * The pointer authentication keys. These are shared within a process,

@@ -91,6 +91,10 @@ ASSYM(TD_FRAME, offsetof(struct thread, td_frame));
 ASSYM(TD_LOCK, offsetof(struct thread, td_lock));
 ASSYM(TD_MD_CANARY, offsetof(struct thread, td_md.md_canary));
 ASSYM(TD_MD_EFIRT_TMP, offsetof(struct thread, td_md.md_efirt_tmp));
+#ifdef CHERI_BOUNDED_KSTACK
+ASSYM(TD_KSTACK, offsetof(struct thread, td_kstack));
+ASSYM(TD_MD_KSTACK, offsetof(struct thread, td_md.md_kstack));
+#endif
 
 ASSYM(TF_SIZE, sizeof(struct trapframe));
 ASSYM(TF_SP, offsetof(struct trapframe, tf_sp));
