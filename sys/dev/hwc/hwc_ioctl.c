@@ -30,11 +30,6 @@
 
 /* Hardware Counters (HWC) framework. */
 
-#ifdef COMPAT_FREEBSD64
-#include <sys/abi_compat.h>
-#include <sys/sysent.h>
-#endif
-
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/ioccom.h>
@@ -42,10 +37,14 @@
 #include <sys/malloc.h>
 #include <sys/mman.h>
 #include <sys/mutex.h>
-#include <sys/refcount.h>
 #include <sys/rwlock.h>
 #include <sys/smp.h>
 #include <sys/hwc.h>
+
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#include <sys/sysent.h>
+#endif
 
 #include <dev/hwc/hwc_context.h>
 #include <dev/hwc/hwc_contexthash.h>
@@ -132,10 +131,11 @@ hwc_ioctl_alloc_mode_thread(struct thread *td, struct hwc_owner *ho,
     struct hwc_backend *backend, struct hwc_alloc *halloc)
 {
 	struct hwc_context *ctx, *ctx1;
-	char path[MAXPATHLEN];
 	struct proc *p;
 	int error;
 	struct hwc_vm *vm;
+
+	dprintf("%s\n", __func__);
 
 	/* Check if the owner have this pid configured already. */
 	ctx = hwc_owner_lookup_ctx(ho, halloc->pid);
@@ -151,12 +151,6 @@ hwc_ioctl_alloc_mode_thread(struct thread *td, struct hwc_owner *ho,
 	ctx->hwc_owner = ho;
 	ctx->mode = HWC_MODE_THREAD;
 	ctx->hwc_td = td;
-
-	error = copyout(&ctx->ident, halloc->ident, sizeof(int));
-	if (error) {
-		hwc_ctx_free(ctx);
-		return (error);
-	}
 
 	/* Now get the victim proc. */
 	p = pfind(halloc->pid);
@@ -176,7 +170,6 @@ hwc_ioctl_alloc_mode_thread(struct thread *td, struct hwc_owner *ho,
 	/* Ensure it is not being traced already. */
 	ctx1 = hwc_contexthash_lookup(p);
 	if (ctx1) {
-		refcount_release(&ctx1->refcnt);
 		PROC_UNLOCK(p);
 		hwc_ctx_free(ctx);
 		return (EEXIST);
@@ -185,13 +178,13 @@ hwc_ioctl_alloc_mode_thread(struct thread *td, struct hwc_owner *ho,
 	ctx->proc = p;
 	PROC_UNLOCK(p);
 
-	sprintf(path, "hwc_%d", ctx->ident);
-
-	error = hwc_vm_alloc(0, 0, path, &vm);
+	error = hwc_vm_alloc(0, 0, &vm);
 	if (error) {
 		hwc_ctx_free(ctx);
 		return (error);
 	}
+
+	halloc->fd = vm->fd;
 
 	ctx->vm = vm;
 	vm->ctx = ctx;
@@ -283,17 +276,29 @@ hwc_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
 		halloc64 = (struct hwc_alloc64 *)addr;
 		halloc = &local_halloc;
-		CP(*halloc64, *halloc, backend_name_len);
-		halloc->backend_name = USER_PTR(halloc64->backend_name,
-		    halloc->backend_name_len);
+		CP(*halloc64, *halloc, mode);
+		CP(*halloc64, *halloc, pid);
+		halloc->backend_name = USER_PTR_STR(halloc64->backend_name);
 	}
 #endif
 
 	switch (cmd) {
 	case HWC_IOC_ALLOC:
+#ifdef COMPAT_FREEBSD64
+	case HWC_IOC_ALLOC64:
+#endif
 		error = hwc_ioctl_alloc(td, halloc);
-		return (error);
+		if (error)
+			return (error);
+		break;
 	default:
 		return (ENXIO);
 	};
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		CP(*halloc, *halloc64, fd);
+#endif
+
+	return (0);
 }
