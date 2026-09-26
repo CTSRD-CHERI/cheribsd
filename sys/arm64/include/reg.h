@@ -104,6 +104,8 @@ struct arm64_addr_mask {
 };
 
 #if !__has_feature(capabilities)
+#include <sys/cdefs.h>
+
 struct __chericap {
 	__uint64_t	addr;
 	__uint64_t	meta;
