@@ -1962,7 +1962,7 @@ _rtld_thr_exit(long *state)
 	size_t i;
 	sigset_t nset;
 	struct stk_table_stk_info *data;
-	struct stk_table *table = get_stk_table();
+	struct stk_table *table;
 
 	if (!C18N_ENABLED)
 		goto out;
@@ -1976,6 +1976,7 @@ _rtld_thr_exit(long *state)
 	/*
 	 * Uninstall the trusted stack and the stack lookup table.
 	 */
+	table = get_stk_table();
 	set_stk_table(NULL);
 	set_trusted_stk(NULL);
 
