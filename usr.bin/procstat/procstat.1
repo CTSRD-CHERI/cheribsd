@@ -1,6 +1,12 @@
 .\"-
 .\" Copyright (c) 2007-2009 Robert N. M. Watson
+.\" Copyright (c) 2025-2026 Capabilities Limited
 .\" All rights reserved.
+.\"
+.\" This software was developed by SRI International, the University of
+.\" Cambridge Computer Laboratory (Department of Computer Science and
+.\" Technology), and Capabilities Limited under Defense Advanced Research
+.\" Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
 .\"
 .\" Redistribution and use in source and binary forms, with or without
 .\" modification, are permitted provided that the following conditions
@@ -194,6 +200,10 @@ Display security credential information for the process.
 Substring commands are accepted.
 .It Ar cpuset | Ar cs | Fl S
 Display the cpuset information for the thread.
+.It Ar mrs
+Display CHERI heap revocation information exported by
+.Xr mrs 3 --
+the Memory Revocation Shim.
 .It Ar environment | Fl e
 Display environment variables for the process.
 .Pp
@@ -451,6 +461,67 @@ The following compartment flags may be displayed:
 .It D
 contains a library loaded via
 .Xr dlopen 3
+.El
+.Ss CHERI heap revocation information
+Display CHERI heap revocation information from the Memory Revocation Shim (see
+.Xr mrs 3 ) :
+.Pp
+.Bl -tag -width "MAXASIZE" -compact
+.It PID
+process ID
+.It COMM
+command
+.It FLAGS
+mrs flags
+.It %TQR
+percentage target quarantine (of total memory managed by mrs)
+.It %MQR
+percentage measured quarantine (of total memory managed by mrs)
+.It CHEAP
+count of active heap allocations managed by mrs
+.It BHEAP
+bytes of active heap allocations managed by mrs
+.It CQUAR
+count of quarantined heap allocations managed by mrs
+.It BQUAR
+bytes of quarantined heap allocations managed by mrs
+.It ASIZE
+bytes of memory managed by mrs, made up of active and quarantined heap
+allocations
+.It MAXSIZE
+high watermark on bytes of memory managed by mrs, made up of active and
+quarantined heap allocations
+.It MINRVK
+minimum number of bytes of memory managed by mrs below which revocation will
+not take place
+.It UEPOCH
+revocation epoch last passed to
+.Xr cheri_revoke 2
+by mrs, as tracked by mrs
+.It KEPOCH
+revocation epoch as tracked by the kernel
+.It START
+start time stamp for
+.Xr mrs 3
+statistics gathering
+.El
+.Pp
+The following
+.Xr mrs 3
+flags may be displayed:
+.Pp
+.Bl -tag -width X -compact
+.It a
+asynchronous revocation is enabled
+.It b
+.Xr mrs 3
+set the most strict possible bounds on allocation
+.It e
+revoke following every free
+.It f
+abort on pointer validation failure
+.It q
+quarantining and revocation enabled
 .El
 .Ss Environment Variables
 Display the process ID, command, and environment variables:
@@ -1003,10 +1074,12 @@ procstat: procstat_getprocs()
 .Xr sockstat 1 ,
 .Xr cap_enter 2 ,
 .Xr cap_rights_limit 2 ,
+.Xr cheri_revoke 2 ,
 .Xr mlock 2 ,
 .Xr mlockall 2 ,
 .Xr libprocstat 3 ,
 .Xr libxo 3 ,
+.Xr mrs 3 ,
 .Xr signal 3 ,
 .Xr xo_parse_args 3 ,
 .Xr ddb 4 ,

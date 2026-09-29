@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-4-Clause
  *
- * Copyright (c) 2024 Capabilities Limited
+ * Copyright (c) 2024-2025 Capabilities Limited
  * Copyright (c) 2017 Dell EMC
  * Copyright (c) 2009 Stanislav Sedov <stas@FreeBSD.org>
  * Copyright (c) 1988, 1993
@@ -1080,6 +1080,53 @@ procstat_getfiles_sysctl(struct procstat *procstat, struct kinfo_proc *kp,
 	}
 fail:
 	return (head);
+}
+
+int
+procstat_getmrs(struct procstat *procstat, struct kinfo_proc *kp,
+    struct cheri_mrs_stats *stats)
+{
+	int name[4];
+	size_t len = CHERI_MRS_STATS_MAX_SIZE;
+	_Alignas(struct cheri_mrs_stats) char buf[CHERI_MRS_STATS_MAX_SIZE];
+	struct cheri_mrs_stats *mrsstatsp = (struct cheri_mrs_stats *)buf;
+
+	if (mrsstatsp == NULL)
+		goto out;
+
+	switch (procstat->type) {
+	case PROCSTAT_KVM:
+		warnx("kvm method is not supported");
+		goto out;
+
+	case PROCSTAT_SYSCTL:
+		break;
+
+	case PROCSTAT_CORE:
+		warnx("core method is not supported");
+		goto out;
+
+	default:
+		warnx("unknown access method: %d", procstat->type);
+		goto out;
+	}
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_CHERI_MRS_STATS;
+	name[3] = kp->ki_pid;
+	if (sysctl(name, nitems(name), buf, &len, NULL, 0) != 0) {
+		if (errno != ESRCH && errno != EPERM && errno != ENOEXEC)
+			warn("sysctl(kern.proc.cheri_mrs_stats)");
+		goto out;
+	}
+	if (len < sizeof(*mrsstatsp) ||
+	    mrsstatsp->cms_version != CHERI_MRS_STATS_VERSION)
+		goto out;
+	*stats = *mrsstatsp;
+	return (0);
+out:
+	return (-1);
 }
 
 int

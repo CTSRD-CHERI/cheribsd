@@ -2,11 +2,17 @@
 .\" SPDX-License-Identifier: BSD-2-Clause
 .\"
 .\" Copyright (c) 2023 SRI International
+.\" Copyright (c) 2026 Capabilities Limited
 .\"
 .\" This software was developed by SRI International, the University of
 .\" Cambridge Computer Laboratory (Department of Computer Science and
 .\" Technology), and Capabilities Limited under Defense Advanced Research
 .\" Projects Agency (DARPA) Contract No. HR001123C0031 ("MTSS").
+.\"
+.\" This software was developed by SRI International, the University of
+.\" Cambridge Computer Laboratory (Department of Computer Science and
+.\" Technology), and Capabilities Limited under Defense Advanced Research
+.\" Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
 .\"
 .\" Redistribution and use in source and binary forms, with or without
 .\" modification, are permitted provided that the following conditions
@@ -29,7 +35,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd December 12, 2023
+.Dd July 18, 2026
 .Dt MRS 3
 .Os
 .Sh NAME
@@ -164,6 +170,36 @@ This produces output like:
 .Dl  21593 101243 git      USER  mrs_free(0x45e00000)
 .Dl  21593 101243 git      USER  quarantine_insert(0x45e00000, 57344)
 .Dl  21593 101242 git      USER  quarantine_flush()
+.Sh STATISTICS
+.Nm
+can optionally collect statistics on its operation, at some minor cost to its
+operation.
+These statistics are exposed via the
+.Xr procstat 1
+command's
+.Ar mrs
+argument, and can also be be dumped to a file when a process exits cleanly.
+This functionality is controlled by the following environmental variables:
+.Pp
+.Bl -tag -width XXX -compact
+.It Dv _RUNTIME_QUARANTINE_STATS_DISABLE
+Disable statistics gathering (the default) overrides
+.Dv _RUNTIME_QUARANTINE_STATS_ENABLE
+if also set.
+.Pp
+.It Dv _RUNTIME_QUARANTINE_STATS_ENABLE
+Enable statistics gathering; overriden by
+.Dv _RUNTIME_QUARANTINE_STATS_DISABLE
+if also set.
+.Pp
+.It Dv _RUNTIME_QUARANTINE_STATS_FILE
+If present, defines a filesystem path prefix where statistics should be
+dumped on process termination, which will be appended with the process ID.
+.Pp
+.El
+When a process terminates uncleanly -- for example due to receiving a
+.Dv SIGSEGV
+signal -- then the statistics file may not be written.
 .Sh IMPLEMENTATION NOTES
 .Nm
 requires that allocators be extended to provide a
