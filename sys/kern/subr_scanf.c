@@ -34,23 +34,12 @@
  * From: Id: vfscanf.c,v 1.13 1998/09/25 12:20:27 obrien Exp 
  */
 
-#ifdef _KERNEL
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ctype.h>
 #include <sys/limits.h>
 #include <sys/stdarg.h>
 #include <sys/stddef.h>
-#else
-#include <sys/types.h>
-
-#include <ctype.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#endif
 
 #define	BUF		32 	/* Maximum length of numeric string. */
 
@@ -662,13 +651,3 @@ doswitch:
 	}
 	/* NOTREACHED */
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "iovec-macros",
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END
