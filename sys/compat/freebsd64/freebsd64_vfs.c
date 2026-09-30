@@ -34,6 +34,7 @@
 
 #include <sys/param.h>
 #include <sys/fcntl.h>
+#include <sys/inotify.h>
 #include <sys/namei.h>
 #include <sys/proc.h>
 #include <sys/signal.h>
@@ -1246,6 +1247,14 @@ freebsd64_copy_file_range(struct thread *td,
 	return (user_copy_file_range(td, uap->infd,
 	    USER_PTR_OBJ(uap->inoffp), uap->outfd,
 	    USER_PTR_OBJ(uap->outoffp), uap->len, uap->flags));
+}
+
+int
+freebsd64_inotify_add_watch_at(struct thread *td,
+    struct freebsd64_inotify_add_watch_at_args *uap)
+{
+	return (kern_inotify_add_watch(uap->fd, uap->dfd,
+	    USER_PTR_PATH(uap->path), uap->mask, td));
 }
 /*
  * CHERI CHANGES START
