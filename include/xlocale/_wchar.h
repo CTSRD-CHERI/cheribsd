@@ -77,6 +77,10 @@ size_t			 mbsrtowcs_l(wchar_t * __restrict,
 			    mbstate_t * __restrict, locale_t);
 wint_t			 putwc_l(wchar_t, FILE *, locale_t);
 wint_t			 putwchar_l(wchar_t, locale_t);
+#if __BSD_VISIBLE
+int			 __stderr_wprintf_l(locale_t,
+			    const wchar_t * __restrict, ...);
+#endif
 int			 swprintf_l(wchar_t * __restrict, size_t n, locale_t,
 			    const wchar_t * __restrict, ...);
 int			 swscanf_l(const wchar_t * __restrict, locale_t,

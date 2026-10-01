@@ -43,6 +43,10 @@ int	 sprintf_l(char * __restrict, locale_t, const char * __restrict, ...)
 	    __printflike(3, 4);
 int	 sscanf_l(const char * __restrict, locale_t, const char * __restrict,
 	    ...) __scanflike(3, 4);
+#if __BSD_VISIBLE
+int	 __stderr_printf_l(locale_t, const char * __restrict, ...)
+	    __printflike(2, 3);
+#endif
 int	 vfprintf_l(FILE * __restrict, locale_t, const char * __restrict,
 	    __va_list) __printflike(3, 0);
 int	 vprintf_l(locale_t, const char * __restrict, __va_list)

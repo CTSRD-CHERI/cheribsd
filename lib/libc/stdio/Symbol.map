@@ -175,6 +175,13 @@ FBSD_1.6 {
 	mkostempsat;
 };
 
+FBSD_1.8 {
+	__stderr_printf;
+	__stderr_printf_l;
+	__stderr_wprintf;
+	__stderr_wprintf_l;
+};
+
 FBSDprivate_1.0 {
 	_flockfile;
 	_flockfile_debug_stub;
