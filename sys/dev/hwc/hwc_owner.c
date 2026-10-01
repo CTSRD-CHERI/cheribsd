@@ -33,7 +33,6 @@
 #include <sys/malloc.h>
 #include <sys/mman.h>
 #include <sys/mutex.h>
-#include <sys/refcount.h>
 #include <sys/rwlock.h>
 #include <sys/hwc.h>
 
@@ -114,10 +113,6 @@ hwc_owner_shutdown(struct hwc_owner *ho)
 		HWC_CTX_LOCK(ctx);
 		ctx->state = 0;
 		HWC_CTX_UNLOCK(ctx);
-
-		/* Ensure hooks invocation is now completed. */
-		while (refcount_load(&ctx->refcnt) > 0)
-			continue;
 
 		/*
 		 * Note that a thread could be still sleeping on msleep(9).

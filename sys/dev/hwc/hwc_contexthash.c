@@ -33,7 +33,6 @@
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
-#include <sys/refcount.h>
 #include <sys/hwc.h>
 
 #include <dev/hwc/hwc_context.h>
@@ -67,7 +66,6 @@ static LIST_HEAD(hwc_contexthash, hwc_context) * hwc_contexthash;
 
 /*
  * To use by hwc_switch_in/out() only.
- * This function returns with refcnt acquired.
  */
 struct hwc_context *
 hwc_contexthash_lookup(struct proc *p)
@@ -82,7 +80,6 @@ hwc_contexthash_lookup(struct proc *p)
 	HWC_CTXHASH_LOCK();
 	LIST_FOREACH(ctx, hch, next_hch) {
 		if (ctx->proc == p) {
-			refcount_acquire(&ctx->refcnt);
 			HWC_CTXHASH_UNLOCK();
 			return (ctx);
 		}
