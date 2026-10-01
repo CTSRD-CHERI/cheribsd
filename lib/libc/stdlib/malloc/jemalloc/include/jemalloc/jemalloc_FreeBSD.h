@@ -14,6 +14,8 @@
  * CHERI CHANGES END
  */
 
+#ifndef JEMALLOC_NO_PRIVATE_NAMESPACE
+
 #undef JEMALLOC_OVERRIDE_VALLOC
 
 #ifndef MALLOC_PRODUCTION
@@ -24,7 +26,12 @@
 
 #undef JEMALLOC_BACKGROUND_THREAD
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
+/*
+ * We can't merge adjacent mmap reservations (similar to VirtualAlloc
+ * allocated regions on Windows) so we have to disable merging across
+ * mmap regions.
+ */
 #undef JEMALLOC_MAPS_COALESCE
 #endif
 
@@ -36,7 +43,7 @@
 #undef LG_PAGE
 #undef LG_VADDR
 #undef LG_SIZEOF_PTR
-#undef LG_SIZEOF_SIZE_T
+#undef LG_SIZEOF_PTRADDR_T
 #undef LG_SIZEOF_INT
 #undef LG_SIZEOF_LONG
 #undef LG_SIZEOF_INTMAX_T
@@ -105,14 +112,12 @@
 
 #define	LG_PAGE			PAGE_SHIFT
 #define	LG_SIZEOF_INT		2
-#ifndef __CHERI_PURE_CAPABILITY__
-#define	LG_SIZEOF_LONG		LG_SIZEOF_PTR
-#else
+#ifdef __CHERI__
 #define	LG_SIZEOF_LONG		3
+#else
+#define	LG_SIZEOF_LONG		LG_SIZEOF_PTR
 #endif
-#ifndef LG_SIZEOF_SIZE_T
-#define	LG_SIZEOF_SIZE_T	LG_SIZEOF_LONG
-#endif
+#define	LG_SIZEOF_PTRADDR_T	LG_SIZEOF_LONG
 #define	LG_SIZEOF_INTMAX_T	3
 
 #undef CPU_SPINWAIT
@@ -120,8 +125,12 @@
 #include <machine/cpufunc.h>
 #define	CPU_SPINWAIT		cpu_spinwait()
 
-/* Disable lazy-lock machinery, mangle isthreaded, and adjust its type. */
+/*
+ * Disable lazy-lock machinery, redirect isthreaded to libc's flag, undo
+ * jemalloc's namespace stuff for it and adjust its type.
+ */
 #undef JEMALLOC_LAZY_LOCK
+#undef isthreaded
 extern int __isthreaded;
 #define	isthreaded		((bool)__isthreaded)
 
@@ -230,4 +239,6 @@ __sym_compat(sallocm, weak_sallocm, FBSD_1.3);
 __sym_compat(dallocm, weak_dallocm, FBSD_1.3);
 __sym_compat(nallocm, weak_nallocm, FBSD_1.3);
 #endif
+#endif
+
 #endif
