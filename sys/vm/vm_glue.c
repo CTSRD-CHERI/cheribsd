@@ -346,6 +346,9 @@ vm_thread_alloc_kstack_kva(vm_size_t size, int domain)
 	    (kstack_pages + KSTACK_GUARD_PAGES) == 0,
 	    ("%s: allocated kstack KVA not aligned to multiple of kstack size",
 	    __func__));
+#ifdef __CHERI_PURE_CAPABILITY__
+	addr = cheri_perms_clear(addr, CHERI_PERM_EXECUTE);
+#endif
 
 	return (addr);
 #else

@@ -278,7 +278,7 @@ END(cpu_switch)
 ENTRY(fork_trampoline)
 	mov	PTR(0), PTR(19)
 	mov	PTR(1), PTR(20)
-	mov	PTR(2), PTRN(sp)
+	mov	PTR(2), PTR(21)
 	mov	fp, #0	/* Stack traceback stops here. */
 	bl	_C_LABEL(fork_exit)
 
@@ -292,6 +292,14 @@ ENTRY(fork_trampoline)
 #ifdef PAC
 	ldr	x0, [x18, #PC_CURTHREAD]
 	bl	ptrauth_enter_el0
+#endif
+
+#ifdef CHERI_BOUNDED_KSTACK
+	/* Restore unbounded kstack to access trapframe from csp */
+	ldr	PTR(1), [PTR(18), #PC_CURTHREAD]
+	ldr	PTR(2), [PTR(1), #TD_FRAME]
+	ldr	PTR(1), [PTR(1), #TD_KSTACK]
+	scvalue	PTRN(sp), PTR(1), x2
 #endif
 
 	/* Restore sp, lr, elr, and spsr */
@@ -329,6 +337,7 @@ ENTRY(fork_trampoline)
 	ldp	CAP(26), CAP(27), [PTRN(sp), #TF_X + 26 * CAP_WIDTH]
 	ldp	CAP(28), CAP(29), [PTRN(sp), #TF_X + 28 * CAP_WIDTH]
 
+	add	PTRN(sp), PTRN(sp), #TF_SIZE
 	/*
 	 * No need for interrupts reenabling since PSR
 	 * will be set to the desired value anyway.
