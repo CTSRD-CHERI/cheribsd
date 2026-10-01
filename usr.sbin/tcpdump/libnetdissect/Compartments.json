@@ -1,0 +1,8 @@
+{
+    "compartments": {
+        "print-nfs": { "files": [ "parsenfsfh.*o" ] },
+        "print-smb": { "files": [ "smbutil.*o" ] },
+	"signature": { "files": [ "signature.*o" ] }
+    }
+}
+
