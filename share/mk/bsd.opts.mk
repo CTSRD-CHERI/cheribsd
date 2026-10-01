@@ -117,7 +117,7 @@ __CHERI_TGOT_TLS_OPTIONS=	native no compat yes
 __CHERI_TGOT_TLS_DEFAULT=	yes
 
 __INIT_ALL_OPTIONS=	none pattern zero
-__INIT_ALL_DEFAULT=	none
+__INIT_ALL_DEFAULT=	zero
 
 .-include <local.opts.mk>
 
