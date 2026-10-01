@@ -1847,34 +1847,32 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, entry);
 
 	if (imgp->interp_end == 0) {
-		if (args->hdr_etype != ET_DYN) {
-			/*
-			 * Static PDEs don't use AT_BASE as a
-			 * capability root so it can be null-derived.
-			 */
-			exec_base = NULL;
-		} else {
-			/*
-			 * Static PIEs generally use AT_ENTRY/AT_PHDR for
-			 * relocations.  However, the direct-exec rtld case
-			 * uses AT_BASE which must be RWX as noted below.
-			 */
+		/*
+		 * Static binaries don't use AT_BASE as a
+		 * capability root so it can be null-derived.
+		 */
+		if (imgp->proc->p_osrel < P_OSREL_RTLD_PCC &&
+		    args->hdr_etype == ET_DYN) {
+			/* Support direct-exec of old CheriBSD rtld. */
 			exec_base = prog_cap(imgp, CHERI_CAP_USER_DATA_PERMS |
 			    CHERI_CAP_USER_CODE_PERMS | CHERI_PERM_SW_VMEM);
-		}
+		} else
+			exec_base = NULL;
 	} else {
 		/*
-		 * XXX: AT_BASE is both writable and executable because rtld
-		 * uses it as a single root to derive capabilities for rtld
-		 * itself.
-		 *
-		 * TODO: rtld should be fixed to derive code capabilities
-		 * from the initial PCC (similar to AT_ENTRY) and then this
-		 * can be relaxed to RW (similar to AT_PHDR).
+		 * AT_BASE is used by rtld to process its own
+		 * relocations and to derive data capabilities similar
+		 * to AT_PHDR.  rtld uses the initial PCC to derive
+		 * code capabilities similar to AT_ENTRY.
 		 */
-		exec_base = interp_cap(imgp, args,
-		    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS |
-		    CHERI_PERM_SW_VMEM);
+		if (imgp->proc->p_osrel < P_OSREL_RTLD_PCC) {
+			/* Old CheriBSD rtld still needs RWX. */
+			exec_base = interp_cap(imgp, args,
+			    CHERI_CAP_USER_DATA_PERMS |
+			    CHERI_CAP_USER_CODE_PERMS | CHERI_PERM_SW_VMEM);
+		} else
+			exec_base = interp_cap(imgp, args,
+			    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM);
 	}
 	AUXARGS_ENTRY_PTR(pos, AT_BASE, cheri_address_set(exec_base,
 	    args->base));
