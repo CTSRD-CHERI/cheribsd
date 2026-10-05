@@ -27333,7 +27333,7 @@ static int sqlite3MemSize(void *pPrior){
   sqlite3_int64 *p;
   assert( pPrior!=0 );
   p = (sqlite3_int64*)pPrior;
-  p -= (MAX(sizeof(uptr), 8)/sizeof(sqlite3_int64));
+  p--;
   return (int)p[0];
 #endif
 }
