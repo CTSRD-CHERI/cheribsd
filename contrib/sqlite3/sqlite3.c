@@ -15482,6 +15482,8 @@ typedef INT16_TYPE LogEst;
 */
 #define ROUNDDOWN8(x) ((x)&~7)
 
+#define ROUND16(x)     (((x)+15)&~15)
+
 /*
 ** Assert that the pointer X is aligned to an 8-byte boundary.  This
 ** macro is used only within assert() to verify that the code gets
@@ -23734,10 +23736,10 @@ struct VdbeCursor {
 /*
 ** The size (in bytes) of a VdbeCursor object that has an nField value of N
 ** or less.  The value of SZ_VDBECURSOR(n) is guaranteed to be a multiple
-** of 8.
+** of 16.
 */
 #define SZ_VDBECURSOR(N) \
-    (ROUND8(offsetof(VdbeCursor,aType)) + ((N)+1)*sizeof(u64))
+    (ROUND16(ROUND8(offsetof(VdbeCursor,aType)) + ((N)+1)*sizeof(u64)))
 
 /* Return true if P is a null-only cursor
 */
