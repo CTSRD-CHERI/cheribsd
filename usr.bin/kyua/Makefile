@@ -10,12 +10,6 @@ KYUA_VERSION=	0.13
 KYUA_SRCDIR=	${SRCTOP}/contrib/kyua
 .PATH: ${KYUA_SRCDIR}
 
-.if ${MACHINE_ABI:Mpurecap}
-# FIXME: doesn't work as a purecap binary yet
-NEED_COMPAT=   64
-.include <bsd.compat.mk>
-.endif
-
 PACKAGE=	tests
 PROG_CXX=	kyua
 SRCS=		main.cpp
