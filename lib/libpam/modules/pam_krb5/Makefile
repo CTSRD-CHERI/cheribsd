@@ -60,7 +60,7 @@ SRCS=	account.c \
 MAN=	pam-krb5.8
 MLINKS=	pam-krb5.8 pam_krb5.8
 
-CFLAGS=	-I${SRCDIR} \
+CFLAGS+=-I${SRCDIR} \
 	-I${.CURDIR} \
 	-fno-strict-aliasing \
 	-Wno-error=incompatible-pointer-types-discards-qualifiers \
