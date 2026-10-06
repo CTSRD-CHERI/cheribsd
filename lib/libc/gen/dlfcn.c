@@ -445,6 +445,13 @@ dl_c18n_pop_trusted_stack(struct dl_c18n_compart_state *state __unused,
 {
 	return (NULL);
 }
+
+#pragma weak dl_c18n_get_trampoline_target
+uintptr_t
+dl_c18n_get_trampoline_target(const void *addr __unused)
+{
+	return (0);
+}
 #endif
 
 #endif /* !defined(IN_LIBDL) || defined(PIC) */
