@@ -71,14 +71,14 @@ time_current(kdbe_time_t *out)
 static void
 sync_update(kdb_hlog_t *ulog, kdb_ent_header_t *upd)
 {
-    unsigned long start, end, size;
+    uintptr_t start, end, size;
 
     if (!pagesize)
         pagesize = getpagesize();
 
-    start = (unsigned long)upd & ~(pagesize - 1);
+    start = (uintptr_t)upd & ~(pagesize - 1);
 
-    end = ((unsigned long)upd + ulog->kdb_block + (pagesize - 1)) &
+    end = ((uintptr_t)upd + ulog->kdb_block + (pagesize - 1)) &
         ~(pagesize - 1);
 
     size = end - start;

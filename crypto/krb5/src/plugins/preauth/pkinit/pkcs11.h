@@ -270,7 +270,7 @@ struct ck_token_info
 #define CK_EFFECTIVELY_INFINITE		(0)
 
 
-typedef unsigned long ck_session_handle_t;
+typedef uintptr_t ck_session_handle_t;
 
 #define CK_INVALID_HANDLE	(0)
 
