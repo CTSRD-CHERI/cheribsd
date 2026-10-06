@@ -471,7 +471,11 @@ SUBDIR+=gnu/lib
 SUBDIR+= secure/lib
 .endif
 .if ${MK_KERBEROS} != "no"
+.if ${MK_MITKRB5} != "no"
+SUBDIR+=krb5/lib
+.else
 SUBDIR+=kerberos5/lib
+.endif
 .endif
 .else	# !defined(SYSROOT_ONLY)
 SUBDIR+=bin
