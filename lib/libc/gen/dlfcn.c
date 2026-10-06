@@ -454,4 +454,27 @@ dl_c18n_get_trampoline_target(const void *addr __unused)
 }
 #endif
 
+#ifdef CHERI_LIB_C18N
+#pragma weak _rtld_c18n_is_enabled
+bool
+_rtld_c18n_is_enabled(void)
+{
+	return (false);
+}
+
+#pragma weak _rtld_sigaction
+int
+_rtld_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
+{
+	return (__sys_sigaction(sig, act, oact));
+}
+
+#pragma weak _rtld_thr_exit
+void
+_rtld_thr_exit(long *state)
+{
+	return (__sys_thr_exit(state));
+}
+#endif
+
 #endif /* !defined(IN_LIBDL) || defined(PIC) */

@@ -559,6 +559,11 @@ FBSDprivate_1.0 {
 	_rtld_get_stack_prot;
 	_rtld_is_dlopened;
 	_rtld_thread_init;	/* for private use */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(__aarch64__)
+	_rtld_c18n_is_enabled;
+	_rtld_sigaction;
+	_rtld_thr_exit;
+#endif
 	__elf_phdr_match_addr;
 	_err;
 	_warn;
