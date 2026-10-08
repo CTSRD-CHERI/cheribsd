@@ -27,6 +27,7 @@ dev/xilinx/axidma.c		optional	axidma
 dev/xilinx/axidma_if.m		optional	axidma
 dev/xilinx/if_xae.c		optional	xae
 dev/xilinx/xlnx_pcib.c		optional	pci fdt xlnx_pcib
+dev/mgb/if_mgb.c		optional	mgb
 kern/msi_if.m			standard
 kern/pic_if.m			standard
 kern/subr_devmap.c		standard
@@ -55,7 +56,7 @@ riscv/riscv/bus_space_asm.S	standard
 riscv/riscv/busdma_bounce.c	standard
 riscv/riscv/busdma_machdep.c	standard
 riscv/riscv/cache.c		standard
-riscv/riscv/cbo.c		optional	!cheri_purecap_kernel
+riscv/riscv/cbo.c		standard
 riscv/riscv/clock.c		standard
 riscv/riscv/copyinout.S		standard
 riscv/riscv/cpufunc_asm.S	standard

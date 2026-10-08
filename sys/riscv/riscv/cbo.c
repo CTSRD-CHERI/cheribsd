@@ -33,25 +33,25 @@
 #include <machine/cbo.h>
 
 static void
-cbo_zicbom_cpu_dcache_wbinv_range(vm_offset_t va, vm_size_t len)
+cbo_zicbom_cpu_dcache_wbinv_range(vm_pointer_t va, vm_size_t len)
 {
-	vm_offset_t addr;
+	vm_pointer_t addr;
 
 	/*
 	 * A flush operation atomically performs a clean operation followed by
 	 * an invalidate operation.
 	 */
 
-	va &= ~(dcache_line_size - 1);
-	for (addr = va; addr < va + len; addr += dcache_line_size)
+	for (addr = __align_down(va, dcache_line_size); addr < va + len;
+	    addr += dcache_line_size)
 		__asm __volatile(".option push; .option arch, +zicbom\n"
-				 "cbo.flush (%0); .option pop\n" :: "r"(addr));
+				 "cbo.flush (%0); .option pop\n" :: "C"(addr));
 }
 
 static void
-cbo_zicbom_cpu_dcache_inv_range(vm_offset_t va, vm_size_t len)
+cbo_zicbom_cpu_dcache_inv_range(vm_pointer_t va, vm_size_t len)
 {
-	vm_offset_t addr;
+	vm_pointer_t addr;
 
 	/*
 	 * An invalidate operation makes data from store operations performed by
@@ -60,16 +60,16 @@ cbo_zicbom_cpu_dcache_inv_range(vm_offset_t va, vm_size_t len)
 	 * block from the set of coherent caches up to that point.
 	 */
 
-	va &= ~(dcache_line_size - 1);
-	for (addr = va; addr < va + len; addr += dcache_line_size)
+	for (addr = __align_down(va, dcache_line_size); addr < va + len;
+	    addr += dcache_line_size)
 		__asm __volatile(".option push; .option arch, +zicbom\n"
-				 "cbo.inval (%0); .option pop\n" :: "r"(addr));
+				 "cbo.flush (%0); .option pop\n" :: "C"(addr));
 }
 
 static void
-cbo_zicbom_cpu_dcache_wb_range(vm_offset_t va, vm_size_t len)
+cbo_zicbom_cpu_dcache_wb_range(vm_pointer_t va, vm_size_t len)
 {
-	vm_offset_t addr;
+	vm_pointer_t addr;
 
 	/*
 	 * A clean operation makes data from store operations performed by the
@@ -80,10 +80,10 @@ cbo_zicbom_cpu_dcache_wb_range(vm_offset_t va, vm_size_t len)
 	 * previous invalidate, clean, or flush operation on the cache block.
 	 */
 
-	va &= ~(dcache_line_size - 1);
-	for (addr = va; addr < va + len; addr += dcache_line_size)
+	for (addr = __align_down(va, dcache_line_size); addr < va + len;
+	    addr += dcache_line_size)
 		__asm __volatile(".option push; .option arch, +zicbom\n"
-				 "cbo.clean (%0); .option pop\n" :: "r"(addr));
+				 "cbo.clean (%0); .option pop\n" :: "C"(addr));
 }
 
 void

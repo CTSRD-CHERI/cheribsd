@@ -82,6 +82,30 @@ ENTRY(generic_bs_w_8)
 	ret
 END(generic_bs_w_8)
 
+#if 0
+  void
+     bus_space_read_region_1(bus_space_tag_t space, bus_space_handle_t handle,
+         bus_size_t offset, uint8_t *datap, bus_size_t count);
+#endif
+
+ENTRY(generic_bs_rr_1)
+	/* Is there anything to read. */
+	beqz	a4, 2f
+
+	/* Calculate the device address. */
+	ADD_PTR	a0, a1, a2
+
+1:	lbu	t0, 0(a0)
+	sb	t0, 0(a3)
+
+	ADDI_PTR	a0, a0, 1
+	ADDI_PTR	a3, a3, 1
+	addi		a4, a4, -1
+	bnez		a4, 1b
+
+2:	ret
+END(generic_bs_rr_1)
+
 /*
  * CHERI CHANGES START
  * {

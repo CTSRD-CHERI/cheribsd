@@ -343,7 +343,7 @@ static void _pmap_unwire_ptp(pmap_t pmap, vm_offset_t va, vm_page_t m,
     struct spglist *free);
 static int pmap_unuse_pt(pmap_t, vm_offset_t, pd_entry_t, struct spglist *);
 
-static int pmap_change_attr_locked(vm_offset_t va, vm_size_t size, int mode);
+static int pmap_change_attr_locked(vm_pointer_t va, vm_size_t size, int mode);
 
 static uint64_t pmap_satp_mode(void);
 
@@ -5944,7 +5944,7 @@ pmap_page_set_memattr(vm_page_t m, vm_memattr_t ma)
  * virtual address range.
  */
 int
-pmap_change_attr(vm_offset_t va, vm_size_t size, int mode)
+pmap_change_attr(vm_pointer_t va, vm_size_t size, int mode)
 {
 	int error;
 
@@ -5955,9 +5955,9 @@ pmap_change_attr(vm_offset_t va, vm_size_t size, int mode)
 }
 
 static int
-pmap_change_attr_locked(vm_offset_t va, vm_size_t size, int mode)
+pmap_change_attr_locked(vm_pointer_t va, vm_size_t size, int mode)
 {
-	vm_offset_t base, offset, tmpva;
+	vm_pointer_t base, offset, tmpva;
 	vm_paddr_t phys;
 	pd_entry_t *l1, l1e;
 	pd_entry_t *l2, l2e;

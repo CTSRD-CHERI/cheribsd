@@ -8,3 +8,12 @@ ident RVY-093-PURECAP-PRIME
 
 options 	FDT
 options         HZ=100
+
+# Prime with the PCIe extension board
+device		xlnx_pcib
+device		iflib
+device		mgb
+options		ROOTDEVNAME=\"ufs:/dev/nda1p2\"
+nooptions	NFS_ROOT
+nooptions	MD_ROOT
+nomakeoptions	MFS_IMAGE

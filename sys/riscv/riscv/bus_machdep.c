@@ -150,6 +150,12 @@ struct bus_space memmap_bus = {
 	.bs_rm_4 = NULL,
 	.bs_rm_8 = NULL,
 
+	/* read region */
+	.bs_rr_1 = generic_bs_rr_1,
+	.bs_rr_2 = NULL, //generic_bs_rr_2,
+	.bs_rr_4 = NULL, //generic_bs_rr_4,
+	.bs_rr_8 = NULL, //generic_bs_rr_8,
+
 	/* write single */
 	.bs_w_1 = generic_bs_w_1,
 	.bs_w_2 = generic_bs_w_2,

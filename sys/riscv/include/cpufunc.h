@@ -128,7 +128,7 @@ sfence_vma_asid_page(uint64_t asid, uintptr_t addr)
 
 extern int64_t dcache_line_size;
 
-typedef void (*cache_op_t)(vm_offset_t start, vm_size_t size);
+typedef void (*cache_op_t)(vm_pointer_t start, vm_size_t size);
 
 struct riscv_cache_ops {
 	cache_op_t dcache_wbinv_range;
@@ -139,21 +139,21 @@ struct riscv_cache_ops {
 extern struct riscv_cache_ops cache_ops;
 
 static __inline void
-cpu_dcache_wbinv_range(vm_offset_t addr, vm_size_t size)
+cpu_dcache_wbinv_range(vm_pointer_t addr, vm_size_t size)
 {
 	if (cache_ops.dcache_wbinv_range != NULL)
 		cache_ops.dcache_wbinv_range(addr, size);
 }
 
 static __inline void
-cpu_dcache_inv_range(vm_offset_t addr, vm_size_t size)
+cpu_dcache_inv_range(vm_pointer_t addr, vm_size_t size)
 {
 	if (cache_ops.dcache_inv_range != NULL)
 		cache_ops.dcache_inv_range(addr, size);
 }
 
 static __inline void
-cpu_dcache_wb_range(vm_offset_t addr, vm_size_t size)
+cpu_dcache_wb_range(vm_pointer_t addr, vm_size_t size)
 {
 	if (cache_ops.dcache_wb_range != NULL)
 		cache_ops.dcache_wb_range(addr, size);

@@ -53,7 +53,7 @@ bool has_errata_thead_pbmt = false;
 #define	THEAD_DCACHE_SIZE	64
 
 static void
-thead_cpu_dcache_wbinv_range(vm_offset_t va, vm_size_t len)
+thead_cpu_dcache_wbinv_range(vm_pointer_t va, vm_size_t len)
 {
 	register vm_offset_t t0 __asm("t0") = rounddown(va, dcache_line_size);
 
@@ -65,7 +65,7 @@ thead_cpu_dcache_wbinv_range(vm_offset_t va, vm_size_t len)
 }
 
 static void
-thead_cpu_dcache_inv_range(vm_offset_t va, vm_size_t len)
+thead_cpu_dcache_inv_range(vm_pointer_t va, vm_size_t len)
 {
 	register vm_offset_t t0 __asm("t0") = rounddown(va, dcache_line_size);
 
@@ -77,7 +77,7 @@ thead_cpu_dcache_inv_range(vm_offset_t va, vm_size_t len)
 }
 
 static void
-thead_cpu_dcache_wb_range(vm_offset_t va, vm_size_t len)
+thead_cpu_dcache_wb_range(vm_pointer_t va, vm_size_t len)
 {
 	register vm_offset_t t0 __asm("t0") = rounddown(va, dcache_line_size);
 
