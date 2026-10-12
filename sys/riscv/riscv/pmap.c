@@ -373,10 +373,10 @@ pagecopy(void *s, void *d)
 	memcpy(d, s, PAGE_SIZE);
 }
 
+#ifdef __CHERI_HYBRID__
 static __inline void
 pagecopy_cleartags(void *s, void *d)
 {
-#if __has_feature(capabilities)
 	void * __capability *dst;
 	void * __capability *src;
 	u_int i;
@@ -385,10 +385,8 @@ pagecopy_cleartags(void *s, void *d)
 	src = s;
 	for (i = 0; i < PAGE_SIZE / sizeof(*dst); i++)
 		*dst++ = cheri_tag_clear(*src++);
-#else
-	pagecopy(s, d);
-#endif
 }
+#endif
 
 static __inline void
 pagezero(void *p)
@@ -4667,7 +4665,16 @@ pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
 	vm_pointer_t src = PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(msrc));
 	vm_pointer_t dst = PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(mdst));
 
+#ifdef __CHERI_HYBRID__
 	pagecopy_cleartags((void *)src, (void *)dst);
+#else
+#ifdef __riscv_xcheri
+	src = cheri_kern_perms_clear(src, CHERI_PERM_LOAD_CAP);
+#else
+	src = cheri_kern_perms_clear(src, CHERI_PERM_CAP);
+#endif
+	pagecopy((void *)src, (void *)dst);
+#endif
 }
 
 #if __has_feature(capabilities)
