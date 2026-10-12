@@ -7555,12 +7555,12 @@ pmap_zero_page(vm_page_t m)
 void
 pmap_zero_page_area(vm_page_t m, int off, int size)
 {
-	vm_pointer_t va = PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(m));
+	vm_pointer_t va = PHYS_TO_DMAP_LEN(VM_PAGE_TO_PHYS(m) + off, size);
 
 	if (off == 0 && size == PAGE_SIZE)
 		pagezero((void *)va);
 	else
-		bzero((char *)va + off, size);
+		bzero((void *)va, size);
 }
 
 /*
