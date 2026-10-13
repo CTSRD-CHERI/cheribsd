@@ -77,7 +77,7 @@ CHERIBSDTEST(store_local_disallowed,
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
     .ct_si_code = SI_CODE_STORELOCAL,
-    .ct_si_trapno = TRAPNO_LOAD_STORE)
+    .ct_si_trapno = TRAPNO_STORE)
 #else
 CHERIBSDTEST(store_local_disallowed,
     "Checks tag is stripped when local capabilities are stored via non-store-local capabilities")
