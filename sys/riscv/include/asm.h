@@ -87,6 +87,26 @@
 
 #define	GET_PCC(rd)				\
 	cspecialr	CAP(rd), pcc
+#elif defined(__riscv_zcherihybrid)
+/*
+ * Zcheri hybrid is required for DDC
+ * Note: these macros require capability mode
+ * to use CLEN registers.
+ */
+#define	GET_DDC(rd)				\
+	csrr		CAP(rd), ddc
+
+#define	SET_DDC(rs)				\
+	csrw		ddc, CAP(rs)
+
+#define	GET_UTIDC(rd)				\
+	csrr		CAP(rd), utidc
+
+#define	SET_UTIDC(rd)				\
+	csrw		utidc, CAP(rd)
+
+#define	GET_PCC(rd)				\
+	auipc		CAP(rd), 0
 #elif defined(__riscv_zyhybrid)
 /*
  * RVY hybrid is required for DDC
@@ -119,6 +139,15 @@
 
 #define	CSRRW_CAP(rd, csrn, rs)			\
 	csrrw		rd, csrn, rs
+#elif defined(__riscv_zcheripurecap)
+#define	CSRR_CAP(rd, csrn)			\
+	csrr		CAP(rd), csrn ## c
+
+#define	CSRW_CAP(csrn, rs)			\
+	csrw		csrn ## c, CAP(rs)
+
+#define	CSRRW_CAP(rd, csrn, rs)			\
+	csrrw		CAP(rd), csrn ## c, CAP(rs)
 #elif defined(__riscv_xcheri)
 #define	CSRR_CAP(rd, csrn)			\
 	cspecialr	CAP(rd), csrn ## c
@@ -128,6 +157,7 @@
 
 #define	CSRRW_CAP(rd, csrn, rs)				\
 	cspecialrw	CAP(rd), csrn ## c, CAP(rs)
+
 #endif
 
 /*
@@ -138,11 +168,7 @@
 #define	INT_WIDTH	8
 
 #if __has_feature(capabilities)
-#ifdef __riscv_xcheri
 #define	CAP(x)		c ## x
-#else
-#define	CAP(x)		x
-#endif
 #define	CAP_WIDTH	16
 
 #define	L_CAP		ly
@@ -170,6 +196,20 @@
 	99:
 #define	YMODE_ENTER
 #define	YMODE_EXIT
+#elif defined(__riscv_zcheripurecap)
+#define	MODESW_CAP(tmp, tmp1)	modesw.cap
+#define	MODESW_INT(tmp)		modesw.int
+#ifdef __CHERI_HYBRID__
+#define	YMODE_ENTER				\
+	modesw.cap;				\
+	.option capmode
+#define	YMODE_EXIT				\
+	modesw.int;				\
+	.option nocapmode
+#else
+#define	YMODE_ENTER
+#define	YMODE_EXIT
+#endif
 #elif defined(__riscv_y)
 #define	MODESW_CAP(tmp, tmp1)	ymodeswy
 #define	MODESW_INT(tmp)		ymodeswi
