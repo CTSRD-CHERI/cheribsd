@@ -89,7 +89,7 @@
 #define cheri_tag_clear(x)	__builtin_cheri_tag_clear(x)
 #define cheri_tag_get(x)	__builtin_cheri_tag_get(x)
 #ifdef __riscv
-#if defined(__riscv_y)
+#if defined(__riscv_y) || defined(__riscv_zcheripurecap)
 /* CLoadTags not available, just use gettag(load) instead. */
 #define	cheri_tags_load(m)						\
 	cheri_tag_get(							\
