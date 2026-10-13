@@ -141,7 +141,7 @@
 
 #endif /* __WANT_OLD_CHERI_MACROS */
 
-#if defined(__riscv_y)
+#if defined(__riscv_y) || defined(__riscv_zcheripurecap)
 /* CLoadTags not available, just use gettag(load) instead. */
 #define cheri_loadtags(m)						\
 	cheri_tag_get(							\
