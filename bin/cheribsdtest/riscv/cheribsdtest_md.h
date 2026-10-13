@@ -38,7 +38,8 @@
 
 #include <machine/riscvreg.h>
 
-#define	TRAPNO_CHERI		(SCAUSE_CHERI)
+#define	TRAPNO_LOAD		(SCAUSE_CHERI)
+#define	TRAPNO_STORE		(SCAUSE_CHERI)
 #ifdef __riscv_xcheri
 #define	TRAPNO_STORE_CAP_PF	(SCAUSE_STORE_AMO_CAP_PAGE_FAULT)
 #else

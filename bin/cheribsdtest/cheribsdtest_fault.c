@@ -74,7 +74,7 @@ CHERIBSDTEST(fault_bounds, "Exercise capability bounds check failure",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
     .ct_si_code = PROT_CHERI_BOUNDS,
-    .ct_si_trapno = TRAPNO_LOAD_STORE)
+    .ct_si_trapno = TRAPNO_STORE)
 {
 	char * __capability arrayp = cheri_ptr(array, sizeof(array));
 	int i;
@@ -91,7 +91,7 @@ CHERIBSDTEST(fault_perm_load,
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
     .ct_si_code = PROT_CHERI_PERM,
-    .ct_si_trapno = TRAPNO_LOAD_STORE)
+    .ct_si_trapno = TRAPNO_LOAD)
 {
 	char * __capability arrayp = cheri_ptrperm(array, sizeof(array), 0);
 
@@ -150,7 +150,7 @@ CHERIBSDTEST(fault_perm_store,
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
     .ct_si_code = PROT_CHERI_PERM,
-    .ct_si_trapno = TRAPNO_LOAD_STORE)
+    .ct_si_trapno = TRAPNO_STORE)
 {
 	char * __capability arrayp = cheri_ptrperm(array, sizeof(array), 0);
 
@@ -210,7 +210,7 @@ CHERIBSDTEST(fault_tag, "Store via untagged capability",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
     .ct_si_code = PROT_CHERI_TAG,
-    .ct_si_trapno = TRAPNO_LOAD_STORE)
+    .ct_si_trapno = TRAPNO_STORE)
 {
 	char ch;
 	char * __capability chp = cheri_ptr(&ch, sizeof(ch));
