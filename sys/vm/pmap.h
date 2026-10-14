@@ -127,6 +127,9 @@ static const int PMAP_CAPLOADGEN_HASCAPS   = 0x1;
 static const int PMAP_CAPLOADGEN_NONEWMAPS = 0x2; // no new mappings
 static const int PMAP_CAPLOADGEN_UPDATETLB = 0x4;
 static const int PMAP_CAPLOADGEN_XBUSIED   = 0x8; // input page xbusied, !wired
+#ifdef CHERI_CAPREVOKE_TWOSTAGE_CLEAN
+static const int PMAP_CAPLOADGEN_CLEANED   = 0x10; // second scan done on clean transition
+#endif
 enum pmap_caploadgen_res {
 	PMAP_CAPLOADGEN_OK              = 0, /* Update done */
 	PMAP_CAPLOADGEN_ALREADY         = 1, /* Update already applied */
@@ -136,6 +139,9 @@ enum pmap_caploadgen_res {
 	PMAP_CAPLOADGEN_SCAN_RO_WIRED   = 5, /* mapped RO and wired */
 	PMAP_CAPLOADGEN_SCAN_RO_XBUSIED = 6, /* mapped RO and xbusy */
 	PMAP_CAPLOADGEN_SCAN_RW_XBUSIED = 7, /* mapped RW and xbusy */
+#ifdef CHERI_CAPREVOKE_TWOSTAGE_CLEAN
+	PMAP_CAPLOADGEN_CLEANING        = 8, /* Cleaning, requires rescan */
+#endif
 };
 enum pmap_caploadgen_res pmap_caploadgen_update(pmap_t, vm_offset_t,
 		    vm_page_t *, int flags);
