@@ -82,6 +82,20 @@ typedef	uint64_t	pn_t;			/* page number */
 
 #define	PTE_KERN_CHERI	(PTE_YR | PTE_YW | PTE_YD)
 #define	PTE_PROMOTE_CHERI (PTE_YR | PTE_YW | PTE_YD | PTE_CRM | PTE_YRG)
+#elif defined(__riscv_zcheripurecap)
+#define	PTE_CW		(1UL << 60) /* Capability Read/Write */
+#define	PTE_CRG		(1UL << 59) /* Cap Read Generation */
+#define	PTE_CHERI_MASK	(PTE_CW | PTE_CRG)
+
+#define	PTE_YR		PTE_CW
+#define	PTE_YW		PTE_CW
+#define	PTE_YRG		PTE_CRG
+#define	PTE_CR_CLEAR	0
+#define	PTE_CR_OK	PTE_CW
+#define	PTE_CR_GEN	PTE_CW
+
+#define	PTE_KERN_CHERI	PTE_CW
+#define	PTE_PROMOTE_CHERI (PTE_CW | PTE_CRG)
 #elif defined(__riscv_y)
 /* RVY 0.9.8 Svyrg */
 #define	PTE_YR		(1UL << 55) /* Capability Read */
