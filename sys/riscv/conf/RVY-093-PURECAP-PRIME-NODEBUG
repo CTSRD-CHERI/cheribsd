@@ -1,0 +1,6 @@
+#NO_UNIVERSE
+
+include "RVY-093-PURECAP-PRIME"
+include "std.nodebug"
+
+ident RVY-093-PURECAP-PRIME-NODEBUG
