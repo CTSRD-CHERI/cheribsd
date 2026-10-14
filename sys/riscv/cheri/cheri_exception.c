@@ -36,6 +36,7 @@
 
 #include <machine/riscvreg.h>
 
+#ifdef __riscv_xcheri
 static const char *cheri_exccode_descr[] = {
 	[CHERI_EXCCODE_NONE] = "none",
 	[CHERI_EXCCODE_LENGTH] = "length violation",
@@ -188,3 +189,4 @@ cheri_stval_to_sicode(register_t stval)
 		return (0);
 	}
 }
+#endif /* defined(__riscv_xcheri) */
