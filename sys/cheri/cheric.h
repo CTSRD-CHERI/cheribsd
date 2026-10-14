@@ -88,6 +88,12 @@
 #define cheri_sentry_create(x)	__builtin_cheri_seal_entry(x)
 #define cheri_tag_clear(x)	__builtin_cheri_tag_clear(x)
 #define cheri_tag_get(x)	__builtin_cheri_tag_get(x)
+#ifdef __riscv
+#define cheri_tags_load(m)						\
+	__builtin_cheri_cap_load_tags((__cheri_tocap void * __capability)(m))
+#else
+#define cheri_tags_load(x)	__builtin_cheri_cap_load_tags(x)
+#endif
 #define cheri_type_copy(x, y)	__builtin_cheri_cap_type_copy((x), (y))
 #define cheri_type_get(x)	__builtin_cheri_type_get(x)
 #define cheri_unseal(x, y)	__builtin_cheri_unseal((x), (y))
