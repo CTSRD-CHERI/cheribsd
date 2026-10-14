@@ -335,6 +335,14 @@ MACHINE_CPU += riscv
 . endif
 .endif
 
+.if ${MACHINE_CPUARCH} == "riscv"
+.if ${MACHINE_CPU:Mrvy}
+CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-vararg
+CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-memarg-caller
+CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-memarg-callee
+. endif
+.endif
+
 .if ${MACHINE_CPUARCH} == "aarch64"
 . if ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-march=morello
@@ -392,7 +400,7 @@ RISCV_MARCH=	rv64imafdc
 .if ${MACHINE_CPU:Mxcheri}
 RISCV_MARCH:=	${RISCV_MARCH}xcheri
 .elif ${MACHINE_CPU:Mrvy}
-RISCV_MARCH:=	${RISCV_MARCH}zcherihybrid_zcherilevels
+RISCV_MARCH:=	${RISCV_MARCH:S/i/y/}zyhybrid_zylevels1b
 .endif
 
 .if ${MACHINE_ARCH:Mriscv*c*}
