@@ -73,9 +73,15 @@
 #else /* !defined(__riscv_xcheri) */
 #define	CHERI_PERM_WRITE		(1 << 0)	/* 0x00000001 */
 #define	CHERI_PERM_LOAD_MUTABLE		(1 << 1)	/* 0x00000002 */
+#ifdef __riscv_zcheripurecap
 #define	CHERI_PERM_ELEVATE_LEVEL	(1 << 2)	/* 0x00000004 */
 #define	CHERI_PERM_STORE_LEVEL		(1 << 3)	/* 0x00000008 */
 #define	CHERI_PERM_CAPABILITY_LEVEL	(1 << 4)	/* 0x00000010 */
+#else
+#define	CHERI_PERM_LOAD_GLOBAL		(1 << 2)	/* 0x00000004 */
+#define	CHERI_PERM_STORE_LOCAL		(1 << 3)	/* 0x00000008 */
+#define	CHERI_PERM_GLOBAL		(1 << 4)	/* 0x00000010 */
+#endif
 #define	CHERI_PERM_CAP			(1 << 5)	/* 0x00000020 */
 #define	CHERI_PERM_SYSTEM_REGS		(1 << 16)	/* 0x00010000 */
 #define	CHERI_PERM_EXECUTE		(1 << 17)	/* 0x00020000 */
@@ -106,15 +112,20 @@
 #endif
 #endif /* !_KERNEL */
 
-#ifdef __riscv_y
+#if defined(__riscv_zcheripurecap) || defined(__riscv_y)
 /*
  * Re-define these because RVY cheriintrin.h uses different names.
  * XXX-AM: Ideally we unify on a single naming convention.
  */
 #define	CHERI_PERM_STORE		CHERI_PERM_WRITE
 #define	CHERI_PERM_LOAD			CHERI_PERM_READ
+#ifdef __riscv_zcheripurecap
 #define	CHERI_PERM_GLOBAL		CHERI_PERM_CAPABILITY_LEVEL
 #define	CHERI_PERM_STORE_LOCAL_CAP	CHERI_PERM_STORE_LEVEL
+#define	CHERI_PERM_LOAD_GLOBAL		CHERI_PERM_ELEVATE_LEVEL
+#else
+#define	CHERI_PERM_STORE_LOCAL_CAP	CHERI_PERM_STORE_LOCAL
+#endif
 #endif
 
 /* Supported architecture permission bits feature flags */
