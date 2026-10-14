@@ -58,7 +58,7 @@ _tcb_set(struct tcb *tcb)
 	__asm __volatile("yaddi tp, %0, %1" :: "C" (tcb),
 	    "I" (TLS_TCB_SIZE));
 #else
-	__asm __volatile("cincoffset ctp, %0, %1" :: "C" (tcb),
+	__asm __volatile("caddi ctp, %0, %1" :: "C" (tcb),
 	    "I" (TLS_TCB_SIZE));
 #endif
 #else
@@ -76,7 +76,7 @@ _tcb_get(void)
 	__asm __volatile("yaddi %0, tp, %1" : "=C" (tcb) :
 	    "I" (-TLS_TCB_SIZE));
 #else
-	__asm __volatile("cincoffset %0, ctp, %1" : "=C" (tcb) :
+	__asm __volatile("caddi %0, ctp, %1" : "=C" (tcb) :
 	    "I" (-TLS_TCB_SIZE));
 #endif
 #else
