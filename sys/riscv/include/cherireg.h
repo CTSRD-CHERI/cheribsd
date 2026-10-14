@@ -317,6 +317,7 @@
 /*
  * List of CHERI capability cause code constants.
  */
+#ifdef __riscv_xcheri
 #define	CHERI_EXCCODE_NONE		0x00
 #define	CHERI_EXCCODE_LENGTH		0x01
 #define	CHERI_EXCCODE_TAG		0x02
@@ -350,6 +351,7 @@
 #define	_CHERI_EXCCODE_RESERVED1d	0x1d
 #define	_CHERI_EXCCODE_RESERVED1e	0x1e
 #define	_CHERI_EXCCODE_RESERVED1f	0x1f
+#endif /* defined(__riscv_xcheri) */
 
 /*
  * Derive an unbounded pointer before initial relocation.  For
