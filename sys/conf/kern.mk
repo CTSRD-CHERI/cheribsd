@@ -195,7 +195,7 @@ RISCV_MARCH=	rv64imafdch
 .if ${MACHINE_CPU:Mxcheri}
 RISCV_MARCH:=	${RISCV_MARCH}xcheri
 .elif ${MACHINE_CPU:Mrvy}
-RISCV_MARCH:=	${RISCV_MARCH}zcherihybrid_zcherilevels
+RISCV_MARCH:=	${RISCV_MARCH:S/i/y/}zyhybrid_zylevels1b
 .endif
 
 RISCV_ABI=	lp64
@@ -210,6 +210,12 @@ INLINE_LIMIT?=	8000
 
 .if ${LINKER_FEATURES:Mriscv-relaxations} == ""
 CFLAGS+=	-mno-relax
+.endif
+
+.if ${MACHINE_CPU:Mrvy}
+CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-vararg
+CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-memarg-caller
+CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-memarg-callee
 .endif
 .endif
 
