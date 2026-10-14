@@ -87,7 +87,7 @@ stack_save(struct stack *st)
 #ifdef __riscv_y
 	__asm __volatile("ymv %0, sp" : "=&C" (sp));
 #else
-	__asm __volatile("cmove %0, csp" : "=&C" (sp));
+	__asm __volatile("cmv %0, csp" : "=&C" (sp));
 #endif
 #else
 	__asm __volatile("mv %0, sp" : "=&r" (sp));

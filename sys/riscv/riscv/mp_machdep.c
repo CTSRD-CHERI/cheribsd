@@ -175,7 +175,7 @@ init_secondary(uint64_t hart)
 #ifdef __riscv_y
 	__asm __volatile("ymv tp, %0" :: "C"(pcpup));
 #else
-	__asm __volatile("cmove ctp, %0" :: "C"(pcpup));
+	__asm __volatile("cmv ctp, %0" :: "C"(pcpup));
 #endif
 #else
 	__asm __volatile("mv tp, %0" :: "r"(pcpup));
