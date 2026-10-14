@@ -62,7 +62,7 @@ cheri_read_tags_page(const void *page, void *tagbuf, bool *hastagsp)
 	tagbits = 0;
 	hastags = false;
 	while (len > 0) {
-		tags |= cheri_loadtags(src) << tagbits;
+		tags |= cheri_tags_load(src) << tagbits;
 		tagbits += cheri_cloadtags_stride;
 		if (tags != 0)
 			hastags = true;
@@ -107,7 +107,7 @@ measure_cloadtags_stride(void *dummy __unused)
 	cap = (__cheri_tocap void * __capability)&tags;
 
 #ifdef INVARIANTS
-	tags = cheri_loadtags(buf);
+	tags = cheri_tags_load(buf);
 
 	KASSERT(tags == 0, ("CLoadTags on a zeroed buffer returned %lu", tags));
 #endif
@@ -116,7 +116,7 @@ measure_cloadtags_stride(void *dummy __unused)
 	for (i = 0; i < 64; i++)
 		buf[i] = cap;
 
-	tags = cheri_loadtags(buf);
+	tags = cheri_tags_load(buf);
 
 	KASSERT(tags != 0, ("CLoadTags returned 0"));
 	KASSERT(powerof2(tags + 1),
