@@ -69,10 +69,20 @@ DB_SHOW_COMMAND(scr, ddb_dump_scr)
 #endif
 
 	db_printf("ddc: %#.16lp\n",  scr_read(ddc));
+#ifdef __riscv_xcheri
 	db_printf("pcc: %#.16lp\n",  scr_read(pcc));
+#else
+	db_printf("pcc: %#.16lp\n",  cheri_pcc_get());
+#endif
+
+#if defined(__riscv_xcheri)
 	db_printf("stcc: %#.16lp\n",  scr_read(stcc));
 	db_printf("sscratchc: %#.16lp\n",  scr_read(sscratchc));
 	db_printf("sepcc: %#.16lp\n",  scr_read(sepcc));
-
+#elif defined(__riscv_y)
+	db_printf("stvec: %#.16lp\n",  scr_read(stvec));
+	db_printf("sscratch: %#.16lp\n",  scr_read(sscratch));
+	db_printf("sepc: %#.16lp\n",  scr_read(sepc));
+#endif
 	/* XXX: Do user-mode registers if we support N? */
 }
