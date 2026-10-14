@@ -48,8 +48,8 @@ caprev_shadow_set_fw(uint64_t * __capability fw, void * __capability user_obj,
 	__asm__ __volatile__ (
 		"1:\n\t"
 		/* Load reserve first word */
-#ifdef __CHERI_PURE_CAPABILITY__
-		"clr.d %[lshadow], (%[fw])\n\t"
+#ifdef __CHERI__
+		"lr.d %[lshadow], (%[fw])\n\t"
 #else
 		"lr.d.cap %[lshadow], (%[fw])\n\t"
 #endif
@@ -79,11 +79,19 @@ caprev_shadow_set_fw(uint64_t * __capability fw, void * __capability user_obj,
 		 */
 
 		/* Jump out if object detagged */
+#ifdef __riscv_y
+		"ytagr %[scratch], %[obj]\n\t"
+#else
 		"cgettag %[scratch], %[obj]\n\t"
+#endif
 		"beqz %[scratch], 2f\n\t"
 
 		/* Jump out if zero perms */
+#ifdef __riscv_y
+		"ypermr %[scratch], %[obj]\n\t"
+#else
 		"cgetperm %[scratch], %[obj]\n\t"
+#endif
 		"beqz %[scratch], 2f\n\t"
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -91,7 +99,7 @@ caprev_shadow_set_fw(uint64_t * __capability fw, void * __capability user_obj,
 		"or %[lshadow], %[lshadow], %[fwm]\n\t"
 
 		/* SC the updated mask */
-		"csc.d %[asmres], %[lshadow], (%[fw])\n\t"
+		"sc.d %[asmres], %[lshadow], (%[fw])\n\t"
 #else
 		/*
 		 * bitwise or in the mask; into asmres not lshadow since the
