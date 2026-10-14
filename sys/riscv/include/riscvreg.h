@@ -87,7 +87,7 @@
 #define	SSTATUS_XS_MASK			(0x3 << SSTATUS_XS_SHIFT)
 #define	SSTATUS_SUM			(1 << 18)
 #if __riscv_xlen == 64
-#if defined(__riscv_y)
+#if defined(__riscv_zcheripurecap) || defined(__riscv_y)
 #define	SSTATUS_UYRG			(1ul << 61)
 #endif
 #ifdef __riscv_y

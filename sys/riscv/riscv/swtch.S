@@ -424,7 +424,11 @@ ENTRY(fork_trampoline)
 	 * These are part of the per CPU state managed by context switch
 	 * and pmap.
 	 */
+#ifdef __riscv_zcheripurecap
+	li	t1, SSTATUS_UYRG
+#else
 	li	t1, (SSTATUS_YRGE | SSTATUS_SYRG | SSTATUS_UYRG)
+#endif
 	csrr	t2, sstatus
 	and	t2, t2, t1
 	xori	t1, t1, -1
