@@ -82,7 +82,7 @@ caprev_shadow_set_fw(uint64_t * __capability fw, void * __capability user_obj,
 #ifdef __riscv_y
 		"ytagr %[scratch], %[obj]\n\t"
 #else
-		"cgettag %[scratch], %[obj]\n\t"
+		"gctag %[scratch], %[obj]\n\t"
 #endif
 		"beqz %[scratch], 2f\n\t"
 
@@ -90,7 +90,7 @@ caprev_shadow_set_fw(uint64_t * __capability fw, void * __capability user_obj,
 #ifdef __riscv_y
 		"ypermr %[scratch], %[obj]\n\t"
 #else
-		"cgetperm %[scratch], %[obj]\n\t"
+		"gcperm %[scratch], %[obj]\n\t"
 #endif
 		"beqz %[scratch], 2f\n\t"
 
