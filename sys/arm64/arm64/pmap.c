@@ -107,6 +107,7 @@
 #include <sys/asan.h>
 #include <sys/bitstring.h>
 #include <sys/bus.h>
+#include <sys/counter.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
@@ -6566,6 +6567,13 @@ pmap_update_pte_clg(pmap_t pmap, pt_entry_t *pte)
 }
 
 #ifdef CHERI_CAPREVOKE
+
+extern counter_u64_t cheri_became_cap_clean;
+#ifdef CHERI_CAPREVOKE_TWOSTAGE_CLEAN
+extern counter_u64_t cheri_second_stage_dirty;
+extern counter_u64_t cheri_second_stage_alias;
+#endif
+
 void
 pmap_caploadgen_next(pmap_t pmap)
 {
@@ -6668,6 +6676,7 @@ out:
 	 * created.
 	 */
 	if (rv && !(vm_page_astate_load(m).flags & PGA_CAPDIRTY)) {
+		counter_u64_add(cheri_became_cap_clean, 1);
 		vm_page_aflag_clear(m, PGA_CAPSTORE);
 	}
 }
@@ -6817,6 +6826,7 @@ retry:
 					pmap_s1_invalidate_page(pmap, va, true);
 					vm_page_aflag_clear(m,
 					    PGA_CAPDIRTY | PGA_CAPSTORE);
+					counter_u64_add(cheri_became_cap_clean, 1);
 					PMAP_UNLOCK(pmap);
 					m = NULL;
 					goto out_unlocked;
@@ -6825,6 +6835,7 @@ retry:
 				// XXX should not be an assertion
 				KASSERT(exppte & ATTR_S1_AP_RW_BIT,
 				    ("Spurious pte update failure?"));
+				counter_u64_add(cheri_second_stage_dirty, 1);
 			} else if (flags & PMAP_CAPLOADGEN_NONEWMAPS) {
 				/*
 				 * Observed cap-clean page, attempt
@@ -6854,6 +6865,7 @@ retry:
 				if (TAILQ_NEXT(TAILQ_FIRST(&m->md.pv_list),
 				    pv_next) != NULL) {
 					rw_runlock(lock);
+					counter_u64_add(cheri_second_stage_alias, 1);
 					goto clean_bail;
 				}
 				rw_runlock(lock);
@@ -6882,6 +6894,7 @@ retry:
 						pmap_s1_invalidate_page(pmap, va, true);
 					}
 				}
+				// else counter_u64_add(cheri_second_stage_ro_clean, 1);
 
 				res = PMAP_CAPLOADGEN_CLEANING;
 				PMAP_UNLOCK(pmap);

@@ -4017,6 +4017,13 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 
 #if __has_feature(capabilities)
 #ifdef CHERI_CAPREVOKE
+
+extern counter_u64_t cheri_became_cap_clean;
+#ifdef CHERI_CAPREVOKE_TWOSTAGE_CLEAN
+extern counter_u64_t cheri_second_stage_dirty;
+extern counter_u64_t cheri_second_stage_alias;
+#endif
+
 void
 pmap_caploadgen_next(pmap_t pmap)
 {
@@ -4326,12 +4333,14 @@ retry:
 					pmap_invalidate_page(pmap, va);
 					vm_page_aflag_clear(m,
 					    PGA_CAPDIRTY | PGA_CAPSTORE);
+					counter_u64_add(cheri_became_cap_clean, 1);
 					PMAP_UNLOCK(pmap);
 					rw_runlock(&pvh_global_lock);
 					m = NULL;
 					goto out_unlocked;
 				}
 				/* Lost the race, fall-through update CLG */
+				counter_u64_add(cheri_second_stage_dirty, 1);
 			} else if (flags & PMAP_CAPLOADGEN_NONEWMAPS) {
 				/*
 				 * Observed cap-clean page, initiate
@@ -4351,6 +4360,7 @@ retry:
 				if (TAILQ_NEXT(TAILQ_FIRST(&m->md.pv_list),
 				    pv_next) != NULL) {
 					rw_runlock(lock);
+					counter_u64_add(cheri_second_stage_alias, 1);
 					goto clean_bail;
 				}
 				rw_runlock(lock);
