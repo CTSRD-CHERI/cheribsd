@@ -293,6 +293,9 @@ dump_regs(struct trapframe *frame)
 	printf("sstatus: 0x%016lx\n", frame->tf_sstatus);
 	printf("stval  : 0x%016lx\n", frame->tf_stval);
 	printf("scause : 0x%016lx\n", frame->tf_scause);
+#ifdef __riscv_zcheripurecap
+        printf("stval2  : 0x%016lx\n", frame->tf_stval2);
+#endif
 }
 
 #if __has_feature(capabilities)
@@ -302,6 +305,8 @@ cheri_is_length_violation(struct trapframe *frame)
 {
 #if defined(__riscv_xcheri)
 	return (TVAL_CAP_CAUSE(frame->tf_stval) == CHERI_EXCCODE_LENGTH);
+#elif defined(__riscv_zcheripurecap)
+	return (TVAL_CAP_CAUSE(frame->tf_stval2) == CHERI_EXCCODE_BOUNDS);
 #elif defined(__riscv_y)
 	/*
 	 * XXX-AM This is only used to determine whether to raise
@@ -320,6 +325,11 @@ cheri_is_pcc_violation(struct trapframe *frame)
 {
 #if defined(__riscv_xcheri)
 	return (TVAL_CAP_IDX(frame->tf_stval) == 32 /* PCC */);
+#elif defined(__riscv_zcheripurecap)
+	if (TVAL_CAP_TYPE(frame->tf_stval2) == CHERI_EXCTYPE_FETCH_FAULT ||
+	    TVAL_CAP_TYPE(frame->tf_stval2) == CHERI_EXCTYPE_BRANCH_FAULT)
+		return (true);
+	return (false);
 #elif defined(__riscv_y)
 	return (frame->tf_scause == SCAUSE_CHERI_INST_ACCESS_FAULT);
 #endif
@@ -330,6 +340,12 @@ cheri_is_ddc_violation(struct trapframe *frame)
 {
 #if defined(__riscv_xcheri)
 	return (TVAL_CAP_IDX(frame->tf_stval) == 33 /* DDC */);
+#elif defined(__riscv_zcheripurecap)
+	if (TVAL_CAP_TYPE(frame->tf_stval2) == CHERI_EXCTYPE_DATA_FAULT &&
+	    (cheri_getflags(frame->tf_sepc) & CHERI_FLAGS_CAP_MODE_MASK) ==
+	    CHERI_FLAGS_INT_MODE)
+		return (true);
+	return (false);
 #elif defined(__riscv_y)
 	if (frame->tf_scause == SCAUSE_CHERI_LOAD_ACCESS_FAULT ||
 	    frame->tf_scause == SCAUSE_CHERI_STORE_AMO_ACCESS_FAULT) {
@@ -342,13 +358,23 @@ cheri_is_ddc_violation(struct trapframe *frame)
 static bool
 cheri_is_load_cap_fault(struct trapframe *frame)
 {
+#if defined(__riscv_zcheripurecap)
+	return (frame->tf_scause == SCAUSE_LOAD_PAGE_FAULT &&
+	    frame->tf_stval2 == 1);
+#else
 	return (frame->tf_scause == SCAUSE_CHERI_LOAD_PAGE_FAULT);
+#endif
 }
 
 static bool
 cheri_is_store_amo_cap_fault(struct trapframe *frame)
 {
+#if defined(__riscv_zcheripurecap)
+	return (frame->tf_scause == SCAUSE_STORE_PAGE_FAULT &&
+	    frame->tf_stval2 == 1);
+#else
 	return (frame->tf_scause == SCAUSE_CHERI_STORE_AMO_PAGE_FAULT);
+#endif
 }
 
 static void
@@ -362,12 +388,14 @@ dump_cheri_exception(struct trapframe *frame)
 	printf("pid %d tid %d (%s), uid %d: ", p->p_pid, td->td_tid,
 	    p->p_comm, td->td_ucred->cr_uid);
 	switch (frame->tf_scause & SCAUSE_CODE) {
+#if !defined(__riscv_zcheripurecap)
 	case SCAUSE_CHERI_LOAD_PAGE_FAULT:
 		printf("LOAD CAP page fault");
 		break;
 	case SCAUSE_CHERI_STORE_AMO_PAGE_FAULT:
 		printf("STORE/AMO CAP page fault");
 		break;
+#endif
 #if defined(__riscv_y)
 	case SCAUSE_CHERI_INST_ACCESS_FAULT:
 		printf("Instruction access fault");
@@ -383,6 +411,12 @@ dump_cheri_exception(struct trapframe *frame)
 		printf("CHERI fault (type %#lx), capidx %ld",
 		    TVAL_CAP_CAUSE(frame->tf_stval),
 		    TVAL_CAP_IDX(frame->tf_stval));
+		break;
+#elif defined(__riscv_zcheripurecap)
+	case SCAUSE_CHERI:
+		printf("CHERI fault (type %#lx), cause %lx",
+		    TVAL_CAP_TYPE(frame->tf_stval2),
+		    TVAL_CAP_CAUSE(frame->tf_stval2));
 		break;
 #endif
 	default:
@@ -602,7 +636,8 @@ do_trap_supervisor(struct trapframe *frame)
 	case SCAUSE_STORE_PAGE_FAULT:
 	case SCAUSE_LOAD_PAGE_FAULT:
 	case SCAUSE_INST_PAGE_FAULT:
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && !defined(__riscv_zcheripurecap)
+	/* Xcheri or RVY */
 	case SCAUSE_CHERI_STORE_AMO_PAGE_FAULT:
 #endif
 		page_fault_handler(frame, 0);
@@ -666,6 +701,7 @@ do_trap_supervisor(struct trapframe *frame)
 			break;
 #else
 		case SCAUSE_CHERI: {
+#ifdef __riscv_xcheri
 			u_int cap_cause = TVAL_CAP_CAUSE(frame->tf_stval);
 			u_int cap_idx = TVAL_CAP_IDX(frame->tf_stval);
 
@@ -673,6 +709,14 @@ do_trap_supervisor(struct trapframe *frame)
 			    cheri_exccode_string(cap_cause),
 			    cheri_cap_idx_string(cap_idx),
 			    (unsigned long)frame->tf_sepc);
+#else
+                        u_int cap_cause = TVAL_CAP_CAUSE(frame->tf_stval2);
+			u_int cap_fault_type = TVAL_CAP_TYPE(frame->tf_stval2);
+
+			panic("CHERI %s at %#016lx\n",
+                            cheri_exccode_string(cap_fault_type, cap_cause),
+			    (unsigned long)frame->tf_sepc);
+#endif
 			break;
 		}
 #endif
@@ -713,8 +757,14 @@ do_trap_user(struct trapframe *frame)
 	}
 	intr_enable();
 
+#ifdef __riscv_zcheripurecap
+	CTR5(KTR_TRAP, "%s: exception=%lu, sepc=%#lx, stval=%#lx stval2=%#lx",
+            __func__, exception, (unsigned long)frame->tf_sepc, frame->tf_stval,
+	    frame->tf_stval2);
+#else
 	CTR4(KTR_TRAP, "%s: exception=%lu, sepc=%#lx, stval=%#lx", __func__,
 	    exception, (unsigned long)frame->tf_sepc, frame->tf_stval);
+#endif
 
 	switch (exception) {
 	case SCAUSE_LOAD_ACCESS_FAULT:
@@ -734,7 +784,7 @@ do_trap_user(struct trapframe *frame)
 	case SCAUSE_STORE_PAGE_FAULT:
 	case SCAUSE_LOAD_PAGE_FAULT:
 	case SCAUSE_INST_PAGE_FAULT:
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && !defined(__riscv_zcheripurecap)
 	case SCAUSE_CHERI_STORE_AMO_PAGE_FAULT:
 	case SCAUSE_CHERI_LOAD_PAGE_FAULT:
 #endif
@@ -822,6 +872,10 @@ do_trap_user(struct trapframe *frame)
 		call_trapsignal(td, SIGPROT,
 		    cheri_stval_to_sicode(frame->tf_stval), frame->tf_sepc,
 		    exception, TVAL_CAP_IDX(frame->tf_stval));
+#elif defined(__riscv_zcheripurecap)
+		call_trapsignal(td, SIGPROT,
+		    cheri_stval_to_sicode(frame->tf_stval2), frame->tf_sepc,
+		    exception, 0);
 #elif defined(__riscv_y)
 		call_trapsignal(td, SIGPROT,
 		    PROT_CHERI_BOUNDS, frame->tf_sepc,
