@@ -1221,10 +1221,15 @@ pmap_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 		if ((prot & VM_PROT_WRITE) != 0 && (l3 & PTE_W) == 0)
 			use = false;
 #if __has_feature(capabilities)
+#if defined(__riscv_xcheri) || defined(__riscv_y)
 		if (VM_PROT_HAS_READ_CAP(prot) && (l3 & PTE_YR) == 0)
 			use = false;
 		if (VM_PROT_HAS_WRITE_CAP(prot) && (l3 & PTE_YW) == 0)
 			use = false;
+#elif defined(__riscv_zcheripurecap)
+		if ((prot & VM_PROT_CAP) != 0 && (l3 & PTE_YW) == 0)
+			use = false;
+#endif
 #endif
 		if (use) {
 			m = PTE_TO_VM_PAGE(l3);
@@ -3392,6 +3397,10 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (va < VM_MAX_USER_ADDRESS)
 		new_l3 |= PTE_U;
 #if __has_feature(capabilities)
+#if defined(__riscv_zcheripurecap)
+	if (VM_PROT_HAS_READ_CAP(prot))
+		new_l3 |= PTE_YW;
+#endif
 	new_l3 |= cheri_pte_cr(pmap, va, m, prot);
 #endif
 
@@ -4206,6 +4215,9 @@ pmap_caploadgen_get_ucrg(void)
 #endif
 }
 
+#if defined(__riscv_zcheripurecap) && !defined(CHERI_CAPREVOKE_NO_CLEAN)
+#error "Zcheri 0.9.3 requires CHERI_CAPREVOKE_NO_CLEAN"
+#endif
 
 enum pmap_caploadgen_res
 pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
@@ -4310,6 +4322,12 @@ retry:
 		 */
 		res = PMAP_CAPLOADGEN_OK;
 
+                /*
+		 * XXX-AM: Zcheri doesn't ever transition to cap clean for now.
+		 * We also ignore dirty tracking, everything that is cap-permissive
+		 * is dirty.
+		 */
+#ifndef CHERI_CAPREVOKE_NO_CLEAN
 		if (!(flags & PMAP_CAPLOADGEN_HASCAPS)) {
 			/*
 			 * We didn't see a capability on this page; step this
@@ -4375,6 +4393,7 @@ retry:
 				pmap_store_bits(pte, PTE_YD);
 			}
 		}
+#endif /* !defined(CHERI_CAPREVOKE_NO_CLEAN) */
 
 		/*
 		 * On the fast path, where we're just updating the CRG bit, this
@@ -4396,6 +4415,9 @@ retry:
 #endif
 
 #if defined(INVARIANTS)
+#if defined(CHERI_CAPREVOKE_NO_CLEAN)
+		panic("Attempt to scan page without PGA_CAPSTORE");
+#endif
 		/*
 		 * We think there aren't any unrevoked capabilities on this
 		 * page.  Make sure we're not loading one.
@@ -4484,7 +4506,9 @@ out:
 
 	PMAP_UNLOCK(pmap);
 	rw_runlock(&pvh_global_lock);
+#ifndef CHERI_CAPREVOKE_NO_CLEAN
 out_unlocked:
+#endif
 
 	if (*mp != NULL) {
 		if (flags & PMAP_CAPLOADGEN_XBUSIED) {

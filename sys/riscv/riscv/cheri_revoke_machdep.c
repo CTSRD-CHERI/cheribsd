@@ -156,7 +156,7 @@ again:
 		    [cutr] "+C" (cutr), [sc_result] "=r" (sc_result)
 		  : [cut] "C" (cut), [cutp] "C" (cutp)
 		  : "memory");
-#elif defined(__riscv_xcheri) && defined(__CHERI__)
+#elif defined(__riscv_zcheripurecap) || (defined(__riscv_xcheri) && defined(__CHERI__))
 		__asm__ __volatile__ (
 #ifdef __CHERI_HYBRID__
 			".option push\n\t"
