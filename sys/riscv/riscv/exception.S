@@ -145,6 +145,9 @@
 	sd	t0, (TF_STVAL)(sp)
 	csrr	t0, scause
 	sd	t0, (TF_SCAUSE)(sp)
+#ifdef __riscv_zcheripurecap
+	csrr	t0, stval2
+	sd	t0, (TF_STVAL2)(sp)
 #endif
 .if \mode == 1
 	/* Disable user address access for supervisor mode exceptions. */
