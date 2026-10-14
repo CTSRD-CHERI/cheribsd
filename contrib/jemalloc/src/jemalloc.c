@@ -3800,7 +3800,7 @@ je_malloc_underlying_allocation(void *ptr) {
 		ret = NULL;
 	} else {
 		ret = get_underlying_allocation(tsdn, ptr);
-		ret = cheri_andperm(ret,
+		ret = cheri_perms_and(ret,
 		    CHERI_PERMS_USERSPACE_DATA | CHERI_PERM_SW_VMEM);
 	}
 
@@ -3812,7 +3812,7 @@ je_malloc_underlying_allocation(void *ptr) {
 		    CHERI_PERM_SW_VMEM | CHERI_PERM_NO_QUARANTINE);
 		void *ptr_check = cheri_perms_clear(ptr,
 		    CHERI_PERM_NO_QUARANTINE);
-		if (unlikely(!cheri_equal_exact(ptr_check, ret_check))) {
+		if (unlikely(!cheri_is_equal_exact(ptr_check, ret_check))) {
 			ret = NULL;
 		}
 	}

@@ -39,16 +39,16 @@ get_underlying_allocation(tsdn_t *tsdn, void *ptr) {
 	 * Reject zero-length capabilities: region arithmetic can misclassify an
 	 * end-of-region pointer as the start of the next region.
 	 */
-	if (unlikely(!cheri_gettag(ptr))) {
+	if (unlikely(!cheri_tag_get(ptr))) {
 		return NULL;
 	}
-	if (unlikely(cheri_getoffset(ptr) > cheri_getlen(ptr))) {
+	if (unlikely(cheri_offset_get(ptr) > cheri_length_get(ptr))) {
 		return NULL;
 	}
-	if (unlikely(cheri_getlen(ptr) == 0)) {
+	if (unlikely(cheri_length_get(ptr) == 0)) {
 		return NULL;
 	}
-	if (unlikely(cheri_getsealed(ptr))) {
+	if (unlikely(cheri_is_sealed(ptr))) {
 		return NULL;
 	}
 
@@ -71,8 +71,8 @@ get_underlying_allocation(tsdn_t *tsdn, void *ptr) {
 	void *region_base = (void *)((uintptr_t)extent_base +
 	    region_index * underlying_size);
 
-	ubptr = cheri_setbounds(
-	    cheri_setaddress(extent_base, (ptraddr_t)region_base),
+	ubptr = cheri_bounds_set(
+	    cheri_address_set(extent_base, (ptraddr_t)region_base),
 	    underlying_size);
 #endif
 	return ubptr;

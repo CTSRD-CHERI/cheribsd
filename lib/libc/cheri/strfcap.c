@@ -226,7 +226,7 @@ more_spec:
 				OUT("C");
 #endif
 #ifdef HAS_CHERI_PERM_LOAD_MUTABLE
-			if (cheri_getperm(cap) & CHERI_PERM_LOAD_MUTABLE)
+			if (cheri_perms_get(cap) & CHERI_PERM_LOAD_MUTABLE)
 				OUT("M");
 #endif
 #ifdef HAS_CHERI_PERM_EXECUTIVE
