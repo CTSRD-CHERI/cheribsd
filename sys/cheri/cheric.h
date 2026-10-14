@@ -100,7 +100,6 @@
 
 #endif /* defined(_KERNEL) || defined(_STANDALONE) */
 
-#define __WANT_OLD_CHERI_MACROS
 #ifdef __WANT_OLD_CHERI_MACROS
 #define	cheri_getlen(x)		__builtin_cheri_length_get((x))
 #define	cheri_getlength(x)	__builtin_cheri_length_get((x))
