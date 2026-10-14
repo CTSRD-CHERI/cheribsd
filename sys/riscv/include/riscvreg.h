@@ -364,17 +364,17 @@
 #else /* !defined(__CHERI__) */
 #define	scr_read(scr)							\
 ({	void * __capability val;					\
-	__asm __volatile("ymodeswy\n"					\
+	__asm __volatile("modesw.cap\n"					\
 			 "csrr %0, " #scr "\n"				\
-			 "ymodeswi\n"					\
+			 "modesw.int\n"					\
 			: "=C" (val));					\
 	val;								\
 })
 #define	scr_write(scr, val)						\
 ({									\
-	__asm __volatile("ymodeswy\n"					\
+	__asm __volatile("modesw.cap\n"					\
 			 "csrw " #scr ", %0\n"				\
-			 "ymodeswi\n"					\
+			 "modesw.int\n"					\
 			:: "C" (val));					\
 })
 #endif /* !defined(__CHERI__) */

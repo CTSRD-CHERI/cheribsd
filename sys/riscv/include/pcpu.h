@@ -67,9 +67,9 @@ get_pcpu(void)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #ifdef __riscv_y
-	__asm __volatile("ymv %0, tp" : "=&C"(pcpu));
+        __asm __volatile("ymv %0, tp" : "=&C"(pcpu));
 #else
-	__asm __volatile("cmove %0, ctp" : "=&C"(pcpu));
+	__asm __volatile("cmv %0, ctp" : "=&C"(pcpu));
 #endif
 #else
 	__asm __volatile("mv %0, tp" : "=&r"(pcpu));
@@ -87,7 +87,7 @@ get_curthread(void)
 #ifdef __riscv_y
 	__asm __volatile("ly %0, 0(tp)" : "=&C"(td));
 #else
-	__asm __volatile("clc %0, 0(ctp)" : "=&C"(td));
+	__asm __volatile("lc %0, 0(ctp)" : "=&C"(td));
 #endif
 #else
 	__asm __volatile("ld %0, 0(tp)" : "=&r"(td));
