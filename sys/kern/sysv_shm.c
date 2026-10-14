@@ -130,8 +130,6 @@ static int shmget_allocate_segment(struct thread *td, key_t key, size_t size,
     int mode);
 static int shmget_existing(struct thread *td, size_t size, int shmflg,
     int mode, int segnum);
-static int kern_shmat(struct thread *td, int shmid,
-	const void * __capability shmaddr, int shmflg);
 static int kern_shmdt(struct thread *td, const void * __capability shmaddr);
 static int user_shmctl(struct thread *td, int shmid, int cmd,
     struct shmid_ds * __capability ubuf);
@@ -587,7 +585,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 	return (error);
 }
 
-static int
+int
 kern_shmat(struct thread *td, int shmid, const void * __capability shmaddr,
     int shmflg)
 {
