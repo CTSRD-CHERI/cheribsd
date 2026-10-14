@@ -79,6 +79,10 @@ DB_SHOW_COMMAND(scr, ddb_dump_scr)
 	db_printf("stcc: %#.16lp\n",  scr_read(stcc));
 	db_printf("sscratchc: %#.16lp\n",  scr_read(sscratchc));
 	db_printf("sepcc: %#.16lp\n",  scr_read(sepcc));
+#elif defined(__riscv_zcheripurecap)
+	db_printf("stvecc: %#.16lp\n",  scr_read(stvecc));
+	db_printf("sscratchc: %#.16lp\n",  scr_read(sscratchc));
+	db_printf("sepcc: %#.16lp\n",  scr_read(sepcc));
 #elif defined(__riscv_y)
 	db_printf("stvec: %#.16lp\n",  scr_read(stvec));
 	db_printf("sscratch: %#.16lp\n",  scr_read(sscratch));
