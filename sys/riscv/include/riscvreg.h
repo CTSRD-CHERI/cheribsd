@@ -56,10 +56,16 @@
 #define	SCAUSE_LOAD_GUEST_PAGE_FAULT	21
 #define	SCAUSE_VIRTUAL_INSTRUCTION	22
 #define	SCAUSE_STORE_GUEST_PAGE_FAULT	23
-#if __has_feature(capabilities)
-#define	SCAUSE_LOAD_CAP_PAGE_FAULT	26
-#define	SCAUSE_STORE_AMO_CAP_PAGE_FAULT	27
+#if defined(__riscv_xcheri)
+#define	SCAUSE_CHERI_LOAD_PAGE_FAULT	26
+#define	SCAUSE_CHERI_STORE_AMO_PAGE_FAULT	27
 #define	SCAUSE_CHERI			28
+#elif defined(__riscv_y)
+#define	SCAUSE_CHERI_INST_ACCESS_FAULT	32
+#define	SCAUSE_CHERI_LOAD_ACCESS_FAULT	33
+#define	SCAUSE_CHERI_STORE_AMO_ACCESS_FAULT	34
+#define	SCAUSE_CHERI_LOAD_PAGE_FAULT	35
+#define	SCAUSE_CHERI_STORE_AMO_PAGE_FAULT	36
 #endif
 
 #define	SSTATUS_UIE			(1 << 0)
@@ -213,11 +219,12 @@
 #define	TVAL_CAP_IDX_MASK	(0x3f << TVAL_CAP_IDX_SHIFT)
 #define	TVAL_CAP_IDX(tval)						\
 	(((tval) & TVAL_CAP_IDX_MASK) >> TVAL_CAP_IDX_SHIFT)
+#endif
 
 #if defined(__riscv_y)
 #define	SENVCFG_Y	(0x01 << 9)
 #endif
-#endif
+#endif /* __has_feature(capabilities) */
 
 #define	XLEN		__riscv_xlen
 #define	XLEN_BYTES	(XLEN / 8)
