@@ -977,6 +977,11 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 		 *
 		 */
 		if (pmap->pm_stage == PM_STAGE1 && va < VM_MAX_USER_ADDRESS) {
+			/*
+			 * To avoid races with pmap_caploadgen_test_all_clean()
+			 * the page should be xbusied at this point.
+			 */
+			vm_page_assert_xbusied(m);
 			if ((vm_page_astate_load(m).flags & PGA_CAPSTORE) != 0)
 				val |= ATTR_CDBM;
 		} else {
@@ -6675,7 +6680,10 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 #if VM_NRESERVLEVEL > 0
 	pd_entry_t *l2, l2e;
 #endif
-	pt_entry_t *pte, tpte, exppte;
+	pt_entry_t *pte, tpte;
+#ifndef CHERI_CAPREVOKE_NO_CLEAN
+	pt_entry_t exppte;
+#endif
 	vm_page_t m;
 	int lvl;
 
@@ -6762,6 +6770,7 @@ retry:
 		 */
 		res = PMAP_CAPLOADGEN_OK;
 
+#ifndef CHERI_CAPREVOKE_NO_CLEAN
 		if (!(flags & PMAP_CAPLOADGEN_HASCAPS)) {
 			/*
 			 * We didn't see a capability on this page; step this
@@ -6851,6 +6860,7 @@ retry:
 				pmap_set_bits(pte, ATTR_SC);
 			}
 		}
+#endif /* CHERI_CAPREVOKE_NO_CLEAN */
 
 		/*
 		 * On the fast path, where we're just updating the CLG bit, this
@@ -6869,6 +6879,9 @@ retry:
 	} else if (!(vm_page_astate_load(m).flags & PGA_CAPSTORE)) {
 		KASSERT(!(tpte & ATTR_CDBM), ("!PGA_CAPSTORE but CDBM?"));
 		KASSERT(!(tpte & ATTR_SC), ("!PGA_CAPSTORE but SC?"));
+#if defined(CHERI_CAPREVOKE_NO_CLEAN) && defined(INVARIANTS)
+		panic("Attempt to scan page without PGA_CAPSTORE");
+#endif
 
 		/*
 		 * For tag-independent faults, we might still raise a
@@ -6947,7 +6960,9 @@ out:
 #endif /* VM_NRESERVLEVEL > 0 */
 
 	PMAP_UNLOCK(pmap);
+#ifndef CHERI_CAPREVOKE_NO_CLEAN
 out_unlocked:
+#endif
 	if (*mp != NULL) {
 		if (flags & PMAP_CAPLOADGEN_XBUSIED) {
 			vm_page_xunbusy(*mp);
