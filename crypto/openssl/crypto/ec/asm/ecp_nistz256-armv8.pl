@@ -49,7 +49,7 @@ open OUT,"| \"$^X\" $xlate $flavour \"$output\""
 my ($rpx,$apx,$bpx,$bi,$a0,$a1,$a2,$a3,$t0,$t1,$t2,$t3,$poly1,$poly3,
     $acc0,$acc1,$acc2,$acc3,$acc4,$acc5) =
     map("x$_",(0..17,19,20));
-my ($rp,$ap,$bp) = map("PTR($_)",(0..2));
+my ($rp,$ap,$bp,$bip,$polyp) = map("PTR($_)",(0..3,13));
 
 my ($acc6,$acc7)=($apx,$bpx);	# used in __ecp_nistz256_sqr_mont
 
@@ -130,14 +130,14 @@ ecp_nistz256_to_mont:
 	add	PTR(29),PTRN(sp),#0
 	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
 
-	adrp	$bi,.LRR
-	ldr	$bi,[$bi,:lo12:.LRR]	// bp[0]
+	adrp	$bip,.LRR
+	ldr	$bi,[$bip,:lo12:.LRR]	// bp[0]
 	ldp	$a0,$a1,[$ap]
 	ldp	$a2,$a3,[$ap,#16]
-	adrp	$poly3,.Lpoly
-	add	$poly3,$poly3,:lo12:.Lpoly
-	ldr	$poly1,[$poly3,#8]
-	ldr	$poly3,[$poly3,#24]
+	adrp	$polyp,.Lpoly
+	add	$polyp,$polyp,:lo12:.Lpoly
+	ldr	$poly1,[$polyp,#8]
+	ldr	$poly3,[$polyp,#24]
 	adrp	$bp,.LRR		// &bp[0]
 	add	$bp,$bp,:lo12:.LRR
 
@@ -162,10 +162,10 @@ ecp_nistz256_from_mont:
 	mov	$bi,#1			// bp[0]
 	ldp	$a0,$a1,[$ap]
 	ldp	$a2,$a3,[$ap,#16]
-	adrp	$poly3,.Lpoly
-	add	$poly3,$poly3,:lo12:.Lpoly
-	ldr	$poly1,[$poly3,#8]
-	ldr	$poly3,[$poly3,#24]
+	adrp	$polyp,.Lpoly
+	add	$polyp,$polyp,:lo12:.Lpoly
+	ldr	$poly1,[$polyp,#8]
+	ldr	$poly3,[$polyp,#24]
 	adrp	$bp,.Lone		// &bp[0]
 	add	$bp,$bp,:lo12:.Lone
 
@@ -191,10 +191,10 @@ ecp_nistz256_mul_mont:
 	ldr	$bi,[$bp]		// bp[0]
 	ldp	$a0,$a1,[$ap]
 	ldp	$a2,$a3,[$ap,#16]
-	adrp	$poly3,.Lpoly
-	add	$poly3,$poly3,:lo12:.Lpoly
-	ldr	$poly1,[$poly3,#8]
-	ldr	$poly3,[$poly3,#24]
+	adrp	$polyp,.Lpoly
+	add	$polyp,$polyp,:lo12:.Lpoly
+	ldr	$poly1,[$polyp,#8]
+	ldr	$poly3,[$polyp,#24]
 
 	bl	__ecp_nistz256_mul_mont
 
@@ -216,10 +216,10 @@ ecp_nistz256_sqr_mont:
 
 	ldp	$a0,$a1,[$ap]
 	ldp	$a2,$a3,[$ap,#16]
-	adrp	$poly3,.Lpoly
-	add	$poly3,$poly3,:lo12:.Lpoly
-	ldr	$poly1,[$poly3,#8]
-	ldr	$poly3,[$poly3,#24]
+	adrp	$polyp,.Lpoly
+	add	$polyp,$polyp,:lo12:.Lpoly
+	ldr	$poly1,[$polyp,#8]
+	ldr	$poly3,[$polyp,#24]
 
 	bl	__ecp_nistz256_sqr_mont
 
@@ -243,10 +243,10 @@ ecp_nistz256_add:
 	ldp	$t0,$t1,[$bp]
 	ldp	$acc2,$acc3,[$ap,#16]
 	ldp	$t2,$t3,[$bp,#16]
-	adrp	$poly3,.Lpoly
-	add	$poly3,$poly3,:lo12:.Lpoly
-	ldr	$poly1,[$poly3,#8]
-	ldr	$poly3,[$poly3,#24]
+	adrp	$polyp,.Lpoly
+	add	$polyp,$polyp,:lo12:.Lpoly
+	ldr	$poly1,[$polyp,#8]
+	ldr	$poly3,[$polyp,#24]
 
 	bl	__ecp_nistz256_add
 
@@ -266,10 +266,10 @@ ecp_nistz256_div_by_2:
 
 	ldp	$acc0,$acc1,[$ap]
 	ldp	$acc2,$acc3,[$ap,#16]
-	adrp	$poly3,.Lpoly
-	add	$poly3,$poly3,:lo12:.Lpoly
-	ldr	$poly1,[$poly3,#8]
-	ldr	$poly3,[$poly3,#24]
+	adrp	$polyp,.Lpoly
+	add	$polyp,$polyp,:lo12:.Lpoly
+	ldr	$poly1,[$polyp,#8]
+	ldr	$poly3,[$polyp,#24]
 
 	bl	__ecp_nistz256_div_by_2
 
@@ -289,10 +289,10 @@ ecp_nistz256_mul_by_2:
 
 	ldp	$acc0,$acc1,[$ap]
 	ldp	$acc2,$acc3,[$ap,#16]
-	adrp	$poly3,.Lpoly
-	add	$poly3,$poly3,:lo12:.Lpoly
-	ldr	$poly1,[$poly3,#8]
-	ldr	$poly3,[$poly3,#24]
+	adrp	$polyp,.Lpoly
+	add	$polyp,$polyp,:lo12:.Lpoly
+	ldr	$poly1,[$polyp,#8]
+	ldr	$poly3,[$polyp,#24]
 	mov	$t0,$acc0
 	mov	$t1,$acc1
 	mov	$t2,$acc2
@@ -316,10 +316,10 @@ ecp_nistz256_mul_by_3:
 
 	ldp	$acc0,$acc1,[$ap]
 	ldp	$acc2,$acc3,[$ap,#16]
-	adrp	$poly3,.Lpoly
-	add	$poly3,$poly3,:lo12:.Lpoly
-	ldr	$poly1,[$poly3,#8]
-	ldr	$poly3,[$poly3,#24]
+	adrp	$polyp,.Lpoly
+	add	$polyp,$polyp,:lo12:.Lpoly
+	ldr	$poly1,[$polyp,#8]
+	ldr	$poly3,[$polyp,#24]
 	mov	$t0,$acc0
 	mov	$t1,$acc1
 	mov	$t2,$acc2
@@ -355,10 +355,10 @@ ecp_nistz256_sub:
 
 	ldp	$acc0,$acc1,[$ap]
 	ldp	$acc2,$acc3,[$ap,#16]
-	adrp	$poly3,.Lpoly
-	add	$poly3,$poly3,:lo12:.Lpoly
-	ldr	$poly1,[$poly3,#8]
-	ldr	$poly3,[$poly3,#24]
+	adrp	$polyp,.Lpoly
+	add	$polyp,$polyp,:lo12:.Lpoly
+	ldr	$poly1,[$polyp,#8]
+	ldr	$poly3,[$polyp,#24]
 
 	bl	__ecp_nistz256_sub_from
 
@@ -381,10 +381,10 @@ ecp_nistz256_neg:
 	mov	$acc1,xzr
 	mov	$acc2,xzr
 	mov	$acc3,xzr
-	adrp	$poly3,.Lpoly
-	add	$poly3,$poly3,:lo12:.Lpoly
-	ldr	$poly1,[$poly3,#8]
-	ldr	$poly3,[$poly3,#24]
+	adrp	$polyp,.Lpoly
+	add	$polyp,$polyp,:lo12:.Lpoly
+	ldr	$poly1,[$polyp,#8]
+	ldr	$poly3,[$polyp,#24]
 
 	bl	__ecp_nistz256_sub_from
 
@@ -762,11 +762,11 @@ ecp_nistz256_point_double:
 	 mov	$rp_real,$rp
 	ldp	$acc2,$acc3,[$ap,#48]
 	 mov	$ap_real,$ap
-	 adrp	$poly3,.Lpoly
-	 add	$poly3,$poly3,:lo12:.Lpoly
-	 ldr	$poly1,[$poly3,#8]
+	 adrp	$polyp,.Lpoly
+	 add	$polyp,$polyp,:lo12:.Lpoly
+	 ldr	$poly1,[$polyp,#8]
 	mov	$t0,$acc0
-	 ldr	$poly3,[$poly3,#24]
+	 ldr	$poly3,[$polyp,#24]
 	mov	$t1,$acc1
 	 ldp	$a0,$a1,[$ap_real,#64]	// forward load for p256_sqr_mont
 	mov	$t2,$acc2
@@ -926,10 +926,10 @@ ecp_nistz256_point_add:
 	 mov	$rp_real,$rp
 	 mov	$ap_real,$ap
 	 mov	$bp_real,$bp
-	 adrp	$poly3,.Lpoly
-	 add	$poly3,$poly3,:lo12:.Lpoly
-	 ldr	$poly1,[$poly3,#8]
-	 ldr	$poly3,[$poly3,#24]
+	 adrp	$polyp,.Lpoly
+	 add	$polyp,$polyp,:lo12:.Lpoly
+	 ldr	$poly1,[$polyp,#8]
+	 ldr	$poly3,[$polyp,#24]
 	orr	$t0,$a0,$a1
 	orr	$t2,$a2,$a3
 	orr	$in2infty,$t0,$t2
@@ -1183,10 +1183,10 @@ ecp_nistz256_point_add_affine:
 	mov	$rp_real,$rp
 	mov	$ap_real,$ap
 	mov	$bp_real,$bp
-	adrp	$poly3,.Lpoly
-	add	$poly3,$poly3,:lo12:.Lpoly
-	ldr	$poly1,[$poly3,#8]
-	ldr	$poly3,[$poly3,#24]
+	adrp	$polyp,.Lpoly
+	add	$polyp,$polyp,:lo12:.Lpoly
+	ldr	$poly1,[$polyp,#8]
+	ldr	$poly3,[$polyp,#24]
 
 	ldp	$a0,$a1,[$ap,#64]	// in1_z
 	ldp	$a2,$a3,[$ap,#64+16]
