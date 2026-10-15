@@ -1776,8 +1776,8 @@ ___
 }}}
 
 {{{
-my ($inp,$out,$len,$key,$ivp)=map("x$_",(0..4));
-my ($rounds,$roundsx,$cnt,$key_)=("w5","x5","w6","x7");
+my ($inp,$out,$len,$key,$ivp)=("PTR(0)","PTR(1)","x2","PTR(3)","PTR(4)");
+my ($rounds,$roundsx,$cnt,$key_)=("w5","x5","w6","PTR(7)");
 my ($ctr,$tctr0,$tctr1,$tctr2)=map("w$_",(8..10,12));
 my ($tctr3,$tctr4,$tctr5,$tctr6)=map("w$_",(11,13..15));
 my ($tctr7,$tctr8,$tctr9,$tctr10,$tctr11)=map("w$_",(19..23));
@@ -1803,12 +1803,12 @@ $code.=<<___	if ($flavour =~ /64/);
 ${prefix}_ctr32_encrypt_blocks_unroll12_eor3:
 	AARCH64_VALID_CALL_TARGET
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
-	stp		x29,x30,[sp,#-80]!
-	stp		d8,d9,[sp, #16]
-	stp		d10,d11,[sp, #32]
-	stp		d12,d13,[sp, #48]
-	stp		d14,d15,[sp, #64]
-	add		x29,sp,#0
+	stp		PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH+64)]!
+	stp		d8,d9,[PTRN(sp), #(2*PTR_WIDTH)]
+	stp		d10,d11,[PTRN(sp), #(2*PTR_WIDTH+16)]
+	stp		d12,d13,[PTRN(sp), #(2*PTR_WIDTH+32)]
+	stp		d14,d15,[PTRN(sp), #(2*PTR_WIDTH+48)]
+	add		PTR(29),PTRN(sp),#0
 
 	 ldr		$rounds,[$key,#240]
 
@@ -1861,11 +1861,11 @@ ${prefix}_ctr32_encrypt_blocks_unroll12_eor3:
 	b.lo		.Loop6x_ctr32_unroll
 
 	// push regs to stack when 12 data chunks are interleaved
-	 stp		x19,x20,[sp,#-16]!
-	 stp		x21,x22,[sp,#-16]!
-	 stp		x23,x24,[sp,#-16]!
-	 stp		$dat8d,$dat9d,[sp,#-32]!
-	 stp		$dat10d,$dat11d,[sp,#-32]!
+	 stp		PTR(19),PTR(20),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	 stp		PTR(21),PTR(22),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	 stp		PTR(23),PTR(24),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	 stp		$dat8d,$dat9d,[PTRN(sp),#-32]!
+	 stp		$dat10d,$dat11d,[PTRN(sp),#-32]!
 
 	 add		$tctr6,$ctr,#1
 	 add		$tctr7,$ctr,#2
@@ -2169,11 +2169,11 @@ ${prefix}_ctr32_encrypt_blocks_unroll12_eor3:
 	b.hs		.Loop12x_ctr32_unroll
 
 	// pop regs from stack when 12 data chunks are interleaved
-	 ldp		$dat10d,$dat11d,[sp],#32
-	 ldp		$dat8d,$dat9d,[sp],#32
-	 ldp		x23,x24,[sp],#16
-	 ldp		x21,x22,[sp],#16
-	 ldp		x19,x20,[sp],#16
+	 ldp		$dat10d,$dat11d,[PTRN(sp)],#32
+	 ldp		$dat8d,$dat9d,[PTRN(sp)],#32
+	 ldp		PTR(23),PTR(24),[PTRN(sp)],#(2*PTR_WIDTH)
+	 ldp		PTR(21),PTR(22),[PTRN(sp)],#(2*PTR_WIDTH)
+	 ldp		PTR(19),PTR(20),[PTRN(sp)],#(2*PTR_WIDTH)
 
 	 add		$len,$len,#12
 	 cbz		$len,.Lctr32_done_unroll
@@ -2513,11 +2513,11 @@ ${prefix}_ctr32_encrypt_blocks_unroll12_eor3:
 	vst1.8		{$in0},[$out],#16
 
 .Lctr32_done_unroll:
-	ldp		d8,d9,[sp, #16]
-	ldp		d10,d11,[sp, #32]
-	ldp		d12,d13,[sp, #48]
-	ldp		d14,d15,[sp, #64]
-	ldr		x29,[sp],#80
+	ldp		d8,d9,[PTRN(sp), #(2*PTR_WIDTH)]
+	ldp		d10,d11,[PTRN(sp), #(2*PTR_WIDTH+16)]
+	ldp		d12,d13,[PTRN(sp), #(2*PTR_WIDTH+32)]
+	ldp		d14,d15,[PTRN(sp), #(2*PTR_WIDTH+48)]
+	ldr		PTR(29),[PTRN(sp)],#(2*PTR_WIDTH+64)
 	ret
 .size	${prefix}_ctr32_encrypt_blocks_unroll12_eor3,.-${prefix}_ctr32_encrypt_blocks_unroll12_eor3
 ___
