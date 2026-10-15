@@ -208,19 +208,25 @@ LIB64CCFLAGS+=	-Werror=implicit-function-declaration
 LIB64CCFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
 .endif
 
-.if defined(CHERI_SUBOBJECT_BOUNDS)
-# Allow per-subdirectory overrides if we know that there is maximum that works
-.if defined(CHERI_SUBOBJECT_BOUNDS_MAX)
-LIB64CCFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
-.else
-LIB64CCFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
-.endif # CHERI_SUBOBJECT_BOUNDS_MAX
-CHERI_SUBOBJECT_BOUNDS_DEBUG?=yes
-.if ${CHERI_SUBOBJECT_BOUNDS_DEBUG} == "yes"
-# If debugging is enabled, clear SW permission bit 2 when the bounds are reduced
+.if ${OPT_CHERI_SUBOBJECT_BOUNDS} != "none"
+# No compiler check here.  All CHERI compilers support bounds.
+# Require opt-in for now
+CHERI_SUBOBJECT_BOUNDS_MAX?=	conservative
+.  if !${__CHERI_SUBOBJECT_BOUNDS_OPTIONS:M${CHERI_SUBOBJECT_BOUNDS_MAX}}
+.    error Invalid CHERI_SUBOBJECT_BOUNDS_MAX (${CHERI_SUBOBJECT_BOUNDS_MAX})
+.  endif
+.  for sb in ${__CHERI_SUBOBJECT_BOUNDS_OPTIONS}
+.    if ${sb} == ${CHERI_SUBOBJECT_BOUNDS_MAX} || ${sb} == ${OPT_CHERI_SUBOBJECT_BOUNDS}
+       _CHERI_SUBOBJECT_BOUNDS:=	${sb}
+.      break
+.    endif
+.  endfor
+LIB64CCFLAGS+=	-Xclang -cheri-bounds=${_CHERI_SUBOBJECT_BOUNDS}
+.  if ${MK_CHERI_SUBOBJECT_BOUNDS_DEBUG} == "yes"
 LIB64CCFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
-.endif # CHERI_SUBOBJECT_BOUNDS_DEBUG
-.endif # CHERI_SUBOBJECT_BOUNDS
+.  endif
+.endif
+
 .endif
 
 # -------------------------------------------------------------------
@@ -244,19 +250,25 @@ LIB64CBCFLAGS+=	-Werror=implicit-function-declaration
 LIB64CBCFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
 .endif
 
-.if defined(CHERI_SUBOBJECT_BOUNDS)
-# Allow per-subdirectory overrides if we know that there is maximum that works
-.if defined(CHERI_SUBOBJECT_BOUNDS_MAX)
-LIB64CBCFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
-.else
-LIB64CBCFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
-.endif # CHERI_SUBOBJECT_BOUNDS_MAX
-CHERI_SUBOBJECT_BOUNDS_DEBUG?=yes
-.if ${CHERI_SUBOBJECT_BOUNDS_DEBUG} == "yes"
-# If debugging is enabled, clear SW permission bit 2 when the bounds are reduced
+.if ${OPT_CHERI_SUBOBJECT_BOUNDS} != "none"
+# No compiler check here.  All CHERI compilers support bounds.
+# Require opt-in for now
+CHERI_SUBOBJECT_BOUNDS_MAX?=	conservative
+.  if !${__CHERI_SUBOBJECT_BOUNDS_OPTIONS:M${CHERI_SUBOBJECT_BOUNDS_MAX}}
+.    error Invalid CHERI_SUBOBJECT_BOUNDS_MAX (${CHERI_SUBOBJECT_BOUNDS_MAX})
+.  endif
+.  for sb in ${__CHERI_SUBOBJECT_BOUNDS_OPTIONS}
+.    if ${sb} == ${CHERI_SUBOBJECT_BOUNDS_MAX} || ${sb} == ${OPT_CHERI_SUBOBJECT_BOUNDS}
+       _CHERI_SUBOBJECT_BOUNDS:=	${sb}
+.      break
+.    endif
+.  endfor
+LIB64CBCFLAGS+=	-Xclang -cheri-bounds=${_CHERI_SUBOBJECT_BOUNDS}
+.  if ${MK_CHERI_SUBOBJECT_BOUNDS_DEBUG} == "yes"
 LIB64CBCFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
-.endif # CHERI_SUBOBJECT_BOUNDS_DEBUG
-.endif # CHERI_SUBOBJECT_BOUNDS
+.  endif
+.endif
+
 .endif # ${COMPAT_ARCH:Maarch64*}
 .endif # ${MK_LIB64CB} != "no"
 
