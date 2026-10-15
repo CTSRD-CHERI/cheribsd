@@ -136,10 +136,12 @@ my ($a3,$b3,$c3,$d3)=map(($_&~3)+(($_+1)&3),($a2,$b2,$c2,$d2));
 $code.=<<___;
 #include "arm_arch.h"
 #ifndef	__KERNEL__
+#ifndef __CHERI_PURE_CAPABILITY__
 .extern	OPENSSL_armcap_P
 .hidden	OPENSSL_armcap_P
 
 .extern ChaCha20_ctr32_sve
+#endif
 #endif
 
 .rodata
@@ -155,10 +157,19 @@ $code.=<<___;
 
 .text
 
+#ifdef __CHERI_PURE_CAPABILITY__
+.globl	ChaCha20_ctr32
+.type	ChaCha20_ctr32,%function
+#else
 .globl	ChaCha20_ctr32_dflt
 .type	ChaCha20_ctr32_dflt,%function
+#endif
 .align	5
+#ifdef __CHERI_PURE_CAPABILITY__
+ChaCha20_ctr32:
+#else
 ChaCha20_ctr32_dflt:
+#endif
 	AARCH64_SIGN_LINK_REGISTER
 	cmp	$len,#192
 	b.lo	.Lshort
@@ -356,6 +367,9 @@ $code.=<<___;
 	ldp	PTR(29),PTR(30),[PTRN(sp)],#(12*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
+#ifdef __CHERI_PURE_CAPABILITY__
+.size	ChaCha20_ctr32,.-ChaCha20_ctr32
+#else
 .size	ChaCha20_ctr32_dflt,.-ChaCha20_ctr32_dflt
 
 .globl	ChaCha20_ctr32
@@ -392,6 +406,7 @@ ChaCha20_ctr32:
 #endif
 	b	.Lshort
 .size	ChaCha20_ctr32,.-ChaCha20_ctr32
+#endif
 ___
 
 {{{
