@@ -1,0 +1,3 @@
+When enabled, capabilities to sub-objects with tightened bounds have
+software permission bit 2 cleared making it easier to determine the
+source of bounds issues.
