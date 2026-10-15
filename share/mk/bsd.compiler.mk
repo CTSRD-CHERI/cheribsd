@@ -25,6 +25,7 @@
 #              mitigation.
 # - init-all:  supports stack variable initialization.
 # - stackclash:supports stack clash protection
+# - subobject-bounds: supports sub-object bounds on CHERI targets
 # - zeroregs:  supports zeroing used registers on return
 # - aarch64-sha512: supports the AArch64 sha512 intrinsic functions.
 #
@@ -278,6 +279,9 @@ ${X_}COMPILER_FEATURES+=	init-all
 # CHERI LLVM compilers don't support blocks yet
 .if !${MACHINE_ABI:Mpurecap}
 ${X_}COMPILER_FEATURES+=	blocks
+.endif
+.if ${MACHINE_ABI:Mpurecap}
+${X_}COMPILER_FEATURES+=	subobject-bounds
 .endif
 ${X_}COMPILER_FEATURES+=	retpoline
 # PR257638 lld fails with BE compressed debug.  Fixed in main but external tool

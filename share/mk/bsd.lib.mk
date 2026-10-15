@@ -136,6 +136,27 @@ CXXFLAGS+= -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-cl
 .endif
 .endif
 
+.if ${OPT_CHERI_SUBOBJECT_BOUNDS} != "none"
+.  if !${COMPILER_FEATURES:Msubobject-bounds}
+.    error CHERI_SUBOBJECT_BOUNDS requested but not supported by compiler
+.  endif
+# Require opt-in for now
+CHERI_SUBOBJECT_BOUNDS_MAX?=	conservative
+.  if !${__CHERI_SUBOBJECT_BOUNDS_OPTIONS:M${CHERI_SUBOBJECT_BOUNDS_MAX}}
+.    error Invalid CHERI_SUBOBJECT_BOUNDS_MAX (${CHERI_SUBOBJECT_BOUNDS_MAX})
+.  endif
+.  for sb in ${__CHERI_SUBOBJECT_BOUNDS_OPTIONS}
+.    if ${sb} == ${CHERI_SUBOBJECT_BOUNDS_MAX} || ${sb} == ${OPT_CHERI_SUBOBJECT_BOUNDS}
+       _CHERI_SUBOBJECT_BOUNDS:=	${sb}
+.      break
+.    endif
+.  endfor
+CFLAGS+=	-Xclang -cheri-bounds=${_CHERI_SUBOBJECT_BOUNDS}
+.  if ${MK_CHERI_SUBOBJECT_BOUNDS_DEBUG} == "yes"
+CFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
+.  endif
+.endif
+
 # Zero used registers on return (mitigate some ROP)
 .if ${MK_ZEROREGS} != "no"
 .if ${COMPILER_FEATURES:Mzeroregs}
