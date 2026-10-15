@@ -58,7 +58,11 @@
 #define	SI_CODE_CHERI_BOUNDS	PROT_CHERI_BOUNDS
 #define	SI_CODE_CHERI_TAG	PROT_CHERI_TAG
 #define	SI_CODE_CHERI_PERM	PROT_CHERI_PERM
+#if defined(__riscv_xcheri)
 #define	SI_CODE_STORELOCAL	PROT_CHERI_STORELOCAL
+#elif defined(__riscv_zcheripurecap)
+#define	SI_CODE_STORELOCAL	PROT_CHERI_PERM
+#endif
 #else
 /*
  * XXX-AM: RVY can't distinguish cheri exception types.
