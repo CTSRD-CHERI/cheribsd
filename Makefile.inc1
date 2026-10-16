@@ -1647,7 +1647,7 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 .endif # make(distributeworld)
 	${_+_}cd ${.CURDIR}; ${IMAKE} re${.TARGET:S/world$//}; \
 	    ${IMAKEENV} rm -rf ${INSTALLTMP}
-.if !make(packageworld) && ${MK_CAROOT} != "no" && ${MK_OPENSSL} != "no"
+.if !(make(packageworld) || make(installsysroot)) && ${MK_CAROOT} != "no" && ${MK_OPENSSL} != "no"
 	PATH=${TMPPATH:Q}:${PATH:Q} \
 	LOCALBASE=${LOCALBASE:Q} \
 	    certctl ${CERTCTLFLAGS} rehash
