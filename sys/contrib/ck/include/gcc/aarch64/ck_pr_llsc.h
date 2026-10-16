@@ -297,9 +297,8 @@ ck_pr_not_ptr(void *target)
 
         __asm__ __volatile__("1:"
                              "ldxr %0, [%3];"
-                             "gcvalue %2, %0;"
+                             "mvn %2, %x0;"
                              "mov %0, czr;"
-                             "mvn %2, %2;"
                              "scvalue %0, %2;"
                              "stxr %w1, %0, [%3];"
                              "cbnz %w1, 1b;"
@@ -358,20 +357,17 @@ CK_PR_UNARY_S(char, char, "b")
         ck_pr_##O##_ptr(void *target, uintptr_t delta)		\
         {							\
                 uintptr_t previous;				\
-                ptraddr_t tmp1, tmp2;				\
+                ptraddr_t tmp1;					\
                 int res;					\
                 __asm__ __volatile__("1:"			\
-                                     "ldxr %0, [%4];"		\
-                                     "gcvalue %2, %0;"		\
-                                     "gcvalue %3, %5;"		\
-                                     I " %2, %2, %3;"		\
+                                     "ldxr %0, [%3];"		\
+                                     I " %2, %x0, %x4;"		\
                                      "scvalue %0, %2;"		\
-                                     "stxr %w1, %0, [%4];"	\
+                                     "stxr %w1, %0, [%3];"	\
                                      "cbnz %w1, 1b;"		\
                                         : "=&C" (previous),	\
                                           "=&r" (res),		\
-                                          "=&r" (tmp1),		\
-                                          "=&r" (tmp2)		\
+                                          "=&r" (tmp1)		\
                                         : "C" (target),		\
                                           "C" (delta)		\
                                         : "memory", "cc");	\
