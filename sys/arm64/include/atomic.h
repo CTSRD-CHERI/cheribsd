@@ -674,8 +674,7 @@ atomic_##op##_##bar##ptr(volatile uintptr_t *p, uintptr_t val)		\
 	__asm __volatile(						\
 		"1:"							\
 		"ld" #a "xr %0, [%4]\n"					\
-		"gcvalue %2, %0\n"					\
-		"" #asm_op " %2, %2, %3\n"				\
+		"" #asm_op " %2, %x0, %3\n"				\
 		"scvalue %0, %0, %2\n"					\
 		"st" #l "xr %w1, %0, [%4]\n"				\
 		"cbnz %w1, 1b"						\
@@ -799,8 +798,7 @@ atomic_testand##op##_ptr(volatile uintptr_t *p, u_int val)		\
 	mask = ((ptraddr_t)1) << (val & 63);				\
 	__asm __volatile(						\
 	    "1: ldxr		%2, [%4]\n"				\
-	    "   gcvalue		%3, %2\n"				\
-	    "  "#asm_op"	%3, %3, %5\n"				\
+	    "  "#asm_op"	%3, %x2, %5\n"				\
 	    "   scvalue		%0, %2, %3\n"				\
 	    "   stxr		%w1, %0, [%4]\n"			\
 	    "   cbnz		%w1, 1b\n"				\

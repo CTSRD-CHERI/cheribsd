@@ -246,9 +246,8 @@ ck_pr_neg_ptr(void *target)
 
         __asm__ __volatile__("1:"
                              "ldxr %0, [%3];"
-                             "gcvalue %2, %0;"
+                             "neg %2, %x0;"
                              "mov %0, czr;"
-                             "neg %2, %2;"
                              "scvalue %0, %2;"
                              "stxr %w1, %0, [%3];"
                              "cbnz %w1, 1b;"
