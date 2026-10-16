@@ -22,3 +22,5 @@
 20260710  # Bump __CheriBSD_version to 20260710
 # https://github.com/CTSRD-CHERI/cheribsd/commit/a03781ba7d4f5d9534ae017c01a35faf6d57903c
 20260801  # bsd.opts.mk: Adopt "full" TGOT-based TLS ABI for Morello
+# https://github.com/CTSRD-CHERI/cheribsd/commit/8e8320c618d38c618f0c4687454bab2c70505403
+20261013  # KRB5: Enable MIT KRB5 by default
