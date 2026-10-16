@@ -52,7 +52,7 @@ int
 execl(const char *name, const char *arg, ...)
 {
 	va_list ap;
-	char **argv;
+	const char **argv;
 	int n;
 
 	va_start(ap, arg);
@@ -67,18 +67,18 @@ execl(const char *name, const char *arg, ...)
 	}
 	va_start(ap, arg);
 	n = 1;
-	argv[0] = __DECONST(char*, arg);
+	argv[0] = arg;
 	while ((argv[n] = va_arg(ap, char *)) != NULL)
 		n++;
 	va_end(ap);
-	return (_execve(name, argv, environ));
+	return (_execve(name, __DECONST(char **, argv), environ));
 }
 
 int
 execle(const char *name, const char *arg, ...)
 {
 	va_list ap;
-	char **argv;
+	const char **argv;
 	char **envp;
 	int n;
 
@@ -94,19 +94,19 @@ execle(const char *name, const char *arg, ...)
 	}
 	va_start(ap, arg);
 	n = 1;
-	argv[0] = __DECONST(char*, arg);
+	argv[0] = arg;
 	while ((argv[n] = va_arg(ap, char *)) != NULL)
 		n++;
 	envp = va_arg(ap, char **);
 	va_end(ap);
-	return (_execve(name, argv, envp));
+	return (_execve(name, __DECONST(char **, argv), envp));
 }
 
 int
 execlp(const char *name, const char *arg, ...)
 {
 	va_list ap;
-	char **argv;
+	const char **argv;
 	int n;
 
 	va_start(ap, arg);
@@ -121,11 +121,11 @@ execlp(const char *name, const char *arg, ...)
 	}
 	va_start(ap, arg);
 	n = 1;
-	argv[0] = __DECONST(char*, arg);
+	argv[0] = arg;
 	while ((argv[n] = va_arg(ap, char *)) != NULL)
 		n++;
 	va_end(ap);
-	return (execvp(name, argv));
+	return (execvp(name, __DECONST(char **, argv)));
 }
 
 int
@@ -148,7 +148,7 @@ static int
 execvPe_prog(const char *path, char * const *argv, char * const *envp)
 {
 	struct stat sb;
-	char **memp;
+	const char **memp;
 	size_t cnt;
 	int save_errno;
 
@@ -182,15 +182,15 @@ execvPe_prog(const char *path, char * const *argv, char * const *envp)
 		assert(memp != NULL);
 		if (cnt > 0) {
 			memp[0] = argv[0];
-			memp[1] = __DECONST(char *, path);
+			memp[1] = path;
 			memcpy(&memp[2], &argv[1], cnt * sizeof(char *));
 		} else {
 			memp[0] = "sh";
-			memp[1] = __DECONST(char *, path);
+			memp[1] = path;
 			memp[2] = NULL;
 		}
 
-		(void)_execve(_PATH_BSHELL, memp, envp);
+		(void)_execve(_PATH_BSHELL, __DECONST(char **, memp), envp);
 		return (-1);
 	case ENOMEM:
 	case E2BIG:
