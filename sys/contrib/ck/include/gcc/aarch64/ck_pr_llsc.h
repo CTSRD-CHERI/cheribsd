@@ -286,26 +286,21 @@ CK_PR_UNARY(dec, ptr, void, void *, "sub %0, %0, #1", "", "",
 /*
  * Bitwise NOT on a pointer value is weird. This should arguably not
  * exist. In CHERI we create a NULL-derived capability with the
- * cursor set to the bitwise NOT of the address value.
+ * address set to the bitwise NOT of the address value.
  */
 CK_CC_INLINE static void
 ck_pr_not_ptr(void *target)
 {
         void *previous = NULL;
-        ptraddr_t tmp2;
-        int tmp1 = 0;
+        int tmp = 0;
 
         __asm__ __volatile__("1:"
-                             "ldxr %0, [%3];"
-                             "gcvalue %2, %0;"
-                             "mov %0, czr;"
-                             "mvn %2, %2;"
-                             "scvalue %0, %2;"
-                             "stxr %w1, %0, [%3];"
+                             "ldxr %0, [%2];"
+                             "mvn %x0, %x0;"
+                             "stxr %w1, %0, [%2];"
                              "cbnz %w1, 1b;"
                              : "=&C" (previous),
-                               "=&r" (tmp1),
-                               "=&r" (tmp2)
+                               "=&r" (tmp)
                              : "C" (target)
                              : "memory", "cc");
         return;
@@ -358,20 +353,17 @@ CK_PR_UNARY_S(char, char, "b")
         ck_pr_##O##_ptr(void *target, uintptr_t delta)		\
         {							\
                 uintptr_t previous;				\
-                ptraddr_t tmp1, tmp2;				\
+                ptraddr_t tmp1;					\
                 int res;					\
                 __asm__ __volatile__("1:"			\
-                                     "ldxr %0, [%4];"		\
-                                     "gcvalue %2, %0;"		\
-                                     "gcvalue %3, %5;"		\
-                                     I " %2, %2, %3;"		\
+                                     "ldxr %0, [%3];"		\
+                                     I " %2, %x0, %x4;"		\
                                      "scvalue %0, %2;"		\
-                                     "stxr %w1, %0, [%4];"	\
+                                     "stxr %w1, %0, [%3];"	\
                                      "cbnz %w1, 1b;"		\
                                         : "=&C" (previous),	\
                                           "=&r" (res),		\
-                                          "=&r" (tmp1),		\
-                                          "=&r" (tmp2)		\
+                                          "=&r" (tmp1)		\
                                         : "C" (target),		\
                                           "C" (delta)		\
                                         : "memory", "cc");	\

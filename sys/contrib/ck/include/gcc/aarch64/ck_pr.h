@@ -235,26 +235,21 @@ CK_PR_STORE_S_64(double, double, "str")
 /*
  * Negating a pointer value is weird. This should arguably not
  * exist. In CHERI we create a NULL-derived capability with the
- * cursor set to the negated the address value.
+ * address set to the negated address value.
  */
 CK_CC_INLINE static void
 ck_pr_neg_ptr(void *target)
 {
         void *previous = NULL;
-        ptraddr_t tmp2;
-        int tmp1 = 0;
+        int tmp = 0;
 
         __asm__ __volatile__("1:"
-                             "ldxr %0, [%3];"
-                             "gcvalue %2, %0;"
-                             "mov %0, czr;"
-                             "neg %2, %2;"
-                             "scvalue %0, %2;"
-                             "stxr %w1, %0, [%3];"
+                             "ldxr %0, [%2];"
+                             "neg %x0, %x0;"
+                             "stxr %w1, %0, [%2];"
                              "cbnz %w1, 1b;"
                              : "=&C" (previous),
-                               "=&r" (tmp1),
-                               "=&r" (tmp2)
+                               "=&r" (tmp)
                              : "C" (target)
                              : "memory", "cc");
         return;
