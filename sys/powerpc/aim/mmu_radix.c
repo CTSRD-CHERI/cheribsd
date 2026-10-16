@@ -2096,13 +2096,13 @@ mmu_radix_late_bootstrap(vm_offset_t start, vm_offset_t end)
 	 * Allocate virtual address space for the message buffer.
 	 */
 	pa = msgbuf_phys = allocpages((msgbufsize + PAGE_MASK)  >> PAGE_SHIFT);
-	msgbufp = (struct msgbuf *)PHYS_TO_DMAP(pa);
+	msgbufp = (struct msgbuf *)PHYS_TO_DMAP_LEN(pa, msbufsize + PAGE_MASK);
 
 	/*
 	 * Allocate virtual address space for the dynamic percpu area.
 	 */
 	pa = allocpages(DPCPU_SIZE >> PAGE_SHIFT);
-	dpcpu = (void *)PHYS_TO_DMAP(pa);
+	dpcpu = (void *)PHYS_TO_DMAP(pa, DPCPU_SIZE);
 	dpcpu_init(dpcpu, curcpu);
 
 	crashdumpmap = (caddr_t)virtual_avail;
@@ -2119,7 +2119,8 @@ mmu_parttab_init(void)
 {
 	uint64_t ptcr;
 
-	isa3_parttab = (struct pate *)PHYS_TO_DMAP(parttab_phys);
+	isa3_parttab = (struct pate *)PHYS_TO_DMAP_LEN(parttab_phys,
+	    PARTTAB_SIZE);
 
 	if (bootverbose)
 		printf("%s parttab: %p\n", __func__, isa3_parttab);
@@ -2180,7 +2181,8 @@ mmu_radix_proctab_init(void)
 
 	isa3_base_pid = 1;
 
-	isa3_proctab = (void*)PHYS_TO_DMAP(proctab0pa);
+	isa3_proctab = (void*)PHYS_TO_DMAP_LEN(proctab0pa,
+	    1UL << PROCTABL_SIZE_SHIFT);
 	isa3_proctab->proctab0 =
 	    htobe64(RTS_SIZE | DMAP_TO_PHYS((vm_offset_t)kernel_pmap->pm_pml1) |
 		RADIX_PGD_INDEX_SHIFT);
@@ -4038,7 +4040,7 @@ mmu_radix_map(vm_offset_t *virt __unused, vm_paddr_t start,
 
 	CTR5(KTR_PMAP, "%s(%p, %#x, %#x, %#x)", __func__, virt, start, end,
 		 prot);
-	return (PHYS_TO_DMAP(start));
+	return (PHYS_TO_DMAP_LEN(start, end - start));
 }
 
 void

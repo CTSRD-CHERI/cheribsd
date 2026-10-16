@@ -482,8 +482,8 @@ ktls_free_mext_contig(struct mbuf *m)
 	void *epg;
 
 	M_ASSERTEXTPG(m);
-	epg = (void *)PHYS_TO_DMAP(m->m_epg_pa[0]);
-	uma_zfree(ktls_buffer_zone, cheri_kern_bounds_set(epg, ktls_maxlen));
+	epg = (void *)PHYS_TO_DMAP_LEN(m->m_epg_pa[0], ktls_maxlen);
+	uma_zfree(ktls_buffer_zone, epg);
 }
 
 static int
@@ -2877,7 +2877,7 @@ ktls_encrypt_record(struct ktls_wq *wq, struct mbuf *m,
 			len = m_epg_pagelen(m, i, off);
 			state->parray[i] = VM_PAGE_TO_PHYS(pg);
 			IOVEC_INIT(&state->dst_iov[i],
-			    (char *)PHYS_TO_DMAP_PAGE(state->parray[i]) + off,
+			    (char *)PHYS_TO_DMAP(state->parray[i]) + off,
 			    len);
 		}
 	}

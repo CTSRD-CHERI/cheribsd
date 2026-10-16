@@ -55,6 +55,7 @@
 #include <sys/uio.h>
 #include <vm/uma.h>
 #include <vm/vm_page.h>
+#include <vm/vm_param.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 

@@ -224,7 +224,7 @@ ps3_smp_start_cpu(platform_t plat, struct pcpu *pc)
 {
 	/* kernel is spinning on 0x40 == -1 right now */
 	volatile uint32_t *secondary_spin_sem =
-	    (uint32_t *)PHYS_TO_DMAP((uintptr_t)0x40);
+	    (uint32_t *)PHYS_TO_DMAP_LEN((uintptr_t)0x40, sizeof(uint32_t));
 	int remote_pir = pc->pc_hwref;
 	int timeout;
 

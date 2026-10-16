@@ -59,6 +59,7 @@
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <vm/vm_page.h>
+#include <vm/vm_param.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>

@@ -386,7 +386,8 @@ start_all_aps(void)
 	pmap_invalidate_all(kernel_pmap);
 
 	/* copy the AP 1st level boot code */
-	bcopy(mptramp_start, (void *)PHYS_TO_DMAP(boot_address), bootMP_size);
+	bcopy(mptramp_start, (void *)PHYS_TO_DMAP_LEN(boot_address, bootMP_size),
+	    bootMP_size);
 	if (bootverbose)
 		printf("AP boot address %#lx\n", boot_address);
 

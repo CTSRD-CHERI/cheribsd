@@ -147,6 +147,7 @@
 #include <vm/vm_extern.h>
 #include <vm/vm_pageout.h>
 #include <vm/vm_pager.h>
+#include <vm/vm_param.h>
 #include <vm/vm_phys.h>
 #include <vm/vm_radix.h>
 #include <vm/vm_reserv.h>
@@ -3917,7 +3918,7 @@ pmap_kremove(vm_offset_t va)
 vm_offset_t
 pmap_map(vm_offset_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 {
-	return PHYS_TO_DMAP(start);
+	return PHYS_TO_DMAP_LEN(start, end - start);
 }
 
 /*
@@ -8266,12 +8267,12 @@ pmap_zero_page(vm_page_t m)
 void
 pmap_zero_page_area(vm_page_t m, int off, int size)
 {
-	vm_offset_t va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+	vm_offset_t va = PHYS_TO_DMAP_LEN(VM_PAGE_TO_PHYS(m) + off, size);
 
 	if (off == 0 && size == PAGE_SIZE)
 		pagezero((void *)va);
 	else
-		bzero((char *)va + off, size);
+		bzero((char *)va, size);
 }
 
 /*
@@ -9426,7 +9427,7 @@ pmap_mapdev_internal(vm_paddr_t pa, vm_size_t size, int mode, int flags)
 		 * the direct map window, use the direct map.
 		 */
 		if (pa < dmaplimit && pa + size <= dmaplimit) {
-			va = PHYS_TO_DMAP(pa);
+			va = PHYS_TO_DMAP_LEN(pa, size);
 			if ((flags & MAPDEV_SETATTR) != 0) {
 				PMAP_LOCK(kernel_pmap);
 				i = pmap_change_props_locked(va, size,
@@ -9830,7 +9831,8 @@ pmap_change_props_locked(vm_offset_t va, vm_size_t size, vm_prot_t prot,
 				else {
 					/* Run ended, update direct map. */
 					error = pmap_change_props_locked(
-					    PHYS_TO_DMAP(pa_start),
+					    PHYS_TO_DMAP_LEN(pa_start,
+						pa_end - pa_start),
 					    pa_end - pa_start, prot, mode,
 					    flags);
 					if (error != 0)
@@ -9860,7 +9862,8 @@ pmap_change_props_locked(vm_offset_t va, vm_size_t size, vm_prot_t prot,
 				else {
 					/* Run ended, update direct map. */
 					error = pmap_change_props_locked(
-					    PHYS_TO_DMAP(pa_start),
+					    PHYS_TO_DMAP_LEN(pa_start,
+						pa_end - pa_start),
 					    pa_end - pa_start, prot, mode,
 					    flags);
 					if (error != 0)
@@ -9888,7 +9891,8 @@ pmap_change_props_locked(vm_offset_t va, vm_size_t size, vm_prot_t prot,
 				else {
 					/* Run ended, update direct map. */
 					error = pmap_change_props_locked(
-					    PHYS_TO_DMAP(pa_start),
+					    PHYS_TO_DMAP_LEN(pa_start,
+						pa_end - pa_start),
 					    pa_end - pa_start, prot, mode,
 					    flags);
 					if (error != 0)
@@ -9904,7 +9908,8 @@ pmap_change_props_locked(vm_offset_t va, vm_size_t size, vm_prot_t prot,
 	if (error == 0 && pa_start != pa_end && pa_start < dmaplimit) {
 		pa_end1 = MIN(pa_end, dmaplimit);
 		if (pa_start != pa_end1)
-			error = pmap_change_props_locked(PHYS_TO_DMAP(pa_start),
+			error = pmap_change_props_locked(
+			    PHYS_TO_DMAP_LEN(pa_start, pa_end1 - pa_start),
 			    pa_end1 - pa_start, prot, mode, flags);
 	}
 
@@ -10766,7 +10771,7 @@ pmap_large_map(vm_paddr_t spa, vm_size_t len, void **addr,
 
 	/* See if DMAP can serve. */
 	if (spa + len <= dmaplimit) {
-		va = PHYS_TO_DMAP(spa);
+		va = PHYS_TO_DMAP_LEN(spa, len);
 		*addr = (void *)va;
 		return (pmap_change_attr(va, len, mattr));
 	}
