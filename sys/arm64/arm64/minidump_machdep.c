@@ -130,7 +130,7 @@ blk_write(struct dumperinfo *di, char *ptr, vm_paddr_t pa, size_t sz)
 			 * Note that this is safe because all writes using pa
 			 * are at most PAGE_SIZE.
 			 */
-			dump_va = (void *)PHYS_TO_DMAP_LEN(pa, len);
+			dump_va = (void *)PHYS_TO_DMAP_SUBPAGE(pa, len);
 			pa += len;
 			sz -= len;
 			error = blk_flush(di);

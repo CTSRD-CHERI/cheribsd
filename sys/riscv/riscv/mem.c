@@ -126,7 +126,7 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 			/* If within the DMAP use this to copy from */
 			if (PHYS_IN_DMAP(v)) {
 #ifdef __CHERI_PURE_CAPABILITY__
-				error = uiomove((void *)PHYS_TO_DMAP_LEN(v, cnt),
+				error = uiomove((void *)PHYS_TO_DMAP_SUBPAGE(v, cnt),
 				    cnt, uio);
 #else
 				v = PHYS_TO_DMAP(v);

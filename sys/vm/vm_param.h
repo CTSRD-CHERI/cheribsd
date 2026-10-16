@@ -137,7 +137,7 @@ struct xswdev {
 	cheri_kern_bounds_set_exact(PHYS_TO_DMAP(pa), PAGE_SIZE);		\
 })
 
-#define	PHYS_TO_DMAP_LEN(pa, len)					\
+#define	PHYS_TO_DMAP_SUBPAGE(pa, len)					\
 ({									\
 	KASSERT(PHYS_SZ_IN_DMAP(pa, len),				\
 	    ("%s: PA region is outside of dmap, PA: [0x%jx, 0x%jx)",	\
