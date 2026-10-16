@@ -250,8 +250,8 @@
     ((va) >= kva_layout.dmap_low && (va) < kva_layout.dmap_low + dmaplimit)
 
 #define	PMAP_HAS_DMAP	1
-#define	PHYS_TO_DMAP(x)	__extension__ ({				\
-	KASSERT(PHYS_IN_DMAP(x),					\
+#define	PHYS_TO_DMAP_LEN(x, len)	__extension__ ({		\
+	KASSERT(PHYS_IN_DMAP(x) && PHYS_IN_DMAP((x) + (len) - 1),	\
 	    ("physical address %#jx not covered by the DMAP",		\
 	    (uintmax_t)x));						\
 	(x) + kva_layout.dmap_low; })

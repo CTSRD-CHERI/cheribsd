@@ -312,7 +312,7 @@ extern	int vm_level_0_order;
 #endif
 
 #define	PMAP_HAS_DMAP	(hw_direct_map)
-#define PHYS_TO_DMAP(x) ({						\
+#define PHYS_TO_DMAP_LEN(x, len) ({					\
 	KASSERT(hw_direct_map, ("Direct map not provided by PMAP"));	\
 	(x) | DMAP_BASE_ADDRESS; })
 #define DMAP_TO_PHYS(x) ({						\

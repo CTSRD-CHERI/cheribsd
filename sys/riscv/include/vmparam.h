@@ -186,12 +186,14 @@
 #endif
 
 #define	PMAP_HAS_DMAP	1
-#define	PHYS_TO_DMAP(pa)						\
+#define	PHYS_TO_DMAP_LEN(pa, len)					\
 ({									\
-	KASSERT(PHYS_IN_DMAP(pa),					\
+	KASSERT(PHYS_IN_DMAP((pa)) && PHYS_IN_DMAP((pa) + (sz) - 1),	\
 	    ("%s: PA out of range, PA: 0x%lx", __func__,		\
 	    (vm_paddr_t)(pa)));						\
-	(vm_pointer_t)_DMAP_BASE + ((pa) - dmap_phys_base);		\
+	cheri_kern_bounds_set_exact(					\
+		(vm_pointer_t)_DMAP_BASE + ((pa) - dmap_phys_base),	\
+		(len));							\
 })
 
 #define	DMAP_TO_PHYS(va)						\
