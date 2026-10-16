@@ -289,8 +289,7 @@ ENTRY(copyinptr)
 	b.lo	copycommon
 
 	/* And the addresses will both align on a capability */
-	gcvalue	x6, c0			/* Get uaddr's address */
-	eor	x3, x1, x6		/* Compare the addresses */
+	eor	x3, x1, x0		/* Compare the addresses */
 	and	x3, x3, #0xf		/* Check the lower bits */
 	cbnz	x3, copycommon		/* If different don't copy tags */
 
@@ -321,8 +320,7 @@ ENTRY(copyoutptr)
 	b.lo	copycommon
 
 	/* And the addresses will both align on a capability */
-	gcvalue	x6, c1			/* Get uaddr's address */
-	eor	x3, x0, x6		/* Compare the addresses */
+	eor	x3, x0, x1		/* Compare the addresses */
 	and	x3, x3, #0xf		/* Check the lower bits */
 	cbnz	x3, copycommon		/* If different don't copy tags */
 
@@ -361,8 +359,7 @@ copycapcommon:
 	 * We require c0 and c1 to have the same lower bits so need only check
 	 * one of them.
 	 */
-	gcvalue	x3, c0
-	and	x3, x3, #0x0f
+	and	x3, x0, #0x0f
 	cbz	x3, copycap_main	/* Already capability-aligned, skip ahead */
 
 	/* Byte copy until the first capability-aligned address */
