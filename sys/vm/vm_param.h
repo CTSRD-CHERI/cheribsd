@@ -129,24 +129,12 @@ struct xswdev {
 #define	PHYS_SZ_IN_DMAP(pa, sz)					\
     (PHYS_IN_DMAP((pa)) && PHYS_IN_DMAP((pa) + (sz) - 1))
 
-#define	PHYS_TO_DMAP_PAGE(pa)						\
-({									\
-	KASSERT(is_aligned(pa, PAGE_SIZE),				\
-	    ("%s: PA is not page aligned, PA: 0x%jx", __func__,		\
-	    (uintmax_t)(pa)));						\
-	cheri_kern_bounds_set_exact(PHYS_TO_DMAP(pa), PAGE_SIZE);		\
-})
-
-#define	PHYS_TO_DMAP_LEN(pa, len)					\
-({									\
-	KASSERT(PHYS_SZ_IN_DMAP(pa, len),				\
-	    ("%s: PA region is outside of dmap, PA: [0x%jx, 0x%jx)",	\
-	    __func__, (uintmax_t)(pa), (uintmax_t)((pa) + (len))));	\
-	KASSERT(trunc_page(pa) == trunc_page((pa) + (len) - 1),		\
-	    ("%s: PA chunk crosses page boundary, PA: [0x%jx, 0x%jx)",	\
-	    __func__, (uintmax_t)(pa), (uintmax_t)((pa) + (len))));	\
-	cheri_kern_bounds_set_exact(PHYS_TO_DMAP(pa), (len));		\
-})
+#if defined(PHYS_TO_DMAP_LEN)
+#define	PHYS_TO_DMAP(pa)						\
+	cheri_kern_offset_set(PHYS_TO_DMAP_LEN(rounddown2(pa, PAGE_SIZE),	\
+		PAGE_SIZE),							\
+	    (pa) - rounddown2(pa, PAGE_SIZE))
+#endif
 
 #ifndef ASSEMBLER
 #ifdef _KERNEL

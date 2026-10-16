@@ -234,7 +234,7 @@
 #define	SFBUF_PROCESS_PAGE
 
 #define	PMAP_HAS_DMAP	0
-#define	PHYS_TO_DMAP(x)	({ panic("No direct map exists"); 0; })
+#define	PHYS_TO_DMAP_LEN(x, len)	({ panic("No direct map exists"); 0; })
 #define	DMAP_TO_PHYS(x)	({ panic("No direct map exists"); 0; })
 
 /*
