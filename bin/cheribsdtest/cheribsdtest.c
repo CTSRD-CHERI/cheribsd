@@ -954,7 +954,7 @@ main(int argc, char *argv[])
 	 * failure status.
 	 */
 	assert(sizeof(*ccsp) <= (size_t)getpagesize());
-	ccsp = mmap(NULL, getpagesize(), PROT_READ | PROT_WRITE,
+	ccsp = mmap(NULL, getpagesize(), PROT_READ | PROT_WRITE | PROT_CAP,
 	    MAP_ANON | MAP_SHARED, -1, 0);
 	if (ccsp == MAP_FAILED)
 		err(EX_OSERR, "mmap");
