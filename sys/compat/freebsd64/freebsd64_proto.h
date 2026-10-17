@@ -208,14 +208,6 @@ struct freebsd64_mincore_args {
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char vec_l_[PADL_(char *)]; char * vec; char vec_r_[PADR_(char *)];
 };
-struct freebsd64_getgroups_args {
-	char gidsetsize_l_[PADL_(int)]; int gidsetsize; char gidsetsize_r_[PADR_(int)];
-	char gidset_l_[PADL_(gid_t *)]; gid_t * gidset; char gidset_r_[PADR_(gid_t *)];
-};
-struct freebsd64_setgroups_args {
-	char gidsetsize_l_[PADL_(int)]; int gidsetsize; char gidsetsize_r_[PADR_(int)];
-	char gidset_l_[PADL_(const gid_t *)]; const gid_t * gidset; char gidset_r_[PADR_(const gid_t *)];
-};
 struct freebsd64_setitimer_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
 	char itv_l_[PADL_(const struct itimerval *)]; const struct itimerval * itv; char itv_r_[PADR_(const struct itimerval *)];
@@ -1535,6 +1527,14 @@ struct freebsd64_inotify_add_watch_at_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
 	char mask_l_[PADL_(uint32_t)]; uint32_t mask; char mask_r_[PADR_(uint32_t)];
 };
+struct freebsd64_getgroups_args {
+	char gidsetsize_l_[PADL_(int)]; int gidsetsize; char gidsetsize_r_[PADR_(int)];
+	char gidset_l_[PADL_(gid_t *)]; gid_t * gidset; char gidset_r_[PADR_(gid_t *)];
+};
+struct freebsd64_setgroups_args {
+	char gidsetsize_l_[PADL_(int)]; int gidsetsize; char gidsetsize_r_[PADR_(int)];
+	char gidset_l_[PADL_(const gid_t *)]; const gid_t * gidset; char gidset_r_[PADR_(const gid_t *)];
+};
 int	freebsd64_read(struct thread *, struct freebsd64_read_args *);
 int	freebsd64_write(struct thread *, struct freebsd64_write_args *);
 int	freebsd64_open(struct thread *, struct freebsd64_open_args *);
@@ -1573,8 +1573,6 @@ int	freebsd64_munmap(struct thread *, struct freebsd64_munmap_args *);
 int	freebsd64_mprotect(struct thread *, struct freebsd64_mprotect_args *);
 int	freebsd64_madvise(struct thread *, struct freebsd64_madvise_args *);
 int	freebsd64_mincore(struct thread *, struct freebsd64_mincore_args *);
-int	freebsd64_getgroups(struct thread *, struct freebsd64_getgroups_args *);
-int	freebsd64_setgroups(struct thread *, struct freebsd64_setgroups_args *);
 int	freebsd64_setitimer(struct thread *, struct freebsd64_setitimer_args *);
 int	freebsd64_swapon(struct thread *, struct freebsd64_swapon_args *);
 int	freebsd64_getitimer(struct thread *, struct freebsd64_getitimer_args *);
@@ -1844,6 +1842,8 @@ int	freebsd64_getrlimitusage(struct thread *, struct freebsd64_getrlimitusage_ar
 int	freebsd64_setcred(struct thread *, struct freebsd64_setcred_args *);
 int	freebsd64_exterrctl(struct thread *, struct freebsd64_exterrctl_args *);
 int	freebsd64_inotify_add_watch_at(struct thread *, struct freebsd64_inotify_add_watch_at_args *);
+int	freebsd64_getgroups(struct thread *, struct freebsd64_getgroups_args *);
+int	freebsd64_setgroups(struct thread *, struct freebsd64_setgroups_args *);
 
 #ifdef COMPAT_43
 
@@ -2077,6 +2077,16 @@ int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swap
 
 #ifdef COMPAT_FREEBSD14
 
+struct freebsd14_freebsd64_getgroups_args {
+	char gidsetsize_l_[PADL_(int)]; int gidsetsize; char gidsetsize_r_[PADR_(int)];
+	char gidset_l_[PADL_(gid_t *)]; gid_t * gidset; char gidset_r_[PADR_(gid_t *)];
+};
+struct freebsd14_freebsd64_setgroups_args {
+	char gidsetsize_l_[PADL_(int)]; int gidsetsize; char gidsetsize_r_[PADR_(int)];
+	char gidset_l_[PADL_(const gid_t *)]; const gid_t * gidset; char gidset_r_[PADR_(const gid_t *)];
+};
+int	freebsd14_freebsd64_getgroups(struct thread *, struct freebsd14_freebsd64_getgroups_args *);
+int	freebsd14_freebsd64_setgroups(struct thread *, struct freebsd14_freebsd64_setgroups_args *);
 
 #endif /* COMPAT_FREEBSD14 */
 
@@ -2119,8 +2129,8 @@ int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swap
 #define	FREEBSD64_SYS_AUE_freebsd64_mprotect	AUE_MPROTECT
 #define	FREEBSD64_SYS_AUE_freebsd64_madvise	AUE_MADVISE
 #define	FREEBSD64_SYS_AUE_freebsd64_mincore	AUE_MINCORE
-#define	FREEBSD64_SYS_AUE_freebsd64_getgroups	AUE_GETGROUPS
-#define	FREEBSD64_SYS_AUE_freebsd64_setgroups	AUE_SETGROUPS
+#define	FREEBSD64_SYS_AUE_freebsd14_freebsd64_getgroups	AUE_GETGROUPS
+#define	FREEBSD64_SYS_AUE_freebsd14_freebsd64_setgroups	AUE_SETGROUPS
 #define	FREEBSD64_SYS_AUE_freebsd64_setitimer	AUE_SETITIMER
 #define	FREEBSD64_SYS_AUE_freebsd64_swapon	AUE_SWAPON
 #define	FREEBSD64_SYS_AUE_freebsd64_getitimer	AUE_GETITIMER
@@ -2420,6 +2430,8 @@ int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swap
 #define	FREEBSD64_SYS_AUE_freebsd64_setcred	AUE_SETCRED
 #define	FREEBSD64_SYS_AUE_freebsd64_exterrctl	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_inotify_add_watch_at	AUE_INOTIFY
+#define	FREEBSD64_SYS_AUE_freebsd64_getgroups	AUE_GETGROUPS
+#define	FREEBSD64_SYS_AUE_freebsd64_setgroups	AUE_SETGROUPS
 
 #undef PAD_
 #undef PADL_

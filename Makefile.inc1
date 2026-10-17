@@ -1102,8 +1102,7 @@ IMAKE_MTREE=	MTREE_CMD="${MTREE_CMD} ${MTREEFLAGS}"
 .endif
 
 .if make(distributeworld)
-CERTCTLDESTDIR=	${DESTDIR}/${DISTDIR}
-CERTCTLFLAGS+=	-d /base
+CERTCTLDESTDIR=	${DESTDIR}/${DISTDIR}/base
 .else
 CERTCTLDESTDIR=	${DESTDIR}
 .endif
@@ -1164,7 +1163,7 @@ _cleanobj_fast_depend_hack: .PHONY
 	@echo ">>> Deleting stale dependencies...";
 	MACHINE=${MACHINE} MACHINE_ARCH=${MACHINE_ARCH} \
 	    ALL_libcompats=${_ALL_libcompats:Q} \
-	    sh ${.CURDIR}/tools/build/depend-cleanup.sh ${OBJTOP}
+	    sh ${.CURDIR}/tools/build/depend-cleanup.sh ${OBJTOP} ${SRCTOP}
 
 _cleanworldtmp: .PHONY
 .if ${MK_CLEAN} == "yes"
@@ -1261,7 +1260,8 @@ _cleanobj:
 	${_+_}cd ${.CURDIR}; ${LIB${LIBCOMPAT}WMAKE} _NO_INCLUDE_COMPILERMK=t -f Makefile.inc1 ${CLEANDIR}
 .endfor
 .else
-	${_+_}cd ${.CURDIR}; ${WMAKE} _NO_INCLUDE_COMPILERMK=t _cleanobj_fast_depend_hack
+	${_+_}cd ${.CURDIR}; env CLEANMK="_NO_INCLUDE_COMPILERMK=t ${CLEANDIR}" \
+	    MAKE=${MAKE} ${WMAKE} _cleanobj_fast_depend_hack
 .endif	# ${MK_CLEAN} == "yes"
 _obj:
 	@echo
@@ -1648,14 +1648,10 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 .endif # make(distributeworld)
 	${_+_}cd ${.CURDIR}; ${IMAKE} re${.TARGET:S/world$//}; \
 	    ${IMAKEENV} rm -rf ${INSTALLTMP}
-.if !make(packageworld) && ${MK_CAROOT} != "no"
-	@if which openssl>/dev/null; then \
-		PATH=${TMPPATH:Q}:${PATH:Q} \
-		LOCALBASE=${LOCALBASE:Q} \
-		    sh ${SRCTOP}/usr.sbin/certctl/certctl.sh ${CERTCTLFLAGS} rehash; \
-	else \
-		echo "No openssl on the host, not rehashing certificates target -- /etc/ssl may not be populated."; \
-	fi
+.if !(make(packageworld) || make(installsysroot)) && ${MK_CAROOT} != "no" && ${MK_OPENSSL} != "no"
+	PATH=${TMPPATH:Q}:${PATH:Q} \
+	LOCALBASE=${LOCALBASE:Q} \
+	    certctl ${CERTCTLFLAGS} rehash
 .endif
 .if make(distributeworld)
 .for dist in ${EXTRA_DISTRIBUTIONS}
@@ -2857,6 +2853,17 @@ _basic_bootstrap_tools+=sbin/md5
 _basic_bootstrap_tools+=usr.sbin/tzsetup
 .endif
 
+# certctl is needed as an install tool.  libcrypto is rather heavy, so we'll
+# build that alongside it only for platforms that don't expose headers for
+# OpenSSL, like macOS.
+.if ${MK_CAROOT} != "no" && ${MK_OPENSSL} != "no"
+.if ${.MAKE.OS} == "Darwin"
+_bootstrap_libcrypto=secure/lib/libcrypto
+${_bt}-usr.sbin/certctl: ${_bt}-secure/lib/libcrypto
+.endif
+_certctl=usr.sbin/certctl
+.endif
+
 .if defined(BOOTSTRAP_ALL_TOOLS)
 _other_bootstrap_tools+=${_basic_bootstrap_tools}
 .for _subdir _links in ${_basic_bootstrap_tools_multilink}
@@ -2920,6 +2927,8 @@ bootstrap-tools: ${_bt}-links .PHONY
     ${_strfile} \
     usr.bin/dtc \
     ${_cat} \
+    ${_bootstrap_libcrypto} \
+    ${_certctl} \
     ${_kbdcontrol} \
     ${_elftoolchain_libs} \
     ${_libkldelf} \

@@ -10,6 +10,12 @@ newline.  Entries should be separated by a newline.
 
 Changes to this file should not be MFCed.
 
+cce64f2e6851:
+	Add support for the NFSv4.2 Clone operation, which uses
+	block cloning to "copy on write" files on an NFS server.
+	This only works for exported ZFS file systems that have
+	block cloning enabled, at this time.
+
 37b2cb5ecb0f:
 	Add support to VOP_COPY_FILE_RANGE() for block cloning.
 	At this time, ZFS is the only local file system that supports

@@ -1494,7 +1494,7 @@ zfs_ioc_pool_create(zfs_cmd_t *zc)
 			goto pool_props_bad;
 		(void) nvlist_remove_all(props, ZPOOL_HIDDEN_ARGS);
 
-		VERIFY(nvlist_alloc(&zplprops, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+		VERIFY0(nvlist_alloc(&zplprops, NV_UNIQUE_NAME, KM_SLEEP));
 		error = zfs_fill_zplprops_root(version, rootprops,
 		    zplprops, NULL);
 		if (error != 0)
@@ -2246,7 +2246,7 @@ nvl_add_zplprop(objset_t *os, nvlist_t *props, zfs_prop_t prop)
 	 */
 	if ((error = zfs_get_zplprop(os, prop, &value)) != 0)
 		return (error);
-	VERIFY(nvlist_add_uint64(props, zfs_prop_to_name(prop), value) == 0);
+	VERIFY0(nvlist_add_uint64(props, zfs_prop_to_name(prop), value));
 	return (0);
 }
 
@@ -2281,7 +2281,7 @@ zfs_ioc_objset_zplprops(zfs_cmd_t *zc)
 	    dmu_objset_type(os) == DMU_OST_ZFS) {
 		nvlist_t *nv;
 
-		VERIFY(nvlist_alloc(&nv, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+		VERIFY0(nvlist_alloc(&nv, NV_UNIQUE_NAME, KM_SLEEP));
 		if ((err = nvl_add_zplprop(os, nv, ZFS_PROP_VERSION)) == 0 &&
 		    (err = nvl_add_zplprop(os, nv, ZFS_PROP_NORMALIZE)) == 0 &&
 		    (err = nvl_add_zplprop(os, nv, ZFS_PROP_UTF8ONLY)) == 0 &&
@@ -2484,7 +2484,7 @@ zfs_prop_set_userquota(const char *dsname, nvpair_t *pair)
 
 	if (nvpair_type(pair) == DATA_TYPE_NVLIST) {
 		nvlist_t *attrs;
-		VERIFY(nvpair_value_nvlist(pair, &attrs) == 0);
+		VERIFY0(nvpair_value_nvlist(pair, &attrs));
 		if (nvlist_lookup_nvpair(attrs, ZPROP_VALUE,
 		    &pair) != 0)
 			return (SET_ERROR(EINVAL));
@@ -2539,9 +2539,8 @@ zfs_prop_set_special(const char *dsname, zprop_source_t source,
 
 	if (nvpair_type(pair) == DATA_TYPE_NVLIST) {
 		nvlist_t *attrs;
-		VERIFY(nvpair_value_nvlist(pair, &attrs) == 0);
-		VERIFY(nvlist_lookup_nvpair(attrs, ZPROP_VALUE,
-		    &pair) == 0);
+		VERIFY0(nvpair_value_nvlist(pair, &attrs));
+		VERIFY0(nvlist_lookup_nvpair(attrs, ZPROP_VALUE, &pair));
 	}
 
 	/* all special properties are numeric except for keylocation */
@@ -2933,14 +2932,14 @@ props_skip(nvlist_t *props, nvlist_t *skipped, nvlist_t **newprops)
 {
 	nvpair_t *pair;
 
-	VERIFY(nvlist_alloc(newprops, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+	VERIFY0(nvlist_alloc(newprops, NV_UNIQUE_NAME, KM_SLEEP));
 
 	pair = NULL;
 	while ((pair = nvlist_next_nvpair(props, pair)) != NULL) {
 		if (nvlist_exists(skipped, nvpair_name(pair)))
 			continue;
 
-		VERIFY(nvlist_add_nvpair(*newprops, pair) == 0);
+		VERIFY0(nvlist_add_nvpair(*newprops, pair));
 	}
 }
 
@@ -3065,11 +3064,11 @@ zfs_ioc_inherit_prop(zfs_cmd_t *zc)
 
 	switch (type) {
 	case PROP_TYPE_STRING:
-		VERIFY(0 == nvlist_add_string(dummy, propname, ""));
+		VERIFY0(nvlist_add_string(dummy, propname, ""));
 		break;
 	case PROP_TYPE_NUMBER:
 	case PROP_TYPE_INDEX:
-		VERIFY(0 == nvlist_add_uint64(dummy, propname, 0));
+		VERIFY0(nvlist_add_uint64(dummy, propname, 0));
 		break;
 	default:
 		err = SET_ERROR(EINVAL);
@@ -3455,14 +3454,14 @@ zfs_fill_zplprops_impl(objset_t *os, uint64_t zplver,
 	/*
 	 * Put the version in the zplprops
 	 */
-	VERIFY(nvlist_add_uint64(zplprops,
-	    zfs_prop_to_name(ZFS_PROP_VERSION), zplver) == 0);
+	VERIFY0(nvlist_add_uint64(zplprops,
+	    zfs_prop_to_name(ZFS_PROP_VERSION), zplver));
 
 	if (norm == ZFS_PROP_UNDEFINED &&
 	    (error = zfs_get_zplprop(os, ZFS_PROP_NORMALIZE, &norm)) != 0)
 		return (error);
-	VERIFY(nvlist_add_uint64(zplprops,
-	    zfs_prop_to_name(ZFS_PROP_NORMALIZE), norm) == 0);
+	VERIFY0(nvlist_add_uint64(zplprops,
+	    zfs_prop_to_name(ZFS_PROP_NORMALIZE), norm));
 
 	/*
 	 * If we're normalizing, names must always be valid UTF-8 strings.
@@ -3472,55 +3471,55 @@ zfs_fill_zplprops_impl(objset_t *os, uint64_t zplver,
 	if (u8 == ZFS_PROP_UNDEFINED &&
 	    (error = zfs_get_zplprop(os, ZFS_PROP_UTF8ONLY, &u8)) != 0)
 		return (error);
-	VERIFY(nvlist_add_uint64(zplprops,
-	    zfs_prop_to_name(ZFS_PROP_UTF8ONLY), u8) == 0);
+	VERIFY0(nvlist_add_uint64(zplprops,
+	    zfs_prop_to_name(ZFS_PROP_UTF8ONLY), u8));
 
 	if (sense == ZFS_PROP_UNDEFINED &&
 	    (error = zfs_get_zplprop(os, ZFS_PROP_CASE, &sense)) != 0)
 		return (error);
-	VERIFY(nvlist_add_uint64(zplprops,
-	    zfs_prop_to_name(ZFS_PROP_CASE), sense) == 0);
+	VERIFY0(nvlist_add_uint64(zplprops,
+	    zfs_prop_to_name(ZFS_PROP_CASE), sense));
 
 	if (duq == ZFS_PROP_UNDEFINED &&
 	    (error = zfs_get_zplprop(os, ZFS_PROP_DEFAULTUSERQUOTA, &duq)) != 0)
 		return (error);
-	VERIFY(nvlist_add_uint64(zplprops,
-	    zfs_prop_to_name(ZFS_PROP_DEFAULTUSERQUOTA), duq) == 0);
+	VERIFY0(nvlist_add_uint64(zplprops,
+	    zfs_prop_to_name(ZFS_PROP_DEFAULTUSERQUOTA), duq));
 
 	if (dgq == ZFS_PROP_UNDEFINED &&
 	    (error = zfs_get_zplprop(os, ZFS_PROP_DEFAULTGROUPQUOTA,
 	    &dgq)) != 0)
 		return (error);
-	VERIFY(nvlist_add_uint64(zplprops,
-	    zfs_prop_to_name(ZFS_PROP_DEFAULTGROUPQUOTA), dgq) == 0);
+	VERIFY0(nvlist_add_uint64(zplprops,
+	    zfs_prop_to_name(ZFS_PROP_DEFAULTGROUPQUOTA), dgq));
 
 	if (dpq == ZFS_PROP_UNDEFINED &&
 	    (error = zfs_get_zplprop(os, ZFS_PROP_DEFAULTPROJECTQUOTA,
 	    &dpq)) != 0)
 		return (error);
-	VERIFY(nvlist_add_uint64(zplprops,
-	    zfs_prop_to_name(ZFS_PROP_DEFAULTPROJECTQUOTA), dpq) == 0);
+	VERIFY0(nvlist_add_uint64(zplprops,
+	    zfs_prop_to_name(ZFS_PROP_DEFAULTPROJECTQUOTA), dpq));
 
 	if (duoq == ZFS_PROP_UNDEFINED &&
 	    (error = zfs_get_zplprop(os, ZFS_PROP_DEFAULTUSEROBJQUOTA,
 	    &duoq)) != 0)
 		return (error);
-	VERIFY(nvlist_add_uint64(zplprops,
-	    zfs_prop_to_name(ZFS_PROP_DEFAULTUSEROBJQUOTA), duoq) == 0);
+	VERIFY0(nvlist_add_uint64(zplprops,
+	    zfs_prop_to_name(ZFS_PROP_DEFAULTUSEROBJQUOTA), duoq));
 
 	if (dgoq == ZFS_PROP_UNDEFINED &&
 	    (error = zfs_get_zplprop(os, ZFS_PROP_DEFAULTGROUPOBJQUOTA,
 	    &dgoq)) != 0)
 		return (error);
-	VERIFY(nvlist_add_uint64(zplprops,
-	    zfs_prop_to_name(ZFS_PROP_DEFAULTGROUPOBJQUOTA), dgoq) == 0);
+	VERIFY0(nvlist_add_uint64(zplprops,
+	    zfs_prop_to_name(ZFS_PROP_DEFAULTGROUPOBJQUOTA), dgoq));
 
 	if (dpoq == ZFS_PROP_UNDEFINED &&
 	    (error = zfs_get_zplprop(os, ZFS_PROP_DEFAULTPROJECTOBJQUOTA,
 	    &dpoq)) != 0)
 		return (error);
-	VERIFY(nvlist_add_uint64(zplprops,
-	    zfs_prop_to_name(ZFS_PROP_DEFAULTPROJECTOBJQUOTA), dpoq) == 0);
+	VERIFY0(nvlist_add_uint64(zplprops,
+	    zfs_prop_to_name(ZFS_PROP_DEFAULTPROJECTOBJQUOTA), dpoq));
 
 	if (is_ci)
 		*is_ci = (sense == ZFS_CASE_INSENSITIVE);
@@ -3669,8 +3668,8 @@ zfs_ioc_create(const char *fsname, nvlist_t *innvl, nvlist_t *outnvl)
 		 * file system creation, so go figure them out
 		 * now.
 		 */
-		VERIFY(nvlist_alloc(&zct.zct_zplprops,
-		    NV_UNIQUE_NAME, KM_SLEEP) == 0);
+		VERIFY0(nvlist_alloc(&zct.zct_zplprops,
+		    NV_UNIQUE_NAME, KM_SLEEP));
 		error = zfs_fill_zplprops(fsname, nvprops,
 		    zct.zct_zplprops, &is_insensitive);
 		if (error != 0) {
@@ -4917,9 +4916,8 @@ zfs_check_settable(const char *dsname, nvpair_t *pair, cred_t *cr)
 		 * format.
 		 */
 		nvlist_t *attrs;
-		VERIFY(nvpair_value_nvlist(pair, &attrs) == 0);
-		VERIFY(nvlist_lookup_nvpair(attrs, ZPROP_VALUE,
-		    &pair) == 0);
+		VERIFY0(nvpair_value_nvlist(pair, &attrs));
+		VERIFY0(nvlist_lookup_nvpair(attrs, ZPROP_VALUE, &pair));
 	}
 
 	/*
@@ -5104,7 +5102,7 @@ zfs_check_clearable(const char *dataset, nvlist_t *props, nvlist_t **errlist)
 	if (props == NULL)
 		return (0);
 
-	VERIFY(nvlist_alloc(&errors, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+	VERIFY0(nvlist_alloc(&errors, NV_UNIQUE_NAME, KM_SLEEP));
 
 	zc = kmem_alloc(sizeof (zfs_cmd_t), KM_SLEEP);
 	(void) strlcpy(zc->zc_name, dataset, sizeof (zc->zc_name));
@@ -5116,9 +5114,8 @@ zfs_check_clearable(const char *dataset, nvlist_t *props, nvlist_t **errlist)
 		    sizeof (zc->zc_value));
 		if ((err = zfs_check_settable(dataset, pair, CRED())) != 0 ||
 		    (err = zfs_secpolicy_inherit_prop(zc, NULL, CRED())) != 0) {
-			VERIFY(nvlist_remove_nvpair(props, pair) == 0);
-			VERIFY(nvlist_add_int32(errors,
-			    zc->zc_value, err) == 0);
+			VERIFY0(nvlist_remove_nvpair(props, pair));
+			VERIFY0(nvlist_add_int32(errors, zc->zc_value, err));
 		}
 		pair = next_pair;
 	}
@@ -5128,7 +5125,7 @@ zfs_check_clearable(const char *dataset, nvlist_t *props, nvlist_t **errlist)
 		nvlist_free(errors);
 		errors = NULL;
 	} else {
-		VERIFY(nvpair_value_int32(pair, &rv) == 0);
+		VERIFY0(nvpair_value_int32(pair, &rv));
 	}
 
 	if (errlist == NULL)
@@ -5145,16 +5142,14 @@ propval_equals(nvpair_t *p1, nvpair_t *p2)
 	if (nvpair_type(p1) == DATA_TYPE_NVLIST) {
 		/* dsl_prop_get_all_impl() format */
 		nvlist_t *attrs;
-		VERIFY(nvpair_value_nvlist(p1, &attrs) == 0);
-		VERIFY(nvlist_lookup_nvpair(attrs, ZPROP_VALUE,
-		    &p1) == 0);
+		VERIFY0(nvpair_value_nvlist(p1, &attrs));
+		VERIFY0(nvlist_lookup_nvpair(attrs, ZPROP_VALUE, &p1));
 	}
 
 	if (nvpair_type(p2) == DATA_TYPE_NVLIST) {
 		nvlist_t *attrs;
-		VERIFY(nvpair_value_nvlist(p2, &attrs) == 0);
-		VERIFY(nvlist_lookup_nvpair(attrs, ZPROP_VALUE,
-		    &p2) == 0);
+		VERIFY0(nvpair_value_nvlist(p2, &attrs));
+		VERIFY0(nvlist_lookup_nvpair(attrs, ZPROP_VALUE, &p2));
 	}
 
 	if (nvpair_type(p1) != nvpair_type(p2))
@@ -5163,14 +5158,14 @@ propval_equals(nvpair_t *p1, nvpair_t *p2)
 	if (nvpair_type(p1) == DATA_TYPE_STRING) {
 		const char *valstr1, *valstr2;
 
-		VERIFY(nvpair_value_string(p1, &valstr1) == 0);
-		VERIFY(nvpair_value_string(p2, &valstr2) == 0);
+		VERIFY0(nvpair_value_string(p1, &valstr1));
+		VERIFY0(nvpair_value_string(p2, &valstr2));
 		return (strcmp(valstr1, valstr2) == 0);
 	} else {
 		uint64_t intval1, intval2;
 
-		VERIFY(nvpair_value_uint64(p1, &intval1) == 0);
-		VERIFY(nvpair_value_uint64(p2, &intval2) == 0);
+		VERIFY0(nvpair_value_uint64(p1, &intval1));
+		VERIFY0(nvpair_value_uint64(p2, &intval2));
 		return (intval1 == intval2);
 	}
 }
@@ -5238,7 +5233,7 @@ extract_delay_props(nvlist_t *props)
 	};
 	int i;
 
-	VERIFY(nvlist_alloc(&delayprops, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+	VERIFY0(nvlist_alloc(&delayprops, NV_UNIQUE_NAME, KM_SLEEP));
 
 	for (nvp = nvlist_next_nvpair(props, NULL); nvp != NULL;
 	    nvp = nvlist_next_nvpair(props, nvp)) {
@@ -5254,8 +5249,8 @@ extract_delay_props(nvlist_t *props)
 		}
 		if (delayable[i] != 0) {
 			tmp = nvlist_prev_nvpair(props, nvp);
-			VERIFY(nvlist_add_nvpair(delayprops, nvp) == 0);
-			VERIFY(nvlist_remove_nvpair(props, nvp) == 0);
+			VERIFY0(nvlist_add_nvpair(delayprops, nvp));
+			VERIFY0(nvlist_remove_nvpair(props, nvp));
 			nvp = tmp;
 		}
 	}
@@ -5486,15 +5481,15 @@ zfs_ioc_recv_impl(char *tofs, char *tosnap, const char *origin,
 	 * using ASSERT() will be just like a VERIFY.
 	 */
 	if (recv_delayprops != NULL) {
-		ASSERT(nvlist_merge(recvprops, recv_delayprops, 0) == 0);
+		ASSERT0(nvlist_merge(recvprops, recv_delayprops, 0));
 		nvlist_free(recv_delayprops);
 	}
 	if (local_delayprops != NULL) {
-		ASSERT(nvlist_merge(localprops, local_delayprops, 0) == 0);
+		ASSERT0(nvlist_merge(localprops, local_delayprops, 0));
 		nvlist_free(local_delayprops);
 	}
 	if (inherited_delayprops != NULL) {
-		ASSERT(nvlist_merge(localprops, inherited_delayprops, 0) == 0);
+		ASSERT0(nvlist_merge(localprops, inherited_delayprops, 0));
 		nvlist_free(inherited_delayprops);
 	}
 	*read_bytes = off - noff;
@@ -7343,8 +7338,8 @@ zfs_ioctl_register_legacy(zfs_ioc_t ioc, zfs_ioc_legacy_func_t *func,
 
 	ASSERT3U(ioc, >=, ZFS_IOC_FIRST);
 	ASSERT3U(ioc, <, ZFS_IOC_LAST);
-	ASSERT3P(vec->zvec_legacy_func, ==, NULL);
-	ASSERT3P(vec->zvec_func, ==, NULL);
+	ASSERT0P(vec->zvec_legacy_func);
+	ASSERT0P(vec->zvec_func);
 
 	vec->zvec_legacy_func = func;
 	vec->zvec_secpolicy = secpolicy;
@@ -7367,8 +7362,8 @@ zfs_ioctl_register(const char *name, zfs_ioc_t ioc, zfs_ioc_func_t *func,
 
 	ASSERT3U(ioc, >=, ZFS_IOC_FIRST);
 	ASSERT3U(ioc, <, ZFS_IOC_LAST);
-	ASSERT3P(vec->zvec_legacy_func, ==, NULL);
-	ASSERT3P(vec->zvec_func, ==, NULL);
+	ASSERT0P(vec->zvec_legacy_func);
+	ASSERT0P(vec->zvec_func);
 
 	/* if we are logging, the name must be valid */
 	ASSERT(!allow_log || namecheck != NO_NAME);
@@ -8149,7 +8144,7 @@ zfsdev_ioctl_common(uint_t vecnum, zfs_cmd_t *zc, int flag)
 		spa_t *spa;
 		nvlist_t *lognv = NULL;
 
-		ASSERT(vec->zvec_legacy_func == NULL);
+		ASSERT0P(vec->zvec_legacy_func);
 
 		/*
 		 * Add the innvl to the lognv before calling the func,

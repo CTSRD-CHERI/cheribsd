@@ -84,8 +84,8 @@ const char *freebsd64_syscallnames[] = {
 	"obs_vhangup",			/* 76 = obsolete vhangup */
 	"obs_vlimit",			/* 77 = obsolete vlimit */
 	"freebsd64_mincore",			/* 78 = freebsd64_mincore */
-	"freebsd64_getgroups",			/* 79 = freebsd64_getgroups */
-	"freebsd64_setgroups",			/* 80 = freebsd64_setgroups */
+	"compat14.freebsd64_getgroups",		/* 79 = freebsd14 freebsd64_getgroups */
+	"compat14.freebsd64_setgroups",		/* 80 = freebsd14 freebsd64_setgroups */
 	"getpgrp",			/* 81 = getpgrp */
 	"setpgid",			/* 82 = setpgid */
 	"freebsd64_setitimer",			/* 83 = freebsd64_setitimer */
@@ -600,4 +600,6 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_exterrctl",			/* 592 = freebsd64_exterrctl */
 	"freebsd64_inotify_add_watch_at",			/* 593 = freebsd64_inotify_add_watch_at */
 	"inotify_rm_watch",			/* 594 = inotify_rm_watch */
+	"freebsd64_getgroups",			/* 595 = freebsd64_getgroups */
+	"freebsd64_setgroups",			/* 596 = freebsd64_setgroups */
 };

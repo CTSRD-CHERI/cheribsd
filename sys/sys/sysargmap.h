@@ -64,8 +64,6 @@ static int sysargmask[] = {
 	[SYS_mprotect] = (0x0 | 0x1),
 	[SYS_madvise] = (0x0 | 0x1),
 	[SYS_mincore] = (0x0 | 0x1 | 0x4),
-	[SYS_getgroups] = (0x0 | 0x2),
-	[SYS_setgroups] = (0x0 | 0x2),
 	[SYS_getpgrp] = (0x0),
 	[SYS_setpgid] = (0x0),
 	[SYS_setitimer] = (0x0 | 0x2 | 0x4),
@@ -418,6 +416,8 @@ static int sysargmask[] = {
 	[SYS_exterrctl] = (0x0 | 0x4),
 	[SYS_inotify_add_watch_at] = (0x0 | 0x4),
 	[SYS_inotify_rm_watch] = (0x0),
+	[SYS_getgroups] = (0x0 | 0x2),
+	[SYS_setgroups] = (0x0 | 0x2),
 };
 
 #endif /* !_SYSARGMAP_H_ */

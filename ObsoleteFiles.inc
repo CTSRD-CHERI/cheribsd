@@ -51,12 +51,17 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20250812: Remove a bogus manlink
+OLD_FILES+=usr/share/man/man3/quota_statfs.3.gz
+
 # 20250808: nvmfd removed from base install
 OLD_FILES+=usr/sbin/nvmfd
 OLD_FILES+=usr/share/man/man8/nvmfd.8.gz
 
 # 20250807: Replace lib/libgssapi with krb5/lib/gssapi
 OLD_FILES+=usr/include/gssapi_krb5/gssapi.h
+OLD_FILES+=usr/include/gssapi_krb5/gssapi/gssapi.h
+OLD_FILES+=usr/include/gssapi_krb5/gssapi/mechglue.h
 OLD_DIRS+=usr/include/gssapi_krb5/gssapi
 OLD_DIRS+=usr/include/gssapi_krb5
 OLD_FILES+=etc/gssapi/qop
@@ -79,6 +84,9 @@ OLD_FILES+=usr/share/man/man8/zfsboot.8.gz
 
 # 20250728: Machine versions of 'runq.h' do not exist anymore
 OLD_FILES+=usr/include/machine/runq.h
+
+# 20250727: libvmmapi bumped to 7
+OLD_LIBS+=usr/lib/libvmmapi.so.6
 
 # 20250726: MIT KRB5 DSO bump
 OLD_LIBS+=usr/lib/libcom_err.so.121
