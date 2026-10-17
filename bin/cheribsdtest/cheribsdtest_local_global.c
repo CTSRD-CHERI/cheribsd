@@ -71,7 +71,7 @@ CHERIBSDTEST(store_local_allowed,
 	cheribsdtest_success();
 }
 
-#if defined(__riscv_zylevels1b)
+#if defined(__riscv_zylg)
 CHERIBSDTEST(store_local_disallowed,
     "Checks tag is stripped when local capabilities are stored via non-store-local capabilities")
 #else
@@ -101,7 +101,7 @@ CHERIBSDTEST(store_local_disallowed,
 	/* This should fault */
 	*targetp = cap;
 
-#if defined(__riscv_zylevels1b)
+#if defined(__riscv_zylg)
         CHERIBSDTEST_VERIFY(cheri_tag_get(*targetp) == 0);
         cheribsdtest_success();
 #else
