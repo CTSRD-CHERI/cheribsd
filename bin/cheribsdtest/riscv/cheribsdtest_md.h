@@ -97,7 +97,7 @@
 #ifdef __riscv_y
 /* [XLEN - 1:34] reserved0 */
 #define PERM_RESERVED0_MASK ~(((register_t)1 << 24) - 1)
-/* [23:19] [15:9] reserved1, bits [4:2] are checked for Zylevels1b */
+/* [23:19] [15:9] reserved1, bits [4:2] are checked for zylg */
 #define PERM_RESERVED1_MASK (((register_t)0x1f << 19) | ((register_t)0x3f << 10))
 #else
 #define PERM_RESERVED0_MASK ((register_t)0)

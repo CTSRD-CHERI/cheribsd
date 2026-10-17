@@ -88,7 +88,7 @@ bool has_zicboz;
 bool has_zicbop;
 #ifdef __riscv_y
 bool has_zyhybrid;
-bool has_zylevels1b;
+bool has_zylg;
 #endif
 
 struct cpu_desc {
@@ -111,7 +111,7 @@ struct cpu_desc {
 #define	 Z_ZICBOP	(1 << 2)
 #ifdef __riscv_y
 #define	 Z_ZYHYBRID	(1 << 3)
-#define	 Z_ZYLEVELS1B	(1 << 4)
+#define	 Z_ZYLG		(1 << 4)
 #endif
 	int		cbom_block_size;
 	int		cboz_block_size;
@@ -241,7 +241,7 @@ parse_ext_z(struct cpu_desc *desc __unused, char *isa, int idx, int len)
 	CHECK_Z_EXT("zicbop",	Z_ZICBOP);
 #ifdef __riscv_y
 	CHECK_Z_EXT("zyhybrid", Z_ZYHYBRID);
-	CHECK_Z_EXT("zylevels1b", Z_ZYLEVELS1B);
+	CHECK_Z_EXT("zylg", Z_ZYLG);
 #endif
 
 #undef CHECK_Z_EXT
@@ -504,7 +504,7 @@ update_global_capabilities(u_int cpu, struct cpu_desc *desc)
 	UPDATE_CAP(has_zicbop, (desc->z_extensions & Z_ZICBOP) != 0);
 #ifdef __riscv_y
 	UPDATE_CAP(has_zyhybrid, (desc->z_extensions & Z_ZYHYBRID) != 0);
-	UPDATE_CAP(has_zylevels1b, (desc->z_extensions & Z_ZYLEVELS1B) != 0);
+	UPDATE_CAP(has_zylg, (desc->z_extensions & Z_ZYLG) != 0);
 #endif
 
 #undef UPDATE_CAP
@@ -667,7 +667,7 @@ printcpuinfo(u_int cpu)
 		    "\03Zicbop"
 #ifdef __riscv_y
 		    "\04Zyhybrid"
-		    "\05Zylevels1b"
+		    "\05Zylg"
 #endif
 		    );
 	}

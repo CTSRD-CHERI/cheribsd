@@ -403,7 +403,7 @@ RISCV_MARCH:=	${RISCV_MARCH}xcheri
 .  if defined(CHERI_RISCV_STD_093)
 RISCV_MARCH:=	${RISCV_MARCH}zcherihybrid_zcherilevels
 .  else
-RISCV_MARCH:=	${RISCV_MARCH:S/i/y/}zyhybrid_zylevels1b
+RISCV_MARCH:=	${RISCV_MARCH:S/i/y/}zyhybrid_zylg
 .  endif
 .endif
 

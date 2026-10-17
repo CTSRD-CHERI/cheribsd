@@ -189,7 +189,7 @@ LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}xcheri
 .    if defined(CHERI_RISCV_STD_093)
 LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}zcherihybrid_zcherilevels
 .    else
-LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH:S/i/y/}zyhybrid_zylevels1b
+LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH:S/i/y/}zyhybrid_zylg
 .    endif
 .  else
 .    error "Invalid CHERI variant ${LIB${_LIBCOMPAT}CPUTYPE}"

@@ -73,9 +73,15 @@
 #else /* !defined(__riscv_xcheri) */
 #define	CHERI_PERM_WRITE		(1 << 0)	/* 0x00000001 */
 #define	CHERI_PERM_LOAD_MUTABLE		(1 << 1)	/* 0x00000002 */
+#ifdef __riscv_zcheripurecap
 #define	CHERI_PERM_ELEVATE_LEVEL	(1 << 2)	/* 0x00000004 */
 #define	CHERI_PERM_STORE_LEVEL		(1 << 3)	/* 0x00000008 */
 #define	CHERI_PERM_CAPABILITY_LEVEL	(1 << 4)	/* 0x00000010 */
+#else
+#define	CHERI_PERM_LOAD_GLOBAL		(1 << 2)	/* 0x00000004 */
+#define	CHERI_PERM_STORE_LOCAL		(1 << 3)	/* 0x00000008 */
+#define	CHERI_PERM_GLOBAL		(1 << 4)	/* 0x00000010 */
+#endif
 #define	CHERI_PERM_CAP			(1 << 5)	/* 0x00000020 */
 #define	CHERI_PERM_SYSTEM_REGS		(1 << 16)	/* 0x00010000 */
 #define	CHERI_PERM_EXECUTE		(1 << 17)	/* 0x00020000 */
@@ -113,8 +119,13 @@
  */
 #define	CHERI_PERM_STORE		CHERI_PERM_WRITE
 #define	CHERI_PERM_LOAD			CHERI_PERM_READ
+#ifdef __riscv_zcheripurecap
 #define	CHERI_PERM_GLOBAL		CHERI_PERM_CAPABILITY_LEVEL
 #define	CHERI_PERM_STORE_LOCAL_CAP	CHERI_PERM_STORE_LEVEL
+#define	CHERI_PERM_LOAD_GLOBAL		CHERI_PERM_ELEVATE_LEVEL
+#else
+#define	CHERI_PERM_STORE_LOCAL_CAP	CHERI_PERM_STORE_LOCAL
+#endif
 #endif
 
 /* Supported architecture permission bits feature flags */
@@ -145,7 +156,7 @@
 	CHERI_PERM_STORE_CAP | _CHERI_PERMS_HWALL_COMMON)
 #else /* !defined(__riscv_xcheri) */
 #define	CHERI_PERMS_HWALL						\
-	(CHERI_PERM_CAP | CHERI_PERM_ELEVATE_LEVEL |			\
+	(CHERI_PERM_CAP | CHERI_PERM_LOAD_GLOBAL |			\
 	CHERI_PERM_LOAD_MUTABLE | _CHERI_PERMS_HWALL_COMMON)
 #endif /* !defined(__riscv_xcheri) */
 
@@ -167,7 +178,7 @@
 #else /* !defined(__riscv_xcheri) */
 #define CHERI_PERMS_HWALL_MEMORY					\
 	(CHERI_PERM_CAP | CHERI_PERM_LOAD_MUTABLE |			\
-	CHERI_PERM_ELEVATE_LEVEL | _CHERI_PERMS_HWALL_MEMORY_COMMON)
+	CHERI_PERM_LOAD_GLOBAL | _CHERI_PERMS_HWALL_MEMORY_COMMON)
 
 #define CHERI_PERMS_HWALL_OTYPE
 #endif /* !defined(__riscv_xcheri) */
@@ -198,7 +209,7 @@
 #else /* !defined(__riscv_xcheri) */
 #define	CHERI_PERMS_USERSPACE						\
 	(CHERI_PERM_CAP | CHERI_PERM_LOAD_MUTABLE |			\
-	CHERI_PERM_ELEVATE_LEVEL | _CHERI_PERMS_USERSPACE_COMMON)
+	CHERI_PERM_LOAD_GLOBAL | _CHERI_PERMS_USERSPACE_COMMON)
 
 #define	CHERI_PERMS_USERSPACE_DATA					\
 	(CHERI_PERMS_USERSPACE | CHERI_PERM_STORE |			\
@@ -227,7 +238,7 @@
 #else /* !defined(__riscv_xcheri) */
 #define	CHERI_PERMS_KERNEL						\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_CAP |		\
-	CHERI_PERM_LOAD_MUTABLE | CHERI_PERM_ELEVATE_LEVEL)
+	CHERI_PERM_LOAD_MUTABLE | CHERI_PERM_LOAD_GLOBAL)
 
 #define	CHERI_PERMS_KERNEL_DATA				       		\
 	(CHERI_PERMS_KERNEL | CHERI_PERM_STORE |			\
