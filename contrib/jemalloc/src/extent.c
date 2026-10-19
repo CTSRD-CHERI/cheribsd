@@ -2041,7 +2041,8 @@ extent_purge_forced_default(extent_hooks_t *extent_hooks, void *addr,
 	assert(length != 0);
 	assert((length & PAGE_MASK) == 0);
 
-	return pages_purge_forced((void *)((uintptr_t)addr + offset), length);
+	return pages_purge_forced((void *)((uintptr_t)addr +
+	    (uintptr_t)offset), length);
 }
 #endif
 
