@@ -1201,7 +1201,7 @@ extent_recycle(tsdn_t *tsdn, arena_t *arena, extent_hooks_t **r_extent_hooks,
 				memset(addr, 0, size);
 			}
 		} else if (config_debug) {
-			size_t *p = (size_t *)addr;
+			size_t *p = (size_t *)(uintptr_t)addr;
 			/* Check the first page only. */
 			for (size_t i = 0; i < PAGE / sizeof(size_t); i++) {
 				assert(p[i] == 0);
