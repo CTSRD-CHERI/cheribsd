@@ -71,6 +71,24 @@ struct stk_table_stk_info {
 	void *begin;
 };
 
+/*
+ * This structure serves four purposes:
+ * - libthr partially fills the tcb header during thread creation, so it needs a
+ *   pointer to the tcb. To avoiding exposing the rest of the tcb to libthr,
+ *   give it a fake tcb and, upon thread start, copy its header to the real tcb.
+ * - The sealed pointer to the real tcb piggybacks on the fake tcb to reach the
+ *   new thread.
+ * - The sealed pointer to the stack lookup table also piggybacks on the fake
+ *   tcb because it is unsafe to use RTLD's malloc to create it in the new
+ *   thread.
+ * - After thread start, this structure holds the canonical tcb.
+ */
+struct tcb_wrapper {
+	struct tcb header __attribute__((cheri_no_subobject_bounds));
+	struct tcb *tcb;
+	struct stk_table *table;
+};
+
 struct stk_table_metadata {
 	size_t capacity;
 	struct tcb_wrapper *wrap;
@@ -100,11 +118,12 @@ struct stk_table {
 	 */
 	struct stk_table_metadata *meta;
 	/*
-	 * The i-th entry contains the current stack top of compartment i.
+	 * The i-th entry contains the current stack top and TLS structure of
+	 * compartment i.
 	 */
 	struct stk_table_entry {
 		void *stack;
-		void *reserved;
+		struct tcb *tcb;
 	} entries[];
 };
 
@@ -247,4 +266,5 @@ func_sig_legal(struct func_sig sig)
  */
 void c18n_init(Obj_Entry *, Elf_Auxinfo *[]);
 void c18n_init2(Obj_Entry *);
+void c18n_init3(void);
 #endif

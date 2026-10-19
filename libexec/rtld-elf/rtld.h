@@ -686,6 +686,9 @@ void *allocate_module_tls(struct tcb *tcb, int index);
 void *allocate_module_tgot(struct tcb *tcb, int index,
     struct Struct_RtldLockState *lockstate);
 #endif
+#if defined(CHERI_LIB_C18N) && defined(TLS_TGOT) && !defined(TLS_TGOT_COMPAT)
+void *allocate_compart_tls(uint16_t, struct tcb *, size_t, size_t);
+#endif
 #if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 bool allocate_tls_offset(Obj_Entry *obj);
 void free_tls_offset(Obj_Entry *obj);
