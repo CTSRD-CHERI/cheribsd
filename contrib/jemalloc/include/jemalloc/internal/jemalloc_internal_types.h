@@ -1,29 +1,32 @@
 #ifndef JEMALLOC_INTERNAL_TYPES_H
 #define JEMALLOC_INTERNAL_TYPES_H
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20221129,
- *   "target_type": "lib",
- *   "changes": [
- *     "pointer_alignment",
- *     "pointer_shape",
- *     "virtual_address"
- *   ]
- * }
- * CHERI CHANGES END
- */
 
 #include "jemalloc/internal/quantum.h"
 
-/* Page size index type. */
-typedef unsigned pszind_t;
-
-/* Size class index type. */
-typedef unsigned szind_t;
-
 /* Processor / core id type. */
 typedef int malloc_cpuid_t;
+
+/* When realloc(non-null-ptr, 0) is called, what happens? */
+enum zero_realloc_action_e {
+	/* Realloc(ptr, 0) is free(ptr); return malloc(0); */
+	zero_realloc_action_alloc = 0,
+	/* Realloc(ptr, 0) is free(ptr); */
+	zero_realloc_action_free = 1,
+	/* Realloc(ptr, 0) aborts. */
+	zero_realloc_action_abort = 2
+};
+typedef enum zero_realloc_action_e zero_realloc_action_t;
+
+/* Signature of write callback. */
+typedef void (write_cb_t)(void *, const char *);
+
+enum malloc_init_e {
+	malloc_init_uninitialized	= 3,
+	malloc_init_a0_initialized	= 2,
+	malloc_init_recursible		= 1,
+	malloc_init_initialized		= 0 /* Common case --> jnz. */
+};
+typedef enum malloc_init_e malloc_init_t;
 
 /*
  * Flags bits:
@@ -99,22 +102,12 @@ typedef int malloc_cpuid_t;
 	((void *)((uintptr_t)(a) & ((~(alignment)) + 1)))
 
 /* Return the offset between a and the nearest aligned address at or below a. */
-#if __has_builtin(__builtin_align_down)
-#define ALIGNMENT_ADDR2OFFSET(a, alignment)				\
-	((size_t)((a) - __builtin_align_down((a), alignment)))
-#else
 #define ALIGNMENT_ADDR2OFFSET(a, alignment)				\
 	((size_t)((uintptr_t)(a) & (alignment - 1)))
-#endif
 
 /* Return the smallest alignment multiple that is >= s. */
-#if __has_builtin(__builtin_align_up)
-#define ALIGNMENT_CEILING(s, alignment)					\
-	__builtin_align_up((s), (alignment))
-#else
 #define ALIGNMENT_CEILING(s, alignment)					\
 	(((s) + (alignment - 1)) & ((~(alignment)) + 1))
-#endif
 
 /* Declare a variable-length array. */
 #if __STDC_VERSION__ < 199901L
