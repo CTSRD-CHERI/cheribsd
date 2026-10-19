@@ -10,7 +10,7 @@
  *     "unsupported",
  *     "other"
  *   ],
- *   "change_comment": "sbrk, etc",
+ *   "change_comment": "misc",
  *   "hybrid_specific": false
  * }
  * CHERI CHANGES END
@@ -169,9 +169,7 @@
  * JEMALLOC_DSS enables use of sbrk(2) to allocate extents from the data storage
  * segment (DSS).
  */
-#if !defined(__CHERI_PURE_CAPABILITY__)
 #define JEMALLOC_DSS 
-#endif
 
 /* Support memory filling (junk/zero). */
 #define JEMALLOC_FILL 
