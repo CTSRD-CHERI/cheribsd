@@ -199,10 +199,6 @@ extent_alloc(tsdn_t *tsdn, arena_t *arena) {
 	extent_avail_remove(&arena->extent_avail, extent);
 	atomic_fetch_sub_zu(&arena->extent_avail_cnt, 1, ATOMIC_RELAXED);
 	malloc_mutex_unlock(tsdn, &arena->extent_avail_mtx);
-#ifdef __CHERI_PURE_CAPABILITY__
-	/* Ensure we return an extent with offset zero for rtree packing */
-	extent = cheri_bounds_set_exact(extent, sizeof(*extent));
-#endif
 	return extent;
 }
 
@@ -561,11 +557,6 @@ extents_alloc(tsdn_t *tsdn, arena_t *arena, extent_hooks_t **r_extent_hooks,
 	extent_t *extent = extent_recycle(tsdn, arena, r_extent_hooks, extents,
 	    new_addr, size, pad, alignment, slab, szind, zero, commit, false);
 	assert(extent == NULL || extent_dumpable_get(extent));
-#ifdef __CHERI_PURE_CAPABILITY__
-	/* Ensure we return an extent with offset zero for rtree packing */
-	if (extent != NULL)
-		extent = cheri_bounds_set_exact(extent, sizeof(*extent));
-#endif
 	return extent;
 }
 
@@ -1505,9 +1496,7 @@ extent_alloc_retained(tsdn_t *tsdn, arena_t *arena,
 		malloc_mutex_unlock(tsdn, &arena->extent_grow_mtx);
 	}
 	malloc_mutex_assert_not_owner(tsdn, &arena->extent_grow_mtx);
-#ifdef __CHERI_PURE_CAPABILITY__
-	assert(cheri_offset_get(extent) == 0 && "extent offset must be zero for packing in rtree");
-#endif
+
 	return extent;
 }
 
@@ -1576,9 +1565,6 @@ extent_alloc_wrapper(tsdn_t *tsdn, arena_t *arena,
 	}
 
 	assert(extent == NULL || extent_dumpable_get(extent));
-#ifdef __CHERI_PURE_CAPABILITY__
-	assert(cheri_offset_get(extent) == 0 && "extent offset must be zero for packing in rtree");
-#endif
 	return extent;
 }
 
