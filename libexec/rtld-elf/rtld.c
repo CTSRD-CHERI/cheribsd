@@ -1184,6 +1184,11 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	dbg("initializing initial thread local storage");
 	allocate_initial_tls(globallist_curr(TAILQ_FIRST(&obj_list)));
 
+#ifdef CHERI_LIB_C18N
+	if (C18N_ENABLED)
+		c18n_init3();
+#endif
+
 	dbg("initializing key program variables");
 	set_program_var("__progname", argv[0] != NULL ? basename(argv[0]) : "");
 	set_program_var("environ", env);
@@ -6557,6 +6562,105 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign,
 	tcb_list_insert(tcb);
 	return (tcb);
 }
+
+#ifdef CHERI_LIB_C18N
+/*
+ * The compartment TCB is not inserted into the global list, and so does not
+ * participate in distribute_static_tgot. This is fine because an existing
+ * compartment would not contain references to TLS variables defined in a
+ * dlopen'ed object. Consequently, its dtv_defer field is always NULL.
+ *
+ * XXX: If a compromised compartment attempts to access a TLS variable which it
+ * is not authorised to access through __tls_get_addr, a TLS block will
+ * currently be lazily created. Find a way to detect this error.
+ */
+void *
+allocate_compart_tls(compart_id_t cid, struct tcb *canonical,
+    size_t tcbsize, size_t tcbalign)
+{
+	Obj_Entry *obj;
+	char *tls_block;
+	struct dtv *dtv;
+	struct tcb *tcb;
+	char *addr;
+	size_t extra_size, maxalign, pre_size, tls_block_size;
+	size_t tgot_init_align;
+	size_t offset;
+
+	assert(tcbsize >= TLS_TCB_SIZE);
+	maxalign = rtld_max(tcbalign, tgot_static_max_align);
+	tgot_init_align = rtld_max(obj_main->tgotalign, 1);
+
+	/* Compute fragmets sizes. */
+	extra_size = tcbsize - TLS_TCB_SIZE;
+	tls_block_size = tcbsize;
+	pre_size = roundup2(tls_block_size, tgot_init_align) - tls_block_size;
+	tls_block_size += pre_size + tgot_static_space - TLS_TCB_SIZE;
+
+	/* Allocate whole TLS block */
+	tls_block = xmalloc_aligned(tls_block_size, maxalign, 0);
+	tcb = (struct tcb *)(tls_block + pre_size + extra_size);
+
+	dtv = xcalloc(1, sizeof(struct dtv) + tls_max_index *
+		sizeof(struct dtv_slot));
+	tcb->tcb_dtv = dtv;
+	dtv->dtv_gen = tls_dtv_generation;
+	dtv->dtv_size = tls_max_index;
+
+	/* Copy pthread */
+	tcb->tcb_thread = canonical->tcb_thread;
+
+	for (obj = globallist_curr(TAILQ_FIRST(&obj_list)); obj != NULL;
+	    obj = globallist_next(obj)) {
+		/* Skip if object does not use TLS */
+		if (obj->tlsindex == 0)
+			continue;
+
+		/* If there is not static TGOT, allocate one. */
+		if (obj->tgotoffset == 0)
+			addr = xmalloc_aligned(obj->tgotsize, obj->tgotalign,
+			    obj->tgotpoffset);
+		else
+			addr = cheri_bounds_set((char *)tcb + obj->tgotoffset,
+		            obj->tgotsize);
+		memset(addr, 0, obj->tgotsize);
+
+		/* Copy the TGOT entries of the requested compartments. */
+		for (size_t i = 0; i < obj->ncomparts; ++i) {
+			Compart_Entry *com = &obj->comparts[i];
+			if (com->compart_id != cid ||
+			    (ptraddr_t)obj->tgotinit > com->start ||
+			    (ptraddr_t)obj->tgotinit + obj->tgotsize < com->end)
+				continue;
+
+			offset = com->start - (ptraddr_t)obj->tgotinit;
+			memcpy((char *)addr + offset,
+			    (char *)canonical + obj->tgotoffset + offset,
+			    com->end - com->start);
+		}
+
+		/*
+		 * XXX: The exact range of TGOT entries for the default
+		 * compartment is unavailable, so all entries have to be copied.
+		 */
+		if (obj->default_compart_id == cid)
+			memcpy((char *)addr,
+			    (char *)canonical + obj->tgotoffset,
+			    obj->tgotsize);
+
+		/*
+		 * The value dtvs_tls should not be used by anyone. But if the
+		 * TCB is erroneously passed to tls_slot_get_tls, lazy
+		 * allocation will be triggered.
+		 */
+		dtv->dtv_slots[obj->tlsindex - 1] = (struct dtv_slot) {
+			.dtvs_tgot = addr
+		};
+	}
+
+	return (tcb);
+}
+#endif
 
 void
 free_tls(void *tcb, size_t tcbsize, size_t tcbalign)

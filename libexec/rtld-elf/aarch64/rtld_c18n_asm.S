@@ -126,16 +126,18 @@ ENTRY(create_untrusted_stk)
 	mov	w0, w13
 	bl	resolve_untrusted_stk_impl
 	mov	c10, c0
+	mov	c11, c1
 
 	restore_arguments
 
 	set_untrusted_stk	c10
+	set_tcb			c11
 
 	/*
 	 * Clear temporary registers, except:
 	 * c10: Callee's stack
+	 * c11: Callee's TCB
 	 */
-	mov	x11, xzr
 	mov	x12, xzr
 	mov	x13, xzr
 	mov	x14, xzr
@@ -304,9 +306,12 @@ TRAMP(tramp_push_frame)
 	csel	w20, w13, wzr, hi
 	/*
 	 * Load the callee's stack if the stack lookup table index is within
-	 * bounds. Otherwise the resolver will be loaded.
+	 * bounds. Otherwise the resolver will be loaded. Also load the callee's
+	 * TCB.
 	 */
-	ldr	c17, [STACK_TABLE_C, w20, uxtw #0]
+	add	STACK_TABLE_C, STACK_TABLE_C, x20
+	ldp	c17, c19, [STACK_TABLE_C]
+	set_tcb	c19
 	/*
 	 * The tag of the return capability is set iff the condition flag is cs.
 	 */
@@ -553,12 +558,20 @@ TRAMP(tramp_pop_frame)
 	/*
 	 * Store the caller's old stack top in the stack lookup table.
 	 */
-	str	c12, [STACK_TABLE_C, w10, uxtw #0]
+	mov	w13, w10
+	add	STACK_TABLE_C, STACK_TABLE_C, x13
+	str	c12, [STACK_TABLE_C]
+	
+	/*
+	 * Install the caller's TCB.
+	 */
+	ldr	c14, [STACK_TABLE_C, #CAP_WIDTH]
+	set_tcb	c14
 
 	/*
 	 * Extract the number of return value registers.
 	 */
-	ubfx	x13, x10, #50, #2
+	ubfx	x15, x10, #50, #2
 	/*
 	 * Clear unused return value registers. The registers to clear are
 	 * encoded as follows:
@@ -569,7 +582,7 @@ TRAMP(tramp_pop_frame)
 	 *
 	 * Use subs instead of cmp to clear a capability tag.
 	 */
-	subs	w14, w13, #0b01
+	subs	w16, w15, #0b01
 	csel	c0, czr, c0, lo
 	csel	c1, czr, c1, ls
 
@@ -584,8 +597,6 @@ TRAMP(tramp_pop_frame)
 	mov	x7, xzr
 	mov	x8, xzr
 	mov	x9, xzr
-	mov	x15, xzr
-	mov	x16, xzr
 	mov	x17, xzr
 	mov	x18, xzr
 
