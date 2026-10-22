@@ -1537,7 +1537,8 @@ pmap_bootstrap(void)
 	for (int i = 0; i < physmap_idx; i += 2) {
 		if ((physmap[i + 1] - physmap[i]) > largest_phys_size) {
 			largest_phys_size = physmap[i + 1] - physmap[i];
-			bs_state.freemempos = PHYS_TO_DMAP(physmap[i]);
+			bs_state.freemempos = PHYS_TO_DMAP_LEN(physmap[i],
+			    largest_phys_size);
 		}
 	}
 
@@ -2721,14 +2722,28 @@ pmap_map(vm_pointer_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 {
 	vm_pointer_t p;
 
-	p = PHYS_TO_DMAP(start);
-#ifdef __CHERI_PURE_CAPABILITY__
-	p = cheri_bounds_set(p, end - start);
+	p = PHYS_TO_DMAP_LEN(start, end - start);
+#ifdef __CHERI__
 	p = cheri_perms_and(p, vm_prot2perms(cheri_perms_get(p), prot));
+	KASSERT(cheri_tag_get(p), ("pmap_map: imprecise bounds"));
 #endif
 
 	return (p);
 }
+
+#ifdef __CHERI__
+vm_pointer_t
+pmap_map_imprecise(vm_pointer_t *virt, vm_paddr_t start, vm_paddr_t end,
+    int prot)
+{
+	vm_pointer_t p;
+
+	p = PHYS_TO_DMAP_ROUND_LEN(start, end - start);
+	p = cheri_perms_and(p, vm_prot2perms(cheri_perms_get(p), prot));
+
+	return (p);
+}
+#endif
 
 /*
  * Add a list of wired pages to the kva
