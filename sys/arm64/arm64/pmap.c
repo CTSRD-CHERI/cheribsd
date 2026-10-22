@@ -2731,6 +2731,20 @@ pmap_map(vm_pointer_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 	return (p);
 }
 
+#ifdef __CHERI__
+vm_pointer_t
+pmap_map_imprecise(vm_pointer_t *virt, vm_paddr_t start, vm_paddr_t end,
+    int prot)
+{
+	vm_pointer_t p;
+
+	p = PHYS_TO_DMAP_ROUND_LEN(start, end - start);
+	p = cheri_perms_and(p, vm_prot2perms(cheri_perms_get(p), prot));
+
+	return (p);
+}
+#endif
+
 /*
  * Add a list of wired pages to the kva
  * this routine is only used for temporary

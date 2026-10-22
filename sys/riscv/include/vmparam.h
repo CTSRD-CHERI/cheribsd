@@ -196,6 +196,16 @@
 		(len));							\
 })
 
+#define	PHYS_TO_DMAP_ROUND_LEN(pa, len)       \
+({									\
+	KASSERT(PHYS_IN_DMAP(pa) && PHYS_IN_DMAP((pa) + (len) - 1),	\
+	    ("%s: PA out of range, PA: 0x%lx", __func__,		\
+	    (vm_paddr_t)(pa)));						\
+	cheri_kern_bounds_set(						\
+	    (vm_pointer_t)_DMAP_BASE + ((pa) - dmap_phys_base),	\
+	    (len));							\
+})
+
 #define	DMAP_TO_PHYS(va)						\
 ({									\
 	KASSERT(VIRT_IN_DMAP(va),					\

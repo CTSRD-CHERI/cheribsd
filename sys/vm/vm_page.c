@@ -540,7 +540,7 @@ vm_page_array_alloc(vm_pointer_t *vaddr, vm_paddr_t end, vm_paddr_t page_range)
 	 * Allocate physical memory for the page structures, and map it.
 	 */
 	new_end = trunc_page(end - page_range * sizeof(struct vm_page));
-	vm_page_array = (vm_page_t)pmap_map(vaddr, new_end, end,
+	vm_page_array = (vm_page_t)pmap_map_imprecise(vaddr, new_end, end,
 	    VM_PROT_READ | VM_PROT_WRITE);
 	vm_page_array_size = page_range;
 
