@@ -529,18 +529,20 @@ vm_page_array_alloc(vm_pointer_t *vaddr, vm_paddr_t end, vm_paddr_t page_range)
 {
 	vm_paddr_t new_end;
 
+#ifndef __CHERI__
 	/*
 	 * Reserve an unmapped guard page to trap access to vm_page_array[-1].
 	 * However, because this page is allocated from KVM, out-of-bounds
 	 * accesses using the direct map will not be trapped.
 	 */
 	*vaddr += PAGE_SIZE;
+#endif
 
 	/*
 	 * Allocate physical memory for the page structures, and map it.
 	 */
 	new_end = trunc_page(end - page_range * sizeof(struct vm_page));
-	vm_page_array = (vm_page_t)pmap_map(vaddr, new_end, end,
+	vm_page_array = (vm_page_t)pmap_map_imprecise(vaddr, new_end, end,
 	    VM_PROT_READ | VM_PROT_WRITE);
 	vm_page_array_size = page_range;
 
