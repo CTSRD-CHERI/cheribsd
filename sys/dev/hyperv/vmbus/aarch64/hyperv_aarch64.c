@@ -102,6 +102,9 @@ is_hyperv(void)
 		printf("hyperv: Unable to map the FADT\n");
 		return (false);
 	}
+	if (fadt->Header.Revision < 6) {
+		return (false);
+	}
 
 	hypervid = fadt->HypervisorId;
 	acpi_unmap_table(fadt);
