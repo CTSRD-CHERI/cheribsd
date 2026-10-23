@@ -178,8 +178,8 @@ core_vn_write(const struct coredump_writer *cdw, const void * __capability base,
 {
 	struct coredump_vnode_ctx *ctx = cdw->ctx;
 
-	return (vn_rdwr_inchunks(UIO_WRITE, ctx->vp,
-	    __DECONST_CAP(void * __capability, base), len, offset, seg,
+	return (vn_rdwr_inchunks(UIO_WRITE, ctx->vp, __DECONST(void *, base),
+	    len, offset, seg,
 	    IO_UNIT | IO_DIRECT | IO_RANGELOCKED, cred, ctx->fcred, resid, td));
 }
 
