@@ -1096,7 +1096,8 @@ moea64_mid_bootstrap(vm_offset_t kernelstart, vm_offset_t kernelend)
 	/* Place at address usable through the direct map */
 	if (hw_direct_map)
 		moea64_bpvo_pool = (struct pvo_entry *)
-		    PHYS_TO_DMAP((uintptr_t)moea64_bpvo_pool);
+		    PHYS_TO_DMAP_LEN((uintptr_t)moea64_bpvo_pool,
+			moea64_bpvo_pool*sizeof(struct pvo_entry));
 
 	/*
 	 * Make sure kernel vsid is allocated as well as VSID 0.
@@ -2373,7 +2374,7 @@ moea64_map(vm_offset_t *virt, vm_paddr_t pa_start,
 			if (moea64_calc_wimg(va, VM_MEMATTR_DEFAULT) != LPTE_M)
 				break;
 		if (va == pa_end)
-			return (PHYS_TO_DMAP(pa_start));
+			return (PHYS_TO_DMAP_LEN(pa_start, pa_end - pa_start));
 	}
 	sva = *virt;
 	va = sva;

@@ -648,7 +648,8 @@ mmu_booke_sync_icache(pmap_t pm, vm_offset_t va, vm_size_t sz)
 		sync_sz = min(sync_sz, sz);
 		if (valid) {
 			pa += (va & PAGE_MASK);
-			__syncicache((void *)PHYS_TO_DMAP(pa), sync_sz);
+			__syncicache((void *)PHYS_TO_DMAP_LEN(pa, sync_sz),
+			    sync_sz);
 		}
 		va += sync_sz;
 		sz -= sync_sz;

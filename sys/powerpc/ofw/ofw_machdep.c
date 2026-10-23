@@ -91,21 +91,25 @@ static int	openfirmware(void *args);
 __inline void
 ofw_save_trap_vec(char *save_trap_vec)
 {
+	const size_t vecsize = EXC_LAST - EXC_RST;
 	if (!ofw_real_mode || !hw_direct_map)
                 return;
 
-	bcopy((void *)PHYS_TO_DMAP(EXC_RST), save_trap_vec, EXC_LAST - EXC_RST);
+	bcopy((void *)PHYS_TO_DMAP_LEN(EXC_RST, vecsize), save_trap_vec,
+	    vecsize);
 }
 
 static __inline void
 ofw_restore_trap_vec(char *restore_trap_vec)
 {
+	const size_t vecsize = EXC_LAST - EXC_RST;
+	const size_t syncsize = EXC_LAST - EXC_RSVD;
 	if (!ofw_real_mode || !hw_direct_map)
                 return;
 
-	bcopy(restore_trap_vec, (void *)PHYS_TO_DMAP(EXC_RST),
-	    EXC_LAST - EXC_RST);
-	__syncicache((void *)PHYS_TO_DMAP(EXC_RSVD), EXC_LAST - EXC_RSVD);
+	bcopy(restore_trap_vec, (void *)PHYS_TO_DMAP_LEN(EXC_RST, vecsize),
+	    vecsize);
+	__syncicache((void *)PHYS_TO_DMAP_LEN(EXC_RSVD, syncsize), syncsize);
 }
 
 #pragma clang diagnostic pop
