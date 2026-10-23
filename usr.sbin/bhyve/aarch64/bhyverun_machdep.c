@@ -375,7 +375,7 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 	}
 
 	for (uint64_t cpu = 0; cpu < (uint64_t)guest_ncpus; cpu++) {
-		uintcap_t mpidr;
+		uintptr_t mpidr;
 
 		error = vm_get_register(fbsdrun_vcpu(cpu), VM_REG_GUEST_MPIDR_EL1,
 		    &mpidr);
