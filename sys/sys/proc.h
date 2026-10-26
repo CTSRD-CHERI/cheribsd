@@ -755,8 +755,7 @@ struct proc {
 	sbintime_t	p_umtx_min_timeout;
 	vm_offset_t	p_psstrings;
 #if __has_feature(capabilities)
-	struct cheri_c18n_info	*p_c18n_info;	/* (x) Compartment info block */
-	struct cheri_mrs_stats	*p_cheri_mrs_stats; /* (x) Heap/mrs info block */
+	struct cheri_stats	*p_cheri_stats;	/* (x) Compartment/mrs info block */
 #endif
 /* End area that is copied on creation. */
 #define	p_endcopy	p_xexit

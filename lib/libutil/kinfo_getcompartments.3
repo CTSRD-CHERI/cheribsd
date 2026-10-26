@@ -19,7 +19,7 @@
 .Lb libutil
 .Sh SYNOPSIS
 .In sys/types.h
-.In cheri/c18n.h
+.In cheri/cheri_stats.h
 .In libutil.h
 .Ft struct kinfo_cheri_kc18n_compart *
 .Fn kinfo_getcompartments "int *cntp"
@@ -43,7 +43,7 @@ On success the
 function returns a pointer to an array of
 .Vt struct kinfo_cheri_kc18n_compart
 structures as defined by
-.In cheri/c18n.h .
+.In cheri/cheri_stats.h .
 The array is allocated by an internal call to
 .Xr malloc 3
 and must be freed by the caller with a call to

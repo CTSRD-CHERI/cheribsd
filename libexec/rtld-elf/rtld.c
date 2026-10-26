@@ -47,6 +47,10 @@
 #include <sys/uio.h>
 #include <sys/utsname.h>
 
+#ifdef __CHERI__
+#include <cheri/cheri_stats.h>
+#endif
+
 #include <dlfcn.h>
 #include <err.h>
 #include <errno.h>
@@ -72,8 +76,6 @@
 #ifdef CHERI_LIB_C18N
 #include "rtld_c18n.h"
 #endif
-
-#include <cheri/cheri_mrs.h>
 
 /* Types. */
 typedef void (*func_ptr_type)(void);
@@ -288,6 +290,9 @@ size_t ld_static_tls_extra =	    /* Static TLS extra space (bytes) */
 size_t ld_static_tgot_extra =	    /* Static TGOT extra space (bytes) */
     RTLD_STATIC_TGOT_EXTRA;
 #endif
+#ifdef __CHERI__
+struct cheri_stats *cheri_stats;
+#endif
 
 static Objlist list_global = /* Objects dlopened with RTLD_GLOBAL */
     STAILQ_HEAD_INITIALIZER(list_global);
@@ -347,8 +352,6 @@ static int stack_prot = PROT_READ | PROT_WRITE;
 static int stack_prot = PROT_READ | PROT_WRITE | PROT_EXEC;
 static int max_stack_flags;
 #endif
-
-struct cheri_mrs_stats *rtld_cheri_mrs_statsp __exported;
 
 void *rtld_bind_fptr = &_rtld_bind;
 void *tls_get_addr_common_fptr = &tls_get_addr_common;
@@ -1027,14 +1030,12 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		__progname = obj_rtld.path;
 	}
 #endif
-#ifdef __CHERI_PURE_CAPABILITY__
-    if (aux_info[AT_CHERI_MRS] != NULL) {
-        rtld_cheri_mrs_statsp = aux_info[AT_CHERI_MRS]->a_un.a_ptr;
-	bzero(rtld_cheri_mrs_statsp, sizeof(*rtld_cheri_mrs_statsp));
-        rtld_cheri_mrs_statsp->cms_size = sizeof(*rtld_cheri_mrs_statsp);
-        atomic_store_explicit(&rtld_cheri_mrs_statsp->cms_version,
-            CHERI_MRS_STATS_VERSION, memory_order_release);
-    }
+#ifdef __CHERI__
+	if (aux_info[AT_CHERI_STATS] != NULL) {
+		cheri_stats = aux_info[AT_CHERI_STATS]->a_un.a_ptr;
+		bzero(cheri_stats, sizeof(*cheri_stats));
+		cheri_stats->version = CHERI_C18N_INFO_VERSION;
+	}
 #endif
 
 	if (!digest_dynamic(obj_main, 0))

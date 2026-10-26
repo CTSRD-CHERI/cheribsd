@@ -44,6 +44,7 @@ extern const char *ld_compartment_unwind;
 extern const char *ld_compartment_stats;
 extern const char *ld_compartment_switch_count;
 extern const char *ld_compartment_no_fast_path;
+extern struct cheri_stats *cheri_stats;
 extern struct rtld_c18n_stats *c18n_stats;
 
 /*

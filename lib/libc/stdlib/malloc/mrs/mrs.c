@@ -47,7 +47,7 @@
 #include <cheri/cheric.h>
 #include <cheri/revoke.h>
 #include <cheri/libcaprevoke.h>
-#include <cheri/cheri_mrs.h>
+#include <cheri/cheri_stats.h>
 
 #include <machine/vmparam.h>
 
@@ -381,6 +381,7 @@ struct cheri_revoke_counters {
 	atomic_fetch_add_explicit((cntp), (value), memory_order_relaxed)
 
 static const char *mrs_statfile_name = NULL;
+static struct cheri_stats *cheri_stats;
 static struct cheri_mrs_stats *cmsp;
 static struct cheri_revoke_counters revoke_cntrs;
 static bool collect_revoke_stats = false;
@@ -1638,12 +1639,29 @@ mrs_init_impl_locked(void)
 	/*
 	 * Initial export of stats, to be updated on various allocation/etc.
 	 * events.
+	 * This is exported to the kernl via the AT_CHERI_STATS structure.
 	 */
 #ifdef MRS_STATS
 	if (secure_getenv(MALLOC_QUARANTINE_STATS_DISABLE_ENV) == NULL &&
 	    secure_getenv(MALLOC_QUARANTINE_STATS_ENABLE_ENV) != NULL) {
-		if (_elf_aux_info(AT_CHERI_MRS, &cmsp, sizeof(cmsp)) < 0)
-			mrs_puts("error getting AT_CHERI_MRS\n");
+		if (_elf_aux_info(AT_CHERI_STATS, &cheri_stats,
+		    sizeof(cheri_stats)) < 0) {
+			mrs_puts("error getting AT_CHERI_STATS\n");
+			exit(7);
+		}
+		if (cheri_stats->version != CHERI_C18N_INFO_VERSION) {
+			mrs_puts("Invalid cheri info version");
+			exit(7);
+		}
+		/* Dynamically initialize the stats region */
+		cmsp = mmap(NULL, sizeof(*cheri_stats), PROT_READ | PROT_WRITE,
+		    MAP_ANON, -1, 0);
+		if (cmsp == MAP_FAILED) {
+			mrs_puts("Cannot mmap MRS stats");
+			exit(7);
+		}
+		(void)msetname(cmsp, sizeof(*cmsp), "mrs:mrs_stats");
+
 		cmsp->cms_mrs_arenas = APP_QUARANTINE_ARENAS;
 		cmsp->cms_mrs_quarantine_numerator = quarantine_numerator;
 		cmsp->cms_mrs_quarantine_denominator = quarantine_denominator;
@@ -1660,6 +1678,9 @@ mrs_init_impl_locked(void)
 			cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_BOUNDPTRS;
 		clock_gettime(CLOCK_REALTIME, &cmsp->cms_mrs_ts_start);
 		cmsp->cms_mrs_flags |= CHERI_MRS_FLAGS_INITIALIZED;
+		cmsp->cms_version = CHERI_MRS_STATS_VERSION;
+		cheri_stats->mrs_stats = cmsp;
+		cheri_stats->mrs_stats_size = sizeof(*cmsp);
 	}
 	if (secure_getenv(MALLOC_REVOKE_STATS_ENABLE_ENV) != NULL) {
 		collect_revoke_stats = true;

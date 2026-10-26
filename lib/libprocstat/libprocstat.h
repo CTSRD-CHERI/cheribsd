@@ -38,8 +38,7 @@
 #include <sys/elf.h>
 #endif
 #include <sys/caprights.h>
-#include <cheri/c18n.h>
-#include <cheri/cheri_mrs.h>
+#include <cheri/cheri_stats.h>
 
 /*
  * Vnode types.
