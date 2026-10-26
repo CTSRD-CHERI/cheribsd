@@ -42,7 +42,7 @@
 #include <sys/socket.h>
 #include <sys/user.h>
 
-#include <cheri/c18n.h>
+#include <cheri/cheri_stats.h>
 #include <cheri/revoke.h>
 #include <cheri/revoke_kern.h>
 

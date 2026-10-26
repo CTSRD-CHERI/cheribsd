@@ -123,8 +123,9 @@ extern size_t ld_static_tls_extra;
 #ifdef TLS_TGOT
 extern size_t ld_static_tgot_extra;
 #endif
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 extern Elf_Ehdr __ehdr_start;
+extern struct cheri_stats *cheri_stats;
 #endif
 
 extern int npagesizes;

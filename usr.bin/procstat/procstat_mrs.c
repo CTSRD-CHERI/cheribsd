@@ -33,7 +33,7 @@
 #include <sys/param.h>
 #include <sys/user.h>
 
-#include <cheri/cheri_mrs.h>
+#include <cheri/cheri_stats.h>
 
 #include <err.h>
 #include <libprocstat.h>

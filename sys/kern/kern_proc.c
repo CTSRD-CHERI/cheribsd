@@ -109,9 +109,8 @@
 #endif
 
 #if __has_feature(capabilities)
-#include <cheri/c18n.h>
+#include <cheri/cheri_stats.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_mrs.h>
 #endif
 
 SDT_PROVIDER_DEFINE(proc);
@@ -2542,7 +2541,7 @@ sysctl_kern_proc_c18n(SYSCTL_HANDLER_ARGS)
 	int *name = (int *)arg1;
 	u_int namelen = arg2;
 	struct proc *p;
-	struct cheri_c18n_info info;
+	struct cheri_stats info;
 	int error;
 	void *buffer;
 	ssize_t n;
@@ -2556,10 +2555,10 @@ sysctl_kern_proc_c18n(SYSCTL_HANDLER_ARGS)
 
 	if ((p->p_flag & P_SYSTEM) != 0 ||
 	    SV_PROC_FLAG(p, SV_CHERI) == 0 ||
-	    p->p_c18n_info == NULL)
+	    p->p_cheri_stats == NULL)
 		goto out;
 
-	n = proc_readmem_cap(curthread, p, (vm_offset_t)p->p_c18n_info, &info,
+	n = proc_readmem_cap(curthread, p, (vm_offset_t)p->p_cheri_stats, &info,
 	    sizeof(info));
 	if (n != sizeof(info)) {
 		error = EFAULT;
@@ -2571,24 +2570,25 @@ sysctl_kern_proc_c18n(SYSCTL_HANDLER_ARGS)
 	 * error out.
 	 */
 	if (info.version != CHERI_C18N_INFO_VERSION ||
-	    info.stats_size == 0 ||
-	    info.stats_size > RTLD_C18N_STATS_MAX_SIZE) {
+	    info.c18n_stats_size == 0 ||
+	    info.c18n_stats_size > RTLD_C18N_STATS_MAX_SIZE) {
 		error = ENOEXEC;
 		goto out;
 	}
 
-	if (!cheri_can_access(info.stats, CHERI_PERM_LOAD, info.stats_size)) {
+	if (!cheri_can_access(info.c18n_stats, CHERI_PERM_LOAD,
+	    info.c18n_stats_size)) {
 		error = EPROT;
 		goto out;
 	}
-	buffer = malloc(info.stats_size, M_TEMP, M_WAITOK);
-	n = proc_readmem(curthread, p, (__cheri_addr vm_offset_t)info.stats,
-	    buffer, info.stats_size);
-	if (n != info.stats_size) {
+	buffer = malloc(info.c18n_stats_size, M_TEMP, M_WAITOK);
+	n = proc_readmem(curthread, p, (__cheri_addr vm_offset_t)info.c18n_stats,
+	    buffer, info.c18n_stats_size);
+	if (n != info.c18n_stats_size) {
 		error = EFAULT;
 		goto out_free;
 	}
-	error = SYSCTL_OUT(req, buffer, info.stats_size);
+ 	error = SYSCTL_OUT(req, buffer, info.c18n_stats_size);
 out_free:
 	free(buffer, M_TEMP);
 out:
@@ -2652,7 +2652,7 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	int error, *name = (int *)arg1;
 	u_int namelen = arg2;
 	struct proc *p;
-	struct cheri_c18n_info info;
+	struct cheri_stats info;
 	struct rtld_c18n_compart rcc;
 	struct kinfo_cheri_c18n_compart kccc;
 	vm_offset_t rccp;
@@ -2668,10 +2668,10 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 
 	if ((p->p_flag & P_SYSTEM) != 0 ||
 	    SV_PROC_FLAG(p, SV_CHERI) == 0 ||
-	    p->p_c18n_info == NULL)
+	    p->p_cheri_stats == NULL)
 		goto out;
 
-	len = proc_readmem_cap(curthread, p, (vm_offset_t)p->p_c18n_info, &info,
+	len = proc_readmem_cap(curthread, p, (vm_offset_t)p->p_cheri_stats, &info,
 	    sizeof(info));
 	if (len != sizeof(info)) {
 		error = EFAULT;
@@ -2743,7 +2743,7 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 
 		/* If the generation counter has changed, abort. */
 		len = proc_readmem(curthread, p,
-		    (vm_offset_t)&p->p_c18n_info->comparts_gen, &gen,
+		    (vm_offset_t)&p->p_cheri_stats->comparts_gen, &gen,
 		    sizeof(gen));
 		if (len != sizeof(gen)) {
 			error = EFAULT;
@@ -2775,9 +2775,6 @@ out:
 
 /*
  * Return heap and mrs statistics block from the target process.
- *
- * XXXRW: Probably storage for 'stats' should be heap allocated, not stack
- * allocated, in case of substantial future growth.
  */
 static int
 sysctl_kern_proc_cheri_mrs_stats(SYSCTL_HANDLER_ARGS)
@@ -2785,7 +2782,8 @@ sysctl_kern_proc_cheri_mrs_stats(SYSCTL_HANDLER_ARGS)
 	int *name = (int *)arg1;
 	u_int namelen = arg2;
 	struct proc *p;
-	struct cheri_mrs_stats stats;
+	char *buffer;
+	struct cheri_stats stats;
 	int error;
 	ssize_t n;
 
@@ -2798,28 +2796,40 @@ sysctl_kern_proc_cheri_mrs_stats(SYSCTL_HANDLER_ARGS)
 
 	if ((p->p_flag & P_SYSTEM) != 0 ||
 	    SV_PROC_FLAG(p, SV_CHERI) == 0 ||
-	    p->p_cheri_mrs_stats == NULL)
+	    p->p_cheri_stats == NULL)
 		goto out;
 
-	n = proc_readmem(curthread, p, (vm_offset_t)p->p_cheri_mrs_stats,
+	n = proc_readmem_cap(curthread, p, (__cheri_addr vm_offset_t)p->p_cheri_stats,
 	    &stats, sizeof(stats));
 	if (n != sizeof(stats)) {
 		error = EFAULT;
 		goto out;
 	}
 
-	/*
-	 * If there is a version mismatch or the statistics block is oversized,
-	 * error out.
-	 */
-	if (stats.cms_version != CHERI_MRS_STATS_VERSION ||
-	    stats.cms_size == 0 ||
-	    stats.cms_size > CHERI_MRS_STATS_MAX_SIZE) {
+	/* Verify stats block version */
+	if (stats.version != CHERI_C18N_INFO_VERSION ||
+	    stats.mrs_stats == NULL ||
+	    stats.mrs_stats_size == 0 ||
+	    stats.mrs_stats_size > CHERI_MRS_STATS_MAX_SIZE) {
 		error = ENOEXEC;
 		goto out;
 	}
 
-	error = SYSCTL_OUT(req, &stats, stats.cms_size);
+	if (!cheri_can_access(stats.mrs_stats, CHERI_PERM_LOAD,
+	    stats.mrs_stats_size)) {
+		error = EPROT;
+		goto out;
+	}
+	buffer = malloc(stats.mrs_stats_size, M_TEMP, M_WAITOK);
+	n = proc_readmem(curthread, p, (__cheri_addr vm_offset_t)stats.mrs_stats,
+	    buffer, stats.mrs_stats_size);
+	if (n != stats.mrs_stats_size) {
+		error = EFAULT;
+		goto out_free;
+	}
+	error = SYSCTL_OUT(req, buffer, stats.mrs_stats_size);
+out_free:
+	free(buffer, M_TEMP);
 out:
 	PRELE(p);
 	return (error);
