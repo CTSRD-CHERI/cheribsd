@@ -83,7 +83,7 @@ struct ck_epoch_ref {
 };
 
 struct ck_epoch_record {
-	ck_stack_entry_t record_next;
+	ck_stack_entry_t record_next __subobject_use_container_bounds;
 	struct ck_epoch *global;
 	unsigned int state;
 	unsigned int epoch;
