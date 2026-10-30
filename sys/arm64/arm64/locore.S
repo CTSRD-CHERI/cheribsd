@@ -1044,7 +1044,7 @@ common:
 
 	/* Link the l0 -> l1 table */
 	mov	x9, x6
-	buildptr_pagetable 6, pagetable_l1_ttbr0_bootstrap, 11
+	buildptr_pagetable 6, pagetable_l0_ttbr0_bootstrap, 11
 	mov	x10, #1
 	bl	link_l0_pagetable
 
