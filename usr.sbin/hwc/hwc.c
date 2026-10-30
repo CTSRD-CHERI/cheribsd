@@ -93,7 +93,6 @@ static int
 hwc_ctx_alloc(struct hwc_context *tc)
 {
 	struct hwc_alloc al;
-	char filename[32];
 	int error = 0;
 
 	if (tc->backend->methods->init != NULL) {
@@ -109,10 +108,7 @@ hwc_ctx_alloc(struct hwc_context *tc)
 	else
 		return (-1);
 
-	al.pid = tc->pid;
 	al.backend_name = tc->backend->name;
-	al.backend_name_len = strlen((__cheri_fromcap const char *)tc->backend->name);
-	al.ident = &tc->ident;
 
 	error = ioctl(tc->fd, HWC_IOC_ALLOC, &al);
 	if (error) {
@@ -121,13 +117,7 @@ hwc_ctx_alloc(struct hwc_context *tc)
 		return (error);
 	}
 
-	sprintf(filename, "/dev/hwc_%d", tc->ident);
-
-	tc->ctx_fd = open(filename, O_RDWR);
-	if (tc->ctx_fd < 0) {
-		printf("Can't open %s\n", filename);
-		return (-1);
-	}
+	tc->ctx_fd = al.fd;
 
 	return (0);
 }
@@ -314,8 +304,8 @@ main(int argc, char **argv, char **env)
 			backend_name = strdup(optarg);
 			found = 0;
 			for (i = 0; backends[i].name != NULL; i++) {
-				if (strcmp((__cheri_fromcap const char *)
-				    backends[i].name, backend_name) == 0) {
+				if (strcmp(backends[i].name, backend_name) ==
+				    0) {
 					tc->backend = &backends[i];
 					found = 1;
 					break;
