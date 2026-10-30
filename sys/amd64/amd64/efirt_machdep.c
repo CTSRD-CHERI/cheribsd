@@ -101,7 +101,7 @@ efi_phys_to_kva(vm_paddr_t paddr, vm_size_t size)
 {
 
 	if (PHYS_SZ_IN_DMAP(paddr, size))
-		return (PHYS_TO_DMAP(paddr));
+		return (PHYS_TO_DMAP_LEN(paddr, size));
 	return (0);
 }
 

@@ -58,6 +58,7 @@
 #include <sys/proc.h>
 
 #include <vm/vm.h>
+#include <vm/vm_param.h>
 #include <vm/pmap.h>
 
 #include <machine/bus.h>

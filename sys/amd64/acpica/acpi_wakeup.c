@@ -42,6 +42,7 @@
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <vm/vm_page.h>
+#include <vm/vm_param.h>
 
 #include <machine/clock.h>
 #include <machine/cpu.h>
