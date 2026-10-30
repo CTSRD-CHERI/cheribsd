@@ -49,6 +49,10 @@ CFLAGS+=	-I${CHERIBSDTEST_DIR}/${MACHINE}
 
 CFLAGS+=	'-DPROG="${PROG}"' '-DPROG_SUFFIX="${PROG:S/^cheribsdtest//}"'
 
+# Don't try any subobject bounds so cheribsdtest_bounds_subobject.c can
+# force them in CFLAGS
+OPT_CHERI_SUBOBJECT_BOUNDS=none
+
 .if ${MACHINE_ABI:Mpurecap}
 SRCS+=	cheribsdtest_cheriabi.c
 SRCS+=	cheribsdtest_cheriabi_libc.c

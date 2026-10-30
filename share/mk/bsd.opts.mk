@@ -76,6 +76,7 @@ __DEFAULT_NO_OPTIONS = \
     BIND_NOW \
     BRANCH_PROTECTION \
     CCACHE_BUILD \
+    CHERI_SUBOBJECT_BOUNDS_DEBUG \
     COMPARTMENT_POLICY \
     CTF \
     INSTALL_AS_USER \
@@ -110,8 +111,23 @@ BROKEN_OPTIONS+=	BRANCH_PROTECTION
 .endif
 
 __SINGLE_OPTIONS = \
+   CHERI_SUBOBJECT_BOUNDS \
    CHERI_TGOT_TLS \
    INIT_ALL
+
+__CHERI_SUBOBJECT_BOUNDS_OPTIONS= \
+    none \
+    conservative \
+    references-only \
+    subobject-safe \
+    raggressive \
+    very-aggressive \
+    everywhere-unsafe
+.if ${MACHINE_ARCH} == "aarch64c" || ${MACHINE_ARCH} == "riscv64c"
+__CHERI_SUBOBJECT_BOUNDS_DEFAULT=	subobject-safe
+.else
+__CHERI_SUBOBJECT_BOUNDS_DEFAULT=	none
+.endif
 
 __CHERI_TGOT_TLS_OPTIONS=	native no compat yes
 __CHERI_TGOT_TLS_DEFAULT=	yes

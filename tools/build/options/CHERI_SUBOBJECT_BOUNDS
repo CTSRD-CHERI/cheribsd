@@ -1,0 +1,39 @@
+On CHERI targets, set the maximum degree of bounds tightening for
+userspace programs and libraries.
+The default value is
+.Li conservative
+on CHERI targets and
+.Li none
+on other targets.
+Each value adds bounds beyond the previous one:
+.Bl -tag -width indent
+.It Li none
+Don't try to set bounds.
+In practice, this is the same as
+.Li conservative
+on CHERI targets.
+.It Li conservative
+Stack allocations
+.It Li references-only
+C++ references that are a fixed size
+.It Li subobject-safe
+When taking a pointer to a subobject
+.It Li aggressive
+Whenever feasiable and not annotated as unsafe
+.It Li very-aggressive
+On individul array entries in &array[index] expressions
+.It everywhere-unsafe
+Everywhere there is no opt-out.
+.El
+Individual program or library Makefiles opt in by setting
+.Va CHERI_SUBOBJECT_BOUNDS_MAX
+to a value other than
+.Li conservative
+before including
+.In bsd.lib.mk
+or
+.In bsd.prog.mk .
+.Pp
+Values above
+.Li subobject-safe
+are likely to be unusable in practice.
