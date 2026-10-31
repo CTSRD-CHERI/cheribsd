@@ -47,12 +47,17 @@
 #include <sys/uio.h>
 #include <sys/utsname.h>
 
+#ifdef __CHERI__
+#include <cheri/cheri_stats.h>
+#endif
+
 #include <dlfcn.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdarg.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -284,6 +289,9 @@ size_t ld_static_tls_extra =	    /* Static TLS extra space (bytes) */
 #ifdef TLS_TGOT
 size_t ld_static_tgot_extra =	    /* Static TGOT extra space (bytes) */
     RTLD_STATIC_TGOT_EXTRA;
+#endif
+#ifdef __CHERI__
+struct cheri_stats *cheri_stats;
 #endif
 
 static Objlist list_global = /* Objects dlopened with RTLD_GLOBAL */
@@ -1020,6 +1028,13 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		free(obj_rtld.path);
 		obj_rtld.path = xstrdup(obj_main->interp);
 		__progname = obj_rtld.path;
+	}
+#endif
+#ifdef __CHERI__
+	if (aux_info[AT_CHERI_STATS] != NULL) {
+		cheri_stats = aux_info[AT_CHERI_STATS]->a_un.a_ptr;
+		bzero(cheri_stats, sizeof(*cheri_stats));
+		cheri_stats->version = CHERI_C18N_INFO_VERSION;
 	}
 #endif
 
