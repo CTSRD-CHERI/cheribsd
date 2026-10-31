@@ -638,15 +638,6 @@ void create_untrusted_stk(void);
 
 static _Atomic(struct stk_table *) dead_stk_tables;
 
-/*
- * A fake tcb that is passed to libthr during thread creation and destruction.
- */
-struct tcb_wrapper {
-	struct tcb header __attribute__((cheri_no_subobject_bounds));
-	struct tcb *tcb;
-	struct stk_table *table;
-};
-
 static void
 push_stk_table(_Atomic(struct stk_table *) *head, struct stk_table *table)
 {
@@ -746,6 +737,15 @@ c18n_free_tcb(void)
 
 	table = pop_stk_table(&dead_stk_tables);
 
+#if defined(TLS_TGOT) && !defined(TLS_TGOT_COMPAT)
+	/*
+	 * Skip freeing RTLD's and system libraries' TCBs because they are the
+	 * canonical TCB whose lifetime is managed by libthr.
+	 */
+	for (size_t i = RTLD_COMPART_ID + 2; i < table->meta->capacity; ++i)
+		free_tls(table->entries[i].tcb, TLS_TCB_SIZE, TLS_TCB_ALIGN);
+#endif
+
 	c18n_free(table->meta->wrap);
 	c18n_free(table->meta);
 	c18n_free(table);
@@ -842,7 +842,15 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 		.size = size,
 		.begin = sp
 	};
-	table->entries[RTLD_COMPART_ID].stack = sp + size;
+	table->entries[RTLD_COMPART_ID] = (struct stk_table_entry) {
+		.stack = sp + size,
+		.tcb = table->meta->wrap->tcb
+	};
+
+	/*
+	 * Install the compartment TCB.
+	 */
+	_tcb_set(table->meta->wrap->tcb);
 
 	/*
 	 * Push a dummy trusted frame indicating that the 'root' compartment is
@@ -858,11 +866,13 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 
 #define	C18N_STACK_SIZE		(4 * 1024 * 1024)
 
-static void *
+static struct stk_table_entry
 get_or_create_untrusted_stk(compart_id_t cid, struct stk_table **tablep)
 {
 	char *stk;
 	size_t size;
+	struct tcb *tcb;
+	struct stk_table_entry ret;
 	RtldLockState lockstate;
 	struct stk_table *table = *tablep;
 
@@ -879,29 +889,46 @@ get_or_create_untrusted_stk(compart_id_t cid, struct stk_table **tablep)
 		lock_release(rtld_bind_lock, &lockstate);
 		set_stk_table(table);
 	} else if (table->meta->compart_stk[cid].size > 0)
-		return (table->entries[cid].stack);
+		return (table->entries[cid]);
 
 	size = C18N_STACK_SIZE;
 	stk = create_stk(size);
+
+	tcb = table->meta->wrap->tcb;
+#if defined(TLS_TGOT) && !defined(TLS_TGOT_COMPAT)
+	/*
+	 * System libraries directly use the canonical TCB to avoid taking a
+	 * lock, which causes infinite recursion when calling into libthr.
+	 */
+	if (cid != RTLD_COMPART_ID + 1) {
+		wlock_acquire(rtld_bind_lock, &lockstate);
+		tcb = allocate_compart_tls(cid, tcb,
+		    TLS_TCB_SIZE, TLS_TCB_ALIGN);
+		lock_release(rtld_bind_lock, &lockstate);
+	}
+#endif
 
 	table->meta->compart_stk[cid] = (struct stk_table_stk_info) {
 		.size = size,
 		.begin = stk - size
 	};
-	table->entries[cid].stack = cheri_perms_clear(stk, CHERI_PERM_SW_VMEM);
+	ret = table->entries[cid] = (struct stk_table_entry) {
+		.stack = cheri_perms_clear(stk, CHERI_PERM_SW_VMEM),
+		.tcb = tcb
+	};
 
 	atomic_fetch_add_explicit(&c18n_stats->rcs_ustack, 1,
 	    memory_order_relaxed);
 
-	return (stk);
+	return (ret);
 }
 
-void *resolve_untrusted_stk_impl(stk_table_index);
+struct stk_table_entry resolve_untrusted_stk_impl(stk_table_index);
 
-void *
+struct stk_table_entry
 resolve_untrusted_stk_impl(stk_table_index index)
 {
-	void *stk;
+	struct stk_table_entry ret;
 	sigset_t nset, oset;
 	struct stk_table *table;
 	struct trusted_frame *tf;
@@ -920,13 +947,13 @@ resolve_untrusted_stk_impl(stk_table_index index)
 	sigprocmask(SIG_SETMASK, &nset, &oset);
 
 	table = get_stk_table();
-	stk = get_or_create_untrusted_stk(index_to_cid(index), &table);
+	ret = get_or_create_untrusted_stk(index_to_cid(index), &table);
 
 	sigprocmask(SIG_SETMASK, &oset, NULL);
 
 	tf = pop_dummy_rtld_trusted_frame(tf);
 
-	return (stk);
+	return (ret);
 }
 
 /*
@@ -1737,6 +1764,7 @@ make_restricted(void *fptr)
 	return (cheri_sentry_create(fptr));
 }
 
+/* Called before loading objects */
 void
 c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 {
@@ -1817,6 +1845,7 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
  */
 #define	MAX_TRAMP_PG_SIZE		(4 * 1024 * 1024)
 
+/* Called before relocations */
 void
 c18n_init2(Obj_Entry *obj_rtld)
 {
@@ -1837,12 +1866,6 @@ c18n_init2(Obj_Entry *obj_rtld)
 
 	sealer_trusted_stk = cheri_bounds_set_exact(sealer, 1);
 	sealer += 1;
-
-	/*
-	 * All libraries have been loaded. Create and initialise a stack lookup
-	 * table with the same size as the number of compartments.
-	 */
-	init_stk_table(expand_stk_table(NULL, comparts.size), NULL);
 
 	/*
 	 * Create a trampoline table with 2^9 = 512 entries.
@@ -1916,6 +1939,23 @@ c18n_init2(Obj_Entry *obj_rtld)
 #endif
 }
 
+/* Called before init functions */
+void
+c18n_init3(void)
+{
+	struct tcb_wrapper *wrap;
+
+	/*
+	 * All libraries have been loaded. Create and initialise a stack lookup
+	 * table with the same size as the number of compartments.
+	 */
+	wrap = c18n_malloc(sizeof(*wrap));
+	*wrap = (struct tcb_wrapper) {
+		.tcb = _tcb_get()
+	};
+	init_stk_table(expand_stk_table(NULL, comparts.size), wrap);
+}
+
 /*
  * libthr support
  */
@@ -1955,6 +1995,14 @@ _rtld_thread_start(struct pthread *curthread)
 		_tcb_set(tcb);
 
 		table = cheri_unseal(wrap->table, sealer_tcb);
+		/*
+		 * The wrapper now holds the canonical tcb. Clear other fields
+		 * for safety.
+		 */
+		*wrap = (struct tcb_wrapper) {
+			.tcb = tcb
+		};
+
 		init_stk_table(table, wrap);
 	}
 
@@ -1996,9 +2044,7 @@ _rtld_thr_exit(long *state)
 	 */
 	i = RTLD_COMPART_ID;
 	table->meta->compart_stk[i] = (struct stk_table_stk_info) {};
-	table->entries[i] = (struct stk_table_entry) {
-		.stack = create_untrusted_stk,
-	};
+	table->entries[i].stack = NULL;
 
 	/*
 	 * Unmap each compartment's stack.
@@ -2022,9 +2068,7 @@ _rtld_thr_exit(long *state)
 			abort();
 		}
 		*data = (struct stk_table_stk_info) {};
-		table->entries[i] = (struct stk_table_entry) {
-			.stack = create_untrusted_stk,
-		};
+		table->entries[i].stack = NULL;
 	}
 
 	/*
@@ -2326,7 +2370,7 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	 * Get the stack of the signal handler's compartment.
 	 */
 	table = get_stk_table();
-	osp = get_or_create_untrusted_stk(callee, &table);
+	osp = get_or_create_untrusted_stk(callee, &table).stack;
 	nsp = osp - 1;
 	*nsp = (struct sigframe) {
 		.sf_si = *info,
