@@ -100,7 +100,7 @@ _WITH_NO_SUBOBJECT_BOUNDS!= grep -c __no_subobject_bounds ${HOST_INCLUDE_ROOT}/s
 SYSINCS+=	cdefs.h
 .endif
 # Define ptraddr_t for bootstrapping
-INCS+=	stdint.h
+INCS+=	stddef.h
 
 _WITH_EXPLICIT_BZERO!= cat ${HOST_INCLUDE_ROOT}/strings.h ${HOST_INCLUDE_ROOT}/string.h | grep -c explicit_bzero || true
 .if ${_WITH_EXPLICIT_BZERO} == 0
