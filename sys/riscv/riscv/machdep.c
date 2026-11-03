@@ -653,7 +653,11 @@ initriscv(struct riscv_bootparams *rvbp)
 
 	/* Set the pcpu pointer */
 #ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __riscv_y
+	__asm __volatile("ymv tp, %0" :: "C"(pcpup));
+#else
 	__asm __volatile("cmove ctp, %0" :: "C"(pcpup));
+#endif
 #else
 	__asm __volatile("mv tp, %0" :: "r"(pcpup));
 #endif
@@ -720,7 +724,7 @@ initriscv(struct riscv_bootparams *rvbp)
 
 	cninit();
 
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && defined __riscv_xcheri
 	/*
 	 * Now that printf() is ready, we check for the required CHERI features
 	 * needed to run this version of CheriBSD to detect incompatible (old)

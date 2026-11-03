@@ -56,10 +56,16 @@
 #define	SCAUSE_LOAD_GUEST_PAGE_FAULT	21
 #define	SCAUSE_VIRTUAL_INSTRUCTION	22
 #define	SCAUSE_STORE_GUEST_PAGE_FAULT	23
-#if __has_feature(capabilities)
-#define	SCAUSE_LOAD_CAP_PAGE_FAULT	26
-#define	SCAUSE_STORE_AMO_CAP_PAGE_FAULT	27
+#if defined(__riscv_xcheri)
+#define	SCAUSE_CHERI_LOAD_PAGE_FAULT	26
+#define	SCAUSE_CHERI_STORE_AMO_PAGE_FAULT	27
 #define	SCAUSE_CHERI			28
+#elif defined(__riscv_y)
+#define	SCAUSE_CHERI_INST_ACCESS_FAULT	32
+#define	SCAUSE_CHERI_LOAD_ACCESS_FAULT	33
+#define	SCAUSE_CHERI_STORE_AMO_ACCESS_FAULT	34
+#define	SCAUSE_CHERI_LOAD_PAGE_FAULT	35
+#define	SCAUSE_CHERI_STORE_AMO_PAGE_FAULT	36
 #endif
 
 #define	SSTATUS_UIE			(1 << 0)
@@ -200,6 +206,7 @@
 #define	SATP_MODE_SV48	(9ULL << SATP_MODE_S)
 
 #if __has_feature(capabilities)
+#ifdef __riscv_xcheri
 #define	SCCSR_E			(1 << 0)
 #define	SCCSR_SGCLG		(1 << 2)
 #define	SCCSR_UGCLG		(1 << 3)
@@ -213,6 +220,11 @@
 #define	TVAL_CAP_IDX(tval)						\
 	(((tval) & TVAL_CAP_IDX_MASK) >> TVAL_CAP_IDX_SHIFT)
 #endif
+
+#if defined(__riscv_y)
+#define	SENVCFG_Y	(0x01 << 9)
+#endif
+#endif /* __has_feature(capabilities) */
 
 #define	XLEN		__riscv_xlen
 #define	XLEN_BYTES	(XLEN / 8)
@@ -308,11 +320,45 @@
 #endif
 
 #if __has_feature(capabilities)
+#ifdef __riscv_xcheri
 #define	scr_read(scr)							\
 ({	void * __capability val;					\
 	__asm __volatile("cspecialr %0, " #scr : "=C" (val));		\
 	val;								\
 })
+#define	scr_write(scr, val)						\
+({									\
+	__asm __volatile("cspecialw " #scr ", %0" :: "C" (val));	\
+})
+#else /* !defined(__riscv_xcheri) */
+#ifdef __CHERI__
+#define	scr_read(scr)							\
+({	void * __capability val;					\
+	__asm __volatile("csrr %0, " #scr : "=C" (val));		\
+	val;								\
+})
+#define	scr_write(scr, val)						\
+({									\
+	__asm __volatile("csrw " #scr ", %0" :: "C" (val));		\
+})
+#else /* !defined(__CHERI__) */
+#define	scr_read(scr)							\
+({	void * __capability val;					\
+	__asm __volatile("ymodeswy\n"					\
+			 "csrr %0, " #scr "\n"				\
+			 "ymodeswi\n"					\
+			: "=C" (val));					\
+	val;								\
+})
+#define	scr_write(scr, val)						\
+({									\
+	__asm __volatile("ymodeswy\n"					\
+			 "csrw " #scr ", %0\n"				\
+			 "ymodeswi\n"					\
+			:: "C" (val));					\
+})
+#endif /* !defined(__CHERI__) */
+#endif /* defined(__riscv_xcheri) */
 #endif
 
 #endif /* !_MACHINE_RISCVREG_H_ */

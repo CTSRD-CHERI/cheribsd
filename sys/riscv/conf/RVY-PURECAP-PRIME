@@ -1,0 +1,10 @@
+#NO_UNIVERSE
+
+include "GENERIC"
+include "std.MFS-ROOT"
+include "std.RVY-PURECAP"
+
+ident RVY-PURECAP-PRIME
+
+options 	FDT
+options         HZ=100

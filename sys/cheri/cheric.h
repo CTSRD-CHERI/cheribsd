@@ -89,10 +89,17 @@
 #define cheri_tag_clear(x)	__builtin_cheri_tag_clear(x)
 #define cheri_tag_get(x)	__builtin_cheri_tag_get(x)
 #ifdef __riscv
-#define cheri_tags_load(m)						\
-	__builtin_cheri_cap_load_tags((__cheri_tocap void * __capability)(m))
+#if defined(__riscv_y)
+/* CLoadTags not available, just use gettag(load) instead. */
+#define	cheri_tags_load(m)						\
+	cheri_tag_get(							\
+	    *(uintcap_t * __capability)(__cheri_tocap void * __capability)(m))
 #else
-#define cheri_tags_load(x)	__builtin_cheri_cap_load_tags(x)
+#define	cheri_tags_load(m)						\
+	__builtin_cheri_cap_load_tags((__cheri_tocap void * __capability)(m))
+#endif
+#else
+#define	cheri_tags_load(x)	__builtin_cheri_cap_load_tags(x)
 #endif
 #define cheri_type_copy(x, y)	__builtin_cheri_cap_type_copy((x), (y))
 #define cheri_type_get(x)	__builtin_cheri_type_get(x)
@@ -143,14 +150,6 @@
 
 /* Compare capabilities including bounds and perms etc. */
 #define cheri_equal_exact(x, y) __builtin_cheri_equal_exact(x, y)
-
-#ifdef __riscv
-#define	cheri_loadtags(m)						\
-	__builtin_cheri_cap_load_tags((__cheri_tocap void * __capability)(m))
-#else
-#define	cheri_loadtags(m)	__builtin_cheri_cap_load_tags((m))
-#endif
-
 #endif /* __WANT_OLD_CHERI_MACROS */
 
 /*

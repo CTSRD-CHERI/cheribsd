@@ -109,7 +109,11 @@ C18N_WRAPPED=	\
 	vfork
 
 SRCS+=		${C18N_WRAPPED:S/$/_c18n.c/}
-PSEUDO+=	${C18N_WRAPPED}
+.for _asm in ${C18N_WRAPPED}
+.if !${MDASM:R:M${_asm:R}}
+PSEUDO+=	${_asm}
+.endif
+.endfor
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}
