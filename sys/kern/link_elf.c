@@ -131,24 +131,6 @@ struct elf_plt {
 	int		pltrelasize;	/* DT_PLTRELSZ */
 };
 
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-struct elf_pcc {
-	bool		assigned;
-	caddr_t		pcc;
-};
-
-struct elf_compartment {
-	u_long		 id;
-	const char	*filename;
-	const char	*name;
-	Elf_Addr	 start;
-	Elf_Addr	 end;
-	elf_pcc_t	 pcc;
-	struct elf_file	*file;
-	elf_plt_t	 plt;
-};
-#endif
-
 struct elf_file {
 	struct linker_file lf __subobject_member_used_for_c_inheritance; /* Common fields */
 	int		preloaded;	/* Was file pre-loaded */
@@ -944,9 +926,6 @@ link_elf_init(void* arg)
 	elf_file_t ef;
 	const char *modname;
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-#ifdef CHERI_COMPARTMENT_STATS
-	struct compartment *compartment;
-#endif
 	elf_compartment_t ec;
 	unsigned int ii;
 #endif
@@ -963,29 +942,10 @@ link_elf_init(void* arg)
 	ec->filename = elf_kernel_filename;
 	ec->name = elf_kernel_defname;
 
-#ifdef CHERI_COMPARTMENT_STATS
-	compartment_metadata_create(ec->id, ec->name,
-	    cheri_setaddress((uintcap_t)ec->pcc, (ptraddr_t)ec->start),
-	    ec);
-#endif
 	for (ii = 0; ii < elf_kernel_file.ncompartments; ii++) {
 		ec = &elf_kernel_file.compartments[ii];
 		ec->filename = elf_kernel_filename;
-#ifdef CHERI_COMPARTMENT_STATS
-		compartment_metadata_create(ec->id, ec->name,
-		    cheri_setaddress((uintcap_t)ec->pcc, (ptraddr_t)ec->start),
-		    ec);
-#endif
 	}
-#ifdef CHERI_COMPARTMENT_STATS
-	for (ii = COMPARTMENT_FIRST_ID; ii <= thread0.td_compartments_maxid;
-	    ii++) {
-		compartment = thread0.td_compartments[TD_CIDNDX(ii)];
-		if (compartment == NULL)
-			continue;
-		compartment_metadata_insert(compartment);
-	}
-#endif
 #endif /* CHERI_COMPARTMENTALIZE_KERNEL */
 
 	modname = NULL;
@@ -1762,10 +1722,10 @@ link_elf_linkup_compartments(linker_file_t lf, struct compartment *compartments,
 	for (compartmentii = 0; compartmentii < ef->ncompartments;
 	    compartmentii++) {
 		ec = &ef->compartments[compartmentii];
-		compartment_linkup(&compartments[compartmentii], ec->id, td);
+		compartment_linkup(&compartments[compartmentii], ec, td);
 	}
 	ec = &ef->defcompartment;
-	compartment_linkup(&compartments[compartmentii], ec->id, td);
+	compartment_linkup(&compartments[compartmentii], ec, td);
 }
 
 int
@@ -1779,11 +1739,11 @@ link_elf_create_compartments(linker_file_t lf, struct thread *td)
 	for (compartmentii = 0; compartmentii < ef->ncompartments;
 	    compartmentii++) {
 		ec = &ef->compartments[compartmentii];
-		if (compartment_create(td, ec->id, false) == NULL)
+		if (compartment_create(td, ec, false) == NULL)
 			return (0);
 	}
 	ec = &ef->defcompartment;
-	if (compartment_create(td, ec->id, false) == NULL)
+	if (compartment_create(td, ec, false) == NULL)
 		return (0);
 	return (1);
 }
@@ -2331,8 +2291,8 @@ elf_compartment_isdefault(linker_file_t lf, uintcap_t ptr)
 }
 
 void
-elf_compartment_entry(linker_file_t lf, uintcap_t ptr, u_long *idp,
-    uintptr_t *ptrp)
+elf_compartment_entry(linker_file_t lf, uintcap_t ptr,
+    elf_compartment_t *dstelf_compartmentp, uintptr_t *ptrp)
 {
 	elf_file_t ef;
 	elf_compartment_t ec;
@@ -2358,7 +2318,7 @@ elf_compartment_entry(linker_file_t lf, uintcap_t ptr, u_long *idp,
 	KASSERT(ec != NULL,
 	    ("elf_compartment_entry: unexpected pointer %p", (void *)ptr));
 
-	*idp = ec->id;
+	*dstelf_compartmentp = ec;
 	cap = cheri_setaddress((uintcap_t)ec->pcc->pcc, ptr);
 	cap = cheri_andperm(cap, cheri_getperm(ptr));
 	cap = cheri_flags_set(cap, cheri_flags_get(ptr));
