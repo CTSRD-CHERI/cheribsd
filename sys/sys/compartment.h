@@ -57,11 +57,28 @@ SYSCTL_DECL(_security_compartment);
 
 struct thread;
 
+struct elf_pcc {
+	bool		assigned;
+	caddr_t		pcc;
+};
+
+struct elf_compartment {
+	u_long		 id;
+	const char	*filename;
+	const char	*name;
+	Elf_Addr	 start;
+	Elf_Addr	 end;
+	elf_pcc_t	 pcc;
+	struct elf_file	*file;
+	elf_plt_t	 plt;
+};
+
 struct compartment {
-	u_long		 c_id;
-	struct thread	*c_thread;
-	vm_pointer_t	 c_kstack;
-	vm_pointer_t	 c_kstackptr;
+	u_long			 c_ndx;
+	elf_compartment_t	c_elf_compartment;
+	struct thread		*c_thread;
+	vm_pointer_t		 c_kstack;
+	vm_pointer_t		 c_kstackptr;
 	TAILQ_ENTRY(compartment) c_next;	/* Next in a thread. */
 	TAILQ_ENTRY(compartment) c_mnext;	/* Next with the same id. */
 	STAILQ_ENTRY(compartment) c_critical_next; /* Next in a cache. */
@@ -85,12 +102,12 @@ void compartment_cpu_cache_fill(void);
 
 u_long compartment_id_create(const char *name, uintcap_t base,
     elf_compartment_t elf_compartment);
-void compartment_linkup(struct compartment *compartment, u_long id,
-    struct thread *td);
+void compartment_linkup(struct compartment *compartment,
+    elf_compartment_t elf_compartment, struct thread *td);
 void compartment_init_stack(struct compartment *compartment,
     vm_pointer_t stack);
-struct compartment *compartment_create(struct thread *td, u_long id,
-    bool usecache);
+struct compartment *compartment_create(struct thread *td,
+    elf_compartment_t elf_compartment, bool usecache);
 void compartment_destroy(struct compartment *compartment);
 void compartment_trampoline_destroy(uintptr_t func);
 void *compartment_entry_for_kernel(uintptr_t func);

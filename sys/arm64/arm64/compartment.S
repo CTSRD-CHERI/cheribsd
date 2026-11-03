@@ -59,11 +59,11 @@ compartment_entries_length:
 	.section .rodata; .globl sym; .p2align 4; .type sym,#object; sym:
 
 .macro template_entry_trampoline type
-\type\()_entry_id:
-	.quad		0
 \type\()_entry_type:
 	.word		0
 	.p2align 4
+\type\()_entry_elf_compartment:
+	.chericap	0
 \type\()_entry_func:
 	.chericap	0
 \type\()_entry_stackptr_func:
@@ -147,7 +147,7 @@ compartment_entries_length:
 	 */
 
 	/* Get or allocate a callee stack. */
-	ldr	x0, \type\()_entry_id
+	ldr	c0, \type\()_entry_elf_compartment
 	ldr	w1, \type\()_entry_type
 	ldr	c16, \type\()_entry_stackptr_func
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
