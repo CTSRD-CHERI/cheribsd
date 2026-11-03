@@ -81,7 +81,7 @@ void compartment_metadata_insert(struct compartment *compartment);
 void compartment_trampoline_tree_remove_all(
     struct compartment_trampoline_tree *tree);
 
-void compartment_cpu_cache_fill(u_int cpuid);
+void compartment_cpu_cache_fill(void);
 
 u_long compartment_id_create(const char *name, uintcap_t base,
     elf_compartment_t elf_compartment);

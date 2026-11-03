@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
+#include <sys/sched.h>
 #include <sys/smp.h>
 #include <sys/sx.h>
 #include <sys/tree.h>
@@ -145,16 +146,21 @@ static struct compartment *compartment_alloc(void);
 static struct compartment *compartment_alloc_from_cache(struct thread *td);
 DPCPU_DEFINE_STATIC(u_long, ncritical_compartments);
 DPCPU_DEFINE_STATIC(struct compartment_list, critical_compartments);
-DPCPU_DEFINE_STATIC(struct mtx, critical_compartments_spinlock);
 
+/*
+ * Fills the per-CPU cache of compartment contexts. Synchronize the operation
+ * with compartment_alloc_from_cache().
+ *
+ * Requires the spinlock on entry and holds it on exit.
+ */
 void
-compartment_cpu_cache_fill(u_int cpuid)
+compartment_cpu_cache_fill(void)
 {
-	struct mtx *critical_compartments_spinlock;
 	struct compartment_list *critical_compartments;
 	u_long ii, ncritical_compartments, needed;
 	struct compartment *compartment;
 	struct compartment_list list;
+	u_int cpuid;
 
 	/*
 	 * Do not attempt to fill the cache if it is already happening.
@@ -165,13 +171,18 @@ compartment_cpu_cache_fill(u_int cpuid)
 	    ("%s: curthread is already filling the cache", __func__));
 	curthread->td_incachefill = true;
 
-	critical_compartments_spinlock = DPCPU_ID_PTR(cpuid,
-	    critical_compartments_spinlock);
-
-	mtx_lock_spin(critical_compartments_spinlock);
+	/*
+	 * Pin to the current CPU to make sure that the spinlock section entered
+	 * later is synchronised with compartment_alloc_from_cache().
+	 */
+	sched_pin();
+	cpuid = curcpu;
 	ncritical_compartments = DPCPU_ID_GET(cpuid, ncritical_compartments);
-	mtx_unlock_spin(critical_compartments_spinlock);
+	spinlock_exit();
 
+	/*
+	 * Allocate compartments using UMA that must be preemptable.
+	 */
 	STAILQ_INIT(&list);
 	needed = MAX(COMPARTMENT_CACHE_SIZE, ncritical_compartments) -
 	    ncritical_compartments;
@@ -180,14 +191,21 @@ compartment_cpu_cache_fill(u_int cpuid)
 		STAILQ_INSERT_HEAD(&list, compartment, c_critical_next);
 	}
 
-	mtx_lock_spin(critical_compartments_spinlock);
+	/*
+	 * Add as many objects as there were initially missing. The resulting
+	 * cache size can be lower than COMPARTMENT_CACHE_SIZE if the thread was
+	 * preempted by other thread that consumed the cache. We take that into
+	 * account in the cache size.
+	 */
+	spinlock_enter();
 	critical_compartments = DPCPU_ID_PTR(cpuid, critical_compartments);
 	STAILQ_CONCAT(critical_compartments, &list);
 	ncritical_compartments = DPCPU_ID_GET(cpuid, ncritical_compartments);
 	DPCPU_ID_SET(cpuid, ncritical_compartments,
 	    ncritical_compartments + needed);
-	mtx_unlock_spin(critical_compartments_spinlock);
+	spinlock_exit();
 
+	sched_unpin();
 	curthread->td_incachefill = false;
 }
 
@@ -196,7 +214,6 @@ compartment_cpu_cache_init_cpu(u_int cpuid)
 {
 	struct compartment_list *critical_compartments;
 	struct compartment *compartment;
-	struct mtx *critical_compartments_spinlock;
 	u_long ii, ncritical_compartments;
 
 	ncritical_compartments = COMPARTMENT_CACHE_SIZE;
@@ -209,11 +226,6 @@ compartment_cpu_cache_init_cpu(u_int cpuid)
 	}
 
 	DPCPU_ID_SET(cpuid, ncritical_compartments, ncritical_compartments);
-
-	critical_compartments_spinlock = DPCPU_ID_PTR(cpuid,
-	    critical_compartments_spinlock);
-	mtx_init(critical_compartments_spinlock,
-	    "critical_compartments_spinlock", NULL, MTX_SPIN);
 }
 
 static void
@@ -424,17 +436,18 @@ compartment_alloc(void)
 	return (compartment);
 }
 
+/*
+ * Allocate a compartment context using the per-CPU cache. Synchronize the
+ * operation with compartment_cpu_cache_fill().
+ */
 static struct compartment *
 compartment_alloc_from_cache(struct thread *td)
 {
-	struct mtx *critical_compartments_spinlock;
 	struct compartment_list *critical_compartments;
 	struct compartment *compartment;
 	u_long ncritical_compartments;
 
-	critical_compartments_spinlock =
-	    DPCPU_PTR(critical_compartments_spinlock);
-	mtx_lock_spin(critical_compartments_spinlock);
+	spinlock_enter();
 
 	critical_compartments = DPCPU_PTR(critical_compartments);
 	ncritical_compartments = DPCPU_GET(ncritical_compartments);
@@ -445,8 +458,8 @@ compartment_alloc_from_cache(struct thread *td)
 	STAILQ_REMOVE_HEAD(critical_compartments, c_critical_next);
 
 	DPCPU_SET(ncritical_compartments, ncritical_compartments - 1);
-	mtx_unlock_spin(critical_compartments_spinlock);
 
+	spinlock_exit();
 	return (compartment);
 }
 

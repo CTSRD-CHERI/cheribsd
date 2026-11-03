@@ -473,9 +473,6 @@ mi_switch(int flags)
 {
 	uint64_t runtime, new_switchtime;
 	struct thread *td;
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	u_long cpuid;
-#endif
 
 	td = curthread;			/* XXX */
 	THREAD_LOCK_ASSERT(td, MA_OWNED | MA_NOTRECURSED);
@@ -544,10 +541,6 @@ mi_switch(int flags)
 	}
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	cpuid = curcpu;
-#endif
-	spinlock_exit();
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	if (!curthread->td_incachefill &&
 	    !TD_IS_IDLETHREAD(curthread) &&
 	    curthread->td_wantedlock == NULL) {
@@ -560,9 +553,10 @@ mi_switch(int flags)
 		 * - The thread is in the process of acquiring a lock.
 		 *   It cannot acquire cache-related locks.
 		 */
-		compartment_cpu_cache_fill(cpuid);
-	}
+		compartment_cpu_cache_fill();
+	} else
 #endif
+	spinlock_exit();
 }
 
 /*
