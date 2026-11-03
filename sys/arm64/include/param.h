@@ -126,9 +126,9 @@
 #define	KERNEL_MAXPCCS		KERNEL_MAXPLTS
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 /*
- * Maximum number of compartments (except for the default) in the kernel binary.
+ * Maximum number of compartments (including the default) in the kernel binary.
  */
-#define	KERNEL_MAXC18NS		(KERNEL_MAXPLTS - 1)
+#define	KERNEL_MAXC18NS		KERNEL_MAXPLTS
 
 #define	COMPARTMENT_ENTRY_PAGES	7500	/* pages of compartment entries */
 #endif

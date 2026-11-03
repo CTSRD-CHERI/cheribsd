@@ -67,8 +67,8 @@ kstack_contains(struct thread *td, vm_offset_t va, size_t len)
 		return (true);
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	for (ii = 0; ii <= td->td_compartments_maxid; ii++) {
-		compartment = td->td_compartments[ii];
+	for (ii = COMPARTMENT_FIRST_ID; ii <= td->td_compartments_maxid; ii++) {
+		compartment = td->td_compartments[TD_CIDNDX(ii)];
 		if (compartment == NULL)
 			continue;
 		/*

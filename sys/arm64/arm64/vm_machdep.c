@@ -150,7 +150,7 @@ cpu_fork(struct thread *td1, struct proc *p2,
 	td2->td_pcb->pcb_x[PCB_X20] = (uintptr_t)td2;
 	td2->td_pcb->pcb_x[PCB_LR] =
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	    (uintptr_t)executive_get_function((uintptr_t)fork_trampoline);
+	    (uintptr_t)compartment_target((uintptr_t)fork_trampoline);
 #else
 	    (uintptr_t)fork_trampoline;
 #endif
@@ -240,7 +240,7 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	td->td_pcb->pcb_x[PCB_X20] = (uintptr_t)td;
 	td->td_pcb->pcb_x[PCB_LR] =
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	    (uintptr_t)executive_get_function((uintptr_t)fork_trampoline);
+	    (uintptr_t)compartment_target((uintptr_t)fork_trampoline);
 #else
 	    (uintptr_t)fork_trampoline;
 #endif

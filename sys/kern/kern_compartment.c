@@ -37,12 +37,14 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/compartment.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/limits.h>
 #include <sys/linker.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
+#include <sys/sched.h>
 #include <sys/smp.h>
 #include <sys/sx.h>
 #include <sys/tree.h>
@@ -89,19 +91,11 @@ SYSCTL_ULONG(_security_compartment_counters, OID_AUTO, executive_entry,
     CTLFLAG_RW,
     &compartment_trampoline_counters[TRAMPOLINE_TYPE_EXECUTIVE_ENTRY], 0,
     "Number of executive entry calls");
-
-struct compartment_metadata {
-	char		*cm_name;
-	struct mtx	 cm_lock;
-	uintcap_t	 cm_base;
-	elf_compartment_t  cm_elf_compartment;
-	TAILQ_HEAD(, compartment) cm_compartments;
-};
 #endif
 
 struct compartment_trampoline {
-	u_long		ct_compartment_id;
 	int		ct_type;
+	elf_compartment_t ct_elf_compartment;
 	uintcap_t	ct_compartment_func;
 	uintcap_t	ct_compartment_stackptr_func;
 	RB_ENTRY(compartment_trampoline) ct_node;
@@ -112,16 +106,8 @@ struct compartment_trampoline {
 extern int early_boot;
 #endif
 
-u_long compartment_lastid = COMPARTMENT_KERNEL_ID;
+u_long compartment_lastid = COMPARTMENT_FIRST_ID;
 static uma_zone_t compartment_zone;
-#ifdef CHERI_COMPARTMENT_STATS
-static u_long compartment_maxnid;
-static struct compartment_metadata **compartment_metadata;
-static struct sx __exclusive_cache_line compartment_metadatalock;
-static struct mtx compartment_metadataspinlock;
-MTX_SYSINIT(compartment_metadataspinlock, &compartment_metadataspinlock,
-    "compartment_metadataspinlock", MTX_SPIN);
-#endif
 
 static int
 compartment_trampoline_compare(struct compartment_trampoline *a,
@@ -134,9 +120,7 @@ compartment_trampoline_compare(struct compartment_trampoline *a,
 	    (ptraddr_t)b->ct_compartment_func);
 }
 
-RB_HEAD(compartment_tree, compartment_trampoline) compartment_trampolines =
-    RB_INITIALIZER(&compartment_trampolines);
-RB_GENERATE_STATIC(compartment_tree, compartment_trampoline, ct_node,
+RB_GENERATE_STATIC(compartment_trampoline_tree, compartment_trampoline, ct_node,
     compartment_trampoline_compare);
 
 static struct mtx compartment_trampolines_lock;
@@ -147,16 +131,21 @@ static struct compartment *compartment_alloc(void);
 static struct compartment *compartment_alloc_from_cache(struct thread *td);
 DPCPU_DEFINE_STATIC(u_long, ncritical_compartments);
 DPCPU_DEFINE_STATIC(struct compartment_list, critical_compartments);
-DPCPU_DEFINE_STATIC(struct mtx, critical_compartments_spinlock);
 
+/*
+ * Fills the per-CPU cache of compartment contexts. Synchronize the operation
+ * with compartment_alloc_from_cache().
+ *
+ * Requires the spinlock on entry and holds it on exit.
+ */
 void
-compartment_cpu_cache_fill(u_int cpuid)
+compartment_cpu_cache_fill(void)
 {
-	struct mtx *critical_compartments_spinlock;
 	struct compartment_list *critical_compartments;
 	u_long ii, ncritical_compartments, needed;
 	struct compartment *compartment;
 	struct compartment_list list;
+	u_int cpuid;
 
 	/*
 	 * Do not attempt to fill the cache if it is already happening.
@@ -167,13 +156,18 @@ compartment_cpu_cache_fill(u_int cpuid)
 	    ("%s: curthread is already filling the cache", __func__));
 	curthread->td_incachefill = true;
 
-	critical_compartments_spinlock = DPCPU_ID_PTR(cpuid,
-	    critical_compartments_spinlock);
-
-	mtx_lock_spin(critical_compartments_spinlock);
+	/*
+	 * Pin to the current CPU to make sure that the spinlock section entered
+	 * later is synchronised with compartment_alloc_from_cache().
+	 */
+	sched_pin();
+	cpuid = curcpu;
 	ncritical_compartments = DPCPU_ID_GET(cpuid, ncritical_compartments);
-	mtx_unlock_spin(critical_compartments_spinlock);
+	spinlock_exit();
 
+	/*
+	 * Allocate compartments using UMA that must be preemptable.
+	 */
 	STAILQ_INIT(&list);
 	needed = MAX(COMPARTMENT_CACHE_SIZE, ncritical_compartments) -
 	    ncritical_compartments;
@@ -182,14 +176,21 @@ compartment_cpu_cache_fill(u_int cpuid)
 		STAILQ_INSERT_HEAD(&list, compartment, c_critical_next);
 	}
 
-	mtx_lock_spin(critical_compartments_spinlock);
+	/*
+	 * Add as many objects as there were initially missing. The resulting
+	 * cache size can be lower than COMPARTMENT_CACHE_SIZE if the thread was
+	 * preempted by other thread that consumed the cache. We take that into
+	 * account in the cache size.
+	 */
+	spinlock_enter();
 	critical_compartments = DPCPU_ID_PTR(cpuid, critical_compartments);
 	STAILQ_CONCAT(critical_compartments, &list);
 	ncritical_compartments = DPCPU_ID_GET(cpuid, ncritical_compartments);
 	DPCPU_ID_SET(cpuid, ncritical_compartments,
 	    ncritical_compartments + needed);
-	mtx_unlock_spin(critical_compartments_spinlock);
+	spinlock_exit();
 
+	sched_unpin();
 	curthread->td_incachefill = false;
 }
 
@@ -198,7 +199,6 @@ compartment_cpu_cache_init_cpu(u_int cpuid)
 {
 	struct compartment_list *critical_compartments;
 	struct compartment *compartment;
-	struct mtx *critical_compartments_spinlock;
 	u_long ii, ncritical_compartments;
 
 	ncritical_compartments = COMPARTMENT_CACHE_SIZE;
@@ -211,11 +211,6 @@ compartment_cpu_cache_init_cpu(u_int cpuid)
 	}
 
 	DPCPU_ID_SET(cpuid, ncritical_compartments, ncritical_compartments);
-
-	critical_compartments_spinlock = DPCPU_ID_PTR(cpuid,
-	    critical_compartments_spinlock);
-	mtx_init(critical_compartments_spinlock,
-	    "critical_compartments_spinlock", NULL, MTX_SPIN);
 }
 
 static void
@@ -256,112 +251,18 @@ SYSINIT(compartment_cpu_cache_init_bsp, SI_SUB_KLD, SI_ORDER_FIRST,
 SYSINIT(compartment_cpu_cache_init_aps, SI_SUB_CPU, SI_ORDER_ANY,
     compartment_cpu_cache_init_aps, NULL);
 
-#ifdef CHERI_COMPARTMENT_STATS
 void
-compartment_metadata_create(u_long id, const char *name, uintcap_t base,
-    elf_compartment_t elf_compartment)
+compartment_trampoline_tree_remove_all(struct compartment_trampoline_tree *tree)
 {
-	struct compartment_metadata *metadata;
-	struct compartment_metadata **newcompartment_metadata;
-	struct compartment_metadata **oldcompartment_metadata;
-	u_long oldcompartment_maxnid;
+	struct compartment_trampoline *tmptrampoline, *trampoline;
 
-	sx_slock(&compartment_metadatalock);
-
-	if (id >= compartment_maxnid) {
-		/*
-		 * Prevent any interruptible thread from reading
-		 * compartment_metadata for the time we re-allocate it.
-		 */
-		if (!sx_try_upgrade(&compartment_metadatalock)) {
-			sx_sunlock(&compartment_metadatalock);
-			sx_xlock(&compartment_metadatalock);
-		}
-
-		oldcompartment_metadata = compartment_metadata;
-		oldcompartment_maxnid = compartment_maxnid;
-
-		compartment_maxnid *= 2;
-
-		newcompartment_metadata =
-		    malloc(sizeof(*compartment_metadata) * compartment_maxnid,
-		    M_COMPARTMENT, M_NOWAIT | M_USE_RESERVE | M_ZERO);
-		KASSERT(newcompartment_metadata != NULL,
-		    ("%s: unable to reallocate compartment metadata array",
-		     __func__));
-		memcpy(newcompartment_metadata, compartment_metadata,
-		    sizeof(*compartment_metadata) * oldcompartment_maxnid);
-
-		/*
-		 * Update compartment_metadata in a synchronous manner with
-		 * uninterruptible threads.
-		 */
-		mtx_lock_spin(&compartment_metadataspinlock);
-		compartment_metadata = newcompartment_metadata;
-		mtx_unlock_spin(&compartment_metadataspinlock);
-
-		sx_downgrade(&compartment_metadatalock);
-
-		free(oldcompartment_metadata, M_COMPARTMENT);
+	RB_FOREACH_SAFE(trampoline, compartment_trampoline_tree, tree,
+	    tmptrampoline) {
+		RB_REMOVE(compartment_trampoline_tree, tree, trampoline);
+		free(trampoline, M_COMPARTMENT);
 	}
-
-	/*
-	 * NB: We can use a shared lock here as there are never two calls to
-	 * this function with the same id.
-	 */
-	metadata = malloc(sizeof(**compartment_metadata),
-	    M_COMPARTMENT, M_NOWAIT | M_USE_RESERVE | M_ZERO);
-	KASSERT(metadata != NULL,
-	    ("%s: unable to allocate compartment metadata", __func__));
-	compartment_metadata[id] = metadata;
-
-	sx_sunlock(&compartment_metadatalock);
-
-	metadata->cm_name = strdup(name, M_COMPARTMENT);
-	KASSERT(metadata->cm_name != NULL,
-	    ("%s: unable to initialize compartment metadata", __func__));
-	mtx_init(&metadata->cm_lock, "compartment_metadata", NULL, MTX_SPIN);
-	metadata->cm_base = base;
-	metadata->cm_elf_compartment = elf_compartment;
-	TAILQ_INIT(&metadata->cm_compartments);
+	KASSERT(RB_EMPTY(tree), ("%s: tree is not empty.", __func__));
 }
-
-void
-compartment_metadata_insert(struct compartment *compartment)
-{
-	struct compartment_metadata *metadata;
-
-	/* NB: compartment_maxnid can be unlocked as it never decreases. */
-	KASSERT(compartment->c_id < compartment_maxnid,
-	    ("%s: id %lu exceeds the maximum value %lu", __func__,
-	     compartment->c_id, compartment_maxnid - 1));
-
-	sx_slock(&compartment_metadatalock);
-	metadata = compartment_metadata[compartment->c_id];
-	sx_sunlock(&compartment_metadatalock);
-
-	mtx_lock_spin(&metadata->cm_lock);
-	TAILQ_INSERT_TAIL(&metadata->cm_compartments, compartment, c_mnext);
-	mtx_unlock_spin(&metadata->cm_lock);
-}
-
-static void
-compartment_metadata_init(void *arg __unused)
-{
-
-	sx_init(&compartment_metadatalock, "compartment_metadata");
-
-	compartment_maxnid = roundup_pow_of_two(compartment_lastid);
-	compartment_metadata = malloc(sizeof(*compartment_metadata) *
-	    compartment_maxnid, M_COMPARTMENT, M_NOWAIT | M_USE_RESERVE |
-	    M_ZERO);
-	KASSERT(compartment_metadata != NULL,
-	    ("%s: unable to allocate compartment metadata array", __func__));
-}
-
-SYSINIT(compartment_metadata_init, SI_SUB_KLD, SI_ORDER_FIRST,
-    compartment_metadata_init, NULL);
-#endif
 
 u_long
 compartment_id_create(const char *name, uintcap_t base,
@@ -369,32 +270,27 @@ compartment_id_create(const char *name, uintcap_t base,
 {
 
 	atomic_add_long(&compartment_lastid, 1);
-#ifdef CHERI_COMPARTMENT_STATS
-	compartment_metadata_create(compartment_lastid, name, base,
-	    elf_compartment);
-#endif
 	return (compartment_lastid);
 }
 
 void
-compartment_linkup(struct compartment *compartment, u_long id,
-    struct thread *td)
+compartment_linkup(struct compartment *compartment,
+    elf_compartment_t elf_compartment, struct thread *td)
 {
 
 	EXECUTIVE_ASSERT();
+	KASSERT(elf_compartment->id <= td->td_compartments_maxid,
+	    ("%s: id %lu exceeds the maximum value %lu", __func__,
+	     elf_compartment->id, td->td_compartments_maxid));
 
-	compartment->c_id = id;
+	compartment->c_elf_compartment = elf_compartment;
+	/*
+	 * Store the index as compartment->c_elf_compartment can be deallocated
+	 * before the compartment is deallocated.
+	 */
+	compartment->c_ndx = TD_CIDNDX(compartment->c_elf_compartment->id);
 	compartment->c_thread = td;
-
-	if (compartment->c_id > td->td_compartments_maxid) {
-		td->td_compartments_maxid = compartment_lastid;
-		td->td_compartments = realloc(td->td_compartments,
-		    (td->td_compartments_maxid + 1) *
-		    sizeof(*td->td_compartments), M_COMPARTMENT, M_NOWAIT |
-		    M_USE_RESERVE | M_ZERO);
-	}
-	td->td_compartments[compartment->c_id] = compartment;
-
+	td->td_compartments[compartment->c_ndx] = compartment;
 }
 
 void
@@ -418,17 +314,18 @@ compartment_alloc(void)
 	return (compartment);
 }
 
+/*
+ * Allocate a compartment context using the per-CPU cache. Synchronize the
+ * operation with compartment_cpu_cache_fill().
+ */
 static struct compartment *
 compartment_alloc_from_cache(struct thread *td)
 {
-	struct mtx *critical_compartments_spinlock;
 	struct compartment_list *critical_compartments;
 	struct compartment *compartment;
 	u_long ncritical_compartments;
 
-	critical_compartments_spinlock =
-	    DPCPU_PTR(critical_compartments_spinlock);
-	mtx_lock_spin(critical_compartments_spinlock);
+	spinlock_enter();
 
 	critical_compartments = DPCPU_PTR(critical_compartments);
 	ncritical_compartments = DPCPU_GET(ncritical_compartments);
@@ -439,17 +336,15 @@ compartment_alloc_from_cache(struct thread *td)
 	STAILQ_REMOVE_HEAD(critical_compartments, c_critical_next);
 
 	DPCPU_SET(ncritical_compartments, ncritical_compartments - 1);
-	mtx_unlock_spin(critical_compartments_spinlock);
 
+	spinlock_exit();
 	return (compartment);
 }
 
 struct compartment *
-compartment_create(struct thread *td, u_long id, bool usecache)
+compartment_create(struct thread *td, elf_compartment_t elf_compartment,
+    bool usecache)
 {
-#ifdef CHERI_COMPARTMENT_STATS
-	struct compartment_metadata *metadata;
-#endif
 	struct compartment *compartment;
 
 	if (usecache)
@@ -459,22 +354,7 @@ compartment_create(struct thread *td, u_long id, bool usecache)
 		compartment = compartment_alloc();
 		curthread->td_incachefill = false;
 	}
-	compartment_linkup(compartment, id, td);
-
-#ifdef CHERI_COMPARTMENT_STATS
-	/* NB: compartment_maxnid can be unlocked as it never decreases. */
-	KASSERT(id < compartment_maxnid,
-	    ("%s: id %lu exceeds the maximum value %lu", __func__, id,
-	     compartment_maxnid - 1));
-
-	mtx_lock_spin(&compartment_metadataspinlock);
-	metadata = compartment_metadata[id];
-	mtx_unlock_spin(&compartment_metadataspinlock);
-
-	mtx_lock_spin(&metadata->cm_lock);
-	TAILQ_INSERT_TAIL(&metadata->cm_compartments, compartment, c_mnext);
-	mtx_unlock_spin(&metadata->cm_lock);
-#endif
+	compartment_linkup(compartment, elf_compartment, td);
 
 	return (compartment);
 }
@@ -482,22 +362,10 @@ compartment_create(struct thread *td, u_long id, bool usecache)
 void
 compartment_destroy(struct compartment *compartment)
 {
-#ifdef CHERI_COMPARTMENT_STATS
-	struct compartment_metadata *metadata;
-
-	if (compartment->c_id > 0) {
-		sx_slock(&compartment_metadatalock);
-		metadata = compartment_metadata[compartment->c_id];
-		sx_sunlock(&compartment_metadatalock);
-
-		mtx_lock_spin(&metadata->cm_lock);
-		TAILQ_REMOVE(&metadata->cm_compartments, compartment, c_mnext);
-		mtx_unlock_spin(&metadata->cm_lock);
-	}
-#endif
 
 	if (compartment->c_thread != NULL) {
-		compartment->c_thread->td_compartments[compartment->c_id] = NULL;
+		compartment->c_thread->td_compartments[compartment->c_ndx] =
+		    NULL;
 	}
 
 	vm_compartment_dispose(compartment);
@@ -505,7 +373,7 @@ compartment_destroy(struct compartment *compartment)
 }
 
 static vm_pointer_t __used
-compartment_entry_stackptr(u_long id, int type)
+compartment_entry_stackptr(elf_compartment_t elf_compartment, int type)
 {
 	struct compartment *compartment;
 
@@ -519,9 +387,14 @@ compartment_entry_stackptr(u_long id, int type)
 		compartment_trampoline_counters[type]++;
 #endif
 
-	compartment = curthread->td_compartments[id];
+	if (elf_compartment->id <= curthread->td_compartments_maxid)
+		compartment =
+		    curthread->td_compartments[TD_CIDNDX(elf_compartment->id)];
+	else
+		compartment = NULL;
 	if (compartment == NULL)
-		compartment = compartment_create(curthread, id, true);
+		compartment = compartment_create(curthread, elf_compartment,
+		    true);
 	return (compartment->c_kstackptr);
 }
 
@@ -531,26 +404,25 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 {
 	struct compartment_trampoline *trampoline, *oldtrampoline;
 	struct compartment_trampoline tmptrampoline;
+	struct compartment_trampoline_tree *tree;
+	elf_compartment_t dstelf_compartment;
 	uintcap_t dstfunc;
-	u_long dstid;
 
 	EXECUTIVE_ASSERT();
 	KASSERT(lf != NULL,
 	    ("%s: linker file cannot be NULL", __func__));
 
-	elf_compartment_entry(lf, func, &dstid, &dstfunc);
+	elf_compartment_entry(lf, func, &dstelf_compartment, &dstfunc);
+	tree = elf_compartment_trampoline_tree(lf);
 
 	tmptrampoline.ct_compartment_func = dstfunc;
-	oldtrampoline = RB_FIND(compartment_tree, &compartment_trampolines,
+	oldtrampoline = RB_FIND(compartment_trampoline_tree, tree,
 	    &tmptrampoline);
 	if (oldtrampoline != NULL) {
 		trampoline = oldtrampoline;
 		goto out;
 	}
 
-	/*
-	 * TODO: Free the trampoline.
-	 */
 	if (!early_boot) {
 		trampoline = malloc_exec(size, M_COMPARTMENT, M_NOWAIT |
 		    M_USE_RESERVE | M_ZERO);
@@ -568,6 +440,7 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 
 	memcpy(trampoline, data, size);
 
+	trampoline->ct_elf_compartment = dstelf_compartment;
 	trampoline->ct_compartment_func = dstfunc;
 	trampoline->ct_type = type;
 	ELF_STATIC_RELOC_LABEL(trampoline->ct_compartment_stackptr_func,
@@ -575,22 +448,16 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	trampoline->ct_compartment_stackptr_func =
 	    cheri_sealentry(trampoline->ct_compartment_stackptr_func);
 
-	trampoline->ct_compartment_id = dstid;
 	if (!early_boot) {
 		cpu_dcache_wb_range(trampoline, (vm_size_t)size);
 		cpu_icache_sync_range(trampoline, (vm_size_t)size);
-
-		mtx_lock(&compartment_trampolines_lock);
 	}
 
-	oldtrampoline = RB_INSERT(compartment_tree, &compartment_trampolines,
+	oldtrampoline = RB_INSERT(compartment_trampoline_tree, tree,
 	    trampoline);
 	KASSERT(oldtrampoline == NULL,
 	    ("Trampoline for 0x%#lp already exists",
 	    (void *)trampoline->ct_compartment_func));
-
-	if (!early_boot)
-		mtx_unlock(&compartment_trampolines_lock);
 
 out:
 	/*
@@ -668,7 +535,7 @@ compartment_entry(uintptr_t func)
 }
 
 void *
-executive_get_function(uintptr_t func)
+compartment_target(uintptr_t func)
 {
 	struct compartment_trampoline *trampoline;
 
@@ -681,59 +548,38 @@ executive_get_function(uintptr_t func)
 	    func & ~0x1);
 	trampoline = __containerof((char (*)[])trampoline,
 	    struct compartment_trampoline, ct_code);
-	KASSERT(trampoline->ct_type == TRAMPOLINE_TYPE_EXECUTIVE_ENTRY,
-	    ("Invalid trampoline type"));
 
 	return ((void *)trampoline->ct_compartment_func);
 }
 
-#ifdef CHERI_COMPARTMENT_STATS
 #ifdef DDB
 DB_COMMAND_FLAGS(c18nstat, db_c18nstat, DB_CMD_MEMSAFE)
 {
 	const struct proc *proc;
 	struct thread *thread;
 	const struct compartment *compartment;
-	bool verbose;
 	u_long ii;
-
-	verbose = false;
-	for (ii = 0; modif[ii] != '\0'; ii++) {
-		switch (modif[ii]) {
-		case 'v':
-			verbose = true;
-			break;
-		}
-	}
 
 #define	ADDRESS_WIDTH	((int)(sizeof(ptraddr_t) * 2 + 2))
 	db_printf("ADDRESS%*c %6s %-20s %5s %6s %-20s %-20s\n",
 	    ADDRESS_WIDTH - 7, ' ', "CID", "CNAME", "PID", "TID", "COMM",
 	    "TDNAME");
-	if (verbose) {
-		ii = COMPARTMENT_KERNEL_ID;
-	} else {
-		db_printf("*%*c %6lu %-20s %5s %6s %-20s %-20s\n",
-		    ADDRESS_WIDTH - 1, ' ', (u_long)COMPARTMENT_KERNEL_ID,
-		    compartment_metadata[COMPARTMENT_KERNEL_ID]->cm_name,
-		    "*", "*", "*", "*");
-		ii = COMPARTMENT_KERNEL_ID + 1;
-	}
 #undef	ADDRESS_WIDTH
+	ii = COMPARTMENT_FIRST_ID;
 	for (; ii <= compartment_lastid; ii++) {
-		if (db_pager_quit)
-			return;
-		if (TAILQ_EMPTY(&compartment_metadata[ii]->cm_compartments))
-			continue;
-		TAILQ_FOREACH(compartment,
-		    &compartment_metadata[ii]->cm_compartments, c_mnext) {
-			thread = compartment->c_thread;
+		for (thread = kdb_thr_first(); thread != NULL;
+		    thread = kdb_thr_next(thread)) {
+			if (db_pager_quit)
+				return;
+			if (thread->td_compartments[ii] == NULL)
+				continue;
 			if (TD_GET_STATE(thread) == TDS_INACTIVE)
 				continue;
+			compartment = thread->td_compartments[ii];
 			proc = thread->td_proc;
 			db_printf("0x%-16lx %6lu %-20s %5d %6d %-20s %-20s\n",
 			    (ptraddr_t)compartment, ii,
-			    compartment_metadata[ii]->cm_name, proc->p_pid,
+			    compartment->c_elf_compartment->name, proc->p_pid,
 			    thread->td_tid, proc->p_comm, thread->td_name);
 		}
 	}
@@ -744,7 +590,7 @@ DB_SHOW_COMMAND(compartment, db_show_compartment)
 	const struct proc *proc;
 	const struct thread *thread;
 	const struct compartment *compartment;
-	const struct compartment_metadata *metadata;
+	elf_compartment_t elf_compartment;
 
 	if (!have_addr) {
 		db_printf("show compartment addr\n");
@@ -752,23 +598,20 @@ DB_SHOW_COMMAND(compartment, db_show_compartment)
 	}
 
 	compartment = DB_DATA_PTR(addr, struct compartment);
-	metadata = compartment_metadata[compartment->c_id];
+	elf_compartment = compartment->c_elf_compartment;
 	thread = compartment->c_thread;
 	proc = thread->td_proc;
 
 	db_printf("Compartment at %p:\n", compartment);
-	db_printf(" id: %lu\n", compartment->c_id);
-	db_printf(" name: %s\n", metadata->cm_name);
-	db_printf(" base capability: %#p\n", (void *)metadata->cm_base);
+	db_printf(" id: %lu\n", elf_compartment->id);
+	db_printf(" name: %s\n", elf_compartment->name);
+	db_printf(" PCC capability: %#p\n", (void *)elf_compartment->pcc->pcc);
 	db_printf(" stack pointer: %#p\n", (void *)compartment->c_kstackptr);
 	db_printf(" proc (pid %d): %p\n", proc->p_pid, proc);
 	db_printf(" proc command: %s\n", proc->p_comm);
 	db_printf(" thread (tid %d): %p\n", thread->td_tid, thread);
 	db_printf(" thread name: %s\n", thread->td_name);
-	if (metadata->cm_elf_compartment != NULL) {
-		db_printf(" imported symbols:\n");
-		elf_ddb_show_compartment_symbols(metadata->cm_elf_compartment);
-	}
+	db_printf(" imported symbols:\n");
+	elf_ddb_show_compartment_symbols(elf_compartment);
 }
 #endif /* DDB */
-#endif /* CHERI_COMPARTMENT_STATS */
