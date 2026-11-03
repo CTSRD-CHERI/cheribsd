@@ -86,7 +86,7 @@ int compartment_trampoline_tree_foreach(
     struct compartment_trampoline_tree *tree,
     compartment_trampoline_tree_callback_t callback, void *opaque);
 
-void compartment_cpu_cache_fill(u_int cpuid);
+void compartment_cpu_cache_fill(void);
 
 u_long compartment_id_create(const char *name, uintcap_t base,
     elf_compartment_t elf_compartment);
