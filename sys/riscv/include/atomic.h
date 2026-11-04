@@ -459,46 +459,14 @@ static __inline void
 atomic_set_ptr(volatile uintptr_t *p, uintptr_t val)
 {
 
-#ifdef notyet
 	(void)__atomic_or_fetch(p, val, __ATOMIC_RELAXED);
-#else
-	uintptr_t temp1;
-	u_long temp2;
-
-	__asm __volatile(
-		"1:	clr.c	%1, %0\n"
-		"	cgetaddr %2, %1\n"
-		"	or	%2, %2, %3\n"
-		"	csetaddr %1, %1, %2\n"
-		"	csc.c	%2, %1, %0\n"
-		"	bnez	%2, 1b\n"
-		: "+A" (*p), "=&C" (temp1), "=&r" (temp2)
-		: "r" ((ptraddr_t)val)
-		: "memory");
-#endif
 }
 
 static __inline void
 atomic_clear_ptr(volatile uintptr_t *p, uintptr_t val)
 {
 
-#ifdef notyet
 	(void)__atomic_and_fetch(p, ~val, __ATOMIC_RELAXED);
-#else
-	uintptr_t temp1;
-	u_long temp2;
-
-	__asm __volatile(
-		"1:	clr.c	%1, %0\n"
-		"	cgetaddr %2, %1\n"
-		"	and	%2, %2, %3\n"
-		"	csetaddr %1, %1, %2\n"
-		"	csc.c	%2, %1, %0\n"
-		"	bnez	%2, 1b\n"
-		: "+A" (*p), "=&C" (temp1), "=&r" (temp2)
-		: "r" (~(ptraddr_t)val)
-		: "memory");
-#endif
 }
 
 static __inline uintptr_t
@@ -522,24 +490,7 @@ atomic_testandclear_ptr(volatile uintptr_t *p, u_int val)
 	ptraddr_t mask;
 
 	mask = ((ptraddr_t)1) << (val & 63);
-#ifdef notyet
-	old = __atomic_or_fetch(p, val, __ATOMIC_RELAXED);
-#else
-	uintptr_t temp1;
-	u_long temp2;
-
-	__asm __volatile(
-		"1:	clr.c	%1, %0\n"
-		"	cgetaddr %3, %1\n"
-		"	and	%3, %3, %4\n"
-		"	csetaddr %2, %1, %3\n"
-		"	csc.c	%3, %2, %0\n"
-		"	bnez	%3, 1b\n"
-		: "+A" (*p), "=&C" (old), "=&C" (temp1), "=&r" (temp2)
-		: "r" (~(ptraddr_t)mask)
-		: "memory");
-#endif
-
+	old = __atomic_fetch_and(p, ~mask, __ATOMIC_RELAXED);
 	return ((old & mask) != 0);
 }
 
@@ -550,24 +501,7 @@ atomic_testandset_ptr(volatile uintptr_t *p, u_int val)
 	ptraddr_t mask;
 
 	mask = ((ptraddr_t)1) << (val & 63);
-#ifdef notyet
-	old = __atomic_or_fetch(p, val, __ATOMIC_RELAXED);
-#else
-	uintptr_t temp1;
-	u_long temp2;
-
-	__asm __volatile(
-		"1:	clr.c	%1, %0\n"
-		"	cgetaddr %3, %1\n"
-		"	or	%3, %3, %4\n"
-		"	csetaddr %2, %1, %3\n"
-		"	csc.c	%3, %2, %0\n"
-		"	bnez	%3, 1b\n"
-		: "+A" (*p), "=&C" (old), "=&C" (temp1), "=&r" (temp2)
-		: "r" ((ptraddr_t)mask)
-		: "memory");
-#endif
-
+	old = __atomic_fetch_or(p, mask, __ATOMIC_RELAXED);
 	return ((old & mask) != 0);
 }
 
