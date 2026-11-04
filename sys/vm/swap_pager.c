@@ -2357,7 +2357,7 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 	vm_pindex_t modpi;
 	bool mark_capdirty = false;
 
-	scan = (void *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(page));
+	scan = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page));
 	sb = swblk_lookup(page->object, page->pindex);
 
 	modpi = page->pindex % SWAP_META_PAGES;
@@ -2391,7 +2391,7 @@ swp_pager_meta_cheri_put_tags(vm_page_t page)
 	struct swblk *sb;
 	vm_pindex_t modpi;
 
-	scan = (void *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(page));
+	scan = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page));
 	sb = swblk_lookup(page->object, page->pindex);
 
 	modpi = page->pindex % SWAP_META_PAGES;
