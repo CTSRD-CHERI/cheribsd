@@ -32,13 +32,15 @@
  * SUCH DAMAGE.
  */
 
-#ifndef __SYS_CHERI_C18N_H__
-#define	__SYS_CHERI_C18N_H__
+#ifndef __SYS_CHERI_STATS_H__
+#define	__SYS_CHERI_STATS_H__
+
+#include <sys/_timespec.h>
 
 /*
  * Members fields do not need to be atomic outside of RTLD.
  */
-#ifndef IN_RTLD
+#if !defined(IN_RTLD) && !defined(MRS_STATS)
 #define	_Atomic(t)			t
 #endif
 
@@ -70,18 +72,81 @@ struct rtld_c18n_compart {
 	uint8_t			rcc_dlopened : 1;
 };
 
+#define CHERI_MRS_STATS_VERSION		1
+#define CHERI_MRS_STATS_MAX_SIZE	256
+
+#define	CHERI_MRS_FLAGS_INITIALIZED	0x00000001	/* Structure live. */
+#define	CHERI_MRS_FLAGS_QUARANTINING	0x00000002	/* Quarantining. */
+#define	CHERI_MRS_FLAGS_EVERYFREE	0x00000004	/* Revoke every free. */
+#define	CHERI_MRS_FLAGS_ASYNCREVOKE	0x00000008	/* Async revocation. */
+#define	CHERI_MRS_FLAGS_ABORTONFAIL	0x00000010	/* Abort on failure. */
+#define	CHERI_MRS_FLAGS_BOUNDPTRS	0x00000020	/* Bound pointers. */
+
+/*
+ * Statistics gathered by the heap allocator and mrs.  The version field
+ * doubles as a synchronisation flag where a non-zero value indicates that the
+ * other fields have been initialised.
+ */
+struct cheri_mrs_stats {
+	size_t	cms_version;
+
+	/* Counts of events since inception. */
+	_Atomic(size_t)	cms_mrs_count_allocated;
+	_Atomic(size_t)	cms_mrs_count_freed;	/* .. by the caller. */
+	_Atomic(size_t)	cms_mrs_count_returned;	/* .. to the allocator. */
+
+	/* Running totals of outstanding and quarantined memory allocations. */
+	_Atomic(size_t)	cms_mrs_count_inheap;	/* Allocated but not freed. */
+	_Atomic(size_t)	cms_mrs_count_inquarantine; /* Freed but not revoked. */
+
+	/* Byte totals for allocator since inception. */
+	_Atomic(size_t)	cms_mrs_bytes_allocated;
+	_Atomic(size_t)	cms_mrs_bytes_freed;	/* .. by the caller. */
+	_Atomic(size_t)	cms_mrs_bytes_returned;	/* .. to the allocator. */
+
+	/* Running totals of outstanding and quarantined memory in bytes. */
+	_Atomic(size_t)	cms_mrs_bytes_inheap;	/* Allocated but not freed. */
+	_Atomic(size_t)	cms_mrs_bytes_inquarantine; /* Freed but not revoked. */
+
+	/* 32-bit mrs parameters. */
+	uint32_t	cms_mrs_arenas;
+	uint32_t	cms_mrs_quarantine_numerator;
+	uint32_t	cms_mrs_quarantine_denominator;
+	uint32_t	cms_mrs_revocation_minimum;
+
+	/* Status flags. */
+	uint32_t	cms_mrs_flags;
+	uint32_t	_cms_mrs_pad0;
+
+	/* 64-bit mrs global state. */
+	_Atomic(size_t)	cms_mrs_allocated_size;
+	_Atomic(size_t)	cms_mrs_max_allocated_size;
+	_Atomic(size_t)	cms_mrs_max_quarantine_size;
+
+	/* 64-bit mrs parameters. */
+	_Atomic(uint64_t)	cms_mrs_epoch;
+
+	/* Timestamps associated with these stats. */
+	struct timespec	cms_mrs_ts_start;	/* Earliest moment. */
+
+	/* Padding to a sensible size for future non-disruptive growth. */
+	size_t		_cms_pad1[4];
+};
+
 /*
  * The interface provided by the kernel for RTLD to supply compartmentalisation
  * information. The version field doubles as a synchronisation flag where a
  * non-zero value indicates that the other fields have been initialised.
  */
-#define CHERI_C18N_INFO_VERSION		2
+#define CHERI_C18N_INFO_VERSION	3
 
-struct cheri_c18n_info {
-	_Atomic(size_t) version;
+struct cheri_stats {
+	size_t version;
 
-	size_t stats_size;
-	struct rtld_c18n_stats * __kerncap	stats;
+	size_t c18n_stats_size;
+	size_t mrs_stats_size;
+	struct rtld_c18n_stats * __kerncap	c18n_stats;
+	struct cheri_mrs_stats * __kerncap	mrs_stats;
 
 	/*
 	 * Since the `comparts` array may be reallocated or ortherwise change
@@ -123,8 +188,8 @@ struct kinfo_cheri_kc18n_compart {
 	char		kckc_name[CHERI_C18N_COMPART_MAXNAME];
 };
 
-#ifndef IN_RTLD
+#if !defined(IN_RTLD) && !defined(MRS_STATS)
 #undef _Atomic
 #endif
 
-#endif /* __SYS_CHERI_C18N_H__ */
+#endif /* __SYS_CHERI_STATS_H__ */

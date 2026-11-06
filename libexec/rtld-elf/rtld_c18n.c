@@ -70,7 +70,7 @@
 
 #include <machine/sigframe.h>
 
-#include <cheri/c18n.h>
+#include <cheri/cheri_stats.h>
 
 #include <errno.h>
 #include <signal.h>
@@ -149,7 +149,6 @@ const char *ld_compartment_switch_count;
 const char *ld_compartment_no_fast_path;
 
 /* Compartmentalisation information exported to the kernel */
-static struct cheri_c18n_info *c18n_info;
 struct rtld_c18n_stats *c18n_stats;
 
 /* Offset of a trampoline's slow path entry point relative to the fast path */
@@ -314,14 +313,14 @@ expand_comparts_data(compart_id_t capacity)
 {
 	struct compart *data;
 
-	atomic_fetch_add_explicit(&c18n_info->comparts_gen, 1,
+	atomic_fetch_add_explicit(&cheri_stats->comparts_gen, 1,
 	    memory_order_acq_rel);
 
 	data = c18n_realloc(comparts.data, sizeof(*data) * capacity);
-	comparts.data = c18n_info->comparts = r_debug.r_comparts = data;
+	comparts.data = cheri_stats->comparts = r_debug.r_comparts = data;
 	comparts.capacity = capacity;
 
-	atomic_fetch_add_explicit(&c18n_info->comparts_gen, 1,
+	atomic_fetch_add_explicit(&cheri_stats->comparts_gen, 1,
 	    memory_order_acq_rel);
 }
 
@@ -340,7 +339,7 @@ add_comparts_data(const char *name)
 	if (comparts.size == comparts.capacity)
 		expand_comparts_data(comparts.capacity * 2);
 
-	atomic_fetch_add_explicit(&c18n_info->comparts_gen, 1,
+	atomic_fetch_add_explicit(&cheri_stats->comparts_gen, 1,
 	    memory_order_acq_rel);
 	GDB_COMPARTS_STATE(RCT_ADD, NULL);
 
@@ -353,9 +352,9 @@ add_comparts_data(const char *name)
 		},
 		.name = c_name
 	};
-	c18n_info->comparts_size = r_debug.r_comparts_size = comparts.size;
+	cheri_stats->comparts_size = r_debug.r_comparts_size = comparts.size;
 
-	atomic_fetch_add_explicit(&c18n_info->comparts_gen, 1,
+	atomic_fetch_add_explicit(&cheri_stats->comparts_gen, 1,
 	    memory_order_acq_rel);
 	GDB_COMPARTS_STATE(RCT_CONSISTENT, com);
 
@@ -1771,15 +1770,12 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 	atomic_store_explicit(&c18n_stats->version, RTLD_C18N_STATS_VERSION,
 	    memory_order_release);
 
-	if (aux_info[AT_CHERI_C18N] != NULL) {
-		c18n_info = aux_info[AT_CHERI_C18N]->a_un.a_ptr;
-		*c18n_info = (struct cheri_c18n_info) {
-			.stats_size = sizeof(*c18n_stats),
-			.stats = c18n_stats,
-			.comparts_entry_size = sizeof(*comparts.data)
-		};
-		atomic_store_explicit(&c18n_info->version,
-		    CHERI_C18N_INFO_VERSION, memory_order_release);
+	if (aux_info[AT_CHERI_STATS] != NULL) {
+		cheri_stats = aux_info[AT_CHERI_STATS]->a_un.a_ptr;
+		assert(cheri_stats->version == CHERI_C18N_INFO_VERSION);
+		cheri_stats->c18n_stats_size = sizeof(*c18n_stats);
+		cheri_stats->c18n_stats = c18n_stats;
+		cheri_stats->comparts_entry_size = sizeof(*comparts.data);
 	}
 
 	/*

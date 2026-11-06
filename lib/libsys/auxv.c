@@ -105,6 +105,10 @@ static void _init_aux_powerpc_fixup(void);
 int _powerpc_elf_aux_info(int, void *, int);
 #endif
 
+#ifdef __CHERI__
+static void *cheri_statsp;
+#endif
+
 /*
  * This function might be called and actual body executed more than
  * once in multithreading environment.  Due to this, it is and must
@@ -204,6 +208,11 @@ init_aux(void)
 		 */
 		case AT_STACKPROT:	/* 23 */
 			powerpc_new_auxv_format = 1;
+			break;
+#endif
+#ifdef __CHERI__
+		case AT_CHERI_STATS:
+			cheri_statsp = aux->a_un.a_ptr;
 			break;
 #endif
 		}
@@ -459,6 +468,18 @@ _elf_aux_info(int aux, void *buf, int buflen)
 		} else
 			res = EINVAL;
 		break;
+#ifdef __CHERI__
+	case AT_CHERI_STATS:
+		if (buflen == sizeof(void *)) {
+			if (cheri_statsp != NULL) {
+				*(void **)buf = cheri_statsp;
+				res = 0;
+			} else
+				res = ENOENT;
+		} else
+			res = EINVAL;
+		break;
+#endif
 	default:
 		res = ENOENT;
 		break;
