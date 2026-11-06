@@ -268,15 +268,9 @@ struct compart {
 	 */
 	struct string_base libs;
 	/*
-	 * Symbols that the library is allowed to import, if restrict_imports is
-	 * true.
-	 */
-	struct string_base imports;
-	/*
 	 * Symbols trusted by the library.
 	 */
 	struct string_base trusts;
-	bool restrict_imports;
 };
 
 extern int _compart_size;
@@ -519,8 +513,6 @@ parse_policy(const char *pol, size_t size)
 
 			if (eat(&cur, "trust\n"))
 				symbols = &com->trusts;
-			else if (eat(&cur, "import\n"))
-				symbols = &com->imports;
 			else
 				policy_error(&cur);
 
@@ -570,10 +562,6 @@ evaluate_rules(compart_id_t caller, compart_id_t callee, const char *sym)
 {
 	struct rule *cur;
 	struct rule_action *act;
-
-	if (comparts.data[caller].restrict_imports &&
-	    !string_base_search(&comparts.data[caller].imports, sym))
-		return (false);
 
 	SLIST_FOREACH(cur, &rules, link) {
 		if (cur->callee != callee ||
