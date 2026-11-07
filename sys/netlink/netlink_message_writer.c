@@ -298,7 +298,7 @@ nlmsg_ack(struct nlpcb *nlp, int error, struct nlmsghdr *hdr,
 	errmsg = nlmsg_reserve_data(nw, payload_len, struct nlmsgerr);
 	errmsg->error = error;
 	/* In case of error copy the whole message, else just the header */
-	memcpy(&errmsg->msg, hdr, cap_ack ? sizeof(*hdr) : hdr->nlmsg_len);
+	memcpy(__unbounded_addressof(errmsg->msg), hdr, cap_ack ? sizeof(*hdr) : hdr->nlmsg_len);
 
 	if (npt->err_msg != NULL && nlp->nl_flags & NLF_EXT_ACK)
 		nlattr_add_string(nw, NLMSGERR_ATTR_MSG, npt->err_msg);

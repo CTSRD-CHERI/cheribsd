@@ -2215,7 +2215,7 @@ tcp_newtcpcb(struct inpcb *inp, struct tcpcb *listening_tcb)
 	 * code that rely on that.  For now take safe approach and zero whole
 	 * tcpcb.  This definitely can be optimized.
 	 */
-	bzero(&tp->t_start_zero, t_zero_size);
+	bzero(__unbounded_addressof(tp->t_start_zero), t_zero_size);
 
 	/* Initialise cc_var struct for this tcpcb. */
 	tp->t_ccv.tp = tp;
