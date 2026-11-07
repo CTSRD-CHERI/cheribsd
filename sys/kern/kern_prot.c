@@ -2729,7 +2729,8 @@ void
 crcopy(struct ucred *dest, struct ucred *src)
 {
 
-	bcopy(&src->cr_startcopy, &dest->cr_startcopy,
+	bcopy(__unbounded_addressof(src->cr_startcopy),
+		__unbounded_addressof(dest->cr_startcopy),
 	    (unsigned)((caddr_t)&src->cr_endcopy -
 		(caddr_t)&src->cr_startcopy));
 	dest->cr_flags = src->cr_flags;

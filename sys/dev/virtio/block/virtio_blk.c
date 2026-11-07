@@ -901,7 +901,7 @@ vtblk_request_dequeue(struct vtblk_softc *sc)
 	req = TAILQ_FIRST(&sc->vtblk_req_free);
 	if (req != NULL) {
 		TAILQ_REMOVE(&sc->vtblk_req_free, req, vbr_link);
-		bzero(&req->vbr_hdr, sizeof(struct vtblk_request) -
+		bzero(__unbounded_addressof(req->vbr_hdr), sizeof(struct vtblk_request) -
 		    offsetof(struct vtblk_request, vbr_hdr));
 	}
 

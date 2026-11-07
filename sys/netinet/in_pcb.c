@@ -639,7 +639,7 @@ in_pcballoc(struct socket *so, struct inpcbinfo *pcbinfo)
 	inp = uma_zalloc_smr(pcbinfo->ipi_zone, M_NOWAIT);
 	if (inp == NULL)
 		return (ENOBUFS);
-	bzero(&inp->inp_start_zero, inp_zero_size);
+	bzero(__unbounded_addressof(inp->inp_start_zero), inp_zero_size);
 #ifdef NUMA
 	inp->inp_numa_domain = M_NODOM;
 #endif

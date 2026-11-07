@@ -292,9 +292,10 @@ kthread_add1(void (*func)(void *), void *arg, struct proc *p,
 	if (newtdp != NULL)
 		*newtdp = newtd;
 
-	bzero(&newtd->td_startzero,
+	bzero(__unbounded_addressof(newtd->td_startzero),
 	    __rangeof(struct thread, td_startzero, td_endzero));
-	bcopy(&oldtd->td_startcopy, &newtd->td_startcopy,
+	bcopy(__unbounded_addressof(oldtd->td_startcopy),
+		__unbounded_addressof(newtd->td_startcopy),
 	    __rangeof(struct thread, td_startcopy, td_endcopy));
 
 	/* set up arg0 for 'ps', et al */
