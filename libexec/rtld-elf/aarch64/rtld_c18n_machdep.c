@@ -30,7 +30,7 @@
 #include <sys/param.h>
 #include <sys/mman.h>
 
-#include <cheri/c18n.h>
+#include <cheri/cheri_stats.h>
 
 #include <stdlib.h>
 

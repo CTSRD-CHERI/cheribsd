@@ -14,7 +14,7 @@
 #include <sys/sysctl.h>
 #include <sys/user.h>
 
-#include <cheri/c18n.h>
+#include <cheri/cheri_stats.h>
 
 #include <stdlib.h>
 #include <string.h>

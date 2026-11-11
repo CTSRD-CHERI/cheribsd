@@ -1048,11 +1048,12 @@ typedef struct {
 #define	AT_KPRELOAD	34	/* Base of vdso, preloaded by rtld */
 #define	AT_USRSTACKBASE	35	/* Top of user stack */
 #define	AT_USRSTACKLIM	36	/* Grow limit of user stack */
-#define	AT_CHERI_C18N	37	/* Compartment info block */
+#define	AT_CHERI_STATS	37	/* Compartment info block */
 #define	AT_HWCAP3	38	/* CPU feature flags 3. */
 #define	AT_HWCAP4	39	/* CPU feature flags 4. */
 
-#define	AT_COUNT	40	/* Count of defined aux entry types. */
+#define	AT_COUNT	41	/* Count of defined aux entry types. */
+
 
 /*
  * Relocation types.
