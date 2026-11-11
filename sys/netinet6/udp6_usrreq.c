@@ -1038,7 +1038,7 @@ udp6_attach(struct socket *so, int proto, struct thread *td)
 	 */
 	inp->inp_ip_ttl = V_ip_defttl;
 	up = intoudpcb(inp);
-	bzero(&up->u_start_zero, u_zero_size);
+	bzero(__unbounded_addressof(up->u_start_zero), u_zero_size);
 	INP_WUNLOCK(inp);
 	return (0);
 }
