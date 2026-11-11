@@ -1,7 +1,12 @@
 PACKAGE=	clibs
 SHLIBDIR?= /lib
 
+
 .include <src.opts.mk>
+
+.ifdef CHERI_STACK_TEMP_SAFETY
+CFLAGS+=-DCHERI_STACK_TEMP_SAFETY
+.endif
 
 LIBC_SRCTOP?= ${SRCTOP}/lib/libc
 LIBSYS_SRCTOP?=	${SRCTOP}/lib/libsys

@@ -884,11 +884,16 @@ get_or_create_untrusted_stk(compart_id_t cid, struct stk_table **tablep)
 	size = C18N_STACK_SIZE;
 	stk = create_stk(size);
 
+#ifdef CHERI_STACK_TEMP_SAFETY
+    stk = cheri_perms_clear(stk, CHERI_PERM_GLOBAL);
+#endif
+
 	table->meta->compart_stk[cid] = (struct stk_table_stk_info) {
 		.size = size,
 		.begin = stk - size
 	};
-	table->entries[cid].stack = cheri_perms_clear(stk, CHERI_PERM_SW_VMEM);
+	uint64_t perms = CHERI_PERM_SW_VMEM;
+	table->entries[cid].stack = cheri_perms_clear(stk, perms);
 
 	atomic_fetch_add_explicit(&c18n_stats->rcs_ustack, 1,
 	    memory_order_relaxed);

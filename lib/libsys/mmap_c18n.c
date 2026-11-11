@@ -31,6 +31,9 @@ __mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 #ifdef __aarch64__
 		perms |= CHERI_PERM_EXECUTIVE;
 #endif
+#ifdef CHERI_STACK_TEMP_SAFETY
+    perms |= CHERI_PERM_STORE_LOCAL_CAP;
+#endif
 		ret = cheri_perms_clear(ret, perms);
 	}
 #endif
