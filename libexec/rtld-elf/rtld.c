@@ -913,19 +913,6 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 			ld_static_tgot_extra = sz;
 	}
 #endif
-	dangerous_ld_env = libmap_disable || libmap_override != NULL ||
-	    ld_library_path != NULL || ld_preload != NULL ||
-	    ld_elf_hints_path != NULL || ld_loadfltr || !ld_dynamic_weak
-#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
-	    || static_tls_extra != NULL
-#endif
-#ifdef TLS_TGOT
-	    || static_tgot_extra != NULL
-#endif
-	    ;
-	if (!ld_tracing)
-		ld_tracing = ld_get_env_var(LD_TRACE_LOADED_OBJECTS);
-	ld_utrace = ld_get_env_var(LD_UTRACE);
 #ifdef CHERI_LIB_C18N
 	ld_compartment_utrace = ld_get_env_var(LD_UTRACE_COMPARTMENT);
 	ld_compartment_policy = ld_get_env_var(LD_COMPARTMENT_POLICY);
@@ -945,6 +932,19 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	else if (ld_get_env_var(LD_COMPARTMENT_ENABLE) != NULL)
 		ld_compartment_enable = true;
 #endif
+	dangerous_ld_env = libmap_disable || libmap_override != NULL ||
+	    ld_library_path != NULL || ld_preload != NULL ||
+	    ld_elf_hints_path != NULL || ld_loadfltr || !ld_dynamic_weak
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
+	    || static_tls_extra != NULL
+#endif
+#ifdef TLS_TGOT
+	    || static_tgot_extra != NULL
+#endif
+	    ;
+	if (!ld_tracing)
+		ld_tracing = ld_get_env_var(LD_TRACE_LOADED_OBJECTS);
+	ld_utrace = ld_get_env_var(LD_UTRACE);
 
 	set_ld_elf_hints_path();
 	if (ld_debug != NULL && *ld_debug != '\0')
