@@ -498,13 +498,4 @@ CWARNFLAGS+=	-Werror=implicit-function-declaration
 .ifdef CHERI_USE_CAP_TABLE
 CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
 .endif
-
-.if defined(CHERI_SUBOBJECT_BOUNDS)
-# Allow per-subdirectory overrides if we know that there is maximum that works
-.if defined(CHERI_SUBOBJECT_BOUNDS_MAX)
-CFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
-.else
-CFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
-.endif # CHERI_SUBOBJECT_BOUNDS_MAX
-.endif # CHERI_SUBOBJECT_BOUNDS
 .endif

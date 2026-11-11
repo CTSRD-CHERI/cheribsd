@@ -35,6 +35,10 @@
 #error "This code requires a CHERI-aware compiler"
 #endif
 
+#ifndef __CHERI_SUBOBJECT_BOUNDS__
+#error "__CHERI_SUBOBJECT_BOUNDS__ must be enabled"
+#endif
+
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/signal.h>
