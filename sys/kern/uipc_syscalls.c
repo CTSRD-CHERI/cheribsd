@@ -482,7 +482,7 @@ user_connectat(struct thread *td, int fd, int s,
 
 	error = getsockaddr(&sa, name, namelen);
 	if (error == 0) {
-		error = kern_connectat(td, AT_FDCWD, s, sa);
+		error = kern_connectat(td, fd, s, sa);
 		free(sa, M_SONAME);
 	}
 	return (error);
