@@ -35,10 +35,14 @@
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/mman.h>
-#include <sys/refcount.h>
 #include <sys/rwlock.h>
 #include <sys/hwc.h>
 #include <sys/smp.h>
+
+#include <sys/fcntl.h>
+#include <sys/file.h>
+#include <sys/filedesc.h>
+#include <sys/filio.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -70,16 +74,7 @@
 static MALLOC_DEFINE(M_HWC_VM, "hwc_vm", "Hardware Counters");
 
 static int
-hwc_vm_open(struct cdev *cdev, int oflags, int devtype, struct thread *td)
-{
-
-	dprintf("%s\n", __func__);
-
-	return (0);
-}
-
-static int
-hwc_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
+hwc_vm_ioctl(struct file *fp, u_long cmd, void *data, struct ucred *active_cred,
     struct thread *td)
 {
 	struct hwc_configure *hc;
@@ -90,8 +85,9 @@ hwc_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwc_owner *ho;
 	int error;
 
-	vm = dev->si_drv1;
-	KASSERT(vm != NULL, ("si_drv1 is NULL"));
+	vm = fp->f_data;
+
+	KASSERT(vm != NULL, ("data is NULL"));
 
 	ctx = vm->ctx;
 
@@ -116,20 +112,20 @@ hwc_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		ctx->state = CTX_STATE_RUNNING;
 		HWC_CTX_UNLOCK(ctx);
 
-		hstart = (struct hwc_start *)addr;
+		hstart = (struct hwc_start *)data;
 		error = hwc_backend_start(ctx, hstart);
 		if (error)
 			return (error);
 		break;
 	case HWC_IOC_STOP:
-		hstop = (struct hwc_stop *)addr;
+		hstop = (struct hwc_stop *)data;
 		error = hwc_backend_stop(ctx, hstop);
 		if (error)
 			return (error);
 		ctx->state = CTX_STATE_STOPPED;
 		break;
 	case HWC_IOC_CONFIGURE:
-		hc = (struct hwc_configure *)addr;
+		hc = (struct hwc_configure *)data;
 		hwc_backend_configure(ctx, hc);
 		break;
 	default:
@@ -139,36 +135,9 @@ hwc_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	return (0);
 }
 
-static struct cdevsw hwc_vm_cdevsw = {
-	.d_version	= D_VERSION,
-	.d_name		= "hwc",
-	.d_open		= hwc_vm_open,
-	.d_mmap_single	= NULL,
-	.d_ioctl	= hwc_vm_ioctl,
+static const struct fileops vm_fileops = {
+	.fo_ioctl = hwc_vm_ioctl,
 };
-
-static int
-hwc_vm_create_cdev(struct hwc_vm *vm, char *path)
-{
-	struct make_dev_args args;
-	int error;
-
-	dprintf("%s: path %s\n", __func__, path);
-
-	make_dev_args_init(&args);
-	args.mda_devsw = &hwc_vm_cdevsw;
-	args.mda_flags = MAKEDEV_CHECKNAME | MAKEDEV_WAITOK;
-	args.mda_uid = UID_ROOT;
-	args.mda_gid = GID_WHEEL;
-	args.mda_mode = 0660;
-	args.mda_si_drv1 = vm;
-
-	error = make_dev_s(&args, &vm->cdev, "%s", path);
-	if (error != 0)
-		return (error);
-
-	return (0);
-}
 
 void
 hwc_vm_free(struct hwc_vm *vm)
@@ -176,24 +145,30 @@ hwc_vm_free(struct hwc_vm *vm)
 
 	dprintf("%s\n", __func__);
 
-	if (vm->cdev)
-		destroy_dev_sched(vm->cdev);
 	free(vm, M_HWC_VM);
 }
 
 int
-hwc_vm_alloc(size_t bufsize, int kva_req, char *path, struct hwc_vm **vm0)
+hwc_vm_alloc(size_t bufsize, int kva_req, struct hwc_vm **vm0)
 {
 	struct hwc_vm *vm;
+	struct thread *td;
+	struct file *fp;
 	int error;
+	int fd;
 
 	vm = malloc(sizeof(struct hwc_vm), M_HWC_VM, M_WAITOK | M_ZERO);
 
-	error = hwc_vm_create_cdev(vm, path);
-	if (error) {
-		hwc_vm_free(vm);
+	td = curthread;
+
+	error = falloc(td, &fp, &fd, 0);
+	if (error != 0)
 		return (error);
-	}
+
+	finit(fp, FREAD | FWRITE, DTYPE_DEV, vm, &vm_fileops);
+
+	vm->fp = fp;
+	vm->fd = fd;
 
 	*vm0 = vm;
 

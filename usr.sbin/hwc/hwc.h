@@ -39,7 +39,7 @@ struct hwc_methods {
 };
 
 struct hwc_backend {
-	const char * __capability name;
+	const char * __kerncap name;
 	const char *fullname;
 	struct hwc_methods *methods;
 };
@@ -51,7 +51,6 @@ struct hwc_context {
 	cpuset_t cpu_map;
 	int fd;
 	int attach;
-	int ident;
 	char *config_file;
 	char *output_file;
 	int mode;
