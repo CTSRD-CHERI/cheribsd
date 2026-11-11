@@ -122,6 +122,8 @@ static uintptr_t sealer_trusted_stk;
 uintptr_t sealer_pltgot;
 
 /* Enable compartmentalisation */
+const char *ld_c18n_disable_env;
+const char *ld_c18n_enable_env;
 bool ld_c18n_enable;
 
 /* Use utrace() to log compartmentalisation-related events */
