@@ -36,6 +36,8 @@
  * Global symbols
  */
 extern uintptr_t sealer_pltgot;
+extern const char *ld_c18n_disable_env;
+extern const char *ld_c18n_enable_env;
 extern const char *ld_c18n_utrace;
 extern const char *ld_c18n_policy;
 extern const char *ld_c18n_overhead;

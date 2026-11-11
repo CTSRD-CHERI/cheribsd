@@ -477,16 +477,16 @@ static struct ld_env_var_desc ld_env_vars[] = {
 #endif
 	LD_ENV_DESC(NO_DL_ITERATE_PHDR_AFTER_FORK, false),
 #ifdef CHERI_LIB_C18N
-	LD_ENV_DESC(UTRACE_C18N, false),
-	LD_ENV_DESC(C18N_ENABLE, false),
-	LD_ENV_DESC(C18N_DISABLE, false),
-	LD_ENV_DESC(C18N_POLICY, false),
-	LD_ENV_DESC(C18N_OVERHEAD, false),
-	LD_ENV_DESC(C18N_SIG, false),
-	LD_ENV_DESC(C18N_UNWIND, false),
-	LD_ENV_DESC(C18N_STATS, false),
-	LD_ENV_DESC(C18N_SWITCH_COUNT, false),
-	LD_ENV_DESC(C18N_NO_FAST_PATH, false),
+	LD_ENV_DESC(UTRACE_C18N, true),
+	LD_ENV_DESC(C18N_ENABLE, true),
+	LD_ENV_DESC(C18N_DISABLE, true),
+	LD_ENV_DESC(C18N_POLICY, true),
+	LD_ENV_DESC(C18N_OVERHEAD, true),
+	LD_ENV_DESC(C18N_SIG, true),
+	LD_ENV_DESC(C18N_UNWIND, true),
+	LD_ENV_DESC(C18N_STATS, true),
+	LD_ENV_DESC(C18N_SWITCH_COUNT, true),
+	LD_ENV_DESC(C18N_NO_FAST_PATH, true),
 #endif
 };
 
@@ -924,12 +924,14 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	    LD_C18N_SWITCH_COUNT);
 	ld_c18n_no_fast_path = ld_get_env_var(
 	    LD_C18N_NO_FAST_PATH);
+	ld_c18n_disable_env = ld_get_env_var(LD_C18N_DISABLE);
+	ld_c18n_enable_env = ld_get_env_var(LD_C18N_ENABLE);
 	/*
 	 * DISABLE takes precedence over ENABLE.
 	 */
-	if (ld_get_env_var(LD_C18N_DISABLE) != NULL)
+	if (ld_c18n_disable_env != NULL)
 		ld_c18n_enable = false;
-	else if (ld_get_env_var(LD_C18N_ENABLE) != NULL)
+	else if (ld_c18n_enable_env != NULL)
 		ld_c18n_enable = true;
 #endif
 	dangerous_ld_env = libmap_disable || libmap_override != NULL ||
@@ -940,6 +942,12 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #endif
 #ifdef TLS_TGOT
 	    || static_tgot_extra != NULL
+#endif
+#ifdef CHERI_LIB_C18N
+	    || ld_c18n_disable_env || ld_c18n_enable_env ||
+	    ld_c18n_utrace || ld_c18n_policy || ld_c18n_overhead ||
+	    ld_c18n_sig || ld_c18n_unwind || ld_c18n_stats ||
+	    ld_c18n_switch_count || ld_c18n_no_fast_path
 #endif
 	    ;
 	if (!ld_tracing)
