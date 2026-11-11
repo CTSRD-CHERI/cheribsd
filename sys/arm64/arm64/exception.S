@@ -82,9 +82,22 @@
 	mrs	PTR(18), PTRN(tpidr_el1)
 .endm
 
+/*
+ * When CHERI_BOUNDED_KSTACK is enabled and saving user context,
+ * install the bounded kernel stack and leave a bounded pointer
+ * to td_frame in c20.
+ */
 .macro	save_registers el
 	add	PTR(29), PTRN(sp), #(TF_SIZE)
 .if \el == 0
+#ifdef CHERI_BOUNDED_KSTACK
+	ldr	PTR(20), [PTR(18), #(PC_CURTHREAD)]
+	ldr	PTRN(1), [PTR(20), #(TD_MD_KSTACK)]
+	mov	PTRN(sp), PTR(1)
+	ldr	PTR(20), [PTR(20), #(TD_FRAME)]
+	/* Note: fp is updated, but it is out of bounds. */
+	add	PTR(29), PTR(20), #(TF_SIZE)
+#endif
 #if defined(PERTHREAD_SSP)
 	/* Load the SSP canary to sp_el0 */
 	ldr	x1, [x18, #(PC_CURTHREAD)]
@@ -113,6 +126,7 @@
 
 	/* Unmask debug and SError exceptions */
 	msr	daifclr, #(DAIF_D | DAIF_A)
+
 .else
 	/*
 	 * Unmask debug and SError exceptions.
@@ -131,7 +145,11 @@
 	msr	daifset, #(DAIF_ALL)
 .if \el == 0
 	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
+#ifdef CHERI_BOUNDED_KSTACK
+	mov	PTR(1), PTR(20)
+#else
 	mov	PTR(1), PTRN(sp)
+#endif
 	bl	dbg_monitor_exit
 
 #ifdef PAC
@@ -150,6 +168,17 @@
 #endif
 1:
 .endif
+
+#ifdef CHERI_BOUNDED_KSTACK
+.if \el == 0
+	/* Restore unbounded kstack to access trapframe from csp */
+	ldr	PTR(1), [PTR(18), #PC_CURTHREAD]
+	ldr	PTR(2), [PTR(1), #TD_FRAME]
+	ldr	PTR(1), [PTR(1), #TD_KSTACK]
+	scvalue	PTRN(sp), PTR(1), x2
+.endif
+#endif
+
 	ldp	CAP(18), CAPN(lr), [PTRN(sp), #(TF_SP)]
 #if __has_feature(capabilities)
 	ldr	w11, [PTRN(sp), #(TF_SPSR)]
@@ -233,7 +262,11 @@
 	msr	daif, x19
 
 	/* handle the ast */
+#ifdef CHERI_BOUNDED_KSTACK
+	mov	PTR(0), PTR(20)
+#else
 	mov	PTR(0), PTRN(sp)
+#endif
 	bl	_C_LABEL(ast)
 
 	/* Re-check for new ast scheduled */
@@ -268,6 +301,10 @@ ENTRY(handle_el1h_sync)
 	KMSAN_ENTER
 	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
 	mov	PTR(1), PTRN(sp)
+#ifdef CHERI_BOUNDED_KSTACK
+	mov	x2, #TF_SIZE
+	scbndse	PTR(1), PTR(1), x2
+#endif
 	bl	do_el1h_sync
 	KMSAN_LEAVE
 	restore_registers 1
@@ -278,6 +315,10 @@ ENTRY(handle_el1h_irq)
 	save_registers 1
 	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
+#ifdef CHERI_BOUNDED_KSTACK
+	mov	x1, #TF_SIZE
+	scbndse	PTR(0), PTR(0), x1
+#endif
 	mov	x1, #INTR_ROOT_IRQ
 	bl	intr_irq_handler
 	KMSAN_LEAVE
@@ -289,6 +330,10 @@ ENTRY(handle_el1h_fiq)
 	save_registers 1
 	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
+#ifdef CHERI_BOUNDED_KSTACK
+	mov	x1, #TF_SIZE
+	scbndse	PTR(0), PTR(0), x1
+#endif
 	mov	x1, #INTR_ROOT_FIQ
 	bl	intr_irq_handler
 	KMSAN_LEAVE
@@ -300,6 +345,10 @@ ENTRY(handle_el1h_serror)
 	save_registers 1
 	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
+#ifdef CHERI_BOUNDED_KSTACK
+	mov	x1, #TF_SIZE
+	scbndse	PTR(0), PTR(0), x1
+#endif
 1:	bl	do_serror
 	b	1b
 	KMSAN_LEAVE
@@ -309,12 +358,18 @@ ENTRY(handle_el0_sync)
 	save_registers 0
 	KMSAN_ENTER
 	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
+#ifdef CHERI_BOUNDED_KSTACK
+	mov	PTR(1), PTR(20)
+#else
 	mov	PTR(1), PTRN(sp)
 	mov	PTR(22), PTR(0)
 	str	PTR(1), [PTR(0), #TD_FRAME]
+#endif
 	bl	do_el0_sync
 	do_ast
+#ifndef CHERI_BOUNDED_KSTACK
 	str	PTR(zr), [PTR(22), #TD_FRAME]
+#endif
 	KMSAN_LEAVE
 	restore_registers 0
 	ERET
@@ -323,7 +378,11 @@ END(handle_el0_sync)
 ENTRY(handle_el0_irq)
 	save_registers 0
 	KMSAN_ENTER
+#ifdef CHERI_BOUNDED_KSTACK
+	mov	PTR(0), PTR(20)
+#else
 	mov	PTR(0), PTRN(sp)
+#endif
 	mov	x1, #INTR_ROOT_IRQ
 	bl	intr_irq_handler
 	do_ast
@@ -335,7 +394,11 @@ END(handle_el0_irq)
 ENTRY(handle_el0_fiq)
 	save_registers 0
 	KMSAN_ENTER
+#ifdef CHERI_BOUNDED_KSTACK
+	mov	PTR(0), PTR(20)
+#else
 	mov	PTR(0), PTRN(sp)
+#endif
 	mov	x1, #INTR_ROOT_FIQ
 	bl	intr_irq_handler
 	do_ast
@@ -347,7 +410,11 @@ END(handle_el0_fiq)
 ENTRY(handle_el0_serror)
 	save_registers 0
 	KMSAN_ENTER
+#ifdef CHERI_BOUNDED_KSTACK
+	mov	PTR(0), PTR(19)
+#else
 	mov	PTR(0), PTRN(sp)
+#endif
 1:	bl	do_serror
 	b	1b
 	KMSAN_LEAVE
@@ -357,6 +424,10 @@ ENTRY(handle_empty_exception)
 	save_registers 0
 	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
+#ifdef CHERI_BOUNDED_KSTACK
+	mov	x1, #TF_SIZE
+	scbndse	PTR(0), PTR(0), x1
+#endif
 1:	bl	unhandled_exception
 	b	1b
 	KMSAN_LEAVE

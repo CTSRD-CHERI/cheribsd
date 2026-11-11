@@ -43,6 +43,7 @@ struct trapframe;
 
 #define	PCB_X19		0
 #define	PCB_X20		1
+#define	PCB_X21		2
 #define	PCB_FP		10
 #define	PCB_LR		11
 
