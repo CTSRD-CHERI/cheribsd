@@ -710,7 +710,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #ifdef CHERI_LIB_C18N
 		if ((aux_info[AT_BSDFLAGS]->a_un.a_val & ELF_BSDF_CHERI_C18N) !=
 		    0)
-			ld_compartment_enable = true;
+			ld_c18n_enable = true;
 #endif
 	}
 
@@ -914,23 +914,23 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	}
 #endif
 #ifdef CHERI_LIB_C18N
-	ld_compartment_utrace = ld_get_env_var(LD_UTRACE_C18N);
-	ld_compartment_policy = ld_get_env_var(LD_C18N_POLICY);
-	ld_compartment_overhead = ld_get_env_var(LD_C18N_OVERHEAD);
-	ld_compartment_sig = ld_get_env_var(LD_C18N_SIG);
-	ld_compartment_unwind = ld_get_env_var(LD_C18N_UNWIND);
-	ld_compartment_stats = ld_get_env_var(LD_C18N_STATS);
-	ld_compartment_switch_count = ld_get_env_var(
+	ld_c18n_utrace = ld_get_env_var(LD_UTRACE_C18N);
+	ld_c18n_policy = ld_get_env_var(LD_C18N_POLICY);
+	ld_c18n_overhead = ld_get_env_var(LD_C18N_OVERHEAD);
+	ld_c18n_sig = ld_get_env_var(LD_C18N_SIG);
+	ld_c18n_unwind = ld_get_env_var(LD_C18N_UNWIND);
+	ld_c18n_stats = ld_get_env_var(LD_C18N_STATS);
+	ld_c18n_switch_count = ld_get_env_var(
 	    LD_C18N_SWITCH_COUNT);
-	ld_compartment_no_fast_path = ld_get_env_var(
+	ld_c18n_no_fast_path = ld_get_env_var(
 	    LD_C18N_NO_FAST_PATH);
 	/*
 	 * DISABLE takes precedence over ENABLE.
 	 */
 	if (ld_get_env_var(LD_C18N_DISABLE) != NULL)
-		ld_compartment_enable = false;
+		ld_c18n_enable = false;
 	else if (ld_get_env_var(LD_C18N_ENABLE) != NULL)
-		ld_compartment_enable = true;
+		ld_c18n_enable = true;
 #endif
 	dangerous_ld_env = libmap_disable || libmap_override != NULL ||
 	    ld_library_path != NULL || ld_preload != NULL ||
@@ -1804,7 +1804,7 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 
 #ifdef CHERI_LIB_C18N
 		case DT_CHERI_C18N_SIG:
-			if (ld_compartment_sig != NULL)
+			if (ld_c18n_sig != NULL)
 				obj->sigtab = (const struct func_sig *)
 				    (obj->relocbase + dynp->d_un.d_ptr);
 			break;
