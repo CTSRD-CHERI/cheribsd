@@ -215,6 +215,13 @@ void		 pmap_zero_page_area(vm_page_t, int off, int size);
 #define	pmap_copy_page_tags(src, dst)	pmap_copy_page((src), (dst))
 #endif
 
+#ifdef __CHERI__
+vm_pointer_t	 pmap_map_imprecise(vm_pointer_t *virt, vm_paddr_t start,
+		    vm_paddr_t end, int prot);
+#else
+#define	pmap_map_imprecise pmap_map
+#endif
+
 #endif /* _KERNEL */
 #endif /* _PMAP_VM_ */
 // CHERI CHANGES START
