@@ -477,16 +477,16 @@ static struct ld_env_var_desc ld_env_vars[] = {
 #endif
 	LD_ENV_DESC(NO_DL_ITERATE_PHDR_AFTER_FORK, false),
 #ifdef CHERI_LIB_C18N
-	LD_ENV_DESC(UTRACE_COMPARTMENT, false),
-	LD_ENV_DESC(COMPARTMENT_ENABLE, false),
-	LD_ENV_DESC(COMPARTMENT_DISABLE, false),
-	LD_ENV_DESC(COMPARTMENT_POLICY, false),
-	LD_ENV_DESC(COMPARTMENT_OVERHEAD, false),
-	LD_ENV_DESC(COMPARTMENT_SIG, false),
-	LD_ENV_DESC(COMPARTMENT_UNWIND, false),
-	LD_ENV_DESC(COMPARTMENT_STATS, false),
-	LD_ENV_DESC(COMPARTMENT_SWITCH_COUNT, false),
-	LD_ENV_DESC(COMPARTMENT_NO_FAST_PATH, false),
+	LD_ENV_DESC(UTRACE_C18N, false),
+	LD_ENV_DESC(C18N_ENABLE, false),
+	LD_ENV_DESC(C18N_DISABLE, false),
+	LD_ENV_DESC(C18N_POLICY, false),
+	LD_ENV_DESC(C18N_OVERHEAD, false),
+	LD_ENV_DESC(C18N_SIG, false),
+	LD_ENV_DESC(C18N_UNWIND, false),
+	LD_ENV_DESC(C18N_STATS, false),
+	LD_ENV_DESC(C18N_SWITCH_COUNT, false),
+	LD_ENV_DESC(C18N_NO_FAST_PATH, false),
 #endif
 };
 
@@ -914,22 +914,22 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	}
 #endif
 #ifdef CHERI_LIB_C18N
-	ld_compartment_utrace = ld_get_env_var(LD_UTRACE_COMPARTMENT);
-	ld_compartment_policy = ld_get_env_var(LD_COMPARTMENT_POLICY);
-	ld_compartment_overhead = ld_get_env_var(LD_COMPARTMENT_OVERHEAD);
-	ld_compartment_sig = ld_get_env_var(LD_COMPARTMENT_SIG);
-	ld_compartment_unwind = ld_get_env_var(LD_COMPARTMENT_UNWIND);
-	ld_compartment_stats = ld_get_env_var(LD_COMPARTMENT_STATS);
+	ld_compartment_utrace = ld_get_env_var(LD_UTRACE_C18N);
+	ld_compartment_policy = ld_get_env_var(LD_C18N_POLICY);
+	ld_compartment_overhead = ld_get_env_var(LD_C18N_OVERHEAD);
+	ld_compartment_sig = ld_get_env_var(LD_C18N_SIG);
+	ld_compartment_unwind = ld_get_env_var(LD_C18N_UNWIND);
+	ld_compartment_stats = ld_get_env_var(LD_C18N_STATS);
 	ld_compartment_switch_count = ld_get_env_var(
-	    LD_COMPARTMENT_SWITCH_COUNT);
+	    LD_C18N_SWITCH_COUNT);
 	ld_compartment_no_fast_path = ld_get_env_var(
-	    LD_COMPARTMENT_NO_FAST_PATH);
+	    LD_C18N_NO_FAST_PATH);
 	/*
 	 * DISABLE takes precedence over ENABLE.
 	 */
-	if (ld_get_env_var(LD_COMPARTMENT_DISABLE) != NULL)
+	if (ld_get_env_var(LD_C18N_DISABLE) != NULL)
 		ld_compartment_enable = false;
-	else if (ld_get_env_var(LD_COMPARTMENT_ENABLE) != NULL)
+	else if (ld_get_env_var(LD_C18N_ENABLE) != NULL)
 		ld_compartment_enable = true;
 #endif
 	dangerous_ld_env = libmap_disable || libmap_override != NULL ||

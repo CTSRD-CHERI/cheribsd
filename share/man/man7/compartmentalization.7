@@ -61,9 +61,9 @@ or
 as appropriate.
 .Pp
 Overriding this still are the environment variables
-.Ev LD_COMPARTMENT_ENABLE
+.Ev LD_C18N_ENABLE
 and
-.Ev LD_COMPARTMENT_DISABLE .
+.Ev LD_C18N_DISABLE .
 If both environtment variables are set, c18n is disabled.
 Note that environment variables are not reliably inherited when processes fork.
 .Ss COMPARTMENT TRANSITION TRACING
@@ -71,7 +71,7 @@ Compartment transitions can be traced with the
 .Xr ktrace 1
 facility.
 To generate a trace, set the environment variable
-.Ev LD_UTRACE_COMPARTMENT
+.Ev LD_UTRACE_C18N
 and invoke the executable with
 .Xr ktrace 1 .
 .Pp
@@ -86,7 +86,7 @@ traces.
 .Ss COMPARTMENT TRANSITION OVERHEAD SIMULATION
 To simulate the overhead of making a system call during each compartment
 transition, set the environment variable
-.Ev LD_COMPARTMENT_OVERHEAD
+.Ev LD_C18N_OVERHEAD
 and invoke the executable.
 Each compartment transition will then make a
 .Xr getpid 2
