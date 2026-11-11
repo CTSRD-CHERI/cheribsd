@@ -181,6 +181,9 @@ wchar_t	*wmemmove(wchar_t *, const wchar_t *, size_t);
 wchar_t	*wmempcpy(wchar_t * __restrict, const wchar_t * __restrict, size_t);
 #endif
 wchar_t	*wmemset(wchar_t *, wchar_t, size_t);
+#if __BSD_VISIBLE
+int	__stderr_wprintf(const wchar_t * __restrict, ...);
+#endif
 int	wprintf(const wchar_t * __restrict, ...);
 int	wscanf(const wchar_t * __restrict, ...);
 

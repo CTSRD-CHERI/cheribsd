@@ -300,6 +300,9 @@ void	 setbuf(FILE * __restrict, char * __restrict);
 int	 setvbuf(FILE * __restrict, char * __restrict, int, size_t);
 int	 (sprintf)(char * __restrict, const char * __restrict, ...);
 int	 sscanf(const char * __restrict, const char * __restrict, ...);
+#if __BSD_VISIBLE || defined(__SQUASH_FPRINTF_STDERR)
+int	 __stderr_printf(const char * __restrict, ...);
+#endif
 FILE	*tmpfile(void);
 char	*tmpnam(char *);
 int	 ungetc(int, FILE *);
@@ -511,6 +514,17 @@ extern int __isthreaded;
 
 #define	getchar()	getc(stdin)
 #define	putchar(x)	putc(x, stdout)
+
+#ifdef __SQUASH_FPRINTF_STDERR
+#define fprintf(filep, ...) ({						\
+	int __ret ## __LINE__;						\
+	if (__builtin_strcmp(#filep, "stderr") == 0)			\
+		__ret ## __LINE__ = __stderr_printf(__VA_ARGS__);	\
+	else								\
+		__ret ## __LINE__ = fprintf((filep), __VA_ARGS__);	\
+	__ret ## __LINE__;						\
+})
+#endif
 
 #if __BSD_VISIBLE
 /*
