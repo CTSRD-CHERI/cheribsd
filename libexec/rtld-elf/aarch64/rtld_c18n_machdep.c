@@ -69,9 +69,9 @@ tramp_compile(char **entry, const struct tramp_data *data)
 	size_t header_off, target_off, landing_off, unused_regs;
 	compart_id_t callee;
 	bool executive = cheri_perms_get(data->target) & CHERI_PERM_EXECUTIVE;
-	bool count = ld_compartment_switch_count != NULL;
-	bool hook = ld_compartment_utrace != NULL ||
-	    ld_compartment_overhead != NULL;
+	bool count = ld_c18n_switch_count != NULL;
+	bool hook = ld_c18n_utrace != NULL ||
+	    ld_c18n_overhead != NULL;
 
 #define	COPY_VALUE(val)	({				\
 	size_t _old_size = size;			\
@@ -172,7 +172,7 @@ tramp_compile(char **entry, const struct tramp_data *data)
 	    51 - (data->sig.valid ? data->sig.ret_args : 0));
 	PATCH_LDR_IMM(push_frame, target, target_off);
 
-	if (executive || ld_compartment_unwind != NULL)
+	if (executive || ld_c18n_unwind != NULL)
 		COPY(update_fp);
 	else
 		COPY(update_fp_untagged);

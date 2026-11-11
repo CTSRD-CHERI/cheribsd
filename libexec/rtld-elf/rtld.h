@@ -61,9 +61,9 @@
 /*
  * This environment variable is exposed here so that tls.h can see it.
  */
-extern bool ld_compartment_enable;
+extern bool ld_c18n_enable;
 
-#define	C18N_ENABLED	ld_compartment_enable
+#define	C18N_ENABLED	ld_c18n_enable
 #endif
 
 #include "rtld_lock.h"

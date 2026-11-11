@@ -122,31 +122,31 @@ static uintptr_t sealer_trusted_stk;
 uintptr_t sealer_pltgot;
 
 /* Enable compartmentalisation */
-bool ld_compartment_enable;
+bool ld_c18n_enable;
 
 /* Use utrace() to log compartmentalisation-related events */
-const char *ld_compartment_utrace;
+const char *ld_c18n_utrace;
 
 /* Path of the compartmentalisation policy */
-const char *ld_compartment_policy;
+const char *ld_c18n_policy;
 
 /* Simulate overhead during compartment transitions */
-const char *ld_compartment_overhead;
+const char *ld_c18n_overhead;
 
 /* Read the .c18n.signature ELF section */
-const char *ld_compartment_sig;
+const char *ld_c18n_sig;
 
 /* Expose tagged frame pointers to trusted frames */
-const char *ld_compartment_unwind;
+const char *ld_c18n_unwind;
 
 /* Export compartmentalisation statistics to a file */
-const char *ld_compartment_stats;
+const char *ld_c18n_stats;
 
 /* Export count of compartment switches to statistics */
-const char *ld_compartment_switch_count;
+const char *ld_c18n_switch_count;
 
 /* Do not use the fast paths in trampolines for self-transitions */
-const char *ld_compartment_no_fast_path;
+const char *ld_c18n_no_fast_path;
 
 /* Compartmentalisation information exported to the kernel */
 static struct cheri_c18n_info *c18n_info;
@@ -1282,7 +1282,7 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 	const char *caller;
 	struct utrace_c18n ut;
 
-	if (ld_compartment_utrace != NULL) {
+	if (ld_c18n_utrace != NULL) {
 		if (hdr->symnum == 0)
 			sym = "<unknown>";
 		else
@@ -1304,7 +1304,7 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 		strlcpy(ut.caller, caller, sizeof(ut.caller));
 		utrace(&ut, sizeof(ut));
 	}
-	if (ld_compartment_overhead != NULL)
+	if (ld_c18n_overhead != NULL)
 		getpid();
 }
 
@@ -1438,7 +1438,7 @@ tramp_make_entry(struct tramp_header *header, bool slow)
 {
 	uint8_t *entry = header->entry;
 
-	if (ld_compartment_no_fast_path != NULL || slow)
+	if (ld_c18n_no_fast_path != NULL || slow)
 		entry += c18n_tramp_entry_slow_offset;
 	entry = cheri_perms_clear(entry, FUNC_PTR_REMOVE_PERMS);
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -1645,7 +1645,7 @@ tramp_get_header(const void *data)
 	 * exposed. The return entry point is after either function pointer
 	 * entry point.
 	 */
-	if (ld_compartment_no_fast_path != NULL)
+	if (ld_c18n_no_fast_path != NULL)
 		data = (const char *)data - c18n_tramp_entry_slow_offset;
 	data = __containerof(data, struct tramp_header, entry);
 
@@ -1738,10 +1738,10 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 	/*
 	 * Create memory mapping for compartmentalisation statistics.
 	 */
-	if (ld_compartment_stats == NULL)
+	if (ld_c18n_stats == NULL)
 		fd = -1;
 	else {
-		fd = open(ld_compartment_stats, O_RDWR | O_TRUNC | O_CREAT,
+		fd = open(ld_c18n_stats, O_RDWR | O_TRUNC | O_CREAT,
 		    0666);
 		if (fd == -1)
 			rtld_fatal("c18n: Cannot open file (%s)",
@@ -1780,8 +1780,8 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 
 	parse_policy(c18n_default_policy, c18n_default_policy_size);
 
-	if (ld_compartment_policy != NULL) {
-		if ((fd = open(ld_compartment_policy, O_RDONLY)) == -1)
+	if (ld_c18n_policy != NULL) {
+		if ((fd = open(ld_c18n_policy, O_RDONLY)) == -1)
 			rtld_fatal("c18n: Cannot open policy file");
 
 		if (fstat(fd, &st) == -1)
