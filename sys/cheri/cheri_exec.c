@@ -105,9 +105,6 @@ cheri_sigcode_capability(struct thread *td)
 	tmpcap = (void * __capability)cheri_bounds_set_exact(
 	    cheri_perms_and(PROC_SIGCODE(p), CHERI_CAP_USER_CODE_PERMS),
 	    *sv->sv_szsigcode);
-
-	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-		tmpcap = cheri_capmode(tmpcap);
-
+	tmpcap = cheri_capmode(tmpcap);
 	return (cheri_sentry_create(tmpcap));
 }
