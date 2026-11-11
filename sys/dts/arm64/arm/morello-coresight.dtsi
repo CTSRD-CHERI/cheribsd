@@ -1,0 +1,347 @@
+// SPDX-License-Identifier: GPL-2.0
+
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+
+/ {
+	cpu_debug0: cpu-debug@402010000 {
+		compatible = "arm,coresight-cpu-debug", "arm,primecell";
+		cpu = <&cpu0>;
+		reg = <0x4 0x02010000 0x0 0x1000>;
+	};
+
+	etm0: etm@402040000 {
+		compatible = "arm,coresight-etm4x", "arm,primecell";
+		cpu = <&cpu0>;
+		reg = <0x4 0x02040000 0 0x1000>;
+
+		out-ports {
+			port {
+				cluster0_etm0_out_port: endpoint {
+					remote-endpoint = <&cluster0_static_funnel_in_port0>;
+				};
+			};
+		};
+	};
+
+	cpu_debug1: cpu-debug@402110000 {
+		compatible = "arm,coresight-cpu-debug", "arm,primecell";
+		cpu = <&cpu1>;
+		reg = <0x4 0x02110000 0x0 0x1000>;
+	};
+	etm1: etm@402140000 {
+		compatible = "arm,coresight-etm4x", "arm,primecell";
+		cpu = <&cpu1>;
+		reg = <0x4 0x02140000 0 0x1000>;
+
+		out-ports {
+			port {
+				cluster0_etm1_out_port: endpoint {
+					remote-endpoint = <&cluster0_static_funnel_in_port1>;
+				};
+			};
+		};
+	};
+
+	cpu_debug2: cpu-debug@403010000 {
+		compatible = "arm,coresight-cpu-debug", "arm,primecell";
+		cpu = <&cpu2>;
+		reg = <0x4 0x03010000 0x0 0x1000>;
+	};
+
+	etm2: etm@403040000 {
+		compatible = "arm,coresight-etm4x", "arm,primecell";
+		cpu = <&cpu2>;
+		reg = <0x4 0x03040000 0 0x1000>;
+
+		out-ports {
+			port {
+				cluster1_etm0_out_port: endpoint {
+					remote-endpoint = <&cluster1_static_funnel_in_port0>;
+				};
+			};
+		};
+	};
+
+	cpu_debug3: cpu-debug@403110000 {
+		compatible = "arm,coresight-cpu-debug", "arm,primecell";
+		cpu = <&cpu3>;
+		reg = <0x4 0x03110000 0x0 0x1000>;
+	};
+
+	etm3: etm@403140000 {
+		compatible = "arm,coresight-etm4x", "arm,primecell";
+		cpu = <&cpu3>;
+		reg = <0x4 0x03140000 0 0x1000>;
+
+		out-ports {
+			port {
+				cluster1_etm1_out_port: endpoint {
+					remote-endpoint = <&cluster1_static_funnel_in_port1>;
+				};
+			};
+		};
+	};
+
+	sfunnel0: funnel@0 {
+		compatible = "arm,coresight-static-funnel";
+
+		out-ports {
+			port {
+				cluster0_static_funnel_out_port: endpoint {
+					remote-endpoint = <&etf0_in_port>;
+				};
+			};
+		};
+
+		in-ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				cluster0_static_funnel_in_port0: endpoint {
+					remote-endpoint = <&cluster0_etm0_out_port>;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+				cluster0_static_funnel_in_port1: endpoint {
+					remote-endpoint = <&cluster0_etm1_out_port>;
+				};
+			};
+		};
+	};
+
+	sfunnel1: funnel@1 {
+		compatible = "arm,coresight-static-funnel";
+
+		out-ports {
+			port {
+				cluster1_static_funnel_out_port: endpoint {
+					remote-endpoint = <&etf1_in_port>;
+				};
+			};
+		};
+
+		in-ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				cluster1_static_funnel_in_port0: endpoint {
+					remote-endpoint = <&cluster1_etm0_out_port>;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+				cluster1_static_funnel_in_port1: endpoint {
+					remote-endpoint = <&cluster1_etm1_out_port>;
+				};
+			};
+		};
+	};
+
+	tpiu@400130000 {
+		compatible = "arm,coresight-tpiu", "arm,primecell";
+		reg = <0x4 0x00130000 0 0x1000>;
+
+		in-ports {
+			port {
+				tpiu_in_port: endpoint {
+					remote-endpoint = <&replicator_out_port0>;
+				};
+			};
+		};
+	};
+
+	master_funnel: funnel@4000a0000 {
+		compatible = "arm,coresight-dynamic-funnel", "arm,primecell";
+		reg = <0x4 0x000a0000 0 0x1000>;
+
+		out-ports {
+			port {
+				master_funnel_out_port: endpoint {
+					remote-endpoint = <&replicator_in_port>;
+				};
+			};
+		};
+
+		master_funnel_in_ports: in-ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				master_funnel_in_port0: endpoint {
+					remote-endpoint = <&cluster_funnel_out_port>;
+				};
+			};
+
+			port@5 {
+				reg = <5>;
+				master_funnel_in_port5: endpoint {
+					remote-endpoint = <&etf2_out_port>;
+				};
+			};
+		};
+	};
+
+	etr@400120000 {
+		compatible = "arm,coresight-tmc", "arm,primecell";
+		reg = <0x4 0x00120000 0 0x1000>;
+
+		arm,scatter-gather;
+		in-ports {
+			port {
+				etr_in_port: endpoint {
+					remote-endpoint = <&replicator_out_port1>;
+				};
+			};
+		};
+	};
+
+	replicator@400110000 {
+		compatible = "arm,coresight-dynamic-replicator", "arm,primecell";
+		reg = <0x4 0x00110000 0 0x1000>;
+
+		out-ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				replicator_out_port0: endpoint {
+					remote-endpoint = <&tpiu_in_port>;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+				replicator_out_port1: endpoint {
+					remote-endpoint = <&etr_in_port>;
+				};
+			};
+		};
+		in-ports {
+			port {
+				replicator_in_port: endpoint {
+					remote-endpoint = <&master_funnel_out_port>;
+				};
+			};
+		};
+	};
+
+	cluster_funnel: funnel@4000b0000 {
+		compatible = "arm,coresight-dynamic-funnel", "arm,primecell";
+		reg = <0x4 0x000b0000 0 0x1000>;
+
+		out-ports {
+			port {
+				cluster_funnel_out_port: endpoint {
+					remote-endpoint = <&master_funnel_in_port0>;
+				};
+			};
+		};
+
+		in-ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				cluster_funnel_in_port0: endpoint {
+					remote-endpoint = <&etf0_out_port>;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+				cluster_funnel_in_port1: endpoint {
+					remote-endpoint = <&etf1_out_port>;
+				};
+			};
+		};
+	};
+
+	etf0: etf@400410000 {
+		compatible = "arm,coresight-tmc", "arm,primecell";
+		reg = <0x4 0x00410000 0 0x1000>;
+
+		in-ports {
+			port {
+				etf0_in_port: endpoint {
+					remote-endpoint = <&cluster0_static_funnel_out_port>;
+				};
+			};
+		};
+
+		out-ports {
+			port {
+				etf0_out_port: endpoint {
+					remote-endpoint = <&cluster_funnel_in_port0>;
+				};
+			};
+		};
+	};
+
+	etf1: etf@400420000 {
+		compatible = "arm,coresight-tmc", "arm,primecell";
+		reg = <0x4 0x00420000 0 0x1000>;
+
+		in-ports {
+			port {
+				etf1_in_port: endpoint {
+					remote-endpoint = <&cluster1_static_funnel_out_port>;
+				};
+			};
+		};
+
+		out-ports {
+			port {
+				etf1_out_port: endpoint {
+					remote-endpoint = <&cluster_funnel_in_port1>;
+				};
+			};
+		};
+	};
+
+	stm_etf: etf@400010000 {
+		compatible = "arm,coresight-tmc", "arm,primecell";
+		reg = <0x4 0x00010000 0 0x1000>;
+
+		in-ports {
+			port {
+				etf2_in_port: endpoint {
+					remote-endpoint = <&stm_out_port>;
+				};
+			};
+		};
+
+		out-ports {
+			port {
+				etf2_out_port: endpoint {
+					remote-endpoint = <&master_funnel_in_port5>;
+				};
+			};
+		};
+	};
+
+	stm@400800000 {
+		compatible = "arm,coresight-stm", "arm,primecell";
+		reg = <4 0x00800000 0 0x1000>,
+		      <0 0x4d000000 0 0x1000000>;
+		reg-names = "stm-base", "stm-stimulus-base";
+
+		out-ports {
+			port {
+				stm_out_port: endpoint {
+					remote-endpoint = <&etf2_in_port>;
+				};
+			};
+		};
+	};
+};
