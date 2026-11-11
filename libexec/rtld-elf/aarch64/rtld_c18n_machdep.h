@@ -45,10 +45,12 @@
 #define	TRUSTED_STACK		rddc_el0
 #define	UNTRUSTED_STACK		csp
 #define	STACK_TABLE		rctpidr_el0
+#define	TCB			ctpidr_el0
 #else
 #define	TRUSTED_STACK		ddc
 #define	UNTRUSTED_STACK		rcsp_el0
 #define	STACK_TABLE		ctpidr_el0
+#define	TCB			rctpidr_el0
 #endif
 #define	STACK_TABLE_N		17
 #define	STACK_TABLE_C		__CONCAT(c, STACK_TABLE_N)
@@ -75,6 +77,10 @@
 .macro	get_rtld_stk		reg
 	mrs	STACK_TABLE_C, STACK_TABLE
 	ldr	\reg, [STACK_TABLE_C, #STACK_TABLE_RTLD]
+.endmacro
+
+.macro	set_tcb			reg
+	msr	TCB, \reg
 .endmacro
 
 #else
