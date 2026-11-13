@@ -2021,11 +2021,11 @@ typedef struct vdev_indirect_config {
 
 typedef struct vdev {
 	STAILQ_ENTRY(vdev) v_childlink;	/* link in parent's child list */
-	STAILQ_ENTRY(vdev) v_alllink;	/* link in global vdev list */
 	vdev_list_t	v_children;	/* children of this vdev */
 	const char	*v_name;	/* vdev name */
 	uint64_t	v_guid;		/* vdev guid */
-	uint64_t	v_txg;		/* most recent transaction */
+	uint64_t	v_label;	/* label instantiated from (top vdev) */
+	uint64_t	v_txg;		/* most recent transaction (top vdev) */
 	uint64_t	v_id;		/* index in parent */
 	uint64_t	v_psize;	/* physical device capacity */
 	int		v_ashift;	/* offset to block shift */

@@ -236,11 +236,6 @@ TCP_REQUEST_TRK opt_global.h
 TCP_ACCOUNTING	opt_global.h
 TCP_BBR		opt_inet.h
 TCP_RACK	opt_inet.h
-#
-# TCP SaD Detection is an experimental Sack attack Detection (SaD)
-# algorithm that uses "normal" behaviour with SACK's to detect
-# a possible attack. It is strictly experimental at this point.
-#
 TURNSTILE_PROFILING
 UMTX_PROFILING
 UMTX_CHAINS	opt_global.h
@@ -1013,6 +1008,7 @@ IICHID_DEBUG	opt_hid.h
 IICHID_SAMPLING	opt_hid.h
 HKBD_DFLT_KEYMAP	opt_hkbd.h
 HIDRAW_MAKE_UHID_ALIAS	opt_hid.h
+U2F_MAKE_UHID_ALIAS	opt_hid.h
 
 # kenv options
 # The early kernel environment (loader environment, config(8)-provided static)
