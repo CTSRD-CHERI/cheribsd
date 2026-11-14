@@ -54,6 +54,25 @@ handler_func(int signum)
 	handler_signum = signum;
 }
 
+CHERIBSDTEST(signal_sigaction_errno,
+    "Check that sigaction() reports errors through the caller's errno")
+{
+	struct sigaction sa;
+	int ret;
+
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = SIG_DFL;
+	errno = 0;
+	ret = sigaction(-1, &sa, NULL);
+	if (ret != -1)
+		cheribsdtest_failure_errx("sigaction(-1) returned %d", ret);
+	if (errno != EINVAL)
+		cheribsdtest_failure_errx("errno %d != EINVAL (%d)", errno,
+		    EINVAL);
+
+	cheribsdtest_success();
+}
+
 CHERIBSDTEST(signal_handler_usr1,
     "Install a signal handler (sa_handler) for SIGUSR1 and check it works")
 {
