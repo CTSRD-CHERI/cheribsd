@@ -53,6 +53,9 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <stdarg.h>
+#ifdef CHERI_LIB_C18N
+#include <stdatomic.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5020,12 +5023,27 @@ dladdr(const void *addr, Dl_info *info)
 {
 	const Obj_Entry *obj;
 	const Elf_Sym *def;
+#ifdef CHERI_LIB_C18N
+	struct tramp_header *header;
+#endif
 	void *symbol_addr;
 	unsigned long symoffset;
 	RtldLockState lockstate;
 
 	rlock_acquire(rtld_bind_lock, &lockstate);
-	obj = obj_from_addr(addr);
+#ifdef CHERI_LIB_C18N
+	if (C18N_ENABLED && (header = tramp_get_header(addr)) != NULL) {
+		/*
+		 * addr is a trampoline.  Use the object that defines the
+		 * wrapped function and look up its symbols by the real
+		 * function address rather than the trampoline address.
+		 */
+		obj = __DECONST(Obj_Entry *, header->defobj);
+		addr = atomic_load_explicit(&header->target,
+		    memory_order_relaxed);
+	} else
+#endif
+		obj = obj_from_addr(addr);
 	if (obj == NULL) {
 		_rtld_error("No shared object contains address");
 		lock_release(rtld_bind_lock, &lockstate);
