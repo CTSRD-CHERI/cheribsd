@@ -57,7 +57,7 @@ static interpos_func_t __libsys_interposing[INTERPOS_MAX] = {
 	SLOT(sendto, __sys_sendto),
 	SLOT(setcontext, __sys_setcontext),
 #ifdef CHERI_LIB_C18N
-	SLOT(sigaction, _rtld_sigaction),
+	SLOT(sigaction, __libsys_sigaction_c18n),
 #else
 	SLOT(sigaction, __sys_sigaction),
 #endif

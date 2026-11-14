@@ -79,9 +79,6 @@ static void check_cancel(struct pthread *curthread, ucontext_t *ucp);
 #pragma weak _rtld_sighandler
 void _rtld_sighandler(int, siginfo_t *, void *);
 
-#pragma weak _rtld_sigaction
-int _rtld_sigaction(int, const struct sigaction *, struct sigaction *);
-
 #pragma weak _rtld_siginvoke
 void _rtld_siginvoke(int, siginfo_t *, void *, const struct sigaction *);
 #endif
@@ -512,7 +509,7 @@ _thr_signal_init(int dlopened)
 			if (sig == SIGCANCEL)
 				continue;
 #ifdef CHERI_LIB_C18N
-			error = _rtld_sigaction(sig, NULL, &oact);
+			error = __libsys_sigaction_c18n(sig, NULL, &oact);
 #else
 			error = __sys_sigaction(sig, NULL, &oact);
 #endif
