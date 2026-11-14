@@ -33,6 +33,7 @@
 #include <sys/types.h>
 
 #include <dlfcn.h>
+#include <string.h>
 
 #include <cheribsdtest_dynamic.h>
 
@@ -65,6 +66,29 @@ CHERIBSDTEST(fptr_canon_dlsym,
 
 	CHERIBSDTEST_VERIFY2(cheri_ptr_equal_exact(fptr_inside, fptr_dlsym),
 	    "inside %#p differs from dlsym %#p", fptr_inside, fptr_dlsym);
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(fptr_canon_dladdr,
+    "Check that dladdr reports the defining symbol for a function pointer")
+{
+	Dl_info info;
+	void (*fptr)(void);
+	int error;
+
+	fptr = &cheribsdtest_dynamic_dummy_func;
+	memset(&info, 0, sizeof(info));
+	error = dladdr(fptr, &info);
+
+	CHERIBSDTEST_VERIFY2(error != 0, "dladdr(%#p) failed", fptr);
+	CHERIBSDTEST_VERIFY2(info.dli_sname != NULL,
+	    "dladdr(%#p) did not find a symbol", fptr);
+	CHERIBSDTEST_VERIFY2(strcmp(info.dli_sname,
+	    "cheribsdtest_dynamic_dummy_func") == 0,
+	    "dladdr(%#p) found symbol %s", fptr, info.dli_sname);
+	CHERIBSDTEST_VERIFY2(info.dli_saddr != NULL,
+	    "dladdr(%#p) returned a NULL symbol address", fptr);
 
 	cheribsdtest_success();
 }
