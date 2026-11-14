@@ -462,13 +462,6 @@ _rtld_c18n_is_enabled(void)
 	return (false);
 }
 
-#pragma weak _rtld_sigaction
-int
-_rtld_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
-{
-	return (__sys_sigaction(sig, act, oact));
-}
-
 #pragma weak _rtld_thr_exit
 void
 _rtld_thr_exit(long *state)
