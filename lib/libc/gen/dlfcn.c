@@ -462,10 +462,18 @@ _rtld_c18n_is_enabled(void)
 	return (false);
 }
 
-#pragma weak _rtld_sigaction
+#pragma weak _rtld_sigaction_impl
 int
 _rtld_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 {
+	struct rtld_sigaction_result res;
+
+	if (_rtld_sigaction_impl != NULL) {
+		res = _rtld_sigaction_impl(sig, act, oact);
+		if (res.rs_ret != 0 && res.rs_errno != 0)
+			errno = res.rs_errno;
+		return (res.rs_ret);
+	}
 	return (__sys_sigaction(sig, act, oact));
 }
 
