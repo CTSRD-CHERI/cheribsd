@@ -2059,7 +2059,6 @@ static struct sigaction sigactions[_SIG_MAXSIG];
 void _rtld_sighandler_init(__siginfohandler_t *);
 void _rtld_sighandler(int, siginfo_t *, void *);
 void _rtld_siginvoke(int, siginfo_t *, ucontext_t *, const struct sigaction *);
-int _rtld_sigaction(int, const struct sigaction *, struct sigaction *);
 
 static void
 sigdispatch(int sig, siginfo_t *info, void *_ucp)
@@ -2393,16 +2392,24 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	set_trusted_stk(ntf->previous);
 }
 
-int
-_rtld_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
+struct rtld_sigaction_result
+_rtld_sigaction_impl(int sig, const struct sigaction *act,
+    struct sigaction *oact)
 {
 	struct sigaction act2, oact2, nact, *slot;
 	const struct sigaction *nactp = act;
 	sigset_t nset, oset;
-	int ret;
+	int ret, error = 0;
 
-	if (!C18N_ENABLED)
-		return (__sys_sigaction(sig, act, oact));
+	if (!C18N_ENABLED) {
+		ret = __sys_sigaction(sig, act, oact);
+		if (ret != 0)
+			error = errno;
+		return ((struct rtld_sigaction_result) {
+		    .rs_ret = ret,
+		    .rs_errno = error
+		});
+	}
 
 	/*
 	 * Make the function re-entrant by blocking all signals.
@@ -2426,8 +2433,9 @@ _rtld_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 	}
 
 	ret = __sys_sigaction(sig, nactp, &oact2);
-
-	if (ret == 0) {
+	if (ret != 0)
+		error = errno;
+	else {
 		slot = &sigactions[sig - 1];
 		if (oact != NULL) {
 			if (oact2.sa_handler == SIG_DFL ||
@@ -2442,5 +2450,8 @@ _rtld_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 
 	sigprocmask(SIG_SETMASK, &oset, NULL);
 
-	return (ret);
+	return ((struct rtld_sigaction_result) {
+	    .rs_ret = ret,
+	    .rs_errno = error
+	});
 }
