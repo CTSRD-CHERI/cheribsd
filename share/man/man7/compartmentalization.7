@@ -79,6 +79,10 @@ and invoke the executable with
 Compartment transition tracing is only intended for debugging and analysis
 purposes.
 Turning it on will reduce security.
+.Pp
+.Sy NOTE:
+Unusual control flow such as reusing return pointers may produce inaccurate
+traces.
 .Ss COMPARTMENT TRANSITION OVERHEAD SIMULATION
 To simulate the overhead of making a system call during each compartment
 transition, set the environment variable
