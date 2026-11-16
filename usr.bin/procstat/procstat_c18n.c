@@ -34,7 +34,7 @@
 #include <sys/param.h>
 #include <sys/user.h>
 
-#include <cheri/c18n.h>
+#include <cheri/cheri_stats.h>
 
 #include <err.h>
 #include <libprocstat.h>

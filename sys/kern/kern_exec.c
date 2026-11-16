@@ -104,7 +104,7 @@
 #include <security/mac/mac_framework.h>
 
 #if __has_feature(capabilities)
-#include <cheri/c18n.h>
+#include <cheri/cheri_stats.h>
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #include <cheri/cherireg.h>
@@ -2059,14 +2059,14 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 
 #if __has_feature(capabilities)
 	/*
-	 * Allocate the compartment statistics header.
+	 * Allocate the cheri statistics header.
 	 */
-	destp -= sizeof(*imgp->c18n_info);
+	destp -= sizeof(*imgp->cheri_stats);
 	destp = rounddown2(destp, sizeof(void * __capability));
-	imgp->c18n_info = (struct cheri_c18n_info * __kerncap)
-	    cheri_bounds_set_exact(destp, sizeof(*imgp->c18n_info));
-	p->p_c18n_info =
-	    (__cheri_fromcap struct cheri_c18n_info *)imgp->c18n_info;
+	imgp->cheri_stats = (struct cheri_stats * __kerncap)
+	    cheri_bounds_set_exact(destp, sizeof(*imgp->cheri_stats));
+	p->p_cheri_stats =
+	    (__cheri_fromcap struct cheri_stats *)imgp->cheri_stats;
 #endif
 
 	if (imgp->auxargs) {

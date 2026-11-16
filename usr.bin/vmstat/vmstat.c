@@ -47,7 +47,7 @@
 
 #include <vm/vm_param.h>
 
-#include <cheri/c18n.h>
+#include <cheri/cheri_stats.h>
 
 #include <ctype.h>
 #include <devstat.h>

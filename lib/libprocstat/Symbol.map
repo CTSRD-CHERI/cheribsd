@@ -56,6 +56,7 @@ FBSD_1.7 {
 
 FBSD_1.8 {
 	 procstat_get_kqueue_info;
+	 procstat_getmrs;
 	 procstat_getrlimitusage;
 	 procstat_freekqinfo;
 	 procstat_freerlimitusage;
