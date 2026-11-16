@@ -38,14 +38,14 @@
 extern uintptr_t sealer_pltgot;
 extern const char *ld_c18n_disable_env;
 extern const char *ld_c18n_enable_env;
-extern const char *ld_c18n_utrace;
-extern const char *ld_c18n_policy;
+extern const char *ld_c18n_no_fast_path;
 extern const char *ld_c18n_overhead;
-extern const char *ld_c18n_sig;
-extern const char *ld_c18n_unwind;
 extern const char *ld_c18n_stats;
 extern const char *ld_c18n_switch_count;
-extern const char *ld_c18n_no_fast_path;
+extern const char *ld_c18n_utrace;
+extern const char *ld_c18n_policy;
+extern const char *ld_c18n_sig;
+extern const char *ld_c18n_unwind;
 extern struct rtld_c18n_stats *c18n_stats;
 
 /*
