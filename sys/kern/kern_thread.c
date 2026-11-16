@@ -801,6 +801,7 @@ thread_alloc(int pages)
 	td->td_voidstack = (vm_pointer_t)&td->td_voidstack;
 	td->td_compartments = NULL;
 	td->td_compartments_maxid = 0;
+	compartment_tree_init(&td->td_unhashed_compartments);
 	if (!thread_alloc_compartments(td)) {
 		return (NULL);
 	}
@@ -836,6 +837,42 @@ thread_recycle(struct thread *td, int pages)
 }
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+void
+thread_expand_compartments(struct thread *td)
+{
+	struct compartment **compartments, **oldcompartments;
+	u_long compartments_maxid;
+
+	compartments_maxid = compartment_lastid;
+	if (td->td_compartments_maxid >= compartments_maxid)
+		return;
+
+	compartments = malloc((TD_CIDNDX(compartments_maxid) + 1) *
+	    sizeof(*td->td_compartments), M_COMPARTMENT, M_WAITOK | M_ZERO);
+
+	if (td != &thread0)
+		oldcompartments = td->td_compartments;
+	else {
+		/*
+		 * In case of thread0 the old compartments were statically
+		 * allocated. Don't return them not to call free() on them.
+		 */
+		oldcompartments = NULL;
+	}
+
+	if (td->td_compartments_maxid > 0)
+		memcpy(compartments, td->td_compartments,
+		    (TD_CIDNDX(td->td_compartments_maxid) + 1) *
+		    sizeof(*td->td_compartments));
+	td->td_compartments_maxid = compartments_maxid;
+	td->td_compartments = compartments;
+
+	if (oldcompartments != NULL)
+		free(oldcompartments, M_COMPARTMENT);
+
+	compartment_tree_hash(&td->td_unhashed_compartments, td);
+}
+
 /*
  * Allocate compiled-in kernel compartments.
  */
@@ -846,23 +883,7 @@ thread_alloc_compartments(struct thread *td)
 	KASSERT(td->td_compartments_maxid == 0,
 	    ("thread_alloc_compartments called on a thread with existing compartments"));
 
-	/*
-	 * XXXKW: Overallocate the array to allow linking compartments of
-	 * modules that could be dynamically loaded during a thread's lifetime
-	 * and which are called by the thread due to:
-	 * - an IPI (e.g., dtraceall.ko and its dependencies create 11
-	 *   compartments, including dtrace.ko that issues an IPI on SYSINIT())
-	 * This is a temporary workaround. There are most likely other cases
-	 * that are not considered yet (e.g., operations on a file stored in
-	 * a file system that is handled by a dynamically loaded module).
-	 * The correct implementation should not involve a data structure that
-	 * requires expanding while a thread is in a critical section (e.g., on
-	 * IPI).
-	 */
-	td->td_compartments_maxid = compartment_lastid + 16;
-	td->td_compartments = realloc(td->td_compartments,
-	    (TD_CIDNDX(td->td_compartments_maxid) + 1) *
-	    sizeof(*td->td_compartments), M_COMPARTMENT, M_NOWAIT | M_ZERO);
+	thread_expand_compartments(td);
 	return (link_elf_create_compartments(linker_kernel_file, td));
 }
 
@@ -876,6 +897,7 @@ thread_free_compartments(struct thread *td)
 			continue;
 		compartment_destroy(td->td_compartments[TD_CIDNDX(ii)]);
 	}
+	compartment_tree_remove_all(&td->td_unhashed_compartments);
 	free(td->td_compartments, M_COMPARTMENT);
 	td->td_compartments = NULL;
 	td->td_compartments_maxid = 0;

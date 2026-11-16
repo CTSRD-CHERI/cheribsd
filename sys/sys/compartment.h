@@ -56,6 +56,7 @@
 SYSCTL_DECL(_security_compartment);
 
 struct thread;
+struct compartment_tree;
 
 struct elf_pcc {
 	bool		assigned;
@@ -79,8 +80,7 @@ struct compartment {
 	struct thread		*c_thread;
 	vm_pointer_t		 c_kstack;
 	vm_pointer_t		 c_kstackptr;
-	TAILQ_ENTRY(compartment) c_next;	/* Next in a thread. */
-	TAILQ_ENTRY(compartment) c_mnext;	/* Next with the same id. */
+	SPLAY_ENTRY(compartment)  c_unhashed_next; /* Next unhashed. */
 	STAILQ_ENTRY(compartment) c_critical_next; /* Next in a cache. */
 };
 
@@ -97,6 +97,10 @@ typedef int (*compartment_trampoline_tree_callback_t)(
 void compartment_metadata_create(u_long id, const char *name, uintcap_t base,
     elf_compartment_t elf_compartment);
 void compartment_metadata_insert(struct compartment *compartment);
+
+void compartment_tree_init(struct compartment_tree *tree);
+void compartment_tree_remove_all(struct compartment_tree *tree);
+void compartment_tree_hash(struct compartment_tree *tree, struct thread *td);
 
 void compartment_trampoline_tree_init(struct compartment_trampoline_tree *tree);
 void compartment_trampoline_tree_remove_all(

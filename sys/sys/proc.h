@@ -174,6 +174,7 @@ struct pargs {
  */
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 struct compartment;
+struct compartment_tree;
 #endif
 struct cpuset;
 struct filecaps;
@@ -399,6 +400,8 @@ struct thread {
 	vm_pointer_t	td_voidstack;	/* (k) First stack for a c18n call. */
 	struct compartment **td_compartments;	/* (k) Thread compartments. */
 	u_long		td_compartments_maxid;
+	/* (k) Unhashed thread compartments. */
+	SPLAY_HEAD(compartment_tree, compartment) td_unhashed_compartments;
 #endif
 #ifdef EPOCH_TRACE
 	SLIST_HEAD(, epoch_tracker) td_epochs;
@@ -1278,6 +1281,7 @@ void	cpu_compartment_alloc(struct compartment *compartment);
 struct	thread *thread_alloc(int pages);
 int	thread_check_susp(struct thread *td, bool sleep);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+void	thread_expand_compartments(struct thread *td);
 int	thread_alloc_compartments(struct thread *td);
 void	thread_free_compartments(struct thread *td);
 #endif

@@ -127,8 +127,18 @@ static struct mtx compartment_trampolines_lock;
 MTX_SYSINIT(compartmenttrampolines, &compartment_trampolines_lock,
     "compartment_trampolines", MTX_DEF);
 
+static int
+compartment_compare(struct compartment *a, struct compartment *b)
+{
+	return (a->c_ndx - b->c_ndx);
+}
+
+SPLAY_PROTOTYPE(compartment_tree, compartment, c_unhashed_next,
+    compartment_compare);
+SPLAY_GENERATE(compartment_tree, compartment, c_unhashed_next,
+    compartment_compare);
+
 static struct compartment *compartment_alloc(void);
-static struct compartment *compartment_alloc_from_cache(struct thread *td);
 DPCPU_DEFINE_STATIC(u_long, ncritical_compartments);
 DPCPU_DEFINE_STATIC(struct compartment_list, critical_compartments);
 
@@ -285,6 +295,42 @@ compartment_trampoline_tree_foreach(struct compartment_trampoline_tree *tree,
 	return (0);
 }
 
+void
+compartment_tree_init(struct compartment_tree *tree)
+{
+	SPLAY_INIT(tree);
+}
+
+void
+compartment_tree_remove_all(struct compartment_tree *tree)
+{
+	struct compartment *compartment, *nextcompartment;
+
+	for (compartment = SPLAY_MIN(compartment_tree, tree);
+	    compartment != NULL; compartment = nextcompartment) {
+		nextcompartment = SPLAY_NEXT(compartment_tree, tree,
+		    compartment);
+		SPLAY_REMOVE(compartment_tree, tree, compartment);
+		compartment_destroy(compartment);
+	}
+}
+
+void
+compartment_tree_hash(struct compartment_tree *tree, struct thread *td)
+{
+	struct compartment *compartment, *nextcompartment;
+
+	for (compartment = SPLAY_MIN(compartment_tree, tree);
+	    compartment != NULL; compartment = nextcompartment) {
+		if (compartment->c_ndx > TD_CIDNDX(td->td_compartments_maxid))
+			break;
+		nextcompartment = SPLAY_NEXT(compartment_tree, tree,
+		    compartment);
+		SPLAY_REMOVE(compartment_tree, tree, compartment);
+		td->td_compartments[compartment->c_ndx] = compartment;
+	}
+}
+
 u_long
 compartment_id_create(const char *name, uintcap_t base,
     elf_compartment_t elf_compartment)
@@ -300,9 +346,6 @@ compartment_linkup(struct compartment *compartment,
 {
 
 	EXECUTIVE_ASSERT();
-	KASSERT(elf_compartment->id <= td->td_compartments_maxid,
-	    ("%s: id %lu exceeds the maximum value %lu", __func__,
-	     elf_compartment->id, td->td_compartments_maxid));
 
 	compartment->c_elf_compartment = elf_compartment;
 	/*
@@ -311,7 +354,11 @@ compartment_linkup(struct compartment *compartment,
 	 */
 	compartment->c_ndx = TD_CIDNDX(compartment->c_elf_compartment->id);
 	compartment->c_thread = td;
-	td->td_compartments[compartment->c_ndx] = compartment;
+	if (compartment->c_elf_compartment->id <= td->td_compartments_maxid)
+		td->td_compartments[compartment->c_ndx] = compartment;
+	else
+		SPLAY_INSERT(compartment_tree, &td->td_unhashed_compartments,
+		    compartment);
 }
 
 void
@@ -340,7 +387,7 @@ compartment_alloc(void)
  * operation with compartment_cpu_cache_fill().
  */
 static struct compartment *
-compartment_alloc_from_cache(struct thread *td)
+compartment_alloc_from_cache(void)
 {
 	struct compartment_list *critical_compartments;
 	struct compartment *compartment;
@@ -369,7 +416,7 @@ compartment_create(struct thread *td, elf_compartment_t elf_compartment,
 	struct compartment *compartment;
 
 	if (usecache)
-		compartment = compartment_alloc_from_cache(td);
+		compartment = compartment_alloc_from_cache();
 	else {
 		curthread->td_incachefill = true;
 		compartment = compartment_alloc();
@@ -396,7 +443,8 @@ compartment_destroy(struct compartment *compartment)
 static vm_pointer_t __used
 compartment_entry_stackptr(elf_compartment_t elf_compartment, int type)
 {
-	struct compartment *compartment;
+	struct compartment *compartment, tmpcompartment;
+	u_long ndx;
 
 	EXECUTIVE_ASSERT();
 
@@ -408,11 +456,14 @@ compartment_entry_stackptr(elf_compartment_t elf_compartment, int type)
 		compartment_trampoline_counters[type]++;
 #endif
 
+	ndx = TD_CIDNDX(elf_compartment->id);
 	if (elf_compartment->id <= curthread->td_compartments_maxid)
-		compartment =
-		    curthread->td_compartments[TD_CIDNDX(elf_compartment->id)];
-	else
-		compartment = NULL;
+		compartment = curthread->td_compartments[ndx];
+	else {
+		tmpcompartment.c_ndx = ndx;
+		compartment = SPLAY_FIND(compartment_tree,
+		    &curthread->td_unhashed_compartments, &tmpcompartment);
+	}
 	if (compartment == NULL)
 		compartment = compartment_create(curthread, elf_compartment,
 		    true);

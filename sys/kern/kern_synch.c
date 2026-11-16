@@ -554,6 +554,7 @@ mi_switch(int flags)
 		 *   It cannot acquire cache-related locks.
 		 */
 		compartment_cpu_cache_fill();
+		thread_expand_compartments(curthread);
 	} else
 #endif
 	spinlock_exit();
