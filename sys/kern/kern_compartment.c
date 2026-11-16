@@ -223,8 +223,8 @@ compartment_cpu_cache_init_cpu(u_int cpuid)
 	DPCPU_ID_SET(cpuid, ncritical_compartments, ncritical_compartments);
 }
 
-static void
-compartment_cpu_cache_init_bsp(void *arg __unused)
+void
+compartment_cpu_cache_init_bsp(void)
 {
 	compartment_zone = uma_zcreate("compartment_zone",
 	    sizeof(struct compartment), NULL, NULL, NULL, NULL,
@@ -251,13 +251,13 @@ compartment_cpu_cache_init_aps(void *arg __unused)
 /*
  * NB: The zone and critical compartments can be allocated after PCPU/DPCPU
  * storage is initialised (on boot) and after the UMA subsystem is sufficiently
- * initialised. BSP must be initialised prior to module loading in case of new
- * SYSINITs, IFUNC resolvers, constructors, etc. APs cannot be initialised
- * until after mp_start (currently SI_SUB_CPU, SI_ORDER_THIRD) as we need
- * mp_maxid and all_cpus initialised for CPU_FOREACH to work.
+ * initialised.
+ * BSP must be initialised prior to module loading in case of new SYSINITs,
+ * IFUNC resolvers, constructors, etc (see linker_preload()).
+ * APs cannot be initialised until after mp_start (currently SI_SUB_CPU,
+ * SI_ORDER_THIRD) as we need mp_maxid and all_cpus initialised for CPU_FOREACH
+ * to work.
  */
-SYSINIT(compartment_cpu_cache_init_bsp, SI_SUB_KLD, SI_ORDER_FIRST,
-    compartment_cpu_cache_init_bsp, NULL);
 SYSINIT(compartment_cpu_cache_init_aps, SI_SUB_CPU, SI_ORDER_ANY,
     compartment_cpu_cache_init_aps, NULL);
 

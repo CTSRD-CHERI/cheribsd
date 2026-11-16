@@ -34,6 +34,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/boottrace.h>
+#include <sys/compartment.h>
 #include <sys/eventhandler.h>
 #include <sys/fcntl.h>
 #include <sys/jail.h>
@@ -1961,7 +1962,12 @@ fail:
 	}
 	sx_xunlock(&kld_sx);
 	/* woohoo! we made it! */
+	/*
+	 * Now that we know the number of compartments in the system, initialise
+	 * the cache for BSP.
+	 */
 	thread_expand_compartments(curthread);
+	compartment_cpu_cache_init_bsp();
 }
 SYSINIT(preload, SI_SUB_KLD, SI_ORDER_MIDDLE, linker_preload, NULL);
 

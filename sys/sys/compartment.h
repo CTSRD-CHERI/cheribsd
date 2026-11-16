@@ -102,6 +102,7 @@ void compartment_tree_hash(struct compartment_tree *tree, struct thread *td);
 void compartment_trampoline_tree_remove_all(
     struct compartment_trampoline_tree *tree);
 
+void compartment_cpu_cache_init_bsp(void);
 void compartment_cpu_cache_fill(void);
 
 u_long compartment_id_create(const char *name, uintcap_t base,
