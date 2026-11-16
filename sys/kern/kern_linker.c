@@ -1961,6 +1961,7 @@ fail:
 	}
 	sx_xunlock(&kld_sx);
 	/* woohoo! we made it! */
+	thread_expand_compartments(curthread);
 }
 SYSINIT(preload, SI_SUB_KLD, SI_ORDER_MIDDLE, linker_preload, NULL);
 
