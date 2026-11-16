@@ -34,6 +34,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/boottrace.h>
+#include <sys/compartment.h>
 #include <sys/eventhandler.h>
 #include <sys/fcntl.h>
 #include <sys/jail.h>
@@ -1963,6 +1964,11 @@ fail:
 	/* woohoo! we made it! */
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	thread_expand_compartments(curthread);
+	/*
+	 * Now that we know the number of compartments in the system, initialise
+	 * the cache for BSP.
+	 */
+	compartment_cpu_cache_init_bsp();
 #endif
 }
 SYSINIT(preload, SI_SUB_KLD, SI_ORDER_MIDDLE, linker_preload, NULL);
