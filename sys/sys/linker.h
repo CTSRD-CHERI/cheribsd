@@ -357,7 +357,6 @@ void	elf_compartment_entry(linker_file_t lf, uintcap_t ptr,
 	    elf_compartment_t *dstelf_compartmentp, uintptr_t *ptrp);
 struct compartment_trampoline_tree *elf_compartment_trampoline_tree(linker_file_t lf);
 Elf_Addr elf_relocaddr(linker_file_t _lf, Elf_Addr addr);
-bool	elf_is_preloaded(linker_file_t lf);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 void	link_elf_linkup_compartments(linker_file_t lf,
 	    struct compartment *compartments, size_t ncompartments,
