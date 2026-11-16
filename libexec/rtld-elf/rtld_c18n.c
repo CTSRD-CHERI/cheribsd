@@ -121,25 +121,22 @@ static uintptr_t sealer_trusted_stk;
 
 uintptr_t sealer_pltgot;
 
-/* Enable compartmentalisation */
+/*
+ * Enable/disable compartmentalisation
+ */
 const char *ld_c18n_disable_env;
 const char *ld_c18n_enable_env;
 bool ld_c18n_enable;
 
-/* Use utrace() to log compartmentalisation-related events */
-const char *ld_c18n_utrace;
-
-/* Path of the compartmentalisation policy */
-const char *ld_c18n_policy;
+/*
+ * Performance and tracing analysis
+ */
 
 /* Simulate overhead during compartment transitions */
 const char *ld_c18n_overhead;
 
-/* Read the .c18n.signature ELF section */
-const char *ld_c18n_sig;
-
-/* Expose tagged frame pointers to trusted frames */
-const char *ld_c18n_unwind;
+/* Do not use the fast paths in trampolines for self-transitions */
+const char *ld_c18n_no_fast_path;
 
 /* Export compartmentalisation statistics to a file */
 const char *ld_c18n_stats;
@@ -147,10 +144,25 @@ const char *ld_c18n_stats;
 /* Export count of compartment switches to statistics */
 const char *ld_c18n_switch_count;
 
-/* Do not use the fast paths in trampolines for self-transitions */
-const char *ld_c18n_no_fast_path;
+/* Use utrace() to log compartmentalisation-related events */
+const char *ld_c18n_utrace;
 
-/* Compartmentalisation information exported to the kernel */
+/*
+ * Experimental features
+ */
+
+/* Path of the compartmentalisation policy */
+const char *ld_c18n_policy;
+
+/* Read the .c18n.signature ELF section */
+const char *ld_c18n_sig;
+
+/* Expose tagged frame pointers to trusted frames */
+const char *ld_c18n_unwind;
+
+/*
+ * Compartmentalisation information exported to the kernel
+ */
 static struct cheri_c18n_info *c18n_info;
 struct rtld_c18n_stats *c18n_stats;
 

@@ -477,16 +477,18 @@ static struct ld_env_var_desc ld_env_vars[] = {
 #endif
 	LD_ENV_DESC(NO_DL_ITERATE_PHDR_AFTER_FORK, false),
 #ifdef CHERI_LIB_C18N
-	LD_ENV_DESC(UTRACE_C18N, true),
-	LD_ENV_DESC(C18N_ENABLE, true),
 	LD_ENV_DESC(C18N_DISABLE, true),
-	LD_ENV_DESC(C18N_POLICY, true),
+	LD_ENV_DESC(C18N_ENABLE, true),
+
+	LD_ENV_DESC(C18N_NO_FAST_PATH, true),
 	LD_ENV_DESC(C18N_OVERHEAD, true),
-	LD_ENV_DESC(C18N_SIG, true),
-	LD_ENV_DESC(C18N_UNWIND, true),
 	LD_ENV_DESC(C18N_STATS, true),
 	LD_ENV_DESC(C18N_SWITCH_COUNT, true),
-	LD_ENV_DESC(C18N_NO_FAST_PATH, true),
+	LD_ENV_DESC(UTRACE_C18N, true),
+
+	LD_ENV_DESC(C18N_POLICY, true),
+	LD_ENV_DESC(C18N_SIG, true),
+	LD_ENV_DESC(C18N_UNWIND, true),
 #endif
 };
 
@@ -914,18 +916,18 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	}
 #endif
 #ifdef CHERI_LIB_C18N
-	ld_c18n_utrace = ld_get_env_var(LD_UTRACE_C18N);
-	ld_c18n_policy = ld_get_env_var(LD_C18N_POLICY);
-	ld_c18n_overhead = ld_get_env_var(LD_C18N_OVERHEAD);
-	ld_c18n_sig = ld_get_env_var(LD_C18N_SIG);
-	ld_c18n_unwind = ld_get_env_var(LD_C18N_UNWIND);
-	ld_c18n_stats = ld_get_env_var(LD_C18N_STATS);
-	ld_c18n_switch_count = ld_get_env_var(
-	    LD_C18N_SWITCH_COUNT);
-	ld_c18n_no_fast_path = ld_get_env_var(
-	    LD_C18N_NO_FAST_PATH);
 	ld_c18n_disable_env = ld_get_env_var(LD_C18N_DISABLE);
 	ld_c18n_enable_env = ld_get_env_var(LD_C18N_ENABLE);
+
+	ld_c18n_no_fast_path = ld_get_env_var(LD_C18N_NO_FAST_PATH);
+	ld_c18n_overhead = ld_get_env_var(LD_C18N_OVERHEAD);
+	ld_c18n_stats = ld_get_env_var(LD_C18N_STATS);
+	ld_c18n_switch_count = ld_get_env_var(LD_C18N_SWITCH_COUNT);
+	ld_c18n_utrace = ld_get_env_var(LD_UTRACE_C18N);
+
+	ld_c18n_policy = ld_get_env_var(LD_C18N_POLICY);
+	ld_c18n_sig = ld_get_env_var(LD_C18N_SIG);
+	ld_c18n_unwind = ld_get_env_var(LD_C18N_UNWIND);
 	/*
 	 * DISABLE takes precedence over ENABLE.
 	 */
@@ -944,10 +946,10 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	    || static_tgot_extra != NULL
 #endif
 #ifdef CHERI_LIB_C18N
-	    || ld_c18n_disable_env || ld_c18n_enable_env ||
-	    ld_c18n_utrace || ld_c18n_policy || ld_c18n_overhead ||
-	    ld_c18n_sig || ld_c18n_unwind || ld_c18n_stats ||
-	    ld_c18n_switch_count || ld_c18n_no_fast_path
+	    || ld_c18n_disable_env || ld_c18n_enable_env
+	    || ld_c18n_no_fast_path || ld_c18n_overhead || ld_c18n_stats ||
+	    ld_c18n_switch_count || ld_c18n_utrace
+	    || ld_c18n_policy || ld_c18n_sig || ld_c18n_unwind
 #endif
 	    ;
 	if (!ld_tracing)
