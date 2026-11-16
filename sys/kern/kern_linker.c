@@ -628,11 +628,21 @@ static linker_file_t
 linker_find_file_by_id(int fileid)
 {
 	linker_file_t lf;
+	int locked;
 
-	sx_assert(&kld_sx, SA_XLOCKED);
-	TAILQ_FOREACH(lf, &linker_files, link)
+	/*
+	 * Similarly to linker_file_lookup_symbol(), this function can be called
+	 * as part of symbol resolution that already acquires the kld_sx lock.
+	 */
+	locked = sx_xlocked(&kld_sx);
+	if (!locked)
+		sx_xlock(&kld_sx);
+	TAILQ_FOREACH(lf, &linker_files, link) {
 		if (lf->id == fileid && lf->flags & LINKER_FILE_LINKED)
 			break;
+	}
+	if (!locked)
+		sx_xunlock(&kld_sx);
 	return (lf);
 }
 
@@ -640,13 +650,22 @@ linker_file_t
 linker_find_file_by_ptr(uintptr_t ptr)
 {
 	linker_file_t lf;
+	int locked;
 
-	sx_assert(&kld_sx, SA_XLOCKED);
+	/*
+	 * Similarly to linker_file_lookup_symbol(), this function can be called
+	 * as part of symbol resolution that already acquires the kld_sx lock.
+	 */
+	locked = sx_xlocked(&kld_sx);
+	if (!locked)
+		sx_xlock(&kld_sx);
 	TAILQ_FOREACH(lf, &linker_files, link) {
 		if (ptr >= (uintptr_t)lf->address &&
 		    ptr < (uintptr_t)lf->address + lf->size)
 			break;
 	}
+	if (!locked)
+		sx_xunlock(&kld_sx);
 	return (lf);
 }
 
