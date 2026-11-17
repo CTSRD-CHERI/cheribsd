@@ -161,7 +161,7 @@ run()
 # $2 source filename w/o extension
 # $3 source extension
 # $4 optional regex for egrep -w
-_clean_dep()
+clean_dep()
 {
 	for libcompat in "" $ALL_libcompats; do
 		dirprfx=${libcompat:+obj-lib${libcompat}/}
@@ -172,16 +172,6 @@ _clean_dep()
 			    "$OBJTOP"/$dirprfx$1/$2.*o
 		fi
 	done
-}
-
-clean_dep()
-{
-	local dir="$1"; shift
-
-	_clean_dep "$dir" "$@"
-	if [ "$1" == "lib/libc" ]; then
-		_clean_dep lib/libc_c18n "$@"
-	fi
 }
 
 # Clean the object file for a given source file if it exists and
