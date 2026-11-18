@@ -161,7 +161,7 @@ struct mpt_raid_action64 {
 	uint8_t write;
 };
 
-#ifdef __CHERI__
+#if __has_feature(capabilities)
 #define	MPTIO_READ_CFG_HEADER64	_IOWR('M', 100, struct mpt_cfg_page_req64)
 #define	MPTIO_READ_CFG_PAGE64	_IOWR('M', 101, struct mpt_cfg_page_req64)
 #define	MPTIO_READ_EXT_CFG_HEADER64 _IOWR('M', 102, struct mpt_ext_cfg_page_req64)

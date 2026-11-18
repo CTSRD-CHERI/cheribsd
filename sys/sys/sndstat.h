@@ -145,7 +145,7 @@ struct sndstioc_nv_arg64 {
 	uint64_t buf;
 };
 
-#ifdef __CHERI__
+#if __has_feature(capabilities)
 #define SNDSTIOC_GET_DEVS64 \
 	_IOC_NEWTYPE(SNDSTIOC_GET_DEVS, struct sndstioc_nv_arg64)
 #define SNDSTIOC_ADD_USER_DEVS64 \

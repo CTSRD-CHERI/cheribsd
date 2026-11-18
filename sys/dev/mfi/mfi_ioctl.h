@@ -141,7 +141,7 @@ struct mfi_ioc_aen {
 #define MFI_CMD32	_IOC_NEWTYPE(MFI_CMD, struct mfi_ioc_packet32)
 #endif
 #ifdef COMPAT_FREEBSD64
-#ifdef __CHERI__
+#if __has_feature(capabilities)
 #define MFI_CMD64	_IOC_NEWTYPE(MFI_CMD, struct mfi_ioc_packet64)
 #else
 CTASSERT(sizeof(struct mfi_ioc_packet) == sizeof(struct mfi_ioc_packet64));
@@ -215,7 +215,7 @@ struct mfi_ioc_passthru64 {
 #define MFIIO_PASSTHRU32	_IOC_NEWTYPE(MFIIO_PASSTHRU, struct mfi_ioc_passthru32)
 #endif
 #ifdef COMPAT_FREEBSD64
-#ifdef __CHERI__
+#if __has_feature(capabilities)
 #define MFIIO_PASSTHRU64	_IOC_NEWTYPE(MFIIO_PASSTHRU, struct mfi_ioc_passthru64)
 #else
 CTASSERT(sizeof(struct mfi_ioc_passthru) == sizeof(struct mfi_ioc_passthru64));
