@@ -739,7 +739,7 @@ void if_setipsec_accel_methods(if_t ifp, const struct if_ipsec_accel_methods *);
 void if_hw_tsomax_common(if_t ifp, struct ifnet_hw_tsomax *);
 int if_hw_tsomax_update(if_t ifp, struct ifnet_hw_tsomax *);
 
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64)
 struct ifreq_buffer64 {
 	uint64_t	length;		/* (size_t) */
 	uint64_t	buffer;		/* (void *) */
@@ -771,16 +771,22 @@ struct ifreq64 {
 		u_char		ifru_vlan_pcp;
 	} ifr_ifru;
 };
+#ifndef __CHERI__
+CTASSERT(sizeof(struct ifreq_buffer) == sizeof(struct ifreq_buffer64));
+CTASSERT(sizeof(struct ifreq) == sizeof(struct ifreq64));
+#endif
+#endif /* !COMPAT_FREEBSD64 */
 
 /* Helper macros for struct ifreq ioctls */
+#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
 #define	IFREQ64(cmd)	_IOC_NEWTYPE((cmd), struct ifreq64)
 #define	CASE_IOC_IFREQ(cmd)					\
     (cmd):							\
     case IFREQ64(cmd)
-#else /* !COMPAT_FREEBSD64 */
+#else
 #define	CASE_IOC_IFREQ(cmd)					\
     (cmd)
-#endif /* !COMPAT_FREEBSD64 */
+#endif
 
 /* accessors for struct ifreq */
 void * __capability ifr_buffer_get_buffer(u_long cmd, void *data);

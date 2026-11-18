@@ -85,7 +85,9 @@ struct fiodgname_arg64 {
 	int		len;
 	uint64_t	buf;	/* (void *) */
 };
+#ifdef __CHERI__
 #define	FIODGNAME_64	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg64)
+#endif
 #endif
 
 void * __capability fiodgname_buf_get_ptr(void *fgnp, u_long com);
