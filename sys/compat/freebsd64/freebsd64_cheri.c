@@ -34,8 +34,10 @@
 #include <sys/proc.h>
 #include <sys/syscallsubr.h>
 
+#if __has_feature(capabilities)
 #include <cheri/cheric.h>
 #include <cheri/cherireg.h>
+#endif
 
 #include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
