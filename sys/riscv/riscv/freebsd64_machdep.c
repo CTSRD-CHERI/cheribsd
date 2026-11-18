@@ -74,7 +74,7 @@
 _Static_assert(sizeof(mcontext64_t) == 864, "mcontext64_t size incorrect");
 _Static_assert(sizeof(ucontext64_t) == 936, "ucontext64_t size incorrect");
 _Static_assert(sizeof(struct __siginfo64) == 80, "struct __siginfo64 size incorrect");
-#ifndef __CHERI__
+#if !__has_feature(capabilities)
 _Static_assert(sizeof(mcontext_t) == sizeof(mcontext64_t),
     "mcontext64_t size out of sync");
 _Static_assert(sizeof(ucontext_t) == sizeof(ucontext64_t),
@@ -147,7 +147,7 @@ SYSINIT(freebsd64, SI_SUB_EXEC, SI_ORDER_ANY,
 SYSINIT(freebsd64_register_sysvec, SI_SUB_VM, SI_ORDER_ANY,
     elf64_register_sysvec, &elf_freebsd_freebsd64_sysvec);
 
-#ifdef __CHERI__
+#if __has_feature(capabilities)
 /*
  * Number of GPRs in mc_gpregs that are mirrored in mc_capregs up to,
  * but not including sepc.
@@ -364,7 +364,7 @@ elf64_dump_thread(struct thread *td __unused, void *dst __unused,
 {
 }
 
-#else /* !__CHERI__ */
+#else /* !__has_feature(capabilities) */
 
 int
 freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
@@ -399,7 +399,7 @@ freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 	return (ENOTSUP);
 }
 
-#endif /* !__CHERI__ */
+#endif /* !__has_feature(capabilities) */
 /*
  * CHERI CHANGES START
  * {
