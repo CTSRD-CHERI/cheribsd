@@ -279,13 +279,13 @@ uhid_snes_ioctl(struct usb_fifo *fifo, u_long cmd, void *data, int fflags)
 	struct uhid_snes_softc *sc = usb_fifo_softc(fifo);
 	struct usb_gen_descriptor *ugd;
 #if defined(COMPAT_FREEBSD32) || \
-    (defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+    (defined(COMPAT_FREEBSD64) && __has_feature(capabilities))
 	struct usb_gen_descriptor local_ugd;
 #endif
 #ifdef COMPAT_FREEBSD32
 	struct usb_gen_descriptor32 *ugd32 = NULL;
 #endif
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	struct usb_gen_descriptor64 *ugd64 = NULL;
 #endif
 	uint32_t size;
@@ -294,7 +294,7 @@ uhid_snes_ioctl(struct usb_fifo *fifo, u_long cmd, void *data, int fflags)
 
 	ugd = data;
 #if defined(COMPAT_FREEBSD32) || \
-    (defined(COMPAT_FREEBSD64) && defined(__CHERI__))
+    (defined(COMPAT_FREEBSD64) && __has_feature(capabilities))
 	switch (cmd) {
 #ifdef COMPAT_FREEBSD32
 	case USB_GET_REPORT_DESC32:
@@ -306,7 +306,7 @@ uhid_snes_ioctl(struct usb_fifo *fifo, u_long cmd, void *data, int fflags)
 		cmd = _IOC_NEWTYPE(cmd, struct usb_gen_descriptor);
 		break;
 #endif
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case USB_GET_REPORT_DESC64:
 	case USB_GET_REPORT64:
 	case USB_SET_REPORT64:
@@ -426,7 +426,7 @@ uhid_snes_ioctl(struct usb_fifo *fifo, u_long cmd, void *data, int fflags)
 	if (ugd32 != NULL)
 		update_usb_gen_descriptor32(ugd32, ugd);
 #endif
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	if (ugd64 != NULL)
 		update_usb_gen_descriptor64(ugd64, ugd);
 #endif

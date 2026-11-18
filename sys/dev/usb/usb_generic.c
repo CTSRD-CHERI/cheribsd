@@ -29,7 +29,7 @@
 #include USB_GLOBAL_INCLUDE_FILE
 #else
 #if defined(COMPAT_FREEBSD32) || \
-    (defined(COMPAT_FREEBSD64) && defined(__CHERI__))
+    (defined(COMPAT_FREEBSD64) && __has_feature(capabilities))
 #include <sys/abi_compat.h>
 #endif
 #include <sys/stdint.h>
@@ -115,7 +115,7 @@ static int	ugen_get_iface_driver(struct usb_fifo *f, struct usb_gen_descriptor *
 #ifdef COMPAT_FREEBSD32
 static int	ugen_get32(u_long cmd, struct usb_fifo *f, struct usb_gen_descriptor32 *ugd32);
 #endif
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 static int	ugen_get64(u_long cmd, struct usb_fifo *f, struct usb_gen_descriptor64 *ugd64);
 #endif
 static int	ugen_re_enumerate(struct usb_fifo *);
@@ -896,7 +896,7 @@ ugen_do_request32(struct usb_fifo *f, struct usb_ctl_request32 *ur32)
 }
 #endif
 
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 static int
 ugen_do_request64(struct usb_fifo *f, struct usb_ctl_request64 *ur64)
 {
@@ -1233,14 +1233,14 @@ ugen_fs_getbuffer(void * __capability *uptrp, struct usb_fifo *f,
 #ifdef COMPAT_FREEBSD32
 		uint32_t *ppBuffer32;
 #endif
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		uint64_t * __capability ppBuffer64;
 #endif
 	} u;
 #ifdef COMPAT_FREEBSD32
 	uint32_t uptr32;
 #endif
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	uint64_t uptr64;
 	uint32_t len32;
 #endif
@@ -1258,7 +1258,7 @@ ugen_fs_getbuffer(void * __capability *uptrp, struct usb_fifo *f,
 		*uptrp = PTRIN(uptr32);
 		return (0);
 #endif
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case sizeof(struct usb_fs_endpoint64):
 		if (fueword64(u.ppBuffer64 + n, &uptr64) != 0)
 			return (EFAULT);
@@ -1455,7 +1455,7 @@ ugen_fs_copyin(struct usb_fifo *f, uint8_t ep_index,
 #ifdef COMPAT_FREEBSD32
 	struct usb_fs_endpoint32 fs_ep32;
 #endif
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	struct usb_fs_endpoint64 fs_ep64;
 #endif
 	int error;
@@ -1484,7 +1484,7 @@ ugen_fs_copyin(struct usb_fifo *f, uint8_t ep_index,
 		CP(fs_ep32, *fs_ep, status);
 		break;
 #endif
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case sizeof(struct usb_fs_endpoint64):
 		error = copyin(ugen_fs_ep_uptr(f, ep_index), &fs_ep64,
 		    f->fs_ep_sz);
@@ -1518,7 +1518,7 @@ ugen_fs_update(const struct usb_fs_endpoint *fs_ep,
 #ifdef COMPAT_FREEBSD32
 		struct usb_fs_endpoint32 *fs_ep_uptr32;
 #endif
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		struct usb_fs_endpoint64 * __capability fs_ep_uptr64;
 #endif
 	} u;
@@ -1542,7 +1542,7 @@ ugen_fs_update(const struct usb_fs_endpoint *fs_ep,
 		status_uptr = &u.fs_ep_uptr32->status;
 		break;
 #endif
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case sizeof(struct usb_fs_endpoint64):
 		u.fs_ep_uptr64 = (struct usb_fs_endpoint64 * __capability)
 		    ugen_fs_ep_uptr(f, ep_index);
@@ -2274,7 +2274,7 @@ ugen_ioctl_post(struct usb_fifo *f, u_long cmd, void *addr, int fflags)
 #ifdef COMPAT_FREEBSD32
 		struct usb_fs_init32 *pinit32;
 #endif
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		struct usb_fs_init64 *pinit64;
 #endif
 		struct usb_fs_uninit *puninit;
@@ -2379,7 +2379,7 @@ ugen_ioctl_post(struct usb_fifo *f, u_long cmd, void *addr, int fflags)
 		break;
 #endif
 	
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case USB_GET_FULL_DESC64:
 	case USB_GET_STRING_DESC64:
 	case USB_GET_IFACE_DRIVER64:
@@ -2407,7 +2407,7 @@ ugen_ioctl_post(struct usb_fifo *f, u_long cmd, void *addr, int fflags)
 		break;
 #endif
 
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case USB_REQUEST64:
 	case USB_DO_REQUEST64:
 		if (!(fflags & FWRITE)) {
@@ -2519,7 +2519,7 @@ ugen_ioctl_post(struct usb_fifo *f, u_long cmd, void *addr, int fflags)
 		    u.pinit32->ep_index_max);
 		break;
 #endif
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case USB_FS_INIT64:
 		error = ugen_fs_init(f, USER_PTR(u.pinit64->pEndpoints,
 		    sizeof(struct usb_fs_endpoint64) * u.pinit64->ep_index_max),
@@ -2644,7 +2644,7 @@ ugen_get32(u_long cmd, struct usb_fifo *f, struct usb_gen_descriptor32 *ugd32)
 
 #endif /* COMPAT_FREEBSD32 */
 
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 void
 usb_gen_descriptor_from64(struct usb_gen_descriptor *ugd,
     const struct usb_gen_descriptor64 *ugd64)
@@ -2708,6 +2708,6 @@ ugen_get64(u_long cmd, struct usb_fifo *f, struct usb_gen_descriptor64 *ugd64)
 
 	return (error);
 }
-#endif /* COMPAT_FREEBSD64 && __CHERI__ */
+#endif /* COMPAT_FREEBSD64 && __has_feature(capabilities) */
 
 #endif	/* USB_HAVE_UGEN */

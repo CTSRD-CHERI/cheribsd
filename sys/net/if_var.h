@@ -771,14 +771,14 @@ struct ifreq64 {
 		u_char		ifru_vlan_pcp;
 	} ifr_ifru;
 };
-#ifndef __CHERI__
+#if !__has_feature(capabilities)
 CTASSERT(sizeof(struct ifreq_buffer) == sizeof(struct ifreq_buffer64));
 CTASSERT(sizeof(struct ifreq) == sizeof(struct ifreq64));
 #endif
 #endif /* !COMPAT_FREEBSD64 */
 
 /* Helper macros for struct ifreq ioctls */
-#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 #define	IFREQ64(cmd)	_IOC_NEWTYPE((cmd), struct ifreq64)
 #define	CASE_IOC_IFREQ(cmd)					\
     (cmd):							\

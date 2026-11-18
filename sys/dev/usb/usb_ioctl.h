@@ -397,7 +397,7 @@ struct usb_read_dir64 {
 	uint32_t urd_maxlen;
 };
 
-#ifdef __CHERI__
+#if __has_feature(capabilities)
 #define	USB_READ_DIR64 \
     _IOC_NEWTYPE(USB_READ_DIR, struct usb_read_dir64)
 #else
@@ -412,7 +412,7 @@ struct usb_ctl_request64 {
 	struct usb_device_request ucr_request;
 };
 
-#ifdef __CHERI__
+#if __has_feature(capabilities)
 #define	USB_REQUEST64		_IOC_NEWTYPE(USB_REQUEST, struct usb_ctl_request64)
 #define	USB_DO_REQUEST64	_IOC_NEWTYPE(USB_DO_REQUEST, struct usb_ctl_request64)
 #else
@@ -434,7 +434,7 @@ struct usb_gen_descriptor64 {
 	uint8_t	reserved[8];
 };
 
-#ifdef __CHERI__
+#if __has_feature(capabilities)
 #define	USB_GET_REPORT_DESC64 \
     _IOC_NEWTYPE(USB_GET_REPORT_DESC, struct usb_gen_descriptor64)
 #define	USB_GET_REPORT64 \
@@ -472,7 +472,7 @@ struct usb_fs_init64 {
 	uint8_t	ep_index_max;
 };
 
-#ifdef __CHERI__
+#if __has_feature(capabilities)
 #define	USB_FS_INIT64	_IOC_NEWTYPE(USB_FS_INIT, struct usb_fs_init64)
 #else
 CTASSERT(sizeof(struct usb_fs_endpoint) == sizeof(struct usb_fs_endpoint64));
