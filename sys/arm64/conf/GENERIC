@@ -23,6 +23,8 @@ ident		GENERIC
 include		"std.arm64"
 include		"std.dev"
 
+options 	COMPAT_FREEBSD64
+
 # Include SoC specific configuration
 include		"std.al"
 include		"std.allwinner"
