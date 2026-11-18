@@ -1725,7 +1725,7 @@ te_data_get_ptr(void *irtep, u_long cmd)
 #ifdef COMPAT_FREEBSD32
 		struct ioc_read_toc_entry32 irte32;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
 		struct ioc_read_toc_entry64 irte64;
 #endif
 	} *irteup;
@@ -1739,7 +1739,7 @@ te_data_get_ptr(void *irtep, u_long cmd)
 		return (USER_PTR(irteup->irte32.data,
 		    irteup->irte32.data_len));
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
 	case sizeof(irteup->irte64):
 		return (USER_PTR(irteup->irte64.data,
 		    irteup->irte64.data_len));
@@ -2051,7 +2051,7 @@ cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 #ifdef COMPAT_FREEBSD32
 	case CDIOREADTOCENTRYS_32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
 	case CDIOREADTOCENTRYS_64:
 #endif
 		{

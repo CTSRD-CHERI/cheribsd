@@ -143,7 +143,7 @@ struct freebsd11_kevent32 {
 #endif
 #endif
 
-#if defined(_WANT_KEVENT64) || (defined(_KERNEL) && __has_feature(capabilities))
+#if defined(_WANT_KEVENT64) || defined(_KERNEL)
 struct kevent64 {
 	__uint64_t	ident;		/* identifier for this event */
 	short		filter;		/* filter for event */

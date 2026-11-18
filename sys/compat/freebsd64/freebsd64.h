@@ -174,7 +174,7 @@ struct kinfo_sigtramp64 {
 	uint64_t ksigtramp_spare[4];
 };
 
-#if defined(_WANT_KEVENT64) || (defined(_KERNEL) && __has_feature(capabilities))
+#if defined(_WANT_KEVENT64) || defined(_KERNEL)
 struct kinfo_knote64 {
 	int		knt_kq_fd;
 	struct kevent64	knt_event;

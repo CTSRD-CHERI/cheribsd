@@ -31,7 +31,8 @@
 #ifdef USB_GLOBAL_INCLUDE_FILE
 #include USB_GLOBAL_INCLUDE_FILE
 #else
-#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
+#if defined(COMPAT_FREEBSD32) || \
+    (defined(COMPAT_FREEBSD64) && defined(__CHERI__))
 #include <sys/abi_compat.h>
 #endif
 #include <sys/stdint.h>
@@ -1651,7 +1652,7 @@ usb_static_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 #ifdef COMPAT_FREEBSD32
 		struct usb_read_dir32 *urd32;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
 		struct usb_read_dir64 *urd64;
 #endif
 		void* data;
@@ -1670,7 +1671,7 @@ usb_static_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 			    u.urd32->urd_startentry, u.urd32->urd_maxlen);
 			break;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
 		case USB_READ_DIR64:
 			err = usb_read_symlink(USER_PTR(u.urd64->urd_data,
 			    u.urd64->urd_maxlen), u.urd64->urd_startentry,

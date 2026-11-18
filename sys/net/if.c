@@ -212,7 +212,11 @@ struct if_clonereq64 {
 	int	ifcr_count;
 	uint64_t ifcr_buffer;
 };
+#ifdef __CHERI__
 #define	SIOCIFGCLONERS64 _IOC_NEWTYPE(SIOCIFGCLONERS, struct if_clonereq64)
+#else
+CTASSERT(sizeof(struct if_clonereq) == sizeof(struct if_clonereq64));
+#endif
 
 struct ifconf64 {
 	int	ifc_len;
@@ -221,7 +225,11 @@ struct ifconf64 {
 		uint64_t	ifcu_req;
 	} ifc_ifcu;
 };
+#ifdef __CHERI__
 #define	SIOCGIFCONF64	_IOC_NEWTYPE(SIOCGIFCONF, struct ifconf64)
+#else
+CTASSERT(sizeof(struct ifconf) == sizeof(struct ifconf64));
+#endif
 
 struct ifdrv64 {
 	char		ifd_name[IFNAMSIZ];
@@ -229,8 +237,12 @@ struct ifdrv64 {
 	uint64_t	ifd_len;
 	uint64_t	ifd_data;
 };
+#ifdef __CHERI__
 #define SIOCSDRVSPEC64	_IOC_NEWTYPE(SIOCSDRVSPEC, struct ifdrv64)
 #define SIOCGDRVSPEC64	_IOC_NEWTYPE(SIOCGDRVSPEC, struct ifdrv64)
+#else
+CTASSERT(sizeof(struct ifdrv64) == sizeof(struct ifdrv64));
+#endif
 
 struct ifgroupreq64 {
 	char	ifgr_name[IFNAMSIZ];
@@ -240,10 +252,14 @@ struct ifgroupreq64 {
 		uint64_t	ifgru_groups;
 	} ifgr_ifgru;
 };
+#ifdef __CHERI__
 #define	SIOCAIFGROUP64	_IOC_NEWTYPE(SIOCAIFGROUP, struct ifgroupreq64)
 #define	SIOCGIFGROUP64	_IOC_NEWTYPE(SIOCGIFGROUP, struct ifgroupreq64)
 #define	SIOCDIFGROUP64	_IOC_NEWTYPE(SIOCDIFGROUP, struct ifgroupreq64)
 #define	SIOCGIFGMEMB64	_IOC_NEWTYPE(SIOCGIFGMEMB, struct ifgroupreq64)
+#else
+CTASSERT(sizeof(struct ifgroupreq) == sizeof(struct ifgroupreq64));
+#endif
 
 struct ifmediareq64 {
 	char		ifm_name[IFNAMSIZ];
@@ -254,16 +270,24 @@ struct ifmediareq64 {
 	int		ifm_count;
 	uint64_t	ifm_ulist; /* (int *) */
 };
+#ifdef __CHERI__
 #define	SIOCGIFMEDIA64	_IOC_NEWTYPE(SIOCGIFMEDIA, struct ifmediareq64)
 #define	SIOCGIFXMEDIA64	_IOC_NEWTYPE(SIOCGIFXMEDIA, struct ifmediareq64)
+#else
+CTASSERT(sizeof(struct ifmediareq) == sizeof(struct ifmediareq64));
+#endif
 #endif /* COMPAT_FREEBSD64 */
+
+#if defined(COMPAT_FREEBSD32) && defined(COMPAT_FREEBSD64)
+CTASSERT(sizeof(struct ifreq32) == sizeof(struct ifreq64));
+#endif
 
 union ifreq_union {
 	struct ifreq	ifr;
 #ifdef COMPAT_FREEBSD32
 	struct ifreq32	ifr32;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
 	struct ifreq64	ifr64;
 #endif
 };
@@ -2332,7 +2356,7 @@ ifr_buffer_get_buffer(u_long cmd, void *data)
 
 	ifrup = data;
 	switch (IOCPARM_LEN(cmd)) {
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
 	case sizeof(struct ifreq64):
 #ifdef COMPAT_FREEBSD32
 		if (SV_CURPROC_FLAG(SV_ILP32))
@@ -2362,7 +2386,7 @@ ifr_buffer_set_buffer_null(u_long cmd, void *data)
 
 	ifrup = data;
 	switch (IOCPARM_LEN(cmd)) {
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
 	case sizeof(struct ifreq64):
 #ifdef COMPAT_FREEBSD32
 		if (SV_CURPROC_FLAG(SV_ILP32))
@@ -2392,7 +2416,7 @@ ifr_buffer_get_length(u_long cmd, void *data)
 
 	ifrup = data;
 	switch (IOCPARM_LEN(cmd)) {
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
 	case sizeof(struct ifreq64):
 #ifdef COMPAT_FREEBSD32
 		if (SV_CURPROC_FLAG(SV_ILP32))
@@ -2421,7 +2445,7 @@ ifr_buffer_set_length(u_long cmd, void *data, size_t len)
 
 	ifrup = data;
 	switch (IOCPARM_LEN(cmd)) {
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
 	case sizeof(struct ifreq64):
 #ifdef COMPAT_FREEBSD32
 		if (SV_CURPROC_FLAG(SV_ILP32))
@@ -2451,7 +2475,7 @@ ifr_data_get_ptr(u_long cmd, void *ifrp)
 
 	ifrup = ifrp;
 	switch (IOCPARM_LEN(cmd)) {
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
 	case sizeof(struct ifreq64):
 #ifdef COMPAT_FREEBSD32
 		if (SV_CURPROC_FLAG(SV_ILP32))
@@ -3026,7 +3050,8 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 int
 ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 {
-#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
+#if defined(COMPAT_FREEBSD32) || \
+    (defined(COMPAT_FREEBSD64) && defined(__CHERI__))
 	union {
 		struct if_clonereq ifcr;
 		struct ifconf ifc;
@@ -3042,7 +3067,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	struct ifgroupreq32 *ifgr32;
 	struct ifmediareq32 *ifmr32;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
 	struct if_clonereq64 *ifcr64;
 	struct ifconf64 *ifc64;
 	struct ifdrv64 *ifd64;
@@ -3069,7 +3094,8 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	}
 #endif
 
-#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
+#if defined(COMPAT_FREEBSD32) || \
+    (defined(COMPAT_FREEBSD64) && defined(__CHERI__))
 	saved_cmd = cmd;
 	switch (cmd) {
 #ifdef COMPAT_FREEBSD32
@@ -3131,7 +3157,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		cmd = _IOC_NEWTYPE(cmd, struct ifmediareq);
 		break;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
 	case SIOCGIFCONF64:
 		ifc64 = (struct ifconf64 *)data;
 		thunk.ifc.ifc_len = ifc64->ifc_len;
@@ -3383,7 +3409,8 @@ out_ref:
 	if_rele(ifp);
 out_noref:
 	CURVNET_RESTORE();
-#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
+#if defined(COMPAT_FREEBSD32) || \
+    (defined(COMPAT_FREEBSD64) && defined(__CHERI__))
 	if (error != 0)
 		return (error);
 	switch (saved_cmd) {
@@ -3415,7 +3442,7 @@ out_noref:
 		ifmr32->ifm_count = thunk.ifmr.ifm_count;
 		break;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && defined(__CHERI__)
 	case SIOCGIFCONF64:
 		ifc64->ifc_len = thunk.ifc.ifc_len;
 		break;

@@ -161,12 +161,18 @@ struct mpt_raid_action64 {
 	uint8_t write;
 };
 
+#ifdef __CHERI__
 #define	MPTIO_READ_CFG_HEADER64	_IOWR('M', 100, struct mpt_cfg_page_req64)
 #define	MPTIO_READ_CFG_PAGE64	_IOWR('M', 101, struct mpt_cfg_page_req64)
 #define	MPTIO_READ_EXT_CFG_HEADER64 _IOWR('M', 102, struct mpt_ext_cfg_page_req64)
 #define	MPTIO_READ_EXT_CFG_PAGE64 _IOWR('M', 103, struct mpt_ext_cfg_page_req64)
 #define	MPTIO_WRITE_CFG_PAGE64	_IOWR('M', 104, struct mpt_cfg_page_req64)
 #define	MPTIO_RAID_ACTION64	_IOWR('M', 105, struct mpt_raid_action64)
+#else
+CTASSERT(sizeof(struct mpt_cfg_page_req) == sizeof(struct mpt_cfg_page_req64));
+CTASSERT(sizeof(struct mpt_ext_cfg_page_req) == sizeof(struct mpt_ext_cfg_page_req64));
+CTASSERT(sizeof(struct mpt_raid_action) == sizeof(struct mpt_raid_action64));
+#endif
 #endif
 
 #endif /* !_MPT_IOCTL_H_ */
