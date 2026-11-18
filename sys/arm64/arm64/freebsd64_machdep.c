@@ -76,7 +76,7 @@
 _Static_assert(sizeof(mcontext64_t) == 880, "mcontext64_t size incorrect");
 _Static_assert(sizeof(ucontext64_t) == 960, "ucontext64_t size incorrect");
 _Static_assert(sizeof(struct __siginfo64) == 80, "struct __siginfo64 size incorrect");
-#ifndef __CHERI__
+#if !__has_feature(capabilities)
 _Static_assert(sizeof(mcontext_t) == sizeof(mcontext64_t),
     "mcontext64_t size out of sync");
 _Static_assert(sizeof(ucontext_t) == sizeof(ucontext64_t),
@@ -175,7 +175,7 @@ static struct regset regset_arm64_tls = {
 };
 ELF_REGSET(regset_arm64_tls);
 
-#ifdef __CHERI__
+#if __has_feature(capabilities)
 /*
  * Number of registers in gpregs that are mirrored in capregs
  * up to, but not including elr.
@@ -387,7 +387,7 @@ elf64_dump_thread(struct thread *td __unused, void *dst __unused,
 {
 }
 
-#else /* !__CHERI__ */
+#else /* !__has_feature(capabilities) */
 
 int
 freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
@@ -421,7 +421,7 @@ freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 {
 	return (ENOTSUP);
 }
-#endif /* !__CHERI__ */
+#endif /* !__has_feature(capabilities) */
 /*
  * CHERI CHANGES START
  * {
