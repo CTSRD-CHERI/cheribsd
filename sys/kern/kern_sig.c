@@ -2781,7 +2781,7 @@ ptrace_syscallreq(struct thread *td, struct proc *p,
 {
 	struct sysentvec *sv;
 	struct sysent *se;
-	register_t rv_saved[2];
+	syscallarg_t rv_saved[2];
 	unsigned int sc;
 	int error, nerror;
 	bool audited, sy_thr_static;
@@ -2794,7 +2794,7 @@ ptrace_syscallreq(struct thread *td, struct proc *p,
 		}
 		sc = tsr->ts_sa.args[0];
 		memmove(&tsr->ts_sa.args[0], &tsr->ts_sa.args[1],
-		    sizeof(register_t) * (tsr->ts_nargs - 1));
+		    sizeof(syscallarg_t) * (tsr->ts_nargs - 1));
 	}
 
 	sv = p->p_sysent;

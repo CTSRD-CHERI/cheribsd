@@ -1066,7 +1066,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 			break;
 		}
 		error = copyin(r.sr.pscr_args, pscr_args,
-		    sizeof(u_long) * r.sr.pscr_nargs);
+		    sizeof(syscallarg_t) * r.sr.pscr_nargs);
 		if (error != 0)
 			break;
 		r.sr.pscr_args = pscr_args;
