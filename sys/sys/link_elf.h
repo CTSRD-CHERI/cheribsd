@@ -119,16 +119,6 @@ int rtld_set_var(const char *name, const char *val);
 #include <stddef.h>
 #endif
 #include <machine/c18n.h>
-
-struct sigaction;
-struct rtld_sigaction_result {
-	int rs_ret;
-	int rs_errno;
-};
-
-struct rtld_sigaction_result _rtld_sigaction_impl(int, const struct sigaction *,
-    struct sigaction *);
-
 void *dl_c18n_get_trusted_stack(uintptr_t);
 void dl_c18n_unwind_trusted_stack(void *, void *);
 int dl_c18n_is_trampoline(uintptr_t, void *);

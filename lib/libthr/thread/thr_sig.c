@@ -79,6 +79,7 @@ static void check_cancel(struct pthread *curthread, ucontext_t *ucp);
 #pragma weak _rtld_sighandler
 void _rtld_sighandler(int, siginfo_t *, void *);
 
+#pragma weak _rtld_sigaction
 int _rtld_sigaction(int, const struct sigaction *, struct sigaction *);
 
 #pragma weak _rtld_siginvoke
