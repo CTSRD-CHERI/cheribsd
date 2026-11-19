@@ -117,7 +117,6 @@
 
 #include <security/audit/audit.h>
 
-#include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
 #include <compat/freebsd64/freebsd64.h>
