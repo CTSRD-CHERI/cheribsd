@@ -91,6 +91,7 @@ struct mdproc {
 
 #define	KINFO_PROC_SIZE 1088
 #define	KINFO_PROC32_SIZE 768
+#define	KINFO_PROC64_SIZE KINFO_PROC_SIZE
 
 #ifdef	_KERNEL
 
