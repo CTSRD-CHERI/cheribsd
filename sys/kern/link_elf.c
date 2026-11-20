@@ -269,6 +269,8 @@ static void	elf_compartment_init(elf_compartment_t ec, elf_file_t ef,
 static int	elf_compartment_init_default(elf_file_t ef, u_long id,
 		    const char *filename, caddr_t address, size_t size);
 static bool	elf_pcc_init(elf_pcc_t pcc, caddr_t base, size_t length);
+static int	link_elf_each_compartment(linker_file_t,
+		  linker_compartment_callback_t, void *);
 #endif
 static int	elf_lookup(linker_file_t, Elf_Size, int, uintptr_t *);
 
@@ -292,6 +294,9 @@ static kobj_method_t link_elf_methods[] = {
 	KOBJMETHOD(linker_strtab_get,		link_elf_strtab_get),
 #ifdef VIMAGE
 	KOBJMETHOD(linker_propagate_vnets,	link_elf_propagate_vnets),
+#endif
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	KOBJMETHOD(linker_each_compartment,	link_elf_each_compartment),
 #endif
 	KOBJMETHOD_END
 };
@@ -3054,6 +3059,27 @@ elf_pcc_init(elf_pcc_t pcc, caddr_t base, size_t length)
 		return (false);
 	pcc->pcc = cap;
 	return (true);
+}
+
+static int
+link_elf_each_compartment(linker_file_t file,
+  int (*callback)(elf_compartment_t, void *), void *opaque)
+{
+	elf_file_t ef;
+	elf_compartment_t ec;
+	unsigned int compartmentii;
+	int error;
+
+	ef = (elf_file_t)file;
+	for (compartmentii = 0; compartmentii < ef->ncompartments;
+	    compartmentii++) {
+		ec = &ef->compartments[compartmentii];
+		error = callback(ec, opaque);
+		if (error != 0)
+			return (error);
+	}
+	ec = &ef->defcompartment;
+	return (callback(ec, opaque));
 }
 
 unsigned int
