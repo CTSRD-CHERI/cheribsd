@@ -37,5 +37,8 @@ SUBDIR+=	sdt
 .if ${MACHINE_ARCH:Maarch64*c*}
 SUBDIR+=	systrace_freebsd64
 .endif
+.if ${KERN_OPTS:MCHERI_COMPARTMENTALIZE_KERNEL}
+SUBDIR+=	cbt
+.endif
 
 .include <bsd.subdir.mk>
