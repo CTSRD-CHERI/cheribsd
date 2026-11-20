@@ -312,21 +312,21 @@ kmem_quarantine(void *mem, size_t size)
 	const ptraddr_t shadow_base = (ptraddr_t)kernel_shadow_root_cap;
 	ptraddr_t addr = (ptraddr_t)mem;
 
-	if (__predict_false(cheri_getsealed(mem)))
+	if (__predict_false(cheri_is_sealed(mem)))
 		panic("Quarantine sealed capability %#p", mem);
-	if (__predict_false(!cheri_gettag(mem)))
+	if (__predict_false(!cheri_tag_get(mem)))
 		panic("Quarantine invalid capability %#p", mem);
-	if (__predict_false((cheri_getperm(mem) & CHERI_PERM_SW_KMEM) == 0))
+	if (__predict_false((cheri_perms_get(mem) & CHERI_PERM_SW_KMEM) == 0))
 		panic("Quarantine operation requires PERM_SW_KMEM %#p", mem);
-	if (__predict_false(cheri_gettop(mem) < (ptraddr_t)mem + size))
+	if (__predict_false(cheri_top_get(mem) < (ptraddr_t)mem + size))
 		panic("Quarantine invalid bounds %#p", mem);
 
-	KASSERT(cheri_gettag(kernel_shadow_root_cap),
+	KASSERT(cheri_tag_get(kernel_shadow_root_cap),
 	    ("Invalid kernel shadow root %#p", kernel_shadow_root_cap));
 
 	fwo = kmem_shadow_word_offset(addr);
 	lwo = kmem_shadow_last_word_offset(addr, size);
-	shadow_mem = cheri_setaddress(kernel_shadow_root_cap,
+	shadow_mem = cheri_address_set(kernel_shadow_root_cap,
 	    shadow_base + fwo);
 
 	/* Insert a KTR/Dtrace probe here? */
@@ -348,7 +348,7 @@ kmem_quarantine(void *mem, size_t size)
 
 	/* Paint the last word, this may race with another partial painting */
 	if (lwo != fwo) {
-		shadow_mem = cheri_setaddress(kernel_shadow_root_cap,
+		shadow_mem = cheri_address_set(kernel_shadow_root_cap,
 		    shadow_base + lwo);
 		mask = kmem_shadow_last_word_mask(addr, size);
 		atomic_set_64(shadow_mem, mask);
