@@ -17,6 +17,7 @@ CFLAGS+=	-I${SYSDIR}/cddl/dev/dtrace/x86
 CFLAGS+=	-I${SYSDIR}/cddl/dev/dtrace/${MACHINE_CPUARCH}
 .PATH:		${SYSDIR}/cddl/dev/dtrace/${MACHINE_CPUARCH}
 .endif
+CFLAGS+=	-I${SYSDIR}/cddl/dev/dtrace
 
 .include <bsd.kmod.mk>
 
