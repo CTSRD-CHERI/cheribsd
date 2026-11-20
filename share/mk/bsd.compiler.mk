@@ -25,6 +25,7 @@
 #              mitigation.
 # - init-all:  supports stack variable initialization.
 # - stackclash:supports stack clash protection
+# - subobject-bounds: supports sub-object bounds on CHERI targets
 # - zeroregs:  supports zeroing used registers on return
 # - aarch64-sha512: supports the AArch64 sha512 intrinsic functions.
 #
