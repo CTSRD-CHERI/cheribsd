@@ -169,9 +169,12 @@ struct mpt_raid_action64 {
 #define	MPTIO_WRITE_CFG_PAGE64	_IOWR('M', 104, struct mpt_cfg_page_req64)
 #define	MPTIO_RAID_ACTION64	_IOWR('M', 105, struct mpt_raid_action64)
 #else
-CTASSERT(sizeof(struct mpt_cfg_page_req) == sizeof(struct mpt_cfg_page_req64));
-CTASSERT(sizeof(struct mpt_ext_cfg_page_req) == sizeof(struct mpt_ext_cfg_page_req64));
-CTASSERT(sizeof(struct mpt_raid_action) == sizeof(struct mpt_raid_action64));
+_Static_assert(sizeof(struct mpt_cfg_page_req) == sizeof(struct mpt_cfg_page_req64),
+    "struct mpt_cfg_page_req64 out of sync");
+_Static_assert(sizeof(struct mpt_ext_cfg_page_req) == sizeof(struct mpt_ext_cfg_page_req64),
+    "struct mpt_ext_cfg_page_req64 out of sync");
+_Static_assert(sizeof(struct mpt_raid_action) == sizeof(struct mpt_raid_action64),
+    "struct mpt_raid_action64 out of sync");
 #endif
 #endif
 
