@@ -65,6 +65,9 @@ typedef struct elf_compartment *elf_compartment_t;
 typedef caddr_t linker_sym_t;		/* opaque symbol */
 typedef c_caddr_t c_linker_sym_t;	/* const opaque symbol */
 typedef int (*linker_function_name_callback_t)(const char *, void *);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+typedef int (*linker_compartment_callback_t)(elf_compartment_t, void *);
+#endif
 
 /*
  * expanded out linker_sym_t
@@ -353,10 +356,10 @@ int	elf_reloc(linker_file_t _lf, char *base, const void *_rel, int _type,
 int	elf_reloc_local(linker_file_t _lf, char *base, const void *_rel,
 	    int _type, elf_lookup_fn _lu);
 bool	elf_compartment_isdefault(linker_file_t lf, uintcap_t ptr);
-void	elf_compartment_entry(linker_file_t lf, uintcap_t ptr, u_long *idp,
-	    uintptr_t *ptrp);
+void	elf_compartment_entry(linker_file_t lf, uintcap_t ptr,
+	    elf_compartment_t *dstelf_compartmentp, uintptr_t *ptrp);
+struct compartment_trampoline_tree *elf_compartment_trampoline_tree(linker_file_t lf);
 Elf_Addr elf_relocaddr(linker_file_t _lf, Elf_Addr addr);
-bool	elf_is_preloaded(linker_file_t lf);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 void	link_elf_linkup_compartments(linker_file_t lf,
 	    struct compartment *compartments, size_t ncompartments,

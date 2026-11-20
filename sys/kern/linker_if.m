@@ -186,6 +186,14 @@ METHOD void propagate_vnets {
 	linker_file_t	file;
 };
 #endif
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+METHOD int each_compartment {
+	linker_file_t	file;
+	linker_compartment_callback_t	callback;
+	void*		opaque;
+};
+#endif
 # CHERI CHANGES START
 # {
 #   "updated": 20230509,

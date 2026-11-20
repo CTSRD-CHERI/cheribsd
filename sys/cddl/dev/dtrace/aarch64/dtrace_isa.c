@@ -348,7 +348,13 @@ dtrace_getreg(struct trapframe *frame, uint_t reg)
 	case REG_LR:
 		return (frame->tf_lr);
 	case REG_SP:
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+		if ((cheri_getperm(frame->tf_elr) & CHERI_PERM_EXECUTIVE) == 0)
+			return (frame->tf_rcsp);
+		else
+#else
 		return (frame->tf_sp);
+#endif
 	case REG_PC:
 		return (frame->tf_elr);
 	default:

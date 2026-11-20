@@ -59,6 +59,7 @@
 #include <sys/dtrace.h>
 #include <sys/dtrace_bsd.h>
 
+#include "dtrace_excluded.h"
 #include "fbt.h"
 
 MALLOC_DEFINE(M_FBT, "fbt", "Function Boundary Tracing");
@@ -104,53 +105,8 @@ static int			fbt_verbose = 0;
 int
 fbt_excluded(const char *name)
 {
-
-	if (strncmp(name, "dtrace_", 7) == 0 &&
-	    strncmp(name, "dtrace_safe_", 12) != 0) {
-		/*
-		 * Anything beginning with "dtrace_" may be called
-		 * from probe context unless it explicitly indicates
-		 * that it won't be called from probe context by
-		 * using the prefix "dtrace_safe_".
-		 */
+	if (dtrace_excluded_function(name))
 		return (1);
-	}
-
-	/*
-	 * Omit instrumentation of functions that are probably in DDB.  It
-	 * makes it too hard to debug broken FBT.
-	 *
-	 * NB: kdb_enter() can be excluded, but its call to printf() can't be.
-	 * This is generally OK since we're not yet in debugging context.
-	 */
-	if (strncmp(name, "db_", 3) == 0 ||
-	    strncmp(name, "kdb_", 4) == 0)
-		return (1);
-
-	/*
-	 * Lock owner methods may be called from probe context.
-	 */
-	if (strcmp(name, "owner_mtx") == 0 ||
-	    strcmp(name, "owner_rm") == 0 ||
-	    strcmp(name, "owner_rw") == 0 ||
-	    strcmp(name, "owner_sx") == 0)
-		return (1);
-
-	/*
-	 * The KMSAN runtime can't be instrumented safely.
-	 */
-	if (strncmp(name, "__msan", 6) == 0 ||
-	    strncmp(name, "kmsan_", 6) == 0)
-		return (1);
-
-	/*
-	 * Stack unwinders may be called from probe context on some
-	 * platforms.
-	 */
-#if defined(__aarch64__) || defined(__riscv)
-	if (strcmp(name, "unwind_frame") == 0)
-		return (1);
-#endif
 
 	/*
 	 * When DTrace is built into the kernel we need to exclude
@@ -182,30 +138,10 @@ static void
 fbt_provide_module(void *arg, modctl_t *lf)
 {
 	char modname[MAXPATHLEN];
-	int i;
 	size_t len;
 
-	strlcpy(modname, lf->filename, sizeof(modname));
-	len = strlen(modname);
-	if (len > 3 && strcmp(modname + len - 3, ".ko") == 0)
-		modname[len - 3] = '\0';
-
-	/*
-	 * Employees of dtrace and their families are ineligible.  Void
-	 * where prohibited.
-	 */
-	if (strcmp(modname, "dtrace") == 0)
+	if (dtrace_excluded_module(lf))
 		return;
-
-	/*
-	 * To register with DTrace, a module must list 'dtrace' as a
-	 * dependency in order for the kernel linker to resolve
-	 * symbols like dtrace_register(). All modules with such a
-	 * dependency are ineligible for FBT tracing.
-	 */
-	for (i = 0; i < lf->ndeps; i++)
-		if (strncmp(lf->deps[i]->filename, "dtrace", 6) == 0)
-			return;
 
 	if (lf->fbt_nentries) {
 		/*
@@ -214,6 +150,11 @@ fbt_provide_module(void *arg, modctl_t *lf)
 		 */
 		return;
 	}
+
+	strlcpy(modname, lf->filename, sizeof(modname));
+	len = strlen(modname);
+	if (len > 3 && strcmp(modname + len - 3, ".ko") == 0)
+		modname[len - 3] = '\0';
 
 	/*
 	 * List the functions in the module and the symbol values.

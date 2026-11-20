@@ -17,6 +17,7 @@ CFLAGS+=	-I${SYSDIR}/cddl/dev/fbt/${MACHINE_CPUARCH}
 
 CFLAGS+= 	${OPENZFS_CFLAGS}
 CFLAGS+=  -I${SYSDIR}/cddl/dev/fbt
+CFLAGS+=  -I${SYSDIR}/cddl/dev/dtrace
 
 .include <bsd.kmod.mk>
 
