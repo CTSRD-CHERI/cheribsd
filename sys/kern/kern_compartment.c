@@ -95,9 +95,16 @@ SYSCTL_ULONG(_security_compartment_counters, OID_AUTO, executive_entry,
 
 struct compartment_trampoline {
 	int		ct_type;
+#ifdef KDTRACE_HOOKS
+	bool		ct_entry_probe_enabled : 1;
+	bool		ct_return_probe_enabled : 1;
+#endif
 	elf_compartment_t ct_elf_compartment;
-	uintcap_t	ct_compartment_func;
-	uintcap_t	ct_compartment_stackptr_func;
+	uintcap_t	ct_func;
+	uintcap_t	ct_precall_func;
+#ifdef KDTRACE_HOOKS
+	uintcap_t	ct_postcall_func;
+#endif
 	RB_ENTRY(compartment_trampoline) ct_node;
 	char		ct_code[] __subobject_use_container_bounds;
 };
@@ -106,21 +113,24 @@ struct compartment_trampoline {
 extern int early_boot;
 #endif
 
+#ifdef KDTRACE_HOOKS
+cbt_probe_func_t cbt_probe_func;
+#endif
+
 u_long compartment_lastid = COMPARTMENT_FIRST_ID;
 static uma_zone_t compartment_zone;
 
-static int
+int
 compartment_trampoline_compare(struct compartment_trampoline *a,
     struct compartment_trampoline *b)
 {
 
 	EXECUTIVE_ASSERT();
 
-	return ((ptraddr_t)a->ct_compartment_func -
-	    (ptraddr_t)b->ct_compartment_func);
+	return ((ptraddr_t)a->ct_func - (ptraddr_t)b->ct_func);
 }
 
-RB_GENERATE_STATIC(compartment_trampoline_tree, compartment_trampoline, ct_node,
+RB_GENERATE(compartment_trampoline_tree, compartment_trampoline, ct_node,
     compartment_trampoline_compare);
 
 static struct mtx compartment_trampolines_lock;
@@ -420,9 +430,10 @@ compartment_destroy(struct compartment *compartment)
 }
 
 static vm_pointer_t __used
-compartment_entry_stackptr(elf_compartment_t elf_compartment, int type)
+compartment_entry_precall(struct compartment_trampoline *trampoline)
 {
 	struct compartment *compartment, tmpcompartment;
+	elf_compartment_t callee_compartment;
 	u_long ndx;
 
 	EXECUTIVE_ASSERT();
@@ -431,23 +442,44 @@ compartment_entry_stackptr(elf_compartment_t elf_compartment, int type)
 	/*
 	 * TODO: Make compartment_trampoline_counters actual atomic counters.
 	 */
-	if (compartment_trampoline_counters[type] < ULONG_MAX)
-		compartment_trampoline_counters[type]++;
+	if (compartment_trampoline_counters[trampoline->ct_type] < ULONG_MAX)
+		compartment_trampoline_counters[trampoline->ct_type]++;
 #endif
 
-	ndx = TD_CIDNDX(elf_compartment->id);
-	if (elf_compartment->id <= curthread->td_compartments_maxid)
+	callee_compartment = trampoline->ct_elf_compartment;
+	ndx = TD_CIDNDX(callee_compartment->id);
+	if (callee_compartment->id <= curthread->td_compartments_maxid) {
 		compartment = curthread->td_compartments[ndx];
-	else {
+	} else {
 		tmpcompartment.c_ndx = ndx;
 		compartment = SPLAY_FIND(compartment_tree,
 		    &curthread->td_unhashed_compartments, &tmpcompartment);
 	}
 	if (compartment == NULL)
-		compartment = compartment_create(curthread, elf_compartment,
-		    true);
+		compartment = compartment_create(curthread,
+		    callee_compartment, true);
+
+#ifdef KDTRACE_HOOKS
+	if (trampoline->ct_entry_probe_enabled)
+		cbt_probe_func(callee_compartment->entry_probe,
+		    callee_compartment);
+#endif
+
 	return (compartment->c_kstackptr);
 }
+
+#ifdef KDTRACE_HOOKS
+static void __used
+compartment_entry_postcall(struct compartment_trampoline *trampoline)
+{
+	elf_compartment_t callee_compartment;
+
+	callee_compartment = trampoline->ct_elf_compartment;
+	if (trampoline->ct_return_probe_enabled)
+		cbt_probe_func(callee_compartment->return_probe,
+		    callee_compartment);
+}
+#endif
 
 static struct compartment_trampoline *
 compartment_trampoline_create(const linker_file_t lf, int type, void *data,
@@ -466,7 +498,7 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	elf_compartment_entry(lf, func, &dstelf_compartment, &dstfunc);
 	tree = elf_compartment_trampoline_tree(lf);
 
-	tmptrampoline.ct_compartment_func = dstfunc;
+	tmptrampoline.ct_func = dstfunc;
 	oldtrampoline = RB_FIND(compartment_trampoline_tree, tree,
 	    &tmptrampoline);
 	if (oldtrampoline != NULL) {
@@ -492,12 +524,16 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	memcpy(trampoline, data, size);
 
 	trampoline->ct_elf_compartment = dstelf_compartment;
-	trampoline->ct_compartment_func = dstfunc;
+	trampoline->ct_func = dstfunc;
 	trampoline->ct_type = type;
-	ELF_STATIC_RELOC_LABEL(trampoline->ct_compartment_stackptr_func,
-	    compartment_entry_stackptr);
-	trampoline->ct_compartment_stackptr_func =
-	    cheri_sealentry(trampoline->ct_compartment_stackptr_func);
+	ELF_STATIC_RELOC_LABEL(trampoline->ct_precall_func,
+	    compartment_entry_precall);
+	trampoline->ct_precall_func =
+	    cheri_sealentry(trampoline->ct_precall_func);
+	ELF_STATIC_RELOC_LABEL(trampoline->ct_postcall_func,
+	    compartment_entry_postcall);
+	trampoline->ct_postcall_func =
+	    cheri_sealentry(trampoline->ct_postcall_func);
 
 	if (!early_boot) {
 		cpu_dcache_wb_range(trampoline, (vm_size_t)size);
@@ -506,9 +542,8 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 
 	oldtrampoline = RB_INSERT(compartment_trampoline_tree, tree,
 	    trampoline);
-	KASSERT(oldtrampoline == NULL,
-	    ("Trampoline for 0x%#lp already exists",
-	    (void *)trampoline->ct_compartment_func));
+	KASSERT(oldtrampoline == NULL, ("Trampoline for 0x%#lp already exists",
+	    (void *)trampoline->ct_func));
 
 out:
 	/*
@@ -543,6 +578,38 @@ compartment_trampoline_destroy(uintptr_t func)
 	trampoline = __containerof((char (*)[])func,
 	    struct compartment_trampoline, ct_code);
 	free(trampoline, M_COMPARTMENT);
+}
+
+#ifdef KDTRACE_HOOKS
+void
+compartment_trampoline_toggle_entry_probe(
+    struct compartment_trampoline *trampoline, bool enabled)
+{
+	trampoline->ct_entry_probe_enabled = enabled;
+}
+
+void
+compartment_trampoline_toggle_return_probe(
+    struct compartment_trampoline *trampoline, bool enabled)
+{
+	trampoline->ct_return_probe_enabled = enabled;
+}
+#endif
+
+elf_compartment_t
+compartment_trampoline_get_elf_compartment(
+    struct compartment_trampoline *trampoline)
+{
+
+	return (trampoline->ct_elf_compartment);
+}
+
+ptraddr_t
+compartment_trampoline_get_target_address(
+    struct compartment_trampoline *trampoline)
+{
+
+	return ((ptraddr_t)trampoline->ct_func);
 }
 
 void *
@@ -600,7 +667,7 @@ compartment_target(uintptr_t func)
 	trampoline = __containerof((char (*)[])trampoline,
 	    struct compartment_trampoline, ct_code);
 
-	return ((void *)trampoline->ct_compartment_func);
+	return ((void *)trampoline->ct_func);
 }
 
 #ifdef DDB

@@ -35,6 +35,7 @@ SUBDIR+=	systrace_freebsd32
 SUBDIR+=	sdt
 .endif
 .if ${MACHINE_ARCH:Maarch64*c*}
+SUBDIR+=	cbt
 SUBDIR+=	systrace_freebsd64
 .endif
 

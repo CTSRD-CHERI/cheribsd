@@ -59,15 +59,24 @@ compartment_entries_length:
 	.section .rodata; .globl sym; .p2align 4; .type sym,#object; sym:
 
 .macro template_entry_trampoline type
-\type\()_entry_type:
+\type\()_start:
+\type\()_type:
 	.word		0
+#ifdef KDTRACE_HOOKS
+\type\()_probes_enabled:
+	.word		0
+#endif
 	.p2align 4
-\type\()_entry_elf_compartment:
+\type\()_elf_compartment:
 	.chericap	0
-\type\()_entry_func:
+\type\()_func:
 	.chericap	0
-\type\()_entry_stackptr_func:
+\type\()_precall_func:
 	.chericap	0
+#ifdef KDTRACE_HOOKS
+\type\()_postcall_func:
+	.chericap	0
+#endif
 	/* sizeof(RB_ENTRY(compartment_trampoline)) */
 \type\()_node:
 	.space		48
@@ -132,7 +141,11 @@ compartment_entries_length:
 	ldr	c16, [c16]
 	mov	csp, c16
 #endif
-.else
+.endif
+
+#ifndef KDTRACE_HOOKS
+.ifc \type,compartment
+#endif
 	/*
 	 * Push function arguments.
 	 */
@@ -146,14 +159,20 @@ compartment_entries_length:
 	 * TODO: Clear all registers unused by the stack pointer function.
 	 */
 
-	/* Get or allocate a callee stack. */
-	ldr	c0, \type\()_entry_elf_compartment
-	ldr	w1, \type\()_entry_type
-	ldr	c16, \type\()_entry_stackptr_func
+	/*
+	 * Use the pre-call callback for restricted compartments regardless of
+	 * the kernel configuration and for executive compartments if DTrace
+	 * is enabled.
+	 */
+	adr	c0, \type\()_start
+	ldr	c16, \type\()_precall_func
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	blr	x16
 #else
 	blr	c16
+#endif
+#ifndef KDTRACE_HOOKS
+.endif
 #endif
 
 	/*
@@ -168,6 +187,9 @@ compartment_entries_length:
 	scvalue	c16, c0, x16
 	ldr	c16, [c16, #-CAP_WIDTH]
 
+#ifndef KDTRACE_HOOKS
+.ifc \type,compartment
+#endif
 	/*
 	 * Pop function arguments.
 	 */
@@ -176,7 +198,11 @@ compartment_entries_length:
 	ldp	c4, c5, [csp], #(CAP_WIDTH * 2)
 	ldp	c2, c3, [csp], #(CAP_WIDTH * 2)
 	ldp	c0, c1, [csp], #(CAP_WIDTH * 2)
+#ifndef KDTRACE_HOOKS
+.endif
+#endif
 
+.ifc \type,compartment
 	/* Switch to the callee's stack. */
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	mov	csp, c16
@@ -192,7 +218,7 @@ compartment_entries_length:
 	/*
 	 * Call the target function.
 	 */
-	ldr	c16, \type\()_entry_func
+	ldr	c16, \type\()_func
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	blr	x16
 #else
@@ -218,6 +244,26 @@ compartment_entries_length:
 	gclim	x17, c16
 	scvalue	c17, c16, x17
 	str	c16, [c17, #-CAP_WIDTH]
+
+#ifdef KDTRACE_HOOKS
+	/*
+	 * Push the function result.
+	 */
+	stp	c0, c1, [csp, #-(CAP_WIDTH * 2)]!
+
+	adr	c0, \type\()_start
+	ldr	c16, \type\()_postcall_func
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	blr	x16
+#else
+	blr	c16
+#endif
+
+	/*
+	 * Pop the function result.
+	 */
+	ldp	c0, c1, [csp], #(CAP_WIDTH * 2)
+#endif
 
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*

@@ -65,6 +65,9 @@ typedef struct elf_compartment *elf_compartment_t;
 typedef caddr_t linker_sym_t;		/* opaque symbol */
 typedef c_caddr_t c_linker_sym_t;	/* const opaque symbol */
 typedef int (*linker_function_name_callback_t)(const char *, void *);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+typedef int (*linker_compartment_callback_t)(elf_compartment_t, void *);
+#endif
 
 /*
  * expanded out linker_sym_t

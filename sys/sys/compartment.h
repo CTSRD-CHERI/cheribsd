@@ -56,6 +56,7 @@
 SYSCTL_DECL(_security_compartment);
 
 struct thread;
+struct compartment_trampoline;
 struct compartment_tree;
 
 struct elf_pcc {
@@ -72,6 +73,14 @@ struct elf_compartment {
 	elf_pcc_t	 pcc;
 	struct elf_file	*file;
 	elf_plt_t	 plt;
+#ifdef KDTRACE_HOOKS
+	/*
+	 * XXXKW: Is that acceptable to use uint32_t instead of dtrace_id_t not
+	 * to include sys/dtrace.h?
+	 */
+	uint32_t	 entry_probe;
+	uint32_t	 return_probe;
+#endif
 };
 
 struct compartment {
@@ -85,11 +94,18 @@ struct compartment {
 };
 
 STAILQ_HEAD(compartment_list, compartment);
+
+int compartment_trampoline_compare(struct compartment_trampoline *a,
+    struct compartment_trampoline *b);
 RB_HEAD(compartment_trampoline_tree, compartment_trampoline);
+RB_PROTOTYPE(compartment_trampoline_tree, compartment_trampoline, ct_node,
+    compartment_trampoline_compare);
 
 extern struct compartment compartments0[KERNEL_MAXC18NS];
 
 extern u_long compartment_lastid;
+
+typedef void (*cbt_probe_func_t)(uint32_t, elf_compartment_t);
 
 void compartment_metadata_create(u_long id, const char *name, uintcap_t base,
     elf_compartment_t elf_compartment);
@@ -115,6 +131,16 @@ struct compartment *compartment_create(struct thread *td,
     elf_compartment_t elf_compartment, bool usecache);
 void compartment_destroy(struct compartment *compartment);
 void compartment_trampoline_destroy(uintptr_t func);
+#ifdef KDTRACE_HOOKS
+void compartment_trampoline_toggle_entry_probe(
+    struct compartment_trampoline *trampoline, bool enabled);
+void compartment_trampoline_toggle_return_probe(
+    struct compartment_trampoline *trampoline, bool enabled);
+#endif
+elf_compartment_t compartment_trampoline_get_elf_compartment(
+    struct compartment_trampoline *trampoline);
+ptraddr_t compartment_trampoline_get_target_address(
+    struct compartment_trampoline *trampoline);
 void *compartment_entry_for_kernel(uintptr_t func);
 void *compartment_entry(uintptr_t func);
 void *compartment_target(uintptr_t func);
