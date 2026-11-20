@@ -3411,7 +3411,7 @@ typedef struct oaiocb64 {
 	int	aio_reqprio;		/* Request priority -- ignored */
 	struct	__aiocb_private64 _aiocb_private;
 } oaiocb64_t;
-#ifndef __CHERI__
+#if !__has_feature(capabilities)
 CTASSERT(sizeof(struct osigevent) == sizeof(struct osigevent64));
 CTASSERT(sizeof(struct oaiocb) == sizeof(struct oaiocb64));
 #endif
