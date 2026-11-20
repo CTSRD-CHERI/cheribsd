@@ -499,7 +499,7 @@ kmem_revoke_md_alloc_pcpu(int domain, struct pcpu *pcpup)
 	    paddr + PAGE_SIZE - sizeof(*pcpu_state), sizeof(*pcpu_state));
 
 	pcpu_state->pcpup = pcpup;
-	pcpu_state->dmap_cap = dmap_base_cap;
+	pcpu_state->dmap_cap = dmap_capability;
 	pcpu_state->dmap_phys_base = dmap_phys_base;
 	pcpu_state->shadow_cap = kernel_shadow_root_cap;
 	pcpu_state->clg_fault_kstack = (void *)PHYS_TO_DMAP_LEN(paddr,
@@ -529,7 +529,7 @@ kmem_revoke_md_init_pcpu0(struct pcpu *pcpup)
 	    paddr + PAGE_SIZE - sizeof(*pcpu_state), sizeof(*pcpu_state));
 
 	pcpu_state->pcpup = pcpup;
-	pcpu_state->dmap_cap = dmap_base_cap;
+	pcpu_state->dmap_cap = dmap_capability;
 	pcpu_state->dmap_phys_base = dmap_phys_base;
 	pcpu_state->shadow_cap = kernel_shadow_root_cap;
 	pcpu_state->clg_fault_kstack = cheri_setaddress(
