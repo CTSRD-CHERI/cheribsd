@@ -45,7 +45,9 @@ extern const char *ld_c18n_no_fast_path;
 extern const char *ld_c18n_overhead;
 #endif
 extern const char *ld_c18n_stats;
+#ifdef C18N_SWITCH_COUNT_SUPPORT
 extern const char *ld_c18n_switch_count;
+#endif
 extern const char *ld_c18n_utrace;
 #ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
 extern const char *ld_c18n_policy;

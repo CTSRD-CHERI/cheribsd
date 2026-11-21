@@ -147,8 +147,10 @@ const char *ld_c18n_overhead;
 /* Export compartmentalisation statistics to a file */
 const char *ld_c18n_stats;
 
+#ifdef C18N_SWITCH_COUNT_SUPPORT
 /* Export count of compartment switches to statistics */
 const char *ld_c18n_switch_count;
+#endif
 
 /* Use utrace() to log compartmentalisation-related events */
 const char *ld_c18n_utrace;

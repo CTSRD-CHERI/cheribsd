@@ -929,7 +929,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	ld_c18n_overhead = ld_get_env_var(LD_C18N_OVERHEAD);
 #endif
 	ld_c18n_stats = ld_get_env_var(LD_C18N_STATS);
+#ifdef C18N_SWITCH_COUNT_SUPPORT
 	ld_c18n_switch_count = ld_get_env_var(LD_C18N_SWITCH_COUNT);
+#endif
 	ld_c18n_utrace = ld_get_env_var(LD_UTRACE_C18N);
 
 #ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
@@ -966,7 +968,11 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #ifdef C18N_SIMULATED_OVERHEAD_SUPPORT
 	    || ld_c18n_overhead
 #endif
-	    || ld_c18n_stats || ld_c18n_switch_count || ld_c18n_utrace
+	    || ld_c18n_stats
+#ifdef C18N_SWITCH_COUNT_SUPPORT
+	    || ld_c18n_switch_count
+#endif
+	    || ld_c18n_utrace
 #ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
 	    || ld_c18n_policy
 #endif
