@@ -43,7 +43,9 @@ extern const char *ld_c18n_overhead;
 extern const char *ld_c18n_stats;
 extern const char *ld_c18n_switch_count;
 extern const char *ld_c18n_utrace;
+#ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
 extern const char *ld_c18n_policy;
+#endif
 extern const char *ld_c18n_sig;
 extern const char *ld_c18n_unwind;
 extern struct rtld_c18n_stats *c18n_stats;

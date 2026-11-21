@@ -151,8 +151,10 @@ const char *ld_c18n_utrace;
  * Experimental features
  */
 
+#ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
 /* Path of the compartmentalisation policy */
 const char *ld_c18n_policy;
+#endif
 
 /* Read the .c18n.signature ELF section */
 const char *ld_c18n_sig;
@@ -1746,8 +1748,6 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 	extern const size_t c18n_default_policy_size;
 
 	int fd;
-	char *file;
-	struct stat st;
 
 	/*
 	 * Create memory mapping for compartmentalisation statistics.
@@ -1794,7 +1794,11 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 
 	parse_policy(c18n_default_policy, c18n_default_policy_size);
 
+#ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
 	if (ld_c18n_policy != NULL) {
+		char *file;
+		struct stat st;
+
 		if ((fd = open(ld_c18n_policy, O_RDONLY)) == -1)
 			rtld_fatal("c18n: Cannot open policy file");
 
@@ -1811,6 +1815,7 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 		if (close(fd) != 0)
 			rtld_fatal("c18n: Cannot close policy file");
 	}
+#endif
 }
 
 /*

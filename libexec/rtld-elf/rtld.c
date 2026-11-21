@@ -928,7 +928,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	ld_c18n_switch_count = ld_get_env_var(LD_C18N_SWITCH_COUNT);
 	ld_c18n_utrace = ld_get_env_var(LD_UTRACE_C18N);
 
+#ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
 	ld_c18n_policy = ld_get_env_var(LD_C18N_POLICY);
+#endif
 	ld_c18n_sig = ld_get_env_var(LD_C18N_SIG);
 	ld_c18n_unwind = ld_get_env_var(LD_C18N_UNWIND);
 	/*
@@ -952,7 +954,10 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	    || ld_c18n_disable_env || ld_c18n_enable_env
 	    || ld_c18n_no_fast_path || ld_c18n_overhead || ld_c18n_stats ||
 	    ld_c18n_switch_count || ld_c18n_utrace
-	    || ld_c18n_policy || ld_c18n_sig || ld_c18n_unwind
+#ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
+	    || ld_c18n_policy
+#endif
+	    || ld_c18n_sig || ld_c18n_unwind
 #endif
 	    ;
 	if (!ld_tracing)
