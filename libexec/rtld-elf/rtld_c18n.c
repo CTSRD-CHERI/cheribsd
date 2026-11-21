@@ -144,8 +144,10 @@ const char *ld_c18n_no_fast_path;
 const char *ld_c18n_overhead;
 #endif
 
+#ifdef C18N_STATS_FILE_SUPPORT
 /* Export compartmentalisation statistics to a file */
 const char *ld_c18n_stats;
+#endif
 
 #ifdef C18N_SWITCH_COUNT_SUPPORT
 /* Export count of compartment switches to statistics */
@@ -1778,14 +1780,13 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 	extern const char c18n_default_policy[];
 	extern const size_t c18n_default_policy_size;
 
-	int fd;
+	int fd = -1;
 
 	/*
 	 * Create memory mapping for compartmentalisation statistics.
 	 */
-	if (ld_c18n_stats == NULL)
-		fd = -1;
-	else {
+#ifdef C18N_STATS_FILE_SUPPORT
+	if (ld_c18n_stats != NULL) {
 		fd = open(ld_c18n_stats, O_RDWR | O_TRUNC | O_CREAT,
 		    0666);
 		if (fd == -1)
@@ -1795,7 +1796,7 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 			rtld_fatal("c18n: Cannot truncate file (%s)",
 			    rtld_strerror(errno));
 	}
-
+#endif
 	c18n_stats = mmap(NULL, sizeof(*c18n_stats), PROT_READ | PROT_WRITE,
 	    fd == -1 ? MAP_ANON : MAP_SHARED, fd, 0);
 	if (c18n_stats == MAP_FAILED)

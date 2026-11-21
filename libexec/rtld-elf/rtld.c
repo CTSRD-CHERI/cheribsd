@@ -928,7 +928,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #ifdef C18N_SIMULATED_OVERHEAD_SUPPORT
 	ld_c18n_overhead = ld_get_env_var(LD_C18N_OVERHEAD);
 #endif
+#ifdef C18N_STATS_FILE_SUPPORT
 	ld_c18n_stats = ld_get_env_var(LD_C18N_STATS);
+#endif
 #ifdef C18N_SWITCH_COUNT_SUPPORT
 	ld_c18n_switch_count = ld_get_env_var(LD_C18N_SWITCH_COUNT);
 #endif
@@ -968,7 +970,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #ifdef C18N_SIMULATED_OVERHEAD_SUPPORT
 	    || ld_c18n_overhead
 #endif
+#ifdef C18N_STATS_FILE_SUPPORT
 	    || ld_c18n_stats
+#endif
 #ifdef C18N_SWITCH_COUNT_SUPPORT
 	    || ld_c18n_switch_count
 #endif

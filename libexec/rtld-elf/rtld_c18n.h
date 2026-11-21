@@ -44,7 +44,9 @@ extern const char *ld_c18n_no_fast_path;
 #ifdef C18N_SIMULATED_OVERHEAD_SUPPORT
 extern const char *ld_c18n_overhead;
 #endif
+#ifdef C18N_STATS_FILE_SUPPORT
 extern const char *ld_c18n_stats;
+#endif
 #ifdef C18N_SWITCH_COUNT_SUPPORT
 extern const char *ld_c18n_switch_count;
 #endif
@@ -58,6 +60,7 @@ extern const char *ld_c18n_sig;
 #ifdef C18N_EXPERIMENTAL_UNWIND_SUPPORT
 extern const char *ld_c18n_unwind;
 #endif
+
 extern struct rtld_c18n_stats *c18n_stats;
 
 /*
