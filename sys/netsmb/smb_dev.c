@@ -213,6 +213,7 @@ struct smbioc_rw64 {
 	int		ioc_cnt;
 };
 
+#if __has_feature(capabilities)
 /*
  * Device IOCTLs
  */
@@ -224,6 +225,12 @@ struct smbioc_rw64 {
     _IOC_NEWTYPE(SMBIOC_LOOKUP, struct smbioc_lookup64)
 #define	SMBIOC_READ64		_IOC_NEWTYPE(SMBIOC_READ, struct smbioc_rw64)
 #define	SMBIOC_WRITE64		_IOC_NEWTYPE(SMBIOC_WRITE, struct smbioc_rw64)
+#else
+CTASSERT(sizeof(struct smbioc_rq) == sizeof(struct smbioc_rq64));
+CTASSERT(sizeof(struct smbioc_t2rq) == sizeof(struct smbioc_t2rq64));
+CTASSERT(sizeof(struct smbioc_lookup) == sizeof(struct smbioc_lookup64));
+CTASSERT(sizeof(struct smbioc_rw) == sizeof(struct smbioc_rw64));
+#endif
 #endif /* COMPAT_FREEBSD64 */
 
 static struct cdevsw nsmb_cdevsw = {
@@ -460,7 +467,7 @@ smbioc_rw32_from_rw(void *data, const struct smbioc_rw *rw)
 }
 #endif /* COMPAT_FREEBSD32 */
 
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 static void
 smbioc_ossn64_to_ossn(struct smbioc_ossn *ossn, const void *data)
 {
@@ -595,7 +602,7 @@ smbioc_rw64_from_rw(void *data, const struct smbioc_rw *rw)
 	rw64->ioc_offset = rw->ioc_offset;
 	rw64->ioc_cnt = rw->ioc_cnt;
 }
-#endif /* COMPAT_FREEBSD64 */
+#endif /* COMPAT_FREEBSD64 && __has_feature(capabilities) */
 
 static int
 nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
@@ -609,7 +616,8 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 	struct smbioc_t2rq *t2rq;
 	struct smbioc_lookup *lookup;
 	struct smbioc_rw *rwrq;
-#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
+#if defined(COMPAT_FREEBSD32) || \
+    (defined(COMPAT_FREEBSD64) && __has_feature(capabilities))
 	union {
 		struct smbioc_ossn ossn;
 		struct smbioc_rq rq;
@@ -631,7 +639,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 #ifdef COMPAT_FREEBSD32
 	    case SMBIOC_OPENSESSION32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	    case SMBIOC_OPENSESSION64:
 #endif
 		if (sdp->sd_vc) {
@@ -644,7 +652,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 			smbioc_ossn32_to_ossn(ossn, data);
 		} else
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		if (cmd == SMBIOC_OPENSESSION64) {
 			ossn = &u.ossn;
 			smbioc_ossn64_to_ossn(ossn, data);
@@ -680,7 +688,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 #ifdef COMPAT_FREEBSD32
 	    case SMBIOC_REQUEST32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	    case SMBIOC_REQUEST64:
 #endif
 		if (sdp->sd_share == NULL) {
@@ -693,7 +701,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 			smbioc_rq32_to_rq(rq, data);
 		} else
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		if (cmd == SMBIOC_REQUEST64) {
 			rq = &u.rq;
 			smbioc_rq64_to_rq(rq, data);
@@ -705,7 +713,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 		if (cmd == SMBIOC_OPENSESSION32)
 			smbioc_rq32_from_rq(data, rq);
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		if (cmd == SMBIOC_OPENSESSION64)
 			smbioc_rq64_from_rq(data, rq);
 #endif
@@ -714,7 +722,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 #ifdef COMPAT_FREEBSD32
 	    case SMBIOC_T2RQ32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	    case SMBIOC_T2RQ64:
 #endif
 		if (sdp->sd_share == NULL) {
@@ -727,7 +735,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 			smbioc_t2rq32_to_t2rq(t2rq, data);
 		} else
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		if (cmd == SMBIOC_T2RQ64) {
 			t2rq = &u.t2rq;
 			smbioc_t2rq64_to_t2rq(t2rq, data);
@@ -739,7 +747,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 		if (cmd == SMBIOC_T2RQ32)
 			smbioc_t2rq32_from_t2rq(data, t2rq);
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		if (cmd == SMBIOC_T2RQ64)
 			smbioc_t2rq64_from_t2rq(data, t2rq);
 #endif
@@ -797,7 +805,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 #ifdef COMPAT_FREEBSD32
 	    case SMBIOC_LOOKUP32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	    case SMBIOC_LOOKUP64:
 #endif
 		if (sdp->sd_vc || sdp->sd_share) {
@@ -812,7 +820,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 			smbioc_lookup32_to_lookup(lookup, data);
 		} else
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		if (cmd == SMBIOC_LOOKUP64) {
 			lookup = &u.lookup;
 			smbioc_lookup64_to_lookup(lookup, data);
@@ -837,7 +845,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 #ifdef COMPAT_FREEBSD32
 	    case SMBIOC_READ32: case SMBIOC_WRITE32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	    case SMBIOC_READ64: case SMBIOC_WRITE64:
 #endif
 	    {
@@ -854,7 +862,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 			smbioc_rw32_to_rw(rwrq, data);
 		} else
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		if (cmd == SMBIOC_READ64 || cmd == SMBIOC_WRITE64) {
 			rwrq = &u.rw;
 			smbioc_rw64_to_rw(rwrq, data);
@@ -878,7 +886,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 		if (cmd == SMBIOC_READ32 || cmd == SMBIOC_WRITE32)
 			smbioc_rw32_from_rw(data, rwrq);
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		if (cmd == SMBIOC_READ64 || cmd == SMBIOC_WRITE64)
 			smbioc_rw64_from_rw(data, rwrq);
 #endif

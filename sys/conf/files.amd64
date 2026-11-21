@@ -74,6 +74,7 @@ amd64/amd64/elf_machdep.c	standard
 amd64/amd64/exception.S		standard
 amd64/amd64/exec_machdep.c	standard
 amd64/amd64/fpu.c		standard
+amd64/amd64/freebsd64_machdep.c	optional	compat_freebsd64
 amd64/amd64/gdb_machdep.c	optional	gdb
 amd64/amd64/initcpu.c		standard
 amd64/amd64/io.c		optional	io

@@ -165,10 +165,14 @@ struct md_ioctl64 {
 	int		md_pad[MDNPAD];
 };
 
+#if __has_feature(capabilities)
 #define	MDIOCATTACH_64	_IOC_NEWTYPE(MDIOCATTACH, struct md_ioctl64)
 #define	MDIOCDETACH_64	_IOC_NEWTYPE(MDIOCDETACH, struct md_ioctl64)
 #define	MDIOCQUERY_64	_IOC_NEWTYPE(MDIOCQUERY, struct md_ioctl64)
 #define	MDIOCRESIZE_64	_IOC_NEWTYPE(MDIOCRESIZE, struct md_ioctl64)
+#else
+CTASSERT(sizeof(struct md_ioctl) == sizeof(struct md_ioctl64));
+#endif
 #endif /* COMPAT_FREEBSD64 */
 
 static MALLOC_DEFINE(M_MD, "md_disk", "Memory Disk");
@@ -1992,7 +1996,7 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		break;
 	}
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case MDIOCATTACH_64:
 	case MDIOCDETACH_64:
 	case MDIOCRESIZE_64:
@@ -2019,7 +2023,7 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 #ifdef COMPAT_FREEBSD32
 	case MDIOCATTACH_32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case MDIOCATTACH_64:
 #endif
 		error = kern_mdattach(td, &mdr);
@@ -2028,7 +2032,7 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 #ifdef COMPAT_FREEBSD32
 	case MDIOCDETACH_32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case MDIOCDETACH_64:
 #endif
 		error = kern_mddetach(td, &mdr);
@@ -2037,7 +2041,7 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 #ifdef COMPAT_FREEBSD32
 	case MDIOCRESIZE_32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case MDIOCRESIZE_64:
 #endif
 		error = kern_mdresize(&mdr);
@@ -2046,7 +2050,7 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 #ifdef COMPAT_FREEBSD32
 	case MDIOCQUERY_32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case MDIOCQUERY_64:
 #endif
 		error = kern_mdquery(&mdr);
@@ -2070,7 +2074,7 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		break;
 	}
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case MDIOCATTACH_64:
 	case MDIOCQUERY_64: {
 		struct md_ioctl64 *mdio = (struct md_ioctl64 *)addr;

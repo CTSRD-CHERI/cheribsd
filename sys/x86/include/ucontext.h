@@ -164,6 +164,14 @@ typedef struct __mcontext {
 
 	long	mc_spare[3];
 } mcontext_t;
+
+#ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64_signal.h>
+
+typedef struct __mcontext mcontext64_t;
+typedef struct __ucontext ucontext64_t;
+#endif
+
 #endif /* __amd64__ */
 
 #endif /* !_X86_UCONTEXT_H_ */

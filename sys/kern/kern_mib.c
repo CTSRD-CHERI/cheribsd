@@ -306,7 +306,7 @@ proc_machine_arch(struct proc *p)
 	if (SV_PROC_FLAG(p, SV_ILP32))
 		return (MACHINE_ARCH32);
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	if (!SV_PROC_FLAG(p, SV_CHERI))
 		return (MACHINE_ARCH64);
 #endif
@@ -337,7 +337,7 @@ SYSCTL_PROC(_hw, HW_MACHINE_ARCH, machine_arch, CTLTYPE_STRING | CTLFLAG_RD |
 #define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH64CB " " MACHINE_ARCH64
 #elif defined(MACHINE_ARCH64CB)
 #define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH64CB
-#elif defined(COMPAT_FREEBSD64)
+#elif defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 #define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH64
 #else
 #define	MACHINE_ARCHES	MACHINE_ARCH

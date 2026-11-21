@@ -28,7 +28,7 @@
  * SUCH DAMAGE.
  */
 
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 #include <sys/abi_compat.h>
 #endif
 #include <sys/param.h>
@@ -254,7 +254,7 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 {
 	struct panfrost_file *pfile;
 	struct panfrost_softc *sc;
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	struct drm_panfrost_submit64 *args64;
 	struct drm_panfrost_submit local_args;
 	int sz;
@@ -270,7 +270,7 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 
 	args = data;
 
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
 		args64 = (struct drm_panfrost_submit64 *)data;
 		args = &local_args;

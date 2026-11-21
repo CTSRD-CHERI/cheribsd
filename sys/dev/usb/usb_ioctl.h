@@ -396,8 +396,13 @@ struct usb_read_dir64 {
 	uint32_t urd_startentry;
 	uint32_t urd_maxlen;
 };
+
+#if __has_feature(capabilities)
 #define	USB_READ_DIR64 \
     _IOC_NEWTYPE(USB_READ_DIR, struct usb_read_dir64)
+#else
+CTASSERT(sizeof(struct usb_read_dir) == sizeof(struct usb_read_dir64));
+#endif
 
 struct usb_ctl_request64 {
 	uint64_t ucr_data;
@@ -406,8 +411,13 @@ struct usb_ctl_request64 {
 	uint8_t ucr_addr;
 	struct usb_device_request ucr_request;
 };
+
+#if __has_feature(capabilities)
 #define	USB_REQUEST64		_IOC_NEWTYPE(USB_REQUEST, struct usb_ctl_request64)
 #define	USB_DO_REQUEST64	_IOC_NEWTYPE(USB_DO_REQUEST, struct usb_ctl_request64)
+#else
+CTASSERT(sizeof(struct usb_ctl_request) == sizeof(struct usb_ctl_request64));
+#endif
 
 struct usb_gen_descriptor64 {
 	uint64_t ugd_data;	/* void * */
@@ -424,6 +434,7 @@ struct usb_gen_descriptor64 {
 	uint8_t	reserved[8];
 };
 
+#if __has_feature(capabilities)
 #define	USB_GET_REPORT_DESC64 \
     _IOC_NEWTYPE(USB_GET_REPORT_DESC, struct usb_gen_descriptor64)
 #define	USB_GET_REPORT64 \
@@ -436,6 +447,9 @@ struct usb_gen_descriptor64 {
     _IOC_NEWTYPE(USB_GET_STRING_DESC, struct usb_gen_descriptor64)
 #define	USB_GET_IFACE_DRIVER64 \
     _IOC_NEWTYPE(USB_GET_IFACE_DRIVER, struct usb_gen_descriptor64)
+#else
+CTASSERT(sizeof(struct usb_gen_descriptor) == sizeof(struct usb_gen_descriptor64));
+#endif
 
 void	usb_gen_descriptor_from64(struct usb_gen_descriptor *ugd,
     const struct usb_gen_descriptor64 *ugd64);
@@ -458,7 +472,12 @@ struct usb_fs_init64 {
 	uint8_t	ep_index_max;
 };
 
+#if __has_feature(capabilities)
 #define	USB_FS_INIT64	_IOC_NEWTYPE(USB_FS_INIT, struct usb_fs_init64)
+#else
+CTASSERT(sizeof(struct usb_fs_endpoint) == sizeof(struct usb_fs_endpoint64));
+CTASSERT(sizeof(struct usb_fs_init) == sizeof(struct usb_fs_init64));
+#endif
 
 #endif	/* COMPAT_FREEBSD64 */
 #endif	/* _KERNEL */

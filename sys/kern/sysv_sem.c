@@ -2140,7 +2140,7 @@ freebsd7_freebsd64___semctl(struct thread *td,
 		if (error)
 			return (error);
 		ipcperm_old2new(&dsbuf64.sem_perm, &dsbuf.sem_perm);
-		CP(dsbuf64, dsbuf, __sem_base);
+		PTRIN_CP(dsbuf64, dsbuf, __sem_base);
 		CP(dsbuf64, dsbuf, sem_nsems);
 		CP(dsbuf64, dsbuf, sem_otime);
 		CP(dsbuf64, dsbuf, sem_ctime);
@@ -2166,7 +2166,7 @@ freebsd7_freebsd64___semctl(struct thread *td,
 	case IPC_STAT:
 		bzero(&dsbuf64, sizeof(dsbuf64));
 		ipcperm_new2old(&dsbuf.sem_perm, &dsbuf64.sem_perm);
-		CP(dsbuf, dsbuf64, __sem_base);
+		dsbuf64.__sem_base = (uint64_t)(uintptr_t)dsbuf.__sem_base;
 		CP(dsbuf, dsbuf64, sem_nsems);
 		CP(dsbuf, dsbuf64, sem_otime);
 		CP(dsbuf, dsbuf64, sem_ctime);

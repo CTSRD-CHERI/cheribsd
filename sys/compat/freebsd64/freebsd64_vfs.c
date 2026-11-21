@@ -1112,7 +1112,8 @@ freebsd64_truncate(struct thread *td, struct freebsd64_truncate_args *uap)
 #if defined(COMPAT_FREEBSD6)
 /* Versions with the pad argument */
 int
-freebsd6_truncate(struct thread *td, struct freebsd6_truncate_args *uap)
+freebsd6_freebsd64_truncate(struct thread *td,
+    struct freebsd6_freebsd64_truncate_args *uap)
 {
 	return (kern_truncate(td, USER_PTR_PATH(uap->path), UIO_USERSPACE,
 	    uap->length));

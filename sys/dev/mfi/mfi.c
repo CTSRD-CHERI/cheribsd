@@ -3095,7 +3095,7 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 #ifdef COMPAT_FREEBSD32
 	struct mfi_ioc_packet32 *ioc32;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	struct mfi_ioc_packet64 *ioc64;
 #endif
 	struct mfi_ioc_aen *aen;
@@ -3110,10 +3110,11 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 #ifdef COMPAT_FREEBSD32
 	struct mfi_ioc_passthru32 *iop32 = (struct mfi_ioc_passthru32 *)arg;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	struct mfi_ioc_passthru64 *iop64 = (struct mfi_ioc_passthru64 *)arg;
 #endif
-#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
+#if defined(COMPAT_FREEBSD32) || \
+    (defined(COMPAT_FREEBSD64) && __has_feature(capabilities))
 	struct mfi_ioc_passthru iop_swab;
 #endif
 	int error, locked;
@@ -3173,7 +3174,7 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 #ifdef COMPAT_FREEBSD32
 	case MFI_CMD32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case MFI_CMD64:
 #endif
 		{
@@ -3233,7 +3234,7 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 				cm->cm_stp_len = ioc32->mfi_sgl[0].iov_len;
 				break;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 			case MFI_CMD64:
 				/* 64bit on CHERI */
 				ioc64 = (struct mfi_ioc_packet64 *)ioc;
@@ -3277,7 +3278,7 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 						addr = USER_PTR(PTRIN(ioc32->mfi_sgl[i].iov_base), len);
 						break;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 					case MFI_CMD64:
 						/* 64bit on CHERI */
 						ioc64 = (struct mfi_ioc_packet64 *)ioc;
@@ -3344,7 +3345,7 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 						len = ioc32->mfi_sgl[i].iov_len;
 						addr = USER_PTR(PTRIN(ioc32->mfi_sgl[i].iov_base), len);
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 					case MFI_CMD64:
 						/* 64bit on CHERI */
 						ioc64 = (struct mfi_ioc_packet64 *)ioc;
@@ -3484,7 +3485,7 @@ out:
 		iop32->ioc_frame = iop_swab.ioc_frame;
 		break;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case MFIIO_PASSTHRU64:
 		if (SV_CURPROC_FLAG(SV_LP64 | SV_CHERI) != SV_LP64) {
 			error = ENOTTY;

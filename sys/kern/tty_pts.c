@@ -277,7 +277,7 @@ ptsdev_ioctl(struct file *fp, u_long cmd, void *data,
 #ifdef COMPAT_FREEBSD32
 	case FIODGNAME_32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case FIODGNAME_64:
 #endif
 	{

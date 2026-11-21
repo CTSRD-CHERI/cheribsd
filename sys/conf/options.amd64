@@ -15,6 +15,7 @@ PV_STATS		opt_pmap.h
 # (see src/sys/conf/options), except for broken debugging options.
 COMPAT_AOUT		opt_dontuse.h
 COMPAT_FREEBSD32	opt_global.h
+COMPAT_FREEBSD64	opt_global.h
 #COMPAT_LINUX		opt_dontuse.h
 COMPAT_LINUX32		opt_dontuse.h
 LINPROCFS		opt_dontuse.h
