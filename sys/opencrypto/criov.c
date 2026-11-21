@@ -43,6 +43,7 @@
 
 #include <vm/vm.h>
 #include <vm/vm_page.h>
+#include <vm/vm_param.h>
 #include <vm/pmap.h>
 
 #include <opencrypto/cryptodev.h>
@@ -185,7 +186,7 @@ cvm_page_contiguous_segment(vm_page_t *pages, size_t skip, int len)
 
 	pages += (skip / PAGE_SIZE);
 	skip -= rounddown(skip, PAGE_SIZE);
-	return (((char *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(*pages))) + skip);
+	return (((char *)PHYS_TO_DMAP_LEN(VM_PAGE_TO_PHYS(*pages), len)) + skip);
 }
 
 /*

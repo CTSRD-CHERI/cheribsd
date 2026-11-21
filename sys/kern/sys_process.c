@@ -619,7 +619,7 @@ proc_read_cheri_tags_page(vm_map_t map, vm_offset_t va, void *tagbuf,
 	if (error != 0)
 		return (EFAULT);
 
-	page = (void *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(m));
+	page = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 	cheri_read_tags_page(page, tagbuf, hastagsp);
 	vm_page_unwire(m, PQ_ACTIVE);
 	return (0);
@@ -714,7 +714,7 @@ proc_read_cheri_cap_page(vm_map_t map, vm_offset_t va, struct uio *uio)
 	if (error != KERN_SUCCESS)
 		return (EFAULT);
 
-	src = (uintcap_t *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(m)) + pageoff /
+	src = (uintcap_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)) + pageoff /
 	    sizeof(uintcap_t);
 	while (todo > 0) {
 		capbuf[0] = cheri_tag_get(*src);
@@ -782,7 +782,7 @@ proc_write_cheri_cap_page(struct proc *p, vm_map_t map, vm_offset_t va,
 	if (error != KERN_SUCCESS)
 		return (EFAULT);
 
-	dst = (uintcap_t *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(m)) + pageoff /
+	dst = (uintcap_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)) + pageoff /
 	    sizeof(uintcap_t);
 	while (todo > 0) {
 		error = uiomove(capbuf, sizeof(capbuf), uio);

@@ -349,15 +349,9 @@ vm_cheri_revoke_page_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 	uint32_t cyc_start = get_cyclecount();
 #endif
-	vm_offset_t mva;
+	uintptr_t mva;
 	vm_offset_t mve;
 	uintcap_t * __capability mvu;
-	/*
-	 * XXX NWF
-	 * This isn't what we really want, but we want to be able to fake up a
-	 * a capability to the DMAP area somehow.
-	 */
-	void * __capability kdc = swap_restore_cap;
 	int res;
 
 	vm_page_assert_busied(m);
@@ -365,7 +359,17 @@ vm_cheri_revoke_page_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 	mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 	mve = mva + PAGE_SIZE;
 
-	mvu = cheri_bounds_set(cheri_address_set(kdc, mva), PAGE_SIZE);
+#ifdef __CHERI_HYBRID__
+	/*
+	 * XXX NWF
+	 * This isn't what we really want, but we want to be able to fake up a
+	 * a capability to the DMAP area somehow.
+	 */
+	mvu = cheri_bounds_set(cheri_address_set(swap_restore_cap, mva),
+	    PAGE_SIZE);
+#else
+	mvu = (uintptr_t *)mva;
+#endif
 
 	res = vm_cheri_revoke_page_iter(crc, vm_do_cheri_revoke, mvu, mve);
 
@@ -427,10 +431,9 @@ vm_cheri_revoke_page_ro(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 #endif
 
-	vm_offset_t mva;
+	uintptr_t mva;
 	vm_offset_t mve;
 	uintcap_t * __capability mvu;
-	void * __capability kdc = swap_restore_cap;
 	int res = 0;
 
 	/*
@@ -444,7 +447,12 @@ vm_cheri_revoke_page_ro(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 	mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 	mve = mva + PAGE_SIZE;
 
-	mvu = cheri_bounds_set(cheri_address_set(kdc, mva), PAGE_SIZE);
+#ifdef __CHERI_HYBRID__
+	mvu = cheri_bounds_set(cheri_address_set(swap_restore_cap, mva),
+	    PAGE_SIZE);
+#else
+	mvu = (uintptr_t *)mva;
+#endif
 
 	res = vm_cheri_revoke_page_iter(crc, vm_cheri_revoke_page_ro_adapt, mvu,
 	    mve);

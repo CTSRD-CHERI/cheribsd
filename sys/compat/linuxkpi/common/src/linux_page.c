@@ -88,7 +88,7 @@ linux_page_address(const struct page *page)
 
 	if (page->object != kernel_object) {
 		return (PMAP_HAS_DMAP ?
-		    ((void *)(uintptr_t)PHYS_TO_DMAP_PAGE(page_to_phys(page))) :
+		    ((void *)(uintptr_t)PHYS_TO_DMAP(page_to_phys(page))) :
 		    NULL);
 	}
 	return ((void *)(uintptr_t)(VM_MIN_KERNEL_ADDRESS +
