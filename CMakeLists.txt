@@ -15,15 +15,7 @@ if (NOT TARGET_ARCH)
     message(FATAL_ERROR "TARGET_ARCH must be set!")
 endif()
 
-if("${TARGET}" STREQUAL "mips")
-    if("${TARGET_ARCH}" STREQUAL "mips64")
-        # Default to purecap compilation mode for code completion
-        add_compile_options(-mabi=purecap -msoft-float)
-        set(CLANG_TRIPLE mips64-unknown-freebsd16)
-    else()
-        message(FATAL_ERROR "Unsupported MIPS TARGET_ARCH: ${TARGET}:${TARGET_ARCH}!")
-    endif()
-elseif("${TARGET}" STREQUAL "riscv")
+if("${TARGET}" STREQUAL "riscv")
     if("${TARGET_ARCH}" STREQUAL "riscv64")
         # Default to purecap compilation mode for code completion
         add_compile_options(-march=rv64imafdcxcheri -mabi=l64pc128d -mno-relax)
@@ -176,6 +168,8 @@ file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "
 #define COMPAT_FREEBSD11 1
 #define COMPAT_FREEBSD12 1
 #define COMPAT_FREEBSD13 1
+#define COMPAT_FREEBSD14 1
+#define COMPAT_FREEBSD15 1
 #define COMPAT_FREEBSD32 1
 #define COMPAT_FREEBSD64 1
 #define CPU_CHERI 1
