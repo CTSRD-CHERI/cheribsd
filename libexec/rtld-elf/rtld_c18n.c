@@ -134,11 +134,15 @@ bool ld_c18n_enable;
  * Performance and tracing analysis
  */
 
+#ifdef C18N_SIMULATED_OVERHEAD_SUPPORT
 /* Simulate overhead during compartment transitions */
 const char *ld_c18n_overhead;
+#endif
 
+#ifdef C18N_NO_FAST_PATH_SUPPORT
 /* Do not use the fast paths in trampolines for self-transitions */
 const char *ld_c18n_no_fast_path;
+#endif
 
 /* Export compartmentalisation statistics to a file */
 const char *ld_c18n_stats;
@@ -1326,8 +1330,10 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 		strlcpy(ut.caller, caller, sizeof(ut.caller));
 		utrace(&ut, sizeof(ut));
 	}
+#ifdef C18N_SIMULATED_OVERHEAD_SUPPORT
 	if (ld_c18n_overhead != NULL)
 		getpid();
+#endif
 }
 
 #define	C18N_MAX_TRAMP_SIZE	768
@@ -1468,7 +1474,12 @@ tramp_make_entry(struct tramp_header *header, bool slow)
 {
 	uint8_t *entry = header->entry;
 
-	if (ld_c18n_no_fast_path != NULL || slow)
+#ifdef C18N_NO_FAST_PATH_SUPPORT
+	if (ld_c18n_no_fast_path != NULL)
+		entry += c18n_tramp_entry_slow_offset;
+	else
+#endif
+	if (slow)
 		entry += c18n_tramp_entry_slow_offset;
 	entry = cheri_perms_clear(entry, FUNC_PTR_REMOVE_PERMS);
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -1677,8 +1688,10 @@ tramp_get_header(const void *data)
 	 * exposed. The return entry point is after either function pointer
 	 * entry point.
 	 */
+#ifdef C18N_NO_FAST_PATH_SUPPORT
 	if (ld_c18n_no_fast_path != NULL)
 		data = (const char *)data - c18n_tramp_entry_slow_offset;
+#endif
 	data = __containerof(data, struct tramp_header, entry);
 
 	for (page = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);

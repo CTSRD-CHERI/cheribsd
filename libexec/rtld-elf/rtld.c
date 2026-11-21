@@ -922,7 +922,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	ld_c18n_disable_env = ld_get_env_var(LD_C18N_DISABLE);
 	ld_c18n_enable_env = ld_get_env_var(LD_C18N_ENABLE);
 
+#ifdef C18N_NO_FAST_PATH_SUPPORT
 	ld_c18n_no_fast_path = ld_get_env_var(LD_C18N_NO_FAST_PATH);
+#endif
 	ld_c18n_overhead = ld_get_env_var(LD_C18N_OVERHEAD);
 	ld_c18n_stats = ld_get_env_var(LD_C18N_STATS);
 	ld_c18n_switch_count = ld_get_env_var(LD_C18N_SWITCH_COUNT);
@@ -956,7 +958,10 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #endif
 #ifdef CHERI_LIB_C18N
 	    || ld_c18n_disable_env || ld_c18n_enable_env
-	    || ld_c18n_no_fast_path || ld_c18n_overhead || ld_c18n_stats ||
+#ifdef C18N_NO_FAST_PATH_SUPPORT
+	    || ld_c18n_no_fast_path
+#endif
+	    || ld_c18n_overhead || ld_c18n_stats ||
 	    ld_c18n_switch_count || ld_c18n_utrace
 #ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
 	    || ld_c18n_policy

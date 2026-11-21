@@ -38,7 +38,9 @@
 extern uintptr_t sealer_pltgot;
 extern const char *ld_c18n_disable_env;
 extern const char *ld_c18n_enable_env;
+#ifdef C18N_NO_FAST_PATH_SUPPORT
 extern const char *ld_c18n_no_fast_path;
+#endif
 extern const char *ld_c18n_overhead;
 extern const char *ld_c18n_stats;
 extern const char *ld_c18n_switch_count;
