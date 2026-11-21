@@ -2150,12 +2150,8 @@ _pkgbootstrap: .PHONY
 .endif
 
 PKG_BIN_VERSION!=${PKG_CMD} --version </dev/null 2>/dev/null |\
-    awk -F. '/^[0-9.]+$$/ {print $$1 * 10000 + $$2 * 100 + $$3}'
-.if ${PKG_BIN_VERSION} < 11700
-PKG_EXT=	${PKG_FORMAT}
-.else
+    awk -F. '/^[0-9.]+(-.*)?$$/ {print $$1 * 10000 + $$2 * 100 + $$3}'
 PKG_EXT=	pkg
-.endif
 
 .if !defined(PKG_VERSION_FROM) && make(real-update-packages) && \
     exists(${PKG_ABI_FILE}) && exists(${REPODIR}/${PKG_ABI}/latest)
@@ -2199,7 +2195,7 @@ package-pkg: _pkgbootstrap _repodir .PHONY
 	env ${WMAKEENV} SRCDIR=${.CURDIR} PORTSDIR=${PORTSDIR} REVISION=${_REVISION} \
 		PKG_CMD=${PKG_CMD} PKG_VERSION=${PKG_VERSION} REPODIR=${REPODIR} \
 		WSTAGEDIR=${WSTAGEDIR} \
-		OSVERSION="${SRCRELDATE}" \
+		OSVERSION="${SRCRELDATE}" LOCALBASE=${LOCALBASE} \
 		sh ${.CURDIR}/release/scripts/make-pkg-package.sh
 .endif
 .endif
@@ -2464,6 +2460,9 @@ create-kernel-packages-flavor${flavor:C,^""$,${_default_flavor},}: _pkgbootstrap
 		-r ${KSTAGEDIR}/${DISTDIR} \
 		-o ${REPODIR}/${PKG_ABI}/${PKG_OUTPUT_DIR}
 . endfor
+.else
+create-kernel-packages: .PHONY
+
 .endif
 .if ${BUILDKERNELS:[#]} > 1 && ${NO_INSTALLEXTRAKERNELS} != "yes"
 . for _kernel in ${BUILDKERNELS:[2..-1]}
@@ -2517,9 +2516,6 @@ sign-packages:	.PHONY
 
 real-sign-packages:	_pkgbootstrap .PHONY
 	printf "version = 2;\n" > ${WSTAGEDIR}/meta
-.if ${PKG_BIN_VERSION} < 11700
-	printf "packing_format = \"${PKG_FORMAT}\";\n" >> ${WSTAGEDIR}/meta
-.endif
 	@${PKG_CMD} -o ABI=${PKG_ABI} -o OSVERSION="${SRCRELDATE}" \
 		-o WORKERS_COUNT=${PKG_WORKERS_COUNT} repo \
 		-m ${WSTAGEDIR}/meta \

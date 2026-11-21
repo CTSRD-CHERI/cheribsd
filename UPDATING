@@ -27,6 +27,24 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 16.x IS SLOW:
 	world, or to merely disable the most expensive debugging functionality
 	at runtime, run "ln -s 'abort:false,junk:false' /etc/malloc.conf".)
 
+20250923:
+	Several changes which affect pkgbase users (only):
+
+	powerd has been moved to a new FreeBSD-powerd package.  If you have
+	FreeBSD-set-minimal installed, the new package will be installed
+	automatically, otherwise you may want to install it by hand.
+
+	libpmc and related utilities (/usr/sbin/pmc*) have moved to the new
+	FreeBSD-pmc package.  If you use these, you may want to install the
+	package.
+
+	The libbz2 package has been renamed to bzip2, and /usr/bin/bzip2 has
+	been moved to the new package.  If you have set-minimal installed,
+	the new package will be added automatically, otherwise you may want
+	to manually install it.
+
+	This only affects pkgbase users.
+
 20250918:
 	mandoc (including /usr/bin/man) has been moved to a new package,
 	FreeBSD-mandoc.  If you have the minimal set installed, this package

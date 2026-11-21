@@ -3974,7 +3974,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	int len, left;
 	struct dirent *dp = NULL;
 	u_int32_t *tl;
-	vnode_t newvp = NULLVP;
+	vnode_t newvp = NULL;
 	struct nfsrv_descript nfsd, *nd = &nfsd;
 	struct nameidata nami, *ndp = &nami;
 	struct componentname *cnp = &ndp->ni_cnd;
@@ -4371,7 +4371,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				attr_ok = true;
 				if (NFSRV_CMPFH(nfhp->nfh_fh, nfhp->nfh_len,
 				    dnp->n_fhp->nfh_fh, dnp->n_fhp->nfh_len)) {
-				    VREF(vp);
+				    vref(vp);
 				    newvp = vp;
 				    unlocknewvp = 0;
 				    free(nfhp, M_NFSFH);
@@ -4420,7 +4420,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				    }
 				}
 				nfhp = NULL;
-				if (newvp != NULLVP) {
+				if (newvp != NULL) {
 				    if (attr_ok)
 					error = nfscl_loadattrcache(&newvp,
 					    &nfsva, NULL, 0, 0);
@@ -4450,7 +4450,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 					vput(newvp);
 				    else
 					vrele(newvp);
-				    newvp = NULLVP;
+				    newvp = NULL;
 				}
 			    }
 			} else if (nfhp != NULL) {

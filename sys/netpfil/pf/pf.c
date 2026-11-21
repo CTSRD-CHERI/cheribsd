@@ -5633,6 +5633,9 @@ pf_match_rule(struct pf_test_ctx *ctx, struct pf_kruleset *ruleset)
 			*ctx->rm = ctx->pd->related_rule;
 			break;
 		}
+		PF_TEST_ATTRIB(r->rule_flag & PFRULE_EXPIRED,
+		    TAILQ_NEXT(r, entries));
+		/* Don't count expired rule evaluations. */
 		pf_counter_u64_add(&r->evaluations, 1);
 		PF_TEST_ATTRIB(pfi_kkif_match(r->kif, pd->kif) == r->ifnot,
 			r->skip[PF_SKIP_IFP]);
@@ -5736,6 +5739,21 @@ pf_match_rule(struct pf_test_ctx *ctx, struct pf_kruleset *ruleset)
 		if (r->tag)
 			ctx->tag = r->tag;
 		if (r->anchor == NULL) {
+
+			if (r->rule_flag & PFRULE_ONCE) {
+				uint32_t	rule_flag;
+
+				rule_flag = r->rule_flag;
+				if ((rule_flag & PFRULE_EXPIRED) == 0 &&
+				    atomic_cmpset_int(&r->rule_flag, rule_flag,
+				    rule_flag | PFRULE_EXPIRED)) {
+					r->exptime = time_uptime;
+				} else {
+					r = TAILQ_NEXT(r, entries);
+					continue;
+				}
+			}
+
 			if (r->action == PF_MATCH) {
 				/*
 				 * Apply translations before increasing counters,
@@ -5812,6 +5830,7 @@ pf_match_rule(struct pf_test_ctx *ctx, struct pf_kruleset *ruleset)
 		}
 		r = TAILQ_NEXT(r, entries);
 	}
+
 
 	return (ctx->test_status);
 }
@@ -9178,26 +9197,8 @@ pf_route(struct pf_krule *r, struct ifnet *oifp,
 				} else {
 					dst->sin.sin_addr = ip->ip_dst;
 				}
-
-				/*
-				 * Bind to the correct interface if we're
-				 * if-bound. We don't know which interface
-				 * that will be until here, so we've inserted
-				 * the state on V_pf_all. Fix that now.
-				 */
-				if (s->kif == V_pfi_all && ifp != NULL &&
-				    r->rule_flag & PFRULE_IFBOUND)
-					s->kif = ifp->if_pf_kif;
 			}
 		}
-
-		if (r->rule_flag & PFRULE_IFBOUND &&
-		    pd->act.rt == PF_REPLYTO &&
-		    s->kif == V_pfi_all) {
-			s->kif = pd->act.rt_kif;
-			s->orig_kif = oifp->if_pf_kif;
-		}
-
 		PF_STATE_UNLOCK(s);
 	}
 
@@ -9210,6 +9211,20 @@ pf_route(struct pf_krule *r, struct ifnet *oifp,
 		action = PF_DROP;
 		SDT_PROBE1(pf, ip, route_to, drop, __LINE__);
 		goto bad;
+	}
+
+	/*
+	 * Bind to the correct interface if we're if-bound. We don't know which
+	 * interface that will be until here, so we've inserted the state
+	 * on V_pf_all. Fix that now.
+	 */
+	if (s != NULL && s->kif == V_pfi_all && r->rule_flag & PFRULE_IFBOUND) {
+		/* Verify that we're here because of BOUND_IFACE */
+		MPASS(r->rt == PF_REPLYTO || (pd->af != pd->naf && s->direction == PF_IN));
+		s->kif = ifp->if_pf_kif;
+		if (pd->act.rt == PF_REPLYTO) {
+			s->orig_kif = oifp->if_pf_kif;
+		}
 	}
 
 	if (r->rt == PF_DUPTO)
@@ -9492,26 +9507,8 @@ pf_route6(struct pf_krule *r, struct ifnet *oifp,
 					    sizeof(dst.sin6_addr));
 				else
 					dst.sin6_addr = ip6->ip6_dst;
-
-				/*
-				 * Bind to the correct interface if we're
-				 * if-bound. We don't know which interface
-				 * that will be until here, so we've inserted
-				 * the state on V_pf_all. Fix that now.
-				 */
-				if (s->kif == V_pfi_all && ifp != NULL &&
-				    r->rule_flag & PFRULE_IFBOUND)
-					s->kif = ifp->if_pf_kif;
 			}
 		}
-
-		if (r->rule_flag & PFRULE_IFBOUND &&
-		    pd->act.rt == PF_REPLYTO &&
-		    s->kif == V_pfi_all) {
-			s->kif = pd->act.rt_kif;
-			s->orig_kif = oifp->if_pf_kif;
-		}
-
 		PF_STATE_UNLOCK(s);
 	}
 
@@ -9531,6 +9528,20 @@ pf_route6(struct pf_krule *r, struct ifnet *oifp,
 		action = PF_DROP;
 		SDT_PROBE1(pf, ip6, route_to, drop, __LINE__);
 		goto bad;
+	}
+
+	/*
+	 * Bind to the correct interface if we're if-bound. We don't know which
+	 * interface that will be until here, so we've inserted the state
+	 * on V_pf_all. Fix that now.
+	 */
+	if (s != NULL && s->kif == V_pfi_all && r->rule_flag & PFRULE_IFBOUND) {
+		/* Verify that we're here because of BOUND_IFACE */
+		MPASS(r->rt == PF_REPLYTO || (pd->af != pd->naf && s->direction == PF_IN));
+		s->kif = ifp->if_pf_kif;
+		if (pd->act.rt == PF_REPLYTO) {
+			s->orig_kif = oifp->if_pf_kif;
+		}
 	}
 
 	if (r->rt == PF_DUPTO)
@@ -9774,6 +9785,7 @@ pf_pdesc_to_dnflow(const struct pf_pdesc *pd, const struct pf_krule *r,
     const struct pf_kstate *s, struct ip_fw_args *dnflow)
 {
 	int dndir = r->direction;
+	sa_family_t af  = pd->naf;
 
 	if (s && dndir == PF_INOUT) {
 		dndir = s->direction;
@@ -9814,19 +9826,45 @@ pf_pdesc_to_dnflow(const struct pf_pdesc *pd, const struct pf_krule *r,
 
 	dnflow->f_id.proto = pd->proto;
 	dnflow->f_id.extra = dnflow->rule.info;
-	switch (pd->naf) {
+	if (s)
+		af = s->key[PF_SK_STACK]->af;
+
+	switch (af) {
 	case AF_INET:
 		dnflow->f_id.addr_type = 4;
-		dnflow->f_id.src_ip = ntohl(pd->src->v4.s_addr);
-		dnflow->f_id.dst_ip = ntohl(pd->dst->v4.s_addr);
+		if (s) {
+			dnflow->f_id.src_ip = htonl(
+			    s->key[PF_SK_STACK]->addr[pd->sidx].v4.s_addr);
+			dnflow->f_id.dst_ip = htonl(
+			    s->key[PF_SK_STACK]->addr[pd->didx].v4.s_addr);
+		} else {
+			dnflow->f_id.src_ip = ntohl(pd->src->v4.s_addr);
+			dnflow->f_id.dst_ip = ntohl(pd->dst->v4.s_addr);
+		}
 		break;
 	case AF_INET6:
-		dnflow->flags |= IPFW_ARGS_IP6;
 		dnflow->f_id.addr_type = 6;
-		dnflow->f_id.src_ip6 = pd->src->v6;
-		dnflow->f_id.dst_ip6 = pd->dst->v6;
+
+		if (s) {
+			dnflow->f_id.src_ip6 =
+			    s->key[PF_SK_STACK]->addr[pd->sidx].v6;
+			dnflow->f_id.dst_ip6 =
+			    s->key[PF_SK_STACK]->addr[pd->didx].v6;
+		} else {
+			dnflow->f_id.src_ip6 = pd->src->v6;
+			dnflow->f_id.dst_ip6 = pd->dst->v6;
+		}
 		break;
 	}
+
+	/*
+	 * Separate this out, because while we pass the pre-NAT addresses to
+	 * dummynet we want the post-nat address family in case of nat64.
+	 * Dummynet may call ip_output/ip6_output itself, and we need it to
+	 * call the correct one.
+	 */
+	if (pd->naf == AF_INET6)
+		dnflow->flags |= IPFW_ARGS_IP6;
 
 	return (true);
 }

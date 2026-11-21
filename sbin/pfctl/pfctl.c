@@ -1142,6 +1142,9 @@ pfctl_print_rule_counters(struct pfctl_rule *rule, int opts)
 
 		printf("  [ queue: qname=%s qid=%u pqname=%s pqid=%u ]\n",
 		    rule->qname, rule->qid, rule->pqname, rule->pqid);
+		if (rule->rule_flag & PFRULE_EXPIRED)
+			printf("  [ Expired: %lld secs ago ]\n",
+			    (long long)(time(NULL) - rule->exptime));
 	}
 	if (opts & PF_OPT_VERBOSE) {
 		printf("  [ Evaluations: %-8llu  Packets: %-8llu  "
@@ -1312,7 +1315,6 @@ pfctl_show_rules(int dev, char *path, int opts, enum pfctl_show format,
 	struct pfctl_rule rule;
 	char anchor_call[MAXPATHLEN];
 	u_int32_t nr, header = 0;
-	int rule_numbers = opts & (PF_OPT_VERBOSE2 | PF_OPT_DEBUG);
 	int numeric = opts & PF_OPT_NUMERIC;
 	int len = strlen(path), ret = 0;
 	char *npath, *p;
@@ -1410,8 +1412,14 @@ pfctl_show_rules(int dev, char *path, int opts, enum pfctl_show format,
 		case PFCTL_SHOW_RULES:
 			if (rule.label[0][0] && (opts & PF_OPT_SHOWALL))
 				labels = 1;
-			print_rule(&rule, anchor_call, rule_numbers, numeric);
-			printf("\n");
+			print_rule(&rule, anchor_call, opts, numeric);
+			/*
+			 * Do not print newline, when we have not
+			 * printed expired rule.
+			 */
+			if (!(rule.rule_flag & PFRULE_EXPIRED) ||
+			    (opts & (PF_OPT_VERBOSE2|PF_OPT_DEBUG)))
+				printf("\n");
 			pfctl_print_rule_counters(&rule, opts);
 			break;
 		case PFCTL_SHOW_NOTHING:
@@ -1483,7 +1491,7 @@ pfctl_show_rules(int dev, char *path, int opts, enum pfctl_show format,
 			if (rule.label[0][0] && (opts & PF_OPT_SHOWALL))
 				labels = 1;
 			INDENT(depth, !(opts & PF_OPT_VERBOSE));
-			print_rule(&rule, anchor_call, rule_numbers, numeric);
+			print_rule(&rule, anchor_call, opts, numeric);
 
 			/*
 			 * If this is a 'unnamed' brace notation
@@ -1852,43 +1860,18 @@ pfctl_init_rule(struct pfctl_rule *r)
 	TAILQ_INIT(&(r->route.list));
 }
 
-int
-pfctl_append_rule(struct pfctl *pf, struct pfctl_rule *r,
-    const char *anchor_call)
+void
+pfctl_append_rule(struct pfctl *pf, struct pfctl_rule *r)
 {
 	u_int8_t		rs_num;
 	struct pfctl_rule	*rule;
 	struct pfctl_ruleset	*rs;
-	char 			*p;
 
 	rs_num = pf_get_ruleset_number(r->action);
 	if (rs_num == PF_RULESET_MAX)
 		errx(1, "Invalid rule type %d", r->action);
 
 	rs = &pf->anchor->ruleset;
-
-	if (anchor_call[0] && r->anchor == NULL) {
-		/* 
-		 * Don't make non-brace anchors part of the main anchor pool.
-		 */
-		if ((r->anchor = calloc(1, sizeof(*r->anchor))) == NULL)
-			err(1, "pfctl_append_rule: calloc");
-		
-		pf_init_ruleset(&r->anchor->ruleset);
-		r->anchor->ruleset.anchor = r->anchor;
-		if (strlcpy(r->anchor->path, anchor_call,
-		    sizeof(rule->anchor->path)) >= sizeof(rule->anchor->path))
-			errx(1, "pfctl_append_rule: strlcpy");
-		if ((p = strrchr(anchor_call, '/')) != NULL) {
-			if (!strlen(p))
-				err(1, "pfctl_append_rule: bad anchor name %s",
-				    anchor_call);
-		} else
-			p = (char *)anchor_call;
-		if (strlcpy(r->anchor->name, p,
-		    sizeof(rule->anchor->name)) >= sizeof(rule->anchor->name))
-			errx(1, "pfctl_append_rule: strlcpy");
-	}
 
 	if ((rule = calloc(1, sizeof(*rule))) == NULL)
 		err(1, "calloc");
@@ -1901,7 +1884,6 @@ pfctl_append_rule(struct pfctl *pf, struct pfctl_rule *r,
 	pfctl_move_pool(&r->route, &rule->route);
 
 	TAILQ_INSERT_TAIL(rs->rules[rs_num].active.ptr, rule, entries);
-	return (0);
 }
 
 int

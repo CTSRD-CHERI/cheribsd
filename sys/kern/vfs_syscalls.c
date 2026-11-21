@@ -1979,7 +1979,7 @@ restart:
 	if (error != 0)
 		return (error);
 
-	if (nd.ni_vp != NULLVP || !(nd.ni_cnd.cn_flags & ISWHITEOUT)) {
+	if (nd.ni_vp != NULL || !(nd.ni_cnd.cn_flags & ISWHITEOUT)) {
 		NDFREE_PNBUF(&nd);
 		if (nd.ni_vp == nd.ni_dvp)
 			vrele(nd.ni_dvp);
@@ -4430,7 +4430,7 @@ unionread:
 		struct vnode *tvp = vp;
 
 		vp = vp->v_mount->mnt_vnodecovered;
-		VREF(vp);
+		vref(vp);
 		fp->f_vnode = vp;
 		foffset = 0;
 		vput(tvp);

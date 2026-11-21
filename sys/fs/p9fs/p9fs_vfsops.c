@@ -291,7 +291,7 @@ p9fs_vget_common(struct mount *mp, struct p9fs_node *np, int flags,
 			node->flags |= P9FS_NODE_DELETED;
 
 			vput(vp);
-			*vpp = NULLVP;
+			*vpp = NULL;
 			vp = NULL;
 		} else {
 			*vpp = vp;
@@ -312,7 +312,7 @@ p9fs_vget_common(struct mount *mp, struct p9fs_node *np, int flags,
 
 	/* Allocate a new vnode. */
 	if ((error = getnewvnode("p9fs", mp, &p9fs_vnops, &vp)) != 0) {
-		*vpp = NULLVP;
+		*vpp = NULL;
 		P9_DEBUG(ERROR, "%s: getnewvnode failed: %d\n", __func__, error);
 		return (error);
 	}
@@ -401,7 +401,7 @@ out:
 		vput(vp);
 	}
 
-	*vpp = NULLVP;
+	*vpp = NULL;
 	return (error);
 }
 
@@ -529,14 +529,14 @@ p9fs_root(struct mount *mp, int lkflags, struct vnode **vpp)
 		if (vfid == NULL && clnt->trans_status == P9FS_BEGIN_DISCONNECT)
 			vfid = vmp->p9fs_session.mnt_fid;
 		else {
-			*vpp = NULLVP;
+			*vpp = NULL;
 			return (error);
 		}
 	}
 
 	error = p9fs_vget_common(mp, np, lkflags, np, vfid, vpp, NULL);
 	if (error != 0) {
-		*vpp = NULLVP;
+		*vpp = NULL;
 		return (error);
 	}
 	np->v_node = *vpp;

@@ -1283,7 +1283,7 @@ nfs_lookup(struct vop_lookup_args *ap)
 	bool is_nameddir, needs_nameddir, opennamed;
 
 	dattrflag = 0;
-	*vpp = NULLVP;
+	*vpp = NULL;
 	nmp = VFSTONFS(mp);
 	opennamed = (flags & (OPENNAMED | ISLASTCN)) == (OPENNAMED | ISLASTCN);
 	if (opennamed && (!NFSHASNFSV4(nmp) || !NFSHASNFSV4N(nmp)))
@@ -1308,7 +1308,7 @@ nfs_lookup(struct vop_lookup_args *ap)
 	/*
 	 * If the named attribute directory is needed, acquire it now.
 	 */
-	newvp = NULLVP;
+	newvp = NULL;
 	if (needs_nameddir) {
 		KASSERT(np->n_v4 == NULL, ("nfs_lookup: O_NAMEDATTR when"
 		    " n_v4 not NULL"));
@@ -1321,10 +1321,10 @@ nfs_lookup(struct vop_lookup_args *ap)
 		}
 		dvp = newvp;
 		np = VTONFS(dvp);
-		newvp = NULLVP;
+		newvp = NULL;
 	} else if (opennamed && cnp->cn_namelen == 1 &&
 	    *cnp->cn_nameptr == '.') {
-		VREF(dvp);
+		vref(dvp);
 		*vpp = dvp;
 		return (0);
 	}
@@ -1398,7 +1398,7 @@ nfs_lookup(struct vop_lookup_args *ap)
 				vput(newvp);
 			else
 				vrele(newvp);
-			*vpp = NULLVP;
+			*vpp = NULL;
 		} else if (error == ENOENT) {
 			if (VN_IS_DOOMED(dvp))
 				return (ENOENT);
@@ -1449,7 +1449,7 @@ nfs_lookup(struct vop_lookup_args *ap)
 	NFSUNLOCKMNT(nmp);
 #endif
 
-	newvp = NULLVP;
+	newvp = NULL;
 	NFSINCRGLOBAL(nfsstatsv1.lookupcache_misses);
 	nanouptime(&ts);
 	error = nfsrpc_lookup(dvp, cnp->cn_nameptr, cnp->cn_namelen,
@@ -1463,9 +1463,9 @@ nfs_lookup(struct vop_lookup_args *ap)
 	}
 handle_error:
 	if (error) {
-		if (newvp != NULLVP) {
+		if (newvp != NULL) {
 			vput(newvp);
-			*vpp = NULLVP;
+			*vpp = NULL;
 		}
 
 		if (error != ENOENT) {
@@ -1586,7 +1586,7 @@ handle_error:
 			    0, 1);
 	} else if (NFS_CMPFH(np, nfhp->nfh_fh, nfhp->nfh_len)) {
 		free(nfhp, M_NFSFH);
-		VREF(dvp);
+		vref(dvp);
 		newvp = dvp;
 		if (attrflag)
 			(void) nfscl_loadattrcache(&newvp, &nfsva, NULL,
@@ -2862,7 +2862,7 @@ nfs_sillyrename(struct vnode *dvp, struct vnode *vp, struct componentname *cnp)
 	    M_NEWNFSREQ, M_WAITOK);
 	sp->s_cred = crhold(cnp->cn_cred);
 	sp->s_dvp = dvp;
-	VREF(dvp);
+	vref(dvp);
 
 	/* 
 	 * Fudge together a funny name.
@@ -2960,7 +2960,7 @@ nfs_lookitup(struct vnode *dvp, char *name, int len, struct ucred *cred,
 		    newvp = NFSTOV(np);
 		} else if (NFS_CMPFH(dnp, nfhp->nfh_fh, nfhp->nfh_len)) {
 		    free(nfhp, M_NFSFH);
-		    VREF(dvp);
+		    vref(dvp);
 		    newvp = dvp;
 		} else {
 		    cn.cn_nameptr = name;

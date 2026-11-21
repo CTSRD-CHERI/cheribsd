@@ -273,9 +273,9 @@ null_bypass(struct vop_generic_args *ap)
 		 * are of our type.  Check for and don't map any
 		 * that aren't.  (We must always map first vp or vclean fails.)
 		 */
-		if (i != 0 && (*this_vp_p == NULLVP ||
-		    (*this_vp_p)->v_op != &null_vnodeops)) {
-			old_vps[i] = NULLVP;
+		if (i != 0 && (*this_vp_p == NULL ||
+			       (*this_vp_p)->v_op != &null_vnodeops)) {
+			old_vps[i] = NULL;
 		} else {
 			old_vps[i] = *this_vp_p;
 			*(vps_p[i]) = NULLVPTOLOWERVP(*this_vp_p);
@@ -306,7 +306,7 @@ null_bypass(struct vop_generic_args *ap)
 	 * with the modified argument structure.
 	 */
 	if (vps_p[0] != NULL && *vps_p[0] != NULL) {
-		error = VCALL(ap);
+		error = ap->a_desc->vdesc_call(ap);
 	} else {
 		printf("null_bypass: no map for %s\n", descp->vdesc_name);
 		error = EINVAL;
@@ -336,7 +336,7 @@ null_bypass(struct vop_generic_args *ap)
 			 * must move lock ownership from lower to
 			 * upper (reclaimed) vnode.
 			 */
-			if (lvp != NULLVP) {
+			if (lvp != NULL) {
 				null_copy_inotify(old_vps[i], lvp,
 				    VIRF_INOTIFY);
 				null_copy_inotify(old_vps[i], lvp,
@@ -494,7 +494,7 @@ null_lookup(struct vop_lookup_args *ap)
 	if ((error == 0 || error == EJUSTRETURN) && lvp != NULL) {
 		if (ldvp == lvp) {
 			*ap->a_vpp = dvp;
-			VREF(dvp);
+			vref(dvp);
 			vrele(lvp);
 		} else {
 			error = null_nodeget(mp, lvp, &vp);
@@ -665,7 +665,7 @@ null_remove(struct vop_remove_args *ap)
 	vp = ap->a_vp;
 	if (vrefcnt(vp) > 1) {
 		lvp = NULLVPTOLOWERVP(vp);
-		VREF(lvp);
+		vref(lvp);
 		vreleit = 1;
 	} else
 		vreleit = 0;

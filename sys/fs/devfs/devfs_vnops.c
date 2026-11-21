@@ -1075,7 +1075,7 @@ devfs_lookupx(struct vop_lookup_args *ap, int *dm_unlock)
 	mp = dvp->v_mount;
 	dmp = VFSTODEVFS(mp);
 	dd = dvp->v_data;
-	*vpp = NULLVP;
+	*vpp = NULL;
 
 	if ((flags & ISLASTCN) && nameiop == RENAME)
 		return (EOPNOTSUPP);
@@ -1094,7 +1094,7 @@ devfs_lookupx(struct vop_lookup_args *ap, int *dm_unlock)
 		if ((flags & ISLASTCN) && nameiop != LOOKUP)
 			return (EINVAL);
 		*vpp = dvp;
-		VREF(dvp);
+		vref(dvp);
 		return (0);
 	}
 
@@ -1184,7 +1184,7 @@ devfs_lookupx(struct vop_lookup_args *ap, int *dm_unlock)
 		if (error)
 			return (error);
 		if (*vpp == dvp) {
-			VREF(dvp);
+			vref(dvp);
 			*vpp = dvp;
 			return (0);
 		}

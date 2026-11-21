@@ -454,15 +454,11 @@ extern int		vttoif_tab[];
 #define	VS_SKIP_UNMOUNT	0x0001	/* vfs_write_suspend: fail if the
 				   filesystem is being unmounted */
 
-#define	VREF(vp)	vref(vp)
-
 #ifdef DIAGNOSTIC
 #define	VATTR_NULL(vap)	vattr_null(vap)
 #else
 #define	VATTR_NULL(vap)	(*(vap) = va_null)	/* initialize a vattr */
 #endif /* DIAGNOSTIC */
-
-#define	NULLVP	((struct vnode *)NULL)
 
 /*
  * Global vnode data.
@@ -596,11 +592,6 @@ void	assert_vop_unlocked(struct vnode *vp, const char *str);
 #define ASSERT_VOP_NOT_IN_SEQC(vp)	((void)0)
 
 #endif /* INVARIANTS */
-
-/*
- * This call works for vnodes in the kernel.
- */
-#define VCALL(c) ((c)->a_desc->vdesc_call(c))
 
 #define DOINGASYNC(vp)	   					\
 	(((vp)->v_mount->mnt_kern_flag & MNTK_ASYNC) != 0 &&	\

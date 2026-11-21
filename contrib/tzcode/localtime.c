@@ -1649,9 +1649,13 @@ tzset_unlocked_name(char const *name)
     lclptr = sp = malloc(sizeof *lclptr);
 # endif
   if (sp) {
-    if (zoneinit(sp, name, TZLOAD_FROMENV | TZLOAD_TZSTRING) != 0) {
+    int err = zoneinit(sp, name, TZLOAD_FROMENV | TZLOAD_TZSTRING);
+    if (err != 0) {
       zoneinit(sp, "", 0);
-      strcpy(sp->chars, UNSPEC);
+      /* Abbreviate with "-00" if there was an error.
+	 Do not treat a missing TZDEFAULT file as an error.  */
+      if (name || err != ENOENT)
+	strcpy(sp->chars, UNSPEC);
     }
     if (0 < lcl)
       strcpy(lcl_TZname, name);
@@ -2017,7 +2021,7 @@ offtime_key_init(void)
 }
 #endif /* __FreeBSD__ */
 struct tm *
-offtime(const time_t *timep, long offset)
+offtime(time_t const *timep, long offset)
 {
 #  if !SUPPORT_C89
   static struct tm tm;

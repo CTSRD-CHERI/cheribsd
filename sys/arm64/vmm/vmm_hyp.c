@@ -43,11 +43,11 @@ struct hypctx;
 uint64_t VMM_HYP_FUNC(do_call_guest)(struct hypctx *);
 
 static void
-vmm_hyp_reg_store(struct hypctx *hypctx, struct hyp *hyp, bool guest)
+vmm_hyp_reg_store(struct hypctx *hypctx, struct hyp *hyp, bool guest,
+    bool ecv_poff)
 {
 	uint64_t dfr0;
 
-	/* Store the guest VFP registers */
 	if (guest) {
 		/* Store the timer registers */
 		hypctx->vtimer_cpu.cntkctl_el1 =
@@ -56,7 +56,20 @@ vmm_hyp_reg_store(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 		    READ_SPECIALREG(EL0_REG(CNTV_CVAL));
 		hypctx->vtimer_cpu.virt_timer.cntx_ctl_el0 =
 		    READ_SPECIALREG(EL0_REG(CNTV_CTL));
+	}
+	if (guest_or_nonvhe(guest) && ecv_poff) {
+		/*
+		 * If we have ECV then the guest could modify these registers.
+		 * If VHE is enabled then the kernel will see a different view
+		 * of the registers, so doesn't need to handle them.
+		 */
+		hypctx->vtimer_cpu.phys_timer.cntx_cval_el0 =
+		    READ_SPECIALREG(EL0_REG(CNTP_CVAL));
+		hypctx->vtimer_cpu.phys_timer.cntx_ctl_el0 =
+		    READ_SPECIALREG(EL0_REG(CNTP_CTL));
+	}
 
+	if (guest) {
 		/* Store the GICv3 registers */
 		hypctx->vgic_v3_regs.ich_eisr_el2 =
 		    READ_SPECIALREG(ich_eisr_el2);
@@ -286,29 +299,20 @@ vmm_hyp_reg_store(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	hypctx->hcr_el2 = READ_SPECIALREG(hcr_el2);
 	hypctx->vpidr_el2 = READ_SPECIALREG(vpidr_el2);
 	hypctx->vmpidr_el2 = READ_SPECIALREG(vmpidr_el2);
-
-#ifndef VMM_VHE
-	/* hcrx_el2 depends on feat_hcx */
-	uint64_t mmfr1 = READ_SPECIALREG(id_aa64mmfr1_el1);
-	if (ID_AA64MMFR1_HCX_VAL(mmfr1) >> ID_AA64MMFR1_HCX_SHIFT) {
-		hypctx->hcrx_el2 = READ_SPECIALREG(MRS_REG_ALT_NAME(HCRX_EL2));
-	}
-#endif
 }
 
 static void
-vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest)
+vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest,
+    bool ecv_poff)
 {
 	uint64_t dfr0;
 
 	/* Restore the special registers */
 	WRITE_SPECIALREG(hcr_el2, hypctx->hcr_el2);
 
-	if (guest_or_nonvhe(guest)) {
-		uint64_t mmfr1 = READ_SPECIALREG(id_aa64mmfr1_el1);
-		if (ID_AA64MMFR1_HCX_VAL(mmfr1) >> ID_AA64MMFR1_HCX_SHIFT) {
-			WRITE_SPECIALREG(MRS_REG_ALT_NAME(HCRX_EL2), hypctx->hcrx_el2);
-		}
+	if (guest) {
+		if ((hyp->feats & HYP_FEAT_HCX) != 0)
+			WRITE_SPECIALREG(HCRX_EL2_REG, hypctx->hcrx_el2);
 	}
 	isb();
 
@@ -503,6 +507,29 @@ vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 		WRITE_SPECIALREG(cnthctl_el2, hyp->vtimer.cnthctl_el2);
 		WRITE_SPECIALREG(cntvoff_el2, hyp->vtimer.cntvoff_el2);
 
+		if (ecv_poff) {
+			/*
+			 * Load the same offset as the virtual timer
+			 * to keep in sync.
+			 */
+			WRITE_SPECIALREG(CNTPOFF_EL2_REG,
+			    hyp->vtimer.cntvoff_el2);
+			isb();
+		}
+	}
+	if (guest_or_nonvhe(guest) && ecv_poff) {
+		/*
+		 * If we have ECV then the guest could modify these registers.
+		 * If VHE is enabled then the kernel will see a different view
+		 * of the registers, so doesn't need to handle them.
+		 */
+		WRITE_SPECIALREG(EL0_REG(CNTP_CVAL),
+		    hypctx->vtimer_cpu.phys_timer.cntx_cval_el0);
+		WRITE_SPECIALREG(EL0_REG(CNTP_CTL),
+		    hypctx->vtimer_cpu.phys_timer.cntx_ctl_el0);
+	}
+
+	if (guest) {
 		/* Load the GICv3 registers */
 		WRITE_SPECIALREG(ich_hcr_el2, hypctx->vgic_v3_regs.ich_hcr_el2);
 		WRITE_SPECIALREG(ich_vmcr_el2,
@@ -555,11 +582,19 @@ vmm_hyp_call_guest(struct hyp *hyp, struct hypctx *hypctx)
 	struct hypctx host_hypctx;
 	uint64_t cntvoff_el2;
 	uint64_t ich_hcr_el2, ich_vmcr_el2, cnthctl_el2, cntkctl_el1;
+#ifndef VMM_VHE
+	uint64_t hcrx_el2;
+#endif
 	uint64_t ret;
 	uint64_t s1e1r, hpfar_el2;
-	bool hpfar_valid;
+	bool ecv_poff, hpfar_valid;
 
-	vmm_hyp_reg_store(&host_hypctx, NULL, false);
+	ecv_poff = (hyp->vtimer.cnthctl_el2 & CNTHCTL_ECV_EN) != 0;
+	vmm_hyp_reg_store(&host_hypctx, NULL, false, ecv_poff);
+#ifndef VMM_VHE
+	if ((hyp->feats & HYP_FEAT_HCX) != 0)
+		hcrx_el2 = READ_SPECIALREG(MRS_REG_ALT_NAME(HCRX_EL2));
+#endif
 
 	/* Save the host special registers */
 	cnthctl_el2 = READ_SPECIALREG(cnthctl_el2);
@@ -569,7 +604,7 @@ vmm_hyp_call_guest(struct hyp *hyp, struct hypctx *hypctx)
 	ich_hcr_el2 = READ_SPECIALREG(ich_hcr_el2);
 	ich_vmcr_el2 = READ_SPECIALREG(ich_vmcr_el2);
 
-	vmm_hyp_reg_restore(hypctx, hyp, true);
+	vmm_hyp_reg_restore(hypctx, hyp, true, ecv_poff);
 
 	/* Load the common hypervisor registers */
 	WRITE_SPECIALREG(vttbr_el2, hyp->vttbr_el2);
@@ -585,7 +620,7 @@ vmm_hyp_call_guest(struct hyp *hyp, struct hypctx *hypctx)
 
 	/* Store the exit info */
 	hypctx->exit_info.far_el2 = READ_SPECIALREG(far_el2);
-	vmm_hyp_reg_store(hypctx, hyp, true);
+	vmm_hyp_reg_store(hypctx, hyp, true, ecv_poff);
 
 	hpfar_valid = true;
 	if (ret == EXCP_TYPE_EL1_SYNC) {
@@ -635,7 +670,12 @@ vmm_hyp_call_guest(struct hyp *hyp, struct hypctx *hypctx)
 		}
 	}
 
-	vmm_hyp_reg_restore(&host_hypctx, NULL, false);
+	vmm_hyp_reg_restore(&host_hypctx, NULL, false, ecv_poff);
+
+#ifndef VMM_VHE
+	if ((hyp->feats & HYP_FEAT_HCX) != 0)
+		WRITE_SPECIALREG(MRS_REG_ALT_NAME(HCRX_EL2), hcrx_el2);
+#endif
 
 	/* Restore the host special registers */
 	WRITE_SPECIALREG(ich_hcr_el2, ich_hcr_el2);
@@ -666,8 +706,6 @@ VMM_HYP_FUNC(read_reg)(uint64_t reg)
 	switch (reg) {
 	case HYP_REG_ICH_VTR:
 		return (READ_SPECIALREG(ich_vtr_el2));
-	case HYP_REG_CNTHCTL:
-		return (READ_SPECIALREG(cnthctl_el2));
 	}
 
 	return (0);

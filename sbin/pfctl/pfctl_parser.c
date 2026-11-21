@@ -389,9 +389,11 @@ print_flags(uint16_t f)
 
 void
 print_fromto(struct pf_rule_addr *src, pf_osfp_t osfp, struct pf_rule_addr *dst,
-    sa_family_t af, u_int8_t proto, int verbose, int numeric)
+    sa_family_t af, u_int8_t proto, int opts, int numeric)
 {
 	char buf[PF_OSFP_LEN*3];
+	int verbose = opts & (PF_OPT_VERBOSE2 | PF_OPT_DEBUG);
+
 	if (src->addr.type == PF_ADDR_ADDRMASK &&
 	    dst->addr.type == PF_ADDR_ADDRMASK &&
 	    PF_AZERO(&src->addr.v.a.addr, AF_INET6) &&
@@ -854,7 +856,7 @@ print_eth_rule(struct pfctl_eth_rule *r, const char *anchor_call,
 }
 
 void
-print_rule(struct pfctl_rule *r, const char *anchor_call, int verbose, int numeric)
+print_rule(struct pfctl_rule *r, const char *anchor_call, int opts, int numeric)
 {
 	static const char *actiontypes[] = { "pass", "block", "scrub",
 	    "no scrub", "nat", "no nat", "binat", "no binat", "rdr", "no rdr",
@@ -862,8 +864,12 @@ print_rule(struct pfctl_rule *r, const char *anchor_call, int verbose, int numer
 	static const char *anchortypes[] = { "anchor", "anchor", "anchor",
 	    "anchor", "nat-anchor", "nat-anchor", "binat-anchor",
 	    "binat-anchor", "rdr-anchor", "rdr-anchor" };
-	int	i, ropts;
+	int	 i, ropts;
+	int	 verbose = opts & (PF_OPT_VERBOSE2 | PF_OPT_DEBUG);
 	char	*p;
+
+	if ((r->rule_flag & PFRULE_EXPIRED) && (!verbose))
+		return;
 
 	if (verbose)
 		printf("@%d ", r->nr);
@@ -985,7 +991,7 @@ print_rule(struct pfctl_rule *r, const char *anchor_call, int verbose, int numer
 			printf(" proto %u", r->proto);
 	}
 	print_fromto(&r->src, r->os_fingerprint, &r->dst, r->af, r->proto,
-	    verbose, numeric);
+	    opts, numeric);
 	if (r->rcv_ifname[0])
 		printf(" %sreceived-on %s", r->rcvifnot ? "!" : "",
 		    r->rcv_ifname);
@@ -1234,6 +1240,8 @@ print_rule(struct pfctl_rule *r, const char *anchor_call, int verbose, int numer
 		printf(" %s %d",
 		    r->free_flags & PFRULE_DN_IS_PIPE ? "dnpipe" : "dnqueue",
 		    r->dnpipe);
+	if (r->rule_flag & PFRULE_ONCE)
+		printf(" once");
 	if (r->qname[0] && r->pqname[0])
 		printf(" queue(%s, %s)", r->qname, r->pqname);
 	else if (r->qname[0])
@@ -1285,6 +1293,13 @@ print_rule(struct pfctl_rule *r, const char *anchor_call, int verbose, int numer
 			print_pool(&r->rdr, r->rdr.proxy_port[0],
 			    r->rdr.proxy_port[1], PF_RDR);
 		}
+	}
+
+	if (r->rule_flag & PFRULE_EXPIRED) {
+		printf(" # expired");
+
+		if (r->exptime != 0)
+			printf(" %s", ctime(&r->exptime));
 	}
 }
 

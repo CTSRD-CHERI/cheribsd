@@ -882,7 +882,7 @@ vfs_lookup_degenerate(struct nameidata *ndp, struct vnode *dp, int wantparent)
 	}
 	if (wantparent) {
 		ndp->ni_dvp = dp;
-		VREF(dp);
+		vref(dp);
 	}
 	ndp->ni_vp = dp;
 	cnp->cn_namelen = 0;
@@ -1120,7 +1120,7 @@ vfs_lookup(struct nameidata *ndp)
 
 	cnp->cn_lkflags = LK_SHARED;
 	dp = ndp->ni_startdir;
-	ndp->ni_startdir = NULLVP;
+	ndp->ni_startdir = NULL;
 
 	/*
 	 * Leading slashes, if any, are supposed to be skipped by the caller.
@@ -1283,7 +1283,7 @@ dirloop:
 			    (cnp->cn_flags & NOCROSSMOUNT) != 0)) {
 				ndp->ni_dvp = dp;
 				ndp->ni_vp = dp;
-				VREF(dp);
+				vref(dp);
 				goto nextname;
 			}
 			if ((dp->v_vflag & VV_ROOT) == 0)
@@ -1294,7 +1294,7 @@ dirloop:
 			}
 			tdp = dp;
 			dp = dp->v_mount->mnt_vnodecovered;
-			VREF(dp);
+			vref(dp);
 			vput(tdp);
 			vn_lock(dp,
 			    enforce_lkflags(dp->v_mount, cnp->cn_lkflags |
@@ -1342,7 +1342,7 @@ unionlookup:
 		    (dp->v_mount->mnt_flag & MNT_UNION)) {
 			tdp = dp;
 			dp = dp->v_mount->mnt_vnodecovered;
-			VREF(dp);
+			vref(dp);
 			vput(tdp);
 			vn_lock(dp,
 			    enforce_lkflags(dp->v_mount, cnp->cn_lkflags |
@@ -1614,7 +1614,7 @@ vfs_relookup(struct vnode *dvp, struct vnode **vpp, struct componentname *cnp,
 		}
 		/* ASSERT(dvp == ndp->ni_startdir) */
 		if (refstart)
-			VREF(dvp);
+			vref(dvp);
 		if ((cnp->cn_flags & LOCKPARENT) == 0)
 			VOP_UNLOCK(dp);
 		/*
@@ -1652,7 +1652,7 @@ vfs_relookup(struct vnode *dvp, struct vnode **vpp, struct componentname *cnp,
 
 	/* ASSERT(dvp == ndp->ni_startdir) */
 	if (refstart)
-		VREF(dvp);
+		vref(dvp);
 
 	if ((cnp->cn_flags & LOCKLEAF) == 0)
 		VOP_UNLOCK(dp);

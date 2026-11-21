@@ -93,6 +93,8 @@ void foffset_lock_pair(struct file *fp1, off_t *off1p, struct file *fp2,
 void foffset_lock_uio(struct file *fp, struct uio *uio, int flags);
 void foffset_unlock(struct file *fp, off_t val, int flags);
 void foffset_unlock_uio(struct file *fp, struct uio *uio, int flags);
+void fsetfl_lock(struct file *fp);
+void fsetfl_unlock(struct file *fp);
 
 static inline off_t
 foffset_get(struct file *fp)
@@ -198,7 +200,7 @@ struct file {
 	struct vnode 	*f_vnode;	/* NULL or applicable vnode */
 	struct ucred	*f_cred;	/* associated credentials. */
 	short		f_type;		/* descriptor type */
-	short		f_vnread_flags; /* (f) Sleep lock for f_offset */
+	short		f_vflags;	/* (f) Sleep lock flags for members */
 	/*
 	 *  DTYPE_VNODE specific fields.
 	 */
@@ -221,8 +223,10 @@ struct file {
 #define	f_cdevpriv	f_vnun.fvn_cdevpriv
 #define	f_advice	f_vnun.fvn_advice
 
-#define	FOFFSET_LOCKED       0x1
-#define	FOFFSET_LOCK_WAITING 0x2
+#define	FILE_V_FOFFSET_LOCKED		0x0001
+#define	FILE_V_FOFFSET_LOCK_WAITING	0x0002
+#define	FILE_V_SETFL_LOCKED		0x0004
+#define	FILE_V_SETFL_LOCK_WAITING	0x0008
 #endif /* __BSD_VISIBLE */
 
 #endif /* _KERNEL || _WANT_FILE */
