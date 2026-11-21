@@ -395,6 +395,7 @@ SUBDIR=	\
 	${_sym} \
 	${_syscons} \
 	sysvipc \
+	${_tagscan} \
 	tarfs \
 	tcp \
 	${_ti} \
@@ -959,6 +960,11 @@ BROKEN_MODULES+=dpaa2
 BROKEN_MODULES+=ena
 BROKEN_MODULES+=linprocfs linux64 linux_common
 BROKEN_MODULES+=mlx4 mlx4en mlx5 mlx5en
+.endif
+
+# CHERI-only kernel modules
+.if ${MACHINE_CPU:Mcheri}
+_tagscan=	tagscan
 .endif
 
 SUBDIR+=${MODULES_EXTRA}
