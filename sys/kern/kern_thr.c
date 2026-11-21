@@ -245,9 +245,10 @@ thread_create(struct thread *td, struct rtprio *rtp,
 	if (error)
 		goto fail;
 
-	bzero(&newtd->td_startzero,
+	bzero(__unbounded_addressof(newtd->td_startzero),
 	    __rangeof(struct thread, td_startzero, td_endzero));
-	bcopy(&td->td_startcopy, &newtd->td_startcopy,
+	bcopy(__unbounded_addressof(td->td_startcopy),
+		__unbounded_addressof(newtd->td_startcopy),
 	    __rangeof(struct thread, td_startcopy, td_endcopy));
 	newtd->td_proc = td->td_proc;
 	newtd->td_rb_list = newtd->td_rbp_list = newtd->td_rb_inact = 0;
