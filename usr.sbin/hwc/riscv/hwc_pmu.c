@@ -362,7 +362,7 @@ pmu_configure(struct hwc_context *tc)
 		if (c->enabled == true) {
 			error = pmu_request_configure(tc, i, c->event_id);
 			if (error) {
-				printf("%s: cound not configure ctr id %d\n",
+				printf("%s: could not configure ctr id %d\n",
 				    __func__, i);
 				return (error);
 			}
