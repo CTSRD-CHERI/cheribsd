@@ -49,7 +49,9 @@ extern const char *ld_c18n_policy;
 #ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 extern const char *ld_c18n_sig;
 #endif
+#ifdef C18N_EXPERIMENTAL_UNWIND_SUPPORT
 extern const char *ld_c18n_unwind;
+#endif
 extern struct rtld_c18n_stats *c18n_stats;
 
 /*

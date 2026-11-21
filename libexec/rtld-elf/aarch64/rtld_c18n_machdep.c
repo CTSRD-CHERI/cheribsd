@@ -172,8 +172,12 @@ tramp_compile(char **entry, const struct tramp_data *data)
 	    51 - (data->sig.valid ? data->sig.ret_args : 0));
 	PATCH_LDR_IMM(push_frame, target, target_off);
 
-	if (executive || ld_c18n_unwind != NULL)
+	if (executive)
 		COPY(update_fp);
+#ifdef C18N_EXPERIMENTAL_UNWIND_SUPPORT
+	else if (ld_c18n_unwind != NULL)
+		COPY(update_fp);
+#endif
 	else
 		COPY(update_fp_untagged);
 

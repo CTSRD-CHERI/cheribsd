@@ -934,7 +934,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 	ld_c18n_sig = ld_get_env_var(LD_C18N_SIG);
 #endif
+#ifdef C18N_EXPERIMENTAL_UNWIND_SUPPORT
 	ld_c18n_unwind = ld_get_env_var(LD_C18N_UNWIND);
+#endif
 	/*
 	 * DISABLE takes precedence over ENABLE.
 	 */
@@ -962,7 +964,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 	    || ld_c18n_sig
 #endif
+#ifdef C18N_EXPERIMENTAL_UNWIND_SUPPORT
 	    || ld_c18n_unwind
+#endif
 #endif
 	    ;
 	if (!ld_tracing)

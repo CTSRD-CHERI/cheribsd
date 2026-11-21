@@ -163,8 +163,10 @@ const char *ld_c18n_policy;
 const char *ld_c18n_sig;
 #endif
 
+#ifdef C18N_EXPERIMENTAL_UNWIND_SUPPORT
 /* Expose tagged frame pointers to trusted frames */
 const char *ld_c18n_unwind;
+#endif
 
 /*
  * Compartmentalisation information exported to the kernel
