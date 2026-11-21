@@ -70,8 +70,10 @@ tramp_compile(char **entry, const struct tramp_data *data)
 	compart_id_t callee;
 	bool executive = cheri_perms_get(data->target) & CHERI_PERM_EXECUTIVE;
 	bool count = ld_c18n_switch_count != NULL;
-	bool hook = ld_c18n_utrace != NULL ||
-	    ld_c18n_overhead != NULL;
+	bool hook = ld_c18n_utrace != NULL;
+#ifdef C18N_SIMULATED_OVERHEAD_SUPPORT
+	hook |= ld_c18n_overhead != NULL;
+#endif
 
 #define	COPY_VALUE(val)	({				\
 	size_t _old_size = size;			\

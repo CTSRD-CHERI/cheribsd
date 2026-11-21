@@ -134,14 +134,14 @@ bool ld_c18n_enable;
  * Performance and tracing analysis
  */
 
-#ifdef C18N_SIMULATED_OVERHEAD_SUPPORT
-/* Simulate overhead during compartment transitions */
-const char *ld_c18n_overhead;
-#endif
-
 #ifdef C18N_NO_FAST_PATH_SUPPORT
 /* Do not use the fast paths in trampolines for self-transitions */
 const char *ld_c18n_no_fast_path;
+#endif
+
+#ifdef C18N_SIMULATED_OVERHEAD_SUPPORT
+/* Simulate overhead during compartment transitions */
+const char *ld_c18n_overhead;
 #endif
 
 /* Export compartmentalisation statistics to a file */
