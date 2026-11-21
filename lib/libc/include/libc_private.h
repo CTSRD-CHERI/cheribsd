@@ -415,7 +415,16 @@ int __libc_uexterr_gettext(char *buf, size_t bufsz);
 #ifdef CHERI_LIB_C18N
 bool	_rtld_c18n_is_enabled(void);
 void	_rtld_thr_exit(long *);
-int	_rtld_sigaction(int, const struct sigaction *, struct sigaction *);
+
+struct rtld_sigaction_result {
+	int rs_ret;
+	int rs_errno;
+};
+struct rtld_sigaction_result	_rtld_sigaction(int, const struct sigaction *,
+    struct sigaction *);
+
+int	__libsys_sigaction_c18n(int, const struct sigaction *,
+    struct sigaction *);
 #endif
 
 #endif /* _LIBC_PRIVATE_H_ */
