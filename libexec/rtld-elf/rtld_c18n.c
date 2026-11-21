@@ -106,8 +106,10 @@ _Static_assert(
     STACK_TABLE_RTLD == cid_to_index_raw(RTLD_COMPART_ID),
     "Unexpected struct stk_table member offset");
 
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 _Static_assert(sizeof(struct func_sig) == sizeof(func_sig_int),
     "Unexpected func_sig size");
+#endif
 
 _Static_assert(
     SIG_FRAME_SIZE == sizeof(struct sigframe),
@@ -156,8 +158,10 @@ const char *ld_c18n_utrace;
 const char *ld_c18n_policy;
 #endif
 
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 /* Read the .c18n.signature ELF section */
 const char *ld_c18n_sig;
+#endif
 
 /* Expose tagged frame pointers to trusted frames */
 const char *ld_c18n_unwind;
@@ -1374,6 +1378,7 @@ tramp_pgs_append(const struct tramp_data *data)
 	return (header);
 }
 
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 static bool
 func_sig_equal(struct func_sig lhs, struct func_sig rhs)
 {
@@ -1381,14 +1386,18 @@ func_sig_equal(struct func_sig lhs, struct func_sig rhs)
 		lhs.mem_args == rhs.mem_args &&
 		lhs.ret_args == rhs.ret_args);
 }
+#endif
 
 static void
-tramp_check_found(struct tramp_header *found, const Obj_Entry *reqobj,
+tramp_check_found(struct tramp_header *found, const Obj_Entry *reqobj __unused,
     const struct tramp_data *data)
 {
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 	struct func_sig sig;
+#endif
 	void *found_target;
 
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 	if (data->sig.valid && found->symnum != 0) {
 		sig = sigtab_get(found->defobj, found->symnum);
 
@@ -1401,6 +1410,7 @@ tramp_check_found(struct tramp_header *found, const Obj_Entry *reqobj,
 		    C18N_SIG_FORMAT(data->sig),
 		    found->defobj->path, C18N_SIG_FORMAT(sig));
 	}
+#endif
 
 	if (!cheri_tag_get(data->target))
 		return;
@@ -1442,9 +1452,11 @@ tramp_create(const struct tramp_data *data)
 {
 	struct tramp_data newdata = *data;
 
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 	if (!newdata.sig.valid && newdata.def != NULL)
 		newdata.sig = sigtab_get(newdata.defobj,
 		    newdata.def - newdata.defobj->symtab);
+#endif
 
 	return (tramp_pgs_append(&newdata));
 }
@@ -1618,6 +1630,7 @@ end:
 	return (tramp_entry);
 }
 
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 struct func_sig
 sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 {
@@ -1633,6 +1646,7 @@ sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 
 	return (obj->sigtab[symnum]);
 }
+#endif
 
 struct tramp_header *
 tramp_get_header(const void *data)

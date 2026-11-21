@@ -133,7 +133,9 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 			.target = __DECONST(void *, symval),
 			.defobj = defobj,
 			.def = def,
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 			.sig = sigtab_get(obj, r_symndx)
+#endif
 		});
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__

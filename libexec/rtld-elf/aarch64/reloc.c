@@ -532,8 +532,10 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 					.target = (void *)target,
 					.defobj = defobj,
 					.def = def,
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 					.sig = sigtab_get(obj,
 					    ELF_R_SYM(rela->r_info))
+#endif
 				    });
 #endif
 				/*
@@ -628,7 +630,9 @@ reloc_jmpslots(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 				.target = (void *)target,
 				.defobj = defobj,
 				.def = def,
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 				.sig = sigtab_get(obj, ELF_R_SYM(rela->r_info))
+#endif
 			});
 #endif
 			reloc_jmpslot(where, target, defobj, obj,
@@ -963,8 +967,10 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 					.target = (void *)(uintptr_t)*where,
 					.defobj = defobj,
 					.def = def,
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 					.sig = sigtab_get(obj,
 					    ELF_R_SYM(rela->r_info))
+#endif
 				});
 #endif
 			break;

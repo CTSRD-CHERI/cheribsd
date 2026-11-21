@@ -627,7 +627,8 @@ __END_DECLS
 #endif
 
 #ifndef make_rtld_function_pointer
-#ifdef CHERI_LIB_C18N
+#  ifdef CHERI_LIB_C18N
+#    ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 #define make_rtld_function_pointer(target_func)                         \
 	tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {	\
 		.target = &target_func,					\
@@ -638,10 +639,18 @@ __END_DECLS
 			.ret_args = NONE				\
 		}							\
 	})
-#else
+#    else
+#define make_rtld_function_pointer(target_func)                         \
+	tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {	\
+		.target = &target_func,					\
+		.defobj = &obj_rtld,					\
+	})
+#    endif
+#  else
 #define make_rtld_function_pointer(target_func)	(&target_func)
-#endif
-#endif
+#  endif
+#endif /* make_rtld_function_pointer (*/
+
 #ifndef make_rtld_local_function_pointer
 #define make_rtld_local_function_pointer(target_func)	(&target_func)
 #endif

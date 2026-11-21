@@ -46,7 +46,9 @@ extern const char *ld_c18n_utrace;
 #ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
 extern const char *ld_c18n_policy;
 #endif
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 extern const char *ld_c18n_sig;
+#endif
 extern const char *ld_c18n_unwind;
 extern struct rtld_c18n_stats *c18n_stats;
 
@@ -232,7 +234,9 @@ size_t tramp_compile(char **, const struct tramp_data *);
 
 void *tramp_intern(const Plt_Entry *, compart_id_t, const struct tramp_data *);
 struct tramp_header *tramp_get_header(const void *);
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 struct func_sig sigtab_get(const Obj_Entry *, unsigned long);
+#endif
 
 static inline long
 func_sig_to_otype(struct func_sig sig)
