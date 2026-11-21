@@ -547,6 +547,10 @@ vfp_save_state_common(struct thread *td, struct pcb *pcb, bool full_save)
 		 * heavy userspace code. This would require us to disable
 		 * SVE for all system calls and trap the next use of them.
 		 * As an optimisation only disable SVE on context switch.
+		 *
+		 * XXX-AM: It is unclear when td_frame would be NULL,
+		 * perhaps when handling an interrupt, but the EXCP_SVC64 check
+		 * should take care of this.
 		 */
 		if (td->td_frame == NULL ||
 		    (ESR_ELx_EXCEPTION(td->td_frame->tf_esr) != EXCP_SVC64 &&

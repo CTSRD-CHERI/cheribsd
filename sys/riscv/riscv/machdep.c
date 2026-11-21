@@ -349,6 +349,10 @@ init_proc0(vm_pointer_t kstack)
 	thread0.td_kstack_pages = KSTACK_PAGES;
 	thread0.td_pcb = (struct pcb *)(thread0.td_kstack +
 	    thread0.td_kstack_pages * PAGE_SIZE) - 1;
+#ifdef CHERI_BOUNDED_KSTACK
+	thread0.td_pcb = cheri_bounds_set_exact(thread0.td_pcb,
+	    sizeof(struct pcb));
+#endif
 	thread0.td_pcb->pcb_fpflags = 0;
 	thread0.td_frame = &proc0_tf;
 	pcpup->pc_curpcb = thread0.td_pcb;
