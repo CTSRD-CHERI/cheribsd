@@ -57,7 +57,9 @@ tramp_compile(char **entry, const struct tramp_data *data)
 	IMPORT(count_entry);
 	IMPORT(count_return);
 #endif
+#if defined(C18N_SIMULATED_OVERHEAD_SUPPORT) || defined(C18N_UTRACE_SUPPORT)
 	IMPORT(call_hook);
+#endif
 	IMPORT(invoke_exe);
 	IMPORT(clear_mem_args);
 	IMPORT(clear_ret_args_indirect);
@@ -70,14 +72,21 @@ tramp_compile(char **entry, const struct tramp_data *data)
 #ifdef C18N_SWITCH_COUNT_SUPPORT
 	size_t count_off;
 #endif
-	size_t hook_off;
-	size_t header_off, target_off, landing_off, unused_regs;
+#if defined(C18N_SIMULATED_OVERHEAD_SUPPORT) || defined(C18N_UTRACE_SUPPORT)
+	size_t header_off, hook_off;
+#endif
+	size_t target_off, landing_off, unused_regs;
 	compart_id_t callee;
 	bool executive = cheri_perms_get(data->target) & CHERI_PERM_EXECUTIVE;
 #ifdef C18N_SWITCH_COUNT_SUPPORT
 	bool count = ld_c18n_switch_count != NULL;
 #endif
-	bool hook = ld_c18n_utrace != NULL;
+#if defined(C18N_SIMULATED_OVERHEAD_SUPPORT) || defined(C18N_UTRACE_SUPPORT)
+	bool hook = false;
+#endif
+#ifdef C18N_UTRACE_SUPPORT
+	hook |= ld_c18n_utrace != NULL;
+#endif
 #ifdef C18N_SIMULATED_OVERHEAD_SUPPORT
 	hook |= ld_c18n_overhead != NULL;
 #endif
@@ -136,8 +145,10 @@ tramp_compile(char **entry, const struct tramp_data *data)
 		*PATCH_INS(_offset) |= _value;				\
 	} while (0)
 
+#if defined(C18N_SIMULATED_OVERHEAD_SUPPORT) || defined(C18N_UTRACE_SUPPORT)
 	if (hook)
 		hook_off = COPY_VALUE(&tramp_hook);
+#endif
 
 #ifdef C18N_SWITCH_COUNT_SUPPORT
 	if (count)
@@ -151,7 +162,9 @@ tramp_compile(char **entry, const struct tramp_data *data)
 		    0 : data->def - data->defobj->symtab,
 		.sig = data->sig
 	};
+#if defined(C18N_SIMULATED_OVERHEAD_SUPPORT) || defined(C18N_UTRACE_SUPPORT)
 	header_off = size;
+#endif
 	target_off = size + offsetof(struct tramp_header, target);
 	*entry = buf + size;
 	size += offsetof(struct tramp_header, entry);
@@ -199,12 +212,14 @@ tramp_compile(char **entry, const struct tramp_data *data)
 	}
 #endif
 
+#if defined(C18N_SIMULATED_OVERHEAD_SUPPORT) || defined(C18N_UTRACE_SUPPORT)
 	if (hook) {
 		COPY(call_hook);
 		PATCH_LDR_IMM(call_hook, function, hook_off);
 		PATCH_MOV(call_hook, event, UTRACE_COMPARTMENT_ENTER);
 		PATCH_ADR(PATCH_OFF(call_hook, header), header_off);
 	}
+#endif
 
 	if (executive)
 		COPY(invoke_exe);
@@ -235,12 +250,14 @@ tramp_compile(char **entry, const struct tramp_data *data)
 		COPY(count_return);
 #endif
 
+#if defined(C18N_SIMULATED_OVERHEAD_SUPPORT) || defined(C18N_UTRACE_SUPPORT)
 	if (hook) {
 		COPY(call_hook);
 		PATCH_LDR_IMM(call_hook, function, hook_off);
 		PATCH_MOV(call_hook, event, UTRACE_COMPARTMENT_LEAVE);
 		PATCH_ADR(PATCH_OFF(call_hook, header), header_off);
 	}
+#endif
 
 	COPY(pop_frame);
 

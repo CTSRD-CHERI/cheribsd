@@ -50,7 +50,9 @@ extern const char *ld_c18n_stats;
 #ifdef C18N_SWITCH_COUNT_SUPPORT
 extern const char *ld_c18n_switch_count;
 #endif
+#ifdef C18N_UTRACE_SUPPORT
 extern const char *ld_c18n_utrace;
+#endif
 #ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
 extern const char *ld_c18n_policy;
 #endif

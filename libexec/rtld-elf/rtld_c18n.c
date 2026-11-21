@@ -154,8 +154,10 @@ const char *ld_c18n_stats;
 const char *ld_c18n_switch_count;
 #endif
 
+#ifdef C18N_UTRACE_SUPPORT
 /* Use utrace() to log compartmentalisation-related events */
 const char *ld_c18n_utrace;
+#endif
 
 /*
  * Experimental features
@@ -1300,6 +1302,7 @@ resize_table(int exp)
 	}
 }
 
+#if defined(C18N_SIMULATED_OVERHEAD_SUPPORT) || defined(C18N_UTRACE_SUPPORT)
 void
 tramp_hook_impl(int, const struct tramp_header *, const struct trusted_frame *);
 
@@ -1307,6 +1310,7 @@ void
 tramp_hook_impl(int event, const struct tramp_header *hdr,
     const struct trusted_frame *tf)
 {
+#ifdef C18N_UTRACE_SUPPORT
 	const char *sym;
 	const char *callee;
 	const char *caller;
@@ -1334,11 +1338,17 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 		strlcpy(ut.caller, caller, sizeof(ut.caller));
 		utrace(&ut, sizeof(ut));
 	}
+#else
+	(void)event;
+	(void)hdr;
+	(void)tf;
+#endif
 #ifdef C18N_SIMULATED_OVERHEAD_SUPPORT
 	if (ld_c18n_overhead != NULL)
 		getpid();
 #endif
 }
+#endif
 
 #define	C18N_MAX_TRAMP_SIZE	768
 

@@ -934,7 +934,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #ifdef C18N_SWITCH_COUNT_SUPPORT
 	ld_c18n_switch_count = ld_get_env_var(LD_C18N_SWITCH_COUNT);
 #endif
+#ifdef C18N_UTRACE_SUPPORT
 	ld_c18n_utrace = ld_get_env_var(LD_UTRACE_C18N);
+#endif
 
 #ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
 	ld_c18n_policy = ld_get_env_var(LD_C18N_POLICY);
@@ -976,7 +978,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #ifdef C18N_SWITCH_COUNT_SUPPORT
 	    || ld_c18n_switch_count
 #endif
+#ifdef C18N_UTRACE_SUPPORT
 	    || ld_c18n_utrace
+#endif
 #ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
 	    || ld_c18n_policy
 #endif
