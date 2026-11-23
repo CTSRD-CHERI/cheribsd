@@ -488,7 +488,7 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 void
 _rtld_atfork_pre(int *locks)
 {
-	RtldLockState ls[2];
+	RtldLockState ls[3];
 
 	if (locks == NULL)
 		return;
@@ -505,6 +505,11 @@ _rtld_atfork_pre(int *locks)
 	if (ld_get_env_var(LD_NO_DL_ITERATE_PHDR_AFTER_FORK) == NULL)
 		wlock_acquire(rtld_phdr_lock, &ls[0]);
 	wlock_acquire(rtld_bind_lock, &ls[1]);
+#ifdef CHERI_LIB_C18N
+	if (C18N_ENABLED)
+		wlock_acquire(rtld_tramp_lock, &ls[2]);
+	locks[3] = ls[2].lockstate;
+#endif
 
 	/* XXXKIB: I am really sorry for this. */
 	locks[0] = ls[1].lockstate;
@@ -514,7 +519,7 @@ _rtld_atfork_pre(int *locks)
 void
 _rtld_atfork_post(int *locks)
 {
-	RtldLockState ls[2];
+	RtldLockState ls[3];
 
 	if (locks == NULL)
 		return;
@@ -522,6 +527,12 @@ _rtld_atfork_post(int *locks)
 	bzero(ls, sizeof(ls));
 	ls[0].lockstate = locks[2];
 	ls[1].lockstate = locks[0];
+#ifdef CHERI_LIB_C18N
+	if (C18N_ENABLED) {
+		ls[2].lockstate = locks[3];
+		lock_release(rtld_tramp_lock, &ls[2]);
+	}
+#endif
 	lock_release(rtld_bind_lock, &ls[1]);
 	if (ld_get_env_var(LD_NO_DL_ITERATE_PHDR_AFTER_FORK) == NULL)
 		lock_release(rtld_phdr_lock, &ls[0]);
