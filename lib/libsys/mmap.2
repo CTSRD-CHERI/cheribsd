@@ -429,6 +429,137 @@ The
 system call does not unmap pages, see
 .Xr munmap 2
 for further information.
+.Sh RESERVATIONS
+The
+.Nm
+system call conflates two operations on the virtual address space of the
+caller: allocation of virtual address space and configuration of backing
+store for those allocations.
+The reservation model reduces this conflation by making an address
+space
+.Em reservation
+when an initial
+.Nm
+call is made and permitting updates within that
+.Em reservation .
+The backing store of the
+.Em reservation
+can be modified by subsequent
+.Nm ,
+.Xr madvise 2 ,
+.Xr mprotect 2 ,
+or
+.Xr munmap 2
+calls, but the
+.Em reservation
+cannot change size and its address space will remain allocated until
+all of it has been unmapped by
+.Xr munmap 2 .
+.Pp
+The lifecycle of a reservation is as follows:
+.Pp
+First, an initial
+.Nm
+call:
+.Bl -dash -compact
+.It
+asks the virtual memory system to allocate adjacent pages of virtual
+address space capable of holding
+.Fa len
+bytes.
+This allocation is a
+.Em reservation .
+.It
+configures a VM map entry according to
+the
+.Fa prot ,
+.Fa flags ,
+.Fa fd ,
+and
+.Fa offset
+arguments,
+.It
+and returns a pointer to the
+.Em reservation .
+.El
+.Pp
+It is commonly the case that a initial mmap is made with a
+.Fa prot
+argument of
+.Dv PROT_NONE
+ORed
+with an appropriate
+.Dv PROT_MAX()
+expression.
+.Pp
+Subsequent
+.Nm
+.Xr madvise 2 ,
+.Xr mprotect 2 ,
+or
+.Xr munmap 2
+calls update the backing store of the reservation.
+Any
+.Nm
+calls must use a pointer derived from the original pointer and the
+.Fa flags
+argument must contain
+.Dv MAP_FIXED .
+In order to avoid races inherent in unmapping and then remapping pages,
+once a particular page is unmapped, it cannot be mapped again.
+.Pp
+Finally, when the last page of a
+.Em reservation
+is unmapped, the entire
+.Em reservation
+is released.
+The addresses corresponding to the reservation may or may not be ready
+for immediate reuse if temporal safety features are implemented.
+.Ss CHERI considerations
+For CheriABI processes, the initial
+.Nm
+may create a reservation which is larger than the
+.Fa len
+argument would suggest to allow for bounds representability constraints.
+The backing of any padding pages will be as though they had been unmapped by
+.Xr munmap 2 .
+.Pp
+Initial
+.Em reservations
+should generally be made with an
+.Fa addr
+argument of
+.Dv NULL
+and a
+.Fa flags
+argument that does not contain
+.Dv MAP_FIXED .
+If placement is required, the
+.Fa addr
+argument must be
+.Dv NULL Ns -derived
+.Po cast to
+.Vt void *
+from a non-provenance carrying integer type such as
+.Vt ptraddr_t
+.Pc
+and
+.Dv MAP_FIXED
+implies
+.Dv MAP_EXCL .
+When updating all or part of a
+.Em reservation's
+mapping the
+.Fa addr
+argument must be derived from a pointer to an active reservation
+previously returned by
+.Nm
+and the
+.Fa flags
+argument must contain
+.Dv MAP_FIXED
+and not contain
+.Dv MAP_EXCL .
 .Sh NOTES
 Although this implementation does not impose any alignment restrictions on
 the
