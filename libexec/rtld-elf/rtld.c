@@ -922,15 +922,31 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	ld_c18n_disable_env = ld_get_env_var(LD_C18N_DISABLE);
 	ld_c18n_enable_env = ld_get_env_var(LD_C18N_ENABLE);
 
+#ifdef C18N_NO_FAST_PATH_SUPPORT
 	ld_c18n_no_fast_path = ld_get_env_var(LD_C18N_NO_FAST_PATH);
+#endif
+#ifdef C18N_SIMULATED_OVERHEAD_SUPPORT
 	ld_c18n_overhead = ld_get_env_var(LD_C18N_OVERHEAD);
+#endif
+#ifdef C18N_STATS_FILE_SUPPORT
 	ld_c18n_stats = ld_get_env_var(LD_C18N_STATS);
+#endif
+#ifdef C18N_SWITCH_COUNT_SUPPORT
 	ld_c18n_switch_count = ld_get_env_var(LD_C18N_SWITCH_COUNT);
+#endif
+#ifdef C18N_UTRACE_SUPPORT
 	ld_c18n_utrace = ld_get_env_var(LD_UTRACE_C18N);
+#endif
 
+#ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
 	ld_c18n_policy = ld_get_env_var(LD_C18N_POLICY);
+#endif
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 	ld_c18n_sig = ld_get_env_var(LD_C18N_SIG);
+#endif
+#ifdef C18N_EXPERIMENTAL_UNWIND_SUPPORT
 	ld_c18n_unwind = ld_get_env_var(LD_C18N_UNWIND);
+#endif
 	/*
 	 * DISABLE takes precedence over ENABLE.
 	 */
@@ -950,9 +966,30 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #endif
 #ifdef CHERI_LIB_C18N
 	    || ld_c18n_disable_env || ld_c18n_enable_env
-	    || ld_c18n_no_fast_path || ld_c18n_overhead || ld_c18n_stats ||
-	    ld_c18n_switch_count || ld_c18n_utrace
-	    || ld_c18n_policy || ld_c18n_sig || ld_c18n_unwind
+#ifdef C18N_NO_FAST_PATH_SUPPORT
+	    || ld_c18n_no_fast_path
+#endif
+#ifdef C18N_SIMULATED_OVERHEAD_SUPPORT
+	    || ld_c18n_overhead
+#endif
+#ifdef C18N_STATS_FILE_SUPPORT
+	    || ld_c18n_stats
+#endif
+#ifdef C18N_SWITCH_COUNT_SUPPORT
+	    || ld_c18n_switch_count
+#endif
+#ifdef C18N_UTRACE_SUPPORT
+	    || ld_c18n_utrace
+#endif
+#ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
+	    || ld_c18n_policy
+#endif
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
+	    || ld_c18n_sig
+#endif
+#ifdef C18N_EXPERIMENTAL_UNWIND_SUPPORT
+	    || ld_c18n_unwind
+#endif
 #endif
 	    ;
 	if (!ld_tracing)
@@ -1280,12 +1317,14 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	    &(struct tramp_data) {
 		.target = cheri_sentry_create(obj_main->entry),
 		.defobj = obj_main,
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 		.sig = (struct func_sig) {
 		    .valid = true,
 		    .reg_args = 3,
 		    .mem_args = false,
 		    .ret_args = NONE
 		}
+#endif
 	    }));
 #else
 	return ((func_ptr_type)obj_main->entry);
@@ -1305,12 +1344,14 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 		.target = ptr,
 		.defobj = obj,
 		.def = def,
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 		.sig = (struct func_sig) {
 		    .valid = true,
 		    .reg_args = 8,
 		    .mem_args = false,
 		    .ret_args = ONE
 		}
+#endif
 	    });
 #endif
 	target = call_ifunc_resolver(ptr);
@@ -1363,7 +1404,9 @@ relock:
 			.target = (void *)target,
 			.defobj = defobj,
 			.def = def,
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 			.sig = sigtab_get(obj, ELF_R_SYM(rel->r_info))
+#endif
 		    });
 #endif
 #else
@@ -1816,11 +1859,13 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 #endif
 
 #ifdef CHERI_LIB_C18N
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 		case DT_CHERI_C18N_SIG:
 			if (ld_c18n_sig != NULL)
 				obj->sigtab = (const struct func_sig *)
 				    (obj->relocbase + dynp->d_un.d_ptr);
 			break;
+#endif
 
 		case DT_C18N_STRTAB:
 			obj->c18nstrtab = (const char *)(obj->relocbase +

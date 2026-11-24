@@ -156,6 +156,7 @@ ENTRY(create_untrusted_stk)
 #endif
 END(create_untrusted_stk)
 
+#if defined(C18N_SIMULATED_OVERHEAD_SUPPORT) || defined(C18N_UTRACE_SUPPORT)
 /*
  * The tramp_hook function has non-standard ABI and is only called by
  * trampolines to trace compartment transitions.
@@ -195,6 +196,7 @@ ENTRY(tramp_hook)
 	retr	c30
 #endif
 END(tramp_hook)
+#endif /* C18N_SIMULATED_OVERHEAD_SUPPORT || C18N_UTRACE_SUPPORT */
 
 /*
  * The trampoline templates are assembly code sequences used to construct

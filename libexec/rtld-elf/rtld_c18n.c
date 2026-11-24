@@ -106,8 +106,10 @@ _Static_assert(
     STACK_TABLE_RTLD == cid_to_index_raw(RTLD_COMPART_ID),
     "Unexpected struct stk_table member offset");
 
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 _Static_assert(sizeof(struct func_sig) == sizeof(func_sig_int),
     "Unexpected func_sig size");
+#endif
 
 _Static_assert(
     SIG_FRAME_SIZE == sizeof(struct sigframe),
@@ -132,33 +134,49 @@ bool ld_c18n_enable;
  * Performance and tracing analysis
  */
 
-/* Simulate overhead during compartment transitions */
-const char *ld_c18n_overhead;
-
+#ifdef C18N_NO_FAST_PATH_SUPPORT
 /* Do not use the fast paths in trampolines for self-transitions */
 const char *ld_c18n_no_fast_path;
+#endif
 
+#ifdef C18N_SIMULATED_OVERHEAD_SUPPORT
+/* Simulate overhead during compartment transitions */
+const char *ld_c18n_overhead;
+#endif
+
+#ifdef C18N_STATS_FILE_SUPPORT
 /* Export compartmentalisation statistics to a file */
 const char *ld_c18n_stats;
+#endif
 
+#ifdef C18N_SWITCH_COUNT_SUPPORT
 /* Export count of compartment switches to statistics */
 const char *ld_c18n_switch_count;
+#endif
 
+#ifdef C18N_UTRACE_SUPPORT
 /* Use utrace() to log compartmentalisation-related events */
 const char *ld_c18n_utrace;
+#endif
 
 /*
  * Experimental features
  */
 
+#ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
 /* Path of the compartmentalisation policy */
 const char *ld_c18n_policy;
+#endif
 
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 /* Read the .c18n.signature ELF section */
 const char *ld_c18n_sig;
+#endif
 
+#ifdef C18N_EXPERIMENTAL_UNWIND_SUPPORT
 /* Expose tagged frame pointers to trusted frames */
 const char *ld_c18n_unwind;
+#endif
 
 /*
  * Compartmentalisation information exported to the kernel
@@ -1284,6 +1302,7 @@ resize_table(int exp)
 	}
 }
 
+#if defined(C18N_SIMULATED_OVERHEAD_SUPPORT) || defined(C18N_UTRACE_SUPPORT)
 void
 tramp_hook_impl(int, const struct tramp_header *, const struct trusted_frame *);
 
@@ -1291,6 +1310,7 @@ void
 tramp_hook_impl(int event, const struct tramp_header *hdr,
     const struct trusted_frame *tf)
 {
+#ifdef C18N_UTRACE_SUPPORT
 	const char *sym;
 	const char *callee;
 	const char *caller;
@@ -1318,9 +1338,17 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 		strlcpy(ut.caller, caller, sizeof(ut.caller));
 		utrace(&ut, sizeof(ut));
 	}
+#else
+	(void)event;
+	(void)hdr;
+	(void)tf;
+#endif
+#ifdef C18N_SIMULATED_OVERHEAD_SUPPORT
 	if (ld_c18n_overhead != NULL)
 		getpid();
+#endif
 }
+#endif
 
 #define	C18N_MAX_TRAMP_SIZE	768
 
@@ -1372,6 +1400,7 @@ tramp_pgs_append(const struct tramp_data *data)
 	return (header);
 }
 
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 static bool
 func_sig_equal(struct func_sig lhs, struct func_sig rhs)
 {
@@ -1379,14 +1408,18 @@ func_sig_equal(struct func_sig lhs, struct func_sig rhs)
 		lhs.mem_args == rhs.mem_args &&
 		lhs.ret_args == rhs.ret_args);
 }
+#endif
 
 static void
-tramp_check_found(struct tramp_header *found, const Obj_Entry *reqobj,
+tramp_check_found(struct tramp_header *found, const Obj_Entry *reqobj __unused,
     const struct tramp_data *data)
 {
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 	struct func_sig sig;
+#endif
 	void *found_target;
 
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 	if (data->sig.valid && found->symnum != 0) {
 		sig = sigtab_get(found->defobj, found->symnum);
 
@@ -1399,6 +1432,7 @@ tramp_check_found(struct tramp_header *found, const Obj_Entry *reqobj,
 		    C18N_SIG_FORMAT(data->sig),
 		    found->defobj->path, C18N_SIG_FORMAT(sig));
 	}
+#endif
 
 	if (!cheri_tag_get(data->target))
 		return;
@@ -1440,9 +1474,11 @@ tramp_create(const struct tramp_data *data)
 {
 	struct tramp_data newdata = *data;
 
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 	if (!newdata.sig.valid && newdata.def != NULL)
 		newdata.sig = sigtab_get(newdata.defobj,
 		    newdata.def - newdata.defobj->symtab);
+#endif
 
 	return (tramp_pgs_append(&newdata));
 }
@@ -1452,7 +1488,12 @@ tramp_make_entry(struct tramp_header *header, bool slow)
 {
 	uint8_t *entry = header->entry;
 
-	if (ld_c18n_no_fast_path != NULL || slow)
+#ifdef C18N_NO_FAST_PATH_SUPPORT
+	if (ld_c18n_no_fast_path != NULL)
+		entry += c18n_tramp_entry_slow_offset;
+	else
+#endif
+	if (slow)
 		entry += c18n_tramp_entry_slow_offset;
 	entry = cheri_perms_clear(entry, FUNC_PTR_REMOVE_PERMS);
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -1616,6 +1657,7 @@ end:
 	return (tramp_entry);
 }
 
+#ifdef C18N_EXPERIMENTAL_SIGNATURE_SUPPORT
 struct func_sig
 sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 {
@@ -1631,6 +1673,7 @@ sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 
 	return (obj->sigtab[symnum]);
 }
+#endif
 
 struct tramp_header *
 tramp_get_header(const void *data)
@@ -1659,8 +1702,10 @@ tramp_get_header(const void *data)
 	 * exposed. The return entry point is after either function pointer
 	 * entry point.
 	 */
+#ifdef C18N_NO_FAST_PATH_SUPPORT
 	if (ld_c18n_no_fast_path != NULL)
 		data = (const char *)data - c18n_tramp_entry_slow_offset;
+#endif
 	data = __containerof(data, struct tramp_header, entry);
 
 	for (page = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);
@@ -1745,16 +1790,13 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 	extern const char c18n_default_policy[];
 	extern const size_t c18n_default_policy_size;
 
-	int fd;
-	char *file;
-	struct stat st;
+	int fd = -1;
 
 	/*
 	 * Create memory mapping for compartmentalisation statistics.
 	 */
-	if (ld_c18n_stats == NULL)
-		fd = -1;
-	else {
+#ifdef C18N_STATS_FILE_SUPPORT
+	if (ld_c18n_stats != NULL) {
 		fd = open(ld_c18n_stats, O_RDWR | O_TRUNC | O_CREAT,
 		    0666);
 		if (fd == -1)
@@ -1764,7 +1806,7 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 			rtld_fatal("c18n: Cannot truncate file (%s)",
 			    rtld_strerror(errno));
 	}
-
+#endif
 	c18n_stats = mmap(NULL, sizeof(*c18n_stats), PROT_READ | PROT_WRITE,
 	    fd == -1 ? MAP_ANON : MAP_SHARED, fd, 0);
 	if (c18n_stats == MAP_FAILED)
@@ -1794,7 +1836,11 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 
 	parse_policy(c18n_default_policy, c18n_default_policy_size);
 
+#ifdef C18N_EXPERIMENTAL_POLICY_SUPPORT
 	if (ld_c18n_policy != NULL) {
+		char *file;
+		struct stat st;
+
 		if ((fd = open(ld_c18n_policy, O_RDONLY)) == -1)
 			rtld_fatal("c18n: Cannot open policy file");
 
@@ -1811,6 +1857,7 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 		if (close(fd) != 0)
 			rtld_fatal("c18n: Cannot close policy file");
 	}
+#endif
 }
 
 /*
