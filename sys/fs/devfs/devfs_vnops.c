@@ -79,6 +79,10 @@ static const struct fileops devfs_ops_f;
 #include <vm/vm_extern.h>
 #include <vm/vm_object.h>
 
+#if defined(COMPAT_FREEBSD64) && !__has_feature(capabilities)
+CTASSERT(sizeof(struct fiodgname_arg) == sizeof(struct fiodgname_arg64));
+#endif
+
 static MALLOC_DEFINE(M_CDEVPDATA, "DEVFSP", "Metainfo for cdev-fp data");
 
 struct mtx	devfs_de_interlock;
@@ -893,7 +897,7 @@ fiodgname_buf_get_ptr(void *fgnp, u_long com)
 #ifdef COMPAT_FREEBSD32
 		struct fiodgname_arg32	fgn32;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		struct fiodgname_arg64	fgn64;
 #endif
 	} *fgnup;
@@ -907,7 +911,7 @@ fiodgname_buf_get_ptr(void *fgnp, u_long com)
 		return (USER_PTR((void *)(uintptr_t)fgnup->fgn32.buf,
 		    fgnup->fgn32.len));
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case FIODGNAME_64:
 		return (USER_PTR((void *)(uintptr_t)fgnup->fgn64.buf,
 		    fgnup->fgn64.len));
@@ -949,7 +953,7 @@ devfs_ioctl(struct vop_ioctl_args *ap)
 #ifdef	COMPAT_FREEBSD32
 	case FIODGNAME_32:
 #endif
-#ifdef	COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case FIODGNAME_64:
 #endif
 		fgn = ap->a_data;

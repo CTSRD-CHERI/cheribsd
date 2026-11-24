@@ -76,6 +76,14 @@
 _Static_assert(sizeof(mcontext64_t) == 880, "mcontext64_t size incorrect");
 _Static_assert(sizeof(ucontext64_t) == 960, "ucontext64_t size incorrect");
 _Static_assert(sizeof(struct __siginfo64) == 80, "struct __siginfo64 size incorrect");
+#if !__has_feature(capabilities)
+_Static_assert(sizeof(mcontext_t) == sizeof(mcontext64_t),
+    "mcontext64_t size out of sync");
+_Static_assert(sizeof(ucontext_t) == sizeof(ucontext64_t),
+    "ucontext64_t size out of sync");
+_Static_assert(sizeof(struct __siginfo) == sizeof(struct __siginfo64),
+    "__siginfo64 size out of sync");
+#endif
 
 extern u_long elf_hwcap;
 
@@ -167,6 +175,7 @@ static struct regset regset_arm64_tls = {
 };
 ELF_REGSET(regset_arm64_tls);
 
+#if __has_feature(capabilities)
 /*
  * Number of registers in gpregs that are mirrored in capregs
  * up to, but not including elr.
@@ -367,7 +376,6 @@ freebsd64_sigreturn(struct thread *td, struct freebsd64_sigreturn_args *uap)
 int
 freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 {
-
 	return (ENOTSUP);
 }
 
@@ -378,6 +386,42 @@ elf64_dump_thread(struct thread *td __unused, void *dst __unused,
     size_t *off __unused)
 {
 }
+
+#else /* !__has_feature(capabilities) */
+
+int
+freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
+{
+	return (get_mcontext(td, (mcontext_t *)mcp, flags));
+}
+
+int
+freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
+{
+	return (set_mcontext(td, (mcontext_t *)mcp));
+}
+
+static void
+freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
+{
+	sendsig(catcher, ksi, mask);
+}
+
+struct sigreturn_args;
+int sys_sigreturn(struct thread *td, struct sigreturn_args *uap);
+
+int
+freebsd64_sigreturn(struct thread *td, struct freebsd64_sigreturn_args *uap)
+{
+	return (sys_sigreturn(td, (struct sigreturn_args *)(void *)uap));
+}
+
+int
+freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
+{
+	return (ENOTSUP);
+}
+#endif /* !__has_feature(capabilities) */
 /*
  * CHERI CHANGES START
  * {

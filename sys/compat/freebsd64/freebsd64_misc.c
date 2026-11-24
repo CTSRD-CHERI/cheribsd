@@ -117,7 +117,6 @@
 
 #include <security/audit/audit.h>
 
-#include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
 #include <compat/freebsd64/freebsd64.h>
@@ -134,6 +133,16 @@ struct sf_hdtr64 {
 	struct iovec64 *trailers;
 	int trl_cnt;
 };
+
+#if __has_feature(capabilities)
+#define	freebsd64_cheri_address_set(x, y)	cheri_address_set(x, y)
+#define	freebsd64_cheri_bounds_set(x, y)	cheri_bounds_set(x, y)
+#define	freebsd64_cheri_bounds_set_exact(x, y)	cheri_bounds_set_exact(x, y)
+#else
+#define	freebsd64_cheri_address_set(x, y)	((__typeof__(x))(y))
+#define	freebsd64_cheri_bounds_set(x, y)	(x)
+#define	freebsd64_cheri_bounds_set_exact(x, y)	(x)
+#endif
 
 FEATURE(compat_freebsd64_abi, "Compatible 64-bit FreeBSD system call ABI");
 
@@ -764,9 +773,9 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	    ("%s: stack != strings", __func__));
 
 	destp = (uintcap_t)imgp->strings;
-	destp = cheri_address_set(destp, PROC_PS_STRINGS(p));
+	destp = freebsd64_cheri_address_set(destp, PROC_PS_STRINGS(p));
 	arginfo = (struct freebsd64_ps_strings * __capability)
-	    cheri_bounds_set_exact(destp, sizeof(*arginfo));
+	    freebsd64_cheri_bounds_set_exact(destp, sizeof(*arginfo));
 	imgp->ps_strings = arginfo;
 
 	/*
@@ -790,7 +799,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		destp -= execpath_len;
 		destp = rounddown2(destp, sizeof(uint64_t));
 		imgp->execpathp = (void * __capability)
-		    cheri_bounds_set_exact(destp, execpath_len);
+		    freebsd64_cheri_bounds_set_exact(destp, execpath_len);
 		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
 			return (error);
@@ -801,7 +810,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
-	imgp->canary = (void * __capability)cheri_bounds_set_exact(destp,
+	imgp->canary = (void * __capability)freebsd64_cheri_bounds_set_exact(destp,
 	    sizeof(canary));
 	error = copyout(canary, imgp->canary, sizeof(canary));
 	if (error != 0)
@@ -814,7 +823,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	imgp->pagesizeslen = sizeof(pagesizes[0]) * MAXPAGESIZES;
 	destp -= imgp->pagesizeslen;
 	destp = rounddown2(destp, sizeof(uint64_t));
-	imgp->pagesizes = (void * __capability)cheri_bounds_set_exact(destp,
+	imgp->pagesizes = (void * __capability)freebsd64_cheri_bounds_set_exact(destp,
 	    imgp->pagesizeslen);
 	error = copyout(pagesizes, imgp->pagesizes, imgp->pagesizeslen);
 	if (error != 0)
@@ -825,7 +834,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	destp -= ARG_MAX - imgp->args->stringspace;
 	destp = rounddown2(destp, sizeof(uint64_t));
-	ustringp = cheri_bounds_set(destp, ARG_MAX - imgp->args->stringspace);
+	ustringp = freebsd64_cheri_bounds_set(destp, ARG_MAX - imgp->args->stringspace);
 
 	if (imgp->auxargs) {
 		/*
@@ -864,7 +873,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
-	imgp->argv = cheri_bounds_set(vectp, (argc + 1) * sizeof(*vectp));
+	imgp->argv = freebsd64_cheri_bounds_set(vectp, (argc + 1) * sizeof(*vectp));
 	if (suword(&arginfo->ps_argvstr, (__cheri_addr uint64_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
@@ -884,7 +893,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	if (suword(vectp++, 0) != 0)
 		return (EFAULT);
 
-	imgp->envv = cheri_bounds_set(vectp, (envc + 1) * sizeof(*vectp));
+	imgp->envv = freebsd64_cheri_bounds_set(vectp, (envc + 1) * sizeof(*vectp));
 	if (suword(&arginfo->ps_envstr, (__cheri_addr uint64_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
@@ -906,7 +915,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 
 	if (imgp->auxargs) {
 		vectp++;
-		imgp->auxv = cheri_bounds_set(vectp,
+		imgp->auxv = freebsd64_cheri_bounds_set(vectp,
 		    AT_COUNT * sizeof(Elf64_Auxinfo));
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
 		    (uintcap_t)imgp->auxv);

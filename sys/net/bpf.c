@@ -189,14 +189,21 @@ struct bpf_dltlist64 {
 	uint64_t	bfl_list;	/* (u_int *) */
 };
 
+#if __has_feature(capabilities)
 #define	_CASE_IOC_BPF_DLTLIST64(cmd)				\
     _IOC_NEWTYPE((cmd), struct bpf_dltlist64): case
 #define	_CASE_IOC_BPF_PROGRAM64(cmd)				\
     _IOC_NEWTYPE((cmd), struct bpf_program64): case
-#else /* !COMPAT_FREEBSD64 */
+#else
+CTASSERT(sizeof(struct bpf_dltlist) == sizeof(struct bpf_dltlist64));
+CTASSERT(sizeof(struct bpf_program) == sizeof(struct bpf_program64));
+#endif
+#endif /* COMPAT_FREEBSD64 */
+
+#if !(defined(COMPAT_FREEBSD64) && __has_feature(capabilities))
 #define	_CASE_IOC_BPF_DLTLIST64(cmd)
 #define	_CASE_IOC_BPF_PROGRAM64(cmd)
-#endif /* !COMPAT_FREEBSD64 */
+#endif
 
 #define	CASE_IOC_BPF_DLTLIST(cmd)				\
     _CASE_IOC_BPF_DLTLIST32(cmd)				\
@@ -1944,7 +1951,7 @@ bf_insns_get_ptr(void *fpp)
 #ifdef COMPAT_FREEBSD32
 		struct bpf_program32 fp32;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		struct bpf_program64 fp64;
 #endif
 	} *fpup;
@@ -1956,7 +1963,7 @@ bf_insns_get_ptr(void *fpp)
 		    (struct bpf_insn *)(uintptr_t)fpup->fp32.bf_insns,
 		    fpup->fp32.bf_len * sizeof(struct bpf_insn)));
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	if (!SV_CURPROC_FLAG(SV_CHERI))
 		return (USER_PTR(
 		    (struct bpf_insn *)(uintptr_t)fpup->fp64.bf_insns,
@@ -2941,7 +2948,7 @@ bfl_list_get_ptr(void *bflp)
 #ifdef COMPAT_FREEBSD32
 		struct bpf_dltlist32 bfl32;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		struct bpf_dltlist64 bfl64;
 #endif
 	} *bflup;
@@ -2952,7 +2959,7 @@ bfl_list_get_ptr(void *bflp)
 		return (USER_PTR((u_int *)(uintptr_t)bflup->bfl32.bfl_list,
 		    bflup->bfl32.bfl_len * sizeof(u_int)));
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	if (!SV_CURPROC_FLAG(SV_CHERI))
 		return (USER_PTR((u_int *)(uintptr_t)bflup->bfl64.bfl_list,
 		    bflup->bfl64.bfl_len * sizeof(u_int)));

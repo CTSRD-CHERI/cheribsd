@@ -137,6 +137,11 @@ options 	COMPAT_FREEBSD32
 # Enable (32-bit) a.out binary support
 options 	COMPAT_AOUT
 
+# Enable 64-bit runtime support for FreeBSD/amd64 binaries.
+# This duplicates the default ABI, but uses different syscall entry
+# points for syscalls that use pointers.
+options 	COMPAT_FREEBSD64
+
 #####################################################################
 # ZFS support
 

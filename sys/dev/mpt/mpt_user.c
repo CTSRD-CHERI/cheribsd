@@ -601,12 +601,12 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 	struct mpt_ext_cfg_page_req32 *ext_page_req32;
 	struct mpt_raid_action32 *raid_act32;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	struct mpt_cfg_page_req64 *page_req64;
 	struct mpt_ext_cfg_page_req64 *ext_page_req64;
 	struct mpt_raid_action64 *raid_act64;
 #endif
-#if defined(__amd64__) || defined(COMPAT_FREEBSD64)
+#if defined(__amd64__) || (defined(COMPAT_FREEBSD64) && __has_feature(capabilities))
 	struct mpt_cfg_page_req page_req_swab;
 	struct mpt_ext_cfg_page_req ext_page_req_swab;
 	struct mpt_raid_action raid_act_swab;
@@ -665,7 +665,7 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		break;
 	}
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	/* Convert 64-bit structs to native ones. */
 	page_req64 = (void *)arg;
 	ext_page_req64 = (void *)arg;
@@ -716,7 +716,7 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 #ifdef __amd64__
 	case MPTIO_READ_CFG_HEADER32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case MPTIO_READ_CFG_HEADER64:
 #endif
 	case MPTIO_READ_CFG_HEADER:
@@ -727,7 +727,7 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 #ifdef __amd64__
 	case MPTIO_READ_CFG_PAGE32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case MPTIO_READ_CFG_PAGE64:
 #endif
 	case MPTIO_READ_CFG_PAGE:
@@ -752,7 +752,7 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 #ifdef __amd64__
 	case MPTIO_READ_EXT_CFG_HEADER32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case MPTIO_READ_EXT_CFG_HEADER64:
 #endif
 	case MPTIO_READ_EXT_CFG_HEADER:
@@ -763,7 +763,7 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 #ifdef __amd64__
 	case MPTIO_READ_EXT_CFG_PAGE32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case MPTIO_READ_EXT_CFG_PAGE64:
 #endif
 	case MPTIO_READ_EXT_CFG_PAGE:
@@ -790,7 +790,7 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 #ifdef __amd64__
 	case MPTIO_WRITE_CFG_PAGE32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case MPTIO_WRITE_CFG_PAGE64:
 #endif
 	case MPTIO_WRITE_CFG_PAGE:
@@ -811,7 +811,7 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 #ifdef __amd64__
 	case MPTIO_RAID_ACTION32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case MPTIO_RAID_ACTION64:
 #endif
 	case MPTIO_RAID_ACTION:
@@ -877,7 +877,7 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		break;
 	}
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	/* Convert native structs to 64-bit ones. */
 	switch (cmd) {
 	case MPTIO_READ_CFG_HEADER64:

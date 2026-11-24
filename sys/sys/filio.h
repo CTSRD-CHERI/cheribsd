@@ -85,7 +85,10 @@ struct fiodgname_arg64 {
 	int		len;
 	uint64_t	buf;	/* (void *) */
 };
+
+#if __has_feature(capabilities)
 #define	FIODGNAME_64	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg64)
+#endif
 #endif
 
 void * __capability fiodgname_buf_get_ptr(void *fgnp, u_long com);

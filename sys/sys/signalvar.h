@@ -207,6 +207,17 @@ struct osigevent {
 	} __sigev_u;
 	union sigval sigev_value;	/* Signal value */
 };
+
+#ifdef COMPAT_FREEBSD64
+struct osigevent64 {
+	int	sigev_notify;		/* Notification type */
+	union {
+		int	__sigev_signo;	/* Signal number */
+		int	__sigev_notify_kqueue;
+	} __sigev_u;
+	union sigval64 sigev_value;	/* Signal value */
+};
+#endif
 #endif
 
 #ifdef _KERNEL

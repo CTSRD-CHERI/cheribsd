@@ -144,6 +144,7 @@ struct pci_bar_mmap64 {
 	int		pbm_memattr;
 };
 
+#if __has_feature(capabilities)
 #define	PCIOCGETCONF64	_IOC_NEWTYPE(PCIOCGETCONF, struct pci_conf_io64)
 #define	PCIOCLISTVPD64	_IOC_NEWTYPE(PCIOCLISTVPD, struct pci_list_vpd_io64)
 /*
@@ -151,6 +152,11 @@ struct pci_bar_mmap64 {
  * COMPAT_FREEBSD64 architecture didn't exist until 11.0 (aarch64).
  */
 #define	PCIOCBARMMAP64	_IOC_NEWTYPE(PCIOCBARMMAP, struct pci_bar_mmap64)
+#else
+CTASSERT(sizeof(struct pci_conf_io) == sizeof(struct pci_conf_io64));
+CTASSERT(sizeof(struct pci_list_vpd_io) == sizeof(struct pci_list_vpd_io64));
+CTASSERT(sizeof(struct pci_bar_mmap) == sizeof(struct pci_bar_mmap64));
+#endif
 #endif
 
 /*
@@ -589,10 +595,10 @@ struct pci_conf_freebsd14_32 {
     _IOC_NEWTYPE(PCIOCGETCONF_FREEBSD14, struct pci_conf_io32)
 #endif /* COMPAT_FREEBSD32 */
 
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 #define	PCIOCGETCONF_FREEBSD14_64	\
     _IOC_NEWTYPE(PCIOCGETCONF_FREEBSD14, struct pci_conf_io64)
-#endif /* COMPAT_FREEBSD32 */
+#endif /* COMPAT_FREEBSD64 */
 #endif /* COMPAT_FREEBSD14 */
 
 union pci_conf_union {
@@ -624,7 +630,7 @@ pci_conf_match(u_long cmd, struct pci_match_conf *matches, int num_matches,
 #ifdef COMPAT_FREEBSD14
 	case PCIOCGETCONF_FREEBSD14:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case PCIOCGETCONF64:
 #ifdef COMPAT_FREEBSD14
 	case PCIOCGETCONF_FREEBSD14_64:
@@ -759,7 +765,7 @@ pci_match_conf_size(u_long cmd)
 #ifdef COMPAT_FREEBSD14
 	case PCIOCGETCONF_FREEBSD14:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case PCIOCGETCONF64:
 #ifdef COMPAT_FREEBSD14
 	case PCIOCGETCONF_FREEBSD14_64:
@@ -793,7 +799,7 @@ pci_conf_size(u_long cmd)
 
 	switch (cmd) {
 	case PCIOCGETCONF:
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case PCIOCGETCONF64:
 #endif
 		return (sizeof(struct pci_conf));
@@ -803,7 +809,7 @@ pci_conf_size(u_long cmd)
 #endif
 #ifdef COMPAT_FREEBSD14
 	case PCIOCGETCONF_FREEBSD14:
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case PCIOCGETCONF_FREEBSD14_64:
 #endif
 		return (sizeof(struct pci_conf_freebsd14));
@@ -832,7 +838,7 @@ pci_conf_io_init(struct pci_conf_io *cio, caddr_t data, u_long cmd)
 #ifdef COMPAT_FREEBSD32
 	struct pci_conf_io32 *cio32;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	struct pci_conf_io64 *cio64;
 #endif
 
@@ -870,7 +876,7 @@ pci_conf_io_init(struct pci_conf_io *cio, caddr_t data, u_long cmd)
 		return;
 #endif	/* COMPAT_FREEBSD32 */
 
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case PCIOCGETCONF64:
 #ifdef COMPAT_FREEBSD14
 	case PCIOCGETCONF_FREEBSD14_64:
@@ -888,7 +894,7 @@ pci_conf_io_init(struct pci_conf_io *cio, caddr_t data, u_long cmd)
 		cio->generation = cio64->generation;
 		cio->status = cio64->status;
 		return;
-#endif	/* COMPAT_FREEBSD64 */
+#endif
 
 	default:
 		/* programmer error */
@@ -904,7 +910,7 @@ pci_conf_io_update_data(const struct pci_conf_io *cio, caddr_t data,
 #ifdef COMPAT_FREEBSD32
 	struct pci_conf_io32 *cio32;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	struct pci_conf_io64 *cio64;
 #endif
 
@@ -939,7 +945,7 @@ pci_conf_io_update_data(const struct pci_conf_io *cio, caddr_t data,
 		cio32->num_matches = cio->num_matches;
 		return;
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case PCIOCGETCONF64:
 #ifdef COMPAT_FREEBSD14
 	case PCIOCGETCONF_FREEBSD14_64:
@@ -968,7 +974,7 @@ pci_conf_for_copyout(const struct pci_conf *pcp, union pci_conf_union *pcup,
 
 	switch (cmd) {
 	case PCIOCGETCONF:
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case PCIOCGETCONF64:
 #endif
 		pcup->pc = *pcp;
@@ -976,7 +982,7 @@ pci_conf_for_copyout(const struct pci_conf *pcp, union pci_conf_union *pcup,
 
 #ifdef COMPAT_FREEBSD14
 	case PCIOCGETCONF_FREEBSD14:
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case PCIOCGETCONF_FREEBSD14_64:
 #endif
 		memcpy(&pcup->pc14, pcp, sizeof(pcup->pc14));
@@ -1252,14 +1258,14 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 	struct pci_bar_ioreq *pbi;
 	struct pci_bar_io *bio;
 	struct pci_list_vpd_io *lvio;
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	struct pci_list_vpd_io64 *lvio64;
 	struct pci_list_vpd_io lvios;
 #endif
 	struct pci_match_conf *pattern_buf;
 	struct pci_map *pm;
 	struct pci_bar_mmap *pbm;
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	struct pci_bar_mmap64 *pbm64;
 	struct pci_bar_mmap pbms;
 #endif
@@ -1284,7 +1290,7 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 #ifdef COMPAT_FREEBSD32
 		case PCIOCGETCONF32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		case PCIOCGETCONF64:
 #endif
 #ifdef COMPAT_FREEBSD14
@@ -1292,7 +1298,7 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 #ifdef COMPAT_FREEBSD32
 		case PCIOCGETCONF_FREEBSD14_32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		case PCIOCGETCONF_FREEBSD14_64:
 #endif
 #endif
@@ -1304,7 +1310,7 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 #endif
 		case PCIOCGETBAR:
 		case PCIOCLISTVPD:
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		case PCIOCLISTVPD64:
 #endif
 			break;
@@ -1324,7 +1330,7 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 #ifdef COMPAT_FREEBSD32
 	case PCIOCGETCONF32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case PCIOCGETCONF64:
 #endif
 #ifdef COMPAT_FREEBSD14
@@ -1332,7 +1338,7 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 #ifdef COMPAT_FREEBSD32
 	case PCIOCGETCONF_FREEBSD14_32:
 #endif
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case PCIOCGETCONF_FREEBSD14_64:
 #endif
 #endif
@@ -1643,7 +1649,7 @@ getconfexit:
 			error = ENODEV;
 		break;
 	case PCIOCLISTVPD:
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case PCIOCLISTVPD64:
 		if (cmd == PCIOCLISTVPD64) {
 			lvio64 = (struct pci_list_vpd_io64 *)data;
@@ -1668,14 +1674,14 @@ getconfexit:
 			break;
 		}
 		error = pci_list_vpd(pcidev, lvio);
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		if (cmd == PCIOCLISTVPD64)
 			lvio64->plvi_len = lvio->plvi_len;
 #endif
 		break;
 
 	case PCIOCBARMMAP:
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 	case PCIOCBARMMAP64:
 		if (cmd == PCIOCBARMMAP64) {
 			pbm64 = (struct pci_bar_mmap64 *)data;
@@ -1701,7 +1707,7 @@ getconfexit:
 		    pbm->pbm_sel.pc_bus, pbm->pbm_sel.pc_dev,
 		    pbm->pbm_sel.pc_func);
 		error = pcidev == NULL ? ENODEV : pci_bar_mmap(pcidev, pbm);
-#ifdef COMPAT_FREEBSD64
+#if defined(COMPAT_FREEBSD64) && __has_feature(capabilities)
 		if (cmd == PCIOCBARMMAP64) {
 			pbm64->pbm_map_base =
 			    (__cheri_addr uint64_t)pbm->pbm_map_base;
