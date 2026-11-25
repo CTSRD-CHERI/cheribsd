@@ -3,5 +3,8 @@ FBSDprivate_1.0 {
 	__libsys_errno;
 	__getosreldate;
 	__libsys_interposing_slot;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(__aarch64__)
+	__libsys_sigaction_c18n;
+#endif
 	_elf_aux_info;
 };
