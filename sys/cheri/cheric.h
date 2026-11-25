@@ -221,14 +221,19 @@ cheri_can_access(const void * __capability cap, ptraddr_t perms,
 #define	cheri_kern_bounds_set_exact(x, y)	cheri_bounds_set_exact(x, y)
 #define	cheri_kern_address_set(x, y)	cheri_address_set(x, y)
 #define	cheri_kern_address_get(x)	cheri_address_get(x)
+#define	cheri_kern_offset_set(x, y)	cheri_offset_set(x, y)
 #define	cheri_kern_perms_and(x, y)	cheri_perms_and(x, y)
+#define	cheri_kern_perms_clear(x, y)	cheri_perms_clear(x, y)
 #else
 #define	cheri_kern_tag_get(x)		1
 #define	cheri_kern_bounds_set(x, y)	(x)
 #define	cheri_kern_bounds_set_exact(x, y)	(x)
 #define	cheri_kern_address_set(x, y)	((__typeof__(x))(y))
 #define	cheri_kern_address_get(x)	((uintptr_t)(x))
+#define	cheri_kern_offset_set(x, y)				\
+	((__typeof__(x))((uintptr_t)(x) + (ptraddr_t)(y)))
 #define	cheri_kern_perms_and(x, y)	(x)
+#define	cheri_kern_perms_clear(x, y)	(x)
 #endif	/* __CHERI_PURE_CAPABILITY__ */
 #endif	/* _KERNEL */
 
