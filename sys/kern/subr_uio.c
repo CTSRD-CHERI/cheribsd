@@ -544,7 +544,8 @@ cloneuio(struct uio *uiop)
 	int iovlen;
 
 	uio = allocuio(uiop->uio_iovcnt);
-	bcopy(&uiop->uio_startcopy, &uio->uio_startcopy,
+	bcopy(__unbounded_addressof(uiop->uio_startcopy),
+		__unbounded_addressof(uio->uio_startcopy),
 	    __rangeof(struct uio, uio_startcopy, uio_endcopy));
 	iovlen = uiop->uio_iovcnt * sizeof(struct iovec);
 	bcopy(uiop->uio_iov, uio->uio_iov, iovlen);
