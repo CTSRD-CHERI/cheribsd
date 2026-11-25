@@ -36,21 +36,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static const struct {
-	void	*addr;
-	int	ok[2];	/* Depending on security.bsd.map_at_zero {0, !=0}. */
-} map_at_zero_tests[] = {
-	{ (void *)0,			{ 0, 1 } }, /* Test sysctl. */
-	{ (void *)1,			{ 0, 0 } },
-	{ (void *)(PAGE_SIZE - 1),	{ 0, 0 } },
-	{ (void *)PAGE_SIZE,		{ 1, 1 } },
-	{ (void *)-1,			{ 0, 0 } },
-	{ (void *)(-PAGE_SIZE),		{ 0, 0 } },
-	{ (void *)(-1 - PAGE_SIZE),	{ 0, 0 } },
-	{ (void *)(-1 - PAGE_SIZE - 1),	{ 0, 0 } },
-	{ (void *)(0x1000 * PAGE_SIZE),	{ 1, 1 } },
-};
-
 #define	MAP_AT_ZERO	"security.bsd.map_at_zero"
 
 #ifdef __LP64__
@@ -68,6 +53,22 @@ ATF_TC_BODY(mmap__map_at_zero, tc)
 	int map_at_zero;
 	bool allow_wx;
 	int prot_flags;
+	size_t pgsz = getpagesize();
+
+	const struct {
+		size_t	addr;
+		int	ok[2];	/* Depending on security.bsd.map_at_zero {0, !=0}. */
+	} map_at_zero_tests[] = {
+		{ 0,			{ 0, 1 } }, /* Test sysctl. */
+		{ 1,			{ 0, 0 } },
+		{ pgsz - 1,		{ 0, 0 } },
+		{ pgsz,			{ 1, 1 } },
+		{ -1,			{ 0, 0 } },
+		{ -pgsz,		{ 0, 0 } },
+		{ -1 - pgsz,		{ 0, 0 } },
+		{ -1 - pgsz - 1,	{ 0, 0 } },
+		{ 0x1000 * pgsz,	{ 1, 1 } },
+	};
 
 	len = sizeof(map_at_zero);
 	if (sysctlbyname(MAP_AT_ZERO, &map_at_zero, &len, NULL, 0) == -1) {
@@ -95,14 +96,15 @@ ATF_TC_BODY(mmap__map_at_zero, tc)
 		prot_flags = PROT_READ | PROT_WRITE;
 		if (allow_wx)
 			prot_flags |= PROT_EXEC;
-		p = mmap((void *)map_at_zero_tests[i].addr, PAGE_SIZE,
-		    prot_flags, MAP_ANON | MAP_FIXED, -1, 0);
+		p = mmap((void *)(uintptr_t)map_at_zero_tests[i].addr,
+		    PAGE_SIZE, prot_flags, MAP_ANON | MAP_FIXED, -1, 0);
 		if (p == MAP_FAILED) {
 			ATF_CHECK_MSG(map_at_zero_tests[i].ok[map_at_zero] == 0,
-			    "mmap(%p, ...) failed", map_at_zero_tests[i].addr);
+			    "mmap(%#zx, ...) failed",
+			    map_at_zero_tests[i].addr);
 		} else {
 			ATF_CHECK_MSG(map_at_zero_tests[i].ok[map_at_zero] == 1,
-			    "mmap(%p, ...) succeeded: p=%p\n",
+			    "mmap(%#zx, ...) succeeded: p=%p\n",
 			    map_at_zero_tests[i].addr, p);
 		}
 	}

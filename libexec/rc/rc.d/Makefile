@@ -111,9 +111,10 @@ AUTOFS=		automount \
 		automountd \
 		autounmountd
 
-CONFGROUPS.${MK_BLACKLIST}+=	BLOCKLIST
+CONFGROUPS.${MK_BLOCKLIST}+=	BLOCKLIST
 BLOCKLISTPACKAGE=		blocklist
-BLOCKLIST=	blacklistd
+BLOCKLIST=	blacklistd \
+		blocklistd
 
 CONFGROUPS.${MK_BLUETOOTH}+=	BLUETOOTH
 BLUETOOTHPACKAGE=		bluetooth
@@ -293,7 +294,7 @@ SSHPACKAGE=			ssh
 SSH=		sshd
 
 CONFGROUPS.${MK_UNBOUND}+=	UNBOUND
-UNBOUNDPACKAGE=			unbound
+UNBOUNDPACKAGE=			local-unbound
 UNBOUND=	local_unbound
 
 CONFGROUPS.${MK_VI}+=		VI

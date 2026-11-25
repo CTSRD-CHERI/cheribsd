@@ -814,7 +814,7 @@ unionfs_close(struct vop_close_args *ap)
 	unp = VTOUNIONFS(vp);
 	lvp = unp->un_lowervp;
 	uvp = unp->un_uppervp;
-	unsp = unionfs_find_node_status(unp, td);
+	unsp = (td != NULL) ? unionfs_find_node_status(unp, td) : NULL;
 
 	if (unsp == NULL ||
 	    (unsp->uns_lower_opencnt <= 0 && unsp->uns_upper_opencnt <= 0)) {
@@ -2208,7 +2208,6 @@ unionfs_lock_restart:
 	vholdnz(tvp);
 	VI_UNLOCK(vp);
 	error = VOP_LOCK(tvp, flags);
-	vdrop(tvp);
 	if (error == 0 && (lvp_locked || VTOUNIONFS(vp) == NULL)) {
 		/*
 		 * After dropping the interlock above, there exists a window
@@ -2234,6 +2233,7 @@ unionfs_lock_restart:
 		unp = VTOUNIONFS(vp);
 		if (unp == NULL || unp->un_uppervp != NULL) {
 			VOP_UNLOCK(tvp);
+			vdrop(tvp);
 			/*
 			 * If we previously held the lock, the upgrade may
 			 * have temporarily dropped the lock, in which case
@@ -2249,6 +2249,7 @@ unionfs_lock_restart:
 			goto unionfs_lock_restart;
 		}
 	}
+	vdrop(tvp);
 
 	return (error);
 }
@@ -2259,7 +2260,6 @@ unionfs_unlock(struct vop_unlock_args *ap)
 	struct vnode   *vp;
 	struct vnode   *tvp;
 	struct unionfs_node *unp;
-	int		error;
 
 	KASSERT_UNIONFS_VNODE(ap->a_vp);
 
@@ -2271,11 +2271,7 @@ unionfs_unlock(struct vop_unlock_args *ap)
 
 	tvp = (unp->un_uppervp != NULL ? unp->un_uppervp : unp->un_lowervp);
 
-	vholdnz(tvp);
-	error = VOP_UNLOCK(tvp);
-	vdrop(tvp);
-
-	return (error);
+	return (VOP_UNLOCK(tvp));
 }
 
 static int

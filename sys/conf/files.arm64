@@ -59,6 +59,7 @@ arm64/arm64/exception.S				standard
 arm64/arm64/exec_machdep.c			standard
 arm64/arm64/freebsd32_machdep.c			optional compat_freebsd32
 arm64/arm64/freebsd64_machdep.c			optional compat_freebsd64
+arm64/arm64/freebsd64cb_sigtramp.S		optional cpu_cheri
 arm64/arm64/gdb_machdep.c			optional gdb
 arm64/arm64/gicv3_its.c				optional intrng fdt
 arm64/arm64/gic_v3.c				standard
@@ -84,7 +85,7 @@ arm64/arm64/pmap.c				standard
 arm64/arm64/ptrace_machdep.c			standard
 arm64/arm64/sdt_machdep.c			optional kdtrace_hooks
 arm64/arm64/sigtramp.S				standard
-arm64/arm64/freebsd64cb_sigtramp.S		optional cpu_cheri
+arm64/arm64/spec_workaround.c			standard
 arm64/arm64/stack_machdep.c			optional ddb | stack
 arm64/arm64/strcmp.S				optional !cheri_purecap_kernel
 arm64/arm64/strncmp.S				optional !cheri_purecap_kernel

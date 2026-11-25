@@ -154,7 +154,7 @@ SYSINIT(caprevoke_elf64, SI_SUB_VM, SI_ORDER_ANY, caprevoke_sysvec_init,
     &elf64_freebsd_sysvec);
 #endif
 
-static __ElfN(Brandinfo) freebsd_brand_info = {
+static const __ElfN(Brandinfo) freebsd_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_AARCH64,
 	.compat_3_brand	= "FreeBSD",
@@ -171,8 +171,7 @@ static __ElfN(Brandinfo) freebsd_brand_info = {
 	.header_supported = &elf64c_header_supported,
 #endif
 };
-
-SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_FIRST,
+C_SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_FIRST,
     (sysinit_cfunc_t)__elfN(insert_brand_entry), &freebsd_brand_info);
 
 #if __has_feature(capabilities)
@@ -225,7 +224,7 @@ SYSINIT(caprevoke_elf64cb, SI_SUB_VM, SI_ORDER_ANY, caprevoke_sysvec_init,
     &elf64cb_freebsd_sysvec);
 #endif
 
-static __ElfN(Brandinfo) elf64cb_freebsd_brand_info = {
+static const __ElfN(Brandinfo) elf64cb_freebsd_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_AARCH64,
 	.compat_3_brand	= "FreeBSD",
@@ -238,8 +237,7 @@ static __ElfN(Brandinfo) elf64cb_freebsd_brand_info = {
 	.header_supported = &elf64cb_header_supported,
 #endif
 };
-
-SYSINIT(elf64cb, SI_SUB_EXEC, SI_ORDER_FIRST,
+C_SYSINIT(elf64cb, SI_SUB_EXEC, SI_ORDER_FIRST,
     (sysinit_cfunc_t)__elfN(insert_brand_entry), &elf64cb_freebsd_brand_info);
 
 static Elf_Note benchmark_abi_note = {
@@ -703,7 +701,7 @@ elf_cpu_parse_dynamic(caddr_t loadbase __unused, Elf_Dyn *dynamic __unused)
 	return (0);
 }
 
-static Elf_Note gnu_property_note = {
+static const Elf_Note gnu_property_note = {
 	.n_namesz = sizeof(GNU_ABI_VENDOR),
 	.n_descsz = 16,
 	.n_type = NT_GNU_PROPERTY_TYPE_0,

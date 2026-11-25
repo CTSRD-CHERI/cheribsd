@@ -27,6 +27,32 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 16.x IS SLOW:
 	world, or to merely disable the most expensive debugging functionality
 	at runtime, run "ln -s 'abort:false,junk:false' /etc/malloc.conf".)
 
+20251016:
+	With the migration to OpenZFS in FreeBSD 13.x a number of ZFS sysctls
+	moved to new locations, but backwards compatibility aliases were
+	provided.  These aliases will be removed in the near future.  Please
+	update /etc/sysctl.conf to reference the new OIDs.  For example,
+
+	        vfs.zfs.min_auto_ashift=12
+
+	needs to be changed to
+
+	        vfs.zfs.vdev.min_auto_ashift=12
+
+20251015:
+	The "FreeBSD-unbound" package is renamed to "FreeBSD-local-unbound".
+	If you have set-optional or set-base installed, the new package will
+	be installed automatically, otherwise you should manually install the
+	new package and remove the old one.
+
+	This change only affects pkgbase users.
+
+20251012:
+	Blacklist has been renamed upstream to Blocklist.  If you have it
+	configured, rename all configuration files, firewall anchors or
+	sentinel files to reflect the new nomenclature.  Old setups will
+	continue to work emitting a warning.
+
 20251002:
 	Audio-related utilities including mixer(8) and virtual_oss(8) have
 	moved to the new FreeBSD-sound package.  If you have set-optional or
@@ -700,7 +726,7 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 16.x IS SLOW:
 	Bump _FreeBSD_version to 1400078 to be able to detect this change.
 
 20221212:
-	llvm-objump is now always installed as objdump.  Previously there was
+	llvm-objdump is now always installed as objdump.  Previously there was
 	no /usr/bin/objdump unless the WITH_LLVM_BINUTILS knob was used.
 
 	Some LLVM objdump options have a different output format compared to

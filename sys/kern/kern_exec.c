@@ -503,7 +503,7 @@ do_execve(struct thread *td, struct image_args *args,
 #endif
 	int error, i, orig_osrel;
 	uint32_t orig_fctl0;
-	Elf_Brandinfo *orig_brandinfo;
+	const Elf_Brandinfo *orig_brandinfo;
 	size_t freepath_size;
 	static const char fexecv_proc_title[] = "(fexecv)";
 
@@ -1512,7 +1512,7 @@ exec_map_stack(struct image_params *imgp)
 		    VM_PROT_READ | VM_PROT_EXECUTE,
 		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE, "sys:vdso");
 	} else {
-		vm_map_fixed_name(map, obj, 0, sv->sv_shared_page_base,
+		error = vm_map_fixed_name(map, obj, 0, sv->sv_shared_page_base,
 		    &sharedpage_addr, sv->sv_shared_page_len,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
 		    VM_PROT_READ | VM_PROT_EXECUTE,

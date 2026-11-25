@@ -520,6 +520,8 @@
     ..
     secure
         lib
+            libcrypto
+            ..
         ..
         libexec
         ..
@@ -832,6 +834,8 @@
                 gate
                 ..
                 gpt
+                ..
+                label
                 ..
                 mirror
                 ..
@@ -1282,6 +1286,8 @@
         praudit
         ..
         pw
+        ..
+        quot
         ..
         rpcbind
         ..

@@ -688,6 +688,9 @@ buildasm cleanasm:
 	    ${.TARGET:S/build/all/:S/asm$//}
 .endfor
 
+HAS_TESTS=	yes
+SUBDIR.${MK_TESTS}=	tests
+
 .include <bsd.lib.mk>
 
 .if ${MACHINE} == "powerpc"
