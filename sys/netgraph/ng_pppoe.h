@@ -240,7 +240,7 @@ struct pppoe_hdr{
 
 struct pppoe_full_hdr {
 	struct  ether_header eh;
-	struct pppoe_hdr ph;
+	struct pppoe_hdr ph __subobject_use_container_bounds;
 }__packed;
 
 union	packet {
@@ -249,12 +249,12 @@ union	packet {
 };
 
 struct datatag {
-        struct pppoe_tag hdr;
+        struct pppoe_tag hdr __subobject_use_container_bounds;
 	u_int8_t        data[PPPOE_SERVICE_NAME_SIZE];
 };     
 
 struct maxptag {
-	struct pppoe_tag hdr;
+	struct pppoe_tag hdr __subobject_use_container_bounds;
 	uint16_t	data;
 };
 
