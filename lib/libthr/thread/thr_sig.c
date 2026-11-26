@@ -441,6 +441,15 @@ check_deferred_signal(struct pthread *curthread)
 	memcpy(&info, &curthread->deferred_siginfo, sizeof(siginfo_t));
 	/* remove signal */
 	curthread->deferred_siginfo.si_signo = 0;
+#ifdef CHERI_LIB_C18N
+	/*
+	 * Deferred dispatch still has _thr_deferset active. Block all signals
+	 * here because RTLD's handler assumes that. RTLD installs the user's
+	 * handler mask for the call and setcontext() restores uc_sigmask.
+	 */
+	if (_rtld_c18n_is_enabled())
+		__sys_sigprocmask(SIG_SETMASK, &_thr_maskset, NULL);
+#endif
 	handle_signal(&act, info.si_signo, &info, uc);
 #ifdef CHERI_LIB_C18N
 	setcontext(uc);
