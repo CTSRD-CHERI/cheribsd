@@ -1384,55 +1384,44 @@ static void
 tramp_check_found(struct tramp_header *found, const Obj_Entry *reqobj,
     const struct tramp_data *data)
 {
-	struct func_sig sig;
 	void *found_target;
 
-	if (data->sig.valid && found->symnum != 0) {
-		sig = sigtab_get(found->defobj, found->symnum);
-
-		rtld_require(!sig.valid || func_sig_equal(data->sig, sig),
-		    "Incompatible signatures for function %s: "
-		    "%s requests " C18N_SIG_FORMAT_STRING " but "
-		    "%s provides " C18N_SIG_FORMAT_STRING,
-		    symname(found->defobj, found->symnum),
-		    reqobj != NULL ? reqobj->path : "",
-		    C18N_SIG_FORMAT(data->sig),
-		    found->defobj->path, C18N_SIG_FORMAT(sig));
-	}
+	rtld_require(!data->sig.valid || !found->sig.valid ||
+	    func_sig_equal(data->sig, found->sig),
+	    "Incompatible signatures for function %s: %s requests "
+	    C18N_SIG_FORMAT_STRING " but %s provides " C18N_SIG_FORMAT_STRING,
+	    symname(found->defobj, found->symnum),
+	    reqobj != NULL ? reqobj->path : "", C18N_SIG_FORMAT(data->sig),
+	    found->defobj->path, C18N_SIG_FORMAT(found->sig));
 
 	if (!cheri_tag_get(data->target))
 		return;
 
 	found_target = atomic_load_explicit(&found->target,
-	    memory_order_relaxed);
-	do {
-		if (cheri_tag_get(found_target)) {
-			rtld_require(
-			    cheri_is_equal_exact(found_target, data->target),
-			    "c18n: Incompatible capability metadata for "
-			    "function %s: found %#p, requested %#p\n",
-			    symname(found->defobj, found->symnum),
-			    found_target, data->target);
-			break;
-		} else if (atomic_compare_exchange_weak_explicit(&found->target,
+	    memory_order_acquire);
+	while (!cheri_tag_get(found_target)) {
+		if (atomic_compare_exchange_weak_explicit(&found->target,
 		    &found_target, data->target,
-		    memory_order_relaxed, memory_order_relaxed)) {
+		    memory_order_acquire, memory_order_acquire)) {
 			/*
-			 * Issue a release fence to prevent the storing of the
-			 * updated target from being reordered with any
-			 * subsequent store. This ensures that the updated
-			 * target is visible to the trampoline when it is
-			 * potentially run in another thread.
-			 *
-			 * Strictly speaking, C semantics requires a
-			 * corresponding acquire operation for the ordering to
-			 * be established. But in reality this fence alone is
-			 * sufficient to prevent store-store reordering.
+			 * Issue a release fence so that the store to
+			 * found->target is ordered before any subsequent store
+			 * that publishes the returned trampoline pointer to
+			 * other threads. On the consumer side, calling the
+			 * trampoline creates an address dependency from the
+			 * published trampoline pointer to the PC-relative load
+			 * of found->target, preserving visibility on Morello
+			 * and RISC-V without an acquire load in the trampoline.
 			 */
 			atomic_thread_fence(memory_order_release);
-			break;
+			return;
 		}
-	} while (1);
+	}
+
+	rtld_require(cheri_is_equal_exact(found_target, data->target),
+	    "c18n: Incompatible capability metadata for function %s: "
+	    "found %#p, requested %#p",
+	    symname(found->defobj, found->symnum), found_target, data->target);
 }
 
 static struct tramp_header *
