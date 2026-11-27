@@ -220,11 +220,6 @@ int linker_ddb_search_symbol(ptraddr_t _value, c_linker_sym_t *_sym,
 int linker_ddb_symbol_values(c_linker_sym_t _sym, linker_symval_t *_symval);
 int linker_ddb_search_symbol_name(ptraddr_t value, char *buf, u_int buflen,
 				  long *offset);
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-unsigned int elf_compartments_kinfo_count(linker_file_t lf);
-ssize_t elf_compartments_kinfo_out(linker_file_t lf, struct sysctl_req *req);
-void elf_ddb_show_compartment_symbols(elf_compartment_t ec);
-#endif
 
 /*
  * stack(9) helper for situations where kernel locking is required.
@@ -369,6 +364,7 @@ void	elf_linkup_compartments(linker_file_t lf,
 struct	compartment_trampoline_tree *elf_compartment_trampolines(
 	    linker_file_t file);
 int	elf_create_compartments(linker_file_t lf, struct thread *td);
+void	elf_ddb_show_compartment_symbols(elf_compartment_t ec);
 #endif
 void	link_elf_ireloc(void);
 

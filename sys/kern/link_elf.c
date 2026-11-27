@@ -3096,13 +3096,14 @@ link_elf_pcc_init(elf_pcc_t pcc, caddr_t base, size_t length)
 	return (true);
 }
 
-unsigned int
-elf_compartments_kinfo_count(linker_file_t lf)
+static int
+elf_compartments_kinfo_count(linker_file_t lf, void *arg)
 {
-	elf_file_t ef;
+	elf_file_t ef = (elf_file_t)lf;
+	unsigned int *count = arg;
 
-	ef = (elf_file_t)lf;
-	return (1 /* default */ + ef->ncompartments);
+	*count += 1 /* default */ + ef->ncompartments;
+	return (0);
 }
 
 static ssize_t
@@ -3141,15 +3142,15 @@ elf_compartment_kinfo_out(linker_file_t lf, elf_compartment_t ec,
 	return (0);
 }
 
-ssize_t
-elf_compartments_kinfo_out(linker_file_t lf, struct sysctl_req *req)
+static int
+elf_compartments_kinfo_out(linker_file_t lf, void *arg)
 {
-	elf_file_t ef;
+	elf_file_t ef = (elf_file_t)lf;
+	struct sysctl_req *req = arg;
 	elf_compartment_t ec;
 	unsigned int ii;
 	int error;
 
-	ef = (elf_file_t)lf;
 	ec = &ef->defcompartment;
 	error = elf_compartment_kinfo_out(lf, ec, req);
 	if (error != 0)
@@ -3162,6 +3163,36 @@ elf_compartments_kinfo_out(linker_file_t lf, struct sysctl_req *req)
 	}
 	return (0);
 }
+
+static int
+sysctl_kern_kc18n_compartments(SYSCTL_HANDLER_ARGS)
+{
+	unsigned int ncompartments;
+	int error;
+
+	/*
+	 * If the old pointer is NULL, output the number of compartments.
+	 */
+	if (req->oldptr == NULL) {
+		ncompartments = 0;
+		error = linker_file_foreach(elf_compartments_kinfo_count,
+		    &ncompartments);
+		if (error != 0)
+			goto out;
+		error = SYSCTL_OUT(req, NULL, ncompartments *
+		    sizeof(struct kinfo_cheri_kc18n_compart));
+		goto out;
+	}
+
+	error = linker_file_foreach(elf_compartments_kinfo_out, req);
+
+out:
+	return (error);
+}
+
+static SYSCTL_NODE(_kern, KERN_KC18N_COMPARTS, kc18n_compartments,
+	CTLFLAG_RD | CTLFLAG_MPSAFE, sysctl_kern_kc18n_compartments,
+	"Kernel compartment list");
 
 #ifdef DDB
 static void
