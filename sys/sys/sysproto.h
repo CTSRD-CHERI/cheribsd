@@ -317,6 +317,9 @@ struct select_args {
 	char ex_l_[PADL_(fd_set * __kerncap)]; fd_set * __kerncap ex; char ex_r_[PADR_(fd_set * __kerncap)];
 	char tv_l_[PADL_(struct timeval * __kerncap)]; struct timeval * __kerncap tv; char tv_r_[PADR_(struct timeval * __kerncap)];
 };
+struct cheri_sealcap_alloc_args {
+	char sealcapp_l_[PADL_(uintcap_t * __kerncap)]; uintcap_t * __kerncap sealcapp; char sealcapp_r_[PADR_(uintcap_t * __kerncap)];
+};
 struct fsync_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 };
@@ -2001,6 +2004,7 @@ int	sys_dup2(struct thread *, struct dup2_args *);
 int	sys_cheri_cidcap_alloc(struct thread *, struct cheri_cidcap_alloc_args *);
 int	sys_fcntl(struct thread *, struct fcntl_args *);
 int	sys_select(struct thread *, struct select_args *);
+int	sys_cheri_sealcap_alloc(struct thread *, struct cheri_sealcap_alloc_args *);
 int	sys_fsync(struct thread *, struct fsync_args *);
 int	sys_setpriority(struct thread *, struct setpriority_args *);
 int	sys_socket(struct thread *, struct socket_args *);
@@ -2940,6 +2944,7 @@ int	freebsd14_setgroups(struct thread *, struct freebsd14_setgroups_args *);
 #define	SYS_AUE_cheri_cidcap_alloc	AUE_NULL
 #define	SYS_AUE_fcntl	AUE_FCNTL
 #define	SYS_AUE_select	AUE_SELECT
+#define	SYS_AUE_cheri_sealcap_alloc	AUE_NULL
 #define	SYS_AUE_fsync	AUE_FSYNC
 #define	SYS_AUE_setpriority	AUE_SETPRIORITY
 #define	SYS_AUE_socket	AUE_SOCKET

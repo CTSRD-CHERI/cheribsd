@@ -531,6 +531,13 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		*n_args = 5;
 		break;
 	}
+	/* freebsd64_cheri_sealcap_alloc */
+	case 94: {
+		struct freebsd64_cheri_sealcap_alloc_args *p = params;
+		uarg[a++] = (intcap_t)p->sealcapp; /* uintcap_t * */
+		*n_args = 1;
+		break;
+	}
 	/* fsync */
 	case 95: {
 		struct fsync_args *p = params;
@@ -4361,6 +4368,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 4:
 			p = "userland struct timeval *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* freebsd64_cheri_sealcap_alloc */
+	case 94:
+		switch (ndx) {
+		case 0:
+			p = "userland uintcap_t *";
 			break;
 		default:
 			break;
@@ -9800,6 +9817,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* freebsd64_select */
 	case 93:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* freebsd64_cheri_sealcap_alloc */
+	case 94:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

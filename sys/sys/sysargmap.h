@@ -74,6 +74,7 @@ static int sysargmask[] = {
 	[SYS_cheri_cidcap_alloc] = (0x0 | 0x1),
 	[SYS_fcntl] = (0x0 | 0x4),
 	[SYS_select] = (0x0 | 0x2 | 0x4 | 0x8 | 0x10),
+	[SYS_cheri_sealcap_alloc] = (0x0 | 0x1),
 	[SYS_fsync] = (0x0),
 	[SYS_setpriority] = (0x0),
 	[SYS_socket] = (0x0),

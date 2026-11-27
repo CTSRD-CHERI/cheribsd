@@ -531,6 +531,13 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		*n_args = 5;
 		break;
 	}
+	/* cheri_sealcap_alloc */
+	case 94: {
+		struct cheri_sealcap_alloc_args *p = params;
+		uarg[a++] = (intcap_t)p->sealcapp; /* uintcap_t * __kerncap */
+		*n_args = 1;
+		break;
+	}
 	/* fsync */
 	case 95: {
 		struct fsync_args *p = params;
@@ -4379,6 +4386,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 4:
 			p = "userland struct timeval * __kerncap";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheri_sealcap_alloc */
+	case 94:
+		switch (ndx) {
+		case 0:
+			p = "userland uintcap_t * __kerncap";
 			break;
 		default:
 			break;
@@ -9850,6 +9867,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* select */
 	case 93:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheri_sealcap_alloc */
+	case 94:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
