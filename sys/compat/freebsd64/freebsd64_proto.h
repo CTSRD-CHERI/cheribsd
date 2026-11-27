@@ -235,6 +235,9 @@ struct freebsd64_select_args {
 	char ex_l_[PADL_(fd_set *)]; fd_set * ex; char ex_r_[PADR_(fd_set *)];
 	char tv_l_[PADL_(struct timeval *)]; struct timeval * tv; char tv_r_[PADR_(struct timeval *)];
 };
+struct freebsd64_cheri_sealcap_alloc_args {
+	char sealcapp_l_[PADL_(uintcap_t *)]; uintcap_t * sealcapp; char sealcapp_r_[PADR_(uintcap_t *)];
+};
 struct freebsd64_connect_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
 	char name_l_[PADL_(const struct sockaddr *)]; const struct sockaddr * name; char name_r_[PADR_(const struct sockaddr *)];
@@ -1579,6 +1582,7 @@ int	freebsd64_getitimer(struct thread *, struct freebsd64_getitimer_args *);
 int	freebsd64_cheri_cidcap_alloc(struct thread *, struct freebsd64_cheri_cidcap_alloc_args *);
 int	freebsd64_fcntl(struct thread *, struct freebsd64_fcntl_args *);
 int	freebsd64_select(struct thread *, struct freebsd64_select_args *);
+int	freebsd64_cheri_sealcap_alloc(struct thread *, struct freebsd64_cheri_sealcap_alloc_args *);
 int	freebsd64_connect(struct thread *, struct freebsd64_connect_args *);
 int	freebsd64_bind(struct thread *, struct freebsd64_bind_args *);
 int	freebsd64_setsockopt(struct thread *, struct freebsd64_setsockopt_args *);
@@ -2137,6 +2141,7 @@ int	freebsd14_freebsd64_setgroups(struct thread *, struct freebsd14_freebsd64_se
 #define	FREEBSD64_SYS_AUE_freebsd64_cheri_cidcap_alloc	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_fcntl	AUE_FCNTL
 #define	FREEBSD64_SYS_AUE_freebsd64_select	AUE_SELECT
+#define	FREEBSD64_SYS_AUE_freebsd64_cheri_sealcap_alloc	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_connect	AUE_CONNECT
 #define	FREEBSD64_SYS_AUE_freebsd64_bind	AUE_BIND
 #define	FREEBSD64_SYS_AUE_freebsd64_setsockopt	AUE_SETSOCKOPT

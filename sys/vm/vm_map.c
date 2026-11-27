@@ -419,6 +419,10 @@ vmspace_alloc(uintcap_t min, uintcap_t max, pmap_pinit_t pinit)
 	 * NULL CID installed in each thread at creation.
 	 */
 	vm->vm_prev_cid = 0;
+#ifdef CHERI_OTYPE_BITS
+	init_unrhdr(&vm->vm_sealtype_unr, CHERI_OTYPE_USER_MIN,
+	    CHERI_OTYPE_USER_MAX, UNR_NO_MTX);
+#endif
 #endif
 	return (vm);
 }
@@ -456,6 +460,10 @@ vmspace_dofree(struct vmspace *vm)
 	 * the pmap module to reclaim anything left.
 	 */
 	(void)vm_map_clear(&vm->vm_map);
+
+#if __has_feature(capabilities) && defined(CHERI_OTYPE_BITS)
+	clear_unrhdr(&vm->vm_sealtype_unr);
+#endif
 
 	pmap_release(vmspace_pmap(vm));
 	vm->vm_map.pmap = NULL;
@@ -628,6 +636,56 @@ vmspace_cid_alloc(struct vmspace *vm)
 
 	return (cid);
 }
+
+#ifdef CHERI_OTYPE_BITS
+int
+vmspace_sealtype_alloc(struct vmspace *vm)
+{
+	struct vm_map *map;
+	int type;
+
+	map = &vm->vm_map;
+	vm_map_lock(map);
+	if (map->busy)
+		vm_map_wait_busy(map);
+
+	type = alloc_unr(&vm->vm_sealtype_unr);
+
+	vm_map_unlock(map);
+
+	return (type);
+}
+
+int
+vmspace_sealtype_free(struct vmspace *vm, int type)
+{
+	struct unrhdr *uh;
+	struct vm_map *map;
+	int tmp;
+
+	uh = &vm->vm_sealtype_unr;
+
+	map = &vm->vm_map;
+	vm_map_lock(map);
+	if (map->busy)
+		vm_map_wait_busy(map);
+
+	/* Probe for prior allocation */
+	tmp = alloc_unr_specific(uh, type);
+	if (tmp != -1) {
+		free_unr(uh, tmp);
+		vm_map_unlock(map);
+		return (ENOENT);
+	}
+
+	/* TODO: enqueue for revocation */
+
+	free_unr(uh, type);
+
+	vm_map_unlock(map);
+	return (0);
+}
+#endif
 #endif /* __has_feature(capabilities) */
 
 void
@@ -5191,6 +5249,9 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 
 #if __has_feature(capabilities)
 	vm2->vm_prev_cid = vm1->vm_prev_cid;
+#ifdef CHERI_OTYPE_BITS
+	copy_unhdr(&vm1->vm_sealtype_unr, &vm2->vm_sealtype_unr, UNR_NO_MTX);
+#endif
 #endif
 
 	new_map->anon_loc = old_map->anon_loc;

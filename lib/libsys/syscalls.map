@@ -137,6 +137,8 @@ FBSDprivate_1.0 {
 	__sys_fcntl;
 	_select;
 	__sys_select;
+	_cheri_sealcap_alloc;
+	__sys_cheri_sealcap_alloc;
 	_fsync;
 	__sys_fsync;
 	_setpriority;

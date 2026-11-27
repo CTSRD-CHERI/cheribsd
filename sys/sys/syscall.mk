@@ -77,6 +77,7 @@ MIASM =  \
 	cheri_cidcap_alloc.o \
 	fcntl.o \
 	select.o \
+	cheri_sealcap_alloc.o \
 	fsync.o \
 	setpriority.o \
 	socket.o \

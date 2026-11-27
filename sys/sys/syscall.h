@@ -100,6 +100,7 @@
 #define	SYS_cheri_cidcap_alloc	91
 #define	SYS_fcntl	92
 #define	SYS_select	93
+#define	SYS_cheri_sealcap_alloc	94
 #define	SYS_fsync	95
 #define	SYS_setpriority	96
 #define	SYS_socket	97

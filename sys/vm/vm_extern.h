@@ -127,6 +127,10 @@ void vmspace_exitfree(struct proc *);
 void vmspace_switch_aio(struct vmspace *);
 #if __has_feature(capabilities)
 uint64_t vmspace_cid_alloc(struct vmspace *);
+#ifdef CHERI_OTYPE_BITS
+int vmspace_sealtype_alloc(struct vmspace *);
+int vmspace_sealtype_free(struct vmspace *, int);
+#endif
 #endif
 void vnode_pager_setsize(struct vnode *, vm_ooffset_t);
 void vnode_pager_purge_range(struct vnode *, vm_ooffset_t, vm_ooffset_t);

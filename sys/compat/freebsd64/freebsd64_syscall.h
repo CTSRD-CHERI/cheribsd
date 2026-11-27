@@ -98,6 +98,7 @@
 #define	FREEBSD64_SYS_freebsd64_cheri_cidcap_alloc	91
 #define	FREEBSD64_SYS_freebsd64_fcntl	92
 #define	FREEBSD64_SYS_freebsd64_select	93
+#define	FREEBSD64_SYS_freebsd64_cheri_sealcap_alloc	94
 #define	FREEBSD64_SYS_fsync	95
 #define	FREEBSD64_SYS_setpriority	96
 #define	FREEBSD64_SYS_socket	97

@@ -223,6 +223,7 @@ MAN+=	abort2.2 \
 	cap_rights_limit.2 \
 	chdir.2 \
 	cheri_cidcap_alloc.2 \
+	cheri_sealcap_alloc.2 \
 	cheri_revoke.2 \
 	chflags.2 \
 	chmod.2 \

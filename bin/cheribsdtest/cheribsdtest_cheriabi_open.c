@@ -35,7 +35,6 @@
 #endif
 
 #include <sys/types.h>
-#include <sys/sysctl.h>
 #include <sys/time.h>
 
 #include <err.h>
@@ -235,14 +234,10 @@ CHERIBSDTEST(cheriabi_open_sentry, "Sealed path")
 CHERIBSDTEST(cheriabi_open_sealed, "Sealed path")
 {
 	char *path, *sealed_path;
-	void *sealer;
-	size_t sealer_size;
+	__uintcap_t sealer;
 	int fd;
 
-	sealer_size = sizeof(sealer);
-	if (sysctlbyname("security.cheri.sealcap", &sealer, &sealer_size,
-	    NULL, 0) < 0)
-		cheribsdtest_failure_err("sysctlbyname(security.cheri.sealcap)");
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_sealcap_alloc(&sealcap));
 
 	/* Allocate enough space that it's sealable for 128-bit */
 	path = calloc(1, 1<<12);

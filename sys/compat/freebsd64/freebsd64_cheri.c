@@ -50,3 +50,14 @@ freebsd64_cheri_cidcap_alloc(struct thread *td, struct
 	return (ENOTSUP);
 #endif
 }
+
+int
+freebsd64_cheri_sealcap_alloc(struct thread *td, struct
+    freebsd64_cheri_sealcap_alloc_args *uap)
+{
+#ifdef CHERI_PERM_COMPARTMENT_ID
+	return (kern_cheri_sealcap_alloc(td, USER_PTR_OBJ(uap->sealcapp)));
+#else
+	return (ENOTSUP);
+#endif
+}

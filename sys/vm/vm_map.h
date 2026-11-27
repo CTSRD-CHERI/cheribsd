@@ -69,6 +69,10 @@
 #include <sys/_mutex.h>
 #include <sys/condvar.h>
 
+#if __has_feature(capabilities) && defined(CHERI_OTYPE_BITS)
+#include <sys/_unrhdr.h>
+#endif
+
 #ifdef CHERI_CAPREVOKE
 #include <sys/tree.h>
 
@@ -390,6 +394,9 @@ struct vmspace {
 	u_int vm_refcnt;	/* number of references */
 #if __has_feature(capabilities)
 	uint64_t vm_prev_cid;	/* (d) last compartment ID allocated */
+#ifdef CHERI_OTYPE_BITS
+	struct unrhdr vm_sealtype_unr; /* (d) allocated seal capabilities */
+#endif
 #endif
 	/*
 	 * Keep the PMAP last, so that CPU-specific variations of that

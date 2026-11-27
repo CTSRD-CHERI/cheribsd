@@ -36,7 +36,6 @@
 #endif
 
 #include <sys/types.h>
-#include <sys/sysctl.h>
 #include <sys/time.h>
 
 #include <machine/frame.h>
@@ -117,14 +116,10 @@ CHERIBSDTEST(illegal_perm_seal,
 {
 	int i;
 	void * __capability ip = &i;
-	void * __capability sealcap;
+	__uintcap_t sealcap;
 	void * __capability sealed;
-	size_t sealcap_size;
 
-	sealcap_size = sizeof(sealcap);
-	if (sysctlbyname("security.cheri.sealcap", &sealcap, &sealcap_size,
-	    NULL, 0) < 0)
-		cheribsdtest_failure_err("sysctlbyname(security.cheri.sealcap)");
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_sealcap_alloc(&sealcap));
 	sealcap = cheri_perms_and(sealcap, ~CHERI_PERM_SEAL);
 	sealed = cheri_seal(ip, sealcap);
 	/* cheri_seal() should tag-clear on failure on all architectures. */
@@ -174,15 +169,11 @@ CHERIBSDTEST(illegal_perm_unseal,
 {
 	int i;
 	void * __capability ip = &i;
-	void * __capability sealcap;
+	__uintcap_t sealcap;
 	void * __capability sealed;
 	void * __capability unsealed;
-	size_t sealcap_size;
 
-	sealcap_size = sizeof(sealcap);
-	if (sysctlbyname("security.cheri.sealcap", &sealcap, &sealcap_size,
-	    NULL, 0) < 0)
-		cheribsdtest_failure_err("sysctlbyname(security.cheri.sealcap)");
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_sealcap_alloc(&sealcap));
 	if ((cheri_perms_get(sealcap) & CHERI_PERM_SEAL) == 0)
 		cheribsdtest_failure_errx("unexpected !seal perm on sealcap");
 	sealed = cheri_seal(ip, sealcap);

@@ -150,6 +150,8 @@ int	kern_chdir(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg);
 int	kern_cheri_cidcap_alloc(struct thread *td,
 	    uintcap_t * __capability cidp);
+int	kern_cheri_sealcap_alloc(struct thread *td,
+	    uintcap_t * __capability sealcapp);
 int	kern_chflagsat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg, u_long flags, int atflag);
 int	kern_clock_getcpuclockid2(struct thread *td, id_t id, int which,

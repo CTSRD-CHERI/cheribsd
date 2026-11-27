@@ -1,0 +1,53 @@
+.\"-
+.\" Copyright (c) 2026 Capabilities Limited
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.\" This software was developed by Capabilities Limited with funding from
+.\" Innovate UK and the Department for Science, Innovation and Technology
+.\" for the adoption and diffusion of CHERI technology under project
+.\" 10168042 (“CheriBSD feature extraction, maturity, and testing”).
+.\"
+.Pq Do CheriBSD feature extraction, maturity, and testing Dc .
+.Dd November 27, 2026
+.Dt CHERI_SEALCAP_ALLOC
+.Os
+.Sh NAME
+.Nm cheri_sealcap_alloc
+.Nd Allocate a compartment ID capability
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In cheri/sealcap.h
+.Ft int
+.Fn cheri_sealcap_alloc "uintcap_t *sealcapp"
+.Sh DESCRIPTION
+The
+.Fn cheri_sealcap_alloc
+allocates a unique-per-vmspace capability suitable for sealing and
+unsealing capabilities.
+.Sh RETURN VALUES
+.Rv -std
+.Sh ERRORS
+The
+.Fn cheri_sealcap_alloc
+system call succeeds unless:
+.Bl -tag -width Er
+.It Bq Er EFAULT
+The argument
+.Fa sealcapp
+is not a valid pointer to storage capable of holding a uintcap_t.
+.It Bq Er ENOMEM
+No sealing types are available.
+.It Bq Er ENOSYS
+This platform does not support typed sealing.
+.El
+.Sh BUGS
+A
+.Fn cheri_sealcap_free
+should exist to allow types to be reused after revocation.
+.Sh AUTHORS
+This software and this manual page were developed by Capabilities
+Limited with funding from Innovate UK and the Department for Science,
+Innovation and Technology for the adoption and diffusion of CHERI
+technology under project 10168042

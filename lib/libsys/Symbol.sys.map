@@ -380,6 +380,7 @@ FBSD_1.7 {
 };
 
 FBSD_1.8 {
+	cheri_sealcap_alloc;
 	exterrctl;
 	fchroot;
 	getgroups;
