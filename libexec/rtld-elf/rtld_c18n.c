@@ -389,8 +389,8 @@ compart_id_allocate(const char *lib, int flags)
 	string_base_push(&com->libs, lib);
 
 out:
-	com->info.rcc_dlopened_explicitly = (flags & RTLD_LO_DLOPEN_TOP) != 0;
-	com->info.rcc_dlopened = (flags & RTLD_LO_DLOPEN) != 0;
+	com->info.rcc_dlopened_explicitly |= (flags & RTLD_LO_DLOPEN_TOP) != 0;
+	com->info.rcc_dlopened |= (flags & RTLD_LO_DLOPEN) != 0;
 	return (i);
 }
 
