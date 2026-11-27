@@ -634,7 +634,11 @@
 		    _In_opt_ _Contains_long_timet_ struct timeval *tv
 		);
 	}
-94	AUE_NULL	RESERVED
+94	AUE_NULL	STD|CAPENABLED {
+		int cheri_sealcap_alloc(
+		    uintcap_t *sealcapp
+		);
+	}
 95	AUE_FSYNC	STD|CAPENABLED {
 		int fsync(
 		    int fd

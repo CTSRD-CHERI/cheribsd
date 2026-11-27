@@ -68,7 +68,7 @@ _libsys_other_objects= fstat fstatat fstatfs syscall \
     _sigprocmask _write readlink ___realpathat
 
 .ifdef CHERI_LIB_C18N
-_libsys_other_objects+=_mmap _thr_exit _sigaction ftruncate
+_libsys_other_objects+=cheri_sealcap_alloc _mmap _thr_exit _sigaction ftruncate
 .else
 _libsys_other_objects+=mmap
 .endif

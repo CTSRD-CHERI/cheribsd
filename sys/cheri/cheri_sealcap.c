@@ -31,12 +31,54 @@
  */
 
 #include <sys/param.h>
+#include <sys/proc.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
+#include <sys/sysproto.h>
 #include <sys/systm.h>
 
 #include <cheri/cheri.h>
+
+#include <vm/vm_extern.h>
+
+#if __has_feature(capabilities) && defined(CHERI_OTYPE_BITS)
 
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
 void * __capability userspace_root_sealcap = (void * __capability)(intcap_t)-1;
 SYSCTL_CAPABILITY(_security_cheri, OID_AUTO, sealcap, CTLFLAG_RD | CTLFLAG_PTROUT,
     &userspace_root_sealcap, 0, "CHERI sealing root capability");
+
+int
+sys_cheri_sealcap_alloc(struct thread *td, struct cheri_sealcap_alloc_args *uap)
+{
+	return (kern_cheri_sealcap_alloc(td, uap->sealcapp));
+}
+
+int
+kern_cheri_sealcap_alloc(struct thread *td, uintcap_t * __capability sealcapp)
+{
+	int type;
+	uintcap_t sealcap;
+
+	type = vmspace_sealtype_alloc(td->td_proc->p_vmspace);
+	if (type == -1)
+		return (ENOMEM);
+	sealcap = (uintcap_t)cheri_bounds_set(
+	    cheri_address_set(userspace_root_sealcap, type), 1);
+
+	KASSERT(cheri_tag_get(sealcap), ("untagged sealcap allocated"));
+
+	if (sucap(sealcapp, sealcap) == -1)
+		return (EFAULT);
+	return (0);
+}
+
+#else /* !(__has_feature(capabilities) && defined(CHERI_OTYPE_BITS)) */
+
+int
+sys_cheri_sealcap_alloc(struct thread *td, struct cheri_sealcap_alloc_args *uap)
+{
+	return (ENOSYS);
+}
+
+#endif /* !(__has_feature(capabilities) && defined(CHERI_OTYPE_BITS)) */

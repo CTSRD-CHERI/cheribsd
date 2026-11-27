@@ -66,11 +66,11 @@
 #include <sys/mman.h>
 #include <sys/signalvar.h>
 #include <sys/stat.h>
-#include <sys/sysctl.h>
 
 #include <machine/sigframe.h>
 
 #include <cheri/c18n.h>
+#include <cheri/sealcap.h>
 
 #include <errno.h>
 #include <signal.h>
@@ -1822,23 +1822,17 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 void
 c18n_init2(Obj_Entry *obj_rtld)
 {
-	uintptr_t sealer;
-
 	/*
 	 * Allocate otypes for RTLD use
 	 */
-	if (sysctlbyname("security.cheri.sealcap", &sealer,
-	    &(size_t) { sizeof(sealer) }, NULL, 0) < 0)
-		rtld_fatal("sysctlbyname failed");
+	if (cheri_sealcap_alloc(&sealer_pltgot) != 0)
+		rtld_fatal("cheri_sealcap_alloc(&sealer_pltgot)");
 
-	sealer_pltgot = cheri_bounds_set_exact(sealer, 1);
-	sealer += 1;
+	if (cheri_sealcap_alloc(&sealer_tcb) != 0)
+		rtld_fatal("cheri_sealcap_alloc(&sealer_tcb)");
 
-	sealer_tcb = cheri_bounds_set_exact(sealer, 1);
-	sealer += 1;
-
-	sealer_trusted_stk = cheri_bounds_set_exact(sealer, 1);
-	sealer += 1;
+	if (cheri_sealcap_alloc(&sealer_trusted_stk) != 0)
+		rtld_fatal("cheri_sealcap_alloc(&sealer_trusted_stk)");
 
 	/*
 	 * All libraries have been loaded. Create and initialise a stack lookup
