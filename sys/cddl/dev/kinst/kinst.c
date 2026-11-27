@@ -17,6 +17,7 @@
 
 #include <sys/dtrace.h>
 
+#include "dtrace_excluded.h"
 #include "kinst.h"
 
 MALLOC_DEFINE(M_KINST, "kinst", "Kernel Instruction Tracing");
@@ -93,6 +94,9 @@ kinst_memcpy(volatile void *dst, volatile const void *src, size_t len)
 bool
 kinst_excluded(const char *name)
 {
+	if (dtrace_excluded_function(name))
+		return (true);
+
 	if (kinst_md_excluded(name))
 		return (true);
 
@@ -102,42 +106,6 @@ kinst_excluded(const char *name)
 	 */
 	if (strcmp(name, "cpu_switch") == 0)
 		return (true);
-
-	/*
-	 * Anything beginning with "dtrace_" may be called from probe context
-	 * unless it explicitly indicates that it won't be called from probe
-	 * context by using the prefix "dtrace_safe_".
-	 */
-	if (strncmp(name, "dtrace_", strlen("dtrace_")) == 0 &&
-	    strncmp(name, "dtrace_safe_", strlen("dtrace_safe_")) != 0)
-		return (true);
-
-	/*
-	 * Omit instrumentation of functions that are probably in DDB.  It
-	 * makes it too hard to debug broken kinst.
-	 *
-	 * NB: kdb_enter() can be excluded, but its call to printf() can't be.
-	 * This is generally OK since we're not yet in debugging context.
-	 */
-	if (strncmp(name, "db_", strlen("db_")) == 0 ||
-	    strncmp(name, "kdb_", strlen("kdb_")) == 0)
-		return (true);
-
-	/*
-	 * Lock owner methods may be called from probe context.
-	 */
-	if (strcmp(name, "owner_mtx") == 0 ||
-	    strcmp(name, "owner_rm") == 0 ||
-	    strcmp(name, "owner_rw") == 0 ||
-	    strcmp(name, "owner_sx") == 0)
-		return (true);
-
-	/*
-	 * The KMSAN runtime can't be instrumented safely.
-	 */
-	if (strncmp(name, "__msan", 6) == 0 ||
-	    strncmp(name, "kmsan_", 6) == 0)
-		return (1);
 
 	/*
 	 * When DTrace is built into the kernel we need to exclude the kinst

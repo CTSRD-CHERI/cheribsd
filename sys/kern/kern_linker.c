@@ -34,6 +34,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/boottrace.h>
+#include <sys/compartment.h>
 #include <sys/eventhandler.h>
 #include <sys/fcntl.h>
 #include <sys/jail.h>
@@ -628,11 +629,21 @@ static linker_file_t
 linker_find_file_by_id(int fileid)
 {
 	linker_file_t lf;
+	int locked;
 
-	sx_assert(&kld_sx, SA_XLOCKED);
-	TAILQ_FOREACH(lf, &linker_files, link)
+	/*
+	 * Similarly to linker_file_lookup_symbol(), this function can be called
+	 * as part of symbol resolution that already acquires the kld_sx lock.
+	 */
+	locked = sx_xlocked(&kld_sx);
+	if (!locked)
+		sx_xlock(&kld_sx);
+	TAILQ_FOREACH(lf, &linker_files, link) {
 		if (lf->id == fileid && lf->flags & LINKER_FILE_LINKED)
 			break;
+	}
+	if (!locked)
+		sx_xunlock(&kld_sx);
 	return (lf);
 }
 
@@ -640,13 +651,22 @@ linker_file_t
 linker_find_file_by_ptr(uintptr_t ptr)
 {
 	linker_file_t lf;
+	int locked;
 
-	sx_assert(&kld_sx, SA_XLOCKED);
+	/*
+	 * Similarly to linker_file_lookup_symbol(), this function can be called
+	 * as part of symbol resolution that already acquires the kld_sx lock.
+	 */
+	locked = sx_xlocked(&kld_sx);
+	if (!locked)
+		sx_xlock(&kld_sx);
 	TAILQ_FOREACH(lf, &linker_files, link) {
 		if (ptr >= (uintptr_t)lf->address &&
 		    ptr < (uintptr_t)lf->address + lf->size)
 			break;
 	}
+	if (!locked)
+		sx_xunlock(&kld_sx);
 	return (lf);
 }
 
@@ -1549,7 +1569,7 @@ DB_COMMAND_FLAGS(kldstat, db_kldstat, DB_CMD_MEMSAFE)
 		db_printf("%2d %4d 0x%-16lx 0x%-16zx %s\n", lf->id, lf->refs,
 		    (ptraddr_t)lf->address, lf->size, lf->filename);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-		elf_ddb_kldstat_compartments(lf);
+		LINKER_DDB_KLDSTAT_COMPARTMENTS(lf);
 #endif
 	}
 }
@@ -1942,6 +1962,14 @@ fail:
 	}
 	sx_xunlock(&kld_sx);
 	/* woohoo! we made it! */
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	thread_expand_compartments(curthread);
+	/*
+	 * Now that we know the number of compartments in the system, initialise
+	 * the cache for BSP.
+	 */
+	compartment_cpu_cache_init_bsp();
+#endif
 }
 SYSINIT(preload, SI_SUB_KLD, SI_ORDER_MIDDLE, linker_preload, NULL);
 
@@ -2528,42 +2556,6 @@ SYSCTL_PROC(_kern, OID_AUTO, function_list,
     CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
     sysctl_kern_function_list, "",
     "kernel function list");
-
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-static int
-sysctl_kern_kc18n_compartments(SYSCTL_HANDLER_ARGS)
-{
-	linker_file_t lf;
-	unsigned int ncompartments;
-	int error;
-
-	/*
-	 * If the old pointer is NULL, output the number of compartments.
-	 */
-	if (req->oldptr == NULL) {
-		ncompartments = 0;
-		TAILQ_FOREACH(lf, &linker_files, link) {
-			ncompartments += elf_compartments_kinfo_count(lf);
-		}
-		error = SYSCTL_OUT(req, NULL, ncompartments *
-		    sizeof(struct kinfo_cheri_kc18n_compart));
-		goto out;
-	}
-
-	TAILQ_FOREACH(lf, &linker_files, link) {
-		error = elf_compartments_kinfo_out(lf, req);
-		if (error != 0)
-			return (error);
-	}
-
-out:
-	return (error);
-}
-
-static SYSCTL_NODE(_kern, KERN_KC18N_COMPARTS, kc18n_compartments,
-	CTLFLAG_RD | CTLFLAG_MPSAFE, sysctl_kern_kc18n_compartments,
-	"Kernel compartment list");
-#endif
 
 // CHERI CHANGES START
 // {

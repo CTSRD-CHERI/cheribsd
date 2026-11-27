@@ -43,9 +43,11 @@
 #include <machine/compartment.h>
 
 /*
- * A compartment identifier for the kernel itself.
+ * A compartment identifier for the default compartment in the kernel binary.
  */
-#define	COMPARTMENT_KERNEL_ID			1
+#define	COMPARTMENT_FIRST_ID			1
+
+#define	TD_CIDNDX(id)				(id - COMPARTMENT_FIRST_ID)
 
 #define	TRAMPOLINE_TYPE_COMPARTMENT_ENTRY	0
 #define	TRAMPOLINE_TYPE_EXECUTIVE_ENTRY	1
@@ -54,42 +56,101 @@
 SYSCTL_DECL(_security_compartment);
 
 struct thread;
+struct compartment_trampoline;
+struct compartment_tree;
+
+struct elf_pcc {
+	bool		assigned;
+	caddr_t		pcc;
+};
+
+struct elf_compartment {
+	u_long		 id;
+	const char	*filename;
+	const char	*name;
+	Elf_Addr	 start;
+	Elf_Addr	 end;
+	elf_pcc_t	 pcc;
+	struct elf_file	*file;
+	elf_plt_t	 plt;
+#ifdef KDTRACE_HOOKS
+	/*
+	 * XXXKW: Is that acceptable to use uint32_t instead of dtrace_id_t not
+	 * to include sys/dtrace.h?
+	 */
+	uint32_t	 entry_probe;
+	uint32_t	 return_probe;
+#endif
+};
 
 struct compartment {
-	u_long		 c_id;
-	struct thread	*c_thread;
-	vm_pointer_t	 c_kstack;
-	vm_pointer_t	 c_kstackptr;
-	TAILQ_ENTRY(compartment) c_next;	/* Next in a thread. */
-	TAILQ_ENTRY(compartment) c_mnext;	/* Next with the same id. */
+	u_long			 c_ndx;
+	elf_compartment_t	c_elf_compartment;
+	struct thread		*c_thread;
+	vm_pointer_t		 c_kstack;
+	vm_pointer_t		 c_kstackptr;
+	SPLAY_ENTRY(compartment)  c_unhashed_next; /* Next unhashed. */
 	STAILQ_ENTRY(compartment) c_critical_next; /* Next in a cache. */
 };
 
 STAILQ_HEAD(compartment_list, compartment);
 
+int compartment_trampoline_compare(struct compartment_trampoline *a,
+    struct compartment_trampoline *b);
+RB_HEAD(compartment_trampoline_tree, compartment_trampoline);
+RB_PROTOTYPE(compartment_trampoline_tree, compartment_trampoline, ct_node,
+    compartment_trampoline_compare);
+
 extern struct compartment compartments0[KERNEL_MAXC18NS];
 
 extern u_long compartment_lastid;
+
+typedef int (*compartment_trampoline_tree_callback_t)(
+    struct compartment_trampoline *, void *);
+typedef void (*cbt_probe_func_t)(uint32_t, elf_compartment_t);
 
 void compartment_metadata_create(u_long id, const char *name, uintcap_t base,
     elf_compartment_t elf_compartment);
 void compartment_metadata_insert(struct compartment *compartment);
 
-void compartment_cpu_cache_fill(u_int cpuid);
+void compartment_tree_init(struct compartment_tree *tree);
+void compartment_tree_remove_all(struct compartment_tree *tree);
+void compartment_tree_hash(struct compartment_tree *tree, struct thread *td);
+
+void compartment_trampoline_tree_init(struct compartment_trampoline_tree *tree);
+void compartment_trampoline_tree_remove_all(
+    struct compartment_trampoline_tree *tree);
+int compartment_trampoline_tree_foreach(
+    struct compartment_trampoline_tree *tree,
+    compartment_trampoline_tree_callback_t callback, void *opaque);
+
+void compartment_cpu_cache_init_bsp(void);
+void compartment_cpu_cache_fill(void);
 
 u_long compartment_id_create(const char *name, uintcap_t base,
     elf_compartment_t elf_compartment);
-void compartment_linkup(struct compartment *compartment, u_long id,
-    struct thread *td);
+void compartment_linkup(struct compartment *compartment,
+    elf_compartment_t elf_compartment, struct thread *td);
 void compartment_init_stack(struct compartment *compartment,
     vm_pointer_t stack);
-struct compartment *compartment_create(struct thread *td, u_long id,
-    bool usecache);
+struct compartment *compartment_create(struct thread *td,
+    elf_compartment_t elf_compartment, bool usecache);
+int compartment_init_thread(struct thread *td);
 void compartment_destroy(struct compartment *compartment);
 void compartment_trampoline_destroy(uintptr_t func);
+#ifdef KDTRACE_HOOKS
+void compartment_trampoline_toggle_entry_probe(
+    struct compartment_trampoline *trampoline, bool enabled);
+void compartment_trampoline_toggle_return_probe(
+    struct compartment_trampoline *trampoline, bool enabled);
+#endif
+elf_compartment_t compartment_trampoline_get_elf_compartment(
+    struct compartment_trampoline *trampoline);
+ptraddr_t compartment_trampoline_get_target_address(
+    struct compartment_trampoline *trampoline);
 void *compartment_entry_for_kernel(uintptr_t func);
 void *compartment_entry(uintptr_t func);
-void *executive_get_function(uintptr_t func);
+void *compartment_target(uintptr_t func);
 
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_COMPARTMENT);

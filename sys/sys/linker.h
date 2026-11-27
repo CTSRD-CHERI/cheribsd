@@ -65,6 +65,9 @@ typedef struct elf_compartment *elf_compartment_t;
 typedef caddr_t linker_sym_t;		/* opaque symbol */
 typedef c_caddr_t c_linker_sym_t;	/* const opaque symbol */
 typedef int (*linker_function_name_callback_t)(const char *, void *);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+typedef int (*linker_compartment_callback_t)(elf_compartment_t, void *);
+#endif
 
 /*
  * expanded out linker_sym_t
@@ -217,12 +220,6 @@ int linker_ddb_search_symbol(ptraddr_t _value, c_linker_sym_t *_sym,
 int linker_ddb_symbol_values(c_linker_sym_t _sym, linker_symval_t *_symval);
 int linker_ddb_search_symbol_name(ptraddr_t value, char *buf, u_int buflen,
 				  long *offset);
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-unsigned int elf_compartments_kinfo_count(linker_file_t lf);
-ssize_t elf_compartments_kinfo_out(linker_file_t lf, struct sysctl_req *req);
-void elf_ddb_kldstat_compartments(linker_file_t lf);
-void elf_ddb_show_compartment_symbols(elf_compartment_t ec);
-#endif
 
 /*
  * stack(9) helper for situations where kernel locking is required.
@@ -352,16 +349,22 @@ int	elf_reloc(linker_file_t _lf, char *base, const void *_rel, int _type,
 	    elf_lookup_fn _lu);
 int	elf_reloc_local(linker_file_t _lf, char *base, const void *_rel,
 	    int _type, elf_lookup_fn _lu);
-bool	elf_compartment_isdefault(linker_file_t lf, uintcap_t ptr);
-void	elf_compartment_entry(linker_file_t lf, uintcap_t ptr, u_long *idp,
-	    uintptr_t *ptrp);
 Elf_Addr elf_relocaddr(linker_file_t _lf, Elf_Addr addr);
-bool	elf_is_preloaded(linker_file_t lf);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-void	link_elf_linkup_compartments(linker_file_t lf,
+/*
+ * Compartmentalization-related functions only for use by the compartment API
+ * and the MD code.
+ */
+bool	elf_compartment_isdefault(linker_file_t lf, uintcap_t ptr);
+uintptr_t elf_compartment_entry(linker_file_t lf, uintcap_t ptr,
+	    elf_compartment_t *dstelf_compartmentp);
+void	elf_linkup_compartments(linker_file_t lf,
 	    struct compartment *compartments, size_t ncompartments,
 	    struct thread *td);
-int	link_elf_create_compartments(linker_file_t lf, struct thread *td);
+struct	compartment_trampoline_tree *elf_compartment_trampolines(
+	    linker_file_t file);
+int	elf_create_compartments(linker_file_t lf, struct thread *td);
+void	elf_ddb_show_compartment_symbols(elf_compartment_t ec);
 #endif
 void	link_elf_ireloc(void);
 

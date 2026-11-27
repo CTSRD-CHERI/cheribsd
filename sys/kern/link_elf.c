@@ -131,24 +131,6 @@ struct elf_plt {
 	int		pltrelasize;	/* DT_PLTRELSZ */
 };
 
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-struct elf_pcc {
-	bool		assigned;
-	caddr_t		pcc;
-};
-
-struct elf_compartment {
-	u_long		 id;
-	const char	*filename;
-	const char	*name;
-	Elf_Addr	 start;
-	Elf_Addr	 end;
-	elf_pcc_t	 pcc;
-	struct elf_file	*file;
-	elf_plt_t	 plt;
-};
-#endif
-
 struct elf_file {
 	struct linker_file lf __subobject_member_used_for_c_inheritance; /* Common fields */
 	int		preloaded;	/* Was file pre-loaded */
@@ -211,6 +193,7 @@ struct elf_file {
 	struct elf_compartment defcompartment;
 	unsigned int	ncompartments;
 	struct elf_compartment *compartments;
+	struct compartment_trampoline_tree compartment_trampolines;
 #endif
 };
 
@@ -268,8 +251,9 @@ static long	link_elf_strtab_get(linker_file_t, caddr_t *);
 #ifdef VIMAGE
 static void	link_elf_propagate_vnets(linker_file_t);
 #endif
-static unsigned long elf_plt_count(elf_file_t ef);
-static void	elf_plt_create(elf_file_t ef);
+static unsigned long link_elf_plt_count(elf_file_t ef);
+static void	link_elf_plt_create(elf_file_t ef);
+
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 static bool	link_elf_init_compartments(linker_file_t lf,
 		    const Elf_Phdr *phtable, const Elf_Phdr *phlimit,
@@ -280,12 +264,17 @@ static bool	link_elf_init_pccs(linker_file_t lf, const Elf_Phdr *phtable,
 		    const Elf_Phdr *phlimit);
 static bool	link_elf_load_pccs(linker_file_t lf, const Elf_Phdr *phtable,
 		    const Elf_Phdr *phlimit);
-static void	elf_compartment_init(elf_compartment_t ec, elf_file_t ef,
+static void	link_elf_compartment_init(elf_compartment_t ec, elf_file_t ef,
 		    u_long id, const char *filename, const char *c18nname,
 		    caddr_t address, size_t size, elf_pcc_t pcc, elf_plt_t plt);
-static int	elf_compartment_init_default(elf_file_t ef, u_long id,
+static int	link_elf_compartment_init_default(elf_file_t ef, u_long id,
 		    const char *filename, caddr_t address, size_t size);
-static bool	elf_pcc_init(elf_pcc_t pcc, caddr_t base, size_t length);
+static bool	link_elf_pcc_init(elf_pcc_t pcc, caddr_t base, size_t length);
+static int	link_elf_each_compartment(linker_file_t,
+		  linker_compartment_callback_t, void *);
+static struct compartment_trampoline_tree *link_elf_compartment_trampolines(
+		    linker_file_t file);
+static void	link_elf_ddb_kldstat_compartments(linker_file_t lf);
 #endif
 static int	elf_lookup(linker_file_t, Elf_Size, int, uintptr_t *);
 
@@ -309,6 +298,13 @@ static kobj_method_t link_elf_methods[] = {
 	KOBJMETHOD(linker_strtab_get,		link_elf_strtab_get),
 #ifdef VIMAGE
 	KOBJMETHOD(linker_propagate_vnets,	link_elf_propagate_vnets),
+#endif
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	KOBJMETHOD(linker_each_compartment,	link_elf_each_compartment),
+	KOBJMETHOD(linker_compartment_trampolines, link_elf_compartment_trampolines),
+#ifdef DDB
+	KOBJMETHOD(linker_ddb_kldstat_compartments, link_elf_ddb_kldstat_compartments),
+#endif
 #endif
 	KOBJMETHOD_END
 };
@@ -518,16 +514,34 @@ ef_address(elf_file_t ef, ptraddr_t offset)
  * its permissions and bounds.
  */
 static caddr_t
-make_capability(const Elf_Sym *sym, caddr_t val)
+make_capability(elf_file_t ef, const Elf_Sym *sym, caddr_t val)
 {
 	switch (ELF_ST_TYPE(sym->st_info)) {
 	case STT_FUNC:
 	case STT_GNU_IFUNC:
-		val = cheri_perms_and(val, CHERI_PERMS_KERNEL_CODE);
+		val = cheri_perms_and(val,
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+		    CHERI_PERMS_KERNEL_EXECUTIVE_CODE
+#else
+		    CHERI_PERMS_KERNEL_CODE
+#endif
+		    );
 #ifdef CHERI_FLAGS_CAP_MODE
 		val = cheri_flags_set(val, CHERI_FLAGS_CAP_MODE);
 #endif
 		val = cheri_sentry_create(val);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+		if (ef == (elf_file_t)linker_kernel_file) {
+			/*
+			 * Call a kernel-specific variant because
+			 * linker_kernel_file might not exist yet.
+			 */
+			val = (caddr_t)
+			    compartment_entry_for_kernel((uintptr_t)val);
+		} else {
+			val = (caddr_t)compartment_entry((uintptr_t)val);
+		}
+#endif
 		break;
 	default:
 		val = cheri_bounds_set(val, sym->st_size);
@@ -577,7 +591,7 @@ ef_symbol_address(elf_file_t ef, const Elf_Sym *sym)
 	}
 
 	val = cheri_address_set(base, (ptraddr_t)ef->address + sym->st_value);
-	return (make_capability(sym, val));
+	return (make_capability(ef, sym, val));
 #else
 	return (ef_address(ef, sym->st_value));
 #endif
@@ -810,7 +824,7 @@ elf_init(void *relocbase, ptraddr_t baseend, caddr_t mdp __unused)
 	ef->object = NULL;
 #endif
 	ef->dynamic = dynp;
-	ef->nplts = elf_plt_count(ef);
+	ef->nplts = link_elf_plt_count(ef);
 	if (ef->nplts > KERNEL_MAXPLTS)
 		error = ENOEXEC;
 	ef->plts = plts;
@@ -868,8 +882,8 @@ elf_init(void *relocbase, ptraddr_t baseend, caddr_t mdp __unused)
 		}
 	}
 	if (error == 0) {
-		error = elf_compartment_init_default(ef, COMPARTMENT_KERNEL_ID,
-		    NULL, ef->address,
+		error = link_elf_compartment_init_default(ef,
+		    COMPARTMENT_FIRST_ID, NULL, ef->address,
 #ifdef RELOCATABLE_KERNEL
 		    -(intptr_t)ef->address
 #else
@@ -877,6 +891,7 @@ elf_init(void *relocbase, ptraddr_t baseend, caddr_t mdp __unused)
 #endif
 		    );
 	}
+	compartment_trampoline_tree_init(&ef->compartment_trampolines);
 #endif
 	if (error != 0) {
 		panic("%s: Can't initialize the kernel ELF file", __func__);
@@ -924,11 +939,8 @@ link_elf_init(void* arg)
 	elf_file_t ef;
 	const char *modname;
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-#ifdef CHERI_COMPARTMENT_STATS
-	struct compartment *compartment;
-#endif
 	elf_compartment_t ec;
-	unsigned int compartmentii;
+	unsigned int ii;
 #endif
 
 	linker_file_register(linker_kernel_file, &link_elf_class);
@@ -943,30 +955,10 @@ link_elf_init(void* arg)
 	ec->filename = elf_kernel_filename;
 	ec->name = elf_kernel_defname;
 
-#ifdef CHERI_COMPARTMENT_STATS
-	compartment_metadata_create(ec->id, ec->name,
-	    cheri_setaddress((uintcap_t)ec->pcc, (ptraddr_t)ec->start),
-	    ec);
-#endif
-	for (compartmentii = 0; compartmentii < elf_kernel_file.ncompartments;
-	    compartmentii++) {
-		ec = &elf_kernel_file.compartments[compartmentii];
+	for (ii = 0; ii < elf_kernel_file.ncompartments; ii++) {
+		ec = &elf_kernel_file.compartments[ii];
 		ec->filename = elf_kernel_filename;
-#ifdef CHERI_COMPARTMENT_STATS
-		compartment_metadata_create(ec->id, ec->name,
-		    cheri_setaddress((uintcap_t)ec->pcc, (ptraddr_t)ec->start),
-		    ec);
-#endif
 	}
-#ifdef CHERI_COMPARTMENT_STATS
-	for (compartmentii = 0; compartmentii <= thread0.td_compartments_maxid;
-	    compartmentii++) {
-		compartment = thread0.td_compartments[compartmentii];
-		if (compartment == NULL)
-			continue;
-		compartment_metadata_insert(compartment);
-	}
-#endif
 #endif /* CHERI_COMPARTMENTALIZE_KERNEL */
 
 	modname = NULL;
@@ -1543,7 +1535,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	link_elf_locate_exidx_preload(lf, modptr);
 #endif
 
-	elf_plt_create(ef);
+	link_elf_plt_create(ef);
 	error = parse_dynamic(ef);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	phtable = preload_search_phdrs(ef, &phnum, modptr);
@@ -1579,7 +1571,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 		}
 	}
 	if (error == 0) {
-		error = elf_compartment_init_default(ef, 0, filename,
+		error = link_elf_compartment_init_default(ef, 0, filename,
 		    ef->address, *(size_t *)sizeptr);
 	}
 #endif
@@ -1696,7 +1688,8 @@ link_elf_init_compartments(linker_file_t lf, const Elf_Phdr *phtable,
 			} else {
 				plt = NULL;
 			}
-			elf_compartment_init(&ef->compartments[compartmentii],
+			link_elf_compartment_init(
+			    &ef->compartments[compartmentii],
 			    ef, (lastidp == NULL) ? 0 : ++lastid, lf->filename,
 			    ef->c18nstrtab + phdr->p_paddr,
 			    ef->address + phdr->p_vaddr, phdr->p_memsz, pcc,
@@ -1727,7 +1720,7 @@ link_elf_load_compartments(linker_file_t lf, const Elf_Phdr *phtable,
 }
 
 void
-link_elf_linkup_compartments(linker_file_t lf, struct compartment *compartments,
+elf_linkup_compartments(linker_file_t lf, struct compartment *compartments,
     size_t ncompartments, struct thread *td)
 {
 	elf_file_t ef;
@@ -1735,7 +1728,7 @@ link_elf_linkup_compartments(linker_file_t lf, struct compartment *compartments,
 	unsigned int compartmentii;
 
 	ef = (elf_file_t)lf;
-	if (ef->ncompartments > ncompartments + 1) {
+	if (ef->ncompartments + 1 /* default */ > ncompartments) {
 		panic("%s: too many compartments defined in the file",
 		    __func__);
 	}
@@ -1743,14 +1736,14 @@ link_elf_linkup_compartments(linker_file_t lf, struct compartment *compartments,
 	for (compartmentii = 0; compartmentii < ef->ncompartments;
 	    compartmentii++) {
 		ec = &ef->compartments[compartmentii];
-		compartment_linkup(&compartments[compartmentii], ec->id, td);
+		compartment_linkup(&compartments[compartmentii], ec, td);
 	}
 	ec = &ef->defcompartment;
-	compartment_linkup(&compartments[compartmentii], ec->id, td);
+	compartment_linkup(&compartments[compartmentii], ec, td);
 }
 
 int
-link_elf_create_compartments(linker_file_t lf, struct thread *td)
+elf_create_compartments(linker_file_t lf, struct thread *td)
 {
 	elf_file_t ef;
 	elf_compartment_t ec;
@@ -1760,11 +1753,11 @@ link_elf_create_compartments(linker_file_t lf, struct thread *td)
 	for (compartmentii = 0; compartmentii < ef->ncompartments;
 	    compartmentii++) {
 		ec = &ef->compartments[compartmentii];
-		if (compartment_create(td, ec->id, false) == NULL)
+		if (compartment_create(td, ec, false) == NULL)
 			return (0);
 	}
 	ec = &ef->defcompartment;
-	if (compartment_create(td, ec->id, false) == NULL)
+	if (compartment_create(td, ec, false) == NULL)
 		return (0);
 	return (1);
 }
@@ -1783,7 +1776,7 @@ link_elf_init_pccs(linker_file_t lf, const Elf_Phdr *phtable,
 	for (phdr = phtable; phdr < phlimit; phdr++) {
 		switch (phdr->p_type) {
 		case PT_CHERI_PCC:
-			if (!elf_pcc_init(&ef->pccs[pccii], ef->address +
+			if (!link_elf_pcc_init(&ef->pccs[pccii], ef->address +
 			    phdr->p_vaddr, phdr->p_memsz)) {
 				return (false);
 			}
@@ -2122,7 +2115,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	lf->address = ef->address;
 	lf->size = mapsize;
 
-	elf_plt_create(ef);
+	link_elf_plt_create(ef);
 	error = parse_dynamic(ef);
 	if (error != 0)
 		goto out;
@@ -2147,7 +2140,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 			goto out;
 		}
 	}
-	if (elf_compartment_init_default(ef, 0, lf->filename, ef->address,
+	if (link_elf_compartment_init_default(ef, 0, lf->filename, ef->address,
 	    mapsize) != 0) {
 		error = ENOEXEC;
 		goto out;
@@ -2311,9 +2304,9 @@ elf_compartment_isdefault(linker_file_t lf, uintcap_t ptr)
 	    (ptraddr_t)ptr < ef->defcompartment.end);
 }
 
-void
-elf_compartment_entry(linker_file_t lf, uintcap_t ptr, u_long *idp,
-    uintptr_t *ptrp)
+uintptr_t
+elf_compartment_entry(linker_file_t lf, uintcap_t ptr,
+    elf_compartment_t *dstelf_compartmentp)
 {
 	elf_file_t ef;
 	elf_compartment_t ec;
@@ -2336,17 +2329,52 @@ elf_compartment_entry(linker_file_t lf, uintcap_t ptr, u_long *idp,
 			ec = &ef->defcompartment;
 		}
 	}
-	KASSERT(ec != NULL,
-	    ("elf_compartment_entry: unexpected pointer %p", (void *)ptr));
+	if (ec == NULL)
+		return (0);
 
-	*idp = ec->id;
+	*dstelf_compartmentp = ec;
 	cap = cheri_setaddress((uintcap_t)ec->pcc->pcc, ptr);
 	cap = cheri_andperm(cap, cheri_getperm(ptr));
 	cap = cheri_flags_set(cap, cheri_flags_get(ptr));
 	cap = cheri_sealentry(cap);
-	*ptrp = (uintptr_t)cap;
+	return ((uintptr_t)cap);
 }
-#endif
+
+struct compartment_trampoline_tree *
+elf_compartment_trampolines(linker_file_t file)
+{
+	elf_file_t ef = (elf_file_t)file;
+
+	return (&ef->compartment_trampolines);
+}
+
+static int
+link_elf_each_compartment(linker_file_t file,
+  int (*callback)(elf_compartment_t, void *), void *opaque)
+{
+	elf_file_t ef;
+	elf_compartment_t ec;
+	unsigned int compartmentii;
+	int error;
+
+	ef = (elf_file_t)file;
+	for (compartmentii = 0; compartmentii < ef->ncompartments;
+	    compartmentii++) {
+		ec = &ef->compartments[compartmentii];
+		error = callback(ec, opaque);
+		if (error != 0)
+			return (error);
+	}
+	ec = &ef->defcompartment;
+	return (callback(ec, opaque));
+}
+
+static struct compartment_trampoline_tree *
+link_elf_compartment_trampolines(linker_file_t file)
+{
+	return (elf_compartment_trampolines(file));
+}
+#endif /* CHERI_COMPARTMENTALIZE_KERNEL */
 
 Elf_Addr
 elf_relocaddr(linker_file_t lf, Elf_Addr x)
@@ -2364,15 +2392,6 @@ elf_relocaddr(linker_file_t lf, Elf_Addr x)
 		return ((x - (Elf_Addr)ef->vnet_start) + (Elf_Addr)ef->vnet_base);
 #endif
 	return (x);
-}
-
-bool
-elf_is_preloaded(linker_file_t lf)
-{
-	elf_file_t ef;
-
-	ef = (elf_file_t)lf;
-	return (ef->preloaded);
 }
 
 static void
@@ -2408,6 +2427,7 @@ link_elf_unload_file(linker_file_t file)
 	elf_cpu_unload_file(file);
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	compartment_trampoline_tree_remove_all(&ef->compartment_trampolines);
 	free(ef->compartments, M_LINKER);
 	free(ef->pccs, M_LINKER);
 #endif
@@ -2957,14 +2977,14 @@ elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, uintptr_t *res)
 	if (elf_set_find(&set_pcpu_list, addr, &start, &base)) {
 		addr = (ptraddr_t)addr - (ptraddr_t)start + base;
 #ifdef __CHERI_PURE_CAPABILITY__
-		addr = make_capability(sym, addr);
+		addr = make_capability(ef, sym, addr);
 #endif
 	}
 #ifdef VIMAGE
 	else if (elf_set_find(&set_vnet_list, addr, &start, &base)) {
 		addr = (ptraddr_t)addr - (ptraddr_t)start + base;
 #ifdef __CHERI_PURE_CAPABILITY__
-		addr = make_capability(sym, addr);
+		addr = make_capability(ef, sym, addr);
 #endif
 	}
 #endif
@@ -2973,7 +2993,7 @@ elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, uintptr_t *res)
 }
 
 static unsigned long
-elf_plt_count(elf_file_t ef)
+link_elf_plt_count(elf_file_t ef)
 {
 	Elf_Dyn *dp;
 	unsigned long jmprel, pltgot, pltrelsz;
@@ -2998,10 +3018,10 @@ elf_plt_count(elf_file_t ef)
 }
 
 static void
-elf_plt_create(elf_file_t ef)
+link_elf_plt_create(elf_file_t ef)
 {
 
-	ef->nplts = elf_plt_count(ef);
+	ef->nplts = link_elf_plt_count(ef);
 	/* TODO: Limit nplts. */
 	ef->plts = malloc(ef->nplts * sizeof(*ef->plts), M_LINKER,
 	    M_WAITOK | M_ZERO);
@@ -3009,7 +3029,7 @@ elf_plt_create(elf_file_t ef)
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 static void
-elf_compartment_init(elf_compartment_t ec, elf_file_t ef, u_long id,
+link_elf_compartment_init(elf_compartment_t ec, elf_file_t ef, u_long id,
     const char *filename, const char *c18nname, caddr_t address, size_t size,
     elf_pcc_t pcc, elf_plt_t plt)
 {
@@ -3030,8 +3050,8 @@ elf_compartment_init(elf_compartment_t ec, elf_file_t ef, u_long id,
 }
 
 static int
-elf_compartment_init_default(elf_file_t ef, u_long id, const char *filename,
-    caddr_t address, size_t size)
+link_elf_compartment_init_default(elf_file_t ef, u_long id,
+    const char *filename, caddr_t address, size_t size)
 {
 	elf_pcc_t defpcc;
 	elf_plt_t defplt;
@@ -3053,7 +3073,7 @@ elf_compartment_init_default(elf_file_t ef, u_long id, const char *filename,
 			defplt = &ef->plts[ii];
 		}
 	}
-	elf_compartment_init(&ef->defcompartment, ef, id, filename,
+	link_elf_compartment_init(&ef->defcompartment, ef, id, filename,
 	    elf_compartment_defname, address, size, defpcc, defplt);
 	if (defpcc != NULL)
 		defpcc->assigned = true;
@@ -3063,7 +3083,7 @@ elf_compartment_init_default(elf_file_t ef, u_long id, const char *filename,
 }
 
 static bool
-elf_pcc_init(elf_pcc_t pcc, caddr_t base, size_t length)
+link_elf_pcc_init(elf_pcc_t pcc, caddr_t base, size_t length)
 {
 	caddr_t cap;
 
@@ -3076,25 +3096,25 @@ elf_pcc_init(elf_pcc_t pcc, caddr_t base, size_t length)
 	return (true);
 }
 
-unsigned int
-elf_compartments_kinfo_count(linker_file_t lf)
+static int
+elf_compartments_kinfo_count(linker_file_t lf, void *arg)
 {
-	elf_file_t ef;
+	elf_file_t ef = (elf_file_t)lf;
+	unsigned int *count = arg;
 
-	ef = (elf_file_t)lf;
-	return (1 /* default */ + ef->ncompartments);
+	*count += 1 /* default */ + ef->ncompartments;
+	return (0);
 }
 
 static ssize_t
 elf_compartment_kinfo_out(linker_file_t lf, elf_compartment_t ec,
     struct sysctl_req *req)
 {
-	elf_file_t ef;
+	elf_file_t ef = (elf_file_t)lf;
 	struct kinfo_cheri_kc18n_compart kckc;
 	ssize_t len;
 	int error;
 
-	ef = (elf_file_t)lf;
 	bzero(&kckc, sizeof(kckc));
 
 	kckc.kckc_executive = 0;
@@ -3122,15 +3142,15 @@ elf_compartment_kinfo_out(linker_file_t lf, elf_compartment_t ec,
 	return (0);
 }
 
-ssize_t
-elf_compartments_kinfo_out(linker_file_t lf, struct sysctl_req *req)
+static int
+elf_compartments_kinfo_out(linker_file_t lf, void *arg)
 {
-	elf_file_t ef;
+	elf_file_t ef = (elf_file_t)lf;
+	struct sysctl_req *req = arg;
 	elf_compartment_t ec;
 	unsigned int ii;
 	int error;
 
-	ef = (elf_file_t)lf;
 	ec = &ef->defcompartment;
 	error = elf_compartment_kinfo_out(lf, ec, req);
 	if (error != 0)
@@ -3144,9 +3164,39 @@ elf_compartments_kinfo_out(linker_file_t lf, struct sysctl_req *req)
 	return (0);
 }
 
+static int
+sysctl_kern_kc18n_compartments(SYSCTL_HANDLER_ARGS)
+{
+	unsigned int ncompartments;
+	int error;
+
+	/*
+	 * If the old pointer is NULL, output the number of compartments.
+	 */
+	if (req->oldptr == NULL) {
+		ncompartments = 0;
+		error = linker_file_foreach(elf_compartments_kinfo_count,
+		    &ncompartments);
+		if (error != 0)
+			goto out;
+		error = SYSCTL_OUT(req, NULL, ncompartments *
+		    sizeof(struct kinfo_cheri_kc18n_compart));
+		goto out;
+	}
+
+	error = linker_file_foreach(elf_compartments_kinfo_out, req);
+
+out:
+	return (error);
+}
+
+static SYSCTL_NODE(_kern, KERN_KC18N_COMPARTS, kc18n_compartments,
+	CTLFLAG_RD | CTLFLAG_MPSAFE, sysctl_kern_kc18n_compartments,
+	"Kernel compartment list");
+
 #ifdef DDB
-void
-elf_ddb_kldstat_compartments(linker_file_t lf)
+static void
+link_elf_ddb_kldstat_compartments(linker_file_t lf)
 {
 	elf_file_t ef;
 	elf_compartment_t ec;

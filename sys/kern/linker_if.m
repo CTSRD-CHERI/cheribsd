@@ -186,6 +186,33 @@ METHOD void propagate_vnets {
 	linker_file_t	file;
 };
 #endif
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#
+# Call the callback with each specified compartment in the file.
+# Stop and return the error if the callback returns an error.
+#
+METHOD int each_compartment {
+	linker_file_t	file;
+	linker_compartment_callback_t	callback;
+	void*		opaque;
+};
+
+#
+# Get the compartment trampolines used by kernel-c18n for functions in the file.
+#
+METHOD struct compartment_trampoline_tree* compartment_trampolines {
+	linker_file_t	file;
+};
+
+#
+# Print information on ELF compartments in the file as part of the kldstat
+# ddb(4) command.
+#
+METHOD void ddb_kldstat_compartments {
+	linker_file_t	file;
+};
+#endif
 # CHERI CHANGES START
 # {
 #   "updated": 20230509,
