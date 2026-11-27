@@ -684,40 +684,54 @@ pop_stk_table(_Atomic(struct stk_table *) *head)
 }
 
 static struct stk_table *
-expand_stk_table(struct stk_table *table, size_t capacity)
+expand_stk_table(struct stk_table *old, size_t capacity)
 {
-	size_t o_capacity;
-	bool create = table == NULL;
+	struct stk_table *table;
+	size_t old_capacity = 0;
 
-	table = c18n_realloc(table,
-	    sizeof(*table) + sizeof(*table->entries) * capacity);
+	table = c18n_malloc(sizeof(*table) +
+	    sizeof(*table->entries) * capacity);
 
-	if (create)
-		table->meta = NULL;
+	/*
+	 * Trampolines check the capability bounds, which may round up.
+	 * Initialize every complete slot they can address.
+	 */
+	capacity = cheri_length_get(table) - cheri_offset_get(table);
+	capacity -= offsetof(typeof(*table), entries);
+	capacity /= sizeof(*table->entries);
 
-	table->meta = c18n_realloc(table->meta,
-	    sizeof(*table->meta) +
+	table->resolver = create_untrusted_stk;
+	table->meta = c18n_malloc(sizeof(*table->meta) +
 	    sizeof(*table->meta->compart_stk) * capacity);
-	if (table->meta == NULL)
-		rtld_fatal("realloc failed");
 
-	if (create) {
-		table->resolver = create_untrusted_stk;
+	if (old != NULL) {
+		old_capacity = old->meta->capacity;
+		rtld_require(old_capacity <= capacity,
+		    "c18n: Unexpected stack table capacity");
+		memcpy(table->meta, old->meta, sizeof(*old->meta) +
+		    sizeof(*old->meta->compart_stk) * old_capacity);
+		memcpy(table->entries, old->entries,
+		    sizeof(*old->entries) * old_capacity);
+	} else {
 		table->meta->wrap = NULL;
 		table->meta->trusted_stk = (struct stk_table_stk_info) {};
-		o_capacity = 0;
-	} else
-		o_capacity = table->meta->capacity;
+	}
+	table->meta->capacity = capacity;
 
-	table->meta->capacity =
-	    (cheri_length_get(table) - offsetof(typeof(*table), entries)) /
-	    sizeof(*table->entries);
-
-	for (size_t i = o_capacity; i < table->meta->capacity; ++i) {
+	for (size_t i = old_capacity; i < capacity; ++i) {
 		table->meta->compart_stk[i] = (struct stk_table_stk_info) {};
 		table->entries[i] = (struct stk_table_entry) {
 			.stack = create_untrusted_stk,
 		};
+	}
+
+	/*
+	 * Publish the new table before freeing the old one.
+	 */
+	if (old != NULL) {
+		set_stk_table(table);
+		c18n_free(old->meta);
+		c18n_free(old);
 	}
 
 	return (table);
@@ -879,7 +893,6 @@ get_or_create_untrusted_stk(compart_id_t cid, struct stk_table **tablep)
 		wlock_acquire(rtld_bind_lock, &lockstate);
 		*tablep = table = expand_stk_table(table, comparts.size);
 		lock_release(rtld_bind_lock, &lockstate);
-		set_stk_table(table);
 	} else if (table->meta->compart_stk[cid].size > 0)
 		return (table->entries[cid].stack);
 
