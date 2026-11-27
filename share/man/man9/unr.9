@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd April 21, 2022
+.Dd November 27, 2026
 .Dt UNR 9
 .Os
 .Sh NAME
@@ -41,6 +41,8 @@
 .In sys/systm.h
 .Ft "struct unrhdr *"
 .Fn new_unrhdr "int low" "int high" "struct mtx *mutex"
+.Ft void
+.Fn copy_unrhdr "struct unrhdr *src" "struct unrhdr *dst" "struct mtx *mutex"
 .Ft void
 .Fn clean_unrhdr "struct unrhdr *uh"
 .Ft void
@@ -64,7 +66,7 @@
 .Ft void
 .Fn free_iter_unr "void *handle"
 .Sh DESCRIPTION
-The kernel unit number allocator is a generic facility, which allows to allocate
+The kernel unit number allocator is a generic facility, which allocates
 unit numbers within a specified range.
 .Bl -tag -width indent
 .It Fn new_unrhdr low high mutex
@@ -88,6 +90,14 @@ If the passed value is the token
 .Va UNR_NO_MTX ,
 then no locking is applied internally.
 Otherwise, internal mutex is used.
+.It Fn copy_unrhdr src dst mutex
+Copy the allocated units in the unit number allocator entity pointed to by
+.Fa src
+to a previously allocated unit number allocator entity pointed to by
+.Fa dst .
+The unit number allocator entity pointed to by
+.Fa dst
+should not have any unit numbers allocated or memory may be leaked.
 .It Fn clear_unrhdr uh
 Clear all units from the specified unit number allocator entity.
 This function resets the entity as if it were just initialized with
@@ -187,5 +197,5 @@ Kernel unit number allocator first appeared in
 .An -nosplit
 Kernel unit number allocator was written by
 .An Poul-Henning Kamp .
-This manpage was written by
+This manual page was written by
 .An Gleb Smirnoff .

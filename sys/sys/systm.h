@@ -607,6 +607,7 @@ struct unrhdr;
 #define	UNR_NO_MTX	((void *)(uintptr_t)-1)
 struct unrhdr *new_unrhdr(int low, int high, struct mtx *mutex);
 void init_unrhdr(struct unrhdr *uh, int low, int high, struct mtx *mutex);
+void copy_unhdr(struct unrhdr *src, struct unrhdr *dst, struct mtx *mutex);
 void delete_unrhdr(struct unrhdr *uh);
 void clear_unrhdr(struct unrhdr *uh);
 void clean_unrhdr(struct unrhdr *uh);

@@ -161,6 +161,8 @@ mtx_assert(struct mtx *mp, int flag)
 #define CTASSERT(foo)
 #define WITNESS_WARN(flags, lock, fmt, ...)	(void)0
 
+int alloc_unr_specific(struct unrhdr *uh, u_int item);
+
 #endif /* USERLAND */
 
 /*
@@ -524,6 +526,21 @@ clear_unrhdr(struct unrhdr *uh)
 	init_unrhdr(uh, uh->low, uh->high, uh->mtx);
 
 	check_unrhdr(uh, __LINE__);
+}
+
+void
+copy_unhdr(struct unrhdr *src, struct unrhdr *dst, struct mtx *mutex)
+{
+	int v;
+	void *iter;
+
+	/* Might we want a UNR_SHARE_MTX? */
+	init_unrhdr(dst, src->low, src->high, mutex);
+
+	iter = create_iter_unr(src);
+	while ((v = next_iter_unr(iter)) != -1)
+		alloc_unr_specific(dst, v);
+	free_iter_unr(iter);
 }
 
 /*
