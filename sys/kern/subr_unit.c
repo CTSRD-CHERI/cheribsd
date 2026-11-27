@@ -288,6 +288,11 @@ next_iter_unrl(struct unrhdr *uh, struct unrhdr_iter *iter)
 	}
 
 	for (;;) {
+		if (up == NULL) {
+			iter->ipos = -1;
+			iter->upos = uh;
+			return;
+		}
 		if (y + 1 < iter->upos_first_item + up->len) {
 			if (up->ptr == uh) {
 				iter->ipos = y + 1;
@@ -306,11 +311,6 @@ next_iter_unrl(struct unrhdr *uh, struct unrhdr_iter *iter)
 		iter->upos_first_item += up->len;
 		y = iter->upos_first_item - 1;
 		up = iter->upos = TAILQ_NEXT((struct unr *)iter->upos, list);
-		if (iter->upos == NULL) {
-			iter->ipos = -1;
-			iter->upos = uh;
-			return;
-		}
 	}
 }
 
