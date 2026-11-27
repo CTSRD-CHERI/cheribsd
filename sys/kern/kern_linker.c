@@ -1569,7 +1569,7 @@ DB_COMMAND_FLAGS(kldstat, db_kldstat, DB_CMD_MEMSAFE)
 		db_printf("%2d %4d 0x%-16lx 0x%-16zx %s\n", lf->id, lf->refs,
 		    (ptraddr_t)lf->address, lf->size, lf->filename);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-		elf_ddb_kldstat_compartments(lf);
+		LINKER_DDB_KLDSTAT_COMPARTMENTS(lf);
 #endif
 	}
 }

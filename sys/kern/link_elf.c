@@ -274,6 +274,7 @@ static int	link_elf_each_compartment(linker_file_t,
 		  linker_compartment_callback_t, void *);
 static struct compartment_trampoline_tree *link_elf_compartment_trampolines(
 		    linker_file_t file);
+static void	link_elf_ddb_kldstat_compartments(linker_file_t lf);
 #endif
 static int	elf_lookup(linker_file_t, Elf_Size, int, uintptr_t *);
 
@@ -301,6 +302,9 @@ static kobj_method_t link_elf_methods[] = {
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	KOBJMETHOD(linker_each_compartment,	link_elf_each_compartment),
 	KOBJMETHOD(linker_compartment_trampolines, link_elf_compartment_trampolines),
+#ifdef DDB
+	KOBJMETHOD(linker_ddb_kldstat_compartments, link_elf_ddb_kldstat_compartments),
+#endif
 #endif
 	KOBJMETHOD_END
 };
@@ -3160,8 +3164,8 @@ elf_compartments_kinfo_out(linker_file_t lf, struct sysctl_req *req)
 }
 
 #ifdef DDB
-void
-elf_ddb_kldstat_compartments(linker_file_t lf)
+static void
+link_elf_ddb_kldstat_compartments(linker_file_t lf)
 {
 	elf_file_t ef;
 	elf_compartment_t ec;

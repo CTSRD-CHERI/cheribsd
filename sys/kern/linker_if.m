@@ -204,6 +204,14 @@ METHOD int each_compartment {
 METHOD struct compartment_trampoline_tree* compartment_trampolines {
 	linker_file_t	file;
 };
+
+#
+# Print information on ELF compartments in the file as part of the kldstat
+# ddb(4) command.
+#
+METHOD void ddb_kldstat_compartments {
+	linker_file_t	file;
+};
 #endif
 # CHERI CHANGES START
 # {
