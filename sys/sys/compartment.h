@@ -135,6 +135,7 @@ void compartment_init_stack(struct compartment *compartment,
     vm_pointer_t stack);
 struct compartment *compartment_create(struct thread *td,
     elf_compartment_t elf_compartment, bool usecache);
+int compartment_init_thread(struct thread *td);
 void compartment_destroy(struct compartment *compartment);
 void compartment_trampoline_destroy(uintptr_t func);
 #ifdef KDTRACE_HOOKS

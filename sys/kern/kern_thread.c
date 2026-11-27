@@ -884,7 +884,7 @@ thread_alloc_compartments(struct thread *td)
 	    ("thread_alloc_compartments called on a thread with existing compartments"));
 
 	thread_expand_compartments(td);
-	return (link_elf_create_compartments(linker_kernel_file, td));
+	return (compartment_init_thread(td));
 }
 
 void

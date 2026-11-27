@@ -355,16 +355,21 @@ int	elf_reloc(linker_file_t _lf, char *base, const void *_rel, int _type,
 	    elf_lookup_fn _lu);
 int	elf_reloc_local(linker_file_t _lf, char *base, const void *_rel,
 	    int _type, elf_lookup_fn _lu);
-bool	elf_compartment_isdefault(linker_file_t lf, uintcap_t ptr);
-void	elf_compartment_entry(linker_file_t lf, uintcap_t ptr,
-	    elf_compartment_t *dstelf_compartmentp, uintptr_t *ptrp);
-struct compartment_trampoline_tree *elf_compartment_trampoline_tree(linker_file_t lf);
 Elf_Addr elf_relocaddr(linker_file_t _lf, Elf_Addr addr);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-void	link_elf_linkup_compartments(linker_file_t lf,
+/*
+ * Compartmentalization-related functions only for use by the compartment API
+ * and the MD code.
+ */
+bool	elf_compartment_isdefault(linker_file_t lf, uintcap_t ptr);
+uintptr_t elf_compartment_entry(linker_file_t lf, uintcap_t ptr,
+	    elf_compartment_t *dstelf_compartmentp);
+void	elf_linkup_compartments(linker_file_t lf,
 	    struct compartment *compartments, size_t ncompartments,
 	    struct thread *td);
-int	link_elf_create_compartments(linker_file_t lf, struct thread *td);
+struct	compartment_trampoline_tree *elf_compartment_trampolines(
+	    linker_file_t file);
+int	elf_create_compartments(linker_file_t lf, struct thread *td);
 #endif
 void	link_elf_ireloc(void);
 

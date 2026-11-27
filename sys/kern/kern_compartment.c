@@ -437,6 +437,12 @@ compartment_create(struct thread *td, elf_compartment_t elf_compartment,
 	return (compartment);
 }
 
+int
+compartment_init_thread(struct thread *td)
+{
+	return (elf_create_compartments(linker_kernel_file, td));
+}
+
 void
 compartment_destroy(struct compartment *compartment)
 {
@@ -516,8 +522,9 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	KASSERT(lf != NULL,
 	    ("%s: linker file cannot be NULL", __func__));
 
-	elf_compartment_entry(lf, func, &dstelf_compartment, &dstfunc);
-	tree = elf_compartment_trampoline_tree(lf);
+	dstfunc = elf_compartment_entry(lf, func, &dstelf_compartment);
+	KASSERT(dstfunc != 0, ("%s: invalid target function", __func__));
+	tree = elf_compartment_trampolines(lf);
 
 	tmptrampoline.ct_func = dstfunc;
 	oldtrampoline = RB_FIND(compartment_trampoline_tree, tree,

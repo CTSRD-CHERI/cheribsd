@@ -467,7 +467,7 @@ init_compartments0(vm_pointer_t compartments0_stacks,
 		compartment_init_stack(compartment, stack);
 	}
 	compartment_tree_init(&thread0.td_unhashed_compartments);
-	link_elf_linkup_compartments(linker_kernel_file, compartments0,
+	elf_linkup_compartments(linker_kernel_file, compartments0,
 	    KERNEL_MAXC18NS, &thread0);
 }
 #endif
