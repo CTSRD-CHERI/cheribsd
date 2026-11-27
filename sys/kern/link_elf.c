@@ -272,6 +272,8 @@ static int	link_elf_compartment_init_default(elf_file_t ef, u_long id,
 static bool	link_elf_pcc_init(elf_pcc_t pcc, caddr_t base, size_t length);
 static int	link_elf_each_compartment(linker_file_t,
 		  linker_compartment_callback_t, void *);
+static struct compartment_trampoline_tree *link_elf_compartment_trampolines(
+		    linker_file_t file);
 #endif
 static int	elf_lookup(linker_file_t, Elf_Size, int, uintptr_t *);
 
@@ -298,6 +300,7 @@ static kobj_method_t link_elf_methods[] = {
 #endif
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	KOBJMETHOD(linker_each_compartment,	link_elf_each_compartment),
+	KOBJMETHOD(linker_compartment_trampolines, link_elf_compartment_trampolines),
 #endif
 	KOBJMETHOD_END
 };
@@ -2361,7 +2364,13 @@ link_elf_each_compartment(linker_file_t file,
 	ec = &ef->defcompartment;
 	return (callback(ec, opaque));
 }
-#endif
+
+static struct compartment_trampoline_tree *
+link_elf_compartment_trampolines(linker_file_t file)
+{
+	return (elf_compartment_trampolines(file));
+}
+#endif /* CHERI_COMPARTMENTALIZE_KERNEL */
 
 Elf_Addr
 elf_relocaddr(linker_file_t lf, Elf_Addr x)

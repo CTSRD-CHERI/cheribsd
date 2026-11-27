@@ -197,6 +197,13 @@ METHOD int each_compartment {
 	linker_compartment_callback_t	callback;
 	void*		opaque;
 };
+
+#
+# Get the compartment trampolines used by kernel-c18n for functions in the file.
+#
+METHOD struct compartment_trampoline_tree* compartment_trampolines {
+	linker_file_t	file;
+};
 #endif
 # CHERI CHANGES START
 # {
